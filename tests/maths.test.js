@@ -2,7 +2,7 @@
 import { compare } from './test_utils.js';
 
 import { getFile } from '../src/utils/hub.js';
-import { FFT, medianFilter, bankers_round } from '../src/utils/maths.js';
+import { FFT, medianFilter, bankers_round, log_softmax } from '../src/utils/maths.js';
 
 
 const fft = (arr, complex = false) => {
@@ -135,5 +135,22 @@ describe('Mathematical operations', () => {
 
             });
         }
+    });
+
+    describe('log softmax', () => {
+        // Should match output of scipy log_softmax
+        it('should compute log softmax correctly for usual values', () => {
+            const input = [0, 1, 2, 3];
+            const expected = [-3.4401896985611953, -2.4401896985611953, -1.4401896985611953, -0.44018969856119533];
+            const output = log_softmax(input);
+            compare(output, expected, 1e-13);
+        });
+
+        it('should compute log softmax correctly for values with large differences', () => {
+            const input = [1000, 1];
+            const expected = [0, -999];
+            const output = log_softmax(input);
+            compare(output, expected, 1e-13);
+        });
     });
 });

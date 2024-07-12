@@ -3,29 +3,19 @@
 <p align="center">
     <br/>
     <picture> 
-        <source media="(prefers-color-scheme: dark)" srcset="https://huggingface.co/datasets/Xenova/transformers.js-docs/raw/main/transformersjs-dark.svg" width="500" style="max-width: 100%;">
-        <source media="(prefers-color-scheme: light)" srcset="https://huggingface.co/datasets/Xenova/transformers.js-docs/raw/main/transformersjs-light.svg" width="500" style="max-width: 100%;">
-        <img alt="transformers.js javascript library logo" src="https://huggingface.co/datasets/Xenova/transformers.js-docs/raw/main/transformersjs-light.svg" width="500" style="max-width: 100%;">
+        <source media="(prefers-color-scheme: dark)" srcset="https://github.com/xenova/transformers.js/assets/26504141/bd047e0f-aca9-4ff7-ba07-c7ca55442bc4" width="500" style="max-width: 100%;">
+        <source media="(prefers-color-scheme: light)" srcset="https://github.com/xenova/transformers.js/assets/26504141/84a5dc78-f4ea-43f4-96f2-b8c791f30a8e" width="500" style="max-width: 100%;">
+        <img alt="transformers.js javascript library logo" src="https://github.com/xenova/transformers.js/assets/26504141/84a5dc78-f4ea-43f4-96f2-b8c791f30a8e" width="500" style="max-width: 100%;">
     </picture>
     <br/>
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@xenova/transformers">
-        <img alt="NPM" src="https://img.shields.io/npm/v/@xenova/transformers">
-    </a>
-    <a href="https://www.npmjs.com/package/@xenova/transformers">
-        <img alt="NPM Downloads" src="https://img.shields.io/npm/dw/@xenova/transformers">
-    </a>
-    <a href="https://www.jsdelivr.com/package/npm/@xenova/transformers">
-        <img alt="jsDelivr Hits" src="https://img.shields.io/jsdelivr/npm/hw/@xenova/transformers">
-    </a>
-    <a href="https://github.com/xenova/transformers.js/blob/main/LICENSE">
-        <img alt="License" src="https://img.shields.io/github/license/xenova/transformers.js?color=blue">
-    </a>
-    <a href="https://huggingface.co/docs/transformers.js/index">
-        <img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online">
-    </a>
+    <a href="https://www.npmjs.com/package/@xenova/transformers"><img alt="NPM" src="https://img.shields.io/npm/v/@xenova/transformers"></a>
+    <a href="https://www.npmjs.com/package/@xenova/transformers"><img alt="NPM Downloads" src="https://img.shields.io/npm/dw/@xenova/transformers"></a>
+    <a href="https://www.jsdelivr.com/package/npm/@xenova/transformers"><img alt="jsDelivr Hits" src="https://img.shields.io/jsdelivr/npm/hw/@xenova/transformers"></a>
+    <a href="https://github.com/xenova/transformers.js/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/xenova/transformers.js?color=blue"></a>
+    <a href="https://huggingface.co/docs/transformers.js/index"><img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online"></a>
 </p>
 
 
@@ -260,7 +250,7 @@ You can refine your search by selecting the task you're interested in (e.g., [te
 
 | Task                     | ID | Description | Supported? |
 |--------------------------|----|-------------|------------|
-| [Reinforcement Learning](https://huggingface.co/tasks/reinforcement-learning)   |  n/a  | Learning from actions by interacting with an environment through trial and error and receiving rewards (negative or positive) as feedback. | ❌ |
+| [Reinforcement Learning](https://huggingface.co/tasks/reinforcement-learning)   |  n/a  | Learning from actions by interacting with an environment through trial and error and receiving rewards (negative or positive) as feedback. | ✅ |
 
 
 
@@ -286,6 +276,7 @@ You can refine your search by selecting the task you're interested in (e.g., [te
 1. **[ConvNeXTV2](https://huggingface.co/docs/transformers/model_doc/convnextv2)** (from Facebook AI) released with the paper [ConvNeXt V2: Co-designing and Scaling ConvNets with Masked Autoencoders](https://arxiv.org/abs/2301.00808) by Sanghyun Woo, Shoubhik Debnath, Ronghang Hu, Xinlei Chen, Zhuang Liu, In So Kweon, Saining Xie.
 1. **[DeBERTa](https://huggingface.co/docs/transformers/model_doc/deberta)** (from Microsoft) released with the paper [DeBERTa: Decoding-enhanced BERT with Disentangled Attention](https://arxiv.org/abs/2006.03654) by Pengcheng He, Xiaodong Liu, Jianfeng Gao, Weizhu Chen.
 1. **[DeBERTa-v2](https://huggingface.co/docs/transformers/model_doc/deberta-v2)** (from Microsoft) released with the paper [DeBERTa: Decoding-enhanced BERT with Disentangled Attention](https://arxiv.org/abs/2006.03654) by Pengcheng He, Xiaodong Liu, Jianfeng Gao, Weizhu Chen.
+1. **[Decision Transformer](https://huggingface.co/docs/transformers/model_doc/decision_transformer)** (from Berkeley/Facebook/Google) released with the paper [Decision Transformer: Reinforcement Learning via Sequence Modeling](https://arxiv.org/abs/2106.01345) by Lili Chen, Kevin Lu, Aravind Rajeswaran, Kimin Lee, Aditya Grover, Michael Laskin, Pieter Abbeel, Aravind Srinivas, Igor Mordatch.
 1. **[DeiT](https://huggingface.co/docs/transformers/model_doc/deit)** (from Facebook) released with the paper [Training data-efficient image transformers & distillation through attention](https://arxiv.org/abs/2012.12877) by Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre Sablayrolles, Hervé Jégou.
 1. **[Depth Anything](https://huggingface.co/docs/transformers/main/model_doc/depth_anything)** (from University of Hong Kong and TikTok) released with the paper [Depth Anything: Unleashing the Power of Large-Scale Unlabeled Data](https://arxiv.org/abs/2401.10891) by Lihe Yang, Bingyi Kang, Zilong Huang, Xiaogang Xu, Jiashi Feng, Hengshuang Zhao.
 1. **[DETR](https://huggingface.co/docs/transformers/model_doc/detr)** (from Facebook) released with the paper [End-to-End Object Detection with Transformers](https://arxiv.org/abs/2005.12872) by Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexander Kirillov, Sergey Zagoruyko.

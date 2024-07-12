@@ -158,11 +158,20 @@ export function softmax(arr) {
  * @returns {T} The resulting log_softmax array.
  */
 export function log_softmax(arr) {
-    // Compute the softmax values
-    const softmaxArr = softmax(arr);
+    // Compute the maximum value in the array
+    const maxVal = max(arr)[0];
 
-    // Apply log formula to each element
-    const logSoftmaxArr = softmaxArr.map(x => Math.log(x));
+    // Compute the sum of the exponentials
+    let sumExps = 0;
+    for(let i = 0; i < arr.length; ++i) {
+        sumExps += Math.exp(arr[i] - maxVal);
+    }
+
+    // Compute the log of the sum
+    const logSum = Math.log(sumExps);
+
+    // Compute the softmax values
+    const logSoftmaxArr = arr.map(x => x - maxVal - logSum);
 
     return /** @type {T} */(logSoftmaxArr);
 }

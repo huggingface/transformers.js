@@ -299,6 +299,22 @@ SUPPORTED_MODELS = {
             'sileod/deberta-v3-large-tasksource-nli',
         ],
     },
+    # TODO: Add back in v3
+    # 'decision-transformer': {
+    #     # Reinforcement learning
+    #     'reinforcement-learning': [
+    #         'edbeeching/decision-transformer-gym-hopper-expert',
+    #         'edbeeching/decision-transformer-gym-hopper-medium',
+    #         'edbeeching/decision-transformer-gym-hopper-medium-replay',
+    #         'edbeeching/decision-transformer-gym-hopper-expert-new',
+    #         'edbeeching/decision-transformer-gym-halfcheetah-expert',
+    #         'edbeeching/decision-transformer-gym-halfcheetah-medium',
+    #         'edbeeching/decision-transformer-gym-halfcheetah-medium-replay',
+    #         'edbeeching/decision-transformer-gym-walker2d-expert',
+    #         'edbeeching/decision-transformer-gym-walker2d-medium',
+    #         'edbeeching/decision-transformer-gym-walker2d-medium-replay',
+    #     ],
+    # },
     'deit': {
         # Image classification
         'image-classification': [

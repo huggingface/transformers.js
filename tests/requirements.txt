@@ -3,3 +3,4 @@ sacremoses==0.0.53
 sentencepiece==0.1.99
 protobuf==4.24.3
 rjieba==0.1.11
+jinja2==3.1.4
