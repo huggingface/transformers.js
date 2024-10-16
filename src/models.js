@@ -166,7 +166,10 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        device ?? (
+          apis.IS_EXPOSED_RUNTIME_ENV ? 'auto' : (
+            apis.IS_NODE_ENV ? 'cpu' : 'wasm'
+        ))
     );
     const executionProviders = deviceToExecutionProviders(selectedDevice);
 
