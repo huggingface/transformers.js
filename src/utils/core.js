@@ -1,10 +1,10 @@
 
 /**
  * @file Core utility functions/classes for Transformers.js.
- * 
+ *
  * These are only used internally, meaning an end-user shouldn't
  * need to access anything here.
- * 
+ *
  * @module utils/core
  */
 
@@ -46,7 +46,7 @@ export function escapeRegExp(string) {
  * Check if a value is a typed array.
  * @param {*} val The value to check.
  * @returns {boolean} True if the value is a `TypedArray`, false otherwise.
- * 
+ *
  * Adapted from https://stackoverflow.com/a/71091338/13989043
  */
 export function isTypedArray(val) {
@@ -61,6 +61,15 @@ export function isTypedArray(val) {
  */
 export function isIntegralNumber(x) {
     return Number.isInteger(x) || typeof x === 'bigint'
+}
+
+/**
+ * Determine if a provided width or height is nullish.
+ * @param {*} x The value to check.
+ * @returns {boolean} True if the value is `null`, `undefined` or `-1`, false otherwise.
+ */
+export function isNullishDimension(x) {
+    return x === null || x === undefined || x === -1 || x === '-1';
 }
 
 /**
@@ -132,9 +141,9 @@ export function calculateReflectOffset(i, w) {
 }
 
 /**
- * 
- * @param {Object} o 
- * @param {string[]} props 
+ *
+ * @param {Object} o
+ * @param {string[]} props
  * @returns {Object}
  */
 export function pick(o, props) {
@@ -151,7 +160,7 @@ export function pick(o, props) {
 /**
  * Calculate the length of a string, taking multi-byte characters into account.
  * This mimics the behavior of Python's `len` function.
- * @param {string} s The string to calculate the length of. 
+ * @param {string} s The string to calculate the length of.
  * @returns {number} The length of the string.
  */
 export function len(s) {
