@@ -10,11 +10,12 @@
 import {
     getFile,
 } from './hub.js';
-import { FFT, max } from './maths.js';
+import { FFT, max, resample } from './maths.js';
 import {
     calculateReflectOffset,
 } from './core.js';
 import { Tensor, matmul } from './tensor.js';
+import wav from 'node-wav';
 
 
 /**
@@ -24,7 +25,25 @@ import { Tensor, matmul } from './tensor.js';
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
 export async function read_audio(url, sampling_rate) {
-    if (typeof AudioContext === 'undefined') {
+    /** @type {AudioBuffer} */
+    let decoded;
+    const response = await getFile(url);
+    const buffer = await response.arrayBuffer();
+    if (typeof AudioContext !== 'undefined') {
+        const audioCTX = new AudioContext({ sampleRate: sampling_rate });
+        if (typeof sampling_rate === 'undefined') {
+            console.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`)
+        }
+        decoded = await audioCTX.decodeAudioData(buffer);
+    } else if (response.headers.get('content-type') === 'audio/wav') {
+        const decodedWav = wav.decode(buffer);
+        decoded = {
+            numberOfChannels: decodedWav.channelData.length,
+            getChannelData: (i) => decodedWav.channelData[i],
+            length: decodedWav.channelData[0].length,
+            sampleRate: decodedWav.sampleRate,
+        };
+    } else {
         // Running in node or an environment without AudioContext
         throw Error(
             "Unable to load audio from path/URL since `AudioContext` is not available in your environment. " +
@@ -32,13 +51,6 @@ export async function read_audio(url, sampling_rate) {
             "For more information and some example code, see https://huggingface.co/docs/transformers.js/guides/node-audio-processing."
         )
     }
-
-    const response = await (await getFile(url)).arrayBuffer();
-    const audioCTX = new AudioContext({ sampleRate: sampling_rate });
-    if (typeof sampling_rate === 'undefined') {
-        console.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`)
-    }
-    const decoded = await audioCTX.decodeAudioData(response);
 
     /** @type {Float32Array} */
     let audio;
@@ -73,6 +85,10 @@ export async function read_audio(url, sampling_rate) {
     } else {
         // If the audio is not stereo, we can just use the first channel:
         audio = decoded.getChannelData(0);
+    }
+
+    if (typeof sampling_rate !== 'undefined' && decoded.sampleRate !== sampling_rate) {
+        audio = resample(audio, sampling_rate / decoded.sampleRate);
     }
 
     return audio;

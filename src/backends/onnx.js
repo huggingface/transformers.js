@@ -65,6 +65,12 @@ if (ORT_SYMBOL in globalThis) {
   // If the JS runtime exposes their own ONNX runtime, use it
   ONNX = globalThis[ORT_SYMBOL];
 
+} else if (apis.IS_REACT_NATIVE_ENV) {
+    ONNX = ONNX_NODE.default ?? ONNX_NODE;
+
+    supportedDevices.push('xnnpack', 'cpu');
+    defaultDevices = ['xnnpack', 'cpu'];
+
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
@@ -146,19 +152,19 @@ let wasmInitPromise = null;
 
 /**
  * Create an ONNX inference session.
- * @param {Uint8Array} buffer The ONNX model buffer.
+ * @param {Uint8Array|string} bufferOrPath The ONNX model buffer.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
-export async function createInferenceSession(buffer, session_options, session_config) {
+export async function createInferenceSession(bufferOrPath, session_options, session_config) {
     if (wasmInitPromise) {
         // A previous session has already initialized the WASM runtime
         // so we wait for it to resolve before creating this new session.
         await wasmInitPromise;
     }
 
-    const sessionPromise = InferenceSession.create(buffer, session_options);
+    const sessionPromise = InferenceSession.create(bufferOrPath, session_options);
     wasmInitPromise ??= sessionPromise;
     const session = await sessionPromise;
     session.config = session_config;

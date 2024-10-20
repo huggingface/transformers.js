@@ -8,20 +8,57 @@
  * @module utils/image
  */
 
+import fs from 'fs';
 import { getFile } from './hub.js';
 import { env } from '../env.js';
+import { permute_data, interpolate_data } from './maths.js';
 import { Tensor } from './tensor.js';
+
+import * as codecs from 'image-codecs';
+import { Buffer } from 'buffer';
 
 // Will be empty (or not used) if running in browser or web-worker
 import sharp from 'sharp';
 
 const BROWSER_ENV = typeof self !== 'undefined';
+const IS_REACT_NATIVE = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 const WEBWORKER_ENV = BROWSER_ENV && self.constructor.name === 'DedicatedWorkerGlobalScope';
 
 let createCanvasFunction;
 let ImageDataClass;
 let loadImageFunction;
-if (BROWSER_ENV) {
+if (IS_REACT_NATIVE) {
+    // Optional Support gcanvas or skia with web polyfill for better performance
+    const offscreenCanvasExists = typeof OffscreenCanvas !== 'undefined';
+    if (typeof Image !== 'undefined' && (typeof document !== 'undefined' || offscreenCanvasExists)) {
+        createCanvasFunction = (/** @type {number} */ width, /** @type {number} */ height) => {
+            if (offscreenCanvasExists) {
+                return new OffscreenCanvas(width, height);
+            } else {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                return canvas;
+            }
+        };
+        loadImageFunction = async (/**@type {URL|string}*/url) =>
+            await new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => {
+                    const canvas = createCanvasFunction(image.width, image.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, 0, 0);
+                    const { data } = ctx.getImageData(0, 0, image.width, image.height);
+                    resolve(new RawImage(data, image.width, image.height, 4));
+                    image.dispose?.();
+                    canvas.dispose?.();
+                }
+                image.onerror = reject;
+                image.src = url;
+            });
+        ImageDataClass = global.ImageData;
+    }
+} else if (BROWSER_ENV) {
     // Running in browser or web-worker
     createCanvasFunction = (/** @type {number} */ width, /** @type {number} */ height) => {
         if (!self.OffscreenCanvas) {
@@ -146,12 +183,21 @@ export class RawImage {
      * @returns {Promise<RawImage>} The image object.
      */
     static async fromURL(url) {
-        const response = await getFile(url);
-        if (response.status !== 200) {
-            throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);
+        if (IS_REACT_NATIVE) {
+            if (env.rnUseCanvas && loadImageFunction) {
+                return await loadImageFunction(url);
+            } else {
+                let response = await getFile(url);
+                return this.fromBlob(response);
+            }
+        } else {
+            const response = await getFile(url);
+            if (response.status !== 200) {
+                throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);
+            }
+            const blob = await response.blob();
+            return this.fromBlob(blob);
         }
-        const blob = await response.blob();
-        return this.fromBlob(blob);
     }
 
     /**
@@ -160,7 +206,11 @@ export class RawImage {
      * @returns {Promise<RawImage>} The image object.
      */
     static async fromBlob(blob) {
-        if (BROWSER_ENV) {
+        if (IS_REACT_NATIVE) {
+            const buffer = await blob.arrayBuffer();
+            const { data, width, height } = codecs.decode(Buffer.from(buffer));
+            return new RawImage(new Uint8ClampedArray(data), width, height, 4);
+        } else if (BROWSER_ENV) {
             // Running in environment with canvas
             const img = await loadImageFunction(blob);
 
@@ -319,7 +369,40 @@ export class RawImage {
         // Ensure resample method is a string
         let resampleMethod = RESAMPLING_MAPPING[resample] ?? resample;
 
-        if (BROWSER_ENV) {
+        if (IS_REACT_NATIVE) {
+            if (createCanvasFunction !== undefined && env.rnUseCanvas) {
+                // Running in environment with canvas
+                let canvas = createCanvasFunction(this.width, this.height);
+                let ctx = canvas.getContext('2d');
+                let imageData = this.toImageData();
+                ctx.putImageData(imageData, 0, 0);
+                ctx.drawImage(canvas, 0, 0, this.width, this.height, 0, 0, width, height);
+                let newImageData = ctx.getImageData(0, 0, width, height);
+                const resized = new RawImage(newImageData.data, width, height, 4);
+                canvas.dispose?.();
+                return resized.convert(this.channels);
+            } else {
+                // Running in environment without canvas
+                // WHC -> CHW
+                const [trsnsposed] = permute_data(
+                    this.data,
+                    [this.width, this.height, this.channels],
+                    [2, 0, 1]
+                );
+                const resized = interpolate_data(
+                    trsnsposed,
+                    [this.channels, this.height, this.width],
+                    [height, width]
+                );
+                // CHW -> WHC
+                const [newData] = permute_data(
+                    resized,
+                    [this.channels, height, width],
+                    [1, 2, 0]
+                );
+                return new RawImage(newData, width, height, this.channels);
+            }
+        } else if (BROWSER_ENV) {
             // TODO use `resample` in browser environment
 
             // Store number of channels before resizing
@@ -392,7 +475,38 @@ export class RawImage {
             return this;
         }
 
-        if (BROWSER_ENV) {
+        if (IS_REACT_NATIVE) {
+            if (createCanvasFunction !== undefined && env.rnUseCanvas) {
+                // Running in environment with canvas
+                let newWidth = this.width + left + right;
+                let newHeight = this.height + top + bottom;
+                let canvas = createCanvasFunction(newWidth, newHeight);
+                let ctx = canvas.getContext('2d');
+                let imageData = this.toImageData();
+                ctx.putImageData(imageData, left, top);
+                let newImageData = ctx.getImageData(0, 0, newWidth, newHeight);
+                const padded = new RawImage(newImageData.data, newWidth, newHeight, 4);
+                canvas.dispose?.();
+                return padded.convert(this.channels);
+            } else {
+                // Running in environment without canvas
+                const channels = this.channels;
+                const data = this.data;
+                const width = this.width + left + right;
+                const height = this.height + top + bottom;
+                const paddedData = new Uint8ClampedArray(width * height * channels);
+                for (let i = 0; i < data.length; i += channels) {
+                    const x = Math.floor(i / channels) % this.width;
+                    const y = Math.floor(i / channels / this.width);
+                    const pixelIndex = (y * width + x) * channels;
+                    for (let j = 0; j < channels; j++) {
+                        paddedData[pixelIndex + j] = data[i + j];
+                    }
+                }
+                return new RawImage(paddedData, width, height, channels);
+            }
+
+        } else if (BROWSER_ENV) {
             // Store number of channels before padding
             const numChannels = this.channels;
 
@@ -440,7 +554,34 @@ export class RawImage {
         const crop_width = x_max - x_min + 1;
         const crop_height = y_max - y_min + 1;
 
-        if (BROWSER_ENV) {
+        if (IS_REACT_NATIVE) {
+            if (createCanvasFunction !== undefined && env.rnUseCanvas) {
+                // Running in environment with canvas
+                let canvas = createCanvasFunction(crop_width, crop_height);
+                let ctx = canvas.getContext('2d');
+                let imageData = this.toImageData();
+                ctx.putImageData(imageData, -x_min, -y_min);
+                let newImageData = ctx.getImageData(0, 0, crop_width, crop_height);
+                const cropped = new RawImage(newImageData.data, crop_width, crop_height, 4);
+                canvas.dispose?.();
+                return cropped.convert(this.channels);
+            } else {
+                // Running in environment without canvas
+                let channels = this.channels;
+                let data = this.data;
+                let croppedData = new Uint8ClampedArray(crop_width * crop_height * channels);
+                for (let i = 0; i < croppedData.length; i += channels) {
+                    const x = Math.floor(i / channels) % crop_width;
+                    const y = Math.floor(i / channels / crop_width);
+                    const pixelIndex = ((y + y_min) * this.width + (x + x_min)) * channels;
+                    for (let j = 0; j < channels; j++) {
+                        croppedData[i + j] = data[pixelIndex + j];
+                    }
+                }
+                return new RawImage(croppedData, crop_width, crop_height, channels);
+            }
+
+        } else if (BROWSER_ENV) {
             // Store number of channels before resizing
             const numChannels = this.channels;
 
@@ -487,8 +628,13 @@ export class RawImage {
         const width_offset = (this.width - crop_width) / 2;
         const height_offset = (this.height - crop_height) / 2;
 
+        if (IS_REACT_NATIVE) {
+            return this.crop([
+                width_offset, height_offset,
+                width_offset + crop_width - 1, height_offset + crop_height - 1
+            ]);
 
-        if (BROWSER_ENV) {
+        } else if (BROWSER_ENV) {
             // Store number of channels before resizing
             const numChannels = this.channels;
 
@@ -592,6 +738,16 @@ export class RawImage {
         }
     }
 
+    toImageData() {
+        if (IS_REACT_NATIVE && ImageDataClass === undefined)
+            throw new Error('toImageData() is only supported in browser environments.');
+        // Clone, and convert data to RGBA before create ImageData object.
+        // This is because the ImageData API only supports RGBA
+        let cloned = this.clone().rgba();
+
+        return new ImageDataClass(cloned.data, cloned.width, cloned.height);
+    }
+
     async toBlob(type = 'image/png', quality = 1) {
         if (!BROWSER_ENV) {
             throw new Error('toBlob() is only supported in browser environments.')
@@ -619,7 +775,7 @@ export class RawImage {
     }
 
     toCanvas() {
-        if (!BROWSER_ENV) {
+        if (!createCanvasFunction) {
             throw new Error('toCanvas() is only supported in browser environments.')
         }
 
@@ -692,8 +848,13 @@ export class RawImage {
      * @param {string} path The path to save the image to.
      */
     async save(path) {
+        const extension = path.split('.').pop().toLowerCase();
+        const mime = this._CONTENT_TYPE_MAP[extension] ?? 'image/png';
 
-        if (BROWSER_ENV) {
+        if (IS_REACT_NATIVE) {
+            const buf = Buffer.from(codecs.encode(this.rgba().data, mime));
+            await fs.writeFile(path, buf.toString('base64'), 'base64');
+        } else if (BROWSER_ENV) {
             if (WEBWORKER_ENV) {
                 throw new Error('Unable to save an image from a Web Worker.')
             }
@@ -730,7 +891,7 @@ export class RawImage {
     }
 
     toSharp() {
-        if (BROWSER_ENV) {
+        if (BROWSER_ENV || IS_REACT_NATIVE) {
             throw new Error('toSharp() is only supported in server-side environments.')
         }
 
