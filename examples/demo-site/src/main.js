@@ -618,7 +618,7 @@ worker.addEventListener('message', (event) => {
           CODE_BLOCKS[target].update(message.data);
           break;
         default: // is textbox
-          elem.value = message.data
+          elem.value += message.data
           break;
       }
 

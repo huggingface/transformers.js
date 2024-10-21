@@ -74,6 +74,8 @@ import {
 } from './utils/tensor.js';
 import { RawImage } from './utils/image.js';
 
+import {TextStreamer} from "./generation/streamers.js"
+
 
 /**
  * @typedef {string | RawImage | URL} ImageInput
@@ -985,7 +987,13 @@ export class TextGenerationPipeline extends (/** @type {new (options: TextPipeli
     }
 
     /** @type {TextGenerationPipelineCallback} */
-    async _call(texts, generate_kwargs = {}) {
+    async _call(texts, generate_kwargs = {}, {
+        skip_prompt = false,
+        callback_function = null,
+        token_callback_function = null,
+        decode_kwargs = {},
+        ...kwargs
+    }) {
         let isBatched = false;
         let isChatInput = false;
 
@@ -1031,8 +1039,17 @@ export class TextGenerationPipeline extends (/** @type {new (options: TextPipeli
             truncation: true,
         });
 
+        const streamer = new TextStreamer(this.tokenizer, {
+            skip_prompt:skip_prompt,
+            callback_function:callback_function,
+            token_callback_function:token_callback_function,
+            decode_kwargs : decode_kwargs,
+            ...kwargs
+        });
+
         const outputTokenIds = /** @type {Tensor} */(await this.model.generate({
             ...text_inputs,
+            streamer:streamer,
             ...generate_kwargs
         }));
 

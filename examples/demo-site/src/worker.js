@@ -4,7 +4,7 @@
 // Needed to ensure the UI thread is not blocked when running  //
 /////////////////////////////////////////////////////////////////
 
-import { pipeline, env } from "@xenova/transformers";
+import { pipeline, env } from "@huggingface/transformers";
 env.allowLocalModels = false;
 
 // Define task function mapping
@@ -59,13 +59,14 @@ class PipelineFactory {
      * @param {*} progressCallback 
      * @returns {Promise}
      */
-    static getInstance(progressCallback = null) {
+    static getInstance(progressCallback = null, model_file_name = "") {
         if (this.task === null || this.model === null) {
             throw Error("Must set task and model")
         }
         if (this.instance === null) {
             this.instance = pipeline(this.task, this.model, {
-                progress_callback: progressCallback
+                progress_callback: progressCallback,
+                model_file_name: model_file_name,
             });
         }
 
@@ -182,21 +183,22 @@ async function text_generation(data) {
             task: 'text-generation',
             data: data
         });
-    })
+    }, "decoder_model_merged"
+    )
 
     let text = data.text.trim();
 
     return await pipeline(text, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+        ...data.generation }, { 
+        callback_function: function (decodedText) {
+            const postProcessor = (text) => {
+                return text.replace('<|endoftext|>','');
+            }
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
-                data: decodedText
+                data: postProcessor(decodedText)
             });
         }
     })
