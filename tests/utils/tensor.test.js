@@ -51,6 +51,58 @@ describe("Tensor operations", () => {
     // TODO add tests for errors
   });
 
+  describe("slice", () => {
+    it("should return a given row dim", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(1);
+      const target = new Tensor("float32", [3, 4], [2]);
+
+      compare(t2, target);
+    });
+
+    it("should return a range of rows", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      // The end index is not included.
+      const t2 = t1.slice([1, 3]);
+      const target = new Tensor("float32", [3, 4, 5, 6], [2, 2]);
+
+      compare(t2, target);
+    });
+
+    it("should return a given column dim", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.vslice(1);
+      const target = new Tensor("float32", [2, 4, 6], [3, 1]);
+
+      compare(t2, target);
+    });
+
+    it("should return a range of cols", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [3, 4]);
+      // The end index is not included.
+      const t2 = t1.vslice([1, 3]);
+      const target = new Tensor("float32", [2, 3, 6, 7, 10, 11], [3, 2]);
+
+      compare(t2, target);
+    });
+
+    it("should return a every third row", async () => {
+      // Create 21 nodes.
+      const t1 = new Tensor("float32", Array.from({ length: 21 }, (v, i) => v = ++i), [3, 7]);
+
+      // Extract every third column.
+      const indices = Array.from({ length: t1.dims[1] }, (_, i) => i)
+        .filter(i => i % 3 === 0)
+        // Make sure to wrap each in an array since an array creates a new range.
+        .map(v => [v]);
+      const t2 = t1.vslice(indices);
+
+      const target = new Tensor("float32", [1, 4, 7, 8, 11, 14, 15, 18, 21], [3, 3]);
+
+      compare(t2, target);
+    });
+  });
+
   describe("stack", () => {
     const t1 = new Tensor("float32", [0, 1, 2, 3, 4, 5], [1, 3, 2]);
 

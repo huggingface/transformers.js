@@ -340,10 +340,72 @@ export class Tensor {
         return this;
     }
 
+    /**
+     * Creates a deep copy of the current Tensor.
+     * @returns {Tensor} A new Tensor with the same type, data, and dimensions as the original.
+     */
     clone() {
         return new Tensor(this.type, this.data.slice(), this.dims.slice());
     }
 
+    /**
+     * Performs a vertical slice operation on a 2D Tensor.
+     * @param {number|number[]|number[][]} slices - The slice specification:
+     *   - If a number is given, then a single column is selected.
+     *   - If an array of two numbers is given, then a range of columns [start, end (exclusive)] is selected.
+     *   - If an array of arrays is given, then those specific columns are selected.
+     * @returns {Tensor} A new Tensor containing the selected columns.
+     * @throws {Error} If the slice input is invalid.
+     */
+    vslice(slices) {
+        const rowDim = this.dims[0];
+        const colDim = this.dims[1];
+
+        // Handle different slice cases (single column, range, or list of specific columns)
+        let selectedCols = [];
+        if (typeof slices === 'number') {
+            // Single column slice
+            selectedCols = [slices];
+        } else if (Array.isArray(slices) && slices.length === 2 && !Array.isArray(slices[0]) && !Array.isArray(slices[1])) {
+            // Range slice [start, end]
+            const [start, end] = slices;
+            selectedCols = Array.from({ length: end - start }, (_, i) => i + start);
+        } else if (Array.isArray(slices) && Array.isArray(slices[0])) {
+            // Specific column list [[col1], [col2]]
+            selectedCols = slices.flat();
+        } else {
+            throw new Error('Invalid slice input');
+        }
+
+        // Determine new dimensions: rows remain the same, columns are based on selection
+        const newTensorDims = [rowDim, selectedCols.length];
+        const newBufferSize = newTensorDims[0] * newTensorDims[1];
+        // Allocate memory
+        // @ts-ignore
+        const data = new this.data.constructor(newBufferSize);
+
+        // Fill the new data array by selecting the correct columns
+        for (let row = 0; row < rowDim; ++row) {
+            for (let i = 0; i < selectedCols.length; ++i) {
+                const col = selectedCols[i];
+                const targetIndex = row * newTensorDims[1] + i;
+                const originalIndex = row * colDim + col;
+                data[targetIndex] = this.data[originalIndex];
+            }
+        }
+
+        return new Tensor(this.type, data, newTensorDims);
+    }
+
+    /**
+     * Performs a slice operation on the Tensor along specified dimensions.
+     * @param {...(number|number[]|null)} slices - The slice specifications for each dimension.
+     *   - If a number is given, then a single column is selected.
+     *   - If an array of two numbers is given, then a range of columns [start, end (exclusive)] is selected.
+     *   - If null is given, then the entire dimension is selected.
+     * @returns {Tensor} A new Tensor containing the selected elements.
+     * @throws {Error} If the slice input is invalid.
+     */
     slice(...slices) {
         // This allows for slicing with ranges and numbers
         const newTensorDims = [];
@@ -413,7 +475,6 @@ export class Tensor {
             data[i] = this_data[originalIndex];
         }
         return new Tensor(this.type, data, newTensorDims);
-
     }
 
     /**

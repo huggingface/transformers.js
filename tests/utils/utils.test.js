@@ -1,5 +1,6 @@
 import { AutoProcessor, hamming, hanning, mel_filter_bank } from "../../src/transformers.js";
 import { getFile } from "../../src/utils/hub.js";
+import { RawImage } from "../../src/utils/image.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../init.js";
 import { compare } from "../test_utils.js";
@@ -57,6 +58,34 @@ describe("Utilities", () => {
       const blobUrl = URL.createObjectURL(blob);
       const data = await getFile(blobUrl);
       expect(await data.text()).toBe("Hello, world!");
+    });
+  });
+
+  describe("Image utilities", () => {
+    it("Can split image into separate channels", async () => {
+      const url = './examples/demo-site/public/images/cats.jpg';
+      const image = await RawImage.fromURL(url);
+      // Rather than test the entire image, we'll just test the first 3 pixels;
+      // ensuring that these match.
+      const image_data = image.toChannels().map(c => c.slice(0, 3));
+
+      const target = [
+        new Uint8Array([140, 144, 145]), // Reds
+        new Uint8Array([25, 25, 25]),    // Greens
+        new Uint8Array([56, 67, 73]),    // Blues
+      ];
+
+      compare (image_data, target);
+    });
+
+    it("Can splits channels for grayscale", async () => {
+      const url = './examples/demo-site/public/images/cats.jpg';
+      const image = (await RawImage.fromURL(url)).grayscale();
+
+      const image_data = image.toChannels().map(c => c.slice(0, 3));
+      const target = [new Uint8Array([63, 65, 66])];
+
+      compare (image_data, target);
     });
   });
 });
