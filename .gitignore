@@ -10,3 +10,4 @@ node_modules
 
 # Do not track coverage reports
 /coverage
+.DS_Store
