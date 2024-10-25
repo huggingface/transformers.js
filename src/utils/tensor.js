@@ -74,6 +74,7 @@ export class Tensor {
 
     ort_tensor;
 
+export class Tensor extends ONNXTensor {
     /**
      * Create a new Tensor or copy an existing Tensor.
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
@@ -90,25 +91,15 @@ export class Tensor {
             );
         }
 
-        return new Proxy(this, {
-            get: (obj, key) => {
-                if (typeof key === 'string') {
-                    let index = Number(key);
-                    if (Number.isInteger(index)) {
-                        // key is an integer (i.e., index)
-                        return obj._getitem(index);
-                    }
-                }
-                // @ts-ignore
-                return obj[key];
-            },
-            set: (obj, key, value) => {
-                // TODO allow setting of data
-
-                // @ts-ignore
-                return obj[key] = value;
-            }
-        });
+    /**
+     * Create a new Tensor from an ONNX Tensor.
+     * @param {import('onnxruntime-common').Tensor} tensor The ONNX Tensor to convert.
+     * @returns {Tensor} The new Tensor.
+     * @static
+     */
+    static fromONNX(tensor) {
+        Object.setPrototypeOf(tensor, Tensor.prototype);
+        return warpTensor(tensor);
     }
 
     dispose() {
@@ -179,10 +170,7 @@ export class Tensor {
         const o2 = (index + 1) * iterSize;
 
         // We use subarray if available (typed array), otherwise we use slice (normal array)
-        const data =
-            ('subarray' in this.data)
-                ? this.data.subarray(o1, o2)
-                : this.data.slice(o1, o2);
+        const data = this.data.subarray?.(o1, o2) ?? this.data.slice(o1, o2);
         return new Tensor(this.type, data, iterDims);
     }
 

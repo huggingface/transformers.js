@@ -40,6 +40,8 @@ const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
 
+const IS_REACT_NATIVE_ENV = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+
 /**
  * A read-only object containing information about the APIs available in the current environment.
  */
@@ -49,6 +51,9 @@ export const apis = Object.freeze({
 
     /** Whether we are running in a web worker environment */
     IS_WEBWORKER_ENV,
+
+    /** Whether we are running in a React Native environment */
+    IS_REACT_NATIVE_ENV,
 
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
@@ -73,9 +78,12 @@ export const apis = Object.freeze({
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
-const dirname__ = RUNNING_LOCALLY
-    ? path.dirname(path.dirname(url.fileURLToPath(import.meta.url)))
-    : './';
+let dirname__ = './';
+if (IS_REACT_NATIVE_ENV) {
+    dirname__ = fs.DocumentDirectoryPath;
+} else if (RUNNING_LOCALLY) {
+    dirname__ = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)));
+}
 
 // Only used for environments with access to file system
 const DEFAULT_CACHE_DIR = RUNNING_LOCALLY
@@ -117,7 +125,7 @@ export const env = {
     /////////////////// Backends settings ///////////////////
     // NOTE: These will be populated later by the backends themselves.
     backends: {
-        // onnxruntime-web/onnxruntime-node
+        // onnxruntime-web/onnxruntime-node/onnxruntime-react-native
         onnx: {},
     },
 
@@ -129,6 +137,8 @@ export const env = {
     allowLocalModels: !IS_BROWSER_ENV,
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
+
+    rnUseCanvas: true,
 
     /////////////////// Cache settings ///////////////////
     useBrowserCache: IS_WEB_CACHE_AVAILABLE,

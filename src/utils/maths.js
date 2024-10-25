@@ -959,6 +959,24 @@ export function round(num, decimals) {
 }
 
 /**
+ * Resample the input array to a new length using linear interpolation.
+ * @param {AnyTypedArray} data The input array
+ * @param {number} factor The factor by which to resample
+ */
+export function resample(data, factor) {
+    const target = Math.floor(data.length * factor);
+    const output = new data.constructor(target);
+    for (let i = 0; i < target; ++i) {
+        const index = i / factor;
+        const lower = Math.floor(index);
+        const upper = Math.min(Math.ceil(index), data.length - 1);
+        const weight = index - lower;
+        output[i] = data[lower] * (1 - weight) + data[upper] * weight;
+    }
+    return output;
+}
+
+/**
  * Helper function to round a number to the nearest integer, with ties rounded to the nearest even number.
  * Also known as "bankers' rounding". This is the default rounding mode in python. For example:
  * 1.5 rounds to 2 and 2.5 rounds to 2.
