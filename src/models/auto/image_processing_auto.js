@@ -18,7 +18,7 @@ export class AutoImageProcessor {
         if (!image_processor_class) {
             if (key !== undefined) {
                 // Only log a warning if the class is not found and the key is set.
-                console.warn(`Image rocessor type '${key}' not found, assuming base ImageProcessor. Please report this at ${GITHUB_ISSUE_URL}.`)
+                console.warn(`Image processor type '${key}' not found, assuming base ImageProcessor. Please report this at ${GITHUB_ISSUE_URL}.`)
             }
             image_processor_class = ImageProcessor;
         }
