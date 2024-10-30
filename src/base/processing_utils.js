@@ -19,9 +19,11 @@
  * 
  * @module processors
  */
+import { PROCESSOR_NAME } from '../utils/constants.js';
 import {
     Callable,
 } from '../utils/generic.js';
+import { getModelJSON } from '../utils/hub.js';
 
 /**
  * @typedef {Object} ProcessorProperties Additional processor-specific properties.
@@ -38,6 +40,7 @@ export class Processor extends Callable {
         'tokenizer_class',
         'feature_extractor_class',
     ]
+    static uses_processor_config = false;
 
     /**
      * Creates a new Processor with the given components
@@ -110,8 +113,9 @@ export class Processor extends Callable {
 
         const [config, components] = await Promise.all([
             // TODO:
-            // getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options),
-            {},
+            this.uses_processor_config
+            ? getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options)
+            : {},
             Promise.all(
                 this.classes
                 .filter((cls) => cls in this)
