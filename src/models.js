@@ -61,7 +61,6 @@ import {
 } from './utils/generic.js';
 
 import {
-    isIntegralNumber,
     mergeArrays,
     pick,
 } from './utils/core.js';
@@ -99,6 +98,7 @@ import {
 
 import {
     cat,
+    full,
     full_like,
     mean,
     ones,
@@ -108,6 +108,7 @@ import {
     Tensor,
     zeros_like,
 } from './utils/tensor.js';
+import { RawImage } from './utils/image.js';
 
 import { dynamic_time_warping, medianFilter } from './utils/maths.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
@@ -128,6 +129,7 @@ const MODEL_TYPES = {
     MaskGeneration: 5,
     ImageTextToText: 6,
     Musicgen: 7,
+    MultiModality: 8,
 }
 //////////////////////////////////////////////////
 
@@ -386,7 +388,7 @@ async function sessionRun(session, inputs) {
     } catch (e) {
         // This usually occurs when the inputs are of the wrong type.
         console.error(`An error occurred during model execution: "${e}".`);
-        console.error('Inputs given to model:', checkedInputs);
+        console.error('Inputs given to model:', checkedInputs)
         throw e;
     }
 }
@@ -716,6 +718,52 @@ function image_text_to_text_prepare_inputs_for_generation(self, ...args) {
     }
 }
 
+function multimodality_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
+    const has_past_key_values = !!model_inputs.past_key_values;
+
+    if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
+        if (has_past_key_values) {
+            model_inputs.input_ids = cat([
+                model_inputs.input_ids,
+                model_inputs.input_ids,
+            ], 0)
+            // NOTE: attention_mask handled in generation
+        } else {
+            model_inputs.input_ids = cat([
+                model_inputs.input_ids,
+                full_like(model_inputs.input_ids, BigInt(generation_config.pad_token_id)),
+            ], 0);
+            model_inputs.attention_mask = cat([
+                model_inputs.attention_mask,
+                full_like(model_inputs.attention_mask, 0n),
+            ], 0);
+        }
+    }
+
+    if (has_past_key_values || !model_inputs.pixel_values) {
+        model_inputs.pixel_values = full([0, 0, 3, 384, 384], 1.0);
+    }
+
+    if (has_past_key_values) {
+        const num_img_tokens = 0;
+        const num_text_tokens = 1;
+        const has_image = num_img_tokens > 0 ? 1 : 0;
+
+        const batch_size = 1;
+        model_inputs.images_seq_mask = new Tensor(
+            'bool',
+            new Array(num_img_tokens + num_text_tokens).fill(true).fill(false, 0, num_text_tokens),
+            [batch_size, num_img_tokens + num_text_tokens],
+        );
+        model_inputs.images_emb_mask = new Tensor(
+            'bool',
+            new Array(num_img_tokens).fill(!!has_image),
+            [batch_size, 1, num_img_tokens],
+        );
+    }
+    return model_inputs;
+}
+
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -767,6 +815,11 @@ export class PreTrainedModel extends Callable {
                 this.can_generate = true;
                 this._forward = imageTextToTextForward;
                 this._prepare_inputs_for_generation = image_text_to_text_prepare_inputs_for_generation;
+                break;
+
+            case MODEL_TYPES.MultiModality:
+                this.can_generate = true;
+                this._prepare_inputs_for_generation = multimodality_prepare_inputs_for_generation;
                 break;
 
             default:
@@ -906,6 +959,21 @@ export class PreTrainedModel extends Callable {
                     model: 'text_encoder',
                     decoder_model_merged: 'decoder_model_merged',
                     encodec_decode: 'encodec_decode',
+                }, options),
+                getOptionalConfigs(pretrained_model_name_or_path, {
+                    generation_config: 'generation_config.json',
+                }, options),
+            ]);
+
+        } else if (modelType === MODEL_TYPES.MultiModality) {
+            info = await Promise.all([
+                constructSessions(pretrained_model_name_or_path, {
+                    prepare_inputs_embeds: 'prepare_inputs_embeds',
+                    model: 'language_model',
+                    lm_head: 'lm_head',
+                    gen_head: 'gen_head',
+                    gen_img_embeds: 'gen_img_embeds',
+                    image_decode: 'image_decode',
                 }, options),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
@@ -1658,7 +1726,8 @@ export class PreTrainedModel extends Callable {
             const dtype = session?.config?.kv_cache_dtype ?? 'float32';
             const empty = (dtype === 'float16') ? new Uint16Array() : [];
 
-            const shapes = getKeyValueShapes(this.config);
+            const batch_size = decoderFeeds[this.main_input_name].dims[0];
+            const shapes = getKeyValueShapes(this.config, { batch_size });
 
             for (const name in shapes) {
                 decoderFeeds[name] = new Tensor(dtype, empty, shapes[name]);
@@ -5954,6 +6023,111 @@ export class DecisionTransformerModel extends DecisionTransformerPreTrainedModel
 
 //////////////////////////////////////////////////
 
+export class MultiModalityPreTrainedModel extends PreTrainedModel { }
+export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
+    forward_params = [
+        // prepare_inputs_embeds
+        'input_ids',
+        'pixel_values',
+        'images_seq_mask',
+        'images_emb_mask',
+
+        // language_model
+        'attention_mask',
+        'position_ids',
+        'past_key_values',
+    ];
+
+    constructor(...args) {
+        super(...args);
+
+        // State-based approach to switch out which heads to use during generation
+        this._generation_mode = 'text';
+    }
+
+    async forward(model_inputs) {
+        const mode = this._generation_mode ?? 'text';
+
+        // TODO support re-using PKVs for input_ids.dims[1] !== 1
+        // if (model_inputs.past_key_values) {
+        //     //  && model_inputs.input_ids.dims[1] === 1
+        // }
+
+        let output_1;
+        if (mode === 'text' || !model_inputs.past_key_values) {
+            const session = this.sessions['prepare_inputs_embeds'];
+            const prep_inputs = pick(model_inputs, session.inputNames);
+            output_1 = await sessionRun(session, prep_inputs);
+        } else {
+            const session = this.sessions['gen_img_embeds'];
+            const prep_inputs = pick({
+                image_ids: model_inputs.input_ids,
+            }, session.inputNames);
+            output_1 = await sessionRun(session, prep_inputs);
+        }
+
+        const input_2 = { ...model_inputs, ...output_1 }
+        const output_2 = await decoderForward(this, input_2);
+
+        const head = this.sessions[
+            mode === 'text'
+                ? 'lm_head'
+                : 'gen_head'
+        ];
+        if (!head) {
+            throw new Error(`Unable to find "${head}" generation head`);
+        }
+
+        const output_3 = await sessionRun(head, pick(output_2, head.inputNames))
+
+        return {
+            ...output_1,
+            ...output_2,
+            ...output_3,
+        };
+    }
+
+    /**
+     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     */
+    async generate(options) {
+        this._generation_mode = 'text';
+        return super.generate(options);
+    }
+
+    /**
+     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     */
+    async generate_images(options) {
+        this._generation_mode = 'image';
+
+        const start_num_tokens = (options.inputs ?? options[this.main_input_name]).dims[1];
+        const all_tokens = await super.generate(options);
+
+        const generated_tokens = (/** @type {Tensor} */(all_tokens)).slice(null, [start_num_tokens, null])
+
+        const image_decode = this.sessions['image_decode'];
+        const { decoded_image } = await sessionRun(image_decode, {
+            generated_tokens,
+        });
+
+        // Equivalent to `np.clip((dec + 1) / 2 * 255, 0, 255)`
+        const clamped = decoded_image
+            .add_(1)
+            .mul_(255 / 2)
+            .clamp_(0, 255)
+            .to('uint8');
+
+        // Return as a list of images
+        const images = [];
+        for (const tensor of clamped) {
+            const img = RawImage.fromTensor(tensor);
+            images.push(img);
+        }
+        return images;
+    }
+}
+
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
 // (uses config to instantiate correct class)
@@ -6232,6 +6406,11 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['stablelm', ['StableLmForCausalLM', StableLmForCausalLM]],
 ]);
 
+const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([
+    ['multi_modality', ['MultiModalityCausalLM', MultiModalityCausalLM]],
+]);
+
+
 const MODEL_FOR_MASKED_LM_MAPPING_NAMES = new Map([
     ['bert', ['BertForMaskedLM', BertForMaskedLM]],
     ['roformer', ['RoFormerForMaskedLM', RoFormerForMaskedLM]],
@@ -6404,6 +6583,7 @@ const MODEL_CLASS_TYPE_MAPPING = [
     [MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES, MODEL_TYPES.Seq2Seq],
     [MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES, MODEL_TYPES.Seq2Seq],
     [MODEL_FOR_CAUSAL_LM_MAPPING_NAMES, MODEL_TYPES.DecoderOnly],
+    [MODEL_FOR_MULTIMODALITY_MAPPING_NAMES, MODEL_TYPES.MultiModality],
     [MODEL_FOR_MASKED_LM_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES, MODEL_TYPES.Vision2Seq],

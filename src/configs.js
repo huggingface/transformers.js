@@ -69,6 +69,9 @@ function getNormalizedConfig(config) {
         case 'musicgen':
             init_normalized_config = getNormalizedConfig(config.decoder);
             break;
+        case 'multi_modality':
+            init_normalized_config = getNormalizedConfig(config.language_config);
+            break;
 
         // Decoder-only models
         case 'gpt2':
@@ -216,13 +219,11 @@ function getNormalizedConfig(config) {
  */
 export function getKeyValueShapes(config, {
     prefix = 'past_key_values',
+    batch_size=1,
 } = {}) {
     /** @type {Record<string, number[]>} */
     const decoderFeeds = {};
     const normalized_config = config.normalized_config;
-
-    // TODO support batches (i.e., batch_size > 1)
-    const batch_size = 1;
 
     if (normalized_config.is_encoder_decoder && (
         'num_encoder_heads' in normalized_config && 'num_decoder_heads' in normalized_config

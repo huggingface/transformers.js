@@ -1,4 +1,5 @@
 export * from './florence2/processing_florence2.js';
+export * from './janus/processing_janus.js';
 export * from './owlvit/processing_owlvit.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './sam/processing_sam.js';
