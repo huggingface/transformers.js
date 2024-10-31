@@ -159,7 +159,6 @@ function get_bounding_box(box, asInteger) {
 /**
  * The Pipeline class is the class from which all pipelines inherit.
  * Refer to this class for methods shared across different pipelines.
- * @extends Callable
  */
 export class Pipeline extends Callable {
     /**
