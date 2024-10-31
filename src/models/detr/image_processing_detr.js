@@ -11,7 +11,7 @@ import { full } from '../../utils/tensor.js';
 /**
  * @typedef {object} DetrFeatureExtractorResultProps
  * @property {import('../../utils/tensor.js').Tensor} pixel_mask
- * @typedef {import('../../base/image_processors_utils.js').ImageFeatureExtractorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
+ * @typedef {import('../../base/image_processors_utils.js').ImageProcessorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
  */
 
 export class DetrImageProcessor extends ImageProcessor {

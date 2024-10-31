@@ -14,7 +14,7 @@ import { IMAGE_PROCESSOR_NAME } from '../utils/constants.js';
 
 
 /**
- * @typedef {object} ImageFeatureExtractorResult
+ * @typedef {object} ImageProcessorResult
  * @property {Tensor} pixel_values The pixel values of the batched preprocessed images.
  * @property {HeightWidth[]} original_sizes Array of two-dimensional tuples like [[480, 640]].
  * @property {HeightWidth[]} reshaped_input_sizes Array of two-dimensional tuples like [[1000, 1330]].
@@ -997,7 +997,7 @@ export class ImageProcessor extends Callable {
      * features into a single Tensor.
      * @param {RawImage[]} images The image(s) to extract features from.
      * @param {...any} args Additional arguments.
-     * @returns {Promise<ImageFeatureExtractorResult>} An object containing the concatenated pixel values (and other metadata) of the preprocessed images.
+     * @returns {Promise<ImageProcessorResult>} An object containing the concatenated pixel values (and other metadata) of the preprocessed images.
      */
     async _call(images, ...args) {
         if (!Array.isArray(images)) {

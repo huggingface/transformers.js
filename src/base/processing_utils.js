@@ -1,14 +1,14 @@
 
 /**
- * @file Processors are used to prepare non-textual inputs (e.g., image or audio) for a model.
+ * @file Processors are used to prepare inputs (e.g., text, image or audio) for a model.
  * 
  * **Example:** Using a `WhisperProcessor` to prepare an audio input for a model.
  * ```javascript
  * import { AutoProcessor, read_audio } from '@huggingface/transformers';
  *
- * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
- * let audio = await read_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
- * let { input_features } = await processor(audio);
+ * const processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
+ * const audio = await read_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
+ * const { input_features } = await processor(audio);
  * // Tensor {
  * //   data: Float32Array(240000) [0.4752984642982483, 0.5597258806228638, 0.56434166431427, ...],
  * //   dims: [1, 80, 3000],
