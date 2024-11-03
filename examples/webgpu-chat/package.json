@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@xenova/transformers": "github:xenova/transformers.js#v3",
+    "@huggingface/transformers": "^3.0.1",
     "dompurify": "^3.1.2",
     "marked": "^12.0.2",
     "react": "^18.2.0",

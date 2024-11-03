@@ -4,7 +4,7 @@ import {
     AutoModelForCausalLM,
     TextStreamer,
     StoppingCriteria,
-} from '@xenova/transformers';
+} from '@huggingface/transformers';
 
 
 class CallbackTextStreamer extends TextStreamer {

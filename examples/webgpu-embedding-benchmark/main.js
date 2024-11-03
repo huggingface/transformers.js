@@ -1,5 +1,5 @@
 import './style.css';
-import { env, AutoModel, ones } from '@xenova/transformers';
+import { env, AutoModel, ones } from '@huggingface/transformers';
 import Chart from 'chart.js/auto';
 
 // Throw an error if WebGPU is not supported
@@ -8,9 +8,6 @@ if (!navigator.gpu) {
   alert(err)
   throw Error(err);
 }
-
-env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
-env.backends.onnx.wasm.numThreads = 1;
 
 // Reference the elements that we will need
 const ctx = document.getElementById('chart');

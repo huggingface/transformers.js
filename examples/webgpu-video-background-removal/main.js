@@ -1,9 +1,6 @@
 import './style.css';
 
-import { env, AutoModel, AutoProcessor, RawImage } from '@xenova/transformers';
-
-env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
-env.backends.onnx.wasm.numThreads = 1;
+import { env, AutoModel, AutoProcessor, RawImage } from '@huggingface/transformers';
 
 // Reference the elements that we will need
 const status = document.getElementById('status');

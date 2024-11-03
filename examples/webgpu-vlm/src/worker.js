@@ -9,7 +9,7 @@ import {
     AutoProcessor,
     Tensor,
     full,
-} from '@xenova/transformers';
+} from '@huggingface/transformers';
 
 const DEVICE = 'webgpu';
 const MAX_NEW_TOKENS = 256;

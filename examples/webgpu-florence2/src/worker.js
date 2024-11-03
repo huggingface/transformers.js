@@ -5,7 +5,7 @@ import {
     AutoTokenizer,
     RawImage,
     full,
-} from '@xenova/transformers';
+} from '@huggingface/transformers';
 
 async function hasFp16() {
     try {

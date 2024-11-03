@@ -12,6 +12,6 @@
     "vite": "^5.2.0"
   },
   "dependencies": {
-    "@xenova/transformers": "github:xenova/transformers.js#v3"
+    "@huggingface/transformers": "^3.0.1"
   }
 }

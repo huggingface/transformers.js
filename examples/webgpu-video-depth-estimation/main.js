@@ -1,6 +1,6 @@
 import './style.css';
 
-import { AutoModel, AutoProcessor, RawImage } from '@xenova/transformers';
+import { AutoModel, AutoProcessor, RawImage } from '@huggingface/transformers';
 
 async function hasFp16() {
     try {

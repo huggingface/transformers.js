@@ -12,7 +12,7 @@
     "vite": "^5.0.12"
   },
   "dependencies": {
-    "@xenova/transformers": "^3.0.0",
+    "@huggingface/transformers": "^3.0.1",
     "chart.js": "^4.4.2"
   }
 }

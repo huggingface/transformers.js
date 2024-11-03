@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.0.0-alpha.18",
+    "@huggingface/transformers": "^3.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

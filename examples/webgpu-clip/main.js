@@ -7,7 +7,7 @@ import {
     RawImage,
     dot,
     softmax,
-} from '@xenova/transformers';
+} from '@huggingface/transformers';
 
 import './style.css';
 
