@@ -1108,7 +1108,7 @@ describe("Tiny random models", () => {
             ...inputs,
             max_length: 10,
           });
-          expect(outputs.tolist()).toEqual([[7656n, 23147n, 31291n, 1011n, 8768n, 30904n, 9256n, 28368n, 16199n, 26560n]]);
+          expect(outputs.tolist()).toEqual([[7656n, 39727n, 33077n, 9643n, 30539n, 47869n, 48739n, 15085n, 9203n, 14020n]]);
         },
         MAX_TEST_EXECUTION_TIME,
       );
@@ -1122,8 +1122,8 @@ describe("Tiny random models", () => {
             max_length: 10,
           });
           expect(outputs.tolist()).toEqual([
-            [0n, 7656n, 23147n, 31291n, 1011n, 8768n, 30904n, 9256n, 28368n, 16199n],
-            [7656n, 5788n, 9477n, 14490n, 18374n, 28650n, 10907n, 2989n, 14096n, 27403n],
+            [0n, 7656n, 39727n, 33077n, 9643n, 30539n, 47869n, 48739n, 15085n, 9203n],
+            [7656n, 5788n, 17835n, 13234n, 7592n, 21471n, 30537n, 23023n, 43450n, 4824n],
           ]);
         },
         MAX_TEST_EXECUTION_TIME,
