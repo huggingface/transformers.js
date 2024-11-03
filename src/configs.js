@@ -91,6 +91,7 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             break;
         case 'llama':
+        case 'olmo':
         case 'mobilellm':
         case 'granite':
         case 'cohere':
