@@ -96,7 +96,7 @@ describe("Tokenizer padding/truncation", () => {
 
       {
         // Expected to throw error if jagged array
-        expect(() => tokenizer(inputs)).toThrowError("Unable to create tensor");
+        expect(() => tokenizer(inputs)).toThrow("Unable to create tensor");
       }
 
       {
@@ -468,7 +468,7 @@ describe("Chat templates", () => {
 
     const chat = [{ role: "user", content: "Hello, how are you?" }];
 
-    expect(() => tokenizer.apply_chat_template(chat, { tokenize: false })).toThrowError("tokenizer.chat_template is not set and no template argument was passed");
+    expect(() => tokenizer.apply_chat_template(chat, { tokenize: false })).toThrow("tokenizer.chat_template is not set and no template argument was passed");
   });
 
   it("should support default parameters", async () => {
