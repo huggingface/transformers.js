@@ -1,10 +1,10 @@
 
 /**
- * @file Helper module for image processing. 
- * 
- * These functions and classes are only used internally, 
+ * @file Helper module for image processing.
+ *
+ * These functions and classes are only used internally,
  * meaning an end-user shouldn't need to access anything here.
- * 
+ *
  * @module utils/image
  */
 
@@ -91,7 +91,7 @@ export class RawImage {
         this.channels = channels;
     }
 
-    /** 
+    /**
      * Returns the size of the image (width, height).
      * @returns {[number, number]} The size of the image (width, height).
      */
@@ -101,9 +101,9 @@ export class RawImage {
 
     /**
      * Helper method for reading an image from a variety of input types.
-     * @param {RawImage|string|URL} input 
+     * @param {RawImage|string|URL} input
      * @returns The image object.
-     * 
+     *
      * **Example:** Read image from a URL.
      * ```javascript
      * let image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
@@ -181,7 +181,7 @@ export class RawImage {
 
     /**
      * Helper method to create a new Image from a tensor
-     * @param {Tensor} tensor 
+     * @param {Tensor} tensor
      */
     static fromTensor(tensor, channel_format = 'CHW') {
         if (tensor.dims.length !== 3) {
@@ -355,7 +355,7 @@ export class RawImage {
                 case 'nearest':
                 case 'bilinear':
                 case 'bicubic':
-                    // Perform resizing using affine transform. 
+                    // Perform resizing using affine transform.
                     // This matches how the python Pillow library does it.
                     img = img.affine([width / this.width, 0, 0, height / this.height], {
                         interpolator: resampleMethod
@@ -368,7 +368,7 @@ export class RawImage {
                     img = img.resize({
                         width, height,
                         fit: 'fill',
-                        kernel: 'lanczos3', // PIL Lanczos uses a kernel size of 3 
+                        kernel: 'lanczos3', // PIL Lanczos uses a kernel size of 3
                     });
                     break;
 
@@ -408,13 +408,14 @@ export class RawImage {
             // Draw image to context, padding in the process
             ctx.drawImage(canvas,
                 0, 0, this.width, this.height,
-                left, top, newWidth, newHeight
+                left, top, this.width, this.height
             );
 
             // Create image from the padded data
             const paddedImage = new RawImage(
                 ctx.getImageData(0, 0, newWidth, newHeight).data,
-                newWidth, newHeight, 4);
+                newWidth, newHeight, 4
+            );
 
             // Convert back so that image has the same number of channels as before
             return paddedImage.convert(numChannels);
@@ -447,7 +448,7 @@ export class RawImage {
             // Create canvas object for this image
             const canvas = this.toCanvas();
 
-            // Create a new canvas of the desired size. This is needed since if the 
+            // Create a new canvas of the desired size. This is needed since if the
             // image is too small, we need to pad it with black pixels.
             const ctx = createCanvasFunction(crop_width, crop_height).getContext('2d');
 
@@ -495,7 +496,7 @@ export class RawImage {
             // Create canvas object for this image
             const canvas = this.toCanvas();
 
-            // Create a new canvas of the desired size. This is needed since if the 
+            // Create a new canvas of the desired size. This is needed since if the
             // image is too small, we need to pad it with black pixels.
             const ctx = createCanvasFunction(crop_width, crop_height).getContext('2d');
 
