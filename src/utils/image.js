@@ -324,11 +324,13 @@ export class RawImage {
         // the user passed a null value in.
         // This allows users to pass in something like `resize(320, null)` to
         // resize to 320 width, but maintain aspect ratio.
-        if (isNullishDimension(width) && isNullishDimension(height)) {
+        const nullish_width = isNullishDimension(width);
+        const nullish_height = isNullishDimension(height);
+        if (nullish_width && nullish_height) {
             return this;
-        } else if (isNullishDimension(width)) {
+        } else if (nullish_width) {
             width = (height / this.height) * this.width;
-        } else if (isNullishDimension(height)) {
+        } else if (nullish_height) {
             height = (width / this.width) * this.height;
         }
 
