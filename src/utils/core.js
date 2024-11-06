@@ -43,40 +43,6 @@ export function escapeRegExp(string) {
 }
 
 /**
- * A base class for creating callable objects.
- * 
- * @type {new () => {(...args: any[]): any, _call(...args: any[]): any}}
- */
-export const Callable = /** @type {any} */ (class {
-    /**
-    * Creates a new instance of the Callable class.
-    */
-    constructor() {
-        /**
-         * Creates a closure that delegates to a private method '_call' with the given arguments.
-         * @type {any}
-         * @param {...any} args Zero or more arguments to pass to the '_call' method.
-         * @returns {*} The result of calling the '_call' method.
-         */
-        let closure = function (...args) {
-            return closure._call(...args)
-        }
-        return Object.setPrototypeOf(closure, new.target.prototype)
-    }
-
-    /**
-     * This method should be implemented in subclasses to provide the
-     * functionality of the callable object.
-     *
-     * @param {any[]} args
-     * @throws {Error} If the subclass does not implement the `_call` method.
-     */
-    _call(...args) {
-        throw Error('Must implement _call method in subclass')
-    }
-});
-
-/**
  * Check if a value is a typed array.
  * @param {*} val The value to check.
  * @returns {boolean} True if the value is a `TypedArray`, false otherwise.
@@ -95,15 +61,6 @@ export function isTypedArray(val) {
  */
 export function isIntegralNumber(x) {
     return Number.isInteger(x) || typeof x === 'bigint'
-}
-
-/**
- * Check if a value is exists.
- * @param {*} x The value to check.
- * @returns {boolean} True if the value exists, false otherwise.
- */
-export function exists(x) {
-    return x !== undefined && x !== null;
 }
 
 /**
@@ -172,4 +129,33 @@ export function product(...a) {
  */
 export function calculateReflectOffset(i, w) {
     return Math.abs((i + w) % (2 * w) - w);
+}
+
+/**
+ * 
+ * @param {Object} o 
+ * @param {string[]} props 
+ * @returns {Object}
+ */
+export function pick(o, props) {
+    return Object.assign(
+        {},
+        ...props.map((prop) => {
+            if (o[prop] !== undefined) {
+                return { [prop]: o[prop] };
+            }
+        })
+    );
+}
+
+/**
+ * Calculate the length of a string, taking multi-byte characters into account.
+ * This mimics the behavior of Python's `len` function.
+ * @param {string} s The string to calculate the length of. 
+ * @returns {number} The length of the string.
+ */
+export function len(s) {
+    let length = 0;
+    for (const c of s) ++length;
+    return length;
 }

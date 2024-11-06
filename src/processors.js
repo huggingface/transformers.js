@@ -4,7 +4,7 @@
  * 
  * **Example:** Using a `WhisperProcessor` to prepare an audio input for a model.
  * ```javascript
- * import { AutoProcessor, read_audio } from '@xenova/transformers';
+ * import { AutoProcessor, read_audio } from '@huggingface/transformers';
  *
  * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
  * let audio = await read_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
@@ -21,6 +21,9 @@
  */
 import {
     Callable,
+} from './utils/generic.js';
+
+import {
     calculateDimensions,
     calculateReflectOffset,
 } from './utils/core.js';
@@ -37,7 +40,7 @@ import {
 } from './utils/maths.js';
 
 
-import { Tensor, permute, cat, interpolate, stack } from './utils/tensor.js';
+import { Tensor, cat, interpolate, stack, interpolate_4d, full } from './utils/tensor.js';
 
 import { RawImage } from './utils/image.js';
 import {
@@ -70,7 +73,7 @@ function center_to_corners_format([centerX, centerY, width, height]) {
  * @param {Tensor} outputs.logits The logits
  * @param {Tensor} outputs.pred_boxes The predicted boxes.
  * @param {number} [threshold=0.5] The threshold to use for the scores.
- * @param {number[][]} [target_sizes=null] The sizes of the original images.
+ * @param {[number, number][]} [target_sizes=null] The sizes of the original images.
  * @param {boolean} [is_zero_shot=false] Whether zero-shot object detection was performed.
  * @return {Object[]} An array of objects containing the post-processed outputs.
  * @private
@@ -116,10 +119,13 @@ function post_process_object_detection(outputs, threshold = 0.5, target_sizes = 
                     // This is the background class, skip it
                     continue;
                 }
-                indices.push(maxIndex);
-
                 // Compute softmax over classes
                 probs = softmax(logit.data);
+
+                if (probs[maxIndex] < threshold) {
+                    continue;
+                }
+                indices.push(maxIndex);
             }
 
             for (const index of indices) {
@@ -142,6 +148,364 @@ function post_process_object_detection(outputs, threshold = 0.5, target_sizes = 
         toReturn.push(info);
     }
     return toReturn;
+}
+
+
+/**
+ * Post-processes the outputs of the model (for semantic segmentation).
+ * @param {*} outputs Raw outputs of the model.
+ * @param {[number, number][]} [target_sizes=null] List of tuples corresponding to the requested final size
+ * (height, width) of each prediction. If unset, predictions will not be resized.
+ * @returns {{segmentation: Tensor; labels: number[]}[]} The semantic segmentation maps.
+ */
+function post_process_semantic_segmentation(outputs, target_sizes = null) {
+
+    const logits = outputs.logits;
+    const batch_size = logits.dims[0];
+
+    if (target_sizes !== null && target_sizes.length !== batch_size) {
+        throw Error("Make sure that you pass in as many target sizes as the batch dimension of the logits")
+    }
+
+    const toReturn = [];
+    for (let i = 0; i < batch_size; ++i) {
+        const target_size = target_sizes !== null ? target_sizes[i] : null;
+
+        let data = logits[i];
+
+        // 1. If target_size is not null, we need to resize the masks to the target size
+        if (target_size !== null) {
+            // resize the masks to the target size
+            data = interpolate(data, target_size, 'bilinear', false);
+        }
+        const [height, width] = target_size ?? data.dims.slice(-2);
+
+        const segmentation = new Tensor(
+            'int32',
+            new Int32Array(height * width),
+            [height, width]
+        );
+
+        // Buffer to store current largest value
+        const buffer = data[0].data;
+        const segmentation_data = segmentation.data;
+        for (let j = 1; j < data.dims[0]; ++j) {
+            const row = data[j].data;
+            for (let k = 0; k < row.length; ++k) {
+                if (row[k] > buffer[k]) {
+                    buffer[k] = row[k];
+                    segmentation_data[k] = j;
+                }
+            }
+        }
+
+        // Store which objects have labels
+        // This is much more efficient that creating a set of the final values
+        const hasLabel = new Array(data.dims[0]);
+        for (let j = 0; j < segmentation_data.length; ++j) {
+            const index = segmentation_data[j];
+            hasLabel[index] = index;
+        }
+        /** @type {number[]} The unique list of labels that were detected */
+        const labels = hasLabel.filter(x => x !== undefined);
+
+        toReturn.push({ segmentation, labels });
+    }
+    return toReturn;
+}
+
+
+/**
+ * Binarize the given masks using `object_mask_threshold`, it returns the associated values of `masks`, `scores` and `labels`.
+ * @param {Tensor} class_logits The class logits.
+ * @param {Tensor} mask_logits The mask logits.
+ * @param {number} object_mask_threshold A number between 0 and 1 used to binarize the masks.
+ * @param {number} num_labels The number of labels.
+ * @returns {[Tensor[], number[], number[]]} The binarized masks, the scores, and the labels.
+ * @private
+ */
+function remove_low_and_no_objects(class_logits, mask_logits, object_mask_threshold, num_labels) {
+
+    const mask_probs_item = [];
+    const pred_scores_item = [];
+    const pred_labels_item = [];
+
+    for (let j = 0; j < class_logits.dims[0]; ++j) {
+        const cls = class_logits[j];
+        const mask = mask_logits[j];
+
+        const pred_label = max(cls.data)[1];
+        if (pred_label === num_labels) {
+            // Is the background, so we ignore it
+            continue;
+        }
+
+        const scores = softmax(cls.data);
+        const pred_score = scores[pred_label];
+        if (pred_score > object_mask_threshold) {
+            mask_probs_item.push(mask);
+            pred_scores_item.push(pred_score);
+            pred_labels_item.push(pred_label);
+        }
+    }
+
+    return [mask_probs_item, pred_scores_item, pred_labels_item];
+}
+
+/**
+ * Checks whether the segment is valid or not.
+ * @param {Int32Array} mask_labels Labels for each pixel in the mask.
+ * @param {Tensor[]} mask_probs Probabilities for each pixel in the masks.
+ * @param {number} k The class id of the segment.
+ * @param {number} mask_threshold The mask threshold.
+ * @param {number} overlap_mask_area_threshold The overlap mask area threshold.
+ * @returns {[boolean, number[]]} Whether the segment is valid or not, and the indices of the valid labels.
+ * @private
+ */
+function check_segment_validity(
+    mask_labels,
+    mask_probs,
+    k,
+    mask_threshold = 0.5,
+    overlap_mask_area_threshold = 0.8
+) {
+    // mask_k is a 1D array of indices, indicating where the mask is equal to k
+    const mask_k = [];
+    let mask_k_area = 0;
+    let original_area = 0;
+
+    const mask_probs_k_data = mask_probs[k].data;
+
+    // Compute the area of all the stuff in query k
+    for (let i = 0; i < mask_labels.length; ++i) {
+        if (mask_labels[i] === k) {
+            mask_k.push(i);
+            ++mask_k_area;
+        }
+
+        if (mask_probs_k_data[i] >= mask_threshold) {
+            ++original_area;
+        }
+    }
+    let mask_exists = mask_k_area > 0 && original_area > 0;
+
+    // Eliminate disconnected tiny segments
+    if (mask_exists) {
+        // Perform additional check
+        let area_ratio = mask_k_area / original_area;
+        mask_exists = area_ratio > overlap_mask_area_threshold;
+    }
+
+    return [mask_exists, mask_k]
+}
+
+/**
+ * Computes the segments.
+ * @param {Tensor[]} mask_probs The mask probabilities.
+ * @param {number[]} pred_scores The predicted scores.
+ * @param {number[]} pred_labels The predicted labels.
+ * @param {number} mask_threshold The mask threshold.
+ * @param {number} overlap_mask_area_threshold The overlap mask area threshold.
+ * @param {Set<number>} label_ids_to_fuse The label ids to fuse.
+ * @param {number[]} target_size The target size of the image.
+ * @returns {[Tensor, Array<{id: number, label_id: number, score: number}>]} The computed segments.
+ * @private
+ */
+function compute_segments(
+    mask_probs,
+    pred_scores,
+    pred_labels,
+    mask_threshold,
+    overlap_mask_area_threshold,
+    label_ids_to_fuse = null,
+    target_size = null,
+) {
+    const [height, width] = target_size ?? mask_probs[0].dims;
+
+    const segmentation = new Tensor(
+        'int32',
+        new Int32Array(height * width),
+        [height, width]
+    );
+    const segments = [];
+
+    // 1. If target_size is not null, we need to resize the masks to the target size
+    if (target_size !== null) {
+        // resize the masks to the target size
+        for (let i = 0; i < mask_probs.length; ++i) {
+            mask_probs[i] = interpolate(mask_probs[i], target_size, 'bilinear', false);
+        }
+    }
+
+    // 2. Weigh each mask by its prediction score
+    // NOTE: `mask_probs` is updated in-place
+    // 
+    // Temporary storage for the best label/scores for each pixel ([height, width]):
+    const mask_labels = new Int32Array(mask_probs[0].data.length);
+    const bestScores = new Float32Array(mask_probs[0].data.length);
+
+    for (let i = 0; i < mask_probs.length; ++i) {
+        let score = pred_scores[i];
+
+        const mask_probs_i_data = mask_probs[i].data;
+
+        for (let j = 0; j < mask_probs_i_data.length; ++j) {
+            mask_probs_i_data[j] *= score
+            if (mask_probs_i_data[j] > bestScores[j]) {
+                mask_labels[j] = i;
+                bestScores[j] = mask_probs_i_data[j];
+            }
+        }
+    }
+
+    let current_segment_id = 0;
+
+    // let stuff_memory_list = {}
+    const segmentation_data = segmentation.data;
+    for (let k = 0; k < pred_labels.length; ++k) {
+        const pred_class = pred_labels[k];
+
+        // TODO add `should_fuse`
+        // let should_fuse = pred_class in label_ids_to_fuse
+
+        // Check if mask exists and large enough to be a segment
+        const [mask_exists, mask_k] = check_segment_validity(
+            mask_labels,
+            mask_probs,
+            k,
+            mask_threshold,
+            overlap_mask_area_threshold
+        )
+
+        if (!mask_exists) {
+            // Nothing to see here
+            continue;
+        }
+
+        // TODO
+        // if (pred_class in stuff_memory_list) {
+        //     current_segment_id = stuff_memory_list[pred_class]
+        // } else {
+        //     current_segment_id += 1;
+        // }
+        ++current_segment_id;
+
+
+        // Add current object segment to final segmentation map
+        for (const index of mask_k) {
+            segmentation_data[index] = current_segment_id;
+        }
+
+        segments.push({
+            id: current_segment_id,
+            label_id: pred_class,
+            // was_fused: should_fuse, TODO
+            score: pred_scores[k],
+        })
+
+        // TODO
+        // if(should_fuse){
+        //     stuff_memory_list[pred_class] = current_segment_id
+        // }
+    }
+
+    return [segmentation, segments];
+}
+
+
+/**
+ * Post-process the model output to generate the final panoptic segmentation.
+ * @param {*} outputs The model output to post process
+ * @param {number} [threshold=0.5] The probability score threshold to keep predicted instance masks.
+ * @param {number} [mask_threshold=0.5] Threshold to use when turning the predicted masks into binary values.
+ * @param {number} [overlap_mask_area_threshold=0.8] The overlap mask area threshold to merge or discard small disconnected parts within each binary instance mask.
+ * @param {Set<number>} [label_ids_to_fuse=null] The labels in this state will have all their instances be fused together.
+ * @param {[number, number][]} [target_sizes=null] The target sizes to resize the masks to.
+ * @returns {Array<{ segmentation: Tensor, segments_info: Array<{id: number, label_id: number, score: number}>}>}
+ */
+function post_process_panoptic_segmentation(
+    outputs,
+    threshold = 0.5,
+    mask_threshold = 0.5,
+    overlap_mask_area_threshold = 0.8,
+    label_ids_to_fuse = null,
+    target_sizes = null,
+) {
+    if (label_ids_to_fuse === null) {
+        console.warn("`label_ids_to_fuse` unset. No instance will be fused.")
+        label_ids_to_fuse = new Set();
+    }
+
+    const class_queries_logits = outputs.class_queries_logits ?? outputs.logits; // [batch_size, num_queries, num_classes+1]
+    const masks_queries_logits = outputs.masks_queries_logits ?? outputs.pred_masks; // [batch_size, num_queries, height, width]
+
+    const mask_probs = masks_queries_logits.sigmoid()  // [batch_size, num_queries, height, width]
+
+    let [batch_size, num_queries, num_labels] = class_queries_logits.dims;
+    num_labels -= 1; // Remove last class (background)
+
+    if (target_sizes !== null && target_sizes.length !== batch_size) {
+        throw Error("Make sure that you pass in as many target sizes as the batch dimension of the logits")
+    }
+
+    let toReturn = [];
+    for (let i = 0; i < batch_size; ++i) {
+        let target_size = target_sizes !== null ? target_sizes[i] : null;
+
+        let class_logits = class_queries_logits[i];
+        let mask_logits = mask_probs[i];
+
+        let [mask_probs_item, pred_scores_item, pred_labels_item] = remove_low_and_no_objects(class_logits, mask_logits, threshold, num_labels);
+
+        if (pred_labels_item.length === 0) {
+            // No mask found
+            let [height, width] = target_size ?? mask_logits.dims.slice(-2);
+
+            let segmentation = new Tensor(
+                'int32',
+                new Int32Array(height * width).fill(-1),
+                [height, width]
+            )
+            toReturn.push({
+                segmentation: segmentation,
+                segments_info: []
+            });
+            continue;
+        }
+
+
+        // Get segmentation map and segment information of batch item
+        let [segmentation, segments] = compute_segments(
+            mask_probs_item,
+            pred_scores_item,
+            pred_labels_item,
+            mask_threshold,
+            overlap_mask_area_threshold,
+            label_ids_to_fuse,
+            target_size,
+        )
+
+        toReturn.push({
+            segmentation: segmentation,
+            segments_info: segments
+        })
+    }
+
+    return toReturn;
+}
+
+
+/**
+ * Post-processes the outputs of the model (for instance segmentation).
+ * @param {*} outputs Raw outputs of the model.
+ * @param {number} [threshold=0.5] The probability score threshold to keep predicted instance masks.
+ * @param {[number, number][]} [target_sizes=null] List of tuples corresponding to the requested final size
+ * (height, width) of each prediction. If unset, predictions will not be resized.
+ * @returns {Array<{ segmentation: Tensor, segments_info: Array<{id: number, label_id: number, score: number}>}>}
+ */
+function post_process_instance_segmentation(outputs, threshold = 0.5, target_sizes = null) {
+    throw new Error('Not implemented yet');
+    return [];
 }
 
 /**
@@ -334,10 +698,11 @@ export class ImageFeatureExtractor extends FeatureExtractor {
         const threshold = gray_threshold / 255;
 
         let x_min = gray_image.width, y_min = gray_image.height, x_max = 0, y_max = 0;
+        const gray_image_data = gray_image.data;
         for (let j = 0; j < gray_image.height; ++j) {
             const row = j * gray_image.width;
             for (let i = 0; i < gray_image.width; ++i) {
-                if ((gray_image.data[row + i] - minValue) / diff < threshold) {
+                if ((gray_image_data[row + i] - minValue) / diff < threshold) {
                     // We have a non-zero pixel, so we update the min/max values accordingly
                     x_min = Math.min(x_min, i);
                     y_min = Math.min(y_min, j);
@@ -688,7 +1053,7 @@ export class ImageFeatureExtractor extends FeatureExtractor {
         return {
             original_size: [srcHeight, srcWidth],
             reshaped_input_size: reshaped_input_size,
-            pixel_values: pixel_values,
+            pixel_values,
         }
     }
 
@@ -711,7 +1076,7 @@ export class ImageFeatureExtractor extends FeatureExtractor {
         const pixel_values = stack(imageData.map(x => x.pixel_values), 0);
 
         return {
-            pixel_values: pixel_values,
+            pixel_values,
 
             // Original sizes of images
             original_sizes: imageData.map(x => x.original_size),
@@ -723,76 +1088,25 @@ export class ImageFeatureExtractor extends FeatureExtractor {
 
 }
 
-export class SegformerFeatureExtractor extends ImageFeatureExtractor {
-
-    /**
-     * Converts the output of `SegformerForSemanticSegmentation` into semantic segmentation maps.
-     * @param {*} outputs Raw outputs of the model.
-     * @param {number[][]} [target_sizes=null] List of tuples corresponding to the requested final size
-     * (height, width) of each prediction. If unset, predictions will not be resized.
-     * @returns {{segmentation: Tensor; labels: number[]}[]} The semantic segmentation maps.
-     */
-    post_process_semantic_segmentation(outputs, target_sizes = null) {
-
-        const logits = outputs.logits;
-        const batch_size = logits.dims[0];
-
-        if (target_sizes !== null && target_sizes.length !== batch_size) {
-            throw Error("Make sure that you pass in as many target sizes as the batch dimension of the logits")
-        }
-
-        const toReturn = [];
-        for (let i = 0; i < batch_size; ++i) {
-            const target_size = target_sizes !== null ? target_sizes[i] : null;
-
-            let data = logits[i];
-
-            // 1. If target_size is not null, we need to resize the masks to the target size
-            if (target_size !== null) {
-                // resize the masks to the target size
-                data = interpolate(data, target_size, 'bilinear', false);
-            }
-            const [height, width] = target_size ?? data.dims.slice(-2);
-
-            const segmentation = new Tensor(
-                'int32',
-                new Int32Array(height * width),
-                [height, width]
-            );
-
-            // Buffer to store current largest value
-            const buffer = data[0].data;
-            for (let j = 1; j < data.dims[0]; ++j) {
-                const row = data[j].data;
-                for (let k = 0; k < row.length; ++k) {
-                    if (row[k] > buffer[k]) {
-                        buffer[k] = row[k];
-                        segmentation.data[k] = j;
-                    }
-                }
-            }
-
-            // Store which objects have labels
-            // This is much more efficient that creating a set of the final values
-            const hasLabel = new Array(data.dims[0]);
-            const out = segmentation.data;
-            for (let j = 0; j < out.length; ++j) {
-                const index = out[j];
-                hasLabel[index] = index;
-            }
-            /** @type {number[]} The unique list of labels that were detected */
-            const labels = hasLabel.filter(x => x !== undefined);
-
-            toReturn.push({ segmentation, labels });
-        }
-        return toReturn;
+export class SapiensFeatureExtractor extends ImageFeatureExtractor {
+    /** @type {typeof post_process_semantic_segmentation} */
+    post_process_semantic_segmentation(...args) {
+        return post_process_semantic_segmentation(...args);
     }
 }
+export class SegformerFeatureExtractor extends ImageFeatureExtractor {
+    /** @type {typeof post_process_semantic_segmentation} */
+    post_process_semantic_segmentation(...args) {
+        return post_process_semantic_segmentation(...args);
+    }
+}
+export class PvtImageProcessor extends ImageFeatureExtractor { }
 export class DPTFeatureExtractor extends ImageFeatureExtractor { }
 export class DPTImageProcessor extends DPTFeatureExtractor { } // NOTE: extends DPTFeatureExtractor
 export class BitImageProcessor extends ImageFeatureExtractor { }
 export class GLPNFeatureExtractor extends ImageFeatureExtractor { }
 export class CLIPFeatureExtractor extends ImageFeatureExtractor { }
+export class CLIPImageProcessor extends CLIPFeatureExtractor { } // NOTE: extends CLIPFeatureExtractor
 export class ChineseCLIPFeatureExtractor extends ImageFeatureExtractor { }
 export class SiglipImageProcessor extends ImageFeatureExtractor { }
 export class ConvNextFeatureExtractor extends ImageFeatureExtractor {
@@ -849,16 +1163,27 @@ export class EfficientNetImageProcessor extends ImageFeatureExtractor {
     }
 }
 
+export class MobileNetV1FeatureExtractor extends ImageFeatureExtractor { }
+export class MobileNetV2FeatureExtractor extends ImageFeatureExtractor { }
+export class MobileNetV3FeatureExtractor extends ImageFeatureExtractor { }
+export class MobileNetV4FeatureExtractor extends ImageFeatureExtractor { }
 
 export class MobileViTFeatureExtractor extends ImageFeatureExtractor { }
 export class MobileViTImageProcessor extends MobileViTFeatureExtractor { } // NOTE extends MobileViTFeatureExtractor
 export class OwlViTFeatureExtractor extends ImageFeatureExtractor {
-    /** @type {post_process_object_detection} */
+    /** @type {typeof post_process_object_detection} */
     post_process_object_detection(...args) {
         return post_process_object_detection(...args);
     }
 }
 export class Owlv2ImageProcessor extends OwlViTFeatureExtractor { } // NOTE extends OwlViTFeatureExtractor
+
+export class RTDetrImageProcessor extends ImageFeatureExtractor {
+    /** @type {typeof post_process_object_detection} */
+    post_process_object_detection(...args) {
+        return post_process_object_detection(...args);
+    }
+}
 
 export class DeiTFeatureExtractor extends ImageFeatureExtractor { }
 export class BeitFeatureExtractor extends ImageFeatureExtractor { }
@@ -888,6 +1213,7 @@ export class DonutFeatureExtractor extends ImageFeatureExtractor {
         });
     }
 }
+export class DonutImageProcessor extends DonutFeatureExtractor { } // NOTE extends DonutFeatureExtractor
 export class NougatImageProcessor extends DonutFeatureExtractor { } // NOTE extends DonutFeatureExtractor
 
 /**
@@ -915,297 +1241,19 @@ export class DetrFeatureExtractor extends ImageFeatureExtractor {
         // TODO support different mask sizes (not just 64x64)
         // Currently, just fill pixel mask with 1s
         const maskSize = [result.pixel_values.dims[0], 64, 64];
-        const pixel_mask = new Tensor(
-            'int64',
-            new BigInt64Array(maskSize.reduce((a, b) => a * b)).fill(1n),
-            maskSize
-        );
+        const pixel_mask = full(maskSize, 1n);
 
         return { ...result, pixel_mask };
     }
 
-    /**
-     * Post-processes the outputs of the model (for object detection).
-     * @param {Object} outputs The outputs of the model that must be post-processed
-     * @param {Tensor} outputs.logits The logits
-     * @param {Tensor} outputs.pred_boxes The predicted boxes.
-     * @return {Object[]} An array of objects containing the post-processed outputs.
-     */
-
-    /** @type {post_process_object_detection} */
+    /** @type {typeof post_process_object_detection} */
     post_process_object_detection(...args) {
         return post_process_object_detection(...args);
     }
 
-    /**
-     * Binarize the given masks using `object_mask_threshold`, it returns the associated values of `masks`, `scores` and `labels`.
-     * @param {Tensor} class_logits The class logits.
-     * @param {Tensor} mask_logits The mask logits.
-     * @param {number} object_mask_threshold A number between 0 and 1 used to binarize the masks.
-     * @param {number} num_labels The number of labels.
-     * @returns {[Tensor[], number[], number[]]} The binarized masks, the scores, and the labels.
-     */
-    remove_low_and_no_objects(class_logits, mask_logits, object_mask_threshold, num_labels) {
-
-        let mask_probs_item = [];
-        let pred_scores_item = [];
-        let pred_labels_item = [];
-
-        for (let j = 0; j < class_logits.dims[0]; ++j) {
-            let cls = class_logits[j];
-            let mask = mask_logits[j];
-
-            let pred_label = max(cls.data)[1];
-            if (pred_label === num_labels) {
-                // Is the background, so we ignore it
-                continue;
-            }
-
-            let scores = softmax(cls.data);
-            let pred_score = scores[pred_label];
-            if (pred_score > object_mask_threshold) {
-                mask_probs_item.push(mask);
-                pred_scores_item.push(pred_score);
-                pred_labels_item.push(pred_label);
-            }
-        }
-
-        return [mask_probs_item, pred_scores_item, pred_labels_item];
-
-    }
-
-    /**
-     * Checks whether the segment is valid or not.
-     * @param {Int32Array} mask_labels Labels for each pixel in the mask.
-     * @param {Tensor[]} mask_probs Probabilities for each pixel in the masks.
-     * @param {number} k The class id of the segment.
-     * @param {number} mask_threshold The mask threshold.
-     * @param {number} overlap_mask_area_threshold The overlap mask area threshold.
-     * @returns {[boolean, number[]]} Whether the segment is valid or not, and the indices of the valid labels.
-     */
-    check_segment_validity(
-        mask_labels,
-        mask_probs,
-        k,
-        mask_threshold = 0.5,
-        overlap_mask_area_threshold = 0.8
-    ) {
-        // mask_k is a 1D array of indices, indicating where the mask is equal to k
-        let mask_k = [];
-        let mask_k_area = 0;
-        let original_area = 0;
-
-        // Compute the area of all the stuff in query k
-        for (let i = 0; i < mask_labels.length; ++i) {
-            if (mask_labels[i] === k) {
-                mask_k.push(i);
-                ++mask_k_area;
-            }
-
-            if (mask_probs[k].data[i] >= mask_threshold) {
-                ++original_area;
-            }
-        }
-        let mask_exists = mask_k_area > 0 && original_area > 0;
-
-        // Eliminate disconnected tiny segments
-        if (mask_exists) {
-            // Perform additional check
-            let area_ratio = mask_k_area / original_area;
-            mask_exists = area_ratio > overlap_mask_area_threshold;
-        }
-
-        return [mask_exists, mask_k]
-    }
-
-    /**
-     * Computes the segments.
-     * @param {Tensor[]} mask_probs The mask probabilities.
-     * @param {number[]} pred_scores The predicted scores.
-     * @param {number[]} pred_labels The predicted labels.
-     * @param {number} mask_threshold The mask threshold.
-     * @param {number} overlap_mask_area_threshold The overlap mask area threshold.
-     * @param {Set<number>} label_ids_to_fuse The label ids to fuse.
-     * @param {number[]} target_size The target size of the image.
-     * @returns {[Tensor, Array<{id: number, label_id: number, score: number}>]} The computed segments.
-     */
-    compute_segments(
-        mask_probs,
-        pred_scores,
-        pred_labels,
-        mask_threshold,
-        overlap_mask_area_threshold,
-        label_ids_to_fuse = null,
-        target_size = null,
-    ) {
-        let [height, width] = target_size ?? mask_probs[0].dims;
-
-        let segmentation = new Tensor(
-            'int32',
-            new Int32Array(height * width),
-            [height, width]
-        );
-        let segments = [];
-
-        // 1. If target_size is not null, we need to resize the masks to the target size
-        if (target_size !== null) {
-            // resize the masks to the target size
-            for (let i = 0; i < mask_probs.length; ++i) {
-                mask_probs[i] = interpolate(mask_probs[i], target_size, 'bilinear', false);
-            }
-        }
-
-        // 2. Weigh each mask by its prediction score
-        // NOTE: `mask_probs` is updated in-place
-        // 
-        // Temporary storage for the best label/scores for each pixel ([height, width]):
-        let mask_labels = new Int32Array(mask_probs[0].data.length);
-        let bestScores = new Float32Array(mask_probs[0].data.length);
-
-        for (let i = 0; i < mask_probs.length; ++i) {
-            let score = pred_scores[i];
-
-            for (let j = 0; j < mask_probs[i].data.length; ++j) {
-                mask_probs[i].data[j] *= score
-                if (mask_probs[i].data[j] > bestScores[j]) {
-                    mask_labels[j] = i;
-                    bestScores[j] = mask_probs[i].data[j];
-                }
-            }
-        }
-
-        let current_segment_id = 0;
-
-        // let stuff_memory_list = {}
-        for (let k = 0; k < pred_labels.length; ++k) {
-            let pred_class = pred_labels[k];
-
-            // TODO add `should_fuse`
-            // let should_fuse = pred_class in label_ids_to_fuse
-
-            // Check if mask exists and large enough to be a segment
-            let [mask_exists, mask_k] = this.check_segment_validity(
-                mask_labels,
-                mask_probs,
-                k,
-                mask_threshold,
-                overlap_mask_area_threshold
-            )
-
-            if (!mask_exists) {
-                // Nothing to see here
-                continue;
-            }
-
-            // TODO
-            // if (pred_class in stuff_memory_list) {
-            //     current_segment_id = stuff_memory_list[pred_class]
-            // } else {
-            //     current_segment_id += 1;
-            // }
-            ++current_segment_id;
-
-
-            // Add current object segment to final segmentation map
-            for (let index of mask_k) {
-                segmentation.data[index] = current_segment_id;
-            }
-
-            segments.push({
-                id: current_segment_id,
-                label_id: pred_class,
-                // was_fused: should_fuse, TODO
-                score: pred_scores[k],
-            })
-
-            // TODO
-            // if(should_fuse){
-            //     stuff_memory_list[pred_class] = current_segment_id
-            // }
-        }
-
-        return [segmentation, segments];
-    }
-
-    /**
-     * Post-process the model output to generate the final panoptic segmentation.
-     * @param {*} outputs The model output to post process
-     * @param {number} [threshold=0.5] The probability score threshold to keep predicted instance masks.
-     * @param {number} [mask_threshold=0.5] Threshold to use when turning the predicted masks into binary values.
-     * @param {number} [overlap_mask_area_threshold=0.8] The overlap mask area threshold to merge or discard small disconnected parts within each binary instance mask.
-     * @param {Set<number>} [label_ids_to_fuse=null] The labels in this state will have all their instances be fused together.
-     * @param {number[][]} [target_sizes=null] The target sizes to resize the masks to.
-     * @returns {Array<{ segmentation: Tensor, segments_info: Array<{id: number, label_id: number, score: number}>}>}
-     */
-    post_process_panoptic_segmentation(
-        outputs,
-        threshold = 0.5,
-        mask_threshold = 0.5,
-        overlap_mask_area_threshold = 0.8,
-        label_ids_to_fuse = null,
-        target_sizes = null,
-    ) {
-        if (label_ids_to_fuse === null) {
-            console.warn("`label_ids_to_fuse` unset. No instance will be fused.")
-            label_ids_to_fuse = new Set();
-        }
-
-        const class_queries_logits = outputs.logits; // [batch_size, num_queries, num_classes+1]
-        const masks_queries_logits = outputs.pred_masks; // [batch_size, num_queries, height, width]
-
-        const mask_probs = masks_queries_logits.sigmoid()  // [batch_size, num_queries, height, width]
-
-        let [batch_size, num_queries, num_labels] = class_queries_logits.dims;
-        num_labels -= 1; // Remove last class (background)
-
-        if (target_sizes !== null && target_sizes.length !== batch_size) {
-            throw Error("Make sure that you pass in as many target sizes as the batch dimension of the logits")
-        }
-
-        let toReturn = [];
-        for (let i = 0; i < batch_size; ++i) {
-            let target_size = target_sizes !== null ? target_sizes[i] : null;
-
-            let class_logits = class_queries_logits[i];
-            let mask_logits = mask_probs[i];
-
-            let [mask_probs_item, pred_scores_item, pred_labels_item] = this.remove_low_and_no_objects(class_logits, mask_logits, threshold, num_labels);
-
-            if (pred_labels_item.length === 0) {
-                // No mask found
-                let [height, width] = target_size ?? mask_logits.dims.slice(-2);
-
-                let segmentation = new Tensor(
-                    'int32',
-                    new Int32Array(height * width).fill(-1),
-                    [height, width]
-                )
-                toReturn.push({
-                    segmentation: segmentation,
-                    segments_info: []
-                });
-                continue;
-            }
-
-
-            // Get segmentation map and segment information of batch item
-            let [segmentation, segments] = this.compute_segments(
-                mask_probs_item,
-                pred_scores_item,
-                pred_labels_item,
-                mask_threshold,
-                overlap_mask_area_threshold,
-                label_ids_to_fuse,
-                target_size,
-            )
-
-            toReturn.push({
-                segmentation: segmentation,
-                segments_info: segments
-            })
-        }
-
-        return toReturn;
+    /** @type {typeof post_process_panoptic_segmentation} */
+    post_process_panoptic_segmentation(...args) {
+        return post_process_panoptic_segmentation(...args);
     }
 
     post_process_instance_segmentation() {
@@ -1214,8 +1262,22 @@ export class DetrFeatureExtractor extends ImageFeatureExtractor {
     }
 }
 
+export class MaskFormerFeatureExtractor extends ImageFeatureExtractor {
+
+    /** @type {typeof post_process_panoptic_segmentation} */
+    post_process_panoptic_segmentation(...args) {
+        return post_process_panoptic_segmentation(...args);
+    }
+
+    post_process_instance_segmentation() {
+        // TODO
+        throw Error("Not implemented yet");
+    }
+}
+
+
 export class YolosFeatureExtractor extends ImageFeatureExtractor {
-    /** @type {post_process_object_detection} */
+    /** @type {typeof post_process_object_detection} */
     post_process_object_detection(...args) {
         return post_process_object_detection(...args);
     }
@@ -1228,6 +1290,7 @@ export class YolosFeatureExtractor extends ImageFeatureExtractor {
  * @property {HeightWidth[]} reshaped_input_sizes
  * @property {Tensor} [input_points]
  * @property {Tensor} [input_labels]
+ * @property {Tensor} [input_boxes]
  */
 
 export class SamImageProcessor extends ImageFeatureExtractor {
@@ -1239,7 +1302,7 @@ export class SamImageProcessor extends ImageFeatureExtractor {
      * @param {HeightWidth[]} reshaped_input_sizes 
      * @returns {Tensor}
      */
-    reshape_input_points(input_points, original_sizes, reshaped_input_sizes) {
+    reshape_input_points(input_points, original_sizes, reshaped_input_sizes, is_bounding_box = false) {
 
         // Make deep copy to avoid altering user's input
         input_points = structuredClone(input_points);
@@ -1248,7 +1311,9 @@ export class SamImageProcessor extends ImageFeatureExtractor {
         // TODO: add support for 2D input_points
         if (shape.length === 3) {
             // Correct user's input
-            shape = [1, ...shape];
+            if (!is_bounding_box) {
+                shape = [1, ...shape];
+            }
             input_points = [input_points];
         } else if (shape.length !== 4) {
             throw Error("The input_points must be a 4D tensor of shape `batch_size`, `point_batch_size`, `nb_points_per_image`, `2`.")
@@ -1266,8 +1331,8 @@ export class SamImageProcessor extends ImageFeatureExtractor {
 
             for (let j = 0; j < input_points[i].length; ++j) { // point_batch_size
                 for (let k = 0; k < input_points[i][j].length; ++k) { // nb_points_per_image
-                    for (let w = 0; w < input_points[i][j][k].length; ++w) { // 2
-                        input_points[i][j][k][w] *= resizeFactors[w];
+                    for (let w = 0; w < input_points[i][j][k].length; ++w) { // 2 or 4
+                        input_points[i][j][k][w] *= resizeFactors[w % 2];
                     }
                 }
             }
@@ -1308,15 +1373,29 @@ export class SamImageProcessor extends ImageFeatureExtractor {
     }
     /**
      * @param {any[]} images The URL(s) of the image(s) to extract features from.
-     * @param {any} [input_points] A 3D or 4D array, representing the input points provided by the user.
+     * @param {Object} [options] Additional options for the processor.
+     * @param {any} [options.input_points=null] A 3D or 4D array, representing the input points provided by the user.
      * - 3D: `[point_batch_size, nb_points_per_image, 2]`. In this case, `batch_size` is assumed to be 1.
      * - 4D: `[batch_size, point_batch_size, nb_points_per_image, 2]`.
-     * @param {any} [input_labels] A 2D or 3D array, representing the input labels for the points, used by the prompt encoder to encode the prompt.
+     * @param {any} [options.input_labels=null] A 2D or 3D array, representing the input labels for the points, used by the prompt encoder to encode the prompt.
      * - 2D: `[point_batch_size, nb_points_per_image]`. In this case, `batch_size` is assumed to be 1.
      * - 3D: `[batch_size, point_batch_size, nb_points_per_image]`.
+     * @param {number[][][]} [options.input_boxes=null] A 3D array of shape `(batch_size, num_boxes, 4)`, representing the input boxes provided by the user.
+     * This is used by the prompt encoder to encode the prompt. Generally yields to much better generated masks.
+     * The processor will generate a tensor, with each dimension corresponding respectively to the image batch size,
+     * the number of boxes per image and the coordinates of the top left and botton right point of the box.
+     * In the order (`x1`, `y1`, `x2`, `y2`):
+     * - `x1`: the x coordinate of the top left point of the input box
+     * - `y1`: the y coordinate of the top left point of the input box
+     * - `x2`: the x coordinate of the bottom right point of the input box
+     * - `y2`: the y coordinate of the bottom right point of the input box
      * @returns {Promise<SamImageProcessorResult>}
      */
-    async _call(images, input_points = null, input_labels = null) {
+    async _call(images, {
+        input_points = null,
+        input_labels = null,
+        input_boxes = null
+    } = {}) {
         // TODO allow user to use preprocessed images
         /** @type {SamImageProcessorResult} */
         const processed = await super._call(images);
@@ -1334,23 +1413,29 @@ export class SamImageProcessor extends ImageFeatureExtractor {
             processed.input_labels = this.add_input_labels(input_labels, processed.input_points);
         }
 
+        if (input_boxes) {
+            processed.input_boxes = this.reshape_input_points(
+                input_boxes, processed.original_sizes, processed.reshaped_input_sizes, true,
+            );
+        }
+
         return processed;
     }
 
     /**
      * Remove padding and upscale masks to the original image size.
      * @param {Tensor} masks Batched masks from the mask_decoder in (batch_size, num_channels, height, width) format.
-     * @param {number[][]} original_sizes The original sizes of each image before it was resized to the model's expected input shape, in (height, width) format.
-     * @param {number[][]} reshaped_input_sizes The size of each image as it is fed to the model, in (height, width) format. Used to remove padding.
+     * @param {[number, number][]} original_sizes The original sizes of each image before it was resized to the model's expected input shape, in (height, width) format.
+     * @param {[number, number][]} reshaped_input_sizes The size of each image as it is fed to the model, in (height, width) format. Used to remove padding.
      * @param {Object} options Optional parameters for post-processing.
      * @param {number} [options.mask_threshold] The threshold to use for binarizing the masks.
      * @param {boolean} [options.binarize] Whether to binarize the masks.
      * @param {Object} [options.pad_size] The target size the images were padded to before being passed to the model. If `null`, the target size is assumed to be the processor's `pad_size`.
      * @param {number} [options.pad_size.height] The height the images were padded to.
      * @param {number} [options.pad_size.width] The width the images were padded to.
-     * @returns {Tensor[]} Batched masks in batch_size, num_channels, height, width) format, where (height, width) is given by original_size.
+     * @returns {Promise<Tensor[]>} Batched masks in batch_size, num_channels, height, width) format, where (height, width) is given by original_size.
      */
-    post_process_masks(masks, original_sizes, reshaped_input_sizes, {
+    async post_process_masks(masks, original_sizes, reshaped_input_sizes, {
         mask_threshold = 0.0,
         binarize = true,
         pad_size = null,
@@ -1361,49 +1446,71 @@ export class SamImageProcessor extends ImageFeatureExtractor {
 
         pad_size = pad_size ?? this.pad_size;
 
+        /** @type {[number, number]} */
         const target_image_size = [pad_size.height, pad_size.width];
 
         for (let i = 0; i < original_sizes.length; ++i) {
             const original_size = original_sizes[i];
             const reshaped_input_size = reshaped_input_sizes[i];
 
-            const mask = masks[i]; // [b, c, h, w]
+            // Upscale mask to padded size
+            let interpolated_mask = (await interpolate_4d(
+                masks[i],
+                { mode: 'bilinear', size: target_image_size }
+            ));
 
-            // TODO: improve
-            const interpolated_masks = [];
-            for (let j = 0; j < mask.dims[0]; ++j) {
-                const m = mask[j]; // 3d tensor
+            // Crop mask
+            interpolated_mask = interpolated_mask.slice(null, null, [0, reshaped_input_size[0]], [0, reshaped_input_size[1]]);
 
-                // Upscale mask to padded size
-                let interpolated_mask = interpolate(m, target_image_size, 'bilinear', false);
+            // Downscale mask
+            interpolated_mask = (await interpolate_4d(
+                interpolated_mask,
+                { mode: 'bilinear', size: original_size }
+            ));
 
-                // Crop mask
-                interpolated_mask = interpolated_mask.slice(null, [0, reshaped_input_size[0]], [0, reshaped_input_size[1]]);
-
-                // Downscale mask
-                interpolated_mask = interpolate(interpolated_mask, original_size, 'bilinear', false);
-
-                if (binarize) {
-                    const binarizedMaskData = new Uint8Array(interpolated_mask.data.length);
-                    for (let i = 0; i < interpolated_mask.data.length; ++i) {
-                        if (interpolated_mask.data[i] > mask_threshold) {
-                            binarizedMaskData[i] = 1;
-                        }
+            if (binarize) {
+                const data = interpolated_mask.data;
+                const binarizedMaskData = new Uint8Array(data.length);
+                for (let i = 0; i < data.length; ++i) {
+                    if (data[i] > mask_threshold) {
+                        binarizedMaskData[i] = 1;
                     }
-                    interpolated_mask = new Tensor(
-                        'bool',
-                        binarizedMaskData,
-                        interpolated_mask.dims
-                    )
                 }
-
-                interpolated_masks.push(interpolated_mask);
+                interpolated_mask = new Tensor(
+                    'bool',
+                    binarizedMaskData,
+                    interpolated_mask.dims
+                )
             }
 
-            output_masks.push(stack(interpolated_masks));
+            output_masks.push(interpolated_mask);
         }
 
         return output_masks;
+    }
+
+    /**
+     * Generates a list of crop boxes of different sizes. Each layer has (2**i)**2 boxes for the ith layer.
+     * @param {RawImage} image Input original image
+     * @param {number} target_size Target size of the resized image
+     * @param {Object} options Options for generating crop boxes 
+     * @param {number} [options.crop_n_layers] If >0, mask prediction will be run again on crops of the image.
+     * Sets the number of layers to run, where each layer has 2**i_layer number of image crops.
+     * @param {number} [options.overlap_ratio] Sets the degree to which crops overlap. In the first crop layer,
+     * crops will overlap by this fraction of the image length. Later layers with more crops scale down this overlap.
+     * @param {number} [options.points_per_crop] Number of points to sample from each crop.
+     * @param {number} [options.crop_n_points_downscale_factor] The number of points-per-side sampled in layer n is
+     * scaled down by crop_n_points_downscale_factor**n.
+     * @returns {Object} An object containing the crop boxes, number of points per crop, cropped images, and input labels.
+     */
+    generate_crop_boxes(image, target_size, {
+        crop_n_layers = 0,
+        overlap_ratio = 512 / 1500,
+        points_per_crop = 32,
+        crop_n_points_downscale_factor = 1,
+    } = {}) {
+        // TODO: Implement
+        // return { crop_boxes, points_per_crop, cropped_images, input_labels }
     }
 }
 
@@ -1459,7 +1566,7 @@ export class VitMatteImageProcessor extends ImageFeatureExtractor {
         ), 0);
 
         return {
-            pixel_values: pixel_values,
+            pixel_values,
 
             // Original sizes of images
             original_sizes: imageData.map(x => x.original_size),
@@ -1492,10 +1599,10 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
     /**
      * Computes the log-Mel spectrogram of the provided audio waveform.
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
-     * @returns {{data: Float32Array, dims: number[]}} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
+     * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    _extract_fbank_features(waveform) {
-        const { data, dims } = spectrogram(
+    async _extract_fbank_features(waveform) {
+        const features = await spectrogram(
             waveform,
             this.window, // window
             this.config.n_fft, // frame_length
@@ -1510,13 +1617,14 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
             }
         )
 
+        const data = features.data;
         const maxValue = max(data)[0];
 
         for (let i = 0; i < data.length; ++i) {
             data[i] = (Math.max(data[i], maxValue - 8.0) + 4.0) / 4.0;
         }
 
-        return { data, dims };
+        return features;
     }
 
     /**
@@ -1541,13 +1649,10 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
             waveform.set(audio);
         }
 
-        const { data, dims } = this._extract_fbank_features(waveform);
+        const features = await this._extract_fbank_features(waveform);
 
         return {
-            input_features: new Tensor('float32',
-                data,
-                [1, ...dims]
-            )
+            input_features: features.unsqueeze_(0)
         };
     }
 }
@@ -1626,9 +1731,9 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
      * Computes the log-Mel spectrogram of the provided audio waveform.
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
      * @param {number} max_length The maximum number of frames to return.
-     * @returns {{data: Float32Array, dims: number[]}} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
+     * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    _extract_fbank_features(waveform, max_length) {
+    async _extract_fbank_features(waveform, max_length) {
         // NOTE: We don't pad/truncate since that is passed in as `max_num_frames`
 
         // Kaldi compliance: 16-bit signed integers
@@ -1675,28 +1780,29 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
     } = {}) {
         validate_audio_inputs(audio, 'SeamlessM4TFeatureExtractor');
 
-        let features = this._extract_fbank_features(audio, this.config.max_length);
+        let features = await this._extract_fbank_features(audio, this.config.max_length);
 
         if (do_normalize_per_mel_bins) {
             const [num_features, feature_size] = features.dims;
+            const data = features.data;
             for (let i = 0; i < feature_size; ++i) {
                 let sum = 0;
                 for (let j = 0; j < num_features; ++j) {
-                    sum += features.data[j * feature_size + i];
+                    sum += data[j * feature_size + i];
                 }
 
                 const mean = sum / num_features;
 
                 let variance = 0;
                 for (let j = 0; j < num_features; ++j) {
-                    variance += (features.data[j * feature_size + i] - mean) ** 2;
+                    variance += (data[j * feature_size + i] - mean) ** 2;
                 }
                 variance /= num_features - 1; // NOTE: We use ddof=1
 
                 const std = Math.sqrt(variance + 1e-7);
                 for (let j = 0; j < num_features; ++j) {
                     const index = j * feature_size + i;
-                    features.data[index] = (features.data[index] - mean) / std;
+                    data[index] = (data[index] - mean) / std;
                 }
             }
         }
@@ -1704,18 +1810,20 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
         let padded_attention_mask;
         if (padding) {
             const [num_frames, num_channels] = features.dims;
+            const data = /** @type {Float32Array} */(features.data);
 
             const pad_size = num_frames % pad_to_multiple_of;
             if (pad_size > 0) {
                 const padded_data = new Float32Array(num_channels * (num_frames + pad_size));
-                padded_data.set(features.data)
-                padded_data.fill(this.config.padding_value, features.data.length)
+                padded_data.set(data)
+                padded_data.fill(this.config.padding_value, data.length)
 
                 const numPaddedFrames = num_frames + pad_size;
-                features = {
-                    data: padded_data,
-                    dims: [numPaddedFrames, num_channels],
-                }
+                features = new Tensor(
+                    features.type,
+                    padded_data,
+                    [numPaddedFrames, num_channels],
+                )
 
                 if (return_attention_mask) {
                     padded_attention_mask = new Tensor(
@@ -1736,10 +1844,7 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
             throw new Error(`The number of frames (${num_frames}) must be a multiple of the stride (${stride}).`)
         }
 
-        const input_features = new Tensor('float32',
-            features.data,
-            features.dims,
-        ).view(
+        const input_features = features.view(
             1,
             Math.floor(num_frames / stride),
             num_channels * stride,
@@ -1750,20 +1855,21 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
         if (return_attention_mask) {
             const reshapedNumFrames = input_features.dims[1];
 
-            const attention_mask = new Tensor(
-                'int64',
-                new BigInt64Array(reshapedNumFrames),
-                [1, reshapedNumFrames],
-            );
+            const attention_mask_data = new BigInt64Array(reshapedNumFrames);
+
             if (padded_attention_mask) {
+                const padded_attention_mask_data = padded_attention_mask.data;
                 for (let i = 1, j = 0; i < num_frames; i += stride, ++j) {
-                    attention_mask.data[j] = padded_attention_mask.data[i];
+                    attention_mask_data[j] = padded_attention_mask_data[i];
                 }
             } else {
-                attention_mask.data.fill(1n);
+                attention_mask_data.fill(1n);
             }
-
-            result.attention_mask = attention_mask;
+            result.attention_mask = new Tensor(
+                'int64',
+                attention_mask_data,
+                [1, reshapedNumFrames],
+            );
         }
 
         return result;
@@ -1806,9 +1912,9 @@ export class ASTFeatureExtractor extends FeatureExtractor {
      * Computes the log-Mel spectrogram of the provided audio waveform.
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
      * @param {number} max_length The maximum number of frames to return.
-     * @returns {{data: Float32Array, dims: number[]}} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
+     * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    _extract_fbank_features(waveform, max_length) {
+    async _extract_fbank_features(waveform, max_length) {
         // NOTE: We don't pad/truncate since that is passed in as `max_num_frames`
         return spectrogram(
             waveform,
@@ -1841,20 +1947,18 @@ export class ASTFeatureExtractor extends FeatureExtractor {
     async _call(audio) {
         validate_audio_inputs(audio, 'ASTFeatureExtractor');
 
-        const features = this._extract_fbank_features(audio, this.config.max_length);
+        const features = await this._extract_fbank_features(audio, this.config.max_length);
         if (this.config.do_normalize) {
             // Normalize the input audio spectrogram to have mean=0, std=0.5
             const denom = this.std * 2;
-            for (let i = 0; i < features.data.length; ++i) {
-                features.data[i] = (features.data[i] - this.mean) / denom;
+            const features_data = features.data;
+            for (let i = 0; i < features_data.length; ++i) {
+                features_data[i] = (features_data[i] - this.mean) / denom;
             }
         }
 
         return {
-            input_values: new Tensor('float32',
-                features.data,
-                [1, ...features.dims]
-            )
+            input_values: features.unsqueeze_(0)
         };
     }
 }
@@ -1907,11 +2011,12 @@ export class ClapFeatureExtractor extends FeatureExtractor {
      * @param {number} max_length The maximum length of the waveform.
      * @param {string} truncation The truncation strategy to use.
      * @param {string} padding The padding strategy to use.
-     * @returns {{ data: Float32Array; dims: number[]; longer: boolean; }} An object containing the mel spectrogram data as a Float32Array, its dimensions as an array of numbers, and a boolean indicating whether the waveform was longer than the max length.
+     * @returns {Promise<Tensor>} An object containing the mel spectrogram data as a Float32Array, its dimensions as an array of numbers, and a boolean indicating whether the waveform was longer than the max length.
+     * @private
      */
-    _get_input_mel(waveform, max_length, truncation, padding) {
+    async _get_input_mel(waveform, max_length, truncation, padding) {
 
-        /** @type {{ data: Float32Array; dims: number[]}} */
+        /** @type {Tensor} */
         let input_mel;
         let longer = false;
         const diff = waveform.length - max_length;
@@ -1921,8 +2026,7 @@ export class ClapFeatureExtractor extends FeatureExtractor {
                 const idx = Math.floor(Math.random() * (diff + 1));
                 waveform = waveform.subarray(idx, idx + max_length);
 
-                input_mel = this._extract_fbank_features(waveform, this.mel_filters_slaney, this.config.nb_max_samples);
-                input_mel.dims = [1, ...input_mel.dims]; // "unsqueeze"
+                input_mel = await this._extract_fbank_features(waveform, this.mel_filters_slaney, this.config.nb_max_samples);
             } else {
                 // TODO implement fusion strategy
                 throw new Error(`Truncation strategy "${truncation}" not implemented`)
@@ -1948,14 +2052,10 @@ export class ClapFeatureExtractor extends FeatureExtractor {
                 throw new Error(`Truncation strategy "${truncation}" not implemented`)
             }
 
-            input_mel = this._extract_fbank_features(waveform, this.mel_filters_slaney, this.config.nb_max_samples);
-            input_mel.dims = [1, ...input_mel.dims]; // "unsqueeze"
+            input_mel = await this._extract_fbank_features(waveform, this.mel_filters_slaney, this.config.nb_max_samples);
         }
 
-        return {
-            ...input_mel,
-            longer,
-        }
+        return input_mel.unsqueeze_(0);
     }
 
     /**
@@ -1971,9 +2071,9 @@ export class ClapFeatureExtractor extends FeatureExtractor {
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
      * @param {number[][]} mel_filters The mel filters to use.
      * @param {number} [max_length=null] The maximum number of frames to return.
-     * @returns {{data: Float32Array, dims: number[]}} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
+     * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    _extract_fbank_features(waveform, mel_filters, max_length = null) {
+    async _extract_fbank_features(waveform, mel_filters, max_length = null) {
         // NOTE: We don't pad/truncate since that is passed in as `max_num_frames`
         return spectrogram(
             waveform,
@@ -2005,24 +2105,195 @@ export class ClapFeatureExtractor extends FeatureExtractor {
         validate_audio_inputs(audio, 'ClapFeatureExtractor');
 
         // convert to mel spectrogram, truncate and pad if needed.
-        const padded_inputs = this._get_input_mel(
+        const padded_inputs = await this._get_input_mel(
             audio,
             max_length ?? this.config.nb_max_samples,
             this.config.truncation,
             this.config.padding,
         );
 
-
         return {
-            input_features: new Tensor('float32',
-                padded_inputs.data,
-                [1, ...padded_inputs.dims]
-            )
-        };
+            input_features: padded_inputs.unsqueeze_(0),
+        }
     }
 }
 
 
+export class PyAnnoteFeatureExtractor extends FeatureExtractor {
+    /**
+     * Asynchronously extracts features from a given audio using the provided configuration.
+     * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
+     * @returns {Promise<{ input_values: Tensor; }>} The extracted input features.
+     */
+    async _call(audio) {
+        validate_audio_inputs(audio, 'PyAnnoteFeatureExtractor');
+
+        if (audio instanceof Float64Array) {
+            audio = new Float32Array(audio);
+        }
+
+        const shape = [
+            1,            /* batch_size */
+            1,            /* num_channels */
+            audio.length, /* num_samples */
+        ];
+        return {
+            input_values: new Tensor('float32', audio, shape),
+        };
+    }
+
+    /**
+     * NOTE: Can return fractional values. `Math.ceil` will ensure correct value.
+     * @param {number} samples The number of frames in the audio.
+     * @returns {number} The number of frames in the audio.
+     */
+    samples_to_frames(samples) {
+        return ((samples - this.config.offset) / this.config.step);
+    }
+
+    /**
+     * Post-processes the speaker diarization logits output by the model.
+     * @param {Tensor} logits The speaker diarization logits output by the model.
+     * @param {number} num_samples Number of samples in the input audio.
+     * @returns {Array<Array<{ id: number, start: number, end: number, confidence: number }>>} The post-processed speaker diarization results.
+     */
+    post_process_speaker_diarization(logits, num_samples) {
+        const ratio = (
+            num_samples / this.samples_to_frames(num_samples)
+        ) / this.config.sampling_rate;
+
+        const results = [];
+        for (const scores of logits.tolist()) {
+            const accumulated_segments = [];
+
+            let current_speaker = -1;
+            for (let i = 0; i < scores.length; ++i) {
+                const probabilities = softmax(scores[i]);
+                const [score, id] = max(probabilities);
+                const [start, end] = [i, i + 1];
+
+                if (id !== current_speaker) {
+                    // Speaker has changed
+                    current_speaker = id;
+                    accumulated_segments.push({ id, start, end, score });
+                } else {
+                    // Continue the current segment
+                    accumulated_segments.at(-1).end = end;
+                    accumulated_segments.at(-1).score += score;
+                }
+            }
+
+            results.push(accumulated_segments.map(
+                // Convert frame-space to time-space
+                // and compute the confidence
+                ({ id, start, end, score }) => ({
+                    id,
+                    start: start * ratio,
+                    end: end * ratio,
+                    confidence: score / (end - start),
+                })
+            ));
+        }
+        return results;
+    }
+
+}
+
+export class WeSpeakerFeatureExtractor extends FeatureExtractor {
+
+    constructor(config) {
+        super(config);
+
+        const sampling_rate = this.config.sampling_rate;
+        const mel_filters = mel_filter_bank(
+            256, // num_frequency_bins
+            this.config.num_mel_bins, // num_mel_filters
+            20, // min_frequency
+            Math.floor(sampling_rate / 2), // max_frequency
+            sampling_rate, // sampling_rate
+            null, // norm
+            "kaldi", // mel_scale
+            true, // triangularize_in_mel_space
+        );
+
+        // Do padding:
+        for (let i = 0; i < mel_filters.length; ++i) {
+            mel_filters[i].push(0);
+        }
+        this.mel_filters = mel_filters;
+
+        this.window = window_function(400, 'hamming', {
+            periodic: false,
+        })
+        this.min_num_frames = this.config.min_num_frames;
+    }
+
+    /**
+     * Computes the log-Mel spectrogram of the provided audio waveform.
+     * @param {Float32Array|Float64Array} waveform The audio waveform to process.
+     * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
+     */
+    async _extract_fbank_features(waveform) {
+        // Kaldi compliance: 16-bit signed integers
+        // 32768 == 2 ** 15
+        waveform = waveform.map((/** @type {number} */ x) => x * 32768)
+
+        return spectrogram(
+            waveform,
+            this.window, // window
+            400, // frame_length
+            160, // hop_length
+            {
+                fft_length: 512,
+                power: 2.0,
+                center: false,
+                preemphasis: 0.97,
+                mel_filters: this.mel_filters,
+                log_mel: 'log',
+                mel_floor: 1.192092955078125e-07,
+                remove_dc_offset: true,
+
+                // Custom
+                transpose: true,
+                min_num_frames: this.min_num_frames,
+            }
+        )
+    }
+
+
+    /**
+     * Asynchronously extracts features from a given audio using the provided configuration.
+     * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
+     * @returns {Promise<{ input_features: Tensor }>} A Promise resolving to an object containing the extracted input features as a Tensor.
+     */
+    async _call(audio) {
+        validate_audio_inputs(audio, 'WeSpeakerFeatureExtractor');
+
+        const features = (await this._extract_fbank_features(audio)).unsqueeze_(0);
+
+        if (this.config.fbank_centering_span === null) {
+            // center features with global average
+            const meanData = /** @type {Float32Array} */ (features.mean(1).data);
+            const featuresData = /** @type {Float32Array} */(features.data);
+            const [batch_size, num_frames, feature_size] = features.dims;
+
+            for (let i = 0; i < batch_size; ++i) {
+                const offset1 = i * num_frames * feature_size;
+                const offset2 = i * feature_size;
+                for (let j = 0; j < num_frames; ++j) {
+                    const offset3 = offset1 + j * feature_size;
+                    for (let k = 0; k < feature_size; ++k) {
+                        featuresData[offset3 + k] -= meanData[offset2 + k];
+                    }
+                }
+            }
+        }
+
+        return {
+            input_features: features
+        };
+    }
+}
 
 export class SpeechT5FeatureExtractor extends FeatureExtractor { }
 
@@ -2103,6 +2374,23 @@ export class Wav2Vec2ProcessorWithLM extends Processor {
     }
 }
 
+export class PyAnnoteProcessor extends Processor {
+    /**
+     * Calls the feature_extractor function with the given audio input.
+     * @param {any} audio The audio input to extract features from.
+     * @returns {Promise<any>} A Promise that resolves with the extracted features.
+     */
+    async _call(audio) {
+        return await this.feature_extractor(audio)
+    }
+
+    post_process_speaker_diarization(...args) {
+        // @ts-ignore
+        return this.feature_extractor.post_process_speaker_diarization(...args);
+    }
+
+}
+
 export class SpeechT5Processor extends Processor {
     /**
      * Calls the feature_extractor function with the given input.
@@ -2116,6 +2404,110 @@ export class SpeechT5Processor extends Processor {
 
 export class OwlViTProcessor extends Processor { }
 
+export class Florence2Processor extends Processor {
+    constructor(feature_extractor) {
+        super(feature_extractor);
+
+        const {
+            tasks_answer_post_processing_type,
+            task_prompts_without_inputs,
+            task_prompts_with_input,
+        } = feature_extractor.config;
+
+        /** @type {Map<string, string>} */
+        this.tasks_answer_post_processing_type = new Map(Object.entries(tasks_answer_post_processing_type ?? {}));
+
+        /** @type {Map<string, string>} */
+        this.task_prompts_without_inputs = new Map(Object.entries(task_prompts_without_inputs ?? {}));
+
+        /** @type {Map<string, string>} */
+        this.task_prompts_with_input = new Map(Object.entries(task_prompts_with_input ?? {}));
+
+        this.regexes = {
+            quad_boxes: /(.+?)<loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/gm,
+            bboxes: /([^<]+)?<loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/gm,
+        }
+        this.size_per_bin = 1000;
+    }
+
+    /**
+     * Helper function to construct prompts from input texts
+     * @param {string|string[]} text
+     * @returns {string[]}
+     */
+    construct_prompts(text) {
+        if (typeof text === 'string') {
+            text = [text];
+        }
+
+        const prompts = [];
+        for (const t of text) {
+            // 1. fixed task prompts without additional inputs
+            if (this.task_prompts_without_inputs.has(t)) {
+                prompts.push(this.task_prompts_without_inputs.get(t));
+            }
+            // 2. task prompts with additional inputs 
+            else {
+                for (const [task, prompt] of this.task_prompts_with_input) {
+                    if (t.includes(task)) {
+                        prompts.push(prompt.replaceAll('{input}', t).replaceAll(task, ''));
+                        break;
+                    }
+                }
+
+                // 3. default prompt
+                if (prompts.length !== text.length) {
+                    prompts.push(t);
+                }
+            }
+        }
+        return prompts;
+    }
+
+    /**
+     * Post-process the output of the model to each of the task outputs.
+     * @param {string} text The text to post-process.
+     * @param {string} task The task to post-process the text for.
+     * @param {[number, number]} image_size The size of the image. height x width.
+     */
+    post_process_generation(text, task, image_size) {
+        const task_answer_post_processing_type = this.tasks_answer_post_processing_type.get(task) ?? 'pure_text';
+
+        // remove the special tokens
+        text = text.replaceAll('<s>', '').replaceAll('</s>', '');
+
+        let final_answer;
+        switch (task_answer_post_processing_type) {
+            case 'pure_text':
+                final_answer = text;
+                break;
+
+            case 'description_with_bboxes':
+            case 'bboxes':
+            case 'phrase_grounding':
+            case 'ocr':
+                const key = task_answer_post_processing_type === 'ocr' ? 'quad_boxes' : 'bboxes';
+                const matches = text.matchAll(this.regexes[key]);
+                const labels = [];
+                const items = [];
+                for (const [_, label, ...locations] of matches) {
+                    // Push new label, or duplicate the last label
+                    labels.push(label ? label.trim() : labels.at(-1) ?? '');
+                    items.push(locations.map((x, i) =>
+                        // NOTE: Add 0.5 to use the center position of the bin as the coordinate.
+                        (Number(x) + 0.5) / this.size_per_bin * image_size[i % 2])
+                    );
+                }
+                final_answer = { labels, [key]: items };
+                break;
+
+            default:
+                throw new Error(`Task "${task}" (of type "${task_answer_post_processing_type}") not yet implemented.`);
+        }
+
+        return { [task]: final_answer }
+    }
+}
 
 //////////////////////////////////////////////////
 /**
@@ -2155,23 +2547,34 @@ export class AutoProcessor {
         ViTFeatureExtractor,
         MobileViTFeatureExtractor,
         MobileViTImageProcessor,
+        MobileNetV1FeatureExtractor,
+        MobileNetV2FeatureExtractor,
+        MobileNetV3FeatureExtractor,
+        MobileNetV4FeatureExtractor,
         OwlViTFeatureExtractor,
         Owlv2ImageProcessor,
         CLIPFeatureExtractor,
+        CLIPImageProcessor,
+        Florence2Processor,
         ChineseCLIPFeatureExtractor,
         SiglipImageProcessor,
         ConvNextFeatureExtractor,
         ConvNextImageProcessor,
         SegformerFeatureExtractor,
+        SapiensFeatureExtractor,
         BitImageProcessor,
         DPTImageProcessor,
         DPTFeatureExtractor,
+        PvtImageProcessor,
         GLPNFeatureExtractor,
         BeitFeatureExtractor,
         DeiTFeatureExtractor,
         DetrFeatureExtractor,
+        RTDetrImageProcessor,
+        MaskFormerFeatureExtractor,
         YolosFeatureExtractor,
         DonutFeatureExtractor,
+        DonutImageProcessor,
         NougatImageProcessor,
         EfficientNetImageProcessor,
 
@@ -2184,14 +2587,18 @@ export class AutoProcessor {
         SpeechT5FeatureExtractor,
         ASTFeatureExtractor,
         ClapFeatureExtractor,
+        PyAnnoteFeatureExtractor,
+        WeSpeakerFeatureExtractor,
     }
 
     static PROCESSOR_CLASS_MAPPING = {
         WhisperProcessor,
         Wav2Vec2ProcessorWithLM,
+        PyAnnoteProcessor,
         SamProcessor,
         SpeechT5Processor,
         OwlViTProcessor,
+        Florence2Processor,
     }
 
     /**

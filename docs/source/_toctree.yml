@@ -23,10 +23,14 @@
     title: Server-side Inference in Node.js
   title: Tutorials
 - sections:
+  - local: guides/webgpu
+    title: Running models on WebGPU
+  - local: guides/dtypes
+    title: Using quantized models (dtypes)
   - local: guides/private
     title: Accessing Private/Gated Models
   - local: guides/node-audio-processing
-    title: Server-side Audio Processing in Node.js
+    title: Server-side Audio Processing
   title: Developer Guides
 - sections:
   - local: api/transformers
@@ -49,6 +53,21 @@
     title: Backends
     isExpanded: false
   - sections:
+    - local: api/generation/parameters
+      title: Parameters
+    - local: api/generation/configuration_utils
+      title: Configuration
+    - local: api/generation/logits_process
+      title: Logits Processors
+    - local: api/generation/logits_sampler
+      title: Logits Samplers
+    - local: api/generation/stopping_criteria
+      title: Stopping Criteria
+    - local: api/generation/streamers
+      title: Streamers
+    title: Generation
+    isExpanded: false
+  - sections:
     - local: api/utils/core
       title: Core
     - local: api/utils/hub
@@ -61,8 +80,6 @@
       title: Tensor
     - local: api/utils/maths
       title: Maths
-    - local: api/utils/generation
-      title: Generation
     - local: api/utils/data-structures
       title: Data Structures
     title: Utilities

@@ -7,17 +7,20 @@ on:
   pull_request:
     branches:
       - main
-
-env:
-  TESTING_REMOTELY: true
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 jobs:
   build:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [18.x, latest, node]
+        node-version: [18, 20, 22]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,11 +30,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
       - run: npm run build
-      - run: pip install -r tests/requirements.txt
       
       # Setup the testing environment
-      - run: npm run generate-tests
-      - run: git lfs install && GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/Xenova/t5-small ./models/t5-small
+      - run: git lfs install && GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/hf-internal-testing/tiny-random-T5ForConditionalGeneration ./models/hf-internal-testing/tiny-random-T5ForConditionalGeneration
 
       # Actually run tests
       - run: npm run test

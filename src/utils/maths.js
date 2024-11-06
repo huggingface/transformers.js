@@ -190,27 +190,6 @@ export function dot(arr1, arr2) {
     return result;
 }
 
-
-/**
- * Get the top k items from an iterable, sorted by descending order
- * @param {any[]|TypedArray} items The items to be sorted
- * @param {number|null} [top_k=0] The number of top items to return (default: 0 = return all)
- * @returns {[number, any][]} The top k items, sorted by descending order
- */
-export function getTopItems(items, top_k = 0) {
-    // if top == 0, return all
-
-    items = Array.from(items)
-        .map((x, i) => [i, x])            // Get indices ([index, score])
-        .sort((a, b) => b[1] - a[1])      // Sort by log probabilities
-
-    if (top_k !== null && top_k > 0) {
-        items = items.slice(0, top_k);    // Get top k items
-    }
-
-    return items
-}
-
 /**
  * Computes the cosine similarity between two arrays.
  *
@@ -247,7 +226,7 @@ export function magnitude(arr) {
 /**
  * Returns the value and index of the minimum element in an array.
  * @param {number[]|TypedArray} arr array of numbers.
- * @returns {number[]} the value and index of the minimum element, of the form: [valueOfMin, indexOfMin]
+ * @returns {[number, number]} the value and index of the minimum element, of the form: [valueOfMin, indexOfMin]
  * @throws {Error} If array is empty.
  */
 export function min(arr) {
@@ -991,4 +970,90 @@ export function bankers_round(x) {
     const r = Math.round(x);
     const br = Math.abs(x) % 1 === 0.5 ? (r % 2 === 0 ? r : r - 1) : r;
     return br;
+}
+
+
+/**
+ * Measures similarity between two temporal sequences (e.g., input audio and output tokens
+ * to generate token-level timestamps).
+ * @param {number[][]} matrix 
+ * @returns {number[][]}
+ */
+export function dynamic_time_warping(matrix) {
+    const output_length = matrix.length;
+    const input_length = matrix[0].length;
+
+    const outputShape = [output_length + 1, input_length + 1];
+
+    const cost = Array.from(
+        { length: outputShape[0] },
+        () => Array(outputShape[1]).fill(Infinity)
+    );
+    cost[0][0] = 0;
+
+    const trace = Array.from(
+        { length: outputShape[0] },
+        () => Array(outputShape[1]).fill(-1)
+    );
+
+    for (let j = 1; j < outputShape[1]; ++j) {
+        for (let i = 1; i < outputShape[0]; ++i) {
+            const c0 = cost[i - 1][j - 1];
+            const c1 = cost[i - 1][j];
+            const c2 = cost[i][j - 1];
+
+            let c, t;
+            if (c0 < c1 && c0 < c2) {
+                c = c0;
+                t = 0;
+            } else if (c1 < c0 && c1 < c2) {
+                c = c1;
+                t = 1;
+            } else {
+                c = c2;
+                t = 2;
+            }
+            cost[i][j] = matrix[i - 1][j - 1] + c;
+            trace[i][j] = t;
+        }
+    }
+
+    for (let i = 0; i < outputShape[1]; ++i) { // trace[0, :] = 2
+        trace[0][i] = 2;
+    }
+    for (let i = 0; i < outputShape[0]; ++i) { // trace[:, 0] = 1
+        trace[i][0] = 1;
+    }
+
+    // backtrace
+    let i = output_length;
+    let j = input_length;
+    let text_indices = [];
+    let time_indices = [];
+    while (i > 0 || j > 0) {
+        text_indices.push(i - 1);
+        time_indices.push(j - 1);
+
+        switch (trace[i][j]) {
+            case 0:
+                --i; --j;
+                break;
+            case 1:
+                --i;
+                break;
+            case 2:
+                --j;
+                break;
+            default:
+                throw new Error(
+                    `Internal error in dynamic time warping. Unexpected trace[${i}, ${j}]. Please file a bug report.`
+                )
+        }
+    }
+
+    text_indices.reverse();
+    time_indices.reverse();
+
+    return [text_indices, time_indices];
+
 }

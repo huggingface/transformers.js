@@ -25,14 +25,14 @@ class MyTextToSpeechPipeline {
 
         if (this.model_instance === null) {
             this.model_instance = SpeechT5ForTextToSpeech.from_pretrained(this.model_id, {
-                quantized: false,
+                dtype: 'fp32',
                 progress_callback,
             });
         }
 
         if (this.vocoder_instance === null) {
             this.vocoder_instance = SpeechT5HifiGan.from_pretrained(this.vocoder_id, {
-                quantized: false,
+                dtype: 'fp32',
                 progress_callback,
             });
         }

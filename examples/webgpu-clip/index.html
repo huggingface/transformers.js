@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transformers.js | real-time CLIP</title>
+</head>
+
+<body>
+  <h1>
+    Real-time zero-shot image classification (WebGPU)
+  </h1>
+  <h3>
+    Runs locally in your browser w/
+    <a href="https://github.com/huggingface/transformers.js" target="_blank">🤗 Transformers.js</a>
+  </h3>
+  <div id="container">
+    <video id="video" autoplay muted playsinline></video>
+    <div id="overlay"></div>
+  </div>
+  <div id="controls">
+    <div title="Labels used to perform zero-shot image classification">
+      <label>Labels (comma-separated)</label>
+      <br>
+      <input id="labels" type="text" disabled>
+    </div>
+    <div title="Template used to perform zero-shot image classification">
+      <label>Hypothesis template</label>
+      <br>
+      <input id="template" type="text" value="A photo of a {}" disabled>
+    </div>
+  </div>
+  <label id="status"></label>
+
+  <script type="module" src="/main.js"></script>
+</body>
+
+</html>

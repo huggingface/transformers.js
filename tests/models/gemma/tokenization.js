@@ -1,0 +1,231 @@
+import { GemmaTokenizer } from "../../../src/tokenizers.js";
+import { BASE_TEST_STRINGS, LLAMA_TEST_STRINGS } from "../test_strings.js";
+
+export const TOKENIZER_CLASS = GemmaTokenizer;
+export const TEST_CONFIG = {
+  // Xenova/gemma-tokenizer
+  "Xenova/gemma2-tokenizer": {
+    SIMPLE: {
+      text: BASE_TEST_STRINGS.SIMPLE,
+      tokens: ["How", "\u2581are", "\u2581you", "\u2581doing", "?"],
+      ids: [2, 2299, 708, 692, 3900, 235336],
+      decoded: "<bos>How are you doing?",
+    },
+    SIMPLE_WITH_PUNCTUATION: {
+      text: BASE_TEST_STRINGS.SIMPLE_WITH_PUNCTUATION,
+      tokens: ["You", "\u2581should", "'", "ve", "\u2581done", "\u2581this"],
+      ids: [2, 2045, 1412, 235303, 524, 3015, 736],
+      decoded: "<bos>You should've done this",
+    },
+    NUMBERS: {
+      text: BASE_TEST_STRINGS.NUMBERS,
+      tokens: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\u2581", "0", "\u2581", "1", "\u2581", "2", "\u2581", "3", "\u2581", "4", "\u2581", "5", "\u2581", "6", "\u2581", "7", "\u2581", "8", "\u2581", "9", "\u2581", "1", "0", "\u2581", "1", "0", "0", "\u2581", "1", "0", "0", "0"],
+      ids: [2, 235276, 235274, 235284, 235304, 235310, 235308, 235318, 235324, 235321, 235315, 235248, 235276, 235248, 235274, 235248, 235284, 235248, 235304, 235248, 235310, 235248, 235308, 235248, 235318, 235248, 235324, 235248, 235321, 235248, 235315, 235248, 235274, 235276, 235248, 235274, 235276, 235276, 235248, 235274, 235276, 235276, 235276],
+      decoded: "<bos>0123456789 0 1 2 3 4 5 6 7 8 9 10 100 1000",
+    },
+    TEXT_WITH_NUMBERS: {
+      text: BASE_TEST_STRINGS.TEXT_WITH_NUMBERS,
+      tokens: ["The", "\u2581company", "\u2581was", "\u2581founded", "\u2581in", "\u2581", "2", "0", "1", "6", "."],
+      ids: [2, 651, 3277, 729, 18942, 575, 235248, 235284, 235276, 235274, 235318, 235265],
+      decoded: "<bos>The company was founded in 2016.",
+    },
+    PUNCTUATION: {
+      text: BASE_TEST_STRINGS.PUNCTUATION,
+      tokens: ["A", "\n", "'", "ll", "\u2581!!", "to", "?'", "d", "''", "d", "\u2581of", ",", "\u2581can", "'", "t", "."],
+      ids: [2, 235280, 108, 235303, 529, 9063, 511, 18016, 235258, 3404, 235258, 576, 235269, 798, 235303, 235251, 235265],
+      decoded: "<bos>A\n'll !!to?'d''d of, can't.",
+    },
+    PYTHON_CODE: {
+      text: BASE_TEST_STRINGS.PYTHON_CODE,
+      tokens: ["def", "\u2581main", "():", "\n", "\t", "pass"],
+      ids: [2, 1293, 1872, 4409, 108, 226, 3095],
+      decoded: "<bos>def main():\n\tpass",
+    },
+    JAVASCRIPT_CODE: {
+      text: BASE_TEST_STRINGS.JAVASCRIPT_CODE,
+      tokens: ["let", "\u2581a", "\u2581=", "\u2581obj", ".", "toString", "();", "\n", "toString", "();"],
+      ids: [2, 1243, 476, 589, 6555, 235265, 7114, 821, 108, 7114, 821],
+      decoded: "<bos>let a = obj.toString();\ntoString();",
+    },
+    NEWLINES: {
+      text: LLAMA_TEST_STRINGS.NEWLINES,
+      tokens: ["ax", "\n", "####", "\n", "boo"],
+      ids: [2, 1247, 108, 3308, 108, 31931],
+      decoded: "<bos>ax\n####\nboo",
+    },
+    BASIC: {
+      text: BASE_TEST_STRINGS.BASIC,
+      tokens: ["UN", "want", "\u00e9d", ",", "running"],
+      ids: [2, 2019, 29007, 45346, 235269, 23655],
+      decoded: "<bos>UNwant\u00e9d,running",
+    },
+    CONTROL_TOKENS: {
+      text: BASE_TEST_STRINGS.CONTROL_TOKENS,
+      tokens: ["1", "<0x00>", "2", "\ufffd", "3"],
+      ids: [2, 235274, 217, 235284, 236193, 235304],
+      decoded: "<bos>1\u00002\ufffd3",
+    },
+    HELLO_WORLD_TITLECASE: {
+      text: BASE_TEST_STRINGS.HELLO_WORLD_TITLECASE,
+      tokens: ["Hello", "\u2581World"],
+      ids: [2, 4521, 3855],
+      decoded: "<bos>Hello World",
+    },
+    HELLO_WORLD_LOWERCASE: {
+      text: BASE_TEST_STRINGS.HELLO_WORLD_LOWERCASE,
+      tokens: ["hello", "\u2581world"],
+      ids: [2, 17534, 2134],
+      decoded: "<bos>hello world",
+    },
+    CHINESE_ONLY: {
+      text: BASE_TEST_STRINGS.CHINESE_ONLY,
+      tokens: ["\u751f\u6d3b\u7684", "\u771f", "\u8c1b", "\u662f"],
+      ids: [2, 122182, 235710, 245467, 235427],
+      decoded: "<bos>\u751f\u6d3b\u7684\u771f\u8c1b\u662f",
+    },
+    LEADING_SPACE: {
+      text: BASE_TEST_STRINGS.LEADING_SPACE,
+      tokens: ["\u2581\u2581\u2581", "leading", "\u2581space"],
+      ids: [2, 140, 26650, 3641],
+      decoded: "<bos>   leading space",
+    },
+    TRAILING_SPACE: {
+      text: BASE_TEST_STRINGS.TRAILING_SPACE,
+      tokens: ["trailing", "\u2581space", "\u2581\u2581\u2581"],
+      ids: [2, 100504, 3641, 140],
+      decoded: "<bos>trailing space   ",
+    },
+    DOUBLE_SPACE: {
+      text: BASE_TEST_STRINGS.DOUBLE_SPACE,
+      tokens: ["Hi", "\u2581\u2581", "Hello"],
+      ids: [2, 2151, 139, 4521],
+      decoded: "<bos>Hi  Hello",
+    },
+    CURRENCY: {
+      text: BASE_TEST_STRINGS.CURRENCY,
+      tokens: ["test", "\u2581$", "1", "\u2581R", "2", "\u2581#", "3", "\u2581\u20ac", "4", "\u2581\u00a3", "5", "\u2581\u00a5", "6", "\u2581", "\u20a3", "7", "\u2581\u20b9", "8", "\u2581", "\u20b1", "9", "\u2581test"],
+      ids: [2, 2195, 697, 235274, 625, 235284, 1700, 235304, 8296, 235310, 5955, 235308, 74393, 235318, 235248, 252058, 235324, 56712, 235321, 235248, 243132, 235315, 2121],
+      decoded: "<bos>test $1 R2 #3 \u20ac4 \u00a35 \u00a56 \u20a37 \u20b98 \u20b19 test",
+    },
+    CURRENCY_WITH_DECIMALS: {
+      text: BASE_TEST_STRINGS.CURRENCY_WITH_DECIMALS,
+      tokens: ["I", "\u2581bought", "\u2581an", "\u2581apple", "\u2581for", "\u2581$", "1", ".", "0", "0", "\u2581at", "\u2581the", "\u2581store", "."],
+      ids: [2, 235285, 8989, 671, 15491, 604, 697, 235274, 235265, 235276, 235276, 696, 573, 4659, 235265],
+      decoded: "<bos>I bought an apple for $1.00 at the store.",
+    },
+    ELLIPSIS: {
+      text: BASE_TEST_STRINGS.ELLIPSIS,
+      tokens: ["you", "\u2026", "\u2581\u2581"],
+      ids: [2, 4747, 235417, 139],
+      decoded: "<bos>you\u2026  ",
+    },
+    TEXT_WITH_ESCAPE_CHARACTERS: {
+      text: BASE_TEST_STRINGS.TEXT_WITH_ESCAPE_CHARACTERS,
+      tokens: ["you", "\u2026", "\u00a0\u00a0"],
+      ids: [2, 4747, 235417, 25445],
+      decoded: "<bos>you\u2026\u00a0\u00a0",
+    },
+    TEXT_WITH_ESCAPE_CHARACTERS_2: {
+      text: BASE_TEST_STRINGS.TEXT_WITH_ESCAPE_CHARACTERS_2,
+      tokens: ["you", "\u2026", "\u00a0\u00a0", "you", "\u2026", "\u00a0\u00a0"],
+      ids: [2, 4747, 235417, 25445, 4747, 235417, 25445],
+      decoded: "<bos>you\u2026\u00a0\u00a0you\u2026\u00a0\u00a0",
+    },
+    TILDE_NORMALIZATION: {
+      text: BASE_TEST_STRINGS.TILDE_NORMALIZATION,
+      tokens: ["weird", "\u2581\uff5e", "\u2581edge", "\u2581\uff5e", "\u2581case"],
+      ids: [2, 102422, 134012, 8541, 134012, 2270],
+      decoded: "<bos>weird \uff5e edge \uff5e case",
+    },
+    SPIECE_UNDERSCORE: {
+      text: BASE_TEST_STRINGS.SPIECE_UNDERSCORE,
+      tokens: ["\u2581This", "\u2581\u2581", "is", "\u2581\u2581", "a", "\u2581\u2581", "test", "\u2581\u2581", "."],
+      ids: [2, 1417, 139, 502, 139, 235250, 139, 2195, 139, 235265],
+      decoded: "<bos> This  is  a  test  .",
+    },
+    POPULAR_EMOJIS: {
+      text: BASE_TEST_STRINGS.POPULAR_EMOJIS,
+      tokens: ["\ud83d\ude02", "\u2581\ud83d\udc4d", "\u2581\ud83e\udd23", "\u2581\ud83d\ude0d", "\u2581\ud83d\ude2d", "\u2581\ud83c\udf89", "\u2581\ud83d\ude4f", "\u2581\ud83d\ude0a", "\u2581\ud83d\udd25", "\u2581\ud83d\ude01", "\u2581\ud83d\ude05", "\u2581\ud83e\udd17", "\u2581\ud83d\ude06", "\u2581\ud83d\udc4f", "\u2581\u2764\ufe0f", "\u2581\ud83d\udc9c", "\u2581\ud83d\udc9a", "\u2581\ud83d\udc97", "\u2581\ud83d\udc99", "\u2581\ud83d\udda4", "\u2581\ud83d\ude0e", "\u2581\ud83d\udc4c", "\u2581\ud83e\udd73", "\u2581\ud83d\udcaa", "\u2581\u2728", "\u2581\ud83d\udc49", "\u2581\ud83d\udc40", "\u2581\ud83d\udcaf", "\u2581", "\ud83c\udf88", "\u2581", "\ud83d\ude48", "\u2581\ud83d\ude4c", "\u2581\ud83d\udc80", "\u2581\ud83d\udc47", "\u2581\ud83d\udc4b", "\u2581\u2705", "\u2581", "\ud83c\udf81", "\u2581", "\ud83c\udf1e", "\u2581\ud83c\udf38", "\u2581", "\ud83d\udcb0"],
+      ids: [2, 236471, 38104, 55937, 46434, 55605, 160588, 68226, 44416, 72373, 70636, 75298, 156808, 120433, 104492, 35373, 131674, 191384, 204903, 146773, 166620, 87949, 83860, 211978, 142816, 64726, 166368, 108892, 174882, 235248, 242431, 235248, 241259, 134540, 106918, 154601, 169692, 92641, 235248, 241227, 235248, 241971, 233958, 235248, 241034],
+      decoded: "<bos>\ud83d\ude02 \ud83d\udc4d \ud83e\udd23 \ud83d\ude0d \ud83d\ude2d \ud83c\udf89 \ud83d\ude4f \ud83d\ude0a \ud83d\udd25 \ud83d\ude01 \ud83d\ude05 \ud83e\udd17 \ud83d\ude06 \ud83d\udc4f \u2764\ufe0f \ud83d\udc9c \ud83d\udc9a \ud83d\udc97 \ud83d\udc99 \ud83d\udda4 \ud83d\ude0e \ud83d\udc4c \ud83e\udd73 \ud83d\udcaa \u2728 \ud83d\udc49 \ud83d\udc40 \ud83d\udcaf \ud83c\udf88 \ud83d\ude48 \ud83d\ude4c \ud83d\udc80 \ud83d\udc47 \ud83d\udc4b \u2705 \ud83c\udf81 \ud83c\udf1e \ud83c\udf38 \ud83d\udcb0",
+    },
+    MULTIBYTE_EMOJIS: {
+      text: BASE_TEST_STRINGS.MULTIBYTE_EMOJIS,
+      tokens: ["\u2728", "\u2581\ud83e\udd17", "\u2581", "\ud83d\udc41", "\ufe0f", "\u2581", "\ud83d\udc71", "\ud83c\udffb", "\u2581", "\ud83d\udd75", "\u200d\u2642\ufe0f", "\u2581", "\ud83e\uddd9", "\ud83c\udffb", "\u200d\u2642", "\u2581", "\ud83d\udc68", "\ud83c\udffb", "\u200d", "\ud83c\udf3e", "\u2581", "\ud83e\uddd1", "\u200d", "\ud83e\udd1d", "\u200d", "\ud83e\uddd1", "\u2581", "\ud83d\udc69", "\u200d", "\u2764", "\u200d", "\ud83d\udc8b", "\u200d", "\ud83d\udc68", "\u2581", "\ud83d\udc69", "\u200d", "\ud83d\udc69", "\u200d", "\ud83d\udc67", "\u200d", "\ud83d\udc66", "\u2581", "\ud83e\uddd1", "\ud83c\udffb", "\u200d", "\ud83e\udd1d", "\u200d", "\ud83e\uddd1", "\ud83c\udffb", "\u2581", "\ud83c\udff4", "\udb40\udc67", "\udb40\udc62", "\udb40\udc65", "\udb40\udc6e", "\udb40\udc67", "\udb40\udc7f", "\u2581", "\ud83d\udc68", "\ud83c\udffb", "\u200d", "\u2764\ufe0f", "\u200d", "\ud83d\udc8b", "\u200d", "\ud83d\udc68", "\ud83c\udffc"],
+      ids: [2, 236309, 156808, 235248, 241666, 235969, 235248, 247216, 237933, 235248, 246522, 68399, 235248, 246422, 237933, 63233, 235248, 241568, 237933, 235879, 244448, 235248, 243634, 235879, 241668, 235879, 243634, 235248, 241355, 235879, 236457, 235879, 240887, 235879, 241568, 235248, 241355, 235879, 241355, 235879, 244355, 235879, 244670, 235248, 243634, 237933, 235879, 241668, 235879, 243634, 237933, 235248, 244443, 246738, 247704, 250142, 250123, 246738, 247662, 235248, 241568, 237933, 235879, 16176, 235879, 240887, 235879, 241568, 238683],
+      decoded: "<bos>\u2728 \ud83e\udd17 \ud83d\udc41\ufe0f \ud83d\udc71\ud83c\udffb \ud83d\udd75\u200d\u2642\ufe0f \ud83e\uddd9\ud83c\udffb\u200d\u2642 \ud83d\udc68\ud83c\udffb\u200d\ud83c\udf3e \ud83e\uddd1\u200d\ud83e\udd1d\u200d\ud83e\uddd1 \ud83d\udc69\u200d\u2764\u200d\ud83d\udc8b\u200d\ud83d\udc68 \ud83d\udc69\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66 \ud83e\uddd1\ud83c\udffb\u200d\ud83e\udd1d\u200d\ud83e\uddd1\ud83c\udffb \ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f \ud83d\udc68\ud83c\udffb\u200d\u2764\ufe0f\u200d\ud83d\udc8b\u200d\ud83d\udc68\ud83c\udffc",
+    },
+    BPE_SCORES_PRIORITY_1: {
+      text: LLAMA_TEST_STRINGS.BPE_SCORES_PRIORITY_1,
+      tokens: ["grab", "bed"],
+      ids: [2, 59031, 2907],
+      decoded: "<bos>grabbed",
+    },
+    BPE_SCORES_PRIORITY_2: {
+      text: LLAMA_TEST_STRINGS.BPE_SCORES_PRIORITY_2,
+      tokens: ["\u2581grabbed"],
+      ids: [2, 41939],
+      decoded: "<bos> grabbed",
+    },
+    BPE_SCORES_PRIORITY_3: {
+      text: LLAMA_TEST_STRINGS.BPE_SCORES_PRIORITY_3,
+      tokens: ["\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581", "grab", "bed"],
+      ids: [2, 148, 59031, 2907],
+      decoded: "<bos>           grabbed",
+    },
+    NEWLINE: {
+      text: LLAMA_TEST_STRINGS.NEWLINE,
+      tokens: ["\n"],
+      ids: [2, 108],
+      decoded: "<bos>\n",
+    },
+    NEWLINE_WITH_LEADING_SPACE: {
+      text: LLAMA_TEST_STRINGS.NEWLINE_WITH_LEADING_SPACE,
+      tokens: ["\u2581", "\n"],
+      ids: [2, 235248, 108],
+      decoded: "<bos> \n",
+    },
+    TABS: {
+      text: LLAMA_TEST_STRINGS.TABS,
+      tokens: ["\t", "tabs", "\t\t\t\t", "out", "\u2581here"],
+      ids: [2, 226, 31973, 255971, 745, 1517],
+      decoded: "<bos>\ttabs\t\t\t\tout here",
+    },
+    NEWLINE_AND_TAB: {
+      text: LLAMA_TEST_STRINGS.NEWLINE_AND_TAB,
+      tokens: ["\n", "\t", "\n"],
+      ids: [2, 108, 226, 108],
+      decoded: "<bos>\n\t\n",
+    },
+    CHINESE_LETTER: {
+      text: LLAMA_TEST_STRINGS.CHINESE_LETTER,
+      tokens: ["\u9547"],
+      ids: [2, 237796],
+      decoded: "<bos>\u9547",
+    },
+    EMOJIS_1: {
+      text: LLAMA_TEST_STRINGS.EMOJIS_1,
+      tokens: ["\ud83e\udd99"],
+      ids: [2, 250645],
+      decoded: "<bos>\ud83e\udd99",
+    },
+    EMOJIS_2: {
+      text: LLAMA_TEST_STRINGS.EMOJIS_2,
+      tokens: ["\ud83e\udd99", "<0xEA>", "<0x99>", "<0x8A>"],
+      ids: [2, 250645, 451, 370, 355],
+      decoded: "<bos>\ud83e\udd99\ua64a",
+    },
+    EMOJIS_3: {
+      text: LLAMA_TEST_STRINGS.EMOJIS_3,
+      tokens: ["<0xEA>", "<0x99>", "<0x8A>", "\ud83e\udd99"],
+      ids: [2, 451, 370, 355, 250645],
+      decoded: "<bos>\ua64a\ud83e\udd99",
+    },
+    PARAGRAPH: {
+      text: LLAMA_TEST_STRINGS.PARAGRAPH,
+      tokens: ["The", "\u2581llama", "\u2581(/", "\u02c8", "l", "\u0251", "\u02d0", "m\u0259", "/;", "\u2581", "\ud83e\udd99", "Spanish", "\u2581pronunciation", ":", "\u2581[", "\u02c8", "\u028e", "ama", "])", "\u2581(", "Lama", "\u2581g", "lama", ")", "\u2581is", "\u2581a", "\u2581domesticated", "\u2581South", "\u2581American", "\u2581came", "lid", ",", "\u2581widely", "\u2581used", "\u2581as", "\u2581a", "\u2581meat", "\u2581and", "\u2581pack", "\u2581animal", "\u2581by", "\u2581Andean", "\u2581cultures", "\u2581since", "\u2581the", "\u2581Pre", "-", "Columb", "ian", "\u2581era", ".", "\u2581Lla", "mas", "\u2581are", "\u2581social", "\u2581animals", "\u2581and", "\u2581live", "\u2581with", "\u2581others", "\u2581as", "\u2581a", "\u2581herd", ".", "\u2581Their", "\u2581wool", "\u2581is", "\u2581soft", "\u2581and", "\u2581contains", "\u2581only", "\u2581a", "\u2581small", "\u2581amount", "\u2581of", "\u2581lan", "olin", ".[", "2", "]", "\u2581Lla", "mas", "\u2581can", "\u2581learn", "\u2581simple", "\u2581tasks", "\u2581after", "\u2581a", "\u2581few", "\u2581repetitions", ".", "\u2581When", "\u2581using", "\u2581a", "\u2581pack", ",", "\u2581they", "\u2581can", "\u2581carry", "\u2581about", "\u2581", "2", "5", "\u2581to", "\u2581", "3", "0", "%", "\u2581of", "\u2581their", "\u2581body", "\u2581weight", "\u2581for", "\u2581", "8", "\u2581to", "\u2581", "1", "3", "\u2581km", "\u2581(", "5", "\u2013", "8", "\u2581miles", ").[", "3", "]", "\u2581The", "\u2581name", "\u2581llama", "\u2581(", "in", "\u2581the", "\u2581past", "\u2581also", "\u2581spelled", '\u2581"', "lama", '"', "\u2581or", '\u2581"', "g", "lama", '")', "\u2581was", "\u2581adopted", "\u2581by", "\u2581European", "\u2581settlers", "\u2581from", "\u2581native", "\u2581Peru", "vi", "ans", ".[", "4", "]", "\u2581The", "\u2581ancestors", "\u2581of", "\u2581llamas", "\u2581are", "\u2581thought", "\u2581to", "\u2581have", "\u2581originated", "\u2581from", "\u2581the", "\u2581Great", "\u2581Plains", "\u2581of", "\u2581North", "\u2581America", "\u2581about", "\u2581", "4", "0", "\u2581million", "\u2581years", "\u2581ago", ",", "\u2581and", "\u2581subsequently", "\u2581migrated", "\u2581to", "\u2581South", "\u2581America", "\u2581about", "\u2581three", "\u2581million", "\u2581years", "\u2581ago", "\u2581during", "\u2581the", "\u2581Great", "\u2581American", "\u2581Interchange", ".", "\u2581By", "\u2581the", "\u2581end", "\u2581of", "\u2581the", "\u2581last", "\u2581ice", "\u2581age", "\u2581(", "1", "0", ",", "0", "0", "0", "\u2013", "1", "2", ",", "0", "0", "0", "\u2581years", "\u2581ago", "),", "\u2581came", "lids", "\u2581were", "\u2581extinct", "\u2581in", "\u2581North", "\u2581America", ".[", "3", "]", "\u2581As", "\u2581of", "\u2581", "2", "0", "0", "7", ",", "\u2581there", "\u2581were", "\u2581over", "\u2581seven", "\u2581million", "\u2581llamas", "\u2581and", "\u2581al", "pac", "as", "\u2581in", "\u2581South", "\u2581America", "\u2581and", "\u2581over", "\u2581", "1", "5", "8", ",", "0", "0", "0", "\u2581llamas", "\u2581and", "\u2581", "1", "0", "0", ",", "0", "0", "0", "<0xEA>", "<0x99>", "<0x8A>", "\ud83e\udd99", "\u2581al", "pac", "as", ",", "\u2581descended", "\u2581from", "\u2581progen", "itors", "\u2581imported", "\u2581late", "\u2581in", "\u2581the", "\u2581", "2", "0", "th", "\u2581century", ",", "\u2581in", "\u2581the", "\u2581United", "\u2581States", "\u2581and", "\u2581Canada", ".[", "5", "]", "\u2581In", "\u2581A", "ym", "ara", "\u2581mythology", ",", "\u2581llamas", "\u2581are", "\u2581important", "\u2581beings", ".", "\u2581The", "\u2581Heavenly", "\u2581Llama", "\u2581is", "\u2581said", "\u2581to", "\u2581drink", "\u2581water", "\u2581from", "\u2581the", "\u2581ocean", "\u2581and", "\u2581urin", "ates", "\u2581as", "\u2581it", "\u2581rains", ".[", "6", "]", "\u2581According", "\u2581to", "\u2581A", "ym", "ara", "\u2581es", "ch", "atology", ",", "\u2581llamas", "\u2581will", "\u2581return", "\u2581to", "\u2581the", "\u2581water", "\u2581springs", "\u2581and", "\u2581lagoons", "\u2581where", "\u2581they", "\u2581come", "\u2581from", "\u2581at", "\u2581the", "\u2581end", "\u2581of", "\u2581time", ".[", "6", "]"],
+      ids: [2, 651, 19001, 101949, 239229, 235257, 240527, 240342, 128631, 102430, 235248, 250645, 51590, 74569, 235292, 892, 239229, 246752, 2867, 3013, 591, 221520, 583, 10450, 235275, 603, 476, 183304, 4316, 3725, 3392, 3353, 235269, 16714, 1671, 685, 476, 11827, 578, 3386, 8205, 731, 207552, 24541, 2754, 573, 2769, 235290, 222963, 1282, 6063, 235265, 172809, 2616, 708, 3127, 8398, 578, 3685, 675, 3588, 685, 476, 48010, 235265, 10368, 23834, 603, 4072, 578, 7744, 1297, 476, 2301, 3619, 576, 7607, 28424, 19047, 235284, 235307, 172809, 2616, 798, 3918, 3890, 13333, 1452, 476, 2619, 126286, 235265, 3194, 2177, 476, 3386, 235269, 984, 798, 6383, 1105, 235248, 235284, 235308, 577, 235248, 235304, 235276, 235358, 576, 1024, 2971, 5171, 604, 235248, 235321, 577, 235248, 235274, 235304, 5821, 591, 235308, 235389, 235321, 7112, 232524, 235304, 235307, 714, 1503, 19001, 591, 473, 573, 3433, 1170, 73003, 664, 10450, 235281, 689, 664, 235264, 10450, 1388, 729, 13861, 731, 7737, 57710, 774, 11634, 30160, 893, 779, 19047, 235310, 235307, 714, 44106, 576, 129953, 708, 3421, 577, 791, 52102, 774, 573, 6553, 55118, 576, 4612, 5783, 1105, 235248, 235310, 235276, 4416, 1658, 3958, 235269, 578, 27956, 106398, 577, 4316, 5783, 1105, 2149, 4416, 1658, 3958, 2290, 573, 6553, 3725, 193879, 235265, 3339, 573, 1580, 576, 573, 2001, 8357, 3911, 591, 235274, 235276, 235269, 235276, 235276, 235276, 235389, 235274, 235284, 235269, 235276, 235276, 235276, 1658, 3958, 823, 3392, 41253, 1049, 78561, 575, 4612, 5783, 19047, 235304, 235307, 1877, 576, 235248, 235284, 235276, 235276, 235324, 235269, 1104, 1049, 1163, 6861, 4416, 129953, 578, 717, 23337, 508, 575, 4316, 5783, 578, 1163, 235248, 235274, 235308, 235321, 235269, 235276, 235276, 235276, 129953, 578, 235248, 235274, 235276, 235276, 235269, 235276, 235276, 235276, 451, 370, 355, 250645, 717, 23337, 508, 235269, 64700, 774, 66279, 15517, 29271, 5245, 575, 573, 235248, 235284, 235276, 489, 7861, 235269, 575, 573, 3520, 3858, 578, 6591, 19047, 235308, 235307, 878, 586, 3985, 1610, 76701, 235269, 129953, 708, 2845, 27290, 235265, 714, 89830, 170669, 603, 1180, 577, 7182, 2003, 774, 573, 13940, 578, 111204, 1204, 685, 665, 50852, 19047, 235318, 235307, 11926, 577, 586, 3985, 1610, 875, 530, 92764, 235269, 129953, 877, 2203, 577, 573, 2003, 31104, 578, 221493, 1570, 984, 2063, 774, 696, 573, 1580, 576, 1069, 19047, 235318, 235307],
+      decoded: '<bos>The llama (/\u02c8l\u0251\u02d0m\u0259/; \ud83e\udd99Spanish pronunciation: [\u02c8\u028eama]) (Lama glama) is a domesticated South American camelid, widely used as a meat and pack animal by Andean cultures since the Pre-Columbian era. Llamas are social animals and live with others as a herd. Their wool is soft and contains only a small amount of lanolin.[2] Llamas can learn simple tasks after a few repetitions. When using a pack, they can carry about 25 to 30% of their body weight for 8 to 13 km (5\u20138 miles).[3] The name llama (in the past also spelled "lama" or "glama") was adopted by European settlers from native Peruvians.[4] The ancestors of llamas are thought to have originated from the Great Plains of North America about 40 million years ago, and subsequently migrated to South America about three million years ago during the Great American Interchange. By the end of the last ice age (10,000\u201312,000 years ago), camelids were extinct in North America.[3] As of 2007, there were over seven million llamas and alpacas in South America and over 158,000 llamas and 100,000\ua64a\ud83e\udd99 alpacas, descended from progenitors imported late in the 20th century, in the United States and Canada.[5] In Aymara mythology, llamas are important beings. The Heavenly Llama is said to drink water from the ocean and urinates as it rains.[6] According to Aymara eschatology, llamas will return to the water springs and lagoons where they come from at the end of time.[6]',
+    },
+  },
+};

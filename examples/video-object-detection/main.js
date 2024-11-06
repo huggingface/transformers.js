@@ -18,6 +18,13 @@ const thresholdSlider = document.getElementById('threshold');
 const thresholdLabel = document.getElementById('threshold-value');
 const sizeSlider = document.getElementById('size');
 const sizeLabel = document.getElementById('size-value');
+const scaleSlider = document.getElementById('scale');
+const scaleLabel = document.getElementById('scale-value');
+
+function setStreamSize(width, height) {
+    video.width = canvas.width = Math.round(width);
+    video.height = canvas.height = Math.round(height);
+}
 
 status.textContent = 'Loading model...';
 
@@ -27,6 +34,14 @@ const model = await AutoModel.from_pretrained(model_id);
 const processor = await AutoProcessor.from_pretrained(model_id);
 
 // Set up controls
+let scale = 0.5;
+scaleSlider.addEventListener('input', () => {
+    scale = Number(scaleSlider.value);
+    setStreamSize(video.videoWidth * scale, video.videoHeight * scale);
+    scaleLabel.textContent = scale;
+});
+scaleSlider.disabled = false;
+
 let threshold = 0.25;
 thresholdSlider.addEventListener('input', () => {
     threshold = Number(thresholdSlider.value);
@@ -130,8 +145,7 @@ navigator.mediaDevices.getUserMedia(
     const videoTrack = stream.getVideoTracks()[0];
     const { width, height } = videoTrack.getSettings();
 
-    canvas.width = width;
-    canvas.height = height;
+    setStreamSize(width * scale, height * scale);
 
     // Set container width and height depending on the image aspect ratio
     const ar = width / height;

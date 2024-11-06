@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply rounded-full bg-gray-100 dark:bg-gray-700;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-300 dark:bg-gray-600;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+}
+
+html {
+  @apply scrollbar-thin;
+}

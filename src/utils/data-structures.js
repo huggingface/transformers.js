@@ -22,11 +22,12 @@ export class PriorityQueue {
 
     /**
      * Create a new PriorityQueue.
-     * @param {Function} comparator Comparator function to determine priority. Defaults to a MaxHeap.
+     * @param {function(any, any): boolean} comparator Comparator function to determine priority. Defaults to a MaxHeap.
      */
-    constructor(comparator = (a, b) => a > b) {
+    constructor(comparator = (a, b) => a > b, maxSize = Infinity) {
         this._heap = [];
         this._comparator = comparator;
+        this._maxSize = maxSize;
     }
 
     /**
@@ -68,8 +69,20 @@ export class PriorityQueue {
      */
     extend(values) {
         for (const value of values) {
-            this._heap.push(value);
-            this._siftUp();
+            if (this.size < this._maxSize) {
+                this._heap.push(value);
+                this._siftUp();
+            } else {
+                // Get index of value with the lowest priority
+                const smallest = this._smallest();
+
+                // If the new value has higher priority than the smallest value in the heap
+                // then replace the smallest value with the new value and update the heap
+                if (this._comparator(value, this._heap[smallest])) {
+                    this._heap[smallest] = value;
+                    this._siftUpFrom(smallest);
+                }
+            }
         }
         return this.size;
     }
@@ -160,12 +173,20 @@ export class PriorityQueue {
      * @private
      */
     _siftUp() {
-        let node = this.size - 1;
+        this._siftUpFrom(this.size - 1);
+    }
+
+    /**
+     * Helper function to sift up from a given node.
+     * @param {number} node The index of the node to start sifting up from.
+     */
+    _siftUpFrom(node) {
         while (node > 0 && this._greater(node, this._parent(node))) {
             this._swap(node, this._parent(node));
             node = this._parent(node);
         }
     }
+
     /**
      * Maintain the heap property by updating positions in the heap,
      * starting at the first element and moving down the heap.
@@ -184,6 +205,15 @@ export class PriorityQueue {
             node = maxChild;
         }
     }
+
+    /**
+     * Get the index of the smallest element in the heap. Since we use an array-based heap,
+     * the index can be computed without needing to traverse the heap.
+     * @private
+     */
+    _smallest() {
+        return (2 ** (Math.floor(Math.log2(this.size))) - 1);
+    }
 }
 
 /**
@@ -199,7 +229,7 @@ export class CharTrie {
      * @param {string[]} texts The strings to add to the trie.
      */
     extend(texts) {
-        for (let text of texts) {
+        for (const text of texts) {
             this.push(text);
         }
     }
@@ -210,7 +240,7 @@ export class CharTrie {
      */
     push(text) {
         let node = this.root;
-        for (let ch of text) {
+        for (const ch of text) {
             let child = node.children.get(ch);
             if (child === undefined) {
                 child = CharTrieNode.default();
@@ -228,12 +258,14 @@ export class CharTrie {
      */
     *commonPrefixSearch(text) {
         let node = this.root;
+        if (node === undefined) return;
+
         let prefix = "";
-        for (let i = 0; i < text.length && node !== undefined; ++i) {
-            const ch = text[i];
+        for (const ch of text) {
             prefix += ch;
             node = node.children.get(ch);
-            if (node !== undefined && node.isLeaf) {
+            if (node === undefined) return;
+            if (node.isLeaf) {
                 yield prefix;
             }
         }
@@ -275,8 +307,8 @@ export class TokenLattice {
      * @param {number} eosTokenId The end-of-sequence token ID.
      */
     constructor(sentence, bosTokenId, eosTokenId) {
-        this.sentence = sentence;
-        this.len = sentence.length;
+        this.chars = Array.from(sentence);
+        this.len = this.chars.length;
         this.bosTokenId = bosTokenId;
         this.eosTokenId = eosTokenId;
         this.nodes = [];
@@ -310,7 +342,7 @@ export class TokenLattice {
     /**
      * Implements the Viterbi algorithm to compute the most likely sequence of tokens.
      *
-     * @returns {TokenLatticeNode[]} The array of nodes representing the most likely sequence of tokens.
+     * @returns {TokenLatticeNode[]} The most likely sequence of tokens.
      */
     viterbi() {
         const len = this.len;
@@ -364,11 +396,11 @@ export class TokenLattice {
      * @returns {string} The array of nodes representing the most likely sequence of tokens.
      */
     piece(node) {
-        return this.sentence.slice(node.pos, node.pos + node.length);
+        return this.chars.slice(node.pos, node.pos + node.length).join('');
     }
 
     /**
-     * @returns {Array} The array of nodes representing the most likely sequence of tokens.
+     * @returns {string[]} The most likely sequence of tokens.
      */
     tokens() {
         const nodes = this.viterbi();
@@ -376,7 +408,7 @@ export class TokenLattice {
     }
 
     /**
-     * @returns {Array} The array of nodes representing the most likely sequence of tokens.
+     * @returns {number[]} The most likely sequence of token ids.
      */
     tokenIds() {
         const nodes = this.viterbi();
