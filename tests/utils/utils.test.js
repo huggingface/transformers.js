@@ -62,29 +62,30 @@ describe("Utilities", () => {
   });
 
   describe("Image utilities", () => {
+    let image;
+    beforeAll(async () => {
+      image = await RawImage.fromURL("https://picsum.photos/300/200");
+    });
+
     it("Read image from URL", async () => {
-      const image = await RawImage.fromURL("https://picsum.photos/300/200");
       expect(image.width).toBe(300);
       expect(image.height).toBe(200);
       expect(image.channels).toBe(3);
     });
 
     it("Can resize image", async () => {
-      const image = await RawImage.fromURL("https://picsum.photos/300/200");
       const resized = await image.resize(150, 100);
       expect(resized.width).toBe(150);
       expect(resized.height).toBe(100);
     });
 
     it("Can resize with aspect ratio", async () => {
-      const image = await RawImage.fromURL("https://picsum.photos/300/200");
       const resized = await image.resize(150, null);
       expect(resized.width).toBe(150);
       expect(resized.height).toBe(100);
     });
 
     it("Returns original image if width and height are null", async () => {
-      const image = await RawImage.fromURL("https://picsum.photos/300/200");
       const resized = await image.resize(null, null);
       expect(resized.width).toBe(300);
       expect(resized.height).toBe(200);
