@@ -1,10 +1,13 @@
+/**
+ * @typedef {import('./tensor.js').DataArray} DataArray
+ */
 
 /**
- * @file Helper module for image processing. 
- * 
- * These functions and classes are only used internally, 
+ * @file Helper module for image processing.
+ *
+ * These functions and classes are only used internally,
  * meaning an end-user shouldn't need to access anything here.
- * 
+ *
  * @module utils/image
  */
 
@@ -91,7 +94,7 @@ export class RawImage {
         this.channels = channels;
     }
 
-    /** 
+    /**
      * Returns the size of the image (width, height).
      * @returns {[number, number]} The size of the image (width, height).
      */
@@ -101,9 +104,9 @@ export class RawImage {
 
     /**
      * Helper method for reading an image from a variety of input types.
-     * @param {RawImage|string|URL} input 
+     * @param {RawImage|string|URL} input
      * @returns The image object.
-     * 
+     *
      * **Example:** Read image from a URL.
      * ```javascript
      * let image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
@@ -181,7 +184,7 @@ export class RawImage {
 
     /**
      * Helper method to create a new Image from a tensor
-     * @param {Tensor} tensor 
+     * @param {Tensor} tensor
      */
     static fromTensor(tensor, channel_format = 'CHW') {
         if (tensor.dims.length !== 3) {
@@ -305,6 +308,90 @@ export class RawImage {
     }
 
     /**
+     * Get the pixel at the given coordinates.
+     * @param {number} x The x coordinate of the pixel.
+     * @param {number} y The y coordinate of the pixel.
+     * @returns {Promise<DataArray>} The pixel value. The length of the array will match the channels.
+     */
+    async getPixel(x, y) {
+        x = Math.max(Math.min(x, this.width), 0);
+        y = Math.max(Math.min(y, this.height), 0);
+
+        // Calculate base index, taking into account number of channels.
+        const baseIndex = ((y * this.width) + x) * this.channels;
+        return this.data.slice(baseIndex, baseIndex + this.channels);
+    }
+
+    /**
+     * Set the pixel at the given coordinates.
+     * @param {number} x The x coordinate of the pixel.
+     * @param {number} y The y coordinate of the pixel.
+     * @param {DataArray} value The pixel value. The length of the array should match the channels.
+     * @returns {Promise<RawImage>}
+     * @throws {Error} If the number of channels in the value does not match the number of channels in the image.
+     */
+    async setPixel(x, y, value) {
+        x = Math.max(Math.min(x, this.width), 0);
+        y = Math.max(Math.min(y, this.height), 0);
+
+        if (value.length !== this.channels) {
+            throw new Error(`Expected ${this.channels} values, got ${value.length}`);
+        }
+
+        // Calculate the starting point for that pixel, by first determining
+        // what row to start on, then adding the x offset. Finally, take into
+        // account the number of channels.
+        const baseIndex = ((y * this.width) + x) * this.channels;
+
+        // Iterate for each channel, assigning the value to the corresponding
+        // spot in `this.data`.
+        for (let channel = 0; channel < this.channels; channel++) {
+            const channelIndex = baseIndex + channel;
+            if (channelIndex >= this.data.length) {
+                throw new Error('Index out of bounds');
+            }
+            this.data[channelIndex] = value[channel];
+        }
+
+        return this;
+    }
+
+    /**
+     * Apply an alpha mask to the image.
+     * @param {RawImage} mask The mask to apply. Values should be between 0 and 255, and be a single channel.
+     * @returns {Promise<RawImage>} The masked image.
+     * @throws {Error} If the mask is not the same size as the image.
+     */
+    async applyMask(mask) {
+        if (mask.width !== this.width || mask.height !== this.height) {
+            throw new Error('Mask must be the same size as the image');
+        }
+
+        // We want the current image to have an alpha channel, but the mask will
+        // just be a single channel.
+        this.convert(4);
+        mask.convert(1);
+
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const maskPixel = await mask.getPixel(x, y);
+                if (maskPixel.length === 0 || typeof maskPixel[0] === 'undefined') {
+                    throw new Error('Mask pixel is empty');
+                }
+
+                // Ensure that alpha is a value between 0 and 255, and not a
+                // value between 0 and 1.
+                const alpha = maskPixel[0] < 1 ? maskPixel[0] * 255 : maskPixel[0];
+
+                const pixel = await this.getPixel(x, y);
+                this.setPixel(x, y, [...pixel.slice(0, 3), alpha]);
+            }
+        }
+
+        return this;
+    }
+
+    /**
      * Resize the image to the given dimensions. This method uses the canvas API to perform the resizing.
      * @param {number} width The width of the new image.
      * @param {number} height The height of the new image.
@@ -355,7 +442,7 @@ export class RawImage {
                 case 'nearest':
                 case 'bilinear':
                 case 'bicubic':
-                    // Perform resizing using affine transform. 
+                    // Perform resizing using affine transform.
                     // This matches how the python Pillow library does it.
                     img = img.affine([width / this.width, 0, 0, height / this.height], {
                         interpolator: resampleMethod
@@ -368,7 +455,7 @@ export class RawImage {
                     img = img.resize({
                         width, height,
                         fit: 'fill',
-                        kernel: 'lanczos3', // PIL Lanczos uses a kernel size of 3 
+                        kernel: 'lanczos3', // PIL Lanczos uses a kernel size of 3
                     });
                     break;
 
@@ -447,7 +534,7 @@ export class RawImage {
             // Create canvas object for this image
             const canvas = this.toCanvas();
 
-            // Create a new canvas of the desired size. This is needed since if the 
+            // Create a new canvas of the desired size. This is needed since if the
             // image is too small, we need to pad it with black pixels.
             const ctx = createCanvasFunction(crop_width, crop_height).getContext('2d');
 
@@ -495,7 +582,7 @@ export class RawImage {
             // Create canvas object for this image
             const canvas = this.toCanvas();
 
-            // Create a new canvas of the desired size. This is needed since if the 
+            // Create a new canvas of the desired size. This is needed since if the
             // image is too small, we need to pad it with black pixels.
             const ctx = createCanvasFunction(crop_width, crop_height).getContext('2d');
 
