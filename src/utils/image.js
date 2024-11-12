@@ -372,20 +372,19 @@ export class RawImage {
         this.convert(4);
         mask.convert(1);
 
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                const maskPixel = await mask.getPixel(x, y);
-                if (maskPixel.length === 0 || typeof maskPixel[0] === 'undefined') {
-                    throw new Error('Mask pixel is empty');
-                }
-
-                // Ensure that alpha is a value between 0 and 255, and not a
-                // value between 0 and 1.
-                const alpha = maskPixel[0] < 1 ? maskPixel[0] * 255 : maskPixel[0];
-
-                const pixel = await this.getPixel(x, y);
-                this.setPixel(x, y, [...pixel.slice(0, 3), alpha]);
+        const numPixels = this.width * this.height;
+        for (let i = 0; i < numPixels; i++) {
+            const maskPixel = mask.data[i];
+            if (typeof maskPixel === 'undefined') {
+                throw new Error('Invalid mask');
             }
+
+            // Ensure that the alpha is a range from 0 to 255, and not a range
+            // from 0 to 1.
+            const alpha = maskPixel < 1 ? maskPixel * 255 : maskPixel;
+            // Calculate the offset, multiplying by 4 because of the number of
+            // channels, then offset by 3 to get the alpha channel.
+            this.data[(i * 4) + 3] = alpha;
         }
 
         return this;
