@@ -27,11 +27,19 @@ export class VLChatProcessor extends Processor {
      */
 
     /**
+     * @typedef {Object} VLCChatProcessorResult The processed input.
+     * @property {Tensor} input_ids The input IDs.
+     * @property {Tensor} attention_mask The attention mask.
+     * @property {Tensor} images_seq_mask The image sequence mask.
+     * @property {Tensor} images_emb_mask The image embedding mask.
+     */
+
+    /**
      * @param {MultimodalConversation} conversation The chat messages to process.
      * @param {Object} options Additional options for processing.
      * @param {RawImage|RawImage[]} [options.images] The images to process, if not set in the conversation.
      * @param {string} [options.chat_template="default"] The chat template to use.
-     * @returns {Promise<{input_ids: Tensor; attention_mask: Tensor; images_seq_mask: Tensor; images_emb_mask: Tensor;} & import('../../base/image_processors_utils.js').ImageProcessorResult>} The processed input.
+     * @returns {Promise<VLCChatProcessorResult | VLCChatProcessorResult & import('../../base/image_processors_utils.js').ImageProcessorResult>} The processed input.
      */
     async _call(conversation, {
         images = null,
