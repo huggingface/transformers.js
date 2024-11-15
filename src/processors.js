@@ -602,13 +602,13 @@ export class ImageFeatureExtractor extends FeatureExtractor {
      * Constructs a new ImageFeatureExtractor instance.
      *
      * @param {Object} config The configuration for the feature extractor.
-     * @param {number[]} config.image_mean The mean values for image normalization.
-     * @param {number[]} config.image_std The standard deviation values for image normalization.
-     * @param {boolean} config.do_rescale Whether to rescale the image pixel values to the [0,1] range.
-     * @param {number} config.rescale_factor The factor to use for rescaling the image pixel values.
-     * @param {boolean} config.do_normalize Whether to normalize the image pixel values.
+     * @param {number[]} [config.image_mean] The mean values for image normalization.
+     * @param {number[]} [config.image_std] The standard deviation values for image normalization.
+     * @param {boolean} [config.do_rescale] Whether to rescale the image pixel values to the [0,1] range.
+     * @param {number} [config.rescale_factor] The factor to use for rescaling the image pixel values.
+     * @param {boolean} [config.do_normalize] Whether to normalize the image pixel values.
      * @param {boolean} config.do_resize Whether to resize the image.
-     * @param {number} config.resample What method to use for resampling.
+     * @param {number} [config.resample] What method to use for resampling.
      * @param {number|Object} config.size The size to resize the image to.
      * @param {boolean} [config.do_flip_channel_order=false] Whether to flip the color channels from RGB to BGR.
      * Can be overridden by the `do_flip_channel_order` parameter in the `preprocess` method.
@@ -932,7 +932,11 @@ export class ImageFeatureExtractor extends FeatureExtractor {
      * Preprocesses the given image.
      *
      * @param {RawImage} image The image to preprocess.
-     * @param {Object} overrides The overrides for the preprocessing options.
+     * @param {Object} [overrides] The overrides for the preprocessing options.
+     * @param {boolean|null} [overrides.do_normalize] Do normalize?
+     * @param {boolean|null} [overrides.do_pad] Do pad?
+     * @param {boolean|null} [overrides.do_convert_rgb] Do convert RGB?
+     * @param {boolean|null} [overrides.do_convert_grayscale] Do convert grayscale?
      * @returns {Promise<PreprocessedImage>} The preprocessed image.
      */
     async preprocess(image, {

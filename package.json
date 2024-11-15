@@ -67,6 +67,7 @@
     "sharp": "^0.33.5"
   },
   "devDependencies": {
+    "@runtime-type-inspector/plugin-webpack5": "^4.0.1",
     "@types/jest": "^29.5.14",
     "@webgpu/types": "^0.1.44",
     "catharsis": "github:xenova/catharsis",

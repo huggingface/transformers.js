@@ -3172,7 +3172,7 @@ const TASK_ALIASES = Object.freeze({
  * @typedef {keyof typeof TASK_ALIASES} AliasType
  * @typedef {TaskType | AliasType} PipelineType All possible pipeline types.
  * @typedef {{[K in TaskType]: InstanceType<typeof SUPPORTED_TASKS[K]["pipeline"]>}} SupportedTasks A mapping of pipeline names to their corresponding pipeline classes.
- * @typedef {{[K in AliasType]: InstanceType<typeof SUPPORTED_TASKS[TASK_ALIASES[K]]["pipeline"]>}} AliasTasks A mapping from pipeline aliases to their corresponding pipeline classes.
+ * @typedef {{[K in AliasType]: SupportedTasks[TASK_ALIASES[K]]}} AliasTasks A mapping from pipeline aliases to their corresponding pipeline classes.
  * @typedef {SupportedTasks & AliasTasks} AllTasks A mapping from all pipeline names and aliases to their corresponding pipeline classes.
  */
 

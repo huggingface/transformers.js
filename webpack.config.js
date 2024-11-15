@@ -1,6 +1,7 @@
 import TerserPlugin from "terser-webpack-plugin";
 import { fileURLToPath } from "url";
 import path from "path";
+import { RuntimeTypeInspectorPlugin } from '@runtime-type-inspector/plugin-webpack5';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,15 +29,25 @@ function buildConfig({
       return [module, false];
     }),
   );
-
+  const plugins = [];
+  let devtool = 'source-map';
+  let entry = {
+    [`transformers${name}`]: './src/transformers.js',
+    [`transformers${name}.min`]: './src/transformers.js',
+  };
+  const buildType = 'rti';
+  if (buildType === 'rti') {
+    entry = {
+      [`transformers${name}.rti`]: './src/transformers.rti.js',
+    };
+    plugins.push(new RuntimeTypeInspectorPlugin());
+    devtool = false;
+  }
   /** @type {import('webpack').Configuration} */
   const config = {
     mode: 'development',
-    devtool: 'source-map',
-    entry: {
-      [`transformers${name}`]: './src/transformers.js',
-      [`transformers${name}.min`]: './src/transformers.js',
-    },
+    devtool,
+    entry,
     output: {
       filename: `[name]${suffix}`,
       path: path.join(__dirname, 'dist'),
@@ -46,6 +57,7 @@ function buildConfig({
       assetModuleFilename: '[name][ext]',
       chunkFormat: 'module',
     },
+    plugins,
     optimization: {
       minimize: true,
       minimizer: [new TerserPlugin({
