@@ -9,10 +9,29 @@
  */
 
 /**
+ * @typedef {Object} ProgressInfo
+ * @property {'initiate' | 'download' | 'progress' | 'done'} status
+ * @property {string} name - This can be either:
+ *   - a string, the *model id* of a model repo on huggingface.co.
+ *   - a path to a *directory* potentially containing the file.
+ * @property {string} file - The name of the file
+ * @property {number} [progress] - A number between 0 and 100. Only available for the 'progress' status.
+ * @property {number} [loaded] - The number of bytes loaded. Only available for the 'progress' status.
+ * @property {number} [total] - The total number of bytes to be loaded. Only available for the 'progress' status.
+ */
+
+/**
+ * A callback function that is called with progress information.
+ * @callback ProgressCallback
+ * @param {ProgressInfo} progressInfo
+ * @returns {void}
+ */
+
+/**
  * Helper function to dispatch progress callbacks.
  *
- * @param {Function} progress_callback The progress callback function to dispatch.
- * @param {any} data The data to pass to the progress callback function.
+ * @param {ProgressCallback | null | undefined} progress_callback The progress callback function to dispatch.
+ * @param {ProgressInfo} data The data to pass to the progress callback function.
  * @returns {void}
  * @private
  */
