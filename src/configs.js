@@ -36,6 +36,13 @@ import {
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
  */
 
+/**
+ * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
+ */
+
+/**
+ * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
+ */
 
 /**
  * Loads a config from the specified path.
