@@ -361,6 +361,8 @@ export class RawImage {
      * @param {RawImage} mask The mask to apply. Values should be between 0 and 255, and be a single channel.
      * @returns {Promise<RawImage>} The masked image.
      * @throws {Error} If the mask is not the same size as the image.
+     * @throws {Error} If the image does not have 4 channels.
+     * @throws {Error} If the mask is not a single channel.
      */
     async applyMask(mask) {
         if (mask.width !== this.width || mask.height !== this.height) {
@@ -369,8 +371,12 @@ export class RawImage {
 
         // We want the current image to have an alpha channel, but the mask will
         // just be a single channel.
-        this.convert(4);
-        mask.convert(1);
+        if (this.channels !== 4) {
+            throw new Error('Image must have 4 channels');
+        }
+        if (mask.channels !== 1) {
+            throw new Error('Mask must have 1 channel');
+        }
 
         const numPixels = this.width * this.height;
         for (let i = 0; i < numPixels; i++) {
