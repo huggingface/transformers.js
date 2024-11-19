@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./src/transformers.js",
   "types": "./types/transformers.d.ts",
@@ -67,11 +67,11 @@
     "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.1",
+    "@types/jest": "^29.5.14",
     "@webgpu/types": "^0.1.44",
     "catharsis": "github:xenova/catharsis",
-    "jest": "^29.5.0",
-    "jest-environment-node": "^29.5.0",
+    "jest": "^30.0.0-alpha.6",
+    "jest-environment-node": "^30.0.0-alpha.6",
     "jsdoc-to-markdown": "^8.0.1",
     "prettier": "3.3.3",
     "typescript": "^5.2.2",

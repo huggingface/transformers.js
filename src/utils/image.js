@@ -316,6 +316,11 @@ export class RawImage {
         resample = 2,
     } = {}) {
 
+        // Do nothing if the image already has the desired size
+        if (this.width === width && this.height === height) {
+            return this;
+        }
+
         // Ensure resample method is a string
         let resampleMethod = RESAMPLING_MAPPING[resample] ?? resample;
 

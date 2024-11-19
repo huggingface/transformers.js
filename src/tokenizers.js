@@ -1518,6 +1518,8 @@ class SplitPreTokenizer extends PreTokenizer {
 
         if (this.config.invert) {
             return text.match(this.pattern) || [];
+        } else if (this.config.behavior?.toLowerCase() === 'removed') {
+            return text.split(this.pattern).filter(x => x);
         } else {
             return regexSplit(text, this.pattern);
         }
