@@ -4039,6 +4039,17 @@ export class ViTForImageClassification extends ViTPreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+export class VitPosePreTrainedModel extends PreTrainedModel { }
+
+/**
+ * The VitPose model with a pose estimation head on top.
+ */
+export class VitPoseForPoseEstimation extends VitPosePreTrainedModel { }
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 export class PvtPreTrainedModel extends PreTrainedModel { }
 export class PvtModel extends PvtPreTrainedModel { }
@@ -6569,6 +6580,10 @@ const MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES = new Map([
     ['sapiens', ['SapiensForNormalEstimation', SapiensForNormalEstimation]],
 ])
 
+const MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES = new Map([
+    ['vitpose', ['VitPoseForPoseEstimation', VitPoseForPoseEstimation]],
+])
+
 // NOTE: This is custom to Transformers.js, and is necessary because certain models
 // (e.g., CLIP) are split into vision and text components
 const MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES = new Map([
@@ -6598,6 +6613,7 @@ const MODEL_CLASS_TYPE_MAPPING = [
     [MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
+    [MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_MASK_GENERATION_MAPPING_NAMES, MODEL_TYPES.MaskGeneration],
@@ -6867,6 +6883,10 @@ export class AutoModelForDepthEstimation extends PretrainedMixin {
 
 export class AutoModelForNormalEstimation extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES];
+}
+
+export class AutoModelForPoseEstimation extends PretrainedMixin {
+    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForImageFeatureExtraction extends PretrainedMixin {
