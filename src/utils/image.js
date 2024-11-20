@@ -308,55 +308,6 @@ export class RawImage {
     }
 
     /**
-     * Get the pixel at the given coordinates.
-     * @param {number} x The x coordinate of the pixel.
-     * @param {number} y The y coordinate of the pixel.
-     * @returns {Promise<DataArray>} The pixel value. The length of the array will match the channels.
-     */
-    async getPixel(x, y) {
-        x = Math.max(Math.min(x, this.width), 0);
-        y = Math.max(Math.min(y, this.height), 0);
-
-        // Calculate base index, taking into account number of channels.
-        const baseIndex = ((y * this.width) + x) * this.channels;
-        return this.data.slice(baseIndex, baseIndex + this.channels);
-    }
-
-    /**
-     * Set the pixel at the given coordinates.
-     * @param {number} x The x coordinate of the pixel.
-     * @param {number} y The y coordinate of the pixel.
-     * @param {DataArray} value The pixel value. The length of the array should match the channels.
-     * @returns {Promise<RawImage>}
-     * @throws {Error} If the number of channels in the value does not match the number of channels in the image.
-     */
-    async setPixel(x, y, value) {
-        x = Math.max(Math.min(x, this.width), 0);
-        y = Math.max(Math.min(y, this.height), 0);
-
-        if (value.length !== this.channels) {
-            throw new Error(`Expected ${this.channels} values, got ${value.length}`);
-        }
-
-        // Calculate the starting point for that pixel, by first determining
-        // what row to start on, then adding the x offset. Finally, take into
-        // account the number of channels.
-        const baseIndex = ((y * this.width) + x) * this.channels;
-
-        // Iterate for each channel, assigning the value to the corresponding
-        // spot in `this.data`.
-        for (let channel = 0; channel < this.channels; channel++) {
-            const channelIndex = baseIndex + channel;
-            if (channelIndex >= this.data.length) {
-                throw new Error('Index out of bounds');
-            }
-            this.data[channelIndex] = value[channel];
-        }
-
-        return this;
-    }
-
-    /**
      * Apply an alpha mask to the image.
      * @param {RawImage} mask The mask to apply. Values should be between 0 and 255, and be a single channel.
      * @returns {Promise<RawImage>} The masked image.
@@ -364,7 +315,7 @@ export class RawImage {
      * @throws {Error} If the image does not have 4 channels.
      * @throws {Error} If the mask is not a single channel.
      */
-    async applyMask(mask) {
+    async putAlpha(mask) {
         if (mask.width !== this.width || mask.height !== this.height) {
             throw new Error('Mask must be the same size as the image');
         }
