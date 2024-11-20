@@ -1038,5 +1038,41 @@ describe("Processors", () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    describe(
+      "Qwen2VLProcessor",
+      () => {
+        /** @type {import('../src/transformers.js').Qwen2VLProcessor} */
+        let processor;
+        let images = {};
+
+        beforeAll(async () => {
+          processor = await AutoProcessor.from_pretrained(MODELS.qwen2_vl);
+          images = {
+            white_image: await load_image(TEST_IMAGES.white_image),
+          };
+        });
+
+        it("Image and text", async () => {
+          const conversation = [
+            {
+              role: "user",
+              content: [{ type: "image" }, { type: "text", text: "Describe this image." }],
+            },
+          ];
+
+          const text = processor.apply_chat_template(conversation, {
+            add_generation_prompt: true,
+          });
+          const { input_ids, attention_mask, pixel_values, image_grid_thw } = await processor(text, images.white_image);
+
+          compare(input_ids.dims, [1, 89]);
+          compare(attention_mask.dims, [1, 89]);
+          compare(pixel_values.dims, [256, 1176]);
+          compare(image_grid_thw.dims, [1, 3]);
+        });
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 });

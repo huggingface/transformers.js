@@ -3,6 +3,7 @@ export * from './mgp_str/processing_mgp_str.js';
 export * from './janus/processing_janus.js';
 export * from './owlvit/processing_owlvit.js';
 export * from './pyannote/processing_pyannote.js';
+export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './sam/processing_sam.js';
 export * from './speecht5/processing_speecht5.js';
 export * from './wav2vec2/processing_wav2vec2.js';

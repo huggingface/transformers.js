@@ -73,7 +73,18 @@ export class Processor extends Callable {
     get feature_extractor() {
         return this.components.feature_extractor;
     }
-    
+
+    apply_chat_template(messages, options = {}) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to apply chat template without a tokenizer.');
+        }
+        return this.tokenizer.apply_chat_template(messages, {
+            tokenize: false, // default to false
+            ...options,
+        });
+    }
+
+
     /**
      * Calls the feature_extractor function with the given input.
      * @param {any} input The input to extract features from.
@@ -110,15 +121,15 @@ export class Processor extends Callable {
         const [config, components] = await Promise.all([
             // TODO:
             this.uses_processor_config
-            ? getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options)
-            : {},
+                ? getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options)
+                : {},
             Promise.all(
                 this.classes
-                .filter((cls) => cls in this)
-                .map(async (cls) => {
-                    const component = await this[cls].from_pretrained(pretrained_model_name_or_path, options);
-                    return [cls.replace(/_class$/,''), component];
-                })
+                    .filter((cls) => cls in this)
+                    .map(async (cls) => {
+                        const component = await this[cls].from_pretrained(pretrained_model_name_or_path, options);
+                        return [cls.replace(/_class$/, ''), component];
+                    })
             ).then(Object.fromEntries)
         ]);
 
