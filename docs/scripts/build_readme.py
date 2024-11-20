@@ -69,6 +69,8 @@ DOCS_BASE_URL = 'https://huggingface.co/docs/transformers.js'
 CUSTOM_LINK_MAP = {
     '/custom_usage#convert-your-models-to-onnx': '#convert-your-models-to-onnx',
     './api/env': DOCS_BASE_URL + '/api/env',
+    './guides/webgpu': DOCS_BASE_URL + '/guides/webgpu',
+    './guides/dtypes': DOCS_BASE_URL + '/guides/dtypes',
 }
 
 

@@ -52,7 +52,7 @@ const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncase
 });
 ```
 
-For more information, check out the [WebGPU guide](/guides/webgpu).
+For more information, check out the [WebGPU guide](./guides/webgpu).
 
 > [!WARNING]
 > The WebGPU API is still experimental in many browsers, so if you run into any issues,
@@ -62,7 +62,7 @@ In resource-constrained environments, such as web browsers, it is advisable to u
 the model to lower bandwidth and optimize performance. This can be achieved by adjusting the `dtype` option,
 which allows you to select the appropriate data type for your model. While the available options may vary
 depending on the specific model, typical choices include `"fp32"` (default for WebGPU), `"fp16"`, `"q8"`
-(default for WASM), and `"q4"`. For more information, check out the [quantization guide](../guides/dtypes).
+(default for WASM), and `"q4"`. For more information, check out the [quantization guide](./guides/dtypes).
 ```javascript
 // Run the model at 4-bit quantization
 const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
