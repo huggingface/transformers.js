@@ -6156,6 +6156,34 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     }
 }
 
+export class MgpstrModelOutput extends ModelOutput {
+    constructor({ char_logits, bpe_logits, wp_logits }) {
+        super();
+        this.char_logits = char_logits;
+        this.bpe_logits = bpe_logits;
+        this.wp_logits = wp_logits;
+    }
+
+    get logits() {
+        return [this.char_logits, this.bpe_logits, this.wp_logits];
+    }
+}
+
+export class MgpstrPreTrainedModel extends PreTrainedModel { }
+
+/**
+ * MGP-STR Model transformer with three classification heads on top
+ * (three A^3 modules and three linear layer on top of the transformer encoder output) for scene text recognition (STR).
+ */
+export class MgpstrForSceneTextRecognition extends MgpstrPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new MgpstrModelOutput(await super._call(model_inputs));
+    }
+}
+
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
 // (uses config to instantiate correct class)
@@ -6301,6 +6329,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['mobilenet_v4', ['MobileNetV4Model', MobileNetV4Model]],
 
     ['maskformer', ['MaskFormerModel', MaskFormerModel]],
+    ['mgp-str', ['MgpstrForSceneTextRecognition', MgpstrForSceneTextRecognition]],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([

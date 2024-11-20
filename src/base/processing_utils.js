@@ -107,10 +107,6 @@ export class Processor extends Callable {
      */
     static async from_pretrained(pretrained_model_name_or_path, options) {
 
-        // console.log('FROM PRETRAINED');
-        // console.log(this.classes);
-        // console.log(this.classes.map((cls) => cls in this));
-
         const [config, components] = await Promise.all([
             // TODO:
             this.uses_processor_config

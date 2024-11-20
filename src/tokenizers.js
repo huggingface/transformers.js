@@ -4257,6 +4257,8 @@ export class VitsTokenizer extends PreTrainedTokenizer {
 
 export class CohereTokenizer extends PreTrainedTokenizer { }
 
+export class MgpstrTokenizer extends PreTrainedTokenizer { }
+
 /**
  * Helper class which is used to instantiate pretrained tokenizers with the `from_pretrained` function.
  * The chosen tokenizer class is determined by the type specified in the tokenizer config.
@@ -4310,6 +4312,7 @@ export class AutoTokenizer {
         GemmaTokenizer,
         Grok1Tokenizer,
         CohereTokenizer,
+        MgpstrTokenizer,
 
         // Base case:
         PreTrainedTokenizer,
