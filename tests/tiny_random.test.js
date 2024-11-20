@@ -751,10 +751,7 @@ describe("Tiny random models", () => {
   });
 
   describe("florence2", () => {
-    const texts = [
-      "Describe with a paragraph what is shown in the image.",
-      "Locate the objects with category name in the image.",
-    ];
+    const texts = ["Describe with a paragraph what is shown in the image.", "Locate the objects with category name in the image."];
 
     // Empty white image
     const dims = [224, 224, 3];

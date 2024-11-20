@@ -696,9 +696,9 @@ export const TEST_CONFIG = {
   "onnx-community/camembertv2-base": {
     SIMPLE: {
       text: BASE_TEST_STRINGS.SIMPLE,
-      tokens: ['How', 'are', 'you', 'doi', '##ng', '?'],
+      tokens: ["How", "are", "you", "doi", "##ng", "?"],
       ids: [1, 14473, 9556, 10577, 6471, 9274, 38, 2],
       decoded: "[CLS] How are you doing? [SEP]",
-    }
+    },
   },
 };
