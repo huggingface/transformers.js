@@ -1,7 +1,7 @@
 from enum import Enum
 
 from tqdm import tqdm
-from typing import Set, List
+from typing import Set, List, Optional
 import onnx
 import os
 
@@ -68,16 +68,6 @@ class QuantizationArguments:
         },
     )
 
-    op_block_list: List[str] = field(
-        default_factory=list,
-        metadata={
-            "help": """List of operators to exclude from quantization.
-                   Can be any standard ONNX operator (see https://onnx.ai/onnx/operators/)
-                   or your custom implemented operators.""",
-            "nargs": "+",
-        },
-    )
-
     # 8-bit quantization
     per_channel: bool = field(
         default=None, metadata={"help": "Whether to quantize weights per channel"}
@@ -120,6 +110,16 @@ class QuantizationArguments:
         },
     )
 
+    op_block_list: List[str] = field(
+        default=None,
+        metadata={
+            "help": """List of operators to exclude from quantization.
+                   Can be any standard ONNX operator (see https://onnx.ai/onnx/operators/)
+                   or your custom implemented operators.""",
+            "nargs": "+",
+        },
+    )
+
 
 def get_operators(model: onnx.ModelProto) -> Set[str]:
     operators = set()
@@ -141,7 +141,7 @@ def quantize_q8(
     per_channel: bool,
     reduce_range: bool,
     weight_type: QuantType,
-    op_block_list: List[str] = [],
+    op_block_list: Optional[List[str]]
 ):
     """
     Quantize the weights of the model from float32 to int8/uint8
@@ -163,7 +163,7 @@ def quantize_q8(
         nodes_to_quantize=[],
         nodes_to_exclude=[],
         op_types_to_quantize=[
-            op for op in IntegerOpsRegistry.keys() if op not in op_block_list
+            op for op in IntegerOpsRegistry.keys() if op_block_list is None or op not in op_block_list
         ],
         extra_options=dict(
             EnableSubgraph=True,
@@ -178,7 +178,7 @@ def quantize_q8(
 def quantize_fp16(
     model: onnx.ModelProto,
     save_path: str,
-    op_block_list: List[str] = [],
+    op_block_list: Optional[List[str]]
 ):
     """
     Quantize the weights of the model from float32 to float16
@@ -188,12 +188,19 @@ def quantize_fp16(
     # ValueError: Message onnx.ModelProto exceeds maximum protobuf size of 2GB: 2338583841
     disable_shape_infer = model.ByteSize() >= onnx.checker.MAXIMUM_PROTOBUF
 
+    convert_kwargs = {}
+
+    # Only include the 'op_block_list' keyword argument if a list is provided.
+    # This allows the library to apply its default behavior (see https://github.com/huggingface/transformers.js/pull/1036).
+    # Note: To set 'op_block_list' to an empty list (thereby overriding float16 defaults), a custom script is required.
+    if op_block_list is not None:
+        convert_kwargs["op_block_list"] = []
+
     model_fp16 = float16.convert_float_to_float16(
         model,
         keep_io_types=True,
         disable_shape_infer=disable_shape_infer,
-        op_block_list=op_block_list,
-
+        **convert_kwargs
     )
     graph = gs.import_onnx(model_fp16)
     graph.toposort()
@@ -229,7 +236,6 @@ def quantize_bnb4(
     save_path: str,
     block_size: int,
     quant_type: int,
-    op_block_list: List[str] = [],
 ):
     """
     Quantize the weights of the model from float32 to 4-bit int using MatMulBnb4Quantizer
