@@ -1,5 +1,5 @@
 import { Callable } from "../utils/generic.js";
-import { Tensor, interpolate,stack } from "../utils/tensor.js";
+import { Tensor, interpolate, stack } from "../utils/tensor.js";
 import { bankers_round, max, min, softmax } from "../utils/maths.js";
 import { RawImage } from "../utils/image.js";
 import { calculateReflectOffset } from "../utils/core.js";
@@ -419,6 +419,47 @@ function compute_segments(
     }
 
     return [segmentation, segments];
+}
+
+/**
+ * Rescales the image so that the following conditions are met:
+ *
+ * 1. Both dimensions (height and width) are divisible by 'factor'.
+ * 2. The total number of pixels is within the range ['min_pixels', 'max_pixels'].
+ * 3. The aspect ratio of the image is maintained as closely as possible.
+ * 
+ * @param {number} height The height of the image.
+ * @param {number} width The width of the image.
+ * @param {number} [factor=28] The factor to use for resizing.
+ * @param {number} [min_pixels=56*56] The minimum number of pixels.
+ * @param {number} [max_pixels=14*14*4*1280] The maximum number of pixels.
+ * @returns {[number, number]} The new height and width of the image.
+ * @throws {Error} If the height or width is smaller than the factor.
+ */
+function smart_resize(height, width, factor = 28, min_pixels = 56 * 56, max_pixels = 14 * 14 * 4 * 1280) {
+
+    if (height < factor || width < factor) {
+        throw new Error(`height:${height} or width:${width} must be larger than factor:${factor}`);
+    } else if (Math.max(height, width) / Math.min(height, width) > 200) {
+        throw new Error(
+            `absolute aspect ratio must be smaller than 200, got ${Math.max(height, width) / Math.min(height, width)}`
+        );
+    }
+
+    let h_bar = Math.round(height / factor) * factor;
+    let w_bar = Math.round(width / factor) * factor;
+
+    if (h_bar * w_bar > max_pixels) {
+        const beta = Math.sqrt((height * width) / max_pixels);
+        h_bar = Math.floor((height / beta) / factor) * factor;
+        w_bar = Math.floor((width / beta) / factor) * factor;
+    } else if (h_bar * w_bar < min_pixels) {
+        const beta = Math.sqrt(min_pixels / (height * width));
+        h_bar = Math.ceil((height * beta) / factor) * factor;
+        w_bar = Math.ceil((width * beta) / factor) * factor;
+    }
+
+    return [h_bar, w_bar];
 }
 
 
@@ -842,6 +883,11 @@ export class ImageProcessor extends Callable {
 
         } else if (this.size_divisibility !== undefined) {
             return enforce_size_divisibility([srcWidth, srcHeight], this.size_divisibility);
+        } else if (size.min_pixels !== undefined && size.max_pixels !== undefined) {
+            // Custom resize logic for Qwen2-VL models
+            const { min_pixels, max_pixels } = size;
+            const factor = this.config.patch_size * this.config.merge_size;
+            return smart_resize(srcHeight, srcWidth, factor, min_pixels, max_pixels);
         } else {
             throw new Error(`Could not resize image due to unsupported \`this.size\` option in config: ${JSON.stringify(size)}`);
         }

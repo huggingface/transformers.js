@@ -44,9 +44,11 @@ const MODELS = {
   dinov2: "Xenova/dinov2-small-imagenet1k-1-layer",
   // efficientnet: 'Xenova/efficientnet-b0',
   florence2: "Xenova/tiny-random-Florence2ForConditionalGeneration",
+  qwen2_vl: "hf-internal-testing/tiny-random-Qwen2VLForConditionalGeneration",
 };
 
 const TEST_IMAGES = {
+  white_image: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/white-image.png",
   pattern_3x3: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/pattern_3x3.png",
   pattern_3x5: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/pattern_3x5.png",
   checkerboard_8x8: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/checkerboard_8x8.png",
@@ -611,6 +613,28 @@ describe("Processors", () => {
     //         compare(reshaped_input_sizes, [[224, 224]]);
     //     }
     // }, MAX_TEST_EXECUTION_TIME);
+
+    // Qwen2VLProcessor
+    // - custom image processing (min_pixels, max_pixels)
+    it(
+      MODELS.qwen2_vl,
+      async () => {
+        const processor = await AutoProcessor.from_pretrained(MODELS.qwen2_vl);
+
+        {
+          const image = await load_image(TEST_IMAGES.white_image);
+          const { pixel_values, image_grid_thw, original_sizes, reshaped_input_sizes } = await processor(image);
+
+          compare(pixel_values.dims, [256, 1176]);
+          compare(avg(pixel_values.data), 2.050372362136841);
+          compare(image_grid_thw.tolist(), [[1, 16, 16]]);
+
+          compare(original_sizes, [[224, 224]]);
+          compare(reshaped_input_sizes, [[224, 224]]);
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 
   describe("Audio processors", () => {
