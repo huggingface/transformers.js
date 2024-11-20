@@ -1,4 +1,4 @@
-import { env, AutoProcessor, RawImage } from "../src/transformers.js";
+import { env, AutoProcessor, AutoImageProcessor, RawImage } from "../src/transformers.js";
 import { init, MAX_TEST_EXECUTION_TIME } from "./init.js";
 import { compare } from "./test_utils.js";
 
@@ -75,7 +75,7 @@ describe("Processors", () => {
     it(
       MODELS.swin2sr,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.swin2sr);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.swin2sr);
 
         {
           // Pad to multiple of 8 (3x3 -> 8x8)
@@ -103,7 +103,7 @@ describe("Processors", () => {
     it(
       MODELS.sam,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.sam);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.sam);
 
         {
           // without input points
@@ -175,7 +175,7 @@ describe("Processors", () => {
     it(
       MODELS["donut-swin"],
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS["donut-swin"]);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS["donut-swin"]);
 
         {
           const image = await load_image(TEST_IMAGES.receipt);
@@ -195,7 +195,7 @@ describe("Processors", () => {
     it(
       MODELS.resnet,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.resnet);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.resnet);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -215,7 +215,7 @@ describe("Processors", () => {
     it(
       MODELS.vit,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.vit);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.vit);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -235,7 +235,7 @@ describe("Processors", () => {
     it(
       MODELS.mobilevit,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.mobilevit);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.mobilevit);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -256,7 +256,7 @@ describe("Processors", () => {
     it(
       MODELS.mobilevit_2,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.mobilevit_2);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.mobilevit_2);
 
         {
           // Tests grayscale image
@@ -278,7 +278,7 @@ describe("Processors", () => {
     it(
       MODELS.mobilevit_3,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.mobilevit_3);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.mobilevit_3);
 
         {
           const image = await load_image(TEST_IMAGES.cats);
@@ -301,7 +301,7 @@ describe("Processors", () => {
     it(
       MODELS.deit,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.deit);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.deit);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -321,7 +321,7 @@ describe("Processors", () => {
     it(
       MODELS.beit,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.beit);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.beit);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -341,7 +341,7 @@ describe("Processors", () => {
     it(
       MODELS.detr,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.detr);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.detr);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -364,7 +364,7 @@ describe("Processors", () => {
     it(
       MODELS.yolos,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.yolos);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.yolos);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -384,7 +384,7 @@ describe("Processors", () => {
     it(
       MODELS.dpt,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.dpt);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.dpt);
 
         {
           // Tests grayscale image
@@ -406,7 +406,7 @@ describe("Processors", () => {
     it(
       MODELS.glpn,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.glpn);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.glpn);
 
         {
           const image = await load_image(TEST_IMAGES.cats);
@@ -438,7 +438,7 @@ describe("Processors", () => {
     it(
       MODELS.nougat,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.nougat);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.nougat);
 
         {
           const image = await load_image(TEST_IMAGES.paper);
@@ -456,7 +456,7 @@ describe("Processors", () => {
 
     // OwlViTFeatureExtractor
     it(MODELS.owlvit, async () => {
-      const processor = await AutoProcessor.from_pretrained(MODELS.owlvit);
+      const processor = await AutoImageProcessor.from_pretrained(MODELS.owlvit);
       {
         const image = await load_image(TEST_IMAGES.cats);
         const { pixel_values, original_sizes, reshaped_input_sizes } = await processor(image);
@@ -474,7 +474,7 @@ describe("Processors", () => {
     it(
       MODELS.clip,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.clip);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.clip);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -498,7 +498,7 @@ describe("Processors", () => {
     it(
       MODELS.vitmatte,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.vitmatte);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.vitmatte);
 
         {
           const image = await load_image(TEST_IMAGES.vitmatte_image);
@@ -545,7 +545,7 @@ describe("Processors", () => {
     it(
       MODELS.dinov2,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.dinov2);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.dinov2);
 
         {
           const image = await load_image(TEST_IMAGES.tiger);
@@ -568,7 +568,7 @@ describe("Processors", () => {
     it(
       MODELS.dpt_2,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.dpt_2);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.dpt_2);
 
         {
           const image = await load_image(TEST_IMAGES.cats);
@@ -600,7 +600,7 @@ describe("Processors", () => {
     // // EfficientNetImageProcessor
     // //  - tests include_top
     // it(MODELS.efficientnet, async () => {
-    //     const processor = await AutoProcessor.from_pretrained(MODELS.efficientnet)
+    //     const processor = await AutoImageProcessor.from_pretrained(MODELS.efficientnet)
 
     //     {
     //         const image = await load_image(TEST_IMAGES.cats);
@@ -619,7 +619,7 @@ describe("Processors", () => {
     it(
       MODELS.qwen2_vl,
       async () => {
-        const processor = await AutoProcessor.from_pretrained(MODELS.qwen2_vl);
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.qwen2_vl);
 
         {
           const image = await load_image(TEST_IMAGES.white_image);
@@ -834,7 +834,7 @@ describe("Processors", () => {
     describe(
       "FlorenceProcessor",
       () => {
-        /** @type {import('../src/processors.js').Florence2Processor} */
+        /** @type {import('../src/transformers.js').Florence2Processor} */
         let processor;
         let images = {};
 
