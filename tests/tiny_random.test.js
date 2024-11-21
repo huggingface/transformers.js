@@ -69,6 +69,7 @@ import {
   // Other
   full,
   RawImage,
+  Tensor,
 } from "../src/transformers.js";
 
 import { init, MAX_TEST_TIME, MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME } from "./init.js";
@@ -1828,6 +1829,44 @@ describe("Tiny random models", () => {
             [2n, 1n, 6312n, 28709n, 24704n, 8732n, 1310n, 9808n, 13771n, 27309n],
             [1n, 6312n, 28709n, 1526n, 8687n, 5690n, 1770n, 30811n, 12501n, 3325n],
           ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("patchtst", () => {
+    describe("PatchTSTForPrediction", () => {
+      const model_id = "onnx-community/test-patchtst";
+
+      /** @type {PatchTSTForPrediction} */
+      let model;
+      beforeAll(async () => {
+        model = await BertModel.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const dims = [64, 512, 7];
+          const prod = dims.reduce((a, b) => a * b, 1);
+          const past_values = new Tensor(
+            "float32",
+            Float32Array.from({ length: prod }, (_, i) => i / prod),
+            dims,
+          );
+          const { prediction_outputs } = await model({ past_values });
+
+          const { prediction_length, num_input_channels } = model.config;
+          expect(prediction_outputs.dims).toEqual([dims[0], prediction_length, num_input_channels]);
+          expect(prediction_outputs.mean().item()).toBeCloseTo(0.506528377532959, 5);
         },
         MAX_TEST_EXECUTION_TIME,
       );

@@ -5970,6 +5970,20 @@ export class DecisionTransformerModel extends DecisionTransformerPreTrainedModel
 
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+// PatchTST Transformer models
+
+export class PatchTSTPreTrainedModel extends PreTrainedModel { }
+
+/**
+ * The PatchTST for prediction model.
+ */
+export class PatchTSTForPrediction extends PatchTSTPreTrainedModel { }
+
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
 // (uses config to instantiate correct class)
@@ -6108,6 +6122,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['efficientnet', ['EfficientNetModel', EfficientNetModel]],
 
     ['decision_transformer', ['DecisionTransformerModel', DecisionTransformerModel]],
+    ['patchtst', ['PatchTSTForPrediction', PatchTSTForPrediction]],
 
     ['mobilenet_v1', ['MobileNetV1Model', MobileNetV1Model]],
     ['mobilenet_v2', ['MobileNetV2Model', MobileNetV2Model]],
