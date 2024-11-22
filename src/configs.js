@@ -102,6 +102,7 @@ function getNormalizedConfig(config) {
         case 'mistral':
         case 'starcoder2':
         case 'qwen2':
+        case 'qwen2_vl':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
