@@ -39,7 +39,7 @@ export class Qwen2VLImageProcessor extends ImageProcessor {
                 channel * temporal_patch_size * patch_size * patch_size,
             )
 
-        const image_grid_thw = new Tensor('float32', [grid_t, grid_h, grid_w], [1, 3]);
+        const image_grid_thw = new Tensor('int64', [grid_t, grid_h, grid_w], [1, 3]);
 
         return {
             pixel_values: flatten_patches,
