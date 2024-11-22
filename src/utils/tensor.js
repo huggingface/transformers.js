@@ -349,59 +349,30 @@ export class Tensor {
     }
 
     /**
-     * Performs a vertical slice operation on a 2D Tensor.
-     * @param {number|number[]|number[][]} slices - The slice specification:
-     *   - If a number is given, then a single column is selected.
-     *   - If an array of two numbers is given, then a range of columns [start, end (exclusive)] is selected.
-     *   - If an array of arrays is given, then those specific columns are selected.
-     * @returns {Tensor} A new Tensor containing the selected columns.
-     * @throws {Error} If the slice input is invalid.
-     */
-    vslice(slices) {
-        const rowDim = this.dims[0];
-        const colDim = this.dims[1];
-
-        // Handle different slice cases (single column, range, or list of specific columns)
-        let selectedCols = [];
-        if (typeof slices === 'number') {
-            // Single column slice
-            selectedCols = [slices];
-        } else if (Array.isArray(slices) && slices.length === 2 && !Array.isArray(slices[0]) && !Array.isArray(slices[1])) {
-            // Range slice [start, end]
-            const [start, end] = slices;
-            selectedCols = Array.from({ length: end - start }, (_, i) => i + start);
-        } else if (Array.isArray(slices) && Array.isArray(slices[0])) {
-            // Specific column list [[col1], [col2]]
-            selectedCols = slices.flat();
-        } else {
-            throw new Error('Invalid slice input');
-        }
-
-        // Determine new dimensions: rows remain the same, columns are based on selection
-        const newTensorDims = [rowDim, selectedCols.length];
-        const newBufferSize = newTensorDims[0] * newTensorDims[1];
-        // Allocate memory
-        // @ts-ignore
-        const data = new this.data.constructor(newBufferSize);
-
-        // Fill the new data array by selecting the correct columns
-        for (let row = 0; row < rowDim; ++row) {
-            for (let i = 0; i < selectedCols.length; ++i) {
-                const col = selectedCols[i];
-                const targetIndex = row * newTensorDims[1] + i;
-                const originalIndex = row * colDim + col;
-                data[targetIndex] = this.data[originalIndex];
-            }
-        }
-
-        return new Tensor(this.type, data, newTensorDims);
-    }
-
-    /**
      * Performs a slice operation on the Tensor along specified dimensions.
+     *
+     * Consider a Tensor that has a dimension of [4, 7]:
+     * ```
+     * [ 1,  2,  3,  4,  5,  6,  7]
+     * [ 8,  9, 10, 11, 12, 13, 14]
+     * [15, 16, 17, 18, 19, 20, 21]
+     * [22, 23, 24, 25, 26, 27, 28]
+     * ```
+     * We can slice against the two dims of row and column, for instance in this
+     * case we can start at the second element, and return to the second last,
+     * like this:
+     * ```
+     * tensor.slice([1, -1], [1, -1]);
+     * ```
+     * which would return:
+     * ```
+     * [  9, 10, 11, 12, 13 ]
+     * [ 16, 17, 18, 19, 20 ]
+     * ```
+     *
      * @param {...(number|number[]|null)} slices - The slice specifications for each dimension.
-     *   - If a number is given, then a single column is selected.
-     *   - If an array of two numbers is given, then a range of columns [start, end (exclusive)] is selected.
+     *   - If a number is given, then a single element is selected.
+     *   - If an array of two numbers is given, then a range of elements [start, end (exclusive)] is selected.
      *   - If null is given, then the entire dimension is selected.
      * @returns {Tensor} A new Tensor containing the selected elements.
      * @throws {Error} If the slice input is invalid.

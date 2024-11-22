@@ -69,35 +69,12 @@ describe("Tensor operations", () => {
       compare(t2, target);
     });
 
-    it("should return a given column dim", async () => {
-      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
-      const t2 = t1.vslice(1);
-      const target = new Tensor("float32", [2, 4, 6], [3, 1]);
-
-      compare(t2, target);
-    });
-
-    it("should return a range of cols", async () => {
-      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [3, 4]);
-      // The end index is not included.
-      const t2 = t1.vslice([1, 3]);
-      const target = new Tensor("float32", [2, 3, 6, 7, 10, 11], [3, 2]);
-
-      compare(t2, target);
-    });
-
-    it("should return a every third row", async () => {
+    it("should return a crop", async () => {
       // Create 21 nodes.
-      const t1 = new Tensor("float32", Array.from({ length: 21 }, (v, i) => v = ++i), [3, 7]);
+      const t1 = new Tensor("float32", Array.from({ length: 28 }, (v, i) => v = ++i), [4, 7]);
+      const t2 = t1.slice([1, -1], [1, -1]);
 
-      // Extract every third column.
-      const indices = Array.from({ length: t1.dims[1] }, (_, i) => i)
-        .filter(i => i % 3 === 0)
-        // Make sure to wrap each in an array since an array creates a new range.
-        .map(v => [v]);
-      const t2 = t1.vslice(indices);
-
-      const target = new Tensor("float32", [1, 4, 7, 8, 11, 14, 15, 18, 21], [3, 3]);
+      const target = new Tensor("float32", [9, 10, 11, 12, 13, 16, 17, 18, 19, 20], [2, 5]);
 
       compare(t2, target);
     });
