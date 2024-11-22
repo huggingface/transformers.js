@@ -5973,14 +5973,32 @@ export class DecisionTransformerModel extends DecisionTransformerPreTrainedModel
 
 //////////////////////////////////////////////////
 // PatchTST Transformer models
-
 export class PatchTSTPreTrainedModel extends PreTrainedModel { }
+
+/**
+ * The bare PatchTST Model outputting raw hidden-states without any specific head.
+ */
+export class PatchTSTModel extends PatchTSTPreTrainedModel { }
 
 /**
  * The PatchTST for prediction model.
  */
 export class PatchTSTForPrediction extends PatchTSTPreTrainedModel { }
+//////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// PatchTSMixer Transformer models
+export class PatchTSMixerPreTrainedModel extends PreTrainedModel { }
+
+/**
+ * The bare PatchTSMixer Model outputting raw hidden-states without any specific head.
+ */
+export class PatchTSMixerModel extends PatchTSMixerPreTrainedModel { }
+
+/**
+ * The PatchTSMixer for prediction model.
+ */
+export class PatchTSMixerForPrediction extends PatchTSMixerPreTrainedModel { }
 //////////////////////////////////////////////////
 
 
@@ -6122,7 +6140,8 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['efficientnet', ['EfficientNetModel', EfficientNetModel]],
 
     ['decision_transformer', ['DecisionTransformerModel', DecisionTransformerModel]],
-    ['patchtst', ['PatchTSTForPrediction', PatchTSTForPrediction]],
+    ['patchtst', ['PatchTSTForPrediction', PatchTSTModel]],
+    ['patchtsmixer', ['PatchTSMixerForPrediction', PatchTSMixerModel]],
 
     ['mobilenet_v1', ['MobileNetV1Model', MobileNetV1Model]],
     ['mobilenet_v2', ['MobileNetV2Model', MobileNetV2Model]],
@@ -6407,6 +6426,11 @@ const MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES = new Map([
     ['vitmatte', ['VitMatteForImageMatting', VitMatteForImageMatting]],
 ]);
 
+const MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING_NAMES = new Map([
+    ['patchtst', ['PatchTSTForPrediction', PatchTSTForPrediction]],
+    ['patchtsmixer', ['PatchTSMixerForPrediction', PatchTSMixerForPrediction]],
+])
+
 const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([
     ['swin2sr', ['Swin2SRForImageSuperResolution', Swin2SRForImageSuperResolution]],
 ])
@@ -6448,6 +6472,7 @@ const MODEL_CLASS_TYPE_MAPPING = [
     [MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
+    [MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
