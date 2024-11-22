@@ -34,7 +34,7 @@ export class Qwen2VLProcessor extends Processor {
             const image_grid_thw_list = image_grid_thw.tolist();
             text = text.map(t => {
                 while (t.includes("<|image_pad|>")) {
-                    const prod = image_grid_thw_list[index++].reduce((a, b) => a * b, 1);
+                    const prod = Number(image_grid_thw_list[index++].reduce((a, b) => a * b, 1n));
                     t = t.replace("<|image_pad|>", "<|placeholder|>".repeat(Math.floor(prod / merge_length)));
                 }
                 return t.replaceAll("<|placeholder|>", "<|image_pad|>");
