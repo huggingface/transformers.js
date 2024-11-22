@@ -3740,6 +3740,31 @@ export class ChineseCLIPPreTrainedModel extends PreTrainedModel { }
 export class ChineseCLIPModel extends ChineseCLIPPreTrainedModel { }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// JinaCLIP models
+export class JinaCLIPPreTrainedModel extends PreTrainedModel { }
+
+export class JinaCLIPModel extends JinaCLIPPreTrainedModel { }
+
+export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
+    /** @type {PreTrainedModel.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        // Update default model file name if not provided
+        options.model_file_name ??= 'text_model';
+        return super.from_pretrained(pretrained_model_name_or_path, options);
+    }
+}
+
+export class JinaCLIPVisionModel extends JinaCLIPPreTrainedModel {
+    /** @type {PreTrainedModel.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        // Update default model file name if not provided
+        options.model_file_name ??= 'vision_model';
+        return super.from_pretrained(pretrained_model_name_or_path, options);
+    }
+}
+//////////////////////////////////////////////////
+
 
 //////////////////////////////////////////////////
 // CLIPSeg models
@@ -4035,6 +4060,62 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
      * - mrope_position_deltas: Tensor of shape `(batch_size)`.
      */
     get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask) {
+        if (video_grid_thw) {
+            throw new Error('`video_grid_thw` is not yet supported.');
+        }
+        const spatial_merge_size = this.config.vision_config.spatial_merge_size
+        const image_token_id = this.config.image_token_id
+        const video_token_id = this.config.video_token_id
+        const vision_start_token_id = this.config.vision_start_token_id
+
+        if (image_grid_thw || video_grid_thw) {
+            let total_input_ids = input_ids.tolist();
+            if (!attention_mask) {
+                attention_mask = ones_like(input_ids);
+            }
+            let position_ids = [];
+
+
+            for (let i = 0; i < total_input_ids.length; ++i) {
+                const ids = total_input_ids[i]
+                // .filter((x, idx) => attention_mask[i][idx] == 1);
+
+                const vision_start_indices = ids
+                    .map((x, idx) => x == vision_start_token_id ? idx : -1)
+                    .filter(x => x !== -1);
+
+
+                const vision_tokens = vision_start_indices.map(x => ids[x + 1]);
+                console.log({ ids, vision_start_indices, vision_tokens })
+
+                const image_nums = vision_tokens.filter(x => x == image_token_id).length;
+                const video_nums = vision_tokens.filter(x => x == video_token_id).length;
+                console.log({ image_nums, video_nums })
+
+
+                let llm_pos_ids_list = [];
+                let st = 0;
+                let remain_images = image_nums;
+                let remain_videos = video_nums;
+
+                // const a = ids.findIndex(x => x == image_token_id);
+                // for (let i = 0; i < vision_tokens.length; ++i) {
+                //     if (remain_images > 0 && )
+                // }
+
+                throw new Error('Not implemented');
+            }
+
+
+
+            const image_grid_thw_list = image_grid_thw.tolist();
+
+            return [
+                toI64Tensor(position_ids),
+                ones([1]),
+            ]
+        }
+
         throw new Error('Not yet implemented');
     }
 
@@ -4050,7 +4131,8 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         input_ids,
         attention_mask,
     }) {
-        throw new Error('Not yet implemented');
+        console.log('_merge_input_ids_with_image_features', { inputs_embeds, image_features, input_ids, attention_mask });
+
         return { inputs_embeds, attention_mask }
     }
 }
@@ -6365,6 +6447,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['clipseg', ['CLIPSegModel', CLIPSegModel]],
     ['chinese_clip', ['ChineseCLIPModel', ChineseCLIPModel]],
     ['siglip', ['SiglipModel', SiglipModel]],
+    ['jina_clip', ['JinaCLIPModel', JinaCLIPModel]],
     ['mobilebert', ['MobileBertModel', MobileBertModel]],
     ['squeezebert', ['SqueezeBertModel', SqueezeBertModel]],
     ['wav2vec2', ['Wav2Vec2Model', Wav2Vec2Model]],
@@ -6726,6 +6809,7 @@ const MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES = new Map([
 const MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES = new Map([
     ['clip', ['CLIPVisionModelWithProjection', CLIPVisionModelWithProjection]],
     ['siglip', ['SiglipVisionModel', SiglipVisionModel]],
+    ['jina_clip', ['JinaCLIPVisionModel', JinaCLIPVisionModel]],
 ])
 
 const MODEL_CLASS_TYPE_MAPPING = [
@@ -6781,6 +6865,7 @@ const CUSTOM_MAPPING = [
 
     ['CLIPTextModelWithProjection', CLIPTextModelWithProjection, MODEL_TYPES.EncoderOnly],
     ['SiglipTextModel', SiglipTextModel, MODEL_TYPES.EncoderOnly],
+    ['JinaCLIPTextModel', JinaCLIPTextModel, MODEL_TYPES.EncoderOnly],
     ['ClapTextModelWithProjection', ClapTextModelWithProjection, MODEL_TYPES.EncoderOnly],
     ['ClapAudioModelWithProjection', ClapAudioModelWithProjection, MODEL_TYPES.EncoderOnly],
 ]
