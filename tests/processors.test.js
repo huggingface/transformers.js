@@ -627,7 +627,7 @@ describe("Processors", () => {
 
           compare(pixel_values.dims, [256, 1176]);
           compare(avg(pixel_values.data), 2.050372362136841);
-          compare(image_grid_thw.tolist(), [[1, 16, 16]]);
+          compare(image_grid_thw.tolist(), [[1n, 16n, 16n]]);
 
           compare(original_sizes, [[224, 224]]);
           compare(reshaped_input_sizes, [[224, 224]]);
