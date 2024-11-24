@@ -84,6 +84,13 @@ export class Processor extends Callable {
         });
     }
 
+    batch_decode(...args) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to decode without a tokenizer.');
+        }
+        return this.tokenizer.batch_decode(...args);
+    }
+
 
     /**
      * Calls the feature_extractor function with the given input.
