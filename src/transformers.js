@@ -38,4 +38,4 @@ export * from './models/auto/processing_auto.js';
 
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
-
+export * from './generation/logits_process.js';
