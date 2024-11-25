@@ -69,7 +69,7 @@ export function isIntegralNumber(x) {
  * @returns {boolean} True if the value is `null`, `undefined` or `-1`, false otherwise.
  */
 export function isNullishDimension(x) {
-    return x === null || x === undefined || x === -1 || x === '-1';
+    return x === null || x === undefined || x === -1;
 }
 
 /**
