@@ -232,16 +232,7 @@ def main():
     tokenizer = None
     try:
         # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_id, **from_pretrained_kwargs)
-
-        # To avoid inserting all chat templates into tokenizers.js, we save the chat template
-        # to the tokenizer_config.json file, and load it when the tokenizer is loaded.
-        if getattr(tokenizer, 'chat_template', None) is None and \
-                getattr(tokenizer, 'use_default_system_prompt', False):
-            # No chat template specified, and we use the default
-            setattr(tokenizer, 'chat_template',
-                    tokenizer.default_chat_template)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_id, **from_pretrained_kwargs)
 
     except KeyError:
         pass  # No Tokenizer
