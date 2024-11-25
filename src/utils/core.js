@@ -10,14 +10,14 @@
 
 /**
  * @typedef {Object} ProgressInfo
- * @property {'initiate' | 'download' | 'progress' | 'done'} status
- * @property {string} name - This can be either:
- *   - a string, the *model id* of a model repo on huggingface.co.
- *   - a path to a *directory* potentially containing the file.
- * @property {string} file - The name of the file
- * @property {number} [progress] - A number between 0 and 100. Only available for the 'progress' status.
- * @property {number} [loaded] - The number of bytes loaded. Only available for the 'progress' status.
- * @property {number} [total] - The total number of bytes to be loaded. Only available for the 'progress' status.
+ * @property {'initiate' | 'download' | 'progress' | 'done'} status The status of the progress item.
+ * @property {string} name This can be either:
+ * - a string, the *model id* of a model repo on huggingface.co.
+ * - a path to a *directory* potentially containing the file.
+ * @property {string} file The name of the file
+ * @property {number} [progress] A number between 0 and 100. Only available for the 'progress' status.
+ * @property {number} [loaded] The number of bytes loaded. Only available for the 'progress' status.
+ * @property {number} [total] The total number of bytes to be loaded. Only available for the 'progress' status.
  */
 
 /**
