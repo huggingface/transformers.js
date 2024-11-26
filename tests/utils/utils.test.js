@@ -62,30 +62,27 @@ describe("Utilities", () => {
   });
 
   describe("Image utilities", () => {
+    const [width, height, channels] = [2, 2, 3];
+    const data = Uint8Array.from({ length: width * height * channels }, (_, i) => i % 5);
+    const image = new RawImage(data, width, height, channels);
+
     it("Can split image into separate channels", async () => {
-      const url = './examples/demo-site/public/images/cats.jpg';
-      const image = await RawImage.fromURL(url);
-      // Rather than test the entire image, we'll just test the first 3 pixels;
-      // ensuring that these match.
-      const image_data = image.toChannels().map(c => c.slice(0, 3));
+      const image_data = image.split()
 
       const target = [
-        new Uint8Array([140, 144, 145]), // Reds
-        new Uint8Array([25, 25, 25]),    // Greens
-        new Uint8Array([56, 67, 73]),    // Blues
+        new Uint8Array([0, 3, 1, 4]),  // Reds
+        new Uint8Array([1, 4, 2, 0]), // Greens
+        new Uint8Array([2, 0, 3, 1]), // Blues
       ];
 
-      compare (image_data, target);
+      compare(image_data, target);
     });
 
     it("Can splits channels for grayscale", async () => {
-      const url = './examples/demo-site/public/images/cats.jpg';
-      const image = (await RawImage.fromURL(url)).grayscale();
+      const image_data = image.grayscale().split();
+      const target = [new Uint8Array([1, 3, 2, 1])];
 
-      const image_data = image.toChannels().map(c => c.slice(0, 3));
-      const target = [new Uint8Array([63, 65, 66])];
-
-      compare (image_data, target);
+      compare(image_data, target);
     });
   });
 });
