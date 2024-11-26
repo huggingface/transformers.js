@@ -1,6 +1,7 @@
 export * from './florence2/processing_florence2.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './janus/processing_janus.js';
+export * from './jina_clip/processing_jina_clip.js';
 export * from './owlvit/processing_owlvit.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './qwen2_vl/processing_qwen2_vl.js';

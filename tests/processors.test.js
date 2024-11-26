@@ -10,6 +10,7 @@ env.useFSCache = false;
 const sum = (array) => Number(array.reduce((a, b) => a + b, array instanceof BigInt64Array ? 0n : 0));
 const avg = (array) => sum(array) / array.length;
 
+/** @type {Map<string, RawImage>} */
 const IMAGE_CACHE = new Map();
 const load_image = async (url) => {
   const cached = IMAGE_CACHE.get(url);
@@ -40,6 +41,7 @@ const MODELS = {
   nougat: "Xenova/nougat-small",
   owlvit: "Xenova/owlvit-base-patch32",
   clip: "Xenova/clip-vit-base-patch16",
+  jina_clip: "jinaai/jina-clip-v2",
   vitmatte: "Xenova/vitmatte-small-distinctions-646",
   dinov2: "Xenova/dinov2-small-imagenet1k-1-layer",
   // efficientnet: 'Xenova/efficientnet-b0',
@@ -485,6 +487,27 @@ describe("Processors", () => {
 
           compare(original_sizes, [[408, 612]]);
           compare(reshaped_input_sizes, [[224, 224]]);
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    // JinaCLIPImageProcessor
+    // - custom config overrides
+    it(
+      MODELS.jina_clip,
+      async () => {
+        const processor = await AutoImageProcessor.from_pretrained(MODELS.jina_clip);
+
+        {
+          const image = await load_image(TEST_IMAGES.tiger);
+          const { pixel_values, original_sizes, reshaped_input_sizes } = await processor(image);
+
+          compare(pixel_values.dims, [1, 3, 512, 512]);
+          compare(avg(pixel_values.data), -0.06637834757566452);
+
+          compare(original_sizes, [[408, 612]]);
+          compare(reshaped_input_sizes, [[512, 512]]);
         }
       },
       MAX_TEST_EXECUTION_TIME,
