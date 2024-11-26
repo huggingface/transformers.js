@@ -3538,7 +3538,7 @@ export class CLIPModel extends CLIPPreTrainedModel { }
  * The text model from CLIP without any head or projection on top.
  */
 export class CLIPTextModel extends CLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'text_model';
@@ -3573,7 +3573,7 @@ export class CLIPTextModel extends CLIPPreTrainedModel {
  * ```
  */
 export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'text_model';
@@ -3585,7 +3585,7 @@ export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
  * The vision model from CLIP without any head or projection on top.
  */
 export class CLIPVisionModel extends CLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'vision_model';
@@ -3620,7 +3620,7 @@ export class CLIPVisionModel extends CLIPPreTrainedModel {
  * ```
  */
 export class CLIPVisionModelWithProjection extends CLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'vision_model';
@@ -3706,8 +3706,7 @@ export class SiglipModel extends SiglipPreTrainedModel { }
  * ```
  */
 export class SiglipTextModel extends SiglipPreTrainedModel {
-
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'text_model';
@@ -3742,7 +3741,7 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
  * ```
  */
 export class SiglipVisionModel extends CLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'vision_model';
@@ -3763,7 +3762,7 @@ export class JinaCLIPPreTrainedModel extends PreTrainedModel { }
 export class JinaCLIPModel extends JinaCLIPPreTrainedModel { }
 
 export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'text_model';
@@ -3772,7 +3771,7 @@ export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
 }
 
 export class JinaCLIPVisionModel extends JinaCLIPPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'vision_model';
@@ -5999,8 +5998,7 @@ export class ClapModel extends ClapPreTrainedModel { }
  * ```
  */
 export class ClapTextModelWithProjection extends ClapPreTrainedModel {
-
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'text_model';
@@ -6035,7 +6033,7 @@ export class ClapTextModelWithProjection extends ClapPreTrainedModel {
  * ```
  */
 export class ClapAudioModelWithProjection extends ClapPreTrainedModel {
-    /** @type {PreTrainedModel.from_pretrained} */
+    /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         // Update default model file name if not provided
         options.model_file_name ??= 'audio_model';
