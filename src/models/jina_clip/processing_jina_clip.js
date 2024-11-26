@@ -9,7 +9,7 @@ export class JinaCLIPProcessor extends Processor {
 
     async _call(text=null, images=null, kwargs = {}) {
 
-        if (!text && images){
+        if (!text && !images){
             throw new Error('Either text or images must be provided');
         }
 
