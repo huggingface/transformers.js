@@ -147,7 +147,7 @@ const App = () => {
   return (
     <div className="container mx-auto p-8">
       <h1 className="text-5xl font-bold mb-2">MusicGen Web</h1>
-      <h2 className="text-2xl font-semibold mb-4">In-browser text-to-music w/ <a className="underline" href="http://github.com/xenova/transformers.js">🤗 Transformers.js!</a>
+      <h2 className="text-2xl font-semibold mb-4">In-browser text-to-music w/ <a className="underline" href="https://github.com/huggingface/transformers.js">🤗 Transformers.js!</a>
       </h2>
 
       {/* Text input for user */}

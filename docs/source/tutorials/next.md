@@ -9,7 +9,7 @@ The final product will look something like this:
 
 Useful links:
 - Demo site: [client-side](https://huggingface.co/spaces/Xenova/next-example-app) or [server-side](https://huggingface.co/spaces/Xenova/next-server-example-app)
-- Source code: [client-side](https://github.com/xenova/transformers.js/tree/main/examples/next-client) or [server-side](https://github.com/xenova/transformers.js/tree/main/examples/next-server)
+- Source code: [client-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-client) or [server-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-server)
 
 ## Prerequisites
 
@@ -413,7 +413,7 @@ Visit the URL shown in the terminal (e.g., [http://localhost:3000/](http://local
 
 For this demo, we will build and deploy our application to [Hugging Face Spaces](https://huggingface.co/docs/hub/spaces). If you haven't already, you can create a free Hugging Face account [here](https://huggingface.co/join).
 
-1. Create a new `Dockerfile` in your project's root folder. You can use our [example Dockerfile](https://github.com/xenova/transformers.js/blob/main/examples/next-server/Dockerfile) as a template.
+1. Create a new `Dockerfile` in your project's root folder. You can use our [example Dockerfile](https://github.com/huggingface/transformers.js/blob/main/examples/next-server/Dockerfile) as a template.
 2. Visit [https://huggingface.co/new-space](https://huggingface.co/new-space) and fill in the form. Remember to select "Docker" as the space type (you can choose the "Blank" Docker template).
 3. Click the "Create space" button at the bottom of the page.
 4. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from your project folder (excluding `node_modules` and `.next`, if present) into the upload box and click "Upload". After they have uploaded, scroll down to the button and click "Commit changes to main".

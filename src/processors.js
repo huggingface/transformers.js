@@ -1209,6 +1209,7 @@ export class DonutFeatureExtractor extends ImageFeatureExtractor {
         });
     }
 }
+export class DonutImageProcessor extends DonutFeatureExtractor { } // NOTE extends DonutFeatureExtractor
 export class NougatImageProcessor extends DonutFeatureExtractor { } // NOTE extends DonutFeatureExtractor
 
 /**
@@ -2569,6 +2570,7 @@ export class AutoProcessor {
         MaskFormerFeatureExtractor,
         YolosFeatureExtractor,
         DonutFeatureExtractor,
+        DonutImageProcessor,
         NougatImageProcessor,
         EfficientNetImageProcessor,
 

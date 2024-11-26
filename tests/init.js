@@ -60,3 +60,5 @@ export function init() {
 export const MAX_MODEL_LOAD_TIME = 10_000; // 10 seconds
 export const MAX_TEST_EXECUTION_TIME = 30_000; // 30 seconds
 export const MAX_MODEL_DISPOSE_TIME = 1_000; // 1 second
+
+export const MAX_TEST_TIME = MAX_MODEL_LOAD_TIME + MAX_TEST_EXECUTION_TIME + MAX_MODEL_DISPOSE_TIME;

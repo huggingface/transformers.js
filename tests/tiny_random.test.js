@@ -23,6 +23,8 @@ import {
 
   // Models
   LlamaForCausalLM,
+  OlmoForCausalLM,
+  GraniteForCausalLM,
   CohereModel,
   CohereForCausalLM,
   GemmaForCausalLM,
@@ -51,23 +53,30 @@ import {
   VisionEncoderDecoderModel,
   Florence2ForConditionalGeneration,
   MarianMTModel,
+  PatchTSTModel,
+  PatchTSTForPrediction,
+  PatchTSMixerModel,
+  PatchTSMixerForPrediction,
 
   // Pipelines
   pipeline,
   FillMaskPipeline,
   TextClassificationPipeline,
   TextGenerationPipeline,
+  TranslationPipeline,
   ImageClassificationPipeline,
   ZeroShotImageClassificationPipeline,
   TokenClassificationPipeline,
   QuestionAnsweringPipeline,
+  DocumentQuestionAnsweringPipeline,
 
   // Other
   full,
   RawImage,
+  Tensor,
 } from "../src/transformers.js";
 
-import { init, MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME } from "./init.js";
+import { init, MAX_TEST_TIME, MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME } from "./init.js";
 import { compare } from "./test_utils.js";
 
 init();
@@ -325,15 +334,19 @@ describe("Tiny random models", () => {
         tokenizer = await T5Tokenizer.from_pretrained(model_id);
       }, MAX_MODEL_LOAD_TIME);
 
-      it("forward", async () => {
-        // Example adapted from https://huggingface.co/google-t5/t5-small#how-to-get-started-with-the-model
-        const inputs = tokenizer("Studies have been shown that owning a dog is good for you");
-        const { input_ids: decoder_input_ids } = tokenizer("Studies show that");
+      it(
+        "forward",
+        async () => {
+          // Example adapted from https://huggingface.co/google-t5/t5-small#how-to-get-started-with-the-model
+          const inputs = tokenizer("Studies have been shown that owning a dog is good for you");
+          const { input_ids: decoder_input_ids } = tokenizer("Studies show that");
 
-        const { last_hidden_state } = await model({ ...inputs, decoder_input_ids });
-        expect(last_hidden_state.dims).toEqual([1, 4, 32]);
-        expect(last_hidden_state.mean().item()).toBeCloseTo(7.492632721550763e-5, 8);
-      });
+          const { last_hidden_state } = await model({ ...inputs, decoder_input_ids });
+          expect(last_hidden_state.dims).toEqual([1, 4, 32]);
+          expect(last_hidden_state.mean().item()).toBeCloseTo(7.492632721550763e-5, 8);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       afterAll(async () => {
         await model?.dispose();
@@ -354,16 +367,20 @@ describe("Tiny random models", () => {
         tokenizer = await T5Tokenizer.from_pretrained(model_id);
       }, MAX_MODEL_LOAD_TIME);
 
-      it("forward", async () => {
-        // Example adapted from https://huggingface.co/google-t5/t5-small#how-to-get-started-with-the-model
-        const inputs = tokenizer("Studies have been shown that owning a dog is good for you");
-        const { input_ids: decoder_input_ids } = tokenizer("Studies show that");
+      it(
+        "forward",
+        async () => {
+          // Example adapted from https://huggingface.co/google-t5/t5-small#how-to-get-started-with-the-model
+          const inputs = tokenizer("Studies have been shown that owning a dog is good for you");
+          const { input_ids: decoder_input_ids } = tokenizer("Studies show that");
 
-        const model = await T5ForConditionalGeneration.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
-        const outputs = await model({ ...inputs, decoder_input_ids });
-        expect(outputs.logits.dims).toEqual([1, 4, 32100]);
-        expect(outputs.logits.mean().item()).toBeCloseTo(8.867568901393952e-9, 12);
-      });
+          const model = await T5ForConditionalGeneration.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+          const outputs = await model({ ...inputs, decoder_input_ids });
+          expect(outputs.logits.dims).toEqual([1, 4, 32100]);
+          expect(outputs.logits.mean().item()).toBeCloseTo(8.867568901393952e-9, 12);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       it(
         "batch_size=1",
@@ -470,15 +487,19 @@ describe("Tiny random models", () => {
         tokenizer = await T5Tokenizer.from_pretrained(model_id);
       }, MAX_MODEL_LOAD_TIME);
 
-      it("forward", async () => {
-        // Example from https://huggingface.co/docs/transformers/model_doc/musicgen#transformers.MusicgenForConditionalGeneration.forward.example
-        const inputs = tokenizer(texts, { padding: true });
-        const pad_token_id = BigInt(model.generation_config.pad_token_id);
-        const decoder_input_ids = full([inputs.input_ids.dims[0] * model.config.decoder.num_codebooks, 1], pad_token_id);
-        const { logits } = await model({ ...inputs, decoder_input_ids });
-        expect(logits.dims).toEqual([8, 1, 99]);
-        expect(logits.mean().item()).toBeCloseTo(-0.0018370470497757196, 5);
-      });
+      it(
+        "forward",
+        async () => {
+          // Example from https://huggingface.co/docs/transformers/model_doc/musicgen#transformers.MusicgenForConditionalGeneration.forward.example
+          const inputs = tokenizer(texts, { padding: true });
+          const pad_token_id = BigInt(model.generation_config.pad_token_id);
+          const decoder_input_ids = full([inputs.input_ids.dims[0] * model.config.decoder.num_codebooks, 1], pad_token_id);
+          const { logits } = await model({ ...inputs, decoder_input_ids });
+          expect(logits.dims).toEqual([8, 1, 99]);
+          expect(logits.mean().item()).toBeCloseTo(-0.0018370470497757196, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       it(
         "batch_size=1",
@@ -528,97 +549,126 @@ describe("Tiny random models", () => {
         const input_features = full([1, 80, 3000], 0.0);
 
         describe("English-only", () => {
-          it("default", async () => {
-            const outputs = await model.generate({
-              input_features,
-              is_multilingual: false,
-              max_new_tokens: 1,
-            });
+          it(
+            "default",
+            async () => {
+              const outputs = await model.generate({
+                input_features,
+                is_multilingual: false,
+                max_new_tokens: 1,
+              });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50363n, /* Generated */ 45084n]]);
-          });
-          it("return_timestamps=true", async () => {
-            const outputs = await model.generate({
-              input_features,
-              is_multilingual: false,
-              max_new_tokens: 1,
-              return_timestamps: true,
-            });
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50363n, /* Generated */ 45084n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, /* Generated */ 50366n]]);
-          });
+          it(
+            "return_timestamps=true",
+            async () => {
+              const outputs = await model.generate({
+                input_features,
+                is_multilingual: false,
+                max_new_tokens: 1,
+                return_timestamps: true,
+              });
+
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, /* Generated */ 50366n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
         });
 
         describe("multilingual", () => {
-          it("language unset; task unset", async () => {
-            // language defaults to 'en'
-            // task defaults to 'transcribe'
+          it(
+            "language unset; task unset",
+            async () => {
+              // language defaults to 'en'
+              // task defaults to 'transcribe'
 
-            const outputs = await model.generate({
-              input_features,
-              max_new_tokens: 1,
-            });
+              const outputs = await model.generate({
+                input_features,
+                max_new_tokens: 1,
+              });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, 50363n, /* Generated */ 45084n]]);
-          });
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, 50363n, /* Generated */ 45084n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
 
-          it("language set; task unset", async () => {
-            // task defaults to 'transcribe'
-            const outputs = await model.generate({
-              input_features,
-              max_new_tokens: 1,
-              language: "af",
-            });
+          it(
+            "language set; task unset",
+            async () => {
+              // task defaults to 'transcribe'
+              const outputs = await model.generate({
+                input_features,
+                max_new_tokens: 1,
+                language: "af",
+              });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50327n, 50359n, 50363n, /* Generated */ 45084n]]);
-          });
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50327n, 50359n, 50363n, /* Generated */ 45084n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
 
-          it("language set; task set", async () => {
-            const outputs = await model.generate({
-              input_features,
-              max_new_tokens: 1,
-              language: "zh",
-              task: "translate",
-            });
+          it(
+            "language set; task set",
+            async () => {
+              const outputs = await model.generate({
+                input_features,
+                max_new_tokens: 1,
+                language: "zh",
+                task: "translate",
+              });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50260n, 50358n, 50363n, /* Generated */ 45084n]]);
-          });
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50260n, 50358n, 50363n, /* Generated */ 45084n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
 
-          it("return_timestamps=true", async () => {
-            const outputs = await model.generate({
-              input_features,
-              max_new_tokens: 1,
-              language: "en",
-              task: "transcribe",
-              return_timestamps: true,
-            });
+          it(
+            "return_timestamps=true",
+            async () => {
+              const outputs = await model.generate({
+                input_features,
+                max_new_tokens: 1,
+                language: "en",
+                task: "transcribe",
+                return_timestamps: true,
+              });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, /* Generated */ 50400n]]);
-          });
+              expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, /* Generated */ 50400n]]);
+            },
+            MAX_TEST_EXECUTION_TIME,
+          );
         });
       });
 
       describe("decoder_start_ids", () => {
         const input_features = full([1, 80, 3000], 0.0);
 
-        it("broadcast inputs", async () => {
-          const { decoder_start_token_id, lang_to_id, task_to_id, no_timestamps_token_id } = model.generation_config;
+        it(
+          "broadcast inputs",
+          async () => {
+            const { decoder_start_token_id, lang_to_id, task_to_id, no_timestamps_token_id } = model.generation_config;
 
-          const outputs = await model.generate({
-            input_features, // batch size 1
-            max_new_tokens: 1,
-            decoder_input_ids: [
-              // batch size 2
-              // <|startoftranscript|> <|lang_id|> <|task|> [<|notimestamps|>]
-              [decoder_start_token_id, lang_to_id["<|en|>"], task_to_id["translate"], no_timestamps_token_id],
-              [decoder_start_token_id, lang_to_id["<|fr|>"], task_to_id["transcribe"], no_timestamps_token_id],
-            ],
-          });
-          expect(outputs.tolist()).toEqual([
-            [/* Prefix */ 50258n, 50259n, 50358n, 50363n, /* Generated */ 45084n],
-            [/* Prefix */ 50258n, 50265n, 50359n, 50363n, /* Generated */ 45084n],
-          ]);
-        });
+            const outputs = await model.generate({
+              input_features, // batch size 1
+              max_new_tokens: 1,
+              decoder_input_ids: [
+                // batch size 2
+                // <|startoftranscript|> <|lang_id|> <|task|> [<|notimestamps|>]
+                [decoder_start_token_id, lang_to_id["<|en|>"], task_to_id["translate"], no_timestamps_token_id],
+                [decoder_start_token_id, lang_to_id["<|fr|>"], task_to_id["transcribe"], no_timestamps_token_id],
+              ],
+            });
+            expect(outputs.tolist()).toEqual([
+              [/* Prefix */ 50258n, 50259n, 50358n, 50363n, /* Generated */ 45084n],
+              [/* Prefix */ 50258n, 50265n, 50359n, 50363n, /* Generated */ 45084n],
+            ]);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
       });
 
       afterAll(async () => {
@@ -656,15 +706,19 @@ describe("Tiny random models", () => {
         processor = await AutoProcessor.from_pretrained(model_id);
       }, MAX_MODEL_LOAD_TIME);
 
-      it("forward", async () => {
-        const text_inputs = tokenizer(prompts[0]);
-        const vision_inputs = await processor(image);
-        const inputs = { ...text_inputs, ...vision_inputs };
+      it(
+        "forward",
+        async () => {
+          const text_inputs = tokenizer(prompts[0]);
+          const vision_inputs = await processor(image);
+          const inputs = { ...text_inputs, ...vision_inputs };
 
-        const { logits } = await model(inputs);
-        expect(logits.dims).toEqual([1, 244, 32002]);
-        expect(logits.mean().item()).toBeCloseTo(-0.0005755752790719271, 8);
-      });
+          const { logits } = await model(inputs);
+          expect(logits.dims).toEqual([1, 244, 32002]);
+          expect(logits.mean().item()).toBeCloseTo(-0.0005755752790719271, 8);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       it(
         "batch_size=1",
@@ -726,18 +780,22 @@ describe("Tiny random models", () => {
         processor = await AutoProcessor.from_pretrained(model_id);
       }, MAX_MODEL_LOAD_TIME);
 
-      it("forward", async () => {
-        const text_inputs = tokenizer(texts[0]);
-        const vision_inputs = await processor(image);
-        const inputs = {
-          ...text_inputs,
-          ...vision_inputs,
-          decoder_input_ids: full([1, 1], 2n),
-        };
+      it(
+        "forward",
+        async () => {
+          const text_inputs = tokenizer(texts[0]);
+          const vision_inputs = await processor(image);
+          const inputs = {
+            ...text_inputs,
+            ...vision_inputs,
+            decoder_input_ids: full([1, 1], 2n),
+          };
 
-        const { logits } = await model(inputs);
-        expect(logits.dims).toEqual([1, 1, 51289]);
-      });
+          const { logits } = await model(inputs);
+          expect(logits.dims).toEqual([1, 1, 51289]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       it(
         "batch_size=1",
@@ -934,6 +992,143 @@ describe("Tiny random models", () => {
           expect(outputs.tolist()).toEqual([
             [0n, 1n, 22172n, 18547n, 8143n, 22202n, 9456n, 17213n, 15330n, 26591n],
             [1n, 22172n, 3186n, 24786n, 19169n, 20222n, 29993n, 27146n, 27426n, 24562n],
+          ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("LlamaForCausalLM (onnxruntime-genai)", () => {
+      const model_id = "onnx-community/tiny-random-LlamaForCausalLM-ONNX";
+      /** @type {LlamaTokenizer} */
+      let tokenizer;
+      let inputs;
+      beforeAll(async () => {
+        tokenizer = await LlamaTokenizer.from_pretrained(model_id);
+        inputs = tokenizer("hello");
+      }, MAX_MODEL_LOAD_TIME);
+
+      const dtypes = ["fp32", "fp16", "q4", "q4f16"];
+
+      for (const dtype of dtypes) {
+        it(
+          `dtype=${dtype}`,
+          async () => {
+            /** @type {LlamaForCausalLM} */
+            const model = await LlamaForCausalLM.from_pretrained(model_id, {
+              // TODO move to config
+              ...DEFAULT_MODEL_OPTIONS,
+              dtype,
+            });
+
+            const outputs = await model.generate({
+              ...inputs,
+              max_length: 5,
+            });
+            expect(outputs.tolist()).toEqual([[128000n, 15339n, 15339n, 15339n, 15339n]]);
+
+            await model?.dispose();
+          },
+          MAX_TEST_TIME,
+        );
+      }
+    });
+  });
+
+  describe("olmo", () => {
+    describe("OlmoForCausalLM", () => {
+      const model_id = "onnx-community/tiny-random-olmo-hf";
+      /** @type {OlmoForCausalLM} */
+      let model;
+      /** @type {GPTNeoXTokenizer} */
+      let tokenizer;
+      beforeAll(async () => {
+        model = await OlmoForCausalLM.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+        tokenizer = await GPTNeoXTokenizer.from_pretrained(model_id);
+        tokenizer.padding_side = "left";
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "batch_size=1",
+        async () => {
+          const inputs = tokenizer("hello");
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([[25521n, 10886n, 44936n, 38777n, 33038n, 18557n, 1810n, 33853n, 9517n, 28892n]]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "batch_size>1",
+        async () => {
+          const inputs = tokenizer(["hello", "hello world"], { padding: true });
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([
+            [1n, 25521n, 10886n, 44936n, 38777n, 33038n, 18557n, 1810n, 33853n, 9517n],
+            [25521n, 1533n, 37199n, 27362n, 30594n, 39261n, 8824n, 19175n, 8545n, 29335n],
+          ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("granite", () => {
+    describe("GraniteForCausalLM", () => {
+      const model_id = "hf-internal-testing/tiny-random-GraniteForCausalLM";
+      /** @type {GraniteForCausalLM} */
+      let model;
+      /** @type {GPT2Tokenizer} */
+      let tokenizer;
+      beforeAll(async () => {
+        model = await GraniteForCausalLM.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+        tokenizer = await GPT2Tokenizer.from_pretrained(model_id);
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "batch_size=1",
+        async () => {
+          const inputs = tokenizer("hello");
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([[7656n, 39727n, 33077n, 9643n, 30539n, 47869n, 48739n, 15085n, 9203n, 14020n]]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "batch_size>1",
+        async () => {
+          const inputs = tokenizer(["hello", "hello world"], { padding: true });
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([
+            [0n, 7656n, 39727n, 33077n, 9643n, 30539n, 47869n, 48739n, 15085n, 9203n],
+            [7656n, 5788n, 17835n, 13234n, 7592n, 21471n, 30537n, 23023n, 43450n, 4824n],
           ]);
         },
         MAX_TEST_EXECUTION_TIME,
@@ -1647,6 +1842,142 @@ describe("Tiny random models", () => {
       }, MAX_MODEL_DISPOSE_TIME);
     });
   });
+
+  describe("patchtsmixer", () => {
+    const dims = [64, 512, 7];
+    const prod = dims.reduce((a, b) => a * b, 1);
+    const past_values = new Tensor(
+      "float32",
+      Float32Array.from({ length: prod }, (_, i) => i / prod),
+      dims,
+    );
+
+    describe("PatchTSMixerModel", () => {
+      const model_id = "hf-internal-testing/tiny-random-PatchTSMixerModel";
+
+      /** @type {PatchTSMixerModel} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSMixerModel.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { last_hidden_state } = await model({ past_values });
+
+          const { num_input_channels, num_patches, d_model } = model.config;
+          expect(last_hidden_state.dims).toEqual([dims[0], num_input_channels, num_patches, d_model]);
+          expect(last_hidden_state.mean().item()).toBeCloseTo(0.03344963490962982, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("PatchTSMixerForPrediction", () => {
+      const model_id = "onnx-community/granite-timeseries-patchtsmixer";
+
+      /** @type {PatchTSMixerForPrediction} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSMixerForPrediction.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { prediction_outputs } = await model({ past_values });
+
+          const { prediction_length, num_input_channels } = model.config;
+          expect(prediction_outputs.dims).toEqual([dims[0], prediction_length, num_input_channels]);
+          expect(prediction_outputs.mean().item()).toBeCloseTo(0.5064773559570312, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("patchtst", () => {
+    const dims = [64, 512, 7];
+    const prod = dims.reduce((a, b) => a * b, 1);
+    const past_values = new Tensor(
+      "float32",
+      Float32Array.from({ length: prod }, (_, i) => i / prod),
+      dims,
+    );
+
+    describe("PatchTSTModel", () => {
+      const model_id = "hf-internal-testing/tiny-random-PatchTSTModel";
+
+      /** @type {PatchTSTModel} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSTModel.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { last_hidden_state } = await model({ past_values });
+
+          const { num_input_channels, d_model } = model.config;
+          expect(last_hidden_state.dims).toEqual([dims[0], num_input_channels, 43, d_model]);
+          expect(last_hidden_state.mean().item()).toBeCloseTo(0.016672514379024506, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("PatchTSTForPrediction", () => {
+      const model_id = "onnx-community/granite-timeseries-patchtst";
+
+      /** @type {PatchTSTForPrediction} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSTForPrediction.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { prediction_outputs } = await model({ past_values });
+
+          const { prediction_length, num_input_channels } = model.config;
+          expect(prediction_outputs.dims).toEqual([dims[0], prediction_length, num_input_channels]);
+          expect(prediction_outputs.mean().item()).toBeCloseTo(0.506528377532959, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
 });
 
 describe("Tiny random pipelines", () => {
@@ -1663,62 +1994,78 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe("a [MASK] c");
-        const target = [
-          { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
-          { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
-          { score: 0.0012304208939895034, token: 933, token_str: "##ع", sequence: "aع c" },
-          { score: 0.0012301815440878272, token: 313, token_str: "ფ", sequence: "a ფ c" },
-          { score: 0.001222139224410057, token: 624, token_str: "未", sequence: "a 未 c" },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=2)", async () => {
-        const output = await pipe("a [MASK] c", { top_k: 2 });
-        const target = [
-          { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
-          { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
-        ];
-        compare(output, target, 1e-5);
-      });
-    });
-
-    describe("batch_size>1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe(["a [MASK] c", "a b [MASK] c"]);
-        const target = [
-          [
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe("a [MASK] c");
+          const target = [
             { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
             { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
             { score: 0.0012304208939895034, token: 933, token_str: "##ع", sequence: "aع c" },
             { score: 0.0012301815440878272, token: 313, token_str: "ფ", sequence: "a ფ c" },
             { score: 0.001222139224410057, token: 624, token_str: "未", sequence: "a 未 c" },
-          ],
-          [
-            { score: 0.0013287801994010806, token: 962, token_str: "##ち", sequence: "a bち c" },
-            { score: 0.0012486606137827039, token: 823, token_str: "##ن", sequence: "a bن c" },
-            { score: 0.0012320734094828367, token: 1032, token_str: "##ც", sequence: "a bც c" },
-            { score: 0.0012295148335397243, token: 854, token_str: "##ο", sequence: "a bο c" },
-            { score: 0.0012277684872969985, token: 624, token_str: "未", sequence: "a b 未 c" },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=2)", async () => {
-        const output = await pipe(["a [MASK] c", "a b [MASK] c"], { top_k: 2 });
-        const target = [
-          [
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=2)",
+        async () => {
+          const output = await pipe("a [MASK] c", { top_k: 2 });
+          const target = [
             { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
             { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
-          ],
-          [
-            { score: 0.0013287801994010806, token: 962, token_str: "##ち", sequence: "a bち c" },
-            { score: 0.0012486606137827039, token: 823, token_str: "##ن", sequence: "a bن c" },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("batch_size>1", () => {
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe(["a [MASK] c", "a b [MASK] c"]);
+          const target = [
+            [
+              { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
+              { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
+              { score: 0.0012304208939895034, token: 933, token_str: "##ع", sequence: "aع c" },
+              { score: 0.0012301815440878272, token: 313, token_str: "ფ", sequence: "a ფ c" },
+              { score: 0.001222139224410057, token: 624, token_str: "未", sequence: "a 未 c" },
+            ],
+            [
+              { score: 0.0013287801994010806, token: 962, token_str: "##ち", sequence: "a bち c" },
+              { score: 0.0012486606137827039, token: 823, token_str: "##ن", sequence: "a bن c" },
+              { score: 0.0012320734094828367, token: 1032, token_str: "##ც", sequence: "a bც c" },
+              { score: 0.0012295148335397243, token: 854, token_str: "##ο", sequence: "a bο c" },
+              { score: 0.0012277684872969985, token: 624, token_str: "未", sequence: "a b 未 c" },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=2)",
+        async () => {
+          const output = await pipe(["a [MASK] c", "a b [MASK] c"], { top_k: 2 });
+          const target = [
+            [
+              { score: 0.0013377574505284429, token: 854, token_str: "##ο", sequence: "aο c" },
+              { score: 0.001248967950232327, token: 962, token_str: "##ち", sequence: "aち c" },
+            ],
+            [
+              { score: 0.0013287801994010806, token: 962, token_str: "##ち", sequence: "a bち c" },
+              { score: 0.0012486606137827039, token: 823, token_str: "##ن", sequence: "a bن c" },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -1739,65 +2086,85 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (top_k=1)", async () => {
-        const output = await pipe("a");
-        const target = [{ label: "LABEL_0", score: 0.5076976418495178 }];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=2)", async () => {
-        const output = await pipe("a", { top_k: 2 });
-        const target = [
-          { label: "LABEL_0", score: 0.5076976418495178 },
-          { label: "LABEL_1", score: 0.49230238795280457 },
-        ];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=1)",
+        async () => {
+          const output = await pipe("a");
+          const target = [{ label: "LABEL_0", score: 0.5076976418495178 }];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=2)",
+        async () => {
+          const output = await pipe("a", { top_k: 2 });
+          const target = [
+            { label: "LABEL_0", score: 0.5076976418495178 },
+            { label: "LABEL_1", score: 0.49230238795280457 },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("batch_size>1", () => {
-      it("default (top_k=1)", async () => {
-        const output = await pipe(["a", "b c"]);
-        const target = [
-          { label: "LABEL_0", score: 0.5076976418495178 },
-          { label: "LABEL_0", score: 0.5077522993087769 },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=2)", async () => {
-        const output = await pipe(["a", "b c"], { top_k: 2 });
-        const target = [
-          [
+      it(
+        "default (top_k=1)",
+        async () => {
+          const output = await pipe(["a", "b c"]);
+          const target = [
             { label: "LABEL_0", score: 0.5076976418495178 },
-            { label: "LABEL_1", score: 0.49230238795280457 },
-          ],
-          [
             { label: "LABEL_0", score: 0.5077522993087769 },
-            { label: "LABEL_1", score: 0.49224773049354553 },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=2)",
+        async () => {
+          const output = await pipe(["a", "b c"], { top_k: 2 });
+          const target = [
+            [
+              { label: "LABEL_0", score: 0.5076976418495178 },
+              { label: "LABEL_1", score: 0.49230238795280457 },
+            ],
+            [
+              { label: "LABEL_0", score: 0.5077522993087769 },
+              { label: "LABEL_1", score: 0.49224773049354553 },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
-      it("multi_label_classification", async () => {
-        const problem_type = pipe.model.config.problem_type;
-        pipe.model.config.problem_type = "multi_label_classification";
+      it(
+        "multi_label_classification",
+        async () => {
+          const problem_type = pipe.model.config.problem_type;
+          pipe.model.config.problem_type = "multi_label_classification";
 
-        const output = await pipe(["a", "b c"], { top_k: 2 });
-        const target = [
-          [
-            { label: "LABEL_0", score: 0.5001373887062073 },
-            { label: "LABEL_1", score: 0.49243971705436707 },
-          ],
-          [
-            { label: "LABEL_0", score: 0.5001326203346252 },
-            { label: "LABEL_1", score: 0.492380291223526 },
-          ],
-        ];
-        compare(output, target, 1e-5);
+          const output = await pipe(["a", "b c"], { top_k: 2 });
+          const target = [
+            [
+              { label: "LABEL_0", score: 0.5001373887062073 },
+              { label: "LABEL_1", score: 0.49243971705436707 },
+            ],
+            [
+              { label: "LABEL_0", score: 0.5001326203346252 },
+              { label: "LABEL_1", score: 0.492380291223526 },
+            ],
+          ];
+          compare(output, target, 1e-5);
 
-        // Reset problem type
-        pipe.model.config.problem_type = problem_type;
-      });
+          // Reset problem type
+          pipe.model.config.problem_type = problem_type;
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -1818,55 +2185,13 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default", async () => {
-        const output = await pipe("1 2 3");
+      it(
+        "default",
+        async () => {
+          const output = await pipe("1 2 3");
 
-        // TODO: Add start/end to target
-        const target = [
-          {
-            entity: "LABEL_0",
-            score: 0.5292708,
-            index: 1,
-            word: "1",
-            // 'start': 0, 'end': 1
-          },
-          {
-            entity: "LABEL_0",
-            score: 0.5353687,
-            index: 2,
-            word: "2",
-            // 'start': 2, 'end': 3
-          },
-          {
-            entity: "LABEL_1",
-            score: 0.51381934,
-            index: 3,
-            word: "3",
-            // 'start': 4, 'end': 5
-          },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (ignore_labels set)", async () => {
-        const output = await pipe("1 2 3", { ignore_labels: ["LABEL_0"] });
-        const target = [
-          {
-            entity: "LABEL_1",
-            score: 0.51381934,
-            index: 3,
-            word: "3",
-            // 'start': 4, 'end': 5
-          },
-        ];
-        compare(output, target, 1e-5);
-      });
-    });
-
-    describe("batch_size>1", () => {
-      it("default", async () => {
-        const output = await pipe(["1 2 3", "4 5"]);
-        const target = [
-          [
+          // TODO: Add start/end to target
+          const target = [
             {
               entity: "LABEL_0",
               score: 0.5292708,
@@ -1888,30 +2213,16 @@ describe("Tiny random pipelines", () => {
               word: "3",
               // 'start': 4, 'end': 5
             },
-          ],
-          [
-            {
-              entity: "LABEL_0",
-              score: 0.5432807,
-              index: 1,
-              word: "4",
-              // 'start': 0, 'end': 1
-            },
-            {
-              entity: "LABEL_1",
-              score: 0.5007693,
-              index: 2,
-              word: "5",
-              // 'start': 2, 'end': 3
-            },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (ignore_labels set)", async () => {
-        const output = await pipe(["1 2 3", "4 5"], { ignore_labels: ["LABEL_0"] });
-        const target = [
-          [
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (ignore_labels set)",
+        async () => {
+          const output = await pipe("1 2 3", { ignore_labels: ["LABEL_0"] });
+          const target = [
             {
               entity: "LABEL_1",
               score: 0.51381934,
@@ -1919,19 +2230,91 @@ describe("Tiny random pipelines", () => {
               word: "3",
               // 'start': 4, 'end': 5
             },
-          ],
-          [
-            {
-              entity: "LABEL_1",
-              score: 0.5007693,
-              index: 2,
-              word: "5",
-              // 'start': 2, 'end': 3
-            },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("batch_size>1", () => {
+      it(
+        "default",
+        async () => {
+          const output = await pipe(["1 2 3", "4 5"]);
+          const target = [
+            [
+              {
+                entity: "LABEL_0",
+                score: 0.5292708,
+                index: 1,
+                word: "1",
+                // 'start': 0, 'end': 1
+              },
+              {
+                entity: "LABEL_0",
+                score: 0.5353687,
+                index: 2,
+                word: "2",
+                // 'start': 2, 'end': 3
+              },
+              {
+                entity: "LABEL_1",
+                score: 0.51381934,
+                index: 3,
+                word: "3",
+                // 'start': 4, 'end': 5
+              },
+            ],
+            [
+              {
+                entity: "LABEL_0",
+                score: 0.5432807,
+                index: 1,
+                word: "4",
+                // 'start': 0, 'end': 1
+              },
+              {
+                entity: "LABEL_1",
+                score: 0.5007693,
+                index: 2,
+                word: "5",
+                // 'start': 2, 'end': 3
+              },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (ignore_labels set)",
+        async () => {
+          const output = await pipe(["1 2 3", "4 5"], { ignore_labels: ["LABEL_0"] });
+          const target = [
+            [
+              {
+                entity: "LABEL_1",
+                score: 0.51381934,
+                index: 3,
+                word: "3",
+                // 'start': 4, 'end': 5
+              },
+            ],
+            [
+              {
+                entity: "LABEL_1",
+                score: 0.5007693,
+                index: 2,
+                word: "5",
+                // 'start': 2, 'end': 3
+              },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -1952,20 +2335,28 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (top_k=1)", async () => {
-        const output = await pipe("a", "b c");
-        const target = { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" };
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=3)", async () => {
-        const output = await pipe("a", "b c", { top_k: 3 });
-        const target = [
-          { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" },
-          { score: 0.11300431191921234, /* start: 2, end: 3, */ answer: "c" },
-          { score: 0.10732574015855789, /* start: 0, end: 3, */ answer: "b c" },
-        ];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=1)",
+        async () => {
+          const output = await pipe("a", "b c");
+          const target = { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" };
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=3)",
+        async () => {
+          const output = await pipe("a", "b c", { top_k: 3 });
+          const target = [
+            { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" },
+            { score: 0.11300431191921234, /* start: 2, end: 3, */ answer: "c" },
+            { score: 0.10732574015855789, /* start: 0, end: 3, */ answer: "b c" },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -1987,41 +2378,57 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe(urls[0]);
-        const target = [
-          { label: "LABEL_1", score: 0.5020533800125122 },
-          { label: "LABEL_0", score: 0.4979466497898102 },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=1)", async () => {
-        const output = await pipe(urls[0], { top_k: 1 });
-        const target = [{ label: "LABEL_1", score: 0.5020533800125122 }];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe(urls[0]);
+          const target = [
+            { label: "LABEL_1", score: 0.5020533800125122 },
+            { label: "LABEL_0", score: 0.4979466497898102 },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=1)",
+        async () => {
+          const output = await pipe(urls[0], { top_k: 1 });
+          const target = [{ label: "LABEL_1", score: 0.5020533800125122 }];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("batch_size>1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe(urls);
-        const target = [
-          [
-            { label: "LABEL_1", score: 0.5020533800125122 },
-            { label: "LABEL_0", score: 0.4979466497898102 },
-          ],
-          [
-            { label: "LABEL_1", score: 0.519227921962738 },
-            { label: "LABEL_0", score: 0.4807720482349396 },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=1)", async () => {
-        const output = await pipe(urls, { top_k: 1 });
-        const target = [[{ label: "LABEL_1", score: 0.5020533800125122 }], [{ label: "LABEL_1", score: 0.519227921962738 }]];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe(urls);
+          const target = [
+            [
+              { label: "LABEL_1", score: 0.5020533800125122 },
+              { label: "LABEL_0", score: 0.4979466497898102 },
+            ],
+            [
+              { label: "LABEL_1", score: 0.519227921962738 },
+              { label: "LABEL_0", score: 0.4807720482349396 },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=1)",
+        async () => {
+          const output = await pipe(urls, { top_k: 1 });
+          const target = [[{ label: "LABEL_1", score: 0.5020533800125122 }], [{ label: "LABEL_1", score: 0.519227921962738 }]];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -2047,53 +2454,69 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default", async () => {
-        const output = await pipe(urls[0], labels);
-        const target = [
-          { score: 0.5990662574768066, label: "cat" },
-          { score: 0.40093377232551575, label: "dog" },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (w/ hypothesis_template)", async () => {
-        const output = await pipe(urls[0], labels, { hypothesis_template });
-        const target = [
-          { score: 0.5527022480964661, label: "cat" },
-          { score: 0.44729775190353394, label: "dog" },
-        ];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default",
+        async () => {
+          const output = await pipe(urls[0], labels);
+          const target = [
+            { score: 0.5990662574768066, label: "cat" },
+            { score: 0.40093377232551575, label: "dog" },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (w/ hypothesis_template)",
+        async () => {
+          const output = await pipe(urls[0], labels, { hypothesis_template });
+          const target = [
+            { score: 0.5527022480964661, label: "cat" },
+            { score: 0.44729775190353394, label: "dog" },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("batch_size>1", () => {
-      it("default", async () => {
-        const output = await pipe(urls, labels);
-        const target = [
-          [
-            { score: 0.5990662574768066, label: "cat" },
-            { score: 0.40093377232551575, label: "dog" },
-          ],
-          [
-            { score: 0.5006340146064758, label: "dog" },
-            { score: 0.49936598539352417, label: "cat" },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (w/ hypothesis_template)", async () => {
-        const output = await pipe(urls, labels, { hypothesis_template });
-        const target = [
-          [
-            { score: 0.5527022480964661, label: "cat" },
-            { score: 0.44729775190353394, label: "dog" },
-          ],
-          [
-            { score: 0.5395973324775696, label: "cat" },
-            { score: 0.46040263772010803, label: "dog" },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default",
+        async () => {
+          const output = await pipe(urls, labels);
+          const target = [
+            [
+              { score: 0.5990662574768066, label: "cat" },
+              { score: 0.40093377232551575, label: "dog" },
+            ],
+            [
+              { score: 0.5006340146064758, label: "dog" },
+              { score: 0.49936598539352417, label: "cat" },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (w/ hypothesis_template)",
+        async () => {
+          const output = await pipe(urls, labels, { hypothesis_template });
+          const target = [
+            [
+              { score: 0.5527022480964661, label: "cat" },
+              { score: 0.44729775190353394, label: "dog" },
+            ],
+            [
+              { score: 0.5395973324775696, label: "cat" },
+              { score: 0.46040263772010803, label: "dog" },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -2115,41 +2538,57 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe(audios[0]);
-        const target = [
-          { score: 0.5043687224388123, label: "LABEL_0" },
-          { score: 0.4956313371658325, label: "LABEL_1" },
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=1)", async () => {
-        const output = await pipe(audios[0], { top_k: 1 });
-        const target = [{ score: 0.5043687224388123, label: "LABEL_0" }];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe(audios[0]);
+          const target = [
+            { score: 0.5043687224388123, label: "LABEL_0" },
+            { score: 0.4956313371658325, label: "LABEL_1" },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=1)",
+        async () => {
+          const output = await pipe(audios[0], { top_k: 1 });
+          const target = [{ score: 0.5043687224388123, label: "LABEL_0" }];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("batch_size>1", () => {
-      it("default (top_k=5)", async () => {
-        const output = await pipe(audios);
-        const target = [
-          [
-            { score: 0.5043687224388123, label: "LABEL_0" },
-            { score: 0.4956313371658325, label: "LABEL_1" },
-          ],
-          [
-            { score: 0.5187293887138367, label: "LABEL_0" },
-            { score: 0.4812707006931305, label: "LABEL_1" },
-          ],
-        ];
-        compare(output, target, 1e-5);
-      });
-      it("custom (top_k=1)", async () => {
-        const output = await pipe(audios, { top_k: 1 });
-        const target = [[{ score: 0.5043687224388123, label: "LABEL_0" }], [{ score: 0.5187293887138367, label: "LABEL_0" }]];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (top_k=5)",
+        async () => {
+          const output = await pipe(audios);
+          const target = [
+            [
+              { score: 0.5043687224388123, label: "LABEL_0" },
+              { score: 0.4956313371658325, label: "LABEL_1" },
+            ],
+            [
+              { score: 0.5187293887138367, label: "LABEL_0" },
+              { score: 0.4812707006931305, label: "LABEL_1" },
+            ],
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "custom (top_k=1)",
+        async () => {
+          const output = await pipe(audios, { top_k: 1 });
+          const target = [[{ score: 0.5043687224388123, label: "LABEL_0" }], [{ score: 0.5187293887138367, label: "LABEL_0" }]];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -2189,32 +2628,56 @@ describe("Tiny random pipelines", () => {
         },
       ];
 
-      it("text input (single)", async () => {
-        const output = await pipe(text_input, { max_new_tokens: 3 });
-        compare(output, text_target);
-      });
-      it("text input (list)", async () => {
-        const output = await pipe([text_input], { max_new_tokens: 3 });
-        compare(output, [text_target]);
-      });
+      it(
+        "text input (single)",
+        async () => {
+          const output = await pipe(text_input, { max_new_tokens: 3 });
+          compare(output, text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "text input (list)",
+        async () => {
+          const output = await pipe([text_input], { max_new_tokens: 3 });
+          compare(output, [text_target]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
-      it("text input (single) - return_full_text=false", async () => {
-        const output = await pipe(text_input, { max_new_tokens: 3, return_full_text: false });
-        compare(output, new_text_target);
-      });
-      it("text input (list) - return_full_text=false", async () => {
-        const output = await pipe([text_input], { max_new_tokens: 3, return_full_text: false });
-        compare(output, [new_text_target]);
-      });
+      it(
+        "text input (single) - return_full_text=false",
+        async () => {
+          const output = await pipe(text_input, { max_new_tokens: 3, return_full_text: false });
+          compare(output, new_text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "text input (list) - return_full_text=false",
+        async () => {
+          const output = await pipe([text_input], { max_new_tokens: 3, return_full_text: false });
+          compare(output, [new_text_target]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
-      it("chat input (single)", async () => {
-        const output = await pipe(chat_input, { max_new_tokens: 3 });
-        compare(output, chat_target);
-      });
-      it("chat input (list)", async () => {
-        const output = await pipe([chat_input], { max_new_tokens: 3 });
-        compare(output, [chat_target]);
-      });
+      it(
+        "chat input (single)",
+        async () => {
+          const output = await pipe(chat_input, { max_new_tokens: 3 });
+          compare(output, chat_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "chat input (list)",
+        async () => {
+          const output = await pipe([chat_input], { max_new_tokens: 3 });
+          compare(output, [chat_target]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1
@@ -2226,7 +2689,7 @@ describe("Tiny random pipelines", () => {
     //            [{generated_text: 'hello world zerosMillнал'}],
     //         ];
     //         compare(output, target);
-    //     });
+    //     }, MAX_TEST_EXECUTION_TIME);
     // });
 
     afterAll(async () => {
@@ -2237,7 +2700,7 @@ describe("Tiny random pipelines", () => {
   describe("translation", () => {
     const model_id = "Xenova/tiny-random-M2M100ForConditionalGeneration";
 
-    /** @type {TextGenerationPipeline} */
+    /** @type {TranslationPipeline} */
     let pipe;
     beforeAll(async () => {
       pipe = await pipeline("translation", model_id, {
@@ -2247,16 +2710,20 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default", async () => {
-        const text = "जीवन एक चॉकलेट बॉक्स की तरह है।";
-        const output = await pipe(text, {
-          src_lang: "hi",
-          tgt_lang: "fr",
-          max_new_tokens: 5,
-        });
-        const target = [{ translation_text: "Slovenska төсли төсли төсли" }];
-        compare(output, target);
-      });
+      it(
+        "default",
+        async () => {
+          const text = "जीवन एक चॉकलेट बॉक्स की तरह है।";
+          const output = await pipe(text, {
+            src_lang: "hi",
+            tgt_lang: "fr",
+            max_new_tokens: 5,
+          });
+          const target = [{ translation_text: "Slovenska төсли төсли төсли" }];
+          compare(output, target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {
@@ -2278,29 +2745,37 @@ describe("Tiny random pipelines", () => {
     }, MAX_MODEL_LOAD_TIME);
 
     describe("batch_size=1", () => {
-      it("default (threshold unset)", async () => {
-        const output = await pipe(urls[0]);
-        const target = [];
-        compare(output, target, 1e-5);
-      });
-      it("default (threshold=0)", async () => {
-        const output = await pipe(urls[0], { threshold: 0 });
-        const target = [
-          { score: 0.020360443741083145, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360419526696205, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.02036038413643837, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360447466373444, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360423251986504, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.02036040835082531, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360363647341728, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360343158245087, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-          { score: 0.020360423251986504, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
-        ];
-        compare(output, target, 1e-5);
-      });
+      it(
+        "default (threshold unset)",
+        async () => {
+          const output = await pipe(urls[0]);
+          const target = [];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
+        "default (threshold=0)",
+        async () => {
+          const output = await pipe(urls[0], { threshold: 0 });
+          const target = [
+            { score: 0.020360443741083145, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360419526696205, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.02036038413643837, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360447466373444, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360423251986504, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.02036040835082531, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360363647341728, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360389724373817, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360343158245087, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+            { score: 0.020360423251986504, label: "LABEL_31", box: { xmin: 56, ymin: 55, xmax: 169, ymax: 167 } },
+          ];
+          compare(output, target, 1e-5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Add batched support to object detection pipeline
@@ -2310,14 +2785,47 @@ describe("Tiny random pipelines", () => {
     //         console.log(output);
     //         const target = [];
     //         compare(output, target, 1e-5);
-    //     });
+    //     }, MAX_TEST_EXECUTION_TIME);
     //     it('default (threshold=0)', async () => {
     //         const output = await pipe(urls, { threshold: 0 });
     //         console.log(output);
     //         const target = [];
     //         compare(output, target, 1e-5);
-    //     });
+    //     }, MAX_TEST_EXECUTION_TIME);
     // });
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("document-question-answering", () => {
+    const model_id = "hf-internal-testing/tiny-random-VisionEncoderDecoderModel-donutswin-mbart";
+
+    /** @type {DocumentQuestionAnsweringPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline("document-question-answering", model_id, {
+        // TODO move to config
+        ...DEFAULT_MODEL_OPTIONS,
+      });
+    }, MAX_MODEL_LOAD_TIME);
+
+    describe("batch_size=1", () => {
+      it(
+        "default",
+        async () => {
+          const dims = [64, 32, 3];
+          const image = new RawImage(new Uint8ClampedArray(dims[0] * dims[1] * dims[2]).fill(255), ...dims);
+          const question = "What is the invoice number?";
+          const output = await pipe(image, question);
+
+          const target = [{ answer: null }];
+          compare(output, target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
 
     afterAll(async () => {
       await pipe?.dispose();

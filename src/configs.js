@@ -36,6 +36,13 @@ import {
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
  */
 
+/**
+ * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
+ */
+
+/**
+ * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
+ */
 
 /**
  * Loads a config from the specified path.
@@ -91,6 +98,9 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             break;
         case 'llama':
+        case 'olmo':
+        case 'mobilellm':
+        case 'granite':
         case 'cohere':
         case 'mistral':
         case 'starcoder2':
@@ -364,7 +374,7 @@ export class AutoConfig {
 /**
  * Transformers.js-specific configuration, possibly present in config.json under the key `transformers.js_config`.
  * @typedef {Object} TransformersJSConfig
- * @property {import('./utils/tensor.js').DataType} [kv_cache_dtype] The data type of the key-value cache.
+ * @property {import('./utils/tensor.js').DataType|Record<import('./utils/dtypes.js').DataType, import('./utils/tensor.js').DataType>} [kv_cache_dtype] The data type of the key-value cache.
  * @property {Record<string, number>} [free_dimension_overrides] Override the free dimensions of the model.
  * See https://onnxruntime.ai/docs/tutorials/web/env-flags-and-session-options.html#freedimensionoverrides
  * for more information.

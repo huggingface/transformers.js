@@ -23,10 +23,14 @@
     title: Server-side Inference in Node.js
   title: Tutorials
 - sections:
+  - local: guides/webgpu
+    title: Running models on WebGPU
+  - local: guides/dtypes
+    title: Using quantized models (dtypes)
   - local: guides/private
     title: Accessing Private/Gated Models
   - local: guides/node-audio-processing
-    title: Server-side Audio Processing in Node.js
+    title: Server-side Audio Processing
   title: Developer Guides
 - sections:
   - local: api/transformers

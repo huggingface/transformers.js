@@ -13,32 +13,22 @@ README_TEMPLATE = """
 </p>
 
 <p align="center">
-    <a href="https://www.npmjs.com/package/@huggingface/transformers">
-        <img alt="NPM" src="https://img.shields.io/npm/v/@huggingface/transformers">
-    </a>
-    <a href="https://www.npmjs.com/package/@huggingface/transformers">
-        <img alt="NPM Downloads" src="https://img.shields.io/npm/dw/@huggingface/transformers">
-    </a>
-    <a href="https://www.jsdelivr.com/package/npm/@huggingface/transformers">
-        <img alt="jsDelivr Hits" src="https://img.shields.io/jsdelivr/npm/hw/@huggingface/transformers">
-    </a>
-    <a href="https://github.com/xenova/transformers.js/blob/main/LICENSE">
-        <img alt="License" src="https://img.shields.io/github/license/xenova/transformers.js?color=blue">
-    </a>
-    <a href="https://huggingface.co/docs/transformers.js/index">
-        <img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online">
-    </a>
+    <a href="https://www.npmjs.com/package/@huggingface/transformers"><img alt="NPM" src="https://img.shields.io/npm/v/@huggingface/transformers"></a>
+    <a href="https://www.npmjs.com/package/@huggingface/transformers"><img alt="NPM Downloads" src="https://img.shields.io/npm/dw/@huggingface/transformers"></a>
+    <a href="https://www.jsdelivr.com/package/npm/@huggingface/transformers"><img alt="jsDelivr Hits" src="https://img.shields.io/jsdelivr/npm/hw/@huggingface/transformers"></a>
+    <a href="https://github.com/huggingface/transformers.js/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/huggingface/transformers.js?color=blue"></a>
+    <a href="https://huggingface.co/docs/transformers.js/index"><img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online"></a>
 </p>
 
 {intro}
 
-## Quick tour
-
-{quick_tour}
-
 ## Installation
 
 {installation}
+
+## Quick tour
+
+{quick_tour}
 
 ## Examples
 
@@ -52,7 +42,7 @@ README_TEMPLATE = """
 
 Here is the list of all tasks and architectures currently supported by Transformers.js.
 If you don't see your task/model listed here or it is not yet supported, feel free
-to open up a feature request [here](https://github.com/xenova/transformers.js/issues/new/choose).
+to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
 
 To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)).
 You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).

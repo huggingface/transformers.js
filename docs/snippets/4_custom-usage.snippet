@@ -1,6 +1,6 @@
 
 
-By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-alpha.20/dist/), which should work out-of-the-box. You can customize this as follows:
+By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/), which should work out-of-the-box. You can customize this as follows:
 
 ### Settings
 
@@ -21,7 +21,7 @@ For a full list of available settings, check out the [API Reference](./api/env).
 
 ### Convert your models to ONNX
 
-We recommend using our [conversion script](https://github.com/xenova/transformers.js/blob/main/scripts/convert.py) to convert your PyTorch, TensorFlow, or JAX models to ONNX in a single command. Behind the scenes, it uses [🤗 Optimum](https://huggingface.co/docs/optimum) to perform conversion and quantization of your model.
+We recommend using our [conversion script](https://github.com/huggingface/transformers.js/blob/main/scripts/convert.py) to convert your PyTorch, TensorFlow, or JAX models to ONNX in a single command. Behind the scenes, it uses [🤗 Optimum](https://huggingface.co/docs/optimum) to perform conversion and quantization of your model.
 
 ```bash
 python -m scripts.convert --quantize --model_id <model_name_or_path>

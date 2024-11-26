@@ -1,5 +1,6 @@
 import { AutoTokenizer } from "../../src/tokenizers.js";
 import { AutoModelForSeq2SeqLM, AutoModelForCausalLM } from "../../src/models.js";
+import { TextStreamer } from "../../src/generation/streamers.js";
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME } from "../init.js";
 
 // Initialise the testing environment
@@ -155,6 +156,43 @@ describe("Generation parameters", () => {
         });
         expect(outputs.tolist()).toEqual([[1n, 22172n, 31583n, 18824n, 16621n, 8136n, 16012n]]);
         expect(outputs.dims.at(-1)).toBeGreaterThanOrEqual(MIN_NEW_TOKENS);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("Streamers", () => {
+  describe("decoder-only", () => {
+    const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
+    let model, tokenizer;
+    beforeAll(async () => {
+      model = await AutoModelForCausalLM.from_pretrained(model_id);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "batch_size=1",
+      async () => {
+        const target_chunks = ["helloerdingsdelete ", "melytabular ", "Stadiumoba ", "alcune ", "drug"];
+        const chunks = [];
+        const callback_function = (text) => {
+          chunks.push(text);
+        };
+        const streamer = new TextStreamer(tokenizer, { callback_function, skip_special_tokens: true });
+
+        const inputs = tokenizer("hello");
+        const outputs = await model.generate({
+          ...inputs,
+          max_length: 10,
+          streamer,
+        });
+        expect(outputs.tolist()).toEqual([[1n, 22172n, 18547n, 8143n, 22202n, 9456n, 17213n, 15330n, 26591n, 15721n]]);
+        expect(chunks).toEqual(target_chunks);
       },
       MAX_TEST_EXECUTION_TIME,
     );

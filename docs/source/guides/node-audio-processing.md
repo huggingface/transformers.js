@@ -13,7 +13,7 @@ This tutorial will be written as an ES module, but you can easily adapt it to us
 
 
 **Useful links:**
-- [Source code](https://github.com/xenova/transformers.js/tree/main/examples/node-audio-processing)
+- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/node-audio-processing)
 - [Documentation](https://huggingface.co/docs/transformers.js)
 
 

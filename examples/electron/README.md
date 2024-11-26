@@ -6,7 +6,7 @@ An example project to show how to run 🤗 Transformers in an [Electron](https:/
 ## Getting Started
 1. Clone the repo and enter the project directory:
     ```bash
-    git clone https://github.com/xenova/transformers.js.git
+    git clone https://github.com/huggingface/transformers.js.git
     cd transformers.js/examples/electron/
     ```
 1. Install the necessary dependencies:

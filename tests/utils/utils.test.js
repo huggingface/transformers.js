@@ -64,10 +64,15 @@ describe("Utilities", () => {
   describe("Image utilities", () => {
     const [width, height, channels] = [2, 2, 3];
     const data = Uint8Array.from({ length: width * height * channels }, (_, i) => i % 5);
-    const image = new RawImage(data, width, height, channels);
+    const tiny_image = new RawImage(data, width, height, channels);
+    
+    let image;
+    beforeAll(async () => {
+      image = await RawImage.fromURL("https://picsum.photos/300/200");
+    });
 
     it("Can split image into separate channels", async () => {
-      const image_data = image.split()
+      const image_data = tiny_image.split()
 
       const target = [
         new Uint8Array([0, 3, 1, 4]),  // Reds
@@ -79,10 +84,34 @@ describe("Utilities", () => {
     });
 
     it("Can splits channels for grayscale", async () => {
-      const image_data = image.grayscale().split();
+      const image_data = tiny_image.grayscale().split();
       const target = [new Uint8Array([1, 3, 2, 1])];
 
       compare(image_data, target);
+    });
+
+    it("Read image from URL", async () => {
+      expect(image.width).toBe(300);
+      expect(image.height).toBe(200);
+      expect(image.channels).toBe(3);
+    });
+
+    it("Can resize image", async () => {
+      const resized = await image.resize(150, 100);
+      expect(resized.width).toBe(150);
+      expect(resized.height).toBe(100);
+    });
+
+    it("Can resize with aspect ratio", async () => {
+      const resized = await image.resize(150, null);
+      expect(resized.width).toBe(150);
+      expect(resized.height).toBe(100);
+    });
+
+    it("Returns original image if width and height are null", async () => {
+      const resized = await image.resize(null, null);
+      expect(resized.width).toBe(300);
+      expect(resized.height).toBe(200);
     });
   });
 });

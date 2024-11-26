@@ -8,6 +8,7 @@
  * @module utils/image
  */
 
+import { isNullishDimension } from './core.js';
 import { getFile } from './hub.js';
 import { env } from '../env.js';
 import { Tensor } from './tensor.js';
@@ -306,8 +307,8 @@ export class RawImage {
 
     /**
      * Resize the image to the given dimensions. This method uses the canvas API to perform the resizing.
-     * @param {number} width The width of the new image.
-     * @param {number} height The height of the new image.
+     * @param {number} width The width of the new image. `null` or `-1` will preserve the aspect ratio.
+     * @param {number} height The height of the new image. `null` or `-1` will preserve the aspect ratio.
      * @param {Object} options Additional options for resizing.
      * @param {0|1|2|3|4|5|string} [options.resample] The resampling method to use.
      * @returns {Promise<RawImage>} `this` to support chaining.
@@ -316,8 +317,27 @@ export class RawImage {
         resample = 2,
     } = {}) {
 
+        // Do nothing if the image already has the desired size
+        if (this.width === width && this.height === height) {
+            return this;
+        }
+
         // Ensure resample method is a string
         let resampleMethod = RESAMPLING_MAPPING[resample] ?? resample;
+
+        // Calculate width / height to maintain aspect ratio, in the event that
+        // the user passed a null value in.
+        // This allows users to pass in something like `resize(320, null)` to
+        // resize to 320 width, but maintain aspect ratio.
+        const nullish_width = isNullishDimension(width);
+        const nullish_height = isNullishDimension(height);
+        if (nullish_width && nullish_height) {
+            return this;
+        } else if (nullish_width) {
+            width = (height / this.height) * this.width;
+        } else if (nullish_height) {
+            height = (width / this.width) * this.height;
+        }
 
         if (BROWSER_ENV) {
             // TODO use `resample` in browser environment
@@ -408,13 +428,14 @@ export class RawImage {
             // Draw image to context, padding in the process
             ctx.drawImage(canvas,
                 0, 0, this.width, this.height,
-                left, top, newWidth, newHeight
+                left, top, this.width, this.height
             );
 
             // Create image from the padded data
             const paddedImage = new RawImage(
                 ctx.getImageData(0, 0, newWidth, newHeight).data,
-                newWidth, newHeight, 4);
+                newWidth, newHeight, 4
+            );
 
             // Convert back so that image has the same number of channels as before
             return paddedImage.convert(numChannels);

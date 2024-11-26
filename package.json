@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "3.0.0-alpha.20",
+  "version": "3.0.2",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./src/transformers.js",
   "types": "./types/transformers.d.ts",
@@ -37,11 +37,11 @@
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
-    "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/ --repo_owner xenova"
+    "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xenova/transformers.js.git"
+    "url": "git+https://github.com/huggingface/transformers.js.git"
   },
   "keywords": [
     "transformers",
@@ -57,21 +57,21 @@
   "author": "Hugging Face",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/xenova/transformers.js/issues"
+    "url": "https://github.com/huggingface/transformers.js/issues"
   },
-  "homepage": "https://github.com/xenova/transformers.js#readme",
+  "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.3.0",
     "onnxruntime-node": "1.19.2",
-    "onnxruntime-web": "1.20.0-dev.20240928-1bda91fc57",
+    "onnxruntime-web": "1.21.0-dev.20241024-d9ca84ef96",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.1",
+    "@types/jest": "^29.5.14",
     "@webgpu/types": "^0.1.44",
     "catharsis": "github:xenova/catharsis",
-    "jest": "^29.5.0",
-    "jest-environment-node": "^29.5.0",
+    "jest": "^30.0.0-alpha.6",
+    "jest-environment-node": "^30.0.0-alpha.6",
     "jsdoc-to-markdown": "^8.0.1",
     "prettier": "3.3.3",
     "typescript": "^5.2.2",

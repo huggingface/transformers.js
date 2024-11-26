@@ -7,7 +7,7 @@ In this tutorial, we'll be building a simple React application that performs mul
 
 Useful links:
 - [Demo site](https://huggingface.co/spaces/Xenova/react-translator)
-- [Source code](https://github.com/xenova/transformers.js/tree/main/examples/react-translator)
+- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/react-translator)
 
 
 ## Prerequisites
@@ -127,7 +127,7 @@ We recommend starting the development server again with `npm run dev`
 
 
 First, let's define our components. Create a folder called `components` in the `src` directory, and create the following files:
-1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/xenova/transformers.js/blob/main/examples/react-translator/src/components/LanguageSelector.jsx).
+1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/huggingface/transformers.js/blob/main/examples/react-translator/src/components/LanguageSelector.jsx).
     ```jsx
     const LANGUAGES = {
       "Acehnese (Arabic script)": "ace_Arab",

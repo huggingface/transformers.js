@@ -19,7 +19,7 @@ Although you can always use the [Python library](https://github.com/huggingface/
 </Tip>
 
 **Useful links:**
-- Source code ([ESM](https://github.com/xenova/transformers.js/tree/main/examples/node/esm/app.js) or [CommonJS](https://github.com/xenova/transformers.js/tree/main/examples/node/commonjs/app.js))
+- Source code ([ESM](https://github.com/huggingface/transformers.js/tree/main/examples/node/esm/app.js) or [CommonJS](https://github.com/huggingface/transformers.js/tree/main/examples/node/commonjs/app.js))
 - [Documentation](https://huggingface.co/docs/transformers.js) 
 
 

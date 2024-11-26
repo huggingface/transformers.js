@@ -98,7 +98,7 @@ function App() {
 
       <div>
         <h1 className='text-5xl font-bold mb-2'>The Tokenizer Playground</h1>
-        <h2 className='text-lg font-normal'>Experiment with different tokenizers (running <a className="text-gray-900 underline" href="https://github.com/xenova/transformers.js">locally</a> in your browser).</h2>
+        <h2 className='text-lg font-normal'>Experiment with different tokenizers (running <a className="text-gray-900 underline" href="https://github.com/huggingface/transformers.js">locally</a> in your browser).</h2>
       </div>
 
       <div>

@@ -26,7 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 
-const VERSION = '3.0.0-alpha.20';
+const VERSION = '3.0.2';
 
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof self !== 'undefined';
@@ -73,9 +73,20 @@ export const apis = Object.freeze({
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
-const dirname__ = RUNNING_LOCALLY
-    ? path.dirname(path.dirname(url.fileURLToPath(import.meta.url)))
-    : './';
+
+let dirname__ = './';
+if (RUNNING_LOCALLY) {
+    // NOTE: We wrap `import.meta` in a call to `Object` to prevent Webpack from trying to bundle it in CommonJS.
+    // Although we get the warning: "Accessing import.meta directly is unsupported (only property access or destructuring is supported)",
+    // it is safe to ignore since the bundled value (`{}`) isn't used for CommonJS environments (we use __dirname instead).
+    const _import_meta_url = Object(import.meta).url;
+
+    if (_import_meta_url) {
+        dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))) // ESM
+    } else if (typeof __dirname !== 'undefined') {
+        dirname__ = path.dirname(__dirname) // CommonJS
+    }
+}
 
 // Only used for environments with access to file system
 const DEFAULT_CACHE_DIR = RUNNING_LOCALLY

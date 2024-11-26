@@ -283,7 +283,7 @@ const PROBLEMATIC_REGEX_MAP = new Map([
     ["(?i:'s|'t|'re|'ve|'m|'ll|'d)", "(?:'([sS]|[tT]|[rR][eE]|[vV][eE]|[mM]|[lL][lL]|[dD]))"],
 
     // Used to override the default (invalid) regex of the bloom pretokenizer.
-    // For more information, see https://github.com/xenova/transformers.js/issues/94
+    // For more information, see https://github.com/huggingface/transformers.js/issues/94
     [` ?[^(\\s|[${BLOOM_SPLIT_CHARS}])]+`, ` ?[^\\s${BLOOM_SPLIT_CHARS}]+`],
 ])
 
@@ -1518,6 +1518,8 @@ class SplitPreTokenizer extends PreTokenizer {
 
         if (this.config.invert) {
             return text.match(this.pattern) || [];
+        } else if (this.config.behavior?.toLowerCase() === 'removed') {
+            return text.split(this.pattern).filter(x => x);
         } else {
             return regexSplit(text, this.pattern);
         }
@@ -2577,7 +2579,7 @@ export class PreTrainedTokenizer extends Callable {
 
             // Another slight hack to add `end_of_word_suffix` (if present) to the decoder
             // This is needed for cases where BPE model and ByteLevel decoder are used
-            // For more information, see https://github.com/xenova/transformers.js/issues/74
+            // For more information, see https://github.com/huggingface/transformers.js/issues/74
             // TODO: save this to the decoder when exporting?
             this.decoder.end_of_word_suffix = this.model.end_of_word_suffix;
         }
