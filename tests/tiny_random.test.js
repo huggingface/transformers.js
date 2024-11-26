@@ -54,6 +54,10 @@ import {
   Florence2ForConditionalGeneration,
   Qwen2VLForConditionalGeneration,
   MarianMTModel,
+  PatchTSTModel,
+  PatchTSTForPrediction,
+  PatchTSMixerModel,
+  PatchTSMixerForPrediction,
 
   // Pipelines
   pipeline,
@@ -70,6 +74,7 @@ import {
   // Other
   full,
   RawImage,
+  Tensor,
 } from "../src/transformers.js";
 
 import { init, MAX_TEST_TIME, MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME } from "./init.js";
@@ -1910,6 +1915,142 @@ describe("Tiny random models", () => {
             [2n, 1n, 6312n, 28709n, 24704n, 8732n, 1310n, 9808n, 13771n, 27309n],
             [1n, 6312n, 28709n, 1526n, 8687n, 5690n, 1770n, 30811n, 12501n, 3325n],
           ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("patchtsmixer", () => {
+    const dims = [64, 512, 7];
+    const prod = dims.reduce((a, b) => a * b, 1);
+    const past_values = new Tensor(
+      "float32",
+      Float32Array.from({ length: prod }, (_, i) => i / prod),
+      dims,
+    );
+
+    describe("PatchTSMixerModel", () => {
+      const model_id = "hf-internal-testing/tiny-random-PatchTSMixerModel";
+
+      /** @type {PatchTSMixerModel} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSMixerModel.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { last_hidden_state } = await model({ past_values });
+
+          const { num_input_channels, num_patches, d_model } = model.config;
+          expect(last_hidden_state.dims).toEqual([dims[0], num_input_channels, num_patches, d_model]);
+          expect(last_hidden_state.mean().item()).toBeCloseTo(0.03344963490962982, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("PatchTSMixerForPrediction", () => {
+      const model_id = "onnx-community/granite-timeseries-patchtsmixer";
+
+      /** @type {PatchTSMixerForPrediction} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSMixerForPrediction.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { prediction_outputs } = await model({ past_values });
+
+          const { prediction_length, num_input_channels } = model.config;
+          expect(prediction_outputs.dims).toEqual([dims[0], prediction_length, num_input_channels]);
+          expect(prediction_outputs.mean().item()).toBeCloseTo(0.5064773559570312, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("patchtst", () => {
+    const dims = [64, 512, 7];
+    const prod = dims.reduce((a, b) => a * b, 1);
+    const past_values = new Tensor(
+      "float32",
+      Float32Array.from({ length: prod }, (_, i) => i / prod),
+      dims,
+    );
+
+    describe("PatchTSTModel", () => {
+      const model_id = "hf-internal-testing/tiny-random-PatchTSTModel";
+
+      /** @type {PatchTSTModel} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSTModel.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { last_hidden_state } = await model({ past_values });
+
+          const { num_input_channels, d_model } = model.config;
+          expect(last_hidden_state.dims).toEqual([dims[0], num_input_channels, 43, d_model]);
+          expect(last_hidden_state.mean().item()).toBeCloseTo(0.016672514379024506, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("PatchTSTForPrediction", () => {
+      const model_id = "onnx-community/granite-timeseries-patchtst";
+
+      /** @type {PatchTSTForPrediction} */
+      let model;
+      beforeAll(async () => {
+        model = await PatchTSTForPrediction.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "default",
+        async () => {
+          const { prediction_outputs } = await model({ past_values });
+
+          const { prediction_length, num_input_channels } = model.config;
+          expect(prediction_outputs.dims).toEqual([dims[0], prediction_length, num_input_channels]);
+          expect(prediction_outputs.mean().item()).toBeCloseTo(0.506528377532959, 5);
         },
         MAX_TEST_EXECUTION_TIME,
       );
