@@ -75,7 +75,7 @@ describe("Utilities", () => {
       const image_data = tiny_image.split().map(x => x.data);
 
       const target = [
-        new Uint8Array([0, 3, 1, 4]),  // Reds
+        new Uint8Array([0, 3, 1, 4]), // Reds
         new Uint8Array([1, 4, 2, 0]), // Greens
         new Uint8Array([2, 0, 3, 1]), // Blues
       ];
