@@ -69,7 +69,11 @@ describe("Tensor operations", () => {
     });
 
     it("should return a crop", async () => {
-      const t1 = new Tensor("float32", Array.from({ length: 28 }, (_, i) => i + 1), [4, 7]);
+      const t1 = new Tensor(
+        "float32",
+        Array.from({ length: 28 }, (_, i) => i + 1),
+        [4, 7],
+      );
       const t2 = t1.slice([1, -1], [1, -1]);
 
       const target = new Tensor("float32", [9, 10, 11, 12, 13, 16, 17, 18, 19, 20], [2, 5]);

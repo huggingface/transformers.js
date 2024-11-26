@@ -65,14 +65,14 @@ describe("Utilities", () => {
     const [width, height, channels] = [2, 2, 3];
     const data = Uint8Array.from({ length: width * height * channels }, (_, i) => i % 5);
     const tiny_image = new RawImage(data, width, height, channels);
-    
+
     let image;
     beforeAll(async () => {
       image = await RawImage.fromURL("https://picsum.photos/300/200");
     });
 
     it("Can split image into separate channels", async () => {
-      const image_data = tiny_image.split().map(x => x.data);
+      const image_data = tiny_image.split().map((x) => x.data);
 
       const target = [
         new Uint8Array([0, 3, 1, 4]), // Reds
@@ -84,7 +84,10 @@ describe("Utilities", () => {
     });
 
     it("Can splits channels for grayscale", async () => {
-      const image_data = tiny_image.grayscale().split().map(x => x.data);
+      const image_data = tiny_image
+        .grayscale()
+        .split()
+        .map((x) => x.data);
       const target = [new Uint8Array([1, 3, 2, 1])];
 
       compare(image_data, target);
