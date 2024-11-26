@@ -62,7 +62,6 @@ describe("Tensor operations", () => {
 
     it("should return a range of rows", async () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
-      // The end index is not included.
       const t2 = t1.slice([1, 3]);
       const target = new Tensor("float32", [3, 4, 5, 6], [2, 2]);
 
@@ -70,8 +69,7 @@ describe("Tensor operations", () => {
     });
 
     it("should return a crop", async () => {
-      // Create 21 nodes.
-      const t1 = new Tensor("float32", Array.from({ length: 28 }, (v, i) => v = ++i), [4, 7]);
+      const t1 = new Tensor("float32", Array.from({ length: 28 }, (_, i) => i + 1), [4, 7]);
       const t2 = t1.slice([1, -1], [1, -1]);
 
       const target = new Tensor("float32", [9, 10, 11, 12, 13, 16, 17, 18, 19, 20], [2, 5]);
