@@ -659,7 +659,7 @@ export class RawImage {
     }
 
     /**
-     * Split the image data into individual bands. This method returns an array of individual image bands from an image.
+     * Split this image into individual bands. This method returns an array of individual image bands from an image.
      * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
      * 
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
