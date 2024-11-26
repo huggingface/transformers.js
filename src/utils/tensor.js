@@ -370,10 +370,10 @@ export class Tensor {
      * [ 16, 17, 18, 19, 20 ]
      * ```
      *
-     * @param {...(number|number[]|null)} slices - The slice specifications for each dimension.
-     *   - If a number is given, then a single element is selected.
-     *   - If an array of two numbers is given, then a range of elements [start, end (exclusive)] is selected.
-     *   - If null is given, then the entire dimension is selected.
+     * @param {...(number|number[]|null)} slices The slice specifications for each dimension.
+     * - If a number is given, then a single element is selected.
+     * - If an array of two numbers is given, then a range of elements [start, end (exclusive)] is selected.
+     * - If null is given, then the entire dimension is selected.
      * @returns {Tensor} A new Tensor containing the selected elements.
      * @throws {Error} If the slice input is invalid.
      */
