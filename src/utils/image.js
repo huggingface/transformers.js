@@ -663,10 +663,10 @@ export class RawImage {
      * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
      * 
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
-     * @returns {(Uint8Array|Uint8ClampedArray)[]} An array containing bands.
+     * @returns {RawImage[]} An array containing bands.
      */
     split() {
-        const { data, channels } = this;
+        const { data, width, height, channels } = this;
 
         /** @type {typeof Uint8Array | typeof Uint8ClampedArray} */
         const data_type = /** @type {any} */(data.constructor);
@@ -685,7 +685,7 @@ export class RawImage {
                 split_data[j][i] = data[data_offset + j];
             }
         }
-        return split_data;
+        return split_data.map((data) => new RawImage(data, width, height, 1));
     }
 
     /**
