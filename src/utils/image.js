@@ -638,19 +638,33 @@ export class RawImage {
     }
 
     /**
-     * Splits the image data into separate channels.
-     * The number of elements in the array corresponds to the number of channels in the image.
-     * @returns {Array<Uint8ClampedArray|Uint8Array>} An array containing separate channel data.
+     * Split the image data into individual bands. This method returns an array of individual image bands from an image.
+     * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
+     * 
+     * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
+     * @returns {(Uint8Array|Uint8ClampedArray)[]} An array containing bands.
      */
-    toChannels() {
-        // Split each channel into a separate entry in a `channels` array.
-        const channels = [];
-        for (let c = 0; c < this.channels; c++) {
-            channels.push(
-                this.data.filter((_, i) => i % this.channels === c)
-            );
+    split() {
+        const { data, channels } = this;
+
+        /** @type {typeof Uint8Array | typeof Uint8ClampedArray} */
+        const data_type = /** @type {any} */(data.constructor);
+        const per_channel_length = data.length / channels;
+
+        // Pre-allocate buffers for each channel
+        const split_data = Array.from(
+            { length: channels },
+            () => new data_type(per_channel_length),
+        );
+
+        // Write pixel data
+        for (let i = 0; i < per_channel_length; ++i) {
+            const data_offset = channels * i;
+            for (let j = 0; j < channels; ++j) {
+                split_data[j][i] = data[data_offset + j];
+            }
         }
-        return channels;
+        return split_data;
     }
 
     /**
