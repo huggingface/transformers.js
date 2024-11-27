@@ -44,10 +44,10 @@ import {
 } from './configs.js';
 
 import {
-    deviceToExecutionProviders,
     createInferenceSession,
-    isONNXTensor,
+    deviceToExecutionProviders,
     isONNXProxy,
+    isONNXTensor,
 } from './backends/onnx.js';
 import {
     DATA_TYPES,
@@ -75,49 +75,48 @@ import {
 } from './utils/constants.js';
 
 import {
-    LogitsProcessorList,
+    ClassifierFreeGuidanceLogitsProcessor,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
-    SuppressTokensAtBeginLogitsProcessor,
-    WhisperTimeStampLogitsProcessor,
-    NoRepeatNGramLogitsProcessor,
-    RepetitionPenaltyLogitsProcessor,
-    NoBadWordsLogitsProcessor,
+    LogitsProcessorList,
     MinLengthLogitsProcessor,
     MinNewTokensLengthLogitsProcessor,
-
+    NoBadWordsLogitsProcessor,
+    NoRepeatNGramLogitsProcessor,
+    RepetitionPenaltyLogitsProcessor,
+    SuppressTokensAtBeginLogitsProcessor,
     TemperatureLogitsWarper,
     TopKLogitsWarper,
     TopPLogitsWarper,
-    ClassifierFreeGuidanceLogitsProcessor,
+    WhisperTimeStampLogitsProcessor,
 } from './generation/logits_process.js';
 
 import {
     GenerationConfig,
 } from './generation/configuration_utils.js';
 
+import { RawImage } from './utils/image.js';
 import {
     cat,
-    mean,
-    zeros,
-    zeros_like,
-    ones,
-    ones_like,
     full,
     full_like,
+    mean,
+    ones,
+    ones_like,
     stack,
     std_mean,
     Tensor,
+    zeros,
+    zeros_like,
 } from './utils/tensor.js';
-import { RawImage } from './utils/image.js';
 
-import { dynamic_time_warping, max, medianFilter } from './utils/maths.js';
-import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
-import { LogitsSampler } from './generation/logits_sampler.js';
 import { apis } from './env.js';
+import { LogitsSampler } from './generation/logits_sampler.js';
+import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
+import { dynamic_time_warping, max, medianFilter } from './utils/maths.js';
 
-import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 import { whisper_language_to_code } from './models/whisper/common_whisper.js';
+import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 
 //////////////////////////////////////////////////
 // Model types: used internally
@@ -769,10 +768,6 @@ function multimodality_prepare_inputs_for_generation(self, input_ids, model_inpu
                 full_like(model_inputs.attention_mask, 0n),
             ], 0);
         }
-    }
-
-    if (has_past_key_values || !model_inputs.pixel_values) {
-        model_inputs.pixel_values = full([0, 0, 3, 384, 384], 1.0);
     }
 
     if (has_past_key_values) {
