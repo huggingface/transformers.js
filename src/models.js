@@ -771,10 +771,6 @@ function multimodality_prepare_inputs_for_generation(self, input_ids, model_inpu
         }
     }
 
-    if (has_past_key_values || !model_inputs.pixel_values) {
-        model_inputs.pixel_values = full([0, 0, 3, 384, 384], 1.0);
-    }
-
     if (has_past_key_values) {
         const num_img_tokens = 0;
         const num_text_tokens = 1;
