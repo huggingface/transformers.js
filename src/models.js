@@ -165,12 +165,12 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     }
 
     // If the device is not specified, we use the default (supported) execution providers.
-    const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (
-          apis.IS_EXPOSED_RUNTIME_ENV ? 'auto' : (
-            apis.IS_NODE_ENV ? 'cpu' : 'wasm'
-        ))
+    let selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */ (
+      // Do not asign default device if 'IS_EXPOSED_RUNTIME_ENV'
+      device ?? (apis.IS_EXPOSED_RUNTIME_ENV ? undefined
+        : (apis.IS_NODE_ENV ? 'cpu' : 'wasm'))
     );
+
     const executionProviders = deviceToExecutionProviders(selectedDevice);
 
     // If options.dtype is specified, we use it to choose the suffix for the model file.
@@ -238,7 +238,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     const free_dimension_overrides = custom_config.free_dimension_overrides;
     if (free_dimension_overrides) {
         session_options.freeDimensionOverrides ??= free_dimension_overrides;
-    } else if (selectedDevice.startsWith('webnn') && !session_options.freeDimensionOverrides) {
+    } else if (selectedDevice?.startsWith('webnn') && !session_options.freeDimensionOverrides) {
         console.warn(
             'WebNN does not currently support dynamic shapes and requires `free_dimension_overrides` to be set in config.json as a field within "transformers.js_config". ' +
             'When `free_dimension_overrides` is not set, you may experience significant performance degradation.'

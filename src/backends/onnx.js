@@ -58,7 +58,6 @@ let ONNX;
 if (apis.IS_EXPOSED_RUNTIME_ENV) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[apis.EXPOSED_RUNTIME_SYMBOL];
-    defaultDevices = ['auto'];
 
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
