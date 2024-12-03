@@ -25,7 +25,7 @@ const extractor = await pipeline(
   "feature-extraction",
   "mixedbread-ai/mxbai-embed-xsmall-v1",
   { device: "webgpu" },
-});
+);
 
 // Compute embeddings
 const texts = ["Hello world!", "This is an example sentence."];
