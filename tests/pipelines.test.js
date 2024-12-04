@@ -739,6 +739,21 @@ xdescribe("Pipelines", () => {
           //   ]
           // }
         }
+
+
+        {
+            // Float64Array input test case
+            let audioData64 = new Float64Array(audioData.length);
+            for (let i = 0; i < audioData64.length; i++) {
+                audioData64[i] = audioData[i];
+            }
+
+            let output = await transcriber(audioData64, {return_timestamps: true});
+            expect(output.text.length).toBeGreaterThan(50);
+            expect(output.chunks.length).toBeGreaterThan(0);
+            // { text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." }
+        }
+
         await transcriber.dispose();
       },
       MAX_TEST_EXECUTION_TIME,
@@ -773,7 +788,7 @@ xdescribe("Pipelines", () => {
     it(
       models[2].join(" + "),
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", m(models[2][0]), {
+        let transcriber = await pipeline("automatic-speech-recognition", models[2][0], {
           revision: models[2][1],
           quantized: false,
         });
