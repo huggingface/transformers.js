@@ -504,13 +504,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename
     })
 
-    /** @type {import('./core.js').ProgressInfo} */
-    const progressInfo = {
-        status: 'progress',
-        name: path_or_repo_id,
-        file: filename
-    }
-
     /** @type {Uint8Array} */
     let buffer;
 
@@ -530,7 +523,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 
         // For completeness, we still fire the final progress callback
         dispatchCallback(options.progress_callback, {
-            ...progressInfo,
+            status: 'progress',
+            name: path_or_repo_id,
+            file: filename,
             progress: 100,
             loaded: buffer.length,
             total: buffer.length,
@@ -538,7 +533,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     } else {
         buffer = await readResponse(response, data => {
             dispatchCallback(options.progress_callback, {
-                ...progressInfo,
+                status: 'progress',
+                name: path_or_repo_id,
+                file: filename,
                 ...data,
             })
         })
@@ -595,12 +592,11 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
 
     return JSON.parse(jsonData);
 }
-
 /**
  * Read and track progress when reading a Response object
  *
- * @param {any} response The Response object to read
- * @param {function} progress_callback The function to call with progress updates
+ * @param {Response|FileResponse} response The Response object to read
+ * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
 async function readResponse(response, progress_callback) {
