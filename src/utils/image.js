@@ -1,6 +1,3 @@
-/**
- * @typedef {import('./tensor.js').DataArray} DataArray
- */
 
 /**
  * @file Helper module for image processing.
@@ -308,43 +305,43 @@ export class RawImage {
     }
 
     /**
-     * Apply an alpha mask to the image.
-     * @param {RawImage} mask The mask to apply. Values should be between 0 and 255, and be a single channel.
-     * @returns {Promise<RawImage>} The masked image.
+     * Apply an alpha mask to the image. Operates in place.
+     * @param {RawImage} mask The mask to apply. It should have a single channel.
+     * @returns {RawImage} The masked image.
      * @throws {Error} If the mask is not the same size as the image.
      * @throws {Error} If the image does not have 4 channels.
      * @throws {Error} If the mask is not a single channel.
      */
-    async putAlpha(mask) {
+    putAlpha(mask) {
         if (mask.width !== this.width || mask.height !== this.height) {
-            throw new Error('Mask must be the same size as the image');
-        }
-
-        // We want the current image to have an alpha channel, but the mask will
-        // just be a single channel.
-        if (this.channels !== 4) {
-            throw new Error('Image must have 4 channels');
+            throw new Error(`Expected mask size to be ${this.width}x${this.height}, but got ${mask.width}x${mask.height}`);
         }
         if (mask.channels !== 1) {
-            throw new Error('Mask must have 1 channel');
+            throw new Error(`Expected mask to have 1 channel, but got ${mask.channels}`);
         }
 
-        const numPixels = this.width * this.height;
-        for (let i = 0; i < numPixels; i++) {
-            const maskPixel = mask.data[i];
-            if (typeof maskPixel === 'undefined') {
-                throw new Error('Invalid mask');
+        const this_data = this.data;
+        const mask_data = mask.data;
+        const num_pixels = this.width * this.height;
+        if (this.channels === 3) {
+            // Convert to RGBA and simultaneously apply mask to alpha channel
+            const newData = new Uint8ClampedArray(num_pixels * 4);
+            for (let i = 0, in_offset = 0, out_offset = 0; i < num_pixels; ++i) {
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = mask_data[i];
             }
+            return this._update(newData, this.width, this.height, 4);
 
-            // Ensure that the alpha is a range from 0 to 255, and not a range
-            // from 0 to 1.
-            const alpha = maskPixel < 1 ? maskPixel * 255 : maskPixel;
-            // Calculate the offset, multiplying by 4 because of the number of
-            // channels, then offset by 3 to get the alpha channel.
-            this.data[(i * 4) + 3] = alpha;
+        } else if (this.channels === 4) {
+            // Apply mask to alpha channel in place
+            for (let i = 0; i < num_pixels; ++i) {
+                this_data[4 * i + 3] = mask_data[i];
+            }
+            return this;
         }
-
-        return this;
+        throw new Error(`Expected image to have 3 or 4 channels, but got ${this.channels}`);
     }
 
     /**
