@@ -4503,6 +4503,20 @@ export class ViTForImageClassification extends ViTPreTrainedModel {
 
 
 //////////////////////////////////////////////////
+export class IJepaPreTrainedModel extends PreTrainedModel { }
+export class IJepaModel extends IJepaPreTrainedModel { }
+export class IJepaForImageClassification extends IJepaPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////
 export class VitPosePreTrainedModel extends PreTrainedModel { }
 
 /**
@@ -6772,6 +6786,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['rt_detr', ['RTDetrModel', RTDetrModel]],
     ['table-transformer', ['TableTransformerModel', TableTransformerModel]],
     ['vit', ['ViTModel', ViTModel]],
+    ['ijepa', ['IJepaModel', IJepaModel]],
     ['pvt', ['PvtModel', PvtModel]],
     ['vit_msn', ['ViTMSNModel', ViTMSNModel]],
     ['vit_mae', ['ViTMAEModel', ViTMAEModel]],
@@ -7008,6 +7023,7 @@ const MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['vit', ['ViTForImageClassification', ViTForImageClassification]],
+    ['ijepa', ['IJepaForImageClassification', IJepaForImageClassification]],
     ['pvt', ['PvtForImageClassification', PvtForImageClassification]],
     ['vit_msn', ['ViTMSNForImageClassification', ViTMSNForImageClassification]],
     ['fastvit', ['FastViTForImageClassification', FastViTForImageClassification]],
