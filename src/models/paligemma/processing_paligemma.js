@@ -44,7 +44,6 @@ export class PaliGemmaProcessor extends Processor {
         const image_seq_length = this.image_processor.config.image_seq_length;
         let input_strings;
         if (text.some((t) => t.includes(IMAGE_TOKEN))) {
-            console.log('this.image_processor.config', this.image_processor.config)
             input_strings = text.map(
                 sample => {
                     const expanded_sample = sample.replaceAll(IMAGE_TOKEN, IMAGE_TOKEN.repeat(image_seq_length));
