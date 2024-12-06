@@ -4,6 +4,7 @@ export * from './idefics3/processing_idefics3.js';
 export * from './janus/processing_janus.js';
 export * from './jina_clip/processing_jina_clip.js';
 export * from './owlvit/processing_owlvit.js';
+export * from './paligemma/processing_paligemma.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './sam/processing_sam.js';

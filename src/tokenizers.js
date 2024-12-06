@@ -2605,6 +2605,12 @@ export class PreTrainedTokenizer extends Callable {
         this.unk_token = this.getToken('unk_token');
         this.unk_token_id = this.model.tokens_to_ids.get(this.unk_token);
 
+        this.bos_token = this.getToken('bos_token');
+        this.bos_token_id = this.model.tokens_to_ids.get(this.bos_token);
+
+        this.eos_token = this.getToken('eos_token');
+        this.eos_token_id = this.model.tokens_to_ids.get(this.eos_token);
+
         this.model_max_length = tokenizerConfig.model_max_length;
 
         /** @type {boolean} Whether or not to strip the text when tokenizing (removing excess spaces before and after the string). */

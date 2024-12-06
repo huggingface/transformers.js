@@ -558,7 +558,9 @@ async function decoderForward(self, model_inputs, is_encoder_decoder = false) {
         new_model_inputs.use_cache_branch = boolTensor(!!past_key_values);
     }
     if (session.inputNames.includes('position_ids') && new_model_inputs.attention_mask && !new_model_inputs.position_ids) {
-        new_model_inputs.position_ids = createPositionIds(new_model_inputs, past_key_values);
+        // NOTE: Handle a special case for paligemma models, where positions are 1-indexed
+        const start_index = self.config.model_type === 'paligemma' ? 1 : 0;
+        new_model_inputs.position_ids = createPositionIds(new_model_inputs, past_key_values, start_index);
     }
 
     // Unpack the `past_key_values` object into model inputs
@@ -694,14 +696,14 @@ async function imageTextToTextForward(self, {
  * @param {Tensor} attention_mask
  * @returns {{data: BigInt64Array, dims: number[]}}
  */
-function cumsum_masked_fill(attention_mask) {
+function cumsum_masked_fill(attention_mask, start_index = 0) {
     const [bz, seq_len] = attention_mask.dims;
     const attn_mask_data = attention_mask.data;
 
     const data = new BigInt64Array(attn_mask_data.length);
     for (let i = 0; i < bz; ++i) {
         const start = i * seq_len;
-        let sum = BigInt(0);
+        let sum = BigInt(start_index);
         for (let j = 0; j < seq_len; ++j) {
             const index = start + j;
             if (attn_mask_data[index] === 0n) {
@@ -728,10 +730,10 @@ function cumsum_masked_fill(attention_mask) {
  *     position_ids = position_ids[:, -input_ids.shape[1] :]
  * ```
  */
-function createPositionIds(model_inputs, past_key_values = null) {
+function createPositionIds(model_inputs, past_key_values = null, start_index = 0) {
     const { input_ids, inputs_embeds, attention_mask } = model_inputs;
 
-    const { data, dims } = cumsum_masked_fill(attention_mask);
+    const { data, dims } = cumsum_masked_fill(attention_mask, start_index);
     let position_ids = new Tensor('int64', data, dims);
     if (past_key_values) {
         const offset = -(input_ids ?? inputs_embeds).dims.at(1);
@@ -3548,6 +3550,30 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
     }
 }
 
+export class PaliGemmaPreTrainedModel extends PreTrainedModel {
+    forward_params = [
+        'input_ids',
+        // 'inputs_embeds',
+        'attention_mask',
+        'pixel_values',
+        'position_ids',
+        'past_key_values',
+    ];
+}
+
+export class PaliGemmaForConditionalGeneration extends PaliGemmaPreTrainedModel {
+    _merge_input_ids_with_image_features(kwargs) {
+        const vision_hidden_size = kwargs.image_features.dims.at(-1);
+        const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);
+
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_index,
+            ...kwargs,
+            image_features: reshaped_image_hidden_states,
+        })
+    }
+}
 
 //////////////////////////////////////////////////
 // Idefics3 Models
@@ -7000,6 +7026,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['florence2', ['Florence2ForConditionalGeneration', Florence2ForConditionalGeneration]],
     ['qwen2-vl', ['Qwen2VLForConditionalGeneration', Qwen2VLForConditionalGeneration]],
     ['idefics3', ['Idefics3ForConditionalGeneration', Idefics3ForConditionalGeneration]],
+    ['paligemma', ['PaliGemmaForConditionalGeneration', PaliGemmaForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
