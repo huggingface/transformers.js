@@ -21,12 +21,6 @@
       "default": "./dist/transformers.js"
     }
   },
-  "imports": {
-    "#onnxruntime-webgpu": {
-      "node": "onnxruntime-web",
-      "default": "onnxruntime-web/webgpu"
-    }
-  },
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -63,22 +57,22 @@
   "dependencies": {
     "@huggingface/jinja": "^0.3.2",
     "onnxruntime-node": "1.20.1",
-    "onnxruntime-web": "1.20.1",
+    "onnxruntime-web": "1.21.0-dev.20241205-6ed77cc374",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
-    "@webgpu/types": "^0.1.44",
+    "@webgpu/types": "^0.1.51",
     "catharsis": "github:xenova/catharsis",
     "jest": "^30.0.0-alpha.6",
     "jest-environment-node": "^30.0.0-alpha.6",
-    "jsdoc-to-markdown": "^8.0.1",
-    "prettier": "3.3.3",
-    "typescript": "^5.2.2",
-    "wavefile": "^11.0.0",
-    "webpack": "^5.80.0",
-    "webpack-cli": "^5.0.2",
-    "webpack-dev-server": "^4.13.3"
+    "jsdoc-to-markdown": "^9.1.1",
+    "prettier": "3.4.2",
+    "typescript": "^5.7.2",
+    "wavefile": "11.0.0",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
   },
   "files": [
     "src",

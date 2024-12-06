@@ -21,12 +21,7 @@ import { env, apis } from '../env.js';
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
-
-// Use subpath-imports to ensure Node.js and browser interoperability.
-// See package.json and https://nodejs.org/api/packages.html#subpath-imports
-// for more information.
-// @ts-ignore
-import * as ONNX_WEB from '#onnxruntime-webgpu';
+import * as ONNX_WEB from 'onnxruntime-web';
 
 export { Tensor } from 'onnxruntime-common';
 
@@ -68,7 +63,7 @@ if (ORT_SYMBOL in globalThis) {
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
-    // Updated as of ONNX Runtime 1.18.0
+    // Updated as of ONNX Runtime 1.20.1
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
     // | EPs/Platforms | Windows x64 | Windows arm64 | Linux x64         | Linux arm64 | MacOS x64 | MacOS arm64 |
     // | ------------- | ----------- | ------------- | ----------------- | ----------- | --------- | ----------- |
