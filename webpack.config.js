@@ -86,21 +86,20 @@ function buildConfig({
 
 // Do not bundle onnxruntime-web when packaging for Node.js.
 // Instead, we use the native library (onnxruntime-node).
-const NODE_IGNORE_MODULES = ["onnxruntime-web", "onnxruntime-web/webgpu"];
+const NODE_IGNORE_MODULES = ["onnxruntime-web"];
 
 // Do not bundle the following modules with webpack (mark as external)
 // NOTE: This is necessary for both type="module" and type="commonjs",
 // and will be ignored when building for web (only used for node/deno)
 const NODE_EXTERNAL_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
 
+// Web-only build
+const WEB_BUILD = buildConfig({
+  type: "module",
+})
 
-export default [
-  // Web-only build
-  buildConfig({
-    type: "module",
-  }),
-
-  // Node-compatible builds
+// Node-compatible builds
+const NODE_BUILDS = [
   buildConfig({
     suffix: ".mjs",
     type: "module",
@@ -114,3 +113,7 @@ export default [
     externalModules: NODE_EXTERNAL_MODULES,
   }),
 ];
+
+// When running with `webpack serve`, only build the web target.
+const BUILDS = process.env.WEBPACK_SERVE ? [WEB_BUILD] : [WEB_BUILD, ...NODE_BUILDS];
+export default BUILDS;
