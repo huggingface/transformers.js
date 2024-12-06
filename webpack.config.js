@@ -49,6 +49,14 @@ function buildConfig({
       minimizer: [
         new TerserPlugin({
           test: new RegExp(`\\.min\\${suffix}$`),
+
+          // Do not bundle with comments.
+          // See https://webpack.js.org/plugins/terser-webpack-plugin/#remove-comments for more information.
+          terserOptions: {
+            output: {
+              comments: false,
+            },
+          },
           extractComments: false,
         }),
       ],
