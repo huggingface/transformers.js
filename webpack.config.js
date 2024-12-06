@@ -24,34 +24,34 @@ function buildConfig({
   const outputModule = type === "module";
 
   const alias = Object.fromEntries(
-    ignoreModules.map((module) => {
-      return [module, false];
-    }),
+    ignoreModules.map((module) => [module, false]),
   );
 
   /** @type {import('webpack').Configuration} */
   const config = {
-    mode: 'development',
-    devtool: 'source-map',
+    mode: "development",
+    devtool: "source-map",
     entry: {
-      [`transformers${name}`]: './src/transformers.js',
-      [`transformers${name}.min`]: './src/transformers.js',
+      [`transformers${name}`]: "./src/transformers.js",
+      [`transformers${name}.min`]: "./src/transformers.js",
     },
     output: {
       filename: `[name]${suffix}`,
-      path: path.join(__dirname, 'dist'),
+      path: path.join(__dirname, "dist"),
       library: {
         type,
       },
-      assetModuleFilename: '[name][ext]',
-      chunkFormat: 'module',
+      assetModuleFilename: "[name][ext]",
+      chunkFormat: "module",
     },
     optimization: {
       minimize: true,
-      minimizer: [new TerserPlugin({
-        test: new RegExp(`\\.min\\${suffix}$`),
-        extractComments: false,
-      })],
+      minimizer: [
+        new TerserPlugin({
+          test: new RegExp(`\\.min\\${suffix}$`),
+          extractComments: false,
+        }),
+      ],
     },
     experiments: {
       outputModule,
@@ -73,12 +73,12 @@ function buildConfig({
     config.module = {
       parser: {
         javascript: {
-          importMeta: false
-        }
-      }
-    }
+          importMeta: false,
+        },
+      },
+    };
   } else {
-    config.externalsType = 'commonjs';
+    config.externalsType = "commonjs";
   }
 
   return config;
@@ -91,12 +91,18 @@ const NODE_IGNORE_MODULES = ["onnxruntime-web"];
 // Do not bundle the following modules with webpack (mark as external)
 // NOTE: This is necessary for both type="module" and type="commonjs",
 // and will be ignored when building for web (only used for node/deno)
-const NODE_EXTERNAL_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
+const NODE_EXTERNAL_MODULES = [
+  "onnxruntime-node",
+  "sharp",
+  "fs",
+  "path",
+  "url",
+];
 
 // Web-only build
 const WEB_BUILD = buildConfig({
   type: "module",
-})
+});
 
 // Node-compatible builds
 const NODE_BUILDS = [
@@ -115,5 +121,7 @@ const NODE_BUILDS = [
 ];
 
 // When running with `webpack serve`, only build the web target.
-const BUILDS = process.env.WEBPACK_SERVE ? [WEB_BUILD] : [WEB_BUILD, ...NODE_BUILDS];
+const BUILDS = process.env.WEBPACK_SERVE
+  ? [WEB_BUILD]
+  : [WEB_BUILD, ...NODE_BUILDS];
 export default BUILDS;
