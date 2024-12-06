@@ -304,6 +304,46 @@ export class RawImage {
     }
 
     /**
+     * Apply an alpha mask to the image. Operates in place.
+     * @param {RawImage} mask The mask to apply. It should have a single channel.
+     * @returns {RawImage} The masked image.
+     * @throws {Error} If the mask is not the same size as the image.
+     * @throws {Error} If the image does not have 4 channels.
+     * @throws {Error} If the mask is not a single channel.
+     */
+    putAlpha(mask) {
+        if (mask.width !== this.width || mask.height !== this.height) {
+            throw new Error(`Expected mask size to be ${this.width}x${this.height}, but got ${mask.width}x${mask.height}`);
+        }
+        if (mask.channels !== 1) {
+            throw new Error(`Expected mask to have 1 channel, but got ${mask.channels}`);
+        }
+
+        const this_data = this.data;
+        const mask_data = mask.data;
+        const num_pixels = this.width * this.height;
+        if (this.channels === 3) {
+            // Convert to RGBA and simultaneously apply mask to alpha channel
+            const newData = new Uint8ClampedArray(num_pixels * 4);
+            for (let i = 0, in_offset = 0, out_offset = 0; i < num_pixels; ++i) {
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = this_data[in_offset++];
+                newData[out_offset++] = mask_data[i];
+            }
+            return this._update(newData, this.width, this.height, 4);
+
+        } else if (this.channels === 4) {
+            // Apply mask to alpha channel in place
+            for (let i = 0; i < num_pixels; ++i) {
+                this_data[4 * i + 3] = mask_data[i];
+            }
+            return this;
+        }
+        throw new Error(`Expected image to have 3 or 4 channels, but got ${this.channels}`);
+    }
+
+    /**
      * Resize the image to the given dimensions. This method uses the canvas API to perform the resizing.
      * @param {number} width The width of the new image. `null` or `-1` will preserve the aspect ratio.
      * @param {number} height The height of the new image. `null` or `-1` will preserve the aspect ratio.
