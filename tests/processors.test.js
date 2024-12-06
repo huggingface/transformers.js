@@ -48,6 +48,7 @@ const MODELS = {
   florence2: "Xenova/tiny-random-Florence2ForConditionalGeneration",
   qwen2_vl: "hf-internal-testing/tiny-random-Qwen2VLForConditionalGeneration",
   idefics3: "hf-internal-testing/tiny-random-Idefics3ForConditionalGeneration",
+  paligemma: "hf-internal-testing/tiny-random-PaliGemmaForConditionalGeneration",
 };
 
 const BASE_URL = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/";
@@ -1192,6 +1193,41 @@ describe("Processors", () => {
           compare(attention_mask.dims, [1, 89]);
           compare(pixel_values.dims, [256, 1176]);
           compare(image_grid_thw.dims, [1, 3]);
+        });
+      },
+      MAX_TEST_TIME,
+    );
+
+    describe(
+      "PaliGemmaProcessor",
+      () => {
+        /** @type {import('../src/transformers.js').PaliGemmaProcessor} */
+        let processor;
+        let images = {};
+
+        beforeAll(async () => {
+          processor = await AutoProcessor.from_pretrained(MODELS.paligemma);
+          images = {
+            white_image: await load_image(TEST_IMAGES.white_image),
+          };
+        });
+
+        it("Image-only (default text)", async () => {
+          const { input_ids, pixel_values } = await processor(images.white_image);
+          compare(input_ids.dims, [1, 258]);
+          compare(pixel_values.dims, [1, 3, 224, 224]);
+        });
+
+        it("Single image & text", async () => {
+          const { input_ids, pixel_values } = await processor(images.white_image, "<image>What is on the flower?");
+          compare(input_ids.dims, [1, 264]);
+          compare(pixel_values.dims, [1, 3, 224, 224]);
+        });
+
+        it("Multiple images & text", async () => {
+          const { input_ids, pixel_values } = await processor([images.white_image, images.white_image], "<image><image>Describe the images.");
+          compare(input_ids.dims, [1, 518]);
+          compare(pixel_values.dims, [2, 3, 224, 224]);
         });
       },
       MAX_TEST_TIME,
