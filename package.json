@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./src/transformers.js",
   "types": "./types/transformers.d.ts",
