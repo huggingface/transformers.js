@@ -9,6 +9,7 @@ export class ConvNextImageProcessor extends ImageProcessor {
         /**
          * Percentage of the image to crop. Only has an effect if this.size < 384.
          */
+        // @ts-expect-error TS2339
         this.crop_pct = this.config.crop_pct ?? (224 / 256);
     }
 

@@ -1492,6 +1492,7 @@ export class AudioClassificationPipeline extends (/** @type {new (options: Audio
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
         const preparedAudios = await prepareAudios(audio, sampling_rate);
 
+        // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;
 
         const toReturn = [];
@@ -1866,7 +1867,9 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
 
                 // TODO: Right now we only get top beam
                 if (return_timestamps === 'word') {
+                    // @ts-expect-error TS2339
                     chunk.tokens = data.sequences.tolist()[0];
+                    // @ts-expect-error TS2339
                     chunk.token_timestamps = data.token_timestamps.tolist()[0].map(
                         (/** @type {number} */ x) => round(x, 2)
                     );
@@ -2032,6 +2035,7 @@ export class ImageClassificationPipeline extends (/** @type {new (options: Image
         const { pixel_values } = await this.processor(preparedImages);
         const output = await this.model({ pixel_values });
 
+        // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;
 
         /** @type {ImageClassificationOutput[]} */
