@@ -1,3 +1,5 @@
+/// <reference types="@webgpu/types" />
+
 import { apis } from "../env.js";
 
 import { DEVICE_TYPES } from "./devices.js";
