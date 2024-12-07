@@ -25,6 +25,7 @@ import {
   // Models
   LlamaForCausalLM,
   OlmoForCausalLM,
+  Olmo2ForCausalLM,
   GraniteForCausalLM,
   CohereModel,
   CohereForCausalLM,
@@ -1358,6 +1359,57 @@ describe("Tiny random models", () => {
           expect(outputs.tolist()).toEqual([
             [1n, 25521n, 10886n, 44936n, 38777n, 33038n, 18557n, 1810n, 33853n, 9517n],
             [25521n, 1533n, 37199n, 27362n, 30594n, 39261n, 8824n, 19175n, 8545n, 29335n],
+          ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await model?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+  });
+
+  describe("olmo2", () => {
+    describe("Olmo2ForCausalLM", () => {
+      const model_id = "hf-internal-testing/tiny-random-Olmo2ForCausalLM";
+      /** @type {Olmo2ForCausalLM} */
+      let model;
+      /** @type {GPT2Tokenizer} */
+      let tokenizer;
+      beforeAll(async () => {
+        model = await Olmo2ForCausalLM.from_pretrained(model_id, {
+          // TODO move to config
+          ...DEFAULT_MODEL_OPTIONS,
+        });
+        tokenizer = await GPT2Tokenizer.from_pretrained(model_id);
+        tokenizer.padding_side = "left";
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "batch_size=1",
+        async () => {
+          const inputs = tokenizer("hello");
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([[15339n, 50957n, 43410n, 77030n, 91444n, 99516n, 80720n, 4608n, 90428n, 22806n]]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "batch_size>1",
+        async () => {
+          const inputs = tokenizer(["hello", "hello world"], { padding: true });
+          const outputs = await model.generate({
+            ...inputs,
+            max_length: 10,
+          });
+          expect(outputs.tolist()).toEqual([
+            [100277n, 15339n, 50957n, 43410n, 77030n, 91444n, 99516n, 80720n, 4608n, 90428n],
+            [15339n, 1917n, 12095n, 21350n, 61586n, 19306n, 39486n, 91527n, 59768n, 31934n],
           ]);
         },
         MAX_TEST_EXECUTION_TIME,

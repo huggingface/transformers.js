@@ -104,6 +104,7 @@ function getNormalizedConfig(config) {
             break;
         case 'llama':
         case 'olmo':
+        case 'olmo2':
         case 'mobilellm':
         case 'granite':
         case 'cohere':
