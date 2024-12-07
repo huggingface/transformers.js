@@ -1537,7 +1537,6 @@ export class PreTrainedModel extends Callable {
 
     /**
      * Generates sequences of token ids for models with a language modeling head.
-     // @ts-expect-error TS2306
      * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
@@ -6575,8 +6574,10 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         'past_key_values',
     ];
 
+    /**
+     * @param {ConstructorParameters<typeof MultiModalityPreTrainedModel>} args
+     */
     constructor(...args) {
-        // @ts-expect-error TS2556
         super(...args);
 
         // State-based approach to switch out which heads to use during generation
