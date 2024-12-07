@@ -18,7 +18,7 @@ const outputDir = path.join(root, '/docs/source/api/');
 
 
 // get template data
-const templateData = jsdoc2md.getTemplateDataSync({
+const templateData = await jsdoc2md.getTemplateData({
     files: inputFile,
     configure: conf
 })
@@ -37,7 +37,7 @@ const moduleNames = templateData.reduce(
 for (const moduleName of moduleNames) {
     const template = `{{#module name="${moduleName}"}}{{>docs}}{{/module}}`;
     console.log(`rendering ${moduleName}, template: ${template}`);
-    let output = jsdoc2md.renderSync({
+    let output = await jsdoc2md.render({
         'data': templateData,
         'template': template,
         'heading-depth': 1,
