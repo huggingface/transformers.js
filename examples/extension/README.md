@@ -6,7 +6,7 @@ An example project to show how to run 🤗 Transformers in a browser extension. 
 ## Getting Started
 1. Clone the repo and enter the project directory:
     ```bash
-    git clone https://github.com/xenova/transformers.js.git
+    git clone https://github.com/huggingface/transformers.js.git
     cd transformers.js/examples/extension/
     ```
 1. Install the necessary dependencies:
@@ -21,7 +21,7 @@ An example project to show how to run 🤗 Transformers in a browser extension. 
 
 1. Add the extension to your browser. To do this, go to `chrome://extensions/`, enable developer mode (top right), and click "Load unpacked". Select the `build` directory from the dialog which appears and click "Select Folder".
 
-1. That's it! You should now be able to open the extenion's popup and use the model in your browser!
+1. That's it! You should now be able to open the extension's popup and use the model in your browser!
 
 ## Editing the template
 

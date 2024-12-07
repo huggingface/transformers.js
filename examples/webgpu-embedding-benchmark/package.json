@@ -1,0 +1,18 @@
+{
+  "name": "webgpu-embedding-benchmark",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12"
+  },
+  "dependencies": {
+    "@xenova/transformers": "^3.0.0",
+    "chart.js": "^4.4.2"
+  }
+}

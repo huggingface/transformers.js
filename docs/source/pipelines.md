@@ -14,9 +14,9 @@ For the full list of available tasks/pipelines, check out [this table](#availabl
 Start by creating an instance of `pipeline()` and specifying a task you want to use it for. For example, to create a sentiment analysis pipeline, you can do:
 
 ```javascript
-import { pipeline } from '@xenova/transformers';
+import { pipeline } from '@huggingface/transformers';
 
-let classifier = await pipeline('sentiment-analysis');
+const classifier = await pipeline('sentiment-analysis');
 ```
 
 When running for the first time, the `pipeline` will download and cache the default pretrained model associated with the task. This can take a while, but subsequent calls will be much faster.
@@ -30,14 +30,14 @@ By default, models will be downloaded from the [Hugging Face Hub](https://huggin
 You can now use the classifier on your target text by calling it as a function:
 
 ```javascript
-let result = await classifier('I love transformers!');
+const result = await classifier('I love transformers!');
 // [{'label': 'POSITIVE', 'score': 0.9998}]
 ```
 
 If you have multiple inputs, you can pass them as an array:
 
 ```javascript
-let result = await classifier(['I love transformers!', 'I hate transformers!']);
+const result = await classifier(['I love transformers!', 'I hate transformers!']);
 // [{'label': 'POSITIVE', 'score': 0.9998}, {'label': 'NEGATIVE', 'score': 0.9982}]
 ```
 
@@ -46,9 +46,9 @@ You can also specify a different model to use for the pipeline by passing it as 
 <!-- TODO: REPLACE 'nlptown/bert-base-multilingual-uncased-sentiment' with 'nlptown/bert-base-multilingual-uncased-sentiment'-->
 
 ```javascript
-let reviewer = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
+const reviewer = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
 
-let result = await reviewer('The Shawshank Redemption is a true masterpiece of cinema.');
+const result = await reviewer('The Shawshank Redemption is a true masterpiece of cinema.');
 // [{label: '5 stars', score: 0.8167929649353027}]
 ```
 
@@ -59,10 +59,10 @@ The `pipeline()` function is a great way to quickly use a pretrained model for i
 <!-- TODO: Replace 'Xenova/whisper-small.en' with 'openai/whisper-small.en' -->
 ```javascript
 // Allocate a pipeline for Automatic Speech Recognition
-let transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small.en');
+const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small.en');
 
 // Transcribe an audio file, loaded from a URL.
-let result = await transcriber('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac');
+const result = await transcriber('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac');
 // {text: ' I have a dream that one day this nation will rise up and live out the true meaning of its creed.'}
 ```
 
@@ -86,7 +86,7 @@ You can also specify which revision of the model to use, by passing a `revision`
 Since the Hugging Face Hub uses a git-based versioning system, you can use any valid git revision specifier (e.g., branch name or commit hash)
 
 ```javascript
-let transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
+const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
     revision: 'output_attentions',
 });
 ```
@@ -100,17 +100,17 @@ Many pipelines have additional options that you can specify. For example, when u
 <!-- TODO: Replace 'Xenova/nllb-200-distilled-600M' with 'facebook/nllb-200-distilled-600M' -->
 ```javascript
 // Allocation a pipeline for translation
-let translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
+const translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
 
 // Translate from English to Greek
-let result = await translator('I like to walk my dog.', {
+const result = await translator('I like to walk my dog.', {
     src_lang: 'eng_Latn',
     tgt_lang: 'ell_Grek'
 });
 // [ { translation_text: 'Μου αρέσει να περπατάω το σκυλί μου.' } ]
 
 // Translate back to English
-let result2 = await translator(result[0].translation_text, {
+const result2 = await translator(result[0].translation_text, {
     src_lang: 'ell_Grek',
     tgt_lang: 'eng_Latn'
 });
@@ -125,8 +125,8 @@ For example, to generate a poem using `LaMini-Flan-T5-783M`, you can do:
 
 ```javascript
 // Allocate a pipeline for text2text-generation
-let poet = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-783M');
-let result = await poet('Write me a love poem about cheese.', {
+const poet = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-783M');
+const result = await poet('Write me a love poem about cheese.', {
     max_new_tokens: 200,
     temperature: 0.9,
     repetition_penalty: 2.0,
@@ -147,6 +147,70 @@ I love how versatile you are as an ingredient too?
 Cheddar is my go-to for any occasion or mood; 
 It adds depth and richness without being overpowering its taste buds alone
 ```
+
+### Streaming
+
+Some pipelines such as `text-generation` or `automatic-speech-recognition` support streaming output. This is achieved using the `TextStreamer` class. For example, when using a chat model like `Qwen2.5-Coder-0.5B-Instruct`, you can specify a callback function that will be called with each generated token text (if unset, new tokens will be printed to the console).
+
+```js
+import { pipeline, TextStreamer } from "@huggingface/transformers";
+
+// Create a text generation pipeline
+const generator = await pipeline(
+  "text-generation",
+  "onnx-community/Qwen2.5-Coder-0.5B-Instruct",
+  { dtype: "q4" },
+);
+
+// Define the list of messages
+const messages = [
+  { role: "system", content: "You are a helpful assistant." },
+  { role: "user", content:  "Write a quick sort algorithm." },
+];
+
+// Create text streamer
+const streamer = new TextStreamer(generator.tokenizer, {
+  skip_prompt: true,
+  // Optionally, do something with the text (e.g., write to a textbox)
+  // callback_function: (text) => { /* Do something with text */ },
+})
+
+// Generate a response
+const result = await generator(messages, { max_new_tokens: 512, do_sample: false, streamer });
+```
+
+Logging `result[0].generated_text` to the console gives:
+
+
+<details>
+<summary>Click to view the console output</summary>
+<pre>
+Here's a simple implementation of the quick sort algorithm in Python:
+```python
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + middle + quick_sort(right)
+# Example usage:
+arr = [3, 6, 8, 10, 1, 2]
+sorted_arr = quick_sort(arr)
+print(sorted_arr)
+```
+### Explanation:
+- **Base Case**: If the array has less than or equal to one element (i.e., `len(arr)` is less than or equal to `1`), it is already sorted and can be returned as is.
+- **Pivot Selection**: The pivot is chosen as the middle element of the array.
+- **Partitioning**: The array is partitioned into three parts: elements less than the pivot (`left`), elements equal to the pivot (`middle`), and elements greater than the pivot (`right`). These partitions are then recursively sorted.
+- **Recursive Sorting**: The subarrays are sorted recursively using `quick_sort`.
+This approach ensures that each recursive call reduces the problem size by half until it reaches a base case.
+</pre>
+</details>
+
+This streaming feature allows you to process the output as it is generated, rather than waiting for the entire output to be generated before processing it.
+
 
 For more information on the available options for each pipeline, refer to the [API Reference](./api/pipelines).
 If you would like more control over the inference process, you can use the [`AutoModel`](./api/models), [`AutoTokenizer`](./api/tokenizers), or [`AutoProcessor`](./api/processors) classes instead.

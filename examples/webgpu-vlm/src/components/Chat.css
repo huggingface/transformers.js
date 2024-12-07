@@ -1,0 +1,112 @@
+@scope (.markdown) {
+
+    /* Code blocks */
+    pre {
+        margin: 0.5rem 0;
+        white-space: break-spaces;
+    }
+
+    code {
+        padding: 0.2em 0.4em;
+        border-radius: 4px;
+        font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        font-size: 0.9em;
+    }
+
+    pre,
+    code {
+        background-color: #f2f2f2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+
+        pre,
+        code {
+            background-color: #333;
+        }
+
+    }
+
+    pre:has(code) {
+        padding: 1rem 0.5rem;
+    }
+
+    pre>code {
+        padding: 0;
+    }
+
+    /* Headings */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    h1 {
+        font-size: 2em;
+        margin: 1rem 0;
+    }
+
+    h2 {
+        font-size: 1.5em;
+        margin: 0.83rem 0;
+    }
+
+    h3 {
+        font-size: 1.25em;
+        margin: 0.67rem 0;
+    }
+
+    h4 {
+        font-size: 1em;
+        margin: 0.5rem 0;
+    }
+
+    h5 {
+        font-size: 0.875em;
+        margin: 0.33rem 0;
+    }
+
+    h6 {
+        font-size: 0.75em;
+        margin: 0.25rem 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6:first-child {
+        margin-top: 0;
+    }
+
+    /* Unordered List */
+    ul {
+        list-style-type: disc;
+        margin-left: 1.5rem;
+    }
+
+    /* Ordered List */
+    ol {
+        list-style-type: decimal;
+        margin-left: 1.5rem;
+    }
+
+    /* List Items */
+    li {
+        margin: 0.25rem 0;
+    }
+
+    p:not(:first-child) {
+        margin-top: 0.75rem;
+    }
+
+    p:not(:last-child) {
+        margin-bottom: 0.75rem;
+    }
+}

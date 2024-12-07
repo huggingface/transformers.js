@@ -28,7 +28,7 @@ Transformers.js will attach an Authorization header to requests made to the Hugg
 One way to do this is to call your program with the environment variable set. For example, let's say you have a file called `llama.js` with the following code:
 
 ```js
-import { AutoTokenizer } from '@xenova/transformers';
+import { AutoTokenizer } from '@huggingface/transformers';
 
 // Load tokenizer for a gated repository.
 const tokenizer = await AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf');

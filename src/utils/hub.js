@@ -13,9 +13,8 @@ import { dispatchCallback } from './core.js';
 
 /**
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.     
- * @property {boolean?} [quantized=true] Whether to load the 8-bit quantized version of the model (only applicable when loading model files).
- * @property {function} [progress_callback=null] If specified, this function will be called during model construction, to provide the user with progress updates.
- * @property {Object} [config=null] Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:
+ * @property {import('./core.js').ProgressCallback} [progress_callback=null] If specified, this function will be called during model construction, to provide the user with progress updates.
+ * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:
  * - The model is a model provided by the library (loaded with the *model id* string of a pretrained model).
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
  * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
@@ -23,24 +22,39 @@ import { dispatchCallback } from './core.js';
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
- * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the .onnx suffix). Currently only valid for encoder- or decoder-only models.
  */
 
+/**
+ * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
+ * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
+ * you can specify the folder name here.
+ * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the .onnx suffix). Currently only valid for encoder- or decoder-only models.
+ * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
+ * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
+ * @property {boolean|Record<string, boolean>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
+ * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
+ */
+
+/**
+ * @typedef {PretrainedOptions & ModelSpecificPretrainedOptions} PretrainedModelOptions Options for loading a pretrained model.
+ */
+
+/**
+ * Mapping from file extensions to MIME types.
+ */
+const CONTENT_TYPE_MAP = {
+    'txt': 'text/plain',
+    'html': 'text/html',
+    'css': 'text/css',
+    'js': 'text/javascript',
+    'json': 'application/json',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+}
 class FileResponse {
-    /**
-     * Mapping from file extensions to MIME types.
-     */
-    _CONTENT_TYPE_MAP = {
-        'txt': 'text/plain',
-        'html': 'text/html',
-        'css': 'text/css',
-        'js': 'text/javascript',
-        'json': 'application/json',
-        'png': 'image/png',
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'gif': 'image/gif',
-    }
+
     /**
      * Creates a new `FileResponse` object.
      * @param {string|URL} filePath
@@ -83,7 +97,7 @@ class FileResponse {
     updateContentType() {
         // Set content-type header based on file extension
         const extension = this.filePath.toString().split('.').pop().toLowerCase();
-        this.headers.set('content-type', this._CONTENT_TYPE_MAP[extension] ?? 'application/octet-stream');
+        this.headers.set('content-type', CONTENT_TYPE_MAP[extension] ?? 'application/octet-stream');
     }
 
     /**
@@ -323,7 +337,7 @@ async function tryCache(cache, ...names) {
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * 
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise} A Promise that resolves with the file content as a buffer.
+ * @returns {Promise<Uint8Array>} A Promise that resolves with the file content as a buffer.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}) {
 
@@ -490,12 +504,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename
     })
 
-    const progressInfo = {
-        status: 'progress',
-        name: path_or_repo_id,
-        file: filename
-    }
-
     /** @type {Uint8Array} */
     let buffer;
 
@@ -515,7 +523,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 
         // For completeness, we still fire the final progress callback
         dispatchCallback(options.progress_callback, {
-            ...progressInfo,
+            status: 'progress',
+            name: path_or_repo_id,
+            file: filename,
             progress: 100,
             loaded: buffer.length,
             total: buffer.length,
@@ -523,7 +533,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     } else {
         buffer = await readResponse(response, data => {
             dispatchCallback(options.progress_callback, {
-                ...progressInfo,
+                status: 'progress',
+                name: path_or_repo_id,
+                file: filename,
                 ...data,
             })
         })
@@ -580,12 +592,11 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
 
     return JSON.parse(jsonData);
 }
-
 /**
  * Read and track progress when reading a Response object
  *
- * @param {any} response The Response object to read
- * @param {function} progress_callback The function to call with progress updates
+ * @param {Response|FileResponse} response The Response object to read
+ * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
 async function readResponse(response, progress_callback) {

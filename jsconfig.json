@@ -1,18 +1,14 @@
 {
-    // Only include files in the src directory
-    "include": [
-        "src/**/*"
-    ],
-    "compilerOptions": {
-        // Tells the compiler to check JS files
-        "checkJs": true,
-        "target": "esnext",
-        "module": "esnext",
-        "moduleResolution": "nodenext",
-    },
-    "typeAcquisition": {
-        "include": [
-            "jest"
-        ]
-    }
+  // Only include files in the src directory
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    // Tells the compiler to check JS files
+    "checkJs": true,
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext"
+  },
+  "typeAcquisition": {
+    "include": ["jest"]
+  }
 }

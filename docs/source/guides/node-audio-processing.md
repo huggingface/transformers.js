@@ -13,7 +13,7 @@ This tutorial will be written as an ES module, but you can easily adapt it to us
 
 
 **Useful links:**
-- [Source code](https://github.com/xenova/transformers.js/tree/main/examples/node-audio-processing)
+- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/node-audio-processing)
 - [Documentation](https://huggingface.co/docs/transformers.js)
 
 
@@ -26,11 +26,11 @@ This tutorial will be written as an ES module, but you can easily adapt it to us
 
 ## Getting started
 
-Let's start by creating a new Node.js project and installing Transformers.js via [NPM](https://www.npmjs.com/package/@xenova/transformers):
+Let's start by creating a new Node.js project and installing Transformers.js via [NPM](https://www.npmjs.com/package/@huggingface/transformers):
 
 ```bash
 npm init -y
-npm i @xenova/transformers
+npm i @huggingface/transformers
 ```
 
 <Tip>
@@ -52,7 +52,7 @@ npm i wavefile
 Start by creating a new file called `index.js`, which will be the entry point for our application. Let's also import the necessary modules:
 
 ```js
-import { pipeline } from '@xenova/transformers';
+import { pipeline } from '@huggingface/transformers';
 import wavefile from 'wavefile';
 ```
 

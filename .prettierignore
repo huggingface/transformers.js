@@ -1,0 +1,8 @@
+# Ignore artifacts:
+.github
+dist
+docs
+examples
+scripts
+types
+*.md

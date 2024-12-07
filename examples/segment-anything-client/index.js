@@ -23,9 +23,10 @@ const BASE_URL = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/re
 const EXAMPLE_URL = BASE_URL + 'corgi.jpg';
 
 // Create a web worker so that the main (UI) thread is not blocked during inference.
-const worker = new Worker('worker.js', {
-    type: 'module',
-});
+const worker = new Worker(
+    new URL('./worker.js', import.meta.url),
+    { type: 'module' }
+);
 
 // Preload star and cross images to avoid lag on first click
 const star = new Image();

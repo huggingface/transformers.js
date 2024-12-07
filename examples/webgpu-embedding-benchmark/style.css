@@ -1,0 +1,87 @@
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font-family: sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  padding: 16px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+h1 {
+  text-align: center;
+}
+
+#status {
+  min-height: 16px;
+  margin: 8px 0;
+  text-align: center;
+}
+
+button {
+  transition: all .25s;
+  background: rgba(40, 44, 52, 0.05);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #3080d0;
+  text-decoration: none !important;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+button:disabled {
+  background: rgba(40, 44, 52, 0.1);
+  color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+button:hover {
+  background: rgba(40, 44, 52, 0.1);
+}
+
+p {
+  text-align: center;
+  font-size: 12px;
+  max-width: 600px;
+  padding: 8px;
+}
+
+#chart-container {
+  position: relative;
+  height: 60vh;
+  width: min(90vw, 800px);
+  padding-right: 50px;
+  margin-bottom: 10px;
+}
+
+details {
+  position: fixed;
+  background-color: white;
+  right: 0;
+  top: 0;
+  padding: 16px;
+}
+
+summary {
+  text-align: right;
+}
+
+hr {
+  margin: 8px 0;
+}

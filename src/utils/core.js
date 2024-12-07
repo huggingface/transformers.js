@@ -1,18 +1,67 @@
 
 /**
  * @file Core utility functions/classes for Transformers.js.
- * 
+ *
  * These are only used internally, meaning an end-user shouldn't
  * need to access anything here.
- * 
+ *
  * @module utils/core
+ */
+
+/**
+ * @typedef {Object} InitiateProgressInfo
+ * @property {'initiate'} status
+ * @property {string} name The model id or directory path.
+ * @property {string} file The name of the file.
+ */
+
+/**
+ * @typedef {Object} DownloadProgressInfo
+ * @property {'download'} status
+ * @property {string} name The model id or directory path.
+ * @property {string} file The name of the file.
+ */
+
+/**
+ * @typedef {Object} ProgressStatusInfo
+ * @property {'progress'} status
+ * @property {string} name The model id or directory path.
+ * @property {string} file The name of the file.
+ * @property {number} progress A number between 0 and 100.
+ * @property {number} loaded The number of bytes loaded.
+ * @property {number} total The total number of bytes to be loaded.
+ */
+
+/**
+ * @typedef {Object} DoneProgressInfo
+ * @property {'done'} status
+ * @property {string} name The model id or directory path.
+ * @property {string} file The name of the file.
+ */
+
+/**
+ * @typedef {Object} ReadyProgressInfo
+ * @property {'ready'} status
+ * @property {string} task The loaded task.
+ * @property {string} model The loaded model.
+ */
+
+/**
+ * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo} ProgressInfo
+ */
+
+/**
+ * A callback function that is called with progress information.
+ * @callback ProgressCallback
+ * @param {ProgressInfo} progressInfo
+ * @returns {void}
  */
 
 /**
  * Helper function to dispatch progress callbacks.
  *
- * @param {Function} progress_callback The progress callback function to dispatch.
- * @param {any} data The data to pass to the progress callback function.
+ * @param {ProgressCallback | null | undefined} progress_callback The progress callback function to dispatch.
+ * @param {ProgressInfo} data The data to pass to the progress callback function.
  * @returns {void}
  * @private
  */
@@ -43,44 +92,10 @@ export function escapeRegExp(string) {
 }
 
 /**
- * A base class for creating callable objects.
- * 
- * @type {new () => {(...args: any[]): any, _call(...args: any[]): any}}
- */
-export const Callable = /** @type {any} */ (class {
-    /**
-    * Creates a new instance of the Callable class.
-    */
-    constructor() {
-        /**
-         * Creates a closure that delegates to a private method '_call' with the given arguments.
-         * @type {any}
-         * @param {...any} args Zero or more arguments to pass to the '_call' method.
-         * @returns {*} The result of calling the '_call' method.
-         */
-        let closure = function (...args) {
-            return closure._call(...args)
-        }
-        return Object.setPrototypeOf(closure, new.target.prototype)
-    }
-
-    /**
-     * This method should be implemented in subclasses to provide the
-     * functionality of the callable object.
-     *
-     * @param {any[]} args
-     * @throws {Error} If the subclass does not implement the `_call` method.
-     */
-    _call(...args) {
-        throw Error('Must implement _call method in subclass')
-    }
-});
-
-/**
  * Check if a value is a typed array.
  * @param {*} val The value to check.
  * @returns {boolean} True if the value is a `TypedArray`, false otherwise.
- * 
+ *
  * Adapted from https://stackoverflow.com/a/71091338/13989043
  */
 export function isTypedArray(val) {
@@ -98,12 +113,12 @@ export function isIntegralNumber(x) {
 }
 
 /**
- * Check if a value is exists.
+ * Determine if a provided width or height is nullish.
  * @param {*} x The value to check.
- * @returns {boolean} True if the value exists, false otherwise.
+ * @returns {boolean} True if the value is `null`, `undefined` or `-1`, false otherwise.
  */
-export function exists(x) {
-    return x !== undefined && x !== null;
+export function isNullishDimension(x) {
+    return x === null || x === undefined || x === -1;
 }
 
 /**
@@ -172,4 +187,47 @@ export function product(...a) {
  */
 export function calculateReflectOffset(i, w) {
     return Math.abs((i + w) % (2 * w) - w);
+}
+
+/**
+ *
+ * @param {Object} o
+ * @param {string[]} props
+ * @returns {Object}
+ */
+export function pick(o, props) {
+    return Object.assign(
+        {},
+        ...props.map((prop) => {
+            if (o[prop] !== undefined) {
+                return { [prop]: o[prop] };
+            }
+        })
+    );
+}
+
+/**
+ * Calculate the length of a string, taking multi-byte characters into account.
+ * This mimics the behavior of Python's `len` function.
+ * @param {string} s The string to calculate the length of.
+ * @returns {number} The length of the string.
+ */
+export function len(s) {
+    let length = 0;
+    for (const c of s) ++length;
+    return length;
+}
+
+/**
+ * Count the occurrences of a value in an array or string.
+ * This mimics the behavior of Python's `count` method.
+ * @param {any[]|string} arr The array or string to search.
+ * @param {any} value The value to count.
+ */
+export function count(arr, value) {
+    let count = 0;
+    for (const v of arr) {
+        if (v === value) ++count;
+    }
+    return count;
 }

@@ -7,7 +7,7 @@ In this tutorial, we'll be building a simple React application that performs mul
 
 Useful links:
 - [Demo site](https://huggingface.co/spaces/Xenova/react-translator)
-- [Source code](https://github.com/xenova/transformers.js/tree/main/examples/react-translator)
+- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/react-translator)
 
 
 ## Prerequisites
@@ -44,10 +44,10 @@ You can stop the development server by pressing <kbd>Ctrl</kbd> + <kbd>C</kbd> i
 
 ## Step 2: Install and configure Transformers.js
 
-Now we get to the fun part: adding machine learning to our application! First, install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+Now we get to the fun part: adding machine learning to our application! First, install Transformers.js from [NPM](https://www.npmjs.com/package/@huggingface/transformers) with the following command:
 
 ```bash
-npm install @xenova/transformers
+npm install @huggingface/transformers
 ```
 
 For this application, we will use the [Xenova/nllb-200-distilled-600M](https://huggingface.co/Xenova/nllb-200-distilled-600M) model, which can perform multilingual translation among 200 languages. Before we start, there are 2 things we need to take note of:
@@ -58,7 +58,7 @@ We can achieve both of these goals by using a [Web Worker](https://developer.moz
 
 1. Create a file called `worker.js` in the `src` directory. This script will do all the heavy-lifing for us, including loading and running of the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class which use the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and use this pipeline for all subsequent calls:
     ```javascript
-    import { pipeline } from '@xenova/transformers';
+    import { pipeline } from '@huggingface/transformers';
 
     class MyTranslationPipeline {
       static task = 'translation';
@@ -127,7 +127,7 @@ We recommend starting the development server again with `npm run dev`
 
 
 First, let's define our components. Create a folder called `components` in the `src` directory, and create the following files:
-1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/xenova/transformers.js/blob/main/examples/react-translator/src/components/LanguageSelector.jsx).
+1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/huggingface/transformers.js/blob/main/examples/react-translator/src/components/LanguageSelector.jsx).
     ```jsx
     const LANGUAGES = {
       "Acehnese (Arabic script)": "ace_Arab",

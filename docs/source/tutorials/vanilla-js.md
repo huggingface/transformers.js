@@ -10,7 +10,7 @@ Useful links:
 
 - [Demo site](https://huggingface.co/spaces/Scrimba/vanilla-js-object-detector)
 - [Interactive code walk-through (scrim)](https://scrimba.com/scrim/cKm9bDAg)
-- [Source code](https://github.com/xenova/transformers.js/tree/main/examples/vanilla-js)
+- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/vanilla-js)
 
 ## Step 1:  HTML and CSS setup
 
@@ -57,7 +57,6 @@ body {
 .custom-file-upload {
     display: flex;
     align-items: center;
-    cursor: pointer;
     gap: 10px;
     border: 2px solid black;
     padding: 8px 16px;
@@ -105,7 +104,7 @@ The `type="module"` attribute is important, as it turns our file into a [JavaScr
 Moving into `index.js`, let's import Transformers.js by adding the following line to the top of the file:
 
 ```js
-import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0";
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
 ```
 
 Since we will be downloading the model from the Hugging Face Hub, we can skip the local model check by setting:
@@ -124,7 +123,7 @@ const status = document.getElementById("status");
 
 ## Step 3: Create an object detection pipeline
 
-We’re finally ready to create our object detection pipeline! As a reminder, a [pipeline](./pipelines). is a high-level interface provided by the library to perform a specific task. In our case, we will instantiate an object detection pipeline with the `pipeline()` helper function.
+We’re finally ready to create our object detection pipeline! As a reminder, a [pipeline](../pipelines). is a high-level interface provided by the library to perform a specific task. In our case, we will instantiate an object detection pipeline with the `pipeline()` helper function.
 
 Since this can take some time (especially the first time when we have to download the ~40MB model), we first update the `status` paragraph so that the user knows that we’re about to load the model.
 
@@ -269,14 +268,19 @@ The bounding box and label span also need some styling, so add the following to 
 
 ```css
 .bounding-box {
-  position: absolute;
-  box-sizing: border-box;
+    position: absolute;
+    box-sizing: border-box;
+    border-width: 2px;
+    border-style: solid;
 }
 
 .bounding-box-label {
-  position: absolute;
-  color: white;
-  font-size: 12px;
+    color: white;
+    position: absolute;
+    font-size: 12px;
+    margin-top: -16px;
+    margin-left: -2px;
+    padding: 1px;
 }
 ```
 

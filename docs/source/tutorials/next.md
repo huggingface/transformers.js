@@ -9,7 +9,7 @@ The final product will look something like this:
 
 Useful links:
 - Demo site: [client-side](https://huggingface.co/spaces/Xenova/next-example-app) or [server-side](https://huggingface.co/spaces/Xenova/next-server-example-app)
-- Source code: [client-side](https://github.com/xenova/transformers.js/tree/main/examples/next-client) or [server-side](https://github.com/xenova/transformers.js/tree/main/examples/next-server)
+- Source code: [client-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-client) or [server-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-server)
 
 ## Prerequisites
 
@@ -42,11 +42,11 @@ On installation, you'll see various prompts. For this demo, we'll be selecting t
 
 ### Step 2: Install and configure Transformers.js
 
-You can install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+You can install Transformers.js from [NPM](https://www.npmjs.com/package/@huggingface/transformers) with the following command:
 
 
 ```bash
-npm i @xenova/transformers
+npm i @huggingface/transformers
 ```
 
 We also need to update the `next.config.js` file to ignore node-specific modules when bundling for the browser:
@@ -76,7 +76,7 @@ module.exports = nextConfig
 Next, we'll create a new [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) script where we'll place all ML-related code. This is to ensure that the main thread is not blocked while the model is loading and performing inference. For this application, we'll be using [`Xenova/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english), a ~67M parameter model finetuned on the [Stanford Sentiment Treebank](https://huggingface.co/datasets/sst) dataset. Add the following code to `./src/app/worker.js`:
 
 ```js
-import { pipeline, env } from "@xenova/transformers";
+import { pipeline, env } from "@huggingface/transformers";
 
 // Skip local model check
 env.allowLocalModels = false;
@@ -264,11 +264,11 @@ On installation, you'll see various prompts. For this demo, we'll be selecting t
 
 ### Step 2: Install and configure Transformers.js
 
-You can install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+You can install Transformers.js from [NPM](https://www.npmjs.com/package/@huggingface/transformers) with the following command:
 
 
 ```bash
-npm i @xenova/transformers
+npm i @huggingface/transformers
 ```
 
 We also need to update the `next.config.js` file to prevent Webpack from bundling certain packages:
@@ -294,7 +294,7 @@ Next, let's set up our Route Handler. We can do this by creating two files in a 
 1. `pipeline.js` - to handle the construction of our pipeline.
 
     ```js
-    import { pipeline } from "@xenova/transformers";
+    import { pipeline } from "@huggingface/transformers";
 
     // Use the Singleton pattern to enable lazy construction of the pipeline.
     // NOTE: We wrap the class in a function to prevent code duplication (see below).
@@ -413,7 +413,7 @@ Visit the URL shown in the terminal (e.g., [http://localhost:3000/](http://local
 
 For this demo, we will build and deploy our application to [Hugging Face Spaces](https://huggingface.co/docs/hub/spaces). If you haven't already, you can create a free Hugging Face account [here](https://huggingface.co/join).
 
-1. Create a new `Dockerfile` in your project's root folder. You can use our [example Dockerfile](https://github.com/xenova/transformers.js/blob/main/examples/next-server/Dockerfile) as a template.
+1. Create a new `Dockerfile` in your project's root folder. You can use our [example Dockerfile](https://github.com/huggingface/transformers.js/blob/main/examples/next-server/Dockerfile) as a template.
 2. Visit [https://huggingface.co/new-space](https://huggingface.co/new-space) and fill in the form. Remember to select "Docker" as the space type (you can choose the "Blank" Docker template).
 3. Click the "Create space" button at the bottom of the page.
 4. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from your project folder (excluding `node_modules` and `.next`, if present) into the upload box and click "Upload". After they have uploaded, scroll down to the button and click "Commit changes to main".

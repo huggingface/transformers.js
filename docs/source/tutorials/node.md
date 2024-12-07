@@ -19,7 +19,7 @@ Although you can always use the [Python library](https://github.com/huggingface/
 </Tip>
 
 **Useful links:**
-- Source code ([ESM](https://github.com/xenova/transformers.js/tree/main/examples/node/esm/app.js) or [CommonJS](https://github.com/xenova/transformers.js/tree/main/examples/node/commonjs/app.js))
+- Source code ([ESM](https://github.com/huggingface/transformers.js/tree/main/examples/node/esm/app.js) or [CommonJS](https://github.com/huggingface/transformers.js/tree/main/examples/node/commonjs/app.js))
 - [Documentation](https://huggingface.co/docs/transformers.js) 
 
 
@@ -31,11 +31,11 @@ Although you can always use the [Python library](https://github.com/huggingface/
 
 ## Getting started
 
-Let's start by creating a new Node.js project and installing Transformers.js via [NPM](https://www.npmjs.com/package/@xenova/transformers):
+Let's start by creating a new Node.js project and installing Transformers.js via [NPM](https://www.npmjs.com/package/@huggingface/transformers):
 
 ```bash
 npm init -y
-npm i @xenova/transformers
+npm i @huggingface/transformers
 ```
 
 Next, create a new file called `app.js`, which will be the entry point for our application. Depending on whether you're using [ECMAScript modules](#ecmascript-modules-esm) or [CommonJS](#commonjs), you will need to do some things differently (see below).
@@ -66,7 +66,7 @@ import url from 'url';
 Following that, let's import Transformers.js and define the `MyClassificationPipeline` class.
 
 ```javascript
-import { pipeline, env } from '@xenova/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 
 class MyClassificationPipeline {
   static task = 'text-classification';
@@ -107,7 +107,7 @@ class MyClassificationPipeline {
   static async getInstance(progress_callback = null) {
     if (this.instance === null) {
       // Dynamically import the Transformers.js library
-      let { pipeline, env } = await import('@xenova/transformers');
+      let { pipeline, env } = await import('@huggingface/transformers');
 
       // NOTE: Uncomment this to change the cache directory
       // env.cacheDir = './.cache';
@@ -195,7 +195,7 @@ Great! We've successfully created a basic HTTP server that uses Transformers.js 
 
 ### Model caching
 
-By default, the first time you run the application, it will download the model files and cache them on your file system (in `./node_modules/@xenova/transformers/.cache/`). All subsequent requests will then use this model. You can change the location of the cache by setting `env.cacheDir`. For example, to cache the model in the `.cache` directory in the current working directory, you can add:
+By default, the first time you run the application, it will download the model files and cache them on your file system (in `./node_modules/@huggingface/transformers/.cache/`). All subsequent requests will then use this model. You can change the location of the cache by setting `env.cacheDir`. For example, to cache the model in the `.cache` directory in the current working directory, you can add:
 
 ```javascript
 env.cacheDir = './.cache';

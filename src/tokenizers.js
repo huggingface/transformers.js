@@ -5,7 +5,7 @@
  * **Example:** Create an `AutoTokenizer` and use it to tokenize a sentence.
  * This will automatically detect the tokenizer type based on the tokenizer class defined in `tokenizer.json`.
  * ```javascript
- * import { AutoTokenizer } from '@xenova/transformers';
+ * import { AutoTokenizer } from '@huggingface/transformers';
  * 
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/bert-base-uncased');
  * const { input_ids } = await tokenizer('I love transformers!');
@@ -19,13 +19,16 @@
  * 
  * @module tokenizers
  */
-
 import {
     Callable,
+} from './utils/generic.js';
+
+import {
     reverseDictionary,
     escapeRegExp,
     isIntegralNumber,
     mergeArrays,
+    len,
 } from './utils/core.js';
 
 import {
@@ -43,6 +46,11 @@ import {
 
 import { Template } from '@huggingface/jinja';
 
+import {
+    WHISPER_LANGUAGE_MAPPING,
+    whisper_language_to_code,
+} from './models/whisper/common_whisper.js';
+import { GITHUB_ISSUE_URL } from './utils/constants.js';
 
 /**
  * @typedef {Object} TokenizerProperties Additional tokenizer-specific properties.
@@ -188,7 +196,7 @@ function clean_up_tokenization(text) {
  * @returns {string} The text with accents removed.
  */
 function remove_accents(text) {
-    return text.replace(/[\u0300-\u036f]/g, '');
+    return text.replace(/\p{M}/gu, '');
 }
 
 /**
@@ -200,24 +208,55 @@ function lowercase_and_remove_accent(text) {
     return remove_accents(text.toLowerCase());
 }
 
+
 /**
- * Helper function to fuse consecutive values in an array equal to the specified value.
- * @param {string[]} arr The input array
- * @param {any} value The value to fuse on.
- * @param {Map<string, any>} mapping The mapping from input domain to value.
+ * Checks whether the given Unicode codepoint represents a CJK (Chinese, Japanese, or Korean) character.
+ *
+ * A "chinese character" is defined as anything in the CJK Unicode block:
+ * https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+ *
+ * Note that the CJK Unicode block is NOT all Japanese and Korean characters, despite its name.
+ * The modern Korean Hangul alphabet is a different block, as is Japanese Hiragana and Katakana.
+ * Those alphabets are used to write space-separated words, so they are not treated specially
+ * and are handled like all other languages.
+ *
+ * @param {number|bigint} cp The Unicode codepoint to check.
+ * @returns {boolean} True if the codepoint represents a CJK character, false otherwise.
  */
-function fuse(arr, value, mapping) {
+export function is_chinese_char(cp) {
+    return (
+        (cp >= 0x4E00 && cp <= 0x9FFF)
+        || (cp >= 0x3400 && cp <= 0x4DBF)
+        || (cp >= 0x20000 && cp <= 0x2A6DF)
+        || (cp >= 0x2A700 && cp <= 0x2B73F)
+        || (cp >= 0x2B740 && cp <= 0x2B81F)
+        || (cp >= 0x2B820 && cp <= 0x2CEAF)
+        || (cp >= 0xF900 && cp <= 0xFAFF)
+        || (cp >= 0x2F800 && cp <= 0x2FA1F)
+    )
+}
+
+/**
+ * Helper function to fuse consecutive unknown tokens.
+ * @param {string[]} arr The list of input tokens
+ * @param {Map<string, any>} tokens_to_ids The mapping from tokens to token ids.
+ * @param {number} unk_token_id The value to fuse on.
+ * @private
+ */
+function fuse_unk(arr, tokens_to_ids, unk_token_id) {
     const fused = [];
     let i = 0;
     while (i < arr.length) {
         fused.push(arr[i])
-        if ((mapping.get(arr[i]) ?? value) !== value) {
+        if ((tokens_to_ids.get(arr[i]) ?? unk_token_id) !== unk_token_id) {
             ++i;
             continue;
         }
 
-        while (i < arr.length && (mapping.get(arr[i]) ?? value) === value) {
-            ++i;
+        while (++i < arr.length && (tokens_to_ids.get(arr[i]) ?? unk_token_id) === unk_token_id) {
+            if (tokens_to_ids.get(fused.at(-1)) !== unk_token_id) {
+                fused[fused.length - 1] += arr[i];
+            }
         }
     }
 
@@ -234,12 +273,18 @@ function whitespace_split(text) {
 }
 
 const PUNCTUATION_REGEX = '\\p{P}\\u0021-\\u002F\\u003A-\\u0040\\u005B-\\u0060\\u007B-\\u007E';
+const PUNCTUATION_ONLY_REGEX = new RegExp(`^[${PUNCTUATION_REGEX}]+$`, 'gu');
+const BLOOM_SPLIT_CHARS = '.,!?\u2026\u3002\uff0c\u3001\u0964\u06d4\u060c';
 
-// A mapping of regex patterns to their equivalent (but longer) JS-compatible versions.
+// A mapping of regex patterns to their equivalent (but possibly longer) JS-compatible versions.
 const PROBLEMATIC_REGEX_MAP = new Map([
     // This uses the case insensitive group modifier, which is not supported in JavaScript.
     // When parsing the regex, an "Invalid group" error is thrown.
     ["(?i:'s|'t|'re|'ve|'m|'ll|'d)", "(?:'([sS]|[tT]|[rR][eE]|[vV][eE]|[mM]|[lL][lL]|[dD]))"],
+
+    // Used to override the default (invalid) regex of the bloom pretokenizer.
+    // For more information, see https://github.com/huggingface/transformers.js/issues/94
+    [` ?[^(\\s|[${BLOOM_SPLIT_CHARS}])]+`, ` ?[^\\s${BLOOM_SPLIT_CHARS}]+`],
 ])
 
 
@@ -317,14 +362,21 @@ export class TokenizerModel extends Callable {
             case 'Unigram':
                 // @ts-ignore
                 return new Unigram(config, ...args);
-
             case 'BPE':
                 return new BPE(config);
 
             default:
+                // Some tokenizers, like for google-t5/t5-small, do not have a `type` field.
+                // In this case, we can infer the tokenizer type based on the structure of the `vocab` field.
                 if (config.vocab) {
-                    // @ts-ignore
-                    return new LegacyTokenizerModel(config, ...args);
+                    if (Array.isArray(config.vocab)) {
+                        // config.vocab is of type `[string, number][]`
+                        // @ts-ignore
+                        return new Unigram(config, ...args);
+                    } else {
+                        // @ts-ignore
+                        return new LegacyTokenizerModel(config, ...args);
+                    }
                 }
                 throw new Error(`Unknown TokenizerModel type: ${config.type}`);
         }
@@ -333,15 +385,15 @@ export class TokenizerModel extends Callable {
     /**
      * Internal function to call the TokenizerModel instance.
      * @param {string[]} tokens The tokens to encode.
-     * @returns {string[]} The encoded token IDs.
+     * @returns {string[]} The encoded tokens.
      */
     _call(tokens) {
-        let ids = this.encode(tokens);
+        tokens = this.encode(tokens);
         if (this.fuse_unk) {
             // Fuse unknown tokens
-            ids = fuse(ids, this.unk_token_id, this.tokens_to_ids);
+            tokens = fuse_unk(tokens, this.tokens_to_ids, this.unk_token_id);
         }
-        return ids;
+        return tokens;
     }
 
     /**
@@ -365,7 +417,7 @@ export class TokenizerModel extends Callable {
 
     /**
      * Converts a list of token IDs into a list of tokens.
-     * @param {number[]} ids The token IDs to convert.
+     * @param {number[]|bigint[]} ids The token IDs to convert.
      * @returns {string[]} The converted tokens.
      */
     convert_ids_to_tokens(ids) {
@@ -502,18 +554,18 @@ class Unigram extends TokenizerModel {
         this.unk_token = this.vocab[config.unk_id];
 
         this.tokens_to_ids = new Map(this.vocab.map((x, i) => [x, i]));
-        this.bosToken = ' '; // beginning of a sentence token
+        this.bos_token = ' '; // beginning of a sentence token
 
-        this.bosTokenId = this.tokens_to_ids.get(this.bosToken); // NOTE: may be undefined
-        this.eosToken = moreConfig.eos_token;
+        this.bos_token_id = this.tokens_to_ids.get(this.bos_token); // NOTE: may be undefined
+        this.eos_token = moreConfig.eos_token;
 
-        this.eosTokenId = this.tokens_to_ids.get(this.eosToken);
-        this.unkToken = this.vocab[this.unk_token_id];
+        this.eos_token_id = this.tokens_to_ids.get(this.eos_token);
+        this.unk_token = this.vocab[this.unk_token_id];
 
         this.minScore = min(this.scores)[0];
 
-        this.unkScore = this.minScore - 10.0;
-        this.scores[this.unk_token_id] = this.unkScore;
+        this.unk_score = this.minScore - 10.0;
+        this.scores[this.unk_token_id] = this.unk_score;
 
         this.trie = new CharTrie();
         this.trie.extend(this.vocab);
@@ -528,26 +580,27 @@ class Unigram extends TokenizerModel {
      * @param {TokenLattice} lattice The token lattice to populate with nodes.
      */
     populateNodes(lattice) {
-        const sentence = lattice.sentence;
-        const len = sentence.length;
+        const chars = lattice.chars;
+        const mblen = 1;
         let beginPos = 0;
-        while (beginPos < len) {
-            const mblen = 1;
+        while (beginPos < chars.length) {
             let hasSingleNode = false;
-            const tokens = [];
 
-            for (let token of this.trie.commonPrefixSearch(sentence.slice(beginPos))) {
+            const tokens = [];
+            const sliced = chars.slice(beginPos).join('');
+            const prefixedTokens = this.trie.commonPrefixSearch(sliced);
+            for (const token of prefixedTokens) {
                 tokens.push(token);
                 const tokenId = this.tokens_to_ids.get(token);
                 const tokenScore = this.scores[tokenId];
-                const n = token.length;
+                const n = len(token);
                 lattice.insert(beginPos, n, tokenScore, tokenId);
                 if (!hasSingleNode && n === mblen) {
                     hasSingleNode = true;
                 }
             }
             if (!hasSingleNode) {
-                lattice.insert(beginPos, mblen, this.unkScore, this.unk_token_id);
+                lattice.insert(beginPos, mblen, this.unk_score, this.unk_token_id);
             }
             beginPos += mblen;
         }
@@ -560,7 +613,7 @@ class Unigram extends TokenizerModel {
      * @returns {string[]} An array of subtokens obtained by encoding the input tokens using the unigram model.
      */
     tokenize(normalized) {
-        const lattice = new TokenLattice(normalized, this.bosTokenId, this.eosTokenId);
+        const lattice = new TokenLattice(normalized, this.bos_token_id, this.eos_token_id);
         this.populateNodes(lattice);
         return lattice.tokens();
     }
@@ -630,7 +683,7 @@ class BPE extends TokenizerModel {
      * Create a BPE instance.
      * @param {Object} config The configuration object for BPE.
      * @param {Object} config.vocab A mapping of tokens to ids.
-     * @param {string[]} config.merges An array of BPE merges as strings.
+     * @param {string[]|[string, string][]} config.merges An array of BPE merges as strings.
      * @param {string} config.unk_token The unknown token used for out of vocabulary words.
      * @param {string} config.end_of_word_suffix The suffix to place at the end of each word.
      * @param {string} [config.continuing_subword_suffix] The suffix to insert between words.
@@ -639,8 +692,6 @@ class BPE extends TokenizerModel {
      */
     constructor(config) {
         super(config);
-
-        this.BPE_SPLIT_TOKEN = ' ';
 
         /** @type {Map<string, number>} */
         this.tokens_to_ids = objectToMap(config.vocab);
@@ -653,8 +704,15 @@ class BPE extends TokenizerModel {
             this.vocab[value] = key;
         }
 
-        this.bpe_ranks = new Map(config.merges.map((x, i) => [x, i]));
-        this.merges = config.merges.map(x => x.split(this.BPE_SPLIT_TOKEN));
+        // Tokenizers >= 0.20.0 serializes BPE merges as a [string, string][] instead of a string[],
+        // which resolves the ambiguity for merges containing spaces.
+        const use_new_merge_format = Array.isArray(config.merges[0]);
+
+        /** @type {[string, string][]} */
+        this.merges = use_new_merge_format
+            ? /** @type {[string, string][]} */(config.merges)
+            : (/** @type {string[]} */(config.merges)).map(x => /** @type {[string, string]} */(x.split(' ', 2)));
+        this.bpe_ranks = new Map(this.merges.map((x, i) => [JSON.stringify(x), i]));
 
         this.end_of_word_suffix = config.end_of_word_suffix;
 
@@ -814,7 +872,7 @@ class BPE extends TokenizerModel {
         // `score` is a measure of the merge priority: lower means higher priority
         // We use the BPE rank as a measure of priority (i.e., the local of the merge in the merges list)
         // We also add a fractional component to the score to break ties (with the earlier character having higher priority)
-        const rank = this.bpe_ranks.get(node.token + this.BPE_SPLIT_TOKEN + node.next.token);
+        const rank = this.bpe_ranks.get(JSON.stringify([node.token, node.next.token]));
         if (rank !== undefined) {
             node.score = rank + node.bias;
             queue.push(node);
@@ -839,15 +897,19 @@ class BPE extends TokenizerModel {
             for (const t of bpe_token_list) {
                 if (this.tokens_to_ids.has(t)) {
                     outputTokens.push(t);
-                } else {
-                    if (this.byte_fallback) {
-                        outputTokens.push(
-                            ...Array.from(this.text_encoder.encode(t))
-                                .map(x => `<0x${x.toString(16).toUpperCase().padStart(2, '0')}>`)
-                        );
+                } else if (this.byte_fallback) {
+                    const byteTokens = Array.from(this.text_encoder.encode(t))
+                        .map(x => `<0x${x.toString(16).toUpperCase().padStart(2, '0')}>`);
+                    if (byteTokens.every(x => this.tokens_to_ids.has(x))) {
+                        // Ensure the byte tokens are actually in the vocabulary, otherwise
+                        // we fall back to the unknown token. For more information, see
+                        // https://github.com/huggingface/transformers/issues/28096.
+                        outputTokens.push(...byteTokens);
                     } else {
                         outputTokens.push(this.unk_token);
                     }
+                } else {
+                    outputTokens.push(this.unk_token);
                 }
             }
         }
@@ -1154,7 +1216,7 @@ class BertNormalizer extends Normalizer {
         for (let i = 0; i < text.length; ++i) {
             const char = text[i];
             const cp = char.charCodeAt(0);
-            if (this._is_chinese_char(cp)) {
+            if (is_chinese_char(cp)) {
                 output.push(" ");
                 output.push(char);
                 output.push(" ");
@@ -1166,38 +1228,13 @@ class BertNormalizer extends Normalizer {
     }
 
     /**
-     * Checks whether the given Unicode codepoint represents a CJK (Chinese, Japanese, or Korean) character.
-     *
-     * A "chinese character" is defined as anything in the CJK Unicode block:
-     * https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-     *
-     * Note that the CJK Unicode block is NOT all Japanese and Korean characters, despite its name.
-     * The modern Korean Hangul alphabet is a different block, as is Japanese Hiragana and Katakana.
-     * Those alphabets are used to write space-separated words, so they are not treated specially
-     * and are handled like all other languages.
-     *
-     * @param {number} cp The Unicode codepoint to check.
-     * @returns {boolean} True if the codepoint represents a CJK character, false otherwise.
-     */
-    _is_chinese_char(cp) {
-        return (
-            (cp >= 0x4E00 && cp <= 0x9FFF)
-            || (cp >= 0x3400 && cp <= 0x4DBF)
-            || (cp >= 0x20000 && cp <= 0x2A6DF)
-            || (cp >= 0x2A700 && cp <= 0x2B73F)
-            || (cp >= 0x2B740 && cp <= 0x2B81F)
-            || (cp >= 0x2B820 && cp <= 0x2CEAF)
-            || (cp >= 0xF900 && cp <= 0xFAFF)
-            || (cp >= 0x2F800 && cp <= 0x2FA1F)
-        )
-    }
-    /**
      * Strips accents from the given text.
      * @param {string} text The text to strip accents from.
      * @returns {string} The text with accents removed.
      */
     stripAccents(text) {
-        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        // "Mark, Nonspacing" (Mn)
+        return text.normalize('NFD').replace(/\p{Mn}/gu, '');
     }
 
 
@@ -1481,6 +1518,8 @@ class SplitPreTokenizer extends PreTokenizer {
 
         if (this.config.invert) {
             return text.match(this.pattern) || [];
+        } else if (this.config.behavior?.toLowerCase() === 'removed') {
+            return text.split(this.pattern).filter(x => x);
         } else {
             return regexSplit(text, this.pattern);
         }
@@ -2315,7 +2354,7 @@ class Precompiled extends Normalizer {
         // TODO: detect when a different `this.charsmap` is used.
 
         text = text.replace(/[\u0001-\u0008\u000B\u000E-\u001F\u007F\u008F\u009F]/gm, ''); // Remove control characters
-        text = text.replace(/[\u0009\u000A\u000C\u000D\u1680\u200B\u200C\u200E\u200F\u2028\u2029\u2581\uFEFF\uFFFD]/gm, '\u0020'); // Replace certain characters with a space
+        text = text.replace(/[\u0009\u000A\u000C\u000D\u00A0\u1680\u2000-\u200F\u2028\u2029\u202F\u205F\u2581\u3000\uFEFF\uFFFD]/gm, '\u0020'); // Replace certain characters with a space
 
         if (text.includes('\uFF5E')) {
             // To match the sentencepiece implementation 100%, we must handle a very strange edge-case.
@@ -2452,7 +2491,7 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  * @param {Record<string, any[]>} item The input object.
  * @param {number} length The length to pad to.
  * @param {(key: string) => any} value_fn Determine the value to fill the array, based on its key.
- * @param {'right'|'left'} side Which side to pad the array.
+ * @param {string} side Which side to pad the array.
  * @private
  */
 function padHelper(item, length, value_fn, side) {
@@ -2492,8 +2531,7 @@ function truncateHelper(item, length) {
 export class PreTrainedTokenizer extends Callable {
     return_token_type_ids = false;
 
-    _default_chat_template = `{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}`;
-
+    padding_side = 'right';
     /**
      * Create a new PreTrainedTokenizer instance.
      * @param {Object} tokenizerJSON The JSON of the tokenizer.
@@ -2541,14 +2579,17 @@ export class PreTrainedTokenizer extends Callable {
 
             // Another slight hack to add `end_of_word_suffix` (if present) to the decoder
             // This is needed for cases where BPE model and ByteLevel decoder are used
-            // For more information, see https://github.com/xenova/transformers.js/issues/74
+            // For more information, see https://github.com/huggingface/transformers.js/issues/74
             // TODO: save this to the decoder when exporting?
             this.decoder.end_of_word_suffix = this.model.end_of_word_suffix;
         }
 
-
         this.added_tokens_regex = this.added_tokens.length > 0 ? new RegExp(
-            this.added_tokens.map(x => `${x.lstrip ? '\\s*' : ''}(${escapeRegExp(x.content)})${x.rstrip ? '\\s*' : ''}`).join('|')
+            this.added_tokens.slice()
+                // Sort by length (desc) to avoid early partial matches
+                .sort((a, b) => b.content.length - a.content.length)
+                .map(x => `${x.lstrip ? '\\s*' : ''}(${escapeRegExp(x.content)})${x.rstrip ? '\\s*' : ''}`)
+                .join('|')
         ) : null;
 
         // Set mask token if present (otherwise will be undefined, which is fine)
@@ -2564,6 +2605,12 @@ export class PreTrainedTokenizer extends Callable {
         this.unk_token = this.getToken('unk_token');
         this.unk_token_id = this.model.tokens_to_ids.get(this.unk_token);
 
+        this.bos_token = this.getToken('bos_token');
+        this.bos_token_id = this.model.tokens_to_ids.get(this.bos_token);
+
+        this.eos_token = this.getToken('eos_token');
+        this.eos_token_id = this.model.tokens_to_ids.get(this.eos_token);
+
         this.model_max_length = tokenizerConfig.model_max_length;
 
         /** @type {boolean} Whether or not to strip the text when tokenizing (removing excess spaces before and after the string). */
@@ -2572,9 +2619,9 @@ export class PreTrainedTokenizer extends Callable {
         this.clean_up_tokenization_spaces = tokenizerConfig.clean_up_tokenization_spaces ?? true;
         this.do_lowercase_and_remove_accent = tokenizerConfig.do_lowercase_and_remove_accent ?? false;
 
-        // TODO allow user to change this
-        /** @type {'right'|'left'} */
-        this.padding_side = 'right';
+        if (tokenizerConfig.padding_side) {
+            this.padding_side = tokenizerConfig.padding_side;
+        }
 
         this.legacy = false;
 
@@ -2599,6 +2646,7 @@ export class PreTrainedTokenizer extends Callable {
      * @param {...string} keys One or more keys to search for in the tokenizer config object.
      * @returns {string|null} The value associated with the first matching key, or null if no match is found.
      * @throws {Error} If an object is found for a matching key and its __type property is not "AddedToken".
+     * @private
      */
     getToken(...keys) {
         for (const key of keys) {
@@ -2707,11 +2755,11 @@ export class PreTrainedTokenizer extends Callable {
                 }
 
                 encodedTokens = text.map(
-                    (t, i) => this._encode_plus(t, text_pair[i], { add_special_tokens, return_token_type_ids })
+                    (t, i) => this._encode_plus(t, { text_pair: text_pair[i], add_special_tokens, return_token_type_ids })
                 )
 
             } else {
-                encodedTokens = text.map(x => this._encode_plus(x, null, { add_special_tokens, return_token_type_ids }));
+                encodedTokens = text.map(x => this._encode_plus(x, { add_special_tokens, return_token_type_ids }));
             }
 
         } else {
@@ -2724,7 +2772,7 @@ export class PreTrainedTokenizer extends Callable {
             }
 
             // For single input, we just wrap in an array, and then unwrap later.
-            encodedTokens = [this._encode_plus(text, text_pair, { add_special_tokens, return_token_type_ids })];
+            encodedTokens = [this._encode_plus(text, { text_pair, add_special_tokens, return_token_type_ids })];
         }
         // At this point, tokens is batched: [batch_size, tokens]
         // However, array may be jagged. So, we pad to max_length
@@ -2743,7 +2791,7 @@ export class PreTrainedTokenizer extends Callable {
         }
 
         // Ensure it is less than model max length
-        max_length = Math.min(max_length, this.model_max_length)
+        max_length = Math.min(max_length, this.model_max_length ?? Infinity);
 
         if (padding || truncation) {
 
@@ -2879,56 +2927,88 @@ export class PreTrainedTokenizer extends Callable {
      * Encodes a single text or a pair of texts using the model's tokenizer.
      *
      * @param {string} text The text to encode.
-     * @param {string|null} text_pair The optional second text to encode.
      * @param {Object} options An optional object containing the following properties:
+     * @param {string} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
      * @param {boolean} [options.return_token_type_ids=null] Whether to return token_type_ids.
      * @returns {EncodingSingle} An object containing the encoded text.
      * @private
      */
-    _encode_plus(text, text_pair = null, {
+    _encode_plus(text, {
+        text_pair = null,
         add_special_tokens = true,
         return_token_type_ids = null,
     } = {}) {
-        // Function called by users to encode possibly multiple texts
-        const tokens = this._encode_text(text);
-        const tokens2 = this._encode_text(text_pair);
 
-        const combinedTokens = this.post_processor
-            ? this.post_processor(tokens, tokens2, { add_special_tokens })
-            : { tokens: mergeArrays(tokens ?? [], tokens2 ?? []) };
+        const { tokens, token_type_ids } = this._tokenize_helper(text, { pair: text_pair, add_special_tokens });
 
-        const input_ids = this.model.convert_tokens_to_ids(combinedTokens.tokens);
+        const input_ids = this.model.convert_tokens_to_ids(tokens);
 
         const result = {
             input_ids,
             attention_mask: new Array(input_ids.length).fill(1),
         }
-        if ((return_token_type_ids ?? this.return_token_type_ids) && combinedTokens.token_type_ids) {
-            result.token_type_ids = combinedTokens.token_type_ids;
+        if ((return_token_type_ids ?? this.return_token_type_ids) && token_type_ids) {
+            result.token_type_ids = token_type_ids;
         }
         return result;
+    }
+
+    /**
+     * Internal helper function to tokenize a text, and optionally a pair of texts.
+     * @param {string} text The text to tokenize.
+     * @param {Object} options An optional object containing the following properties:
+     * @param {string} [options.pair=null] The optional second text to tokenize.
+     * @param {boolean} [options.add_special_tokens=false] Whether or not to add the special tokens associated with the corresponding model.
+     * @returns {{tokens: string[], token_type_ids?: number[]}} An object containing the tokens and optionally the token type IDs.
+     */
+    _tokenize_helper(text, {
+        pair = null,
+        add_special_tokens = false,
+    } = {}) {
+        const tokens = this._encode_text(text);
+        const tokens2 = this._encode_text(pair);
+
+        return this.post_processor
+            ? this.post_processor(tokens, tokens2, { add_special_tokens })
+            : { tokens: mergeArrays(tokens ?? [], tokens2 ?? []) };
+    }
+
+    /**
+     * Converts a string into a sequence of tokens.
+     * @param {string} text The sequence to be encoded.
+     * @param {Object} options An optional object containing the following properties:
+     * @param {string} [options.pair] A second sequence to be encoded with the first.
+     * @param {boolean} [options.add_special_tokens=false] Whether or not to add the special tokens associated with the corresponding model.
+     * @returns {string[]} The list of tokens.
+     */
+    tokenize(text, {
+        pair = null,
+        add_special_tokens = false,
+    } = {}) {
+        return this._tokenize_helper(text, { pair, add_special_tokens }).tokens;
     }
 
     /**
      * Encodes a single text or a pair of texts using the model's tokenizer.
      *
      * @param {string} text The text to encode.
-     * @param {string|null} text_pair The optional second text to encode.
      * @param {Object} options An optional object containing the following properties:
+     * @param {string} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
      * @param {boolean} [options.return_token_type_ids=null] Whether to return token_type_ids.
      * @returns {number[]} An array of token IDs representing the encoded text(s).
      */
-    encode(text, text_pair = null, {
+    encode(text, {
+        text_pair = null,
         add_special_tokens = true,
         return_token_type_ids = null,
     } = {}) {
-        const { input_ids } = this._encode_plus(text, text_pair, {
+        return this._encode_plus(text, {
+            text_pair,
             add_special_tokens,
             return_token_type_ids,
-        });
-        return input_ids;
+        }).input_ids;
     }
 
     /**
@@ -2947,7 +3027,7 @@ export class PreTrainedTokenizer extends Callable {
     /**
      * Decodes a sequence of token IDs back to a string.
      *
-     * @param {number[]|Tensor} token_ids List/Tensor of token IDs to decode.
+     * @param {number[]|bigint[]|Tensor} token_ids List/Tensor of token IDs to decode.
      * @param {Object} [decode_args={}]
      * @param {boolean} [decode_args.skip_special_tokens=false] If true, special tokens are removed from the output string.
      * @param {boolean} [decode_args.clean_up_tokenization_spaces=true] If true, spaces before punctuations and abbreviated forms are removed.
@@ -2972,7 +3052,7 @@ export class PreTrainedTokenizer extends Callable {
 
     /**
      * Decode a single list of token ids to a string.
-     * @param {number[]} token_ids List of token ids to decode
+     * @param {number[]|bigint[]} token_ids List of token ids to decode
      * @param {Object} decode_args Optional arguments for decoding
      * @param {boolean} [decode_args.skip_special_tokens=false] Whether to skip special tokens during decoding
      * @param {boolean} [decode_args.clean_up_tokenization_spaces=null] Whether to clean up tokenization spaces during decoding.
@@ -3012,32 +3092,77 @@ export class PreTrainedTokenizer extends Callable {
         return decoded;
     }
 
-    get default_chat_template() {
-        if (!this._warned_about_chat_template) {
-            console.warn(
-                "No chat template is defined for this tokenizer - using a default chat template " +
-                "that implements the ChatML format. If the default is not appropriate for " +
-                "your model, please set `tokenizer.chat_template` to an appropriate template. " +
-                "See https://huggingface.co/docs/transformers/main/chat_templating for more information."
-            )
-            this._warned_about_chat_template = true; // TODO move to logger.warning_once()
-        }
+    /**
+     * Retrieve the chat template string used for tokenizing chat messages. This template is used
+     * internally by the `apply_chat_template` method and can also be used externally to retrieve the model's chat
+     * template for better generation tracking.
+     * 
+     * @param {Object} options An optional object containing the following properties:
+     * @param {string} [options.chat_template=null]
+     * A Jinja template or the name of a template to use for this conversion.
+     * It is usually not necessary to pass anything to this argument,
+     * as the model's template will be used by default.
+     * @param {Object[]} [options.tools=null]
+     * A list of tools (callable functions) that will be accessible to the model. If the template does not
+     * support function calling, this argument will have no effect. Each tool should be passed as a JSON Schema,
+     * giving the name, description and argument types for the tool. See our
+     * [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#automated-function-conversion-for-tool-use)
+     * for more information.
+     * @returns {string} The chat template string.
+     */
+    get_chat_template({
+        chat_template = null,
+        tools = null,
+    } = {}) {
 
-        return this._default_chat_template;
+        // First, handle the cases when the model has a dict of multiple templates
+        if (this.chat_template && typeof this.chat_template === 'object') {
+            const template_dict = this.chat_template;
+
+            if (chat_template !== null && Object.hasOwn(template_dict, chat_template)) {
+                // The user can pass the name of a template to the chat template argument instead of an entire template
+                chat_template = template_dict[chat_template];
+            } else if (chat_template === null) {
+                if (tools !== null && 'tool_use' in template_dict) {
+                    chat_template = template_dict['tool_use'];
+                } else if ('default' in template_dict) {
+                    chat_template = template_dict['default'];
+                } else {
+                    throw Error(
+                        `This model has multiple chat templates with no default specified! Please either pass a chat ` +
+                        `template or the name of the template you wish to use to the 'chat_template' argument. Available ` +
+                        `template names are ${Object.keys(template_dict).sort()}.`
+                    )
+                }
+            }
+        } else if (chat_template === null) {
+            // These are the cases when the model has a single template
+            // priority: `chat_template` argument > `tokenizer.chat_template`
+            if (this.chat_template) {
+                chat_template = this.chat_template;
+            } else {
+                throw Error(
+                    "Cannot use apply_chat_template() because tokenizer.chat_template is not set and no template " +
+                    "argument was passed! For information about writing templates and setting the " +
+                    "tokenizer.chat_template attribute, please see the documentation at " +
+                    "https://huggingface.co/docs/transformers/main/en/chat_templating"
+                )
+            }
+        }
+        return chat_template;
     }
 
     /**
      * Converts a list of message objects with `"role"` and `"content"` keys to a list of token
      * ids. This method is intended for use with chat models, and will read the tokenizer's chat_template attribute to
-     * determine the format and control tokens to use when converting. When chat_template is None, it will fall back
-     * to the default_chat_template specified at the class level.
+     * determine the format and control tokens to use when converting.
      * 
      * See [here](https://huggingface.co/docs/transformers/chat_templating) for more information.
      * 
      * **Example:** Applying a chat template to a conversation.
      * 
      * ```javascript
-     * import { AutoTokenizer } from "@xenova/transformers";
+     * import { AutoTokenizer } from "@huggingface/transformers";
      * 
      * const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
      * 
@@ -3054,10 +3179,23 @@ export class PreTrainedTokenizer extends Callable {
      * // [1, 733, 16289, 28793, 22557, 28725, 910, 460, 368, 28804, 733, 28748, 16289, 28793, 28737, 28742, 28719, 2548, 1598, 28723, 1602, 541, 315, 1316, 368, 3154, 28804, 2, 28705, 733, 16289, 28793, 315, 28742, 28715, 737, 298, 1347, 805, 910, 10706, 5752, 1077, 3791, 28808, 733, 28748, 16289, 28793]
      * ```
      * 
-     * @param {Message[]} conversation A list of message objects with `"role"` and `"content"` keys.
+     * @param {Message[]} conversation A list of message objects with `"role"` and `"content"` keys,
+     * representing the chat history so far.
      * @param {Object} options An optional object containing the following properties:
      * @param {string} [options.chat_template=null] A Jinja template to use for this conversion. If
-     * this is not passed, the model's default chat template will be used instead.
+     * this is not passed, the model's chat template will be used instead.
+     * @param {Object[]} [options.tools=null]
+     * A list of tools (callable functions) that will be accessible to the model. If the template does not
+     * support function calling, this argument will have no effect. Each tool should be passed as a JSON Schema,
+     * giving the name, description and argument types for the tool. See our
+     * [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#automated-function-conversion-for-tool-use)
+     * for more information.
+     * @param {Record<string, string>[]} [options.documents=null]
+     * A list of dicts representing documents that will be accessible to the model if it is performing RAG
+     * (retrieval-augmented generation). If the template does not support RAG, this argument will have no
+     * effect. We recommend that each document should be a dict containing "title" and "text" keys. Please
+     * see the RAG section of the [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#arguments-for-RAG)
+     * for examples of passing documents with chat templates.
      * @param {boolean} [options.add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate
      * the start of an assistant message. This is useful when you want to generate a response from the model.
      * Note that this argument will be passed to the chat template, and so it must be supported in the
@@ -3068,10 +3206,13 @@ export class PreTrainedTokenizer extends Callable {
      * @param {number} [options.max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
      * If not specified, the tokenizer's `max_length` attribute will be used as a default.
      * @param {boolean} [options.return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
+     * @param {boolean} [options.return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
      * @param {Object} [options.tokenizer_kwargs={}] Additional options to pass to the tokenizer.
-     * @returns {string | Tensor | number[]| number[][]} The tokenized output.
+     * @returns {string | Tensor | number[]| number[][]|BatchEncoding} The tokenized output.
      */
     apply_chat_template(conversation, {
+        tools = null,
+        documents = null,
         chat_template = null,
         add_generation_prompt = false,
         tokenize = true,
@@ -3079,34 +3220,13 @@ export class PreTrainedTokenizer extends Callable {
         truncation = false,
         max_length = null,
         return_tensor = true,
+        return_dict = false,
         tokenizer_kwargs = {},
         ...kwargs
     } = {}) {
 
-        // First, handle the cases when the model has a dict of multiple templates
-        if (
-            (this.chat_template && typeof this.chat_template === 'object') ||
-            (this.chat_template === null && this.default_chat_template && typeof this.default_chat_template === 'object')
-        ) {
-            const template_dict = this.chat_template ?? this.default_chat_template; // Guaranteed to be a non-null object
+        chat_template = this.get_chat_template({ chat_template, tools });
 
-            if (chat_template !== null && Object.hasOwn(template_dict, chat_template)) {
-                // The user can pass the name of a template to the chat template argument instead of an entire template
-                chat_template = template_dict[chat_template];
-            } else if (chat_template === null && 'default' in template_dict) {
-                chat_template = template_dict['default'];
-            } else if (chat_template === null) {
-                throw Error(
-                    `This model has multiple chat templates with no default specified! Please either pass a chat ` +
-                    `template or the name of the template you wish to use to the 'chat_template' argument. Available ` +
-                    `template names are ${Object.keys(template_dict).sort()}.`
-                )
-            }
-        } else {
-            // These are the cases when the model has a single template
-            // priority: `chat_template` argument > `tokenizer.chat_template` > `tokenizer.default_chat_template
-            chat_template ??= this.chat_template ?? this.default_chat_template;
-        }
         if (typeof chat_template !== 'string') {
             throw Error(`chat_template must be a string, but got ${typeof chat_template}`);
         }
@@ -3128,21 +3248,23 @@ export class PreTrainedTokenizer extends Callable {
 
         const rendered = compiledTemplate.render({
             messages: conversation,
-            add_generation_prompt: add_generation_prompt,
-
+            add_generation_prompt,
+            tools,
+            documents,
             ...special_tokens_map,
             ...kwargs,
         });
 
         if (tokenize) {
-            return this._call(rendered, {
+            const out = this._call(rendered, {
                 add_special_tokens: false,
                 padding,
                 truncation,
                 max_length,
                 return_tensor,
                 ...tokenizer_kwargs,
-            }).input_ids;
+            });
+            return return_dict ? out : out.input_ids;
         }
 
         return rendered;
@@ -3199,9 +3321,7 @@ export class ElectraTokenizer extends PreTrainedTokenizer {
 }
 
 export class T5Tokenizer extends PreTrainedTokenizer { }
-export class GPT2Tokenizer extends PreTrainedTokenizer {
-    _default_chat_template = `{% for message in messages %}" "{{ message.content }}{{ eos_token }}" "{% endfor %}`
-}
+export class GPT2Tokenizer extends PreTrainedTokenizer { }
 export class BartTokenizer extends PreTrainedTokenizer { }
 export class MBartTokenizer extends PreTrainedTokenizer {
     constructor(tokenizerJSON, tokenizerConfig) {
@@ -3227,35 +3347,16 @@ export class MBart50Tokenizer extends MBartTokenizer { } // NOTE: extends MBartT
 
 export class RobertaTokenizer extends PreTrainedTokenizer { }
 
-export class BloomTokenizer extends GPT2Tokenizer { // NOTE: `GPT2Tokenizer` to get the correct chat template
-
-    constructor(tokenizerJSON, tokenizerConfig) {
-        // Override the default (invalid) regex of the pretokenizer.
-        // For more information, see https://github.com/xenova/transformers.js/issues/94
-        const splitChars = '.,!?\u2026\u3002\uff0c\u3001\u0964\u06d4\u060c';
-        const patternObject = tokenizerJSON.pre_tokenizer?.pretokenizers[0]?.pattern;
-        if (patternObject && patternObject.Regex === ` ?[^(\\s|[${splitChars}])]+`) {
-            patternObject.Regex = ` ?[^\\s${splitChars}]+`;
-        }
-        super(tokenizerJSON, tokenizerConfig);
-    }
-}
+export class BloomTokenizer extends PreTrainedTokenizer { }
 
 const SPIECE_UNDERLINE = "▁";
 
 export class LlamaTokenizer extends PreTrainedTokenizer {
-    _default_chat_template = `{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% elif USE_DEFAULT_PROMPT == true and not '<<SYS>>' in messages[0]['content'] %}{% set loop_messages = messages %}{% set system_message = 'DEFAULT_SYSTEM_MESSAGE' %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\n' + system_message + '\n<</SYS>>\n\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'system' %}{{ '<<SYS>>\n' + content.strip() + '\n<</SYS>>\n\n' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' ' + eos_token }}{% endif %}{% endfor %}`
 
-    DEFAULT_SYSTEM_PROMPT =
-        "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your " +
-        "answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure " +
-        "that your responses are socially unbiased and positive in nature.\n\n" +
-        "If a question does not make any sense, or is not factually coherent, explain why instead of answering something not " +
-        "correct. If you don't know the answer to a question, please don't share false information."
+    padding_side = 'left';
 
     constructor(tokenizerJSON, tokenizerConfig) {
         super(tokenizerJSON, tokenizerConfig);
-        this.use_default_system_prompt = tokenizerConfig.use_default_system_prompt ?? false;
 
         this.legacy = tokenizerConfig.legacy ?? true;
         if (!this.legacy) {
@@ -3288,14 +3389,8 @@ export class LlamaTokenizer extends PreTrainedTokenizer {
         }
         return tokens;
     }
-
-    get default_chat_template() {
-        return super.default_chat_template
-            .replaceAll('USE_DEFAULT_PROMPT', this.use_default_system_prompt ? 'true' : 'false')
-            .replaceAll('DEFAULT_SYSTEM_MESSAGE', this.DEFAULT_SYSTEM_PROMPT.replaceAll("\n", "\\n").replaceAll("'", "\\'"));
-    }
 }
-export class CodeLlamaTokenizer extends LlamaTokenizer { } // NOTE: `LlamaTokenizer` to get the correct chat template
+export class CodeLlamaTokenizer extends PreTrainedTokenizer { }
 
 export class XLMRobertaTokenizer extends PreTrainedTokenizer { }
 export class MPNetTokenizer extends PreTrainedTokenizer { }
@@ -3308,9 +3403,7 @@ export class EsmTokenizer extends PreTrainedTokenizer { }
 
 export class Qwen2Tokenizer extends PreTrainedTokenizer { }
 
-export class GemmaTokenizer extends PreTrainedTokenizer {
-    _default_chat_template = "{% if messages[0]['role'] == 'system' %}{{ raise_exception('System role not supported') }}{% endif %}{% for message in messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if (message['role'] == 'assistant') %}{% set role = 'model' %}{% else %}{% set role = message['role'] %}{% endif %}{{ '<start_of_turn>' + role + '\n' + message['content'] | trim + '<end_of_turn>\n' }}{% endfor %}{% if add_generation_prompt %}{{'<start_of_turn>model\n'}}{% endif %}"
-}
+export class GemmaTokenizer extends PreTrainedTokenizer { }
 
 export class Grok1Tokenizer extends PreTrainedTokenizer { }
 
@@ -3433,139 +3526,19 @@ export class M2M100Tokenizer extends PreTrainedTokenizer {
     }
 }
 
-
-const WHISPER_LANGUAGES = [
-    ["en", "english"],
-    ["zh", "chinese"],
-    ["de", "german"],
-    ["es", "spanish"],
-    ["ru", "russian"],
-    ["ko", "korean"],
-    ["fr", "french"],
-    ["ja", "japanese"],
-    ["pt", "portuguese"],
-    ["tr", "turkish"],
-    ["pl", "polish"],
-    ["ca", "catalan"],
-    ["nl", "dutch"],
-    ["ar", "arabic"],
-    ["sv", "swedish"],
-    ["it", "italian"],
-    ["id", "indonesian"],
-    ["hi", "hindi"],
-    ["fi", "finnish"],
-    ["vi", "vietnamese"],
-    ["he", "hebrew"],
-    ["uk", "ukrainian"],
-    ["el", "greek"],
-    ["ms", "malay"],
-    ["cs", "czech"],
-    ["ro", "romanian"],
-    ["da", "danish"],
-    ["hu", "hungarian"],
-    ["ta", "tamil"],
-    ["no", "norwegian"],
-    ["th", "thai"],
-    ["ur", "urdu"],
-    ["hr", "croatian"],
-    ["bg", "bulgarian"],
-    ["lt", "lithuanian"],
-    ["la", "latin"],
-    ["mi", "maori"],
-    ["ml", "malayalam"],
-    ["cy", "welsh"],
-    ["sk", "slovak"],
-    ["te", "telugu"],
-    ["fa", "persian"],
-    ["lv", "latvian"],
-    ["bn", "bengali"],
-    ["sr", "serbian"],
-    ["az", "azerbaijani"],
-    ["sl", "slovenian"],
-    ["kn", "kannada"],
-    ["et", "estonian"],
-    ["mk", "macedonian"],
-    ["br", "breton"],
-    ["eu", "basque"],
-    ["is", "icelandic"],
-    ["hy", "armenian"],
-    ["ne", "nepali"],
-    ["mn", "mongolian"],
-    ["bs", "bosnian"],
-    ["kk", "kazakh"],
-    ["sq", "albanian"],
-    ["sw", "swahili"],
-    ["gl", "galician"],
-    ["mr", "marathi"],
-    ["pa", "punjabi"],
-    ["si", "sinhala"],
-    ["km", "khmer"],
-    ["sn", "shona"],
-    ["yo", "yoruba"],
-    ["so", "somali"],
-    ["af", "afrikaans"],
-    ["oc", "occitan"],
-    ["ka", "georgian"],
-    ["be", "belarusian"],
-    ["tg", "tajik"],
-    ["sd", "sindhi"],
-    ["gu", "gujarati"],
-    ["am", "amharic"],
-    ["yi", "yiddish"],
-    ["lo", "lao"],
-    ["uz", "uzbek"],
-    ["fo", "faroese"],
-    ["ht", "haitian creole"],
-    ["ps", "pashto"],
-    ["tk", "turkmen"],
-    ["nn", "nynorsk"],
-    ["mt", "maltese"],
-    ["sa", "sanskrit"],
-    ["lb", "luxembourgish"],
-    ["my", "myanmar"],
-    ["bo", "tibetan"],
-    ["tl", "tagalog"],
-    ["mg", "malagasy"],
-    ["as", "assamese"],
-    ["tt", "tatar"],
-    ["haw", "hawaiian"],
-    ["ln", "lingala"],
-    ["ha", "hausa"],
-    ["ba", "bashkir"],
-    ["jw", "javanese"],
-    ["su", "sundanese"],
-]
-
-// @ts-ignore
-const WHISPER_LANGUAGE_MAPPING = new Map(WHISPER_LANGUAGES);
-// @ts-ignore
-const WHISPER_TO_LANGUAGE_CODE_MAPPING = new Map([
-    ...WHISPER_LANGUAGES.map(([k, v]) => [v, k]),
-    ...[
-        ["burmese", "my"],
-        ["valencian", "ca"],
-        ["flemish", "nl"],
-        ["haitian", "ht"],
-        ["letzeburgesch", "lb"],
-        ["pushto", "ps"],
-        ["panjabi", "pa"],
-        ["moldavian", "ro"],
-        ["moldovan", "ro"],
-        ["sinhalese", "si"],
-        ["castilian", "es"],
-    ]
-]);
-
 /**
  * WhisperTokenizer tokenizer
  * @extends PreTrainedTokenizer
  */
 export class WhisperTokenizer extends PreTrainedTokenizer {
-    _default_chat_template = `{% for message in messages %}" "{{ message.content }}{{ eos_token }}" "{% endfor %}`;
+
+    get timestamp_begin() {
+        return this.model.convert_tokens_to_ids(["<|notimestamps|>"])[0] + 1;
+    }
 
     /**
      * Decodes automatic speech recognition (ASR) sequences.
-     * @param {Array<{tokens: number[], token_timestamps?: number[], stride: number[]}>} sequences The sequences to decode.
+     * @param {Array<{tokens: bigint[], token_timestamps?: number[], stride: number[]}>} sequences The sequences to decode.
      * @param {Object} options The options to use for decoding.
      * @returns {Array<string|{chunks?: undefined|Array<{language: string|null, timestamp: Array<number|null>, text: string}>}>} The decoded sequences.
      */
@@ -3652,7 +3625,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
 
                 if (stride_right) {
                     for (let i = token_ids.length - 1; i >= 0; --i) {
-                        const token = token_ids[i];
+                        const token = Number(token_ids[i]);
                         if (token >= timestamp_begin) {
                             // There can be several token in the right stride
                             // But the last one is ALWAYS going to be skipped
@@ -3670,7 +3643,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
 
             // - all tokens within output
             for (let i = 0; i < token_ids.length; ++i) {
-                const token = token_ids[i];
+                const token = Number(token_ids[i]);
                 // 4 possible states for each token
                 // - 1/ Language code
                 // - 2/ all other special tokens (which we ignore)
@@ -3771,6 +3744,14 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                         let end_time;
                         if (i + 1 < token_timestamps.length) {
                             end_time = round(token_timestamps[i + 1] + time_offset, 2);
+
+                            // Do not allow punctuation-only tokens to have a duration.
+                            // This prevents long pauses from messing up the timestamps.
+                            const decoded_text = this.decode([token]);
+                            if (PUNCTUATION_ONLY_REGEX.test(decoded_text)) {
+                                // Add `time_precision` to avoid overlapping timestamps
+                                end_time = round(Math.min(start_time + time_precision, end_time), 2);
+                            }
                         } else {
                             // should never happen
                             end_time = null;
@@ -3914,7 +3895,9 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
 
             const rightLength = rightSequence.length;
             for (let j = 1; j < leftLength + rightLength; ++j) {
-                const eps = j / 10000.0;
+                // Slightly convoluted because we don't want out of bound indices
+                // This will be necessary for a small conflict resolution optimization
+                // later
                 const leftStart = Math.max(0, leftLength - j);
                 const leftStop = Math.min(leftLength, leftLength + rightLength - j);
                 const left = leftSequence.slice(leftStart, leftStop);
@@ -3924,7 +3907,21 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                 if (left.length !== right.length) {
                     throw new Error("There is a bug within whisper `decode_asr` function, please report it. Dropping to prevent bad inference.");
                 }
-                const matches = left.filter((elem, idx) => elem === right[idx]).length;
+
+                let matches;
+                if (use_token_timestamp_sequences) {
+                    // Get length of longest subsequence of tokens that match
+                    // and have timestamps that are in order
+                    matches = left.filter((elem, idx) => (
+                        elem === right[idx]
+                        && left_token_timestamp_sequence[leftStart + idx] <= token_timestamp_sequences[i][rightStart + idx]
+                    )).length;
+                } else {
+                    matches = left.filter((elem, idx) => elem === right[idx]).length;
+                }
+
+                // epsilon to favor long perfect matches
+                const eps = j / 10000.0;
                 const matching = matches / j + eps;
                 if (matches > 1 && matching > max) {
                     max = matching;
@@ -4004,7 +4001,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
     ) {
         let text;
         // @ts-ignore
-        if (decode_args && decode_args.decode_with_timestamps) {
+        if (decode_args?.decode_with_timestamps) {
             if (token_ids instanceof Tensor) {
                 token_ids = prepareTensorForDecode(token_ids);
             }
@@ -4020,7 +4017,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
     }
 
     /**
-     * @param {number[]} token_ids List of token IDs to decode.
+     * @param {number[]|bigint[]} token_ids List of token IDs to decode.
      * @param {Object} decode_args Optional arguments for decoding
      * @private
      */
@@ -4030,9 +4027,10 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
         const timestamp_begin = Array.from(this.all_special_ids).at(-1) + 1;
         /**@type {Array} */
         let outputs = [[]];
-        for (const token of token_ids) {
+        for (let token of token_ids) {
+            token = Number(token);
             if (token >= timestamp_begin) {
-                const timestamp = round((token - timestamp_begin) * time_precision, 2);
+                const timestamp = ((token - timestamp_begin) * time_precision).toFixed(2);
                 outputs.push(`<|${timestamp}|>`);
                 outputs.push([]);
             } else {
@@ -4040,13 +4038,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
             }
         }
         outputs = outputs.map(
-            s => {
-                if (typeof s === 'string') {
-                    return s;
-                } else {
-                    return super.decode(s, decode_args);
-                }
-            }
+            s => typeof s === 'string' ? s : super.decode(s, decode_args)
         )
 
         return outputs.join('');
@@ -4197,105 +4189,6 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
             newIndices.filter(x => x.length > 0),
         ]
     }
-
-    /**
-     * Helper function to build translation inputs for a `WhisperTokenizer`,
-     * depending on the language, task, and whether to predict timestamp tokens.
-     * 
-     * Used to override the prefix tokens appended to the start of the label sequence.
-     * 
-     * **Example: Get ids for a language**
-     * ```javascript
-     * // instantiate the tokenizer and set the prefix token to Spanish
-     * const tokenizer = await WhisperTokenizer.from_pretrained('Xenova/whisper-tiny');
-     * const forced_decoder_ids = tokenizer.get_decoder_prompt_ids({ language: 'spanish' });
-     * // [(1, 50262), (2, 50363)]
-     * ```
-     * 
-     * @param {Object} options Options to generate the decoder prompt.
-     * @param {string} [options.language] The language of the transcription text.
-     * The corresponding language id token is appended to the start of the sequence for multilingual
-     * speech recognition and speech translation tasks, e.g. for "Spanish" the token "<|es|>" is appended
-     * to the start of sequence.
-     * @param {string} [options.task] Task identifier to append at the start of sequence (if any).
-     * This should be used for mulitlingual fine-tuning, with "transcribe" for speech recognition and
-     * "translate" for speech translation.
-     * @param {boolean} [options.no_timestamps] Whether to add the <|notimestamps|> token at the start of the sequence.
-     * @returns {number[][]} The decoder prompt ids.
-     */
-    get_decoder_prompt_ids({
-        language = null,
-        task = null,
-        no_timestamps = true,
-    } = {}) {
-
-        // <|lang_id|> <|task|> <|notimestamps|>
-
-        const forced_decoder_ids = [];
-
-        if (language) {
-            // User wishes to specify the language
-            language = language.toLowerCase();
-
-            // Map to code from user-friendly name (e.g., "english" -> "en")
-            let language_code = WHISPER_TO_LANGUAGE_CODE_MAPPING.get(language);
-
-            if (language_code === undefined) {
-                // User provided something that is not a language name
-
-                if (WHISPER_LANGUAGE_MAPPING.has(language)) {
-                    // User provided the language code directly (e.g., "en")
-                    language_code = language;
-
-                } else {
-                    // User provided something that is not a language code or name
-                    const is_language_code = language.length === 2;
-                    const langs = is_language_code ? WHISPER_LANGUAGE_MAPPING.keys() : WHISPER_LANGUAGE_MAPPING.values();
-
-                    throw new Error(`Language "${language}" is not supported. Must be one of: ${JSON.stringify(langs)}`);
-                }
-            }
-
-            const language_token_id = this.model.tokens_to_ids.get(`<|${language_code}|>`);
-            if (language_token_id === undefined) {
-                throw new Error(`Unable to find language "${language_code}" in model vocabulary. Please report this issue at https://github.com/xenova/transformers.js/issues/new/choose.`)
-            }
-
-            forced_decoder_ids.push(language_token_id);
-        } else {
-            // No token will be forced, which leaves the model to predict the language
-            forced_decoder_ids.push(null);
-        }
-
-        if (task) {
-            task = task.toLowerCase();
-            if (task !== 'transcribe' && task !== 'translate') {
-                throw new Error(`Task "${task}" is not supported. Must be one of: ["transcribe", "translate"]`);
-            }
-
-            const task_token_id = this.model.tokens_to_ids.get(`<|${task}|>`);
-            if (task_token_id === undefined) {
-                throw new Error(`Unable to find task "${task}" in model vocabulary. Please report this issue at https://github.com/xenova/transformers.js/issues/new/choose.`)
-            }
-
-            forced_decoder_ids.push(task_token_id);
-        } else {
-            // No token will be forced, which leaves the model to predict the task
-            forced_decoder_ids.push(null);
-        }
-
-        if (no_timestamps) {
-            const no_timestamps_id = this.model.tokens_to_ids.get(`<|notimestamps|>`);
-            if (no_timestamps_id === undefined) {
-                throw new Error('Unable to find "<|notimestamps|>" in model vocabulary. Please report this issue at https://github.com/xenova/transformers.js/issues/new/choose.')
-            }
-
-            forced_decoder_ids.push(no_timestamps_id);
-        }
-
-        return forced_decoder_ids.map((x, i) => [i + 1, x]).filter(x => x[1] !== null);
-
-    }
 }
 export class CodeGenTokenizer extends PreTrainedTokenizer { }
 export class CLIPTokenizer extends PreTrainedTokenizer { }
@@ -4356,10 +4249,8 @@ export class MarianTokenizer extends PreTrainedTokenizer {
 
 export class Wav2Vec2CTCTokenizer extends PreTrainedTokenizer { }
 
-export class BlenderbotTokenizer extends PreTrainedTokenizer {
-    _default_chat_template = `{% for message in messages %}{% if message['role'] == 'user' %}{{ ' ' }}{% endif %}{{ message['content'] }}{% if not loop.last %}{{ '  ' }}{% endif %}{% endfor %}{{ eos_token }}`;
-}
-export class BlenderbotSmallTokenizer extends BlenderbotTokenizer { } // NOTE `BlenderbotTokenizer` to get the correct chat template
+export class BlenderbotTokenizer extends PreTrainedTokenizer { }
+export class BlenderbotSmallTokenizer extends PreTrainedTokenizer { }
 
 export class SpeechT5Tokenizer extends PreTrainedTokenizer { }
 
@@ -4376,6 +4267,8 @@ export class VitsTokenizer extends PreTrainedTokenizer {
 }
 
 export class CohereTokenizer extends PreTrainedTokenizer { }
+
+export class MgpstrTokenizer extends PreTrainedTokenizer { }
 
 /**
  * Helper class which is used to instantiate pretrained tokenizers with the `from_pretrained` function.
@@ -4430,6 +4323,7 @@ export class AutoTokenizer {
         GemmaTokenizer,
         Grok1Tokenizer,
         CohereTokenizer,
+        MgpstrTokenizer,
 
         // Base case:
         PreTrainedTokenizer,
@@ -4452,7 +4346,6 @@ export class AutoTokenizer {
      * @returns {Promise<PreTrainedTokenizer>} A new instance of the PreTrainedTokenizer class.
      */
     static async from_pretrained(pretrained_model_name_or_path, {
-        quantized = true,
         progress_callback = null,
         config = null,
         cache_dir = null,
@@ -4462,7 +4355,6 @@ export class AutoTokenizer {
     } = {}) {
 
         const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {
-            quantized,
             progress_callback,
             config,
             cache_dir,

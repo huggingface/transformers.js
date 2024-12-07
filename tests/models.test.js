@@ -2,147 +2,129 @@
  * Test that models loaded outside of the `pipeline` function work correctly (e.g., `AutoModel.from_pretrained(...)`);
  */
 
-import {
-    AutoTokenizer,
-    AutoModel,
-    AutoProcessor,
+import { AutoTokenizer, AutoModel, AutoProcessor, BertModel, GPT2Model, T5ForConditionalGeneration, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, BertTokenizer, GPT2Tokenizer, T5Tokenizer, RawImage } from "../src/transformers.js";
 
-    BertModel,
-    GPT2Model,
-    T5Model,
-    CLIPTextModelWithProjection,
-    CLIPVisionModelWithProjection,
+import { init, MAX_TEST_EXECUTION_TIME } from "./init.js";
 
-    BertTokenizer,
-    GPT2Tokenizer,
-    T5Tokenizer,
-
-    RawImage,
-} from '../src/transformers.js';
-
-import { init, m, MAX_TEST_EXECUTION_TIME } from './init.js';
-
-import { compare } from './test_utils.js';
+import { compare } from "./test_utils.js";
 
 // Initialise the testing environment
 init();
 
-describe('Models', () => {
+describe("Models", () => {
+  describe("Loading different architecture types", () => {
+    // List all models which will be tested
+    const models_to_test = [
+      // [name, modelClass, tokenizerClass]
+      ["hf-internal-testing/tiny-random-BertForMaskedLM", BertModel, BertTokenizer], // Encoder-only
+      ["hf-internal-testing/tiny-random-GPT2LMHeadModel", GPT2Model, GPT2Tokenizer], // Decoder-only
+      ["hf-internal-testing/tiny-random-T5ForConditionalGeneration", T5ForConditionalGeneration, T5Tokenizer], // Encoder-decoder
+    ];
 
-    describe('Loading different architecture types', () => {
+    const texts = ["Once upon a time", "I like to eat apples"];
 
-        // List all models which will be tested
-        const models_to_test = [
-            // [name, modelClass, tokenizerClass]
-            ['bert-base-uncased', BertModel, BertTokenizer], // Encoder-only
-            ['gpt2', GPT2Model, GPT2Tokenizer],              // Decoder-only
-            ['t5-small', T5Model, T5Tokenizer],              // Encoder-decoder
-        ];
+    for (const [model_id, modelClass, tokenizerClass] of models_to_test) {
+      // Test that both the auto model and the specific model work
+      const tokenizers = [AutoTokenizer, tokenizerClass];
+      const models = [AutoModel, modelClass];
 
-        let texts = [
-            'Once upon a time',
-            'I like to eat apples',
-        ];
+      for (let i = 0; i < tokenizers.length; ++i) {
+        const tokenizerClassToTest = tokenizers[i];
+        const modelClassToTest = models[i];
 
-        for (let [name, modelClass, tokenizerClass] of models_to_test) {
+        it(
+          `${model_id} (${modelClassToTest.name})`,
+          async () => {
+            // Load model and tokenizer
+            const tokenizer = await tokenizerClassToTest.from_pretrained(model_id);
+            const model = await modelClassToTest.from_pretrained(model_id);
 
-            // Test that both the auto model and the specific model work
-            let tokenizers = [AutoTokenizer, tokenizerClass];
-            let models = [AutoModel, modelClass];
+            const tests = [
+              texts[0], // single
+              texts, // batched
+            ];
+            for (const test of tests) {
+              const inputs = await tokenizer(test, { truncation: true, padding: true });
+              if (model.config.is_encoder_decoder) {
+                inputs.decoder_input_ids = inputs.input_ids;
+              }
+              const output = await model(inputs);
 
-            for (let i = 0; i < tokenizers.length; ++i) {
-                const tokenizerClassToTest = tokenizers[i];
-                const modelClassToTest = models[i];
-
-                it(`${name} (${modelClassToTest.name})`, async () => {
-                    const model_id = m(name);
-
-                    // Load model and tokenizer
-                    let tokenizer = await tokenizerClassToTest.from_pretrained(model_id);
-                    let model = await modelClassToTest.from_pretrained(model_id);
-
-                    let tests = [
-                        texts[0], // single
-                        texts,    // batched
-                    ]
-                    for (let test of tests) {
-                        let encodings = await tokenizer(test, { truncation: true, padding: true });
-                        let output = await model(encodings);
-
-                        if (output.logits) {
-                            // Ensure correct shapes
-                            let expected_shape = [...encodings.input_ids.dims, model.config.vocab_size];
-                            let actual_shape = output.logits.dims;
-                            compare(expected_shape, actual_shape);
-                        } else if (output.last_hidden_state) {
-                            let expected_shape = [...encodings.input_ids.dims, model.config.d_model];
-                            let actual_shape = output.last_hidden_state.dims;
-                            compare(expected_shape, actual_shape);
-                        } else {
-                            console.warn('Unexpected output', output);
-                            throw new Error('Unexpected output');
-                        }
-
-                    }
-
-                    await model.dispose();
-
-                }, MAX_TEST_EXECUTION_TIME);
-
+              if (output.logits) {
+                // Ensure correct shapes
+                const expected_shape = [...inputs.input_ids.dims, model.config.vocab_size];
+                const actual_shape = output.logits.dims;
+                compare(expected_shape, actual_shape);
+              } else if (output.last_hidden_state) {
+                const expected_shape = [...inputs.input_ids.dims, model.config.d_model];
+                const actual_shape = output.last_hidden_state.dims;
+                compare(expected_shape, actual_shape);
+              } else {
+                console.warn("Unexpected output", output);
+                throw new Error("Unexpected output");
+              }
             }
-        }
 
-    });
+            await model.dispose();
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
+      }
+    }
+  });
 
-    describe('Running specific models', () => {
-        const models_to_test = [
-            'openai/clip-vit-base-patch16',
-        ];
-        it(`CLIP (text)`, async () => {
-            const model_id = m(models_to_test[0]);
+  describe("Running specific models", () => {
+    const models_to_test = ["hf-internal-testing/tiny-random-CLIPModel"];
+    it(
+      `CLIP (text)`,
+      async () => {
+        const model_id = models_to_test[0];
 
-            // Load tokenizer and text model
-            const tokenizer = await AutoTokenizer.from_pretrained(model_id);
-            const text_model = await CLIPTextModelWithProjection.from_pretrained(model_id);
+        // Load tokenizer and text model
+        const tokenizer = await AutoTokenizer.from_pretrained(model_id);
+        const text_model = await CLIPTextModelWithProjection.from_pretrained(model_id, { revision: "refs/pr/5" });
 
-            // Run tokenization
-            const texts = ['a photo of a car', 'a photo of a football match'];
-            const text_inputs = tokenizer(texts, { padding: true, truncation: true });
+        // Run tokenization
+        const texts = ["a photo of a car", "a photo of a football match"];
+        const text_inputs = tokenizer(texts, { padding: true, truncation: true });
 
-            // Compute embeddings
-            const { text_embeds } = await text_model(text_inputs);
+        // Compute embeddings
+        const { text_embeds } = await text_model(text_inputs);
 
-            // Ensure correct shapes
-            const expected_shape = [texts.length, text_model.config.projection_dim];
-            const actual_shape = text_embeds.dims;
-            compare(expected_shape, actual_shape);
+        // Ensure correct shapes
+        const expected_shape = [texts.length, text_model.config.projection_dim];
+        const actual_shape = text_embeds.dims;
+        compare(expected_shape, actual_shape);
 
-            await text_model.dispose();
+        await text_model.dispose();
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
 
-        }, MAX_TEST_EXECUTION_TIME);
+    it(
+      `CLIP (vision)`,
+      async () => {
+        const model_id = models_to_test[0];
 
-        it(`CLIP (vision)`, async () => {
-            const model_id = m(models_to_test[0]);
+        // Load processor and vision model
+        const processor = await AutoProcessor.from_pretrained(model_id);
+        const vision_model = await CLIPVisionModelWithProjection.from_pretrained(model_id, { revision: "refs/pr/5" });
 
-            // Load processor and vision model
-            const processor = await AutoProcessor.from_pretrained(model_id);
-            const vision_model = await CLIPVisionModelWithProjection.from_pretrained(model_id);
+        // Read image and run processor
+        const image = await RawImage.read("https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg");
+        const image_inputs = await processor(image);
 
-            // Read image and run processor
-            const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
-            const image_inputs = await processor(image);
+        // Compute embeddings
+        const { image_embeds } = await vision_model(image_inputs);
 
-            // Compute embeddings
-            const { image_embeds } = await vision_model(image_inputs);
+        // Ensure correct shapes
+        const expected_shape = [1, vision_model.config.projection_dim];
+        const actual_shape = image_embeds.dims;
+        compare(expected_shape, actual_shape);
 
-            // Ensure correct shapes
-            const expected_shape = [1, vision_model.config.projection_dim];
-            const actual_shape = image_embeds.dims;
-            compare(expected_shape, actual_shape);
-
-            await vision_model.dispose();
-
-        }, MAX_TEST_EXECUTION_TIME);
-
-    });
+        await vision_model.dispose();
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+  });
 });
