@@ -985,6 +985,7 @@ export class ImageProcessor extends Callable {
         // NOTE: All pixel-level manipulation (i.e., modifying `pixelData`)
         // occurs with data in the hwc format (height, width, channels), 
         // to emulate the behavior of the original Python code (w/ numpy).
+        /** @type {Float32Array} */
         let pixelData = Float32Array.from(image.data);
         let imgDims = [image.height, image.width, image.channels];
 
