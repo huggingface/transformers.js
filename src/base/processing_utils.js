@@ -88,6 +88,7 @@ export class Processor extends Callable {
         if (!this.tokenizer) {
             throw new Error('Unable to decode without a tokenizer.');
         }
+        // @ts-expect-error TS2556
         return this.tokenizer.batch_decode(...args);
     }
 
