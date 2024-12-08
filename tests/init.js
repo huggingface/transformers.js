@@ -62,3 +62,7 @@ export const MAX_TEST_EXECUTION_TIME = 60_000; // 60 seconds
 export const MAX_MODEL_DISPOSE_TIME = 1_000; // 1 second
 
 export const MAX_TEST_TIME = MAX_MODEL_LOAD_TIME + MAX_TEST_EXECUTION_TIME + MAX_MODEL_DISPOSE_TIME;
+
+export const DEFAULT_MODEL_OPTIONS = {
+  dtype: "fp32",
+};

@@ -761,17 +761,16 @@ describe("Processors", () => {
   });
 
   describe("Audio processors", () => {
-    const audioPromise = new Promise(async (resolve) => {
+    let audio;
+    beforeAll(async () => {
       const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/mlk.npy";
       const buffer = await (await fetch(url)).arrayBuffer();
-      const audio = Float32Array.from(new Float64Array(buffer));
-      resolve(audio);
+      audio = Float32Array.from(new Float64Array(buffer));
     });
 
     it(
       "WhisperFeatureExtractor",
       async () => {
-        const audio = await audioPromise;
         const processor = await AutoProcessor.from_pretrained("Xenova/whisper-tiny.en");
         const { input_features } = await processor(audio);
         compare(input_features.dims, [1, 80, 3000]);
@@ -787,7 +786,6 @@ describe("Processors", () => {
     it(
       "ASTFeatureExtractor",
       async () => {
-        const audio = await audioPromise;
         const processor = await AutoProcessor.from_pretrained("Xenova/ast-finetuned-audioset-10-10-0.4593");
         {
           // truncation
@@ -822,7 +820,6 @@ describe("Processors", () => {
     it(
       "SeamlessM4TFeatureExtractor",
       async () => {
-        const audio = await audioPromise;
         const processor = await AutoProcessor.from_pretrained("Xenova/wav2vec2-bert-CV16-en");
         {
           // normal
@@ -863,7 +860,6 @@ describe("Processors", () => {
     it(
       "ClapFeatureExtractor",
       async () => {
-        const audio = await audioPromise;
         const processor = await AutoProcessor.from_pretrained("Xenova/clap-htsat-unfused");
         {
           // truncation
