@@ -119,6 +119,7 @@ function getNormalizedConfig(config) {
             break;
         case 'gemma':
         case 'gemma2':
+        case 'glm':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'head_dim';
