@@ -54,12 +54,25 @@ const supportedDevices = [];
 /** @type {ONNXExecutionProviders[]} */
 let defaultDevices;
 let ONNX;
-const ORT_SYMBOL = Symbol.for('onnxruntime');
 
-if (ORT_SYMBOL in globalThis) {
-  // If the JS runtime exposes their own ONNX runtime, use it
-  ONNX = globalThis[ORT_SYMBOL];
+// If the JS runtime exposes their own ONNX runtime, use it
+if (apis.IS_EXPOSED_RUNTIME_ENV) {
+    const onnxruntime = globalThis[apis.EXPOSED_RUNTIME_SYMBOL];
 
+    // ensure that the runtime implements the necessary functions
+    // consider use array map if need to check more required members.
+    if (!Object.hasOwn(onnxruntime, 'Tensor')) {
+        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}]" definition. Missing required exported member "Tensor".`)
+    }
+
+    if (!Object.hasOwn(onnxruntime, 'InferenceSession')) {
+        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}]" definition. Missing required exported member "InferenceSession".`)
+    }
+    if(!Object.hasOwn(onnxruntime?.InferenceSession, 'create')) {
+        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}].InferenceSession" definition. Missing required exported member "InferenceSession.create".`)
+    }
+
+    ONNX = onnxruntime;
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
