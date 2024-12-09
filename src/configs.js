@@ -144,6 +144,12 @@ function getNormalizedConfig(config) {
             mapping['num_layers'] = 'n_layers';
             mapping['hidden_size'] = 'd_model';
             break;
+        case 'exaone':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_layers';
+            mapping['dim_kv'] = 'head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
 
         // Encoder-decoder models
         case 't5':
