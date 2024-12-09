@@ -204,4 +204,47 @@ describe("Tensor operations", () => {
       compare(norm, target, 1e-3);
     });
   });
+
+  describe("to", () => {
+    it("float32 to int32 (number to number)", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      const target = new Tensor("int32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      const t2 = t1.to("int32");
+      compare(t2, target);
+    });
+    it("float32 to int64 (number to bigint)", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      const target = new Tensor("int64", [1n, 2n, 3n, 4n, 5n, 6n], [2, 3]);
+
+      const t2 = t1.to("int64");
+      compare(t2, target);
+    });
+    it("int64 to float32 (bigint to number)", async () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n, 4n, 5n, 6n], [2, 3]);
+
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      const t2 = t1.to("float32");
+      compare(t2, target);
+    });
+    it("int32 to uint32", async () => {
+      const t1 = new Tensor("int32", [-1, 2, -3, 4, -5, 6], [2, 3]);
+
+      const target = new Tensor("uint32", [4294967295, 2, 4294967293, 4, 4294967291, 6], [2, 3]);
+
+      const t2 = t1.to("uint32");
+      compare(t2, target);
+    });
+    it("int16 to int8 (overflow)", async () => {
+      const t1 = new Tensor("int16", [0, 1, 128, 256, 257, 512], [2, 3]);
+
+      const target = new Tensor("int8", [0, 1, -128, 0, 1, 0], [2, 3]);
+
+      const t2 = t1.to("int8");
+      compare(t2, target);
+    });
+  });
 });

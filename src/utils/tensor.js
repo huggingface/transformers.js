@@ -772,8 +772,21 @@ export class Tensor {
         if (!DataTypeMap.hasOwnProperty(type)) {
             throw new Error(`Unsupported type: ${type}`);
         }
+
+        // Handle special cases where a mapping function is needed (e.g., where one type is a bigint and the other is a number)
+        let map_fn;
+        const is_source_bigint = ['int64', 'uint64'].includes(this.type);
+        const is_dest_bigint = ['int64', 'uint64'].includes(type);
+        if (is_source_bigint && !is_dest_bigint) {
+            // TypeError: Cannot convert a BigInt value to a number
+            map_fn = Number;
+        } else if (!is_source_bigint && is_dest_bigint) {
+            // TypeError: Cannot convert [x] to a BigInt
+            map_fn = BigInt;
+        }
+
         // @ts-ignore
-        return new Tensor(type, DataTypeMap[type].from(this.data), this.dims);
+        return new Tensor(type, DataTypeMap[type].from(this.data, map_fn), this.dims);
     }
 }
 
