@@ -58,7 +58,7 @@ async function generate({ audio, language }) {
     const callback_function = (output) => {
         startTime ??= performance.now();
 
-        let tps;
+        let tps = 0;
         if (numTokens++ > 0) {
             tps = numTokens / (performance.now() - startTime) * 1000;
         }
@@ -70,7 +70,9 @@ async function generate({ audio, language }) {
 
     const streamer = new TextStreamer(tokenizer, {
         skip_prompt: true,
-        skip_special_tokens: true,
+        decode_kwargs: {
+            skip_special_tokens: true,
+        },
         callback_function,
     });
 
@@ -100,6 +102,7 @@ async function load() {
     });
 
     // Load the pipeline and save it for future use.
+    // eslint-disable-next-line no-unused-vars
     const [tokenizer, processor, model] = await AutomaticSpeechRecognitionPipeline.getInstance(x => {
         // We also add a progress callback to the pipeline so that we can
         // track model loading.
