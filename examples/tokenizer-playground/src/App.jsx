@@ -26,9 +26,9 @@ function App() {
   const tokenizerParam = urlParams.get('tokenizer');
   const textParam = urlParams.get('text');
 
-  const [tokenIds, setTokenIds] = useState([])
-  const [decodedTokens, setDecodedTokens] = useState([])
-  const [margins, setMargins] = useState([])
+  const [tokenIds, setTokenIds] = useState([]);
+  const [decodedTokens, setDecodedTokens] = useState([]);
+  const [margins, setMargins] = useState([]);
   const [outputOption, setOutputOption] = useState('text');
   const [tokenizer, setTokenizer] = useState(tokenizerParam ?? 'Xenova/gpt-4');
   const [customTokenizer, setCustomTokenizer] = useState('');
@@ -50,9 +50,9 @@ function App() {
 
     // Create a callback function for messages from the worker thread.
     const onMessageReceived = (e) => {
-      setTokenIds(e.data.token_ids)
-      setDecodedTokens(e.data.decoded)
-      setMargins(e.data.margins)
+      setTokenIds(e.data.token_ids);
+      setDecodedTokens(e.data.decoded);
+      setMargins(e.data.margins);
     };
 
     // Attach the callback function as an event listener.
@@ -75,7 +75,7 @@ function App() {
 
     if (text.length > 10000) {
       setOutputOption(null);
-      console.log('User most likely pasted in a large body of text (> 10k chars), so we hide the output (until specifically requested by the user).')
+      console.log('User most likely pasted in a large body of text (> 10k chars), so we hide the output (until specifically requested by the user).');
     }
     worker.current.postMessage({ model_id, text });
   }, [tokenizer]);
