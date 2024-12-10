@@ -23,7 +23,10 @@ import { env, apis } from '../env.js';
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web';
 
-export { Tensor } from 'onnxruntime-common';
+import { Tensor as Tensor_NODE } from "onnxruntime-common-for-node";
+import { Tensor as Tensor_WEB } from "onnxruntime-common-for-web";
+let Tensor = apis.IS_NODE_ENV ? Tensor_NODE : Tensor_WEB;
+export { Tensor };
 
 /**
  * @typedef {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig} ONNXExecutionProviders
