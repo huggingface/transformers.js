@@ -35,6 +35,9 @@ const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = typeof navigator !== 'undefined' && 'gpu' in navigator;
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 
+const EXPOSED_RUNTIME_SYMBOL = Symbol.for('onnxruntime');
+const IS_EXPOSED_RUNTIME_ENV = EXPOSED_RUNTIME_SYMBOL in globalThis;
+
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
@@ -58,6 +61,12 @@ export const apis = Object.freeze({
 
     /** Whether the WebNN API is available */
     IS_WEBNN_AVAILABLE,
+
+    /** Symbol from JS environment that exposes their own ONNX runtime */
+    EXPOSED_RUNTIME_SYMBOL,
+
+    /** Whether we are running in a JS environment that exposes their own ONNX runtime */
+    IS_EXPOSED_RUNTIME_ENV,
 
     /** Whether the Node.js process API is available */
     IS_PROCESS_AVAILABLE,
