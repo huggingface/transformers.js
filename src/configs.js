@@ -95,8 +95,6 @@ function getNormalizedConfig(config) {
         case 'gpt_neox':
         case 'stablelm':
         case 'opt':
-        case 'phi':
-        case 'phi3':
         case 'falcon':
             mapping['num_heads'] = 'num_attention_heads';
             mapping['num_layers'] = 'num_hidden_layers';
@@ -112,6 +110,9 @@ function getNormalizedConfig(config) {
         case 'starcoder2':
         case 'qwen2':
         case 'qwen2_vl':
+        case 'phi':
+        case 'phi3':
+        case 'phi3_v':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
