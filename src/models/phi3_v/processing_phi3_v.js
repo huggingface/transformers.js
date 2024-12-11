@@ -17,7 +17,11 @@ export class Phi3VProcessor extends Processor {
      * @param  {...any} args 
      * @returns {Promise<any>}
      */
-    async _call(text, images = null, ...args) {
+    async _call(text, images = null, {
+        padding = true,
+        truncation = true,
+        num_crops = null,
+    } = {}) {
 
         if (!Array.isArray(text)) {
             text = [text];
@@ -25,17 +29,14 @@ export class Phi3VProcessor extends Processor {
 
         let text_inputs, image_inputs;
         if (images) {
-            image_inputs = await this.image_processor(images);
+            image_inputs = await this.image_processor(images, { num_crops });
             const { num_img_tokens } = image_inputs;
 
             // The original implementation adds a bos_token before the image tokens
             // TODO: Check if this affects performance, since it looks like a bug in the original implementation
             const prompt_chunks = text.map((t, i) => t.split(IMAGE_TOKEN_PATTERN).join(IMAGE_TOKEN.repeat(num_img_tokens[i])));
 
-            text_inputs = this.tokenizer(prompt_chunks, {
-                padding: true,
-                truncation: true,
-            });
+            text_inputs = this.tokenizer(prompt_chunks, { padding, truncation });
 
             // The model expects image tokens to be negative, so we negate the image token ids
             const image_token_id = this.tokenizer.model.convert_tokens_to_ids([IMAGE_TOKEN])[0];
