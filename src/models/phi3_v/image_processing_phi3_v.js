@@ -5,7 +5,7 @@ import { cat, interpolate_4d, slice, stack, Tensor } from "../../utils/tensor.js
 
 const IMAGE_SIZE = 336;
 const SLICE_AXES = [2, 3]; // axes to slice on
-const { floor, sqrt } = Math;
+const { ceil, floor, sqrt } = Math;
 
 export class Phi3VImageProcessor extends ImageProcessor {
     constructor(config) {
@@ -13,8 +13,9 @@ export class Phi3VImageProcessor extends ImageProcessor {
             ...config,
             do_normalize: true,
             do_pad: true,
-            pad_size: 'square',
+            pad_size: 'custom',
             do_convert_rgb: true,
+            do_resize: true, // Smart resizing "hd_transform"
         });
     }
     calc_num_image_tokens_from_image_size(width, height) {
@@ -23,12 +24,46 @@ export class Phi3VImageProcessor extends ImageProcessor {
         return floor(((floor((height / IMAGE_SIZE)) * floor((width / IMAGE_SIZE)) + 1) * num_img_tokens) + 1 + (floor(height / IMAGE_SIZE) + 1) * sqrt(num_img_tokens));
     }
 
+    /** @type {ImageProcessor['get_resize_output_image_size']} */
+    get_resize_output_image_size(image, size) {
+        // @ts-expect-error
+        const hd_num = this.config.num_crops;
+        const [width, height] = image.size
+
+        let ratio = width / height;
+        let scale = 1;
+
+        // Calculate the scaling factor
+        while (scale * Math.ceil(scale / ratio) <= hd_num) {
+            scale += 1;
+        }
+        scale -= 1;
+
+        // Compute the new dimensions
+        const new_w = Math.floor(scale * 336);
+        const new_h = Math.floor(new_w / ratio);
+
+        return [new_w, new_h]
+    }
+
+
     /** @type {ImageProcessor['pad_image']} */
     pad_image(pixelData, imgDims, padSize, options = {}) {
-        // Pad with white pixels
+        // Phi3V uses a custom padding strategy:
+        // - Pad the shortest edge to a multiple of 336
+        // - Longest edge remains unchanged
+        // - Pad with white pixels
+        const [imageHeight, imageWidth] = imgDims;
+        let height = imageHeight, width = imageWidth;
+        if (imageHeight < imageWidth) {
+            height = IMAGE_SIZE * ceil(imageHeight / IMAGE_SIZE);
+        } else {
+            width = IMAGE_SIZE * ceil(imageWidth / IMAGE_SIZE);
+        }
+
         // NOTE: Since padding is done after normalization, we need to fill with the normalized values
         const constant_values = [1, 1, 1].map((x, i) => (x - this.image_mean[i]) / this.image_std[i]);
-        return super.pad_image(pixelData, imgDims, padSize, {
+        return super.pad_image(pixelData, imgDims, { width, height }, {
             center: true,
             constant_values,
             ...options,
