@@ -3,7 +3,7 @@
 import {
     ImageProcessor,
 } from "../../base/image_processors_utils.js";
-import { cat, full, interpolate_4d, stack } from "../../utils/tensor.js";
+import { cat, full, interpolate_4d, slice, stack } from "../../utils/tensor.js";
 
 export class Idefics3ImageProcessor extends ImageProcessor {
     constructor(config) {
@@ -186,18 +186,29 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             const optimal_width = Math.ceil(width / num_splits_w);
 
             // Iterate through each row and column
-            for (let r = 0; r < num_splits_h; r++) {
-                for (let c = 0; c < num_splits_w; c++) {
-                    // Calculate the starting point of the crop
-                    const start_x = c * optimal_width;
-                    const start_y = r * optimal_height;
+            for (let r = 0; r < num_splits_h; ++r) {
+                for (let c = 0; c < num_splits_w; ++c) {
+                    let start_x, start_y, end_x, end_y;
+                    if (r === num_splits_h - 1) { // At bottom
+                        start_y = height - optimal_height;
+                        end_y = height;
+                    } else {
+                        start_y = r * optimal_height;
+                        end_y = (r + 1) * optimal_height;
+                    }
+                    if (c === num_splits_w - 1) { // At right
+                        start_x = width - optimal_width;
+                        end_x = width;
+                    } else {
+                        start_x = c * optimal_width;
+                        end_x = (c + 1) * optimal_width;
+                    }
 
-                    // Calculate the ending point of the crop
-                    const end_x = Math.min(start_x + optimal_width, width);
-                    const end_y = Math.min(start_y + optimal_height, height);
+                    const starts = [start_y, start_x];
+                    const ends = [end_y, end_x];
 
-                    // Crop the image
-                    frames.push(pixel_values.slice(null, null, [start_y, end_y], [start_x, end_x]));
+                    const patch = await slice(pixel_values, starts, ends, [2, 3]);
+                    frames.push(patch);
                 }
             }
 
