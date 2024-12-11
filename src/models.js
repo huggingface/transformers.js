@@ -3754,9 +3754,11 @@ export class CLIPModel extends CLIPPreTrainedModel { }
 export class CLIPTextModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'text_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'text_model',
+            ...options,
+        });
     }
 }
 
@@ -3789,9 +3791,11 @@ export class CLIPTextModel extends CLIPPreTrainedModel {
 export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'text_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'text_model',
+            ...options,
+        });
     }
 }
 
@@ -3801,9 +3805,11 @@ export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
 export class CLIPVisionModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'vision_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'vision_model',
+            ...options,
+        });
     }
 }
 
@@ -3836,9 +3842,11 @@ export class CLIPVisionModel extends CLIPPreTrainedModel {
 export class CLIPVisionModelWithProjection extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'vision_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'vision_model',
+            ...options,
+        });
     }
 }
 //////////////////////////////////////////////////
@@ -3922,9 +3930,11 @@ export class SiglipModel extends SiglipPreTrainedModel { }
 export class SiglipTextModel extends SiglipPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'text_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'text_model',
+            ...options,
+        });
     }
 }
 
@@ -3957,9 +3967,11 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
 export class SiglipVisionModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'vision_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'vision_model',
+            ...options,
+        });
     }
 }
 //////////////////////////////////////////////////
@@ -4014,18 +4026,22 @@ export class JinaCLIPModel extends JinaCLIPPreTrainedModel {
 export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'text_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'text_model',
+            ...options,
+        });
     }
 }
 
 export class JinaCLIPVisionModel extends JinaCLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'vision_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'vision_model',
+            ...options,
+        });
     }
 }
 //////////////////////////////////////////////////
@@ -6247,9 +6263,11 @@ export class ClapModel extends ClapPreTrainedModel { }
 export class ClapTextModelWithProjection extends ClapPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'text_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'text_model',
+            ...options,
+        });
     }
 }
 
@@ -6282,9 +6300,11 @@ export class ClapTextModelWithProjection extends ClapPreTrainedModel {
 export class ClapAudioModelWithProjection extends ClapPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        // Update default model file name if not provided
-        options.model_file_name ??= 'audio_model';
-        return super.from_pretrained(pretrained_model_name_or_path, options);
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            // Update default model file name if not provided
+            model_file_name: 'audio_model',
+            ...options,
+        });
     }
 }
 //////////////////////////////////////////////////

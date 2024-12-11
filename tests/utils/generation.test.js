@@ -1,7 +1,24 @@
-import { AutoTokenizer } from "../../src/tokenizers.js";
-import { AutoModelForSeq2SeqLM, AutoModelForCausalLM } from "../../src/models.js";
-import { TextStreamer } from "../../src/generation/streamers.js";
-import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME } from "../init.js";
+import {
+  // Models
+  AutoModelForSeq2SeqLM,
+  AutoModelForCausalLM,
+  LlamaForCausalLM,
+  LlavaForConditionalGeneration,
+
+  // Tokenizers
+  AutoTokenizer,
+  LlamaTokenizer,
+
+  // Processors
+  AutoProcessor,
+  Processor,
+
+  // Other
+  TextStreamer,
+  RawImage,
+} from "../../src/transformers.js";
+
+import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
 // Initialise the testing environment
 init();
@@ -18,7 +35,7 @@ const generate = async (model, tokenizer, text, options) => {
 describe("Generation parameters", () => {
   // List all models which will be tested
   const models = [
-    "hf-internal-testing/tiny-random-T5ForConditionalGeneration", //
+    "hf-internal-testing/tiny-random-T5ForConditionalGeneration", // encoder-decoder
     "hf-internal-testing/tiny-random-LlamaForCausalLM", // decoder-only
   ];
   const DUMMY_TEXT = "hello";
@@ -29,7 +46,7 @@ describe("Generation parameters", () => {
     let model;
     let tokenizer;
     beforeAll(async () => {
-      model = await AutoModelForSeq2SeqLM.from_pretrained(model_id);
+      model = await AutoModelForSeq2SeqLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       tokenizer = await AutoTokenizer.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
@@ -98,7 +115,7 @@ describe("Generation parameters", () => {
     let model;
     let tokenizer;
     beforeAll(async () => {
-      model = await AutoModelForCausalLM.from_pretrained(model_id);
+      model = await AutoModelForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       tokenizer = await AutoTokenizer.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
@@ -171,7 +188,7 @@ describe("Streamers", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
     let model, tokenizer;
     beforeAll(async () => {
-      model = await AutoModelForCausalLM.from_pretrained(model_id);
+      model = await AutoModelForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       tokenizer = await AutoTokenizer.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
@@ -193,6 +210,137 @@ describe("Streamers", () => {
         });
         expect(outputs.tolist()).toEqual([[1n, 22172n, 18547n, 8143n, 22202n, 9456n, 17213n, 15330n, 26591n, 15721n]]);
         expect(chunks).toEqual(target_chunks);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("PKV caching", () => {
+  describe("LlamaForCausalLM", () => {
+    const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
+    /** @type {LlamaForCausalLM} */
+    let model;
+    /** @type {LlamaTokenizer} */
+    let tokenizer;
+    beforeAll(async () => {
+      model = await LlamaForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await LlamaTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "batch_size=1",
+      async () => {
+        const inputs = tokenizer("1");
+
+        // Generate first sequence w/o PKV
+        // NOTE: `return_dict_in_generate=true` is required to get PKV
+        const { past_key_values, sequences } = await model.generate({
+          ...inputs,
+          max_new_tokens: 5,
+          do_sample: false,
+          return_dict_in_generate: true,
+        });
+
+        // Update output with new text
+        const decoded = tokenizer.batch_decode(sequences, {
+          skip_special_tokens: false,
+        })[0];
+        const new_inputs = tokenizer(decoded + "2", {
+          add_special_tokens: false,
+        });
+
+        // Run w/o PKV
+        const generated_ids = await model.generate({
+          ...new_inputs,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        // Run w/ PKV
+        const generated_ids_pkv = await model.generate({
+          ...new_inputs,
+          past_key_values,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        const target = [[1n, 259n, 29896n, 24959n, 22063n, 17192n, 12189n, 22468n, 29906n, 3399n, 24823n, 26470n]];
+
+        expect(generated_ids.tolist()).toEqual(target);
+        expect(generated_ids_pkv.tolist()).toEqual(target);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("LlavaForConditionalGeneration", () => {
+    const model_id = "Xenova/tiny-random-LlavaForConditionalGeneration";
+    /** @type {LlavaForConditionalGeneration} */
+    let model;
+    /** @type {PreTrainedTokenizer} */
+    let tokenizer;
+    /** @type {Processor} */
+    let processor;
+    beforeAll(async () => {
+      model = await LlavaForConditionalGeneration.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+      processor = await AutoProcessor.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "batch_size=1",
+      async () => {
+        const text_inputs = tokenizer("<image>hello");
+
+        // Empty white image
+        const dims = [224, 224, 3];
+        const image = new RawImage(new Uint8ClampedArray(dims[0] * dims[1] * dims[2]).fill(255), ...dims);
+        const vision_inputs = await processor(image);
+
+        // Generate first sequence w/o PKV
+        // NOTE: `return_dict_in_generate=true` is required to get PKV
+        const { past_key_values, sequences } = await model.generate({
+          ...text_inputs,
+          ...vision_inputs,
+          max_new_tokens: 5,
+          do_sample: false,
+          return_dict_in_generate: true,
+        });
+
+        // Update output with new text
+        const decoded = tokenizer.batch_decode(sequences).map((x) => x + "new");
+        const new_inputs = tokenizer(decoded, {
+          add_special_tokens: false,
+        });
+
+        // Run w/o PKV
+        const generated_ids = await model.generate({
+          ...new_inputs,
+          ...vision_inputs,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        // Run w/ PKV
+        const generated_ids_pkv = await model.generate({
+          ...new_inputs,
+          past_key_values,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        const target = [[1n, 32000n, 29871n, 23927n, 359n, 1519n, 568n, 5769n, 1330n, 21544n, 11568n, 1482n, 7258n, 1250n, 16117n]];
+        expect(generated_ids.tolist()).toEqual(target);
+        expect(generated_ids_pkv.tolist()).toEqual(target);
       },
       MAX_TEST_EXECUTION_TIME,
     );
