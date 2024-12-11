@@ -17,6 +17,8 @@ export class Phi3VImageProcessor extends ImageProcessor {
             do_convert_rgb: true,
             do_resize: true, // Smart resizing "hd_transform"
         });
+
+        this._num_crops = config.num_crops;
     }
     calc_num_image_tokens_from_image_size(width, height) {
         // @ts-expect-error
@@ -26,8 +28,7 @@ export class Phi3VImageProcessor extends ImageProcessor {
 
     /** @type {ImageProcessor['get_resize_output_image_size']} */
     get_resize_output_image_size(image, size) {
-        // @ts-expect-error
-        const hd_num = this.config.num_crops;
+        const hd_num = this._num_crops;
         const [width, height] = image.size
 
         let ratio = width / height;
@@ -50,16 +51,11 @@ export class Phi3VImageProcessor extends ImageProcessor {
     /** @type {ImageProcessor['pad_image']} */
     pad_image(pixelData, imgDims, padSize, options = {}) {
         // Phi3V uses a custom padding strategy:
-        // - Pad the shortest edge to a multiple of 336
-        // - Longest edge remains unchanged
+        // - Pad to a multiple of 336
         // - Pad with white pixels
         const [imageHeight, imageWidth] = imgDims;
-        let height = imageHeight, width = imageWidth;
-        if (imageHeight < imageWidth) {
-            height = IMAGE_SIZE * ceil(imageHeight / IMAGE_SIZE);
-        } else {
-            width = IMAGE_SIZE * ceil(imageWidth / IMAGE_SIZE);
-        }
+        const height = IMAGE_SIZE * ceil(imageHeight / IMAGE_SIZE);
+        const width = IMAGE_SIZE * ceil(imageWidth / IMAGE_SIZE);
 
         // NOTE: Since padding is done after normalization, we need to fill with the normalized values
         const constant_values = [1, 1, 1].map((x, i) => (x - this.image_mean[i]) / this.image_std[i]);
@@ -73,10 +69,10 @@ export class Phi3VImageProcessor extends ImageProcessor {
     async _call(images, {
         num_crops = null,
     } = {}) {
-        num_crops ??= this.config.num_crops;
-        if (num_crops === 1 || sqrt(num_crops) % 1 !== 0) {
-            // Disallow num_crops==1 since it won't add extra information
-            throw new Error("num_crops must be a square number not equal to 1");
+        // @ts-expect-error
+        this._num_crops = num_crops ??= this.config.num_crops;
+        if (num_crops < 4 || sqrt(num_crops) % 1 !== 0) {
+            throw new Error("num_crops must be a square number >= 4");
         }
 
         if (!Array.isArray(images)) {
@@ -141,6 +137,7 @@ export class Phi3VImageProcessor extends ImageProcessor {
                 all_pixel_values.push(cat([batch_pixel_values, resized_tensors], 0));
             } else {
                 // Only use the global image
+                // NOTE: Not currently supported in modelling code
                 all_pixel_values.push(batch_pixel_values);
             }
         }
@@ -148,15 +145,18 @@ export class Phi3VImageProcessor extends ImageProcessor {
         // [num_images, 1 + num_crops, num_channels=3, height, width]
         const pixel_values = stack(all_pixel_values, 0);
 
+        // Calculate padded image sizes
+        const sizes = reshaped_input_sizes.map(x => x.map(y => IMAGE_SIZE * ceil(y / IMAGE_SIZE)));
+
         const image_sizes = new Tensor(
             'int64',
-            reshaped_input_sizes.flat(),
+            sizes.flat(),
             [num_images, 2],
-        )
+        );
 
-        const num_img_tokens = reshaped_input_sizes.map(
+        const num_img_tokens = sizes.map(
             ([height, width]) => this.calc_num_image_tokens_from_image_size(width, height),
-        )
+        );
 
         return { pixel_values, original_sizes, reshaped_input_sizes, image_sizes, num_img_tokens };
     }
