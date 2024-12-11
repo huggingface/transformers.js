@@ -150,12 +150,13 @@ export class Phi3VImageProcessor extends ImageProcessor {
 
         const image_sizes = new Tensor(
             'int64',
-            new Array(num_images).fill([IMAGE_SIZE, IMAGE_SIZE]).flat(),
+            reshaped_input_sizes.flat(),
             [num_images, 2],
         )
 
-        const image_tokens = this.calc_num_image_tokens_from_image_size(IMAGE_SIZE, IMAGE_SIZE);
-        const num_img_tokens = new Array(num_images).fill(image_tokens);
+        const num_img_tokens = reshaped_input_sizes.map(
+            ([height, width]) => this.calc_num_image_tokens_from_image_size(width, height),
+        )
 
         return { pixel_values, original_sizes, reshaped_input_sizes, image_sizes, num_img_tokens };
     }
