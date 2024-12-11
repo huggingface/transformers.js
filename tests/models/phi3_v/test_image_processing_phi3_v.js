@@ -27,16 +27,6 @@ export default () => {
     }, MAX_PROCESSOR_LOAD_TIME);
 
     it(
-      "num_crops=0",
-      async () => {
-        const { pixel_values } = await processor(images.gradient_image, { num_crops: 0 });
-        expect(pixel_values.dims).toEqual([1, 1, 3, 336, 336]);
-        expect(pixel_values.mean().item()).toBeCloseTo(0.18679802119731903, 2);
-      },
-      MAX_TEST_EXECUTION_TIME,
-    );
-
-    it(
       "square image (num_crops=4)",
       async () => {
         const num_crops = 4;
@@ -70,19 +60,21 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
     it(
-      "multiple images (num_crops=0)",
+      "single image (num_crops=16)",
       async () => {
-        const { pixel_values, image_sizes, num_img_tokens } = await processor([images.gradient_image, images.white_image], { num_crops: 0 });
-        expect(pixel_values.dims).toEqual([2, 1, ...TARGET_IMAGE_SIZE]);
-        expect(image_sizes.tolist()).toEqual([
-          [336n, 672n],
-          [672n, 672n],
-        ]);
-        expect(num_img_tokens).toEqual([457, 757]);
+        const num_crops = 16;
+        const { pixel_values, image_sizes, num_img_tokens } = await processor(images.gradient_image, { num_crops });
+        expect(pixel_values.dims).toEqual([1, 1 + num_crops, 3, 336, 336]);
+        expect(pixel_values.mean().item()).toBeCloseTo(0.4677375257015228, 1);
+
+        expect(image_sizes.tolist()).toEqual([[1008n, 1680n]]);
+        expect(num_img_tokens).toEqual([2353]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
     it(
       "multiple images (num_crops=4)",
       async () => {
