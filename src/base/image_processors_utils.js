@@ -699,7 +699,7 @@ export class ImageProcessor extends Callable {
      * Pad the image by a certain amount.
      * @param {Float32Array} pixelData The pixel data to pad.
      * @param {number[]} imgDims The dimensions of the image (height, width, channels).
-     * @param {{width:number; height:number}|number} padSize The dimensions of the padded image.
+     * @param {{width:number; height:number}|number|'square'} padSize The dimensions of the padded image.
      * @param {Object} options The options for padding.
      * @param {'constant'|'symmetric'} [options.mode='constant'] The type of padding to add.
      * @param {boolean} [options.center=false] Whether to center the image.
@@ -717,6 +717,8 @@ export class ImageProcessor extends Callable {
         if (typeof padSize === 'number') {
             paddedImageWidth = padSize;
             paddedImageHeight = padSize;
+        } else if (padSize === 'square') {
+            paddedImageWidth = paddedImageHeight = Math.max(imageHeight, imageWidth);
         } else {
             paddedImageWidth = padSize.width;
             paddedImageHeight = padSize.height;

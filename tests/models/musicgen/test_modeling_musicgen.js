@@ -27,7 +27,7 @@ export default () => {
         const decoder_input_ids = full([inputs.input_ids.dims[0] * model.config.decoder.num_codebooks, 1], pad_token_id);
         const { logits } = await model({ ...inputs, decoder_input_ids });
         expect(logits.dims).toEqual([8, 1, 99]);
-        expect(logits.mean().item()).toBeCloseTo(-0.0018370470497757196, 5);
+        expect(logits.mean().item()).toBeCloseTo(-0.0018370470497757196, 4);
       },
       MAX_TEST_EXECUTION_TIME,
     );

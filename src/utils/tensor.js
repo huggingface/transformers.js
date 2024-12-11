@@ -984,6 +984,29 @@ export async function topk(x, k) {
     });
 }
 
+
+const arrayToIndexTensor = (array) => new Tensor('int64', array, [array.length]);
+/**
+ * Slice a multidimensional float32 tensor.
+ * @param {Tensor} data: Tensor of data to extract slices from
+ * @param {number[]} starts: 1-D array of starting indices of corresponding axis in axes
+ * @param {number[]} ends: 1-D array of ending indices (exclusive) of corresponding axis in axes
+ * @param {number[]} axes: 1-D array of axes that starts and ends apply to
+ * @param {number[]} [steps]: 1-D array of slice step of corresponding axis in axes.
+ * @returns {Promise<Tensor>} Sliced data tensor.
+ */
+export async function slice(data, starts, ends, axes, steps) {
+    const op = await TensorOpRegistry.slice;
+    return await op({
+        x: data, 
+        s: arrayToIndexTensor(starts), 
+        e: arrayToIndexTensor(ends), 
+        a: arrayToIndexTensor(axes), 
+        t: arrayToIndexTensor(steps ?? new Array(axes.length).fill(1)),
+    });
+}
+
+
 /**
  * Perform mean pooling of the last hidden state followed by a normalization step.
  * @param {Tensor} last_hidden_state Tensor of shape [batchSize, seqLength, embedDim]

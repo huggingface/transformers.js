@@ -37,8 +37,8 @@ const avg = (array) => sum(array) / array.length;
 const MODELS = {
   florence2: "Xenova/tiny-random-Florence2ForConditionalGeneration",
   qwen2_vl: "hf-internal-testing/tiny-random-Qwen2VLForConditionalGeneration",
-  idefics3: "hf-internal-testing/tiny-random-Idefics3ForConditionalGeneration",
   paligemma: "hf-internal-testing/tiny-random-PaliGemmaForConditionalGeneration",
+  phi3_v: "onnx-community/Phi-3.5-vision-instruct",
 };
 
 describe("Processors", () => {
@@ -513,6 +513,73 @@ describe("Processors", () => {
           const { input_ids, pixel_values } = await processor([images.white_image, images.white_image], "<image><image>Describe the images.");
           expect(input_ids.dims).toEqual([1, 518]);
           expect(pixel_values.dims).toEqual([2, 3, 224, 224]);
+        });
+      },
+      MAX_TEST_TIME,
+    );
+
+    describe(
+      "Phi3VProcessor",
+      () => {
+        /** @type {import('../src/transformers.js').Phi3VProcessor} */
+        let processor;
+        let images = {};
+
+        beforeAll(async () => {
+          processor = await AutoProcessor.from_pretrained(MODELS.phi3_v, {
+            // Use legacy to match python version
+            legacy: true,
+          });
+          images = {
+            white_image: await load_cached_image("white_image"),
+          };
+        });
+
+        const create_prompt = (text, images = []) => {
+          const placeholder = images.map((_, i) => `<|image_${i + 1}|>\n`).join("");
+          const messages = [{ role: "user", content: placeholder + text }];
+          const prompt = processor.tokenizer.apply_chat_template(messages, { tokenize: false, add_generation_prompt: true });
+          return prompt;
+        };
+
+        it("Text-only", async () => {
+          const prompt = create_prompt("Hi there.");
+          const { input_ids, pixel_values } = await processor(prompt);
+          expect(input_ids.dims).toEqual([1, 11]);
+          expect(pixel_values).toBeUndefined();
+        });
+
+        it("Single image & text", async () => {
+          const imgs = [images.white_image];
+          const prompt = create_prompt("Describe this image.", imgs);
+          const { input_ids, attention_mask, pixel_values, image_sizes } = await processor(prompt, imgs);
+          expect(input_ids.dims).toEqual([1, /* 773 */ 770]);
+          expect(attention_mask.dims).toEqual(input_ids.dims);
+          expect(pixel_values.dims).toEqual([1, 5, 3, 336, 336]);
+          expect(image_sizes.tolist()).toEqual([[672n, 672n]]);
+        });
+
+        it("Single image (num_crops=16) & text", async () => {
+          const imgs = [images.white_image];
+          const prompt = create_prompt("Describe this image.", imgs);
+          const { input_ids, attention_mask, pixel_values, image_sizes } = await processor(prompt, imgs, { num_crops: 16 });
+          expect(input_ids.dims).toEqual([1, /* 2525 */ 2522]);
+          expect(attention_mask.dims).toEqual(input_ids.dims);
+          expect(pixel_values.dims).toEqual([1, 17, 3, 336, 336]);
+          expect(image_sizes.tolist()).toEqual([[1344n, 1344n]]);
+        });
+
+        it("Multiple images & text", async () => {
+          const imgs = [images.white_image, images.white_image];
+          const prompt = create_prompt("Describe these images.", imgs);
+          const { input_ids, attention_mask, pixel_values, image_sizes } = await processor(prompt, imgs);
+          expect(input_ids.dims).toEqual([1, /* 1533 */ 1527]);
+          expect(attention_mask.dims).toEqual(input_ids.dims);
+          expect(pixel_values.dims).toEqual([2, 5, 3, 336, 336]);
+          expect(image_sizes.tolist()).toEqual([
+            [672n, 672n],
+            [672n, 672n],
+          ]);
         });
       },
       MAX_TEST_TIME,
