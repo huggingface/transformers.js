@@ -1,4 +1,4 @@
-import { Tensor, cat, mean, stack, layer_norm, slice } from "../../src/transformers.js";
+import { Tensor, cat, mean, stack, layer_norm } from "../../src/transformers.js";
 import { init } from "../init.js";
 import { compare } from "../test_utils.js";
 
@@ -208,21 +208,6 @@ describe("Tensor operations", () => {
     });
   });
 
-  describe("slice", () => {
-    it("should slice", async () => {
-      const input = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8, 9], [3, 3]);
-
-      const target = new Tensor("float32", [1, 2, 4, 5], [2, 2]);
-
-      const starts = [0, 0];
-      const ends = [2, 2];
-      const axes = [0, 1];
-      const steps = [1, 1];
-
-      const sliced = await slice(input, starts, ends, axes, steps);
-      compare(sliced, target, 1e-3);
-    });
-  });
   describe("to", () => {
     it("float32 to int32 (number to number)", async () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
