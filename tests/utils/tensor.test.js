@@ -210,16 +210,9 @@ describe("Tensor operations", () => {
 
   describe("slice", () => {
     it("should slice", async () => {
-      const input = new Tensor('float32', [
-        1, 2, 3,
-        4, 5, 6,
-        7, 8, 9,
-      ], [3, 3]);
+      const input = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8, 9], [3, 3]);
 
-      const target = new Tensor('float32', [
-        1, 2,
-        4, 5,
-      ], [2, 2]);
+      const target = new Tensor("float32", [1, 2, 4, 5], [2, 2]);
 
       const starts = [0, 0];
       const ends = [2, 2];
@@ -229,7 +222,7 @@ describe("Tensor operations", () => {
       const sliced = await slice(input, starts, ends, axes, steps);
       compare(sliced, target, 1e-3);
     });
-  })
+  });
   describe("to", () => {
     it("float32 to int32 (number to number)", async () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
