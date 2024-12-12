@@ -22,6 +22,7 @@ const TEST_IMAGES = Object.freeze({
 
   beetle: BASE_URL + "beetle.png",
   book_cover: BASE_URL + "book-cover.png",
+  corgi: BASE_URL + "corgi.jpg",
 });
 
 const TEST_AUDIOS = {
