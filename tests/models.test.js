@@ -2,13 +2,9 @@
  * Test that models loaded outside of the `pipeline` function work correctly (e.g., `AutoModel.from_pretrained(...)`);
  */
 
-import * as MODEL_TESTS from "./models/all_modeling_tests.js";
-
 import { AutoTokenizer, AutoModel, BertModel, GPT2Model, T5ForConditionalGeneration, BertTokenizer, GPT2Tokenizer, T5Tokenizer } from "../src/transformers.js";
-
-import { init, MAX_TEST_EXECUTION_TIME } from "./init.js";
-
-import { compare } from "./test_utils.js";
+import { init, MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "./init.js";
+import { compare, collect_and_execute_tests } from "./test_utils.js";
 
 // Initialise the testing environment
 init();
@@ -38,7 +34,7 @@ describe("Loading different architecture types", () => {
         async () => {
           // Load model and tokenizer
           const tokenizer = await tokenizerClassToTest.from_pretrained(model_id);
-          const model = await modelClassToTest.from_pretrained(model_id, { dtype: "fp32" });
+          const model = await modelClassToTest.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
 
           const tests = [
             texts[0], // single
@@ -65,7 +61,6 @@ describe("Loading different architecture types", () => {
               throw new Error("Unexpected output");
             }
           }
-
           await model.dispose();
         },
         MAX_TEST_EXECUTION_TIME,
@@ -74,8 +69,4 @@ describe("Loading different architecture types", () => {
   }
 });
 
-describe("Model-specific tests", () => {
-  for (const [modelName, modelTest] of Object.entries(MODEL_TESTS)) {
-    describe(modelName, modelTest);
-  }
-});
+await collect_and_execute_tests("Model-specific tests", "modeling");

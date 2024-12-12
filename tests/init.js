@@ -57,6 +57,8 @@ export function init() {
   registerBackend("test", onnxruntimeBackend, Number.POSITIVE_INFINITY);
 }
 
+export const MAX_TOKENIZER_LOAD_TIME = 10_000; // 10 seconds
+export const MAX_FEATURE_EXTRACTOR_LOAD_TIME = 10_000; // 10 seconds
 export const MAX_PROCESSOR_LOAD_TIME = 10_000; // 10 seconds
 export const MAX_MODEL_LOAD_TIME = 15_000; // 15 seconds
 export const MAX_TEST_EXECUTION_TIME = 60_000; // 60 seconds
