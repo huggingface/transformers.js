@@ -29,10 +29,7 @@ export default () => {
     /** @type {Qwen2VLProcessor} */
     let processor;
     beforeAll(async () => {
-      model = await Qwen2VLForConditionalGeneration.from_pretrained(model_id, {
-        // TODO move to config
-        ...DEFAULT_MODEL_OPTIONS,
-      });
+      model = await Qwen2VLForConditionalGeneration.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       processor = await Qwen2VLProcessor.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
