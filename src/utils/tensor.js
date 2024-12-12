@@ -1431,6 +1431,20 @@ export function zeros_like(tensor) {
 }
 
 /**
+ * Returns a tensor filled with random numbers from a uniform distribution on the interval [0, 1)
+ * @param {number[]} size A sequence of integers defining the shape of the output tensor.
+ * @returns {Tensor} The random tensor.
+ */
+export function rand(size) {
+    const length = size.reduce((a, b) => a * b, 1);
+    return new Tensor(
+        "float32",
+        Float32Array.from({ length }, () => Math.random()),
+        size,
+    )
+}
+
+/**
  * Quantizes the embeddings tensor to binary or unsigned binary precision.
  * @param {Tensor} tensor The tensor to quantize.
  * @param {'binary'|'ubinary'} precision The precision to use for quantization.
