@@ -3,6 +3,7 @@ import { RawImage } from "../src/transformers.js";
 const BASE_URL = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/";
 const TEST_IMAGES = Object.freeze({
   white_image: BASE_URL + "white-image.png",
+  blue_image: BASE_URL + "blue-image.png",
   pattern_3x3: BASE_URL + "pattern_3x3.png",
   pattern_3x5: BASE_URL + "pattern_3x5.png",
   checkerboard_8x8: BASE_URL + "checkerboard_8x8.png",
