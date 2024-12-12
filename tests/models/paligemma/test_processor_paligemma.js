@@ -12,7 +12,7 @@ export default () => {
     let images = {};
 
     beforeAll(async () => {
-      processor = await AutoProcessor.from_pretrained(MODELS.paligemma);
+      processor = await AutoProcessor.from_pretrained(model_id);
       images = {
         white_image: await load_cached_image("white_image"),
       };
