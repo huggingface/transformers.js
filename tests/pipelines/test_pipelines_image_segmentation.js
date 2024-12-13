@@ -15,6 +15,10 @@ export default () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
       }, MAX_MODEL_LOAD_TIME);
 
+      it("should be an instance of ImageSegmentationPipeline", () => {
+        expect(pipe).toBeInstanceOf(ImageSegmentationPipeline);
+      });
+
       it(
         "single",
         async () => {

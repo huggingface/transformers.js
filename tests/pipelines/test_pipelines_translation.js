@@ -14,6 +14,10 @@ export default () => {
       pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
     }, MAX_MODEL_LOAD_TIME);
 
+    it("should be an instance of TranslationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TranslationPipeline);
+    });
+
     describe("batch_size=1", () => {
       it(
         "default",

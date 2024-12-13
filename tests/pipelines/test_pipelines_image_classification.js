@@ -16,6 +16,10 @@ export default () => {
       images = await Promise.all([load_cached_image("white_image"), load_cached_image("blue_image")]);
     }, MAX_MODEL_LOAD_TIME);
 
+    it("should be an instance of ImageClassificationPipeline", () => {
+      expect(pipe).toBeInstanceOf(ImageClassificationPipeline);
+    });
+
     describe("batch_size=1", () => {
       it(
         "default (top_k=5)",

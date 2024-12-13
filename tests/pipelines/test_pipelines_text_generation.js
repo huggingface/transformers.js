@@ -14,6 +14,10 @@ export default () => {
       pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
     }, MAX_MODEL_LOAD_TIME);
 
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
     describe("batch_size=1", () => {
       const text_input = "hello";
       const generated_text_target = "erdingsAndroid Load";

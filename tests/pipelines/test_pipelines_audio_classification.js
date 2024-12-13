@@ -15,6 +15,10 @@ export default () => {
       pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
     }, MAX_MODEL_LOAD_TIME);
 
+    it("should be an instance of AudioClassificationPipeline", () => {
+      expect(pipe).toBeInstanceOf(AudioClassificationPipeline);
+    });
+
     describe("batch_size=1", () => {
       it(
         "default (top_k=5)",

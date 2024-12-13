@@ -29,6 +29,9 @@ export default () => {
       });
     }, MAX_MODEL_LOAD_TIME);
 
+    it("should be an instance of ZeroShotClassificationPipeline", () => {
+      expect(pipe).toBeInstanceOf(ZeroShotClassificationPipeline);
+    });
     const sequences_to_classify = ["one day I will see the world", "I love making pizza"];
     const candidate_labels = ["travel", "cooking", "dancing"];
 

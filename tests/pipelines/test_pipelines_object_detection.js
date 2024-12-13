@@ -15,6 +15,10 @@ export default () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
       }, MAX_MODEL_LOAD_TIME);
 
+      it("should be an instance of ObjectDetectionPipeline", () => {
+        expect(pipe).toBeInstanceOf(ObjectDetectionPipeline);
+      });
+
       it(
         "single + threshold",
         async () => {
@@ -64,6 +68,10 @@ export default () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
         images = await Promise.all([load_cached_image("white_image"), load_cached_image("blue_image")]);
       }, MAX_MODEL_LOAD_TIME);
+
+      it("should be an instance of ObjectDetectionPipeline", () => {
+        expect(pipe).toBeInstanceOf(ObjectDetectionPipeline);
+      });
 
       describe("batch_size=1", () => {
         it(
