@@ -107,7 +107,7 @@ let gpuHasFp16 = false;
 try {
   // Shouldn't fail since the WebGPU model has loaded successfully
   const adapter = await navigator.gpu.requestAdapter();
-  adapterInfo = adapter.info;
+  adapterInfo = adapter.info || await adapter.requestAdapterInfo();
   gpuHasFp16 = adapter.features.has('shader-f16')
 } catch (err) {
   adapterInfo = {};
