@@ -1,4 +1,4 @@
-import { pipeline } from "../../src/transformers.js";
+import { pipeline, ZeroShotClassificationPipeline } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -7,7 +7,7 @@ const PIPELINE_ID = "zero-shot-classification";
 export default () => {
   describe("Zero-shot Classification", () => {
     const model_id = "hf-internal-testing/tiny-random-BertForSequenceClassification";
-    /** @type {any} */
+    /** @type {ZeroShotClassificationPipeline} */
     let pipe;
 
     beforeAll(async () => {

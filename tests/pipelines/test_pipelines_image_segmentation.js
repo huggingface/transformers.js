@@ -9,7 +9,7 @@ export default () => {
   describe("Image Segmentation", () => {
     describe("Panoptic Segmentation", () => {
       const model_id = "Xenova/detr-resnet-50-panoptic";
-      /** @type {ImageSegmentationPipeline } */
+      /** @type {ImageSegmentationPipeline} */
       let pipe;
       beforeAll(async () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
