@@ -23,10 +23,11 @@ const TEST_IMAGES = Object.freeze({
   beetle: BASE_URL + "beetle.png",
   book_cover: BASE_URL + "book-cover.png",
   corgi: BASE_URL + "corgi.jpg",
+  man_on_car: BASE_URL + "young-man-standing-and-leaning-on-car.jpg",
 });
 
 const TEST_AUDIOS = {
-  mlk: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/mlk.npy",
+  mlk: BASE_URL + "mlk.npy",
 };
 
 /** @type {Map<string, RawImage>} */
