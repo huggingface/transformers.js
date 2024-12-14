@@ -3342,6 +3342,29 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+// Moonshine models
+export class MoonshinePreTrainedModel extends PreTrainedModel {
+
+    requires_attention_mask = false;
+    main_input_name = 'input_values';
+    forward_params = [
+        'input_values',
+        'decoder_input_ids',
+        'past_key_values',
+    ];
+};
+
+/**
+ * MoonshineModel class for training Moonshine models without a language model head.
+ */
+export class MoonshineModel extends MoonshinePreTrainedModel { }
+
+export class MoonshineForConditionalGeneration extends MoonshinePreTrainedModel { } 
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 /**
  * Vision Encoder-Decoder model based on OpenAI's GPT architecture for image captioning and other vision tasks
@@ -6925,6 +6948,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
 const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['speecht5', ['SpeechT5ForSpeechToText', SpeechT5ForSpeechToText]],
     ['whisper', ['WhisperForConditionalGeneration', WhisperForConditionalGeneration]],
+    ['moonshine', ['MoonshineForConditionalGeneration', MoonshineForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([
