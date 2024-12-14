@@ -1729,6 +1729,8 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
             case 'unispeech-sat':
             case 'hubert':
                 return this._call_wav2vec2(audio, kwargs)
+            case 'moonshine':
+                return this._call_moonshine(audio, kwargs)
             default:
                 throw new Error(`AutomaticSpeechRecognitionPipeline does not support model type '${this.model.config.model_type}'.`)
         }
@@ -1882,6 +1884,36 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
         }
         return single ? toReturn[0] : toReturn;
     }
+
+    /**
+     * @type {AutomaticSpeechRecognitionPipelineCallback}
+     * @private
+     */
+    async _call_moonshine(audio, kwargs) {
+        // TODO use kwargs (e.g., max_new_tokens)
+        const single = !Array.isArray(audio);
+        if (single) {
+            audio = [/** @type {AudioInput} */ (audio)];
+        }
+        const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
+        const preparedAudios = await prepareAudios(audio, sampling_rate);
+        const toReturn = [];
+        for (const aud of preparedAudios) {
+            const inputs = await this.processor(aud);
+
+            // According to the [paper](https://arxiv.org/pdf/2410.15608):
+            // "We use greedy decoding, with a heuristic limit of 6 output tokens
+            // per second of audio to avoid repeated output sequences."
+            const max_new_tokens = Math.floor(aud.length / sampling_rate) * 6;
+            const outputs = await this.model.generate({ ...inputs, max_new_tokens });
+
+            const decoded = this.processor.batch_decode(outputs, { skip_special_tokens: true });
+
+            toReturn.push({ text: decoded[0] })
+        }
+        return single ? toReturn[0] : toReturn;
+    }
+
 }
 
 /**
