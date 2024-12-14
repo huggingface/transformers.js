@@ -26,7 +26,7 @@ export default () => {
           const output = await pipe(text, {
             max_new_tokens: 5,
           });
-          const target = [{ summary_text: "" }];
+          const target = [{ generated_text: "" }];
           expect(output).toEqual(target);
         },
         MAX_TEST_EXECUTION_TIME,
