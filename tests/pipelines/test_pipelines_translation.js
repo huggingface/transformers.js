@@ -5,7 +5,7 @@ import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, D
 const PIPELINE_ID = "translation";
 
 export default () => {
-  describe("Text Classification", () => {
+  describe("Translation", () => {
     const model_id = "Xenova/tiny-random-M2M100ForConditionalGeneration";
 
     /** @type {TranslationPipeline} */
