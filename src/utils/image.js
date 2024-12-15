@@ -350,11 +350,11 @@ export class RawImage {
      * @param {Object} options Additional options for resizing.
      * @param {0|1|2|3|4|5|string} [options.resample] The resampling method to use.
      * @returns {Promise<RawImage>} `this` to support chaining.
+     * @throws {Error} If the width or height is not a whole number.
      */
     async resize(width, height, {
         resample = 2,
     } = {}) {
-
         // Do nothing if the image already has the desired size
         if (this.width === width && this.height === height) {
             return this;
@@ -363,18 +363,26 @@ export class RawImage {
         // Ensure resample method is a string
         let resampleMethod = RESAMPLING_MAPPING[resample] ?? resample;
 
+        const nullish_width = isNullishDimension(width);
+        const nullish_height = isNullishDimension(height);
+        // Width and height must be whole numbers.
+        if (!(Number.isInteger(width) || nullish_width)) {
+            throw new Error(`Width must be an integer, but got ${width}`);
+        }
+        if (!(Number.isInteger(height) || nullish_height)) {
+            throw new Error(`Height must be an integer, but got ${height}`);
+        }
+
         // Calculate width / height to maintain aspect ratio, in the event that
         // the user passed a null value in.
         // This allows users to pass in something like `resize(320, null)` to
         // resize to 320 width, but maintain aspect ratio.
-        const nullish_width = isNullishDimension(width);
-        const nullish_height = isNullishDimension(height);
         if (nullish_width && nullish_height) {
             return this;
         } else if (nullish_width) {
-            width = (height / this.height) * this.width;
+            width = Math.round((height / this.height) * this.width);
         } else if (nullish_height) {
-            height = (width / this.width) * this.height;
+            height = Math.round((width / this.width) * this.height);
         }
 
         if (IS_BROWSER_OR_WEBWORKER) {
@@ -699,7 +707,7 @@ export class RawImage {
     /**
      * Split this image into individual bands. This method returns an array of individual image bands from an image.
      * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
-     * 
+     *
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
      * @returns {RawImage[]} An array containing bands.
      */
