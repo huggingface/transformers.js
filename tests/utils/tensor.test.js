@@ -1,5 +1,8 @@
 import { Tensor, cat, mean, stack, layer_norm } from "../../src/transformers.js";
+import { init } from "../init.js";
 import { compare } from "../test_utils.js";
+
+init();
 
 describe("Tensor operations", () => {
   describe("cat", () => {

@@ -1,13 +1,10 @@
 import { AutoTokenizer } from "../src/tokenizers.js";
-import * as TOKENIZER_TESTS from "./models/all_tokenization_tests.js";
+import { MAX_TOKENIZER_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "./init.js";
+import { compare, collect_tests } from "./test_utils.js";
 
-import { compare } from "./test_utils.js";
-
-const MAX_LOAD_TIME = 10_000;
-const MAX_EXECUTION_TIME = 10_000;
-
+const TOKENIZER_TESTS = await collect_tests("tokenization");
 describe("Tokenizers (model-specific)", () => {
-  for (const [tokenizer_name, { TOKENIZER_CLASS, TEST_CONFIG, CUSTOM_TESTS }] of Object.entries(TOKENIZER_TESTS)) {
+  for (const [tokenizer_name, { TOKENIZER_CLASS, TEST_CONFIG, CUSTOM_TESTS }] of TOKENIZER_TESTS) {
     describe(tokenizer_name, () => {
       for (const model_id in TEST_CONFIG) {
         describe(model_id, () => {
@@ -15,7 +12,7 @@ describe("Tokenizers (model-specific)", () => {
           let tokenizer;
           beforeAll(async () => {
             tokenizer = await TOKENIZER_CLASS.from_pretrained(model_id);
-          }, MAX_LOAD_TIME);
+          }, MAX_TOKENIZER_LOAD_TIME);
 
           for (const [test_name, test_case] of Object.entries(TEST_CONFIG[model_id])) {
             test(test_name, () => {
@@ -184,7 +181,7 @@ describe("Tokenizer padding/truncation", () => {
         ]);
       }
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 });
 
@@ -218,7 +215,7 @@ describe("Token type ids", () => {
 
       compare(model_inputs, expected);
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 
   it(
@@ -255,7 +252,7 @@ describe("Token type ids", () => {
         compare(model_inputs, expected);
       }
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 });
 
@@ -269,7 +266,7 @@ describe("Edge cases", () => {
       let encoded = tokenizer(text);
       expect(encoded.input_ids.data.length).toBeGreaterThan(100000);
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 
   it("should not take too long", async () => {
@@ -293,7 +290,7 @@ describe("Edge cases", () => {
         compare(token_ids, [109]); // Should not be [108, 108]
       }
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 });
 
@@ -320,7 +317,7 @@ describe("Extra decoding tests", () => {
       expect(decoded3).toEqual(text);
       expect(decoded4).toEqual(text);
     },
-    MAX_EXECUTION_TIME,
+    MAX_TEST_EXECUTION_TIME,
   );
 });
 

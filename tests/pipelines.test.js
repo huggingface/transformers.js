@@ -1,16 +1,17 @@
 import { pipeline, cos_sim } from "../src/transformers.js";
 import { init, MAX_TEST_EXECUTION_TIME } from "./init.js";
-import { compare, loadAudio } from "./test_utils.js";
+import { collect_and_execute_pipeline_tests, compare, loadAudio } from "./test_utils.js";
 
 // Initialise the testing environment
 init();
+await collect_and_execute_pipeline_tests("Pipelines");
 
 // NOTE:
 // Due to a memory leak in Jest, we cannot have multiple tests for a single model.
 // This is due to how model construction and destruction occurs, in `beforeAll` and `afterAll`, respectively.
 // As a result, each test is responsible for exactly one model, but we run multiple inputs through it.
 // By encapsulating model construction and destruction in a single `it` block, we avoid these memory issues.
-xdescribe("Pipelines", () => {
+xdescribe("Pipelines (ignored)", () => {
   describe("Text classification", () => {
     // List all models which will be tested
     const models = ["Xenova/distilbert-base-uncased-finetuned-sst-2-english", "Xenova/toxic-bert"];

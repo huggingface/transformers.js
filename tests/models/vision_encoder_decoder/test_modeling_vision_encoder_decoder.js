@@ -1,4 +1,4 @@
-import { GPT2Tokenizer, VisionEncoderDecoderModel, RawImage, full } from "../../../src/transformers.js";
+import { VisionEncoderDecoderModel, full } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -8,11 +8,8 @@ export default () => {
 
     /** @type {VisionEncoderDecoderModel} */
     let model;
-    /** @type {GPT2Tokenizer} */
-    let tokenizer;
     beforeAll(async () => {
       model = await VisionEncoderDecoderModel.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
-      tokenizer = await GPT2Tokenizer.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
     it(
