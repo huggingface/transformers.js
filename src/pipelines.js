@@ -1890,7 +1890,6 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
      * @private
      */
     async _call_moonshine(audio, kwargs) {
-        // TODO use kwargs (e.g., max_new_tokens)
         const single = !Array.isArray(audio);
         if (single) {
             audio = [/** @type {AudioInput} */ (audio)];
@@ -1905,11 +1904,10 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
             // "We use greedy decoding, with a heuristic limit of 6 output tokens
             // per second of audio to avoid repeated output sequences."
             const max_new_tokens = Math.floor(aud.length / sampling_rate) * 6;
-            const outputs = await this.model.generate({ ...inputs, max_new_tokens });
+            const outputs = await this.model.generate({ max_new_tokens, ...kwargs, ...inputs });
 
-            const decoded = this.processor.batch_decode(outputs, { skip_special_tokens: true });
-
-            toReturn.push({ text: decoded[0] })
+            const text = this.processor.batch_decode(outputs, { skip_special_tokens: true })[0];
+            toReturn.push({ text });
         }
         return single ? toReturn[0] : toReturn;
     }
