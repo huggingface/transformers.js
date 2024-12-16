@@ -10,8 +10,11 @@ export class Florence2Processor extends Processor {
         super(config, components);
 
         const {
+            // @ts-expect-error TS2339
             tasks_answer_post_processing_type,
+            // @ts-expect-error TS2339
             task_prompts_without_inputs,
+            // @ts-expect-error TS2339
             task_prompts_with_input,
         } = this.image_processor.config;
 

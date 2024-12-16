@@ -119,6 +119,8 @@ export class MgpstrProcessor extends Processor {
      * - bpe_preds: The list of BPE decoded sentences.
      * - wp_preds: The list of wp decoded sentences.
      */
+    // @ts-expect-error The type of this method is not compatible with the one
+    // in the base class. It might be a good idea to fix this.
     batch_decode([char_logits, bpe_logits, wp_logits]) {
         const [char_preds, char_scores] = this._decode_helper(char_logits, 'char');
         const [bpe_preds, bpe_scores] = this._decode_helper(bpe_logits, 'bpe');

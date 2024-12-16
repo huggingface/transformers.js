@@ -70,15 +70,19 @@ function getNormalizedConfig(config) {
         case 'florence2':
         case 'llava_onevision':
         case 'idefics3':
+            // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;
         case 'moondream1':
+            // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.phi_config);
             break;
         case 'musicgen':
+            // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.decoder);
             break;
         case 'multi_modality':
+            // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.language_config);
             break;
 
@@ -199,6 +203,7 @@ function getNormalizedConfig(config) {
             break;
 
         case 'vision-encoder-decoder':
+            // @ts-expect-error TS2339
             const decoderConfig = getNormalizedConfig(config.decoder);
 
             const add_encoder_pkv = 'num_decoder_layers' in decoderConfig;

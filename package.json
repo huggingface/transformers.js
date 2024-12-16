@@ -24,7 +24,7 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typegen": "tsc ./src/transformers.js --allowJs --declaration --emitDeclarationOnly --declarationMap --outDir types",
+    "typegen": "tsc --build",
     "dev": "webpack serve --no-client-overlay",
     "build": "webpack && npm run typegen",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose",
