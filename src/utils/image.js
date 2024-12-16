@@ -386,26 +386,82 @@ export class RawImage {
         }
 
         if (IS_BROWSER_OR_WEBWORKER) {
-            // TODO use `resample` in browser environment
-
             // Store number of channels before resizing
             const numChannels = this.channels;
 
-            // Create canvas object for this image
-            const canvas = this.toCanvas();
+            // Create the output array for the resized image
+            const resizedData = new Uint8ClampedArray(width * height * numChannels);
 
-            // Actually perform resizing using the canvas API
-            const ctx = createCanvasFunction(width, height).getContext('2d');
+            // Scale factors for mapping new dimensions back to original dimensions
+            const xScale = this.width / width;
+            const yScale = this.height / height;
 
-            // Draw image to context, resizing in the process
-            ctx.drawImage(canvas, 0, 0, width, height);
+            switch (resampleMethod) {
+                case 'bilinear':
+                    // Iterate over each pixel in the new image.
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            // Map new coordinates to original coordinates.
+                            const srcX = x * xScale;
+                            const srcY = y * yScale;
 
-            // Create image from the resized data
-            const resizedImage = new RawImage(ctx.getImageData(0, 0, width, height).data, width, height, 4);
+                            // Calculate the surrounding pixels.
+                            // Ensure that the pixels are within the bounds
+                            // of the image.
+                            const x0 = Math.floor(srcX);
+                            const x1 = Math.min(x0 + 1, this.width - 1);
+                            const y0 = Math.floor(srcY);
+                            const y1 = Math.min(y0 + 1, this.height - 1);
 
-            // Convert back so that image has the same number of channels as before
-            return resizedImage.convert(numChannels);
+                            // Calculate fractional parts for interpolation.
+                            const dx = srcX - x0;
+                            const dy = srcY - y0;
 
+                            for (let c = 0; c < numChannels; c++) {
+                                // Get the values of the new pixel area.
+                                // Always multiply by the width because we
+                                // storing the data in a 1D array.
+                                // To get the second row, we must add a full
+                                // width, then adding the x offset.
+                                const topLeft     = this.data[(((y0 * this.width) + x0) * numChannels) + c];
+                                const topRight    = this.data[(((y0 * this.width) + x1) * numChannels) + c];
+                                const bottomLeft  = this.data[(((y1 * this.width) + x0) * numChannels) + c];
+                                const bottomRight = this.data[(((y1 * this.width) + x1) * numChannels) + c];
+
+                                // Perform bilinear interpolation.
+                                // Find the horizontal position along the
+                                // top and bottom rows.
+                                const top    = (topLeft    * (1 - dx)) + (topRight * dx);
+                                const bottom = (bottomLeft * (1 - dx)) + (bottomRight * dx);
+                                // Find the value between these two values.
+                                const interpolatedValue = (top * (1 - dy)) + (bottom * dy);
+
+                                // Set the value in the resized data.
+                                resizedData[(((y * width) + x) * numChannels) + c] = Math.round(interpolatedValue);
+                            }
+                        }
+                    }
+                break;
+
+                // Fallback to the Canvas API.
+                default:
+                    // Create canvas object for this image
+                    const canvas = this.toCanvas();
+
+                    // Actually perform resizing using the canvas API
+                    const ctx = createCanvasFunction(width, height).getContext('2d');
+
+                    // Draw image to context, resizing in the process
+                    ctx.drawImage(canvas, 0, 0, width, height);
+
+                    // Create image from the resized data
+                    const resizedImage = new RawImage(ctx.getImageData(0, 0, width, height).data, width, height, 4);
+
+                    // Convert back so that image has the same number of channels as before
+                    return resizedImage.convert(numChannels);
+            }
+
+            return new RawImage(resizedData, width, height, numChannels);
         } else {
             // Create sharp image from raw data, and resize
             let img = this.toSharp();
