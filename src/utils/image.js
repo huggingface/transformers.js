@@ -705,24 +705,28 @@ export class RawImage {
         const output = new Uint8ClampedArray(this.data.length);
         const halfSize = Math.floor(kernelSize / 2);
 
-        for (let c = 0; c < this.channels; c++) {
-            for (let y = 0; y < this.height; y++) {
-                for (let x = 0; x < this.width; x++) {
+        const height = this.height;
+        const width = this.width;
+        const channels = this.channels;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                for (let c = 0; c < channels; c++) {
                     let sum = 0;
 
-                    for (let ky = -halfSize; ky < halfSize; ky++) {
-                        for (let kx = -halfSize; kx < halfSize; kx++) {
-                            const pixelX = Math.min(Math.max(x + kx, 0), this.width - 1);
-                            const pixelY = Math.min(Math.max(y + ky, 0), this.height - 1);
+                    for (let ky = -halfSize; ky <= halfSize; ky++) {
+                        for (let kx = -halfSize; kx <= halfSize; kx++) {
+                            const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
+                            const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
 
                             const kernelValue = kernel[ky + halfSize][kx + halfSize];
-                            const dataIndex = (pixelY * this.width + pixelX) * this.channels + c;
+                            const dataIndex = (((pixelY * width) + pixelX) * channels) + c;
 
                             sum += this.data[dataIndex] * kernelValue;
                         }
                     }
 
-                    const outputIndex = (y * this.width + x) * this.channels + c;
+                    const outputIndex = (((y * width) + x) * channels) + c;
                     output[outputIndex] = sum;
                 }
             }
