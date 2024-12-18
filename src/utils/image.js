@@ -651,6 +651,88 @@ export class RawImage {
         }
     }
 
+    /**
+     * Generates a 1D Gaussian kernel.
+     * @param {number} kernelSize - Kernel size (must be odd).
+     * @param {number} sigma - Standard deviation of the Gaussian.
+     * @returns {Array<number>} - The 1D Gaussian kernel.
+     */
+    generateGaussianKernel(kernelSize, sigma) {
+        // Kernel must be odd because each pixel must sit evenly in the middle.
+        if (kernelSize % 2 === 0) {
+            throw new Error('Kernel size must be odd.');
+        }
+
+        const kernel = [];
+        const center = Math.floor(kernelSize / 2);
+        let sum = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+            kernel[i] = [];
+            for (let j = 0; j < kernelSize; j++) {
+                const x = i - center;
+                const y = j - center;
+
+                // Square the numbers.
+                const x2 = x * x;
+                const y2 = y * y;
+                const sigma2 = sigma * sigma;
+
+                const value = Math.exp(-(x2 + y2) / (2 * sigma2));
+                kernel[i][j] = value;
+                sum += value;
+            }
+        }
+
+        // Normalise the kernel.
+        for (let i = 0; i < kernelSize; i++) {
+            for (let j = 0; j < kernelSize; j++) {
+                kernel[i][j] /= sum;
+            }
+        }
+
+        return kernel;
+    }
+
+    /**
+     * Performs a Gaussian blur on the image.
+     * @param {number} kernelSize - Kernel size (must be odd).
+     * @param {number} sigma - Standard deviation of the Gaussian.
+     * @returns {Promise<RawImage>} - The blurred image.
+     */
+    async gaussianBlur(kernelSize = 3, sigma = 1) {
+        const kernel = this.generateGaussianKernel(kernelSize, sigma);
+        const output = new Uint8ClampedArray(this.data.length);
+        const halfSize = Math.floor(kernelSize / 2);
+
+        for (let c = 0; c < this.channels; c++) {
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    let sum = 0;
+
+                    for (let ky = -halfSize; ky < halfSize; ky++) {
+                        for (let kx = -halfSize; kx < halfSize; kx++) {
+                            const pixelX = Math.min(Math.max(x + kx, 0), this.width - 1);
+                            const pixelY = Math.min(Math.max(y + ky, 0), this.height - 1);
+
+                            const kernelValue = kernel[ky + halfSize][kx + halfSize];
+                            const dataIndex = (pixelY * this.width + pixelX) * this.channels + c;
+
+                            sum += this.data[dataIndex] * kernelValue;
+                        }
+                    }
+
+                    const outputIndex = (y * this.width + x) * this.channels + c;
+                    output[outputIndex] = sum;
+                }
+            }
+        }
+
+        // Update the image data with the blurred result.
+        this.data = output;
+        return this;
+    }
+
     async toBlob(type = 'image/png', quality = 1) {
         if (!IS_BROWSER_OR_WEBWORKER) {
             throw new Error('toBlob() is only supported in browser environments.')
