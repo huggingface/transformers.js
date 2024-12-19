@@ -688,7 +688,7 @@ export class FillMaskPipeline extends (/** @type {new (options: TextPipelineCons
                 return {
                     score: values[i],
                     token: Number(x),
-                    token_str: this.tokenizer.model.vocab[x],
+                    token_str: this.tokenizer.decode([x]),
                     sequence: this.tokenizer.decode(sequence, { skip_special_tokens: true }),
                 }
             }));

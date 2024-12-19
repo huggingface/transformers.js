@@ -100,14 +100,9 @@ export default () => {
       async () => {
         const inputs = tokenizer("hello");
         const { logits } = await model(inputs);
-        const target = [[0.00043986947275698185, -0.030218850821256638]].flat();
+        const target = [[0.00043986947275698185, -0.030218850821256638]];
         expect(logits.dims).toEqual([1, 2]);
-        logits
-          .tolist()
-          .flat()
-          .forEach((item, i) => {
-            expect(item).toBeCloseTo(target[i], 5);
-          });
+        expect(logits.tolist()).toBeCloseToNested(target, 5);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -120,14 +115,9 @@ export default () => {
         const target = [
           [0.00043986947275698185, -0.030218850821256638],
           [0.0003853091038763523, -0.03022204339504242],
-        ].flat();
+        ];
         expect(logits.dims).toEqual([2, 2]);
-        logits
-          .tolist()
-          .flat()
-          .forEach((item, i) => {
-            expect(item).toBeCloseTo(target[i], 5);
-          });
+        expect(logits.tolist()).toBeCloseToNested(target, 5);
       },
       MAX_TEST_EXECUTION_TIME,
     );
