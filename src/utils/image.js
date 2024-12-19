@@ -687,11 +687,13 @@ export class RawImage {
      * Performs a Gaussian blur on the image.
      * @param {number} kernelSize - Kernel size (must be odd).
      * @param {number} sigma - Standard deviation of the Gaussian.
+     * @param {number} numChunks - Number of chunks to divide the image into for parallel processing.
      * @returns {Promise<RawImage>} - The blurred image.
      */
-    async gaussianBlur(kernelSize = 3, sigma = 1) {
+    async gaussianBlur(kernelSize = 3, sigma = 1, numChunks = 4) {
         const kernel = this.generateGaussianKernel(kernelSize, sigma);
         const halfSize = Math.floor(kernelSize / 2);
+
         const width = this.width;
         const height = this.height;
         const channels = this.channels;
@@ -703,43 +705,67 @@ export class RawImage {
         const horizontalPass = new Float32Array(this.data.length);
         const verticalPass = new Uint8ClampedArray(this.data.length);
 
-        // Horizontal pass.
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                for (let c = 0; c < channels; c++) {
-                    let sum = 0;
+        const chunkHeight = Math.ceil(height / numChunks);
 
-                    for (let kx = -halfSize; kx <= halfSize; kx++) {
-                        const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
-                        const dataIndex = ((y * width) + pixelX) * channels + c;
-                        const kernelValue = kernel[kx + halfSize];
-                        sum += this.data[dataIndex] * kernelValue;
+        // Process horizontal pass in chunks.
+        const horizontalPassPromises = Array.from({ length: numChunks }, (_, chunkIndex) => {
+            return new Promise(resolve => {
+                const startY = chunkIndex * chunkHeight;
+                const endY = Math.min(startY + chunkHeight, height);
+
+                for (let y = startY; y < endY; y++) {
+                    for (let x = 0; x < width; x++) {
+                        for (let c = 0; c < channels; c++) {
+                            let sum = 0;
+
+                            for (let kx = -halfSize; kx <= halfSize; kx++) {
+                                const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
+                                const dataIndex = (((y * width) + pixelX) * channels) + c;
+                                const kernelValue = kernel[kx + halfSize];
+                                sum += this.data[dataIndex] * kernelValue;
+                            }
+
+                            const outputIndex = (((y * width) + x) * channels) + c;
+                            horizontalPass[outputIndex] = sum;
+                        }
                     }
-
-                    const outputIndex = ((y * width) + x) * channels + c;
-                    horizontalPass[outputIndex] = sum;
                 }
-            }
-        }
+                resolve();
+            });
+        });
 
-        // Vertical pass.
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                for (let c = 0; c < channels; c++) {
-                    let sum = 0;
+        // Wait for all horizontal chunks to complete.
+        await Promise.all(horizontalPassPromises);
 
-                    for (let ky = -halfSize; ky <= halfSize; ky++) {
-                        const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
-                        const dataIndex = ((pixelY * width) + x) * channels + c;
-                        const kernelValue = kernel[ky + halfSize];
-                        sum += horizontalPass[dataIndex] * kernelValue;
+        // Process vertical pass in chunks.
+        const verticalPassPromises = Array.from({ length: numChunks }, (_, chunkIndex) => {
+            return new Promise(resolve => {
+                const startY = chunkIndex * chunkHeight;
+                const endY = Math.min(startY + chunkHeight, height);
+
+                for (let y = startY; y < endY; y++) {
+                    for (let x = 0; x < width; x++) {
+                        for (let c = 0; c < channels; c++) {
+                            let sum = 0;
+
+                            for (let ky = -halfSize; ky <= halfSize; ky++) {
+                                const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
+                                const dataIndex = (((pixelY * width) + x) * channels) + c;
+                                const kernelValue = kernel[ky + halfSize];
+                                sum += horizontalPass[dataIndex] * kernelValue;
+                            }
+
+                            const outputIndex = (((y * width) + x) * channels) + c;
+                            verticalPass[outputIndex] = sum;
+                        }
                     }
-
-                    const outputIndex = ((y * width) + x) * channels + c;
-                    verticalPass[outputIndex] = sum;
                 }
-            }
-        }
+                resolve();
+            });
+        });
+
+        // Wait for all vertical chunks to complete.
+        await Promise.all(verticalPassPromises);
 
         this.data = verticalPass;
         return this;
