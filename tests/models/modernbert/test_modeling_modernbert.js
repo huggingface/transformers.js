@@ -37,6 +37,18 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it(
+      "sequence_length > local_attention_window",
+      async () => {
+        const text = "The sun cast long shadows across the weathered cobblestones as Thomas made his way through the ancient city. The evening air carried whispers of autumn, rustling through the golden leaves that danced and swirled around his feet. His thoughts wandered to the events that had brought him here, to this moment, in this forgotten corner of the world. The old buildings loomed above him, their facades telling stories of centuries past. Windows reflected the dying light of day, creating a kaleidoscope of amber and rose that painted the narrow streets. The distant sound of church bells echoed through the maze of alleyways, marking time's steady march forward. In his pocket, he fingered the small brass key that had belonged to his grandfather. Its weight seemed to grow heavier with each step, a tangible reminder of the promise he had made. The mystery of its purpose had consumed his thoughts for weeks, leading him through archives and dusty libraries, through conversations with local historians and elderly residents who remembered the old days. As the evening deepened into dusk, streetlamps flickered to life one by one, creating pools of warm light that guided his way. The smell of wood smoke and distant cooking fires drifted through the air, reminding him of childhood evenings spent by the hearth, listening to his grandfather's tales of hidden treasures and secret passages. His footsteps echoed against the stone walls, a rhythmic accompaniment to his journey. Each step brought him closer to his destination, though uncertainty still clouded his mind about what he might find. The old map in his other pocket, creased and worn from constant consultation, had led him this far. The street ahead narrowed, and the buildings seemed to lean in closer, their upper stories nearly touching above his head. The air grew cooler in this shadowed passage, and his breath formed small clouds in front of him. Something about this place felt different, charged with possibility and ancient secrets. He walked down the [MASK]";
+        const inputs = tokenizer(text);
+        const { last_hidden_state } = await model(inputs);
+        expect(last_hidden_state.dims).toEqual([1, 397, 32]);
+        expect(last_hidden_state.mean().item()).toBeCloseTo(-0.06889555603265762, 5);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
