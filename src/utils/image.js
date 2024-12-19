@@ -665,30 +665,19 @@ export class RawImage {
 
         const kernel = [];
         const center = Math.floor(kernelSize / 2);
+        const sigma2 = sigma * sigma;
         let sum = 0;
 
         for (let i = 0; i < kernelSize; i++) {
-            kernel[i] = [];
-            for (let j = 0; j < kernelSize; j++) {
-                const x = i - center;
-                const y = j - center;
-
-                // Square the numbers.
-                const x2 = x * x;
-                const y2 = y * y;
-                const sigma2 = sigma * sigma;
-
-                const value = Math.exp(-(x2 + y2) / (2 * sigma2));
-                kernel[i][j] = value;
-                sum += value;
-            }
+            const x = i - center;
+            const value = Math.exp(-(x * x) / (2 * sigma2));
+            kernel[i] = value;
+            sum += value;
         }
 
-        // Normalise the kernel.
+        // Normalize the kernel
         for (let i = 0; i < kernelSize; i++) {
-            for (let j = 0; j < kernelSize; j++) {
-                kernel[i][j] /= sum;
-            }
+            kernel[i] /= sum;
         }
 
         return kernel;
@@ -702,38 +691,57 @@ export class RawImage {
      */
     async gaussianBlur(kernelSize = 3, sigma = 1) {
         const kernel = this.generateGaussianKernel(kernelSize, sigma);
-        const output = new Uint8ClampedArray(this.data.length);
         const halfSize = Math.floor(kernelSize / 2);
-
-        const height = this.height;
         const width = this.width;
+        const height = this.height;
         const channels = this.channels;
 
+        // Rather than checking an entire grid of elements, we can instead do
+        // two separate passes with a 1d array (rather than 2d).
+        // Consider a 3x3 kernel, instead of calculating each pixel 9 times, we
+        // can instead calculate two sets of 3 values and then combine them.
+        const horizontalPass = new Float32Array(this.data.length);
+        const verticalPass = new Uint8ClampedArray(this.data.length);
+
+        // Horizontal pass.
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                for (let c = 0; c < channels; c++) {
+                    let sum = 0;
+
+                    for (let kx = -halfSize; kx <= halfSize; kx++) {
+                        const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
+                        const dataIndex = ((y * width) + pixelX) * channels + c;
+                        const kernelValue = kernel[kx + halfSize];
+                        sum += this.data[dataIndex] * kernelValue;
+                    }
+
+                    const outputIndex = ((y * width) + x) * channels + c;
+                    horizontalPass[outputIndex] = sum;
+                }
+            }
+        }
+
+        // Vertical pass.
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 for (let c = 0; c < channels; c++) {
                     let sum = 0;
 
                     for (let ky = -halfSize; ky <= halfSize; ky++) {
-                        for (let kx = -halfSize; kx <= halfSize; kx++) {
-                            const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
-                            const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
-
-                            const kernelValue = kernel[ky + halfSize][kx + halfSize];
-                            const dataIndex = (((pixelY * width) + pixelX) * channels) + c;
-
-                            sum += this.data[dataIndex] * kernelValue;
-                        }
+                        const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
+                        const dataIndex = ((pixelY * width) + x) * channels + c;
+                        const kernelValue = kernel[ky + halfSize];
+                        sum += horizontalPass[dataIndex] * kernelValue;
                     }
 
-                    const outputIndex = (((y * width) + x) * channels) + c;
-                    output[outputIndex] = sum;
+                    const outputIndex = ((y * width) + x) * channels + c;
+                    verticalPass[outputIndex] = sum;
                 }
             }
         }
 
-        // Update the image data with the blurred result.
-        this.data = output;
+        this.data = verticalPass;
         return this;
     }
 
@@ -785,7 +793,7 @@ export class RawImage {
     /**
      * Split this image into individual bands. This method returns an array of individual image bands from an image.
      * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
-     * 
+     *
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
      * @returns {RawImage[]} An array containing bands.
      */
