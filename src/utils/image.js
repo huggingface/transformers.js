@@ -651,6 +651,100 @@ export class RawImage {
         }
     }
 
+    /**
+     * Generates a 1D Gaussian kernel.
+     * @param {number} kernelSize - Kernel size (must be odd).
+     * @param {number} sigma - Standard deviation of the Gaussian.
+     * @returns {Array<number>} - The 1D Gaussian kernel.
+     */
+    generateGaussianKernel(kernelSize, sigma) {
+        // Kernel must be odd because each pixel must sit evenly in the middle.
+        if (kernelSize % 2 === 0) {
+            throw new Error('Kernel size must be odd.');
+        }
+
+        const kernel = [];
+        const center = Math.floor(kernelSize / 2);
+        const sigma2 = sigma * sigma;
+        let sum = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+            const x = i - center;
+            const value = Math.exp(-(x * x) / (2 * sigma2));
+            kernel[i] = value;
+            sum += value;
+        }
+
+        // Normalize the kernel
+        for (let i = 0; i < kernelSize; i++) {
+            kernel[i] /= sum;
+        }
+
+        return kernel;
+    }
+
+    /**
+     * Performs a Gaussian blur on the image.
+     * @param {number} kernelSize - Kernel size (must be odd).
+     * @param {number} sigma - Standard deviation of the Gaussian.
+     * @returns {Promise<RawImage>} - The blurred image.
+     */
+    async gaussianBlur(kernelSize = 3, sigma = 1) {
+        const kernel = this.generateGaussianKernel(kernelSize, sigma);
+        const halfSize = Math.floor(kernelSize / 2);
+        const width = this.width;
+        const height = this.height;
+        const channels = this.channels;
+
+        // Rather than checking an entire grid of elements, we can instead do
+        // two separate passes with a 1d array (rather than 2d).
+        // Consider a 3x3 kernel, instead of calculating each pixel 9 times, we
+        // can instead calculate two sets of 3 values and then combine them.
+        const horizontalPass = new Float32Array(this.data.length);
+        const verticalPass = new Uint8ClampedArray(this.data.length);
+
+        // Horizontal pass.
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                for (let c = 0; c < channels; c++) {
+                    let sum = 0;
+
+                    for (let kx = -halfSize; kx <= halfSize; kx++) {
+                        const pixelX = Math.min(Math.max(x + kx, 0), width - 1);
+                        const dataIndex = ((y * width) + pixelX) * channels + c;
+                        const kernelValue = kernel[kx + halfSize];
+                        sum += this.data[dataIndex] * kernelValue;
+                    }
+
+                    const outputIndex = ((y * width) + x) * channels + c;
+                    horizontalPass[outputIndex] = sum;
+                }
+            }
+        }
+
+        // Vertical pass.
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                for (let c = 0; c < channels; c++) {
+                    let sum = 0;
+
+                    for (let ky = -halfSize; ky <= halfSize; ky++) {
+                        const pixelY = Math.min(Math.max(y + ky, 0), height - 1);
+                        const dataIndex = ((pixelY * width) + x) * channels + c;
+                        const kernelValue = kernel[ky + halfSize];
+                        sum += horizontalPass[dataIndex] * kernelValue;
+                    }
+
+                    const outputIndex = ((y * width) + x) * channels + c;
+                    verticalPass[outputIndex] = sum;
+                }
+            }
+        }
+
+        this.data = verticalPass;
+        return this;
+    }
+
     async toBlob(type = 'image/png', quality = 1) {
         if (!IS_BROWSER_OR_WEBWORKER) {
             throw new Error('toBlob() is only supported in browser environments.')
@@ -699,7 +793,7 @@ export class RawImage {
     /**
      * Split this image into individual bands. This method returns an array of individual image bands from an image.
      * For example, splitting an "RGB" image creates three new images each containing a copy of one of the original bands (red, green, blue).
-     * 
+     *
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
      * @returns {RawImage[]} An array containing bands.
      */
