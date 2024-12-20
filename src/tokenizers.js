@@ -726,9 +726,6 @@ class BPE extends TokenizerModel {
         }
 
         this.ignore_merges = this.config.ignore_merges ?? false;
-
-        /** @type {Map<string, string[]>} */
-        this.cache = new Map();
     }
 
     /**
@@ -740,11 +737,6 @@ class BPE extends TokenizerModel {
     bpe(token) {
         if (token.length === 0) {
             return [];
-        }
-
-        const cached = this.cache.get(token);
-        if (cached !== undefined) {
-            return cached;
         }
 
         const word = Array.from(token);
@@ -854,9 +846,6 @@ class BPE extends TokenizerModel {
                 result[i] += this.continuing_subword_suffix;
             }
         }
-
-        // Save the result to the cache
-        this.cache.set(token, result);
 
         return result;
     }
