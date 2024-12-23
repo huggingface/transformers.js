@@ -1,4 +1,4 @@
-import { createInferenceSession } from "../backends/onnx.js";
+import { createInferenceSession, isONNXProxy } from "../backends/onnx.js";
 import { Tensor } from "../utils/tensor.js";
 
 /**
@@ -17,7 +17,8 @@ const wrap = async (session_bytes, session_options, names) => {
         new Uint8Array(session_bytes), session_options,
     );
     return /** @type {any} */(async (/** @type {Record<string, Tensor>} */ inputs) => {
-        const ortFeed = Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, v.ort_tensor]));
+        const proxied = isONNXProxy();
+        const ortFeed = Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, (proxied ? v.clone() : v).ort_tensor]));
         const outputs = await session.run(ortFeed);
 
         if (Array.isArray(names)) {
