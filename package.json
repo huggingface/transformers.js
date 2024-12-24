@@ -69,6 +69,7 @@
     "jest-environment-node": "^30.0.0-alpha.6",
     "jsdoc-to-markdown": "^9.1.1",
     "prettier": "3.4.2",
+    "terser-webpack-plugin": "^5.3.10",
     "typescript": "^5.7.2",
     "wavefile": "11.0.0",
     "webpack": "^5.97.1",
