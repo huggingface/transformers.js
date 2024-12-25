@@ -3421,7 +3421,7 @@ export class MoonshinePreTrainedModel extends PreTrainedModel {
  */
 export class MoonshineModel extends MoonshinePreTrainedModel { }
 
-export class MoonshineForConditionalGeneration extends MoonshinePreTrainedModel { } 
+export class MoonshineForConditionalGeneration extends MoonshinePreTrainedModel { }
 //////////////////////////////////////////////////
 
 
@@ -3821,9 +3821,9 @@ export class CLIPTextModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'text_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'text_model',
         });
     }
 }
@@ -3858,9 +3858,9 @@ export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'text_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'text_model',
         });
     }
 }
@@ -3872,9 +3872,9 @@ export class CLIPVisionModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'vision_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'vision_model',
         });
     }
 }
@@ -3909,9 +3909,9 @@ export class CLIPVisionModelWithProjection extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'vision_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'vision_model',
         });
     }
 }
@@ -3997,9 +3997,9 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'text_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'text_model',
         });
     }
 }
@@ -4034,9 +4034,9 @@ export class SiglipVisionModel extends CLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'vision_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'vision_model',
         });
     }
 }
@@ -4093,9 +4093,9 @@ export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'text_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'text_model',
         });
     }
 }
@@ -4104,9 +4104,9 @@ export class JinaCLIPVisionModel extends JinaCLIPPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'vision_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'vision_model',
         });
     }
 }
@@ -6338,9 +6338,9 @@ export class ClapTextModelWithProjection extends ClapPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'text_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'text_model',
         });
     }
 }
@@ -6375,9 +6375,9 @@ export class ClapAudioModelWithProjection extends ClapPreTrainedModel {
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
-            // Update default model file name if not provided
-            model_file_name: 'audio_model',
             ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'audio_model',
         });
     }
 }
