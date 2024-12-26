@@ -7728,10 +7728,17 @@ export class SequenceClassifierOutput extends ModelOutput {
     /**
      * @param {Object} output The output of the model.
      * @param {Tensor} output.logits classification (or regression if config.num_labels==1) scores (before SoftMax).
+     * @param {Record<string, Tensor>} [output.attentions] Object of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length, sequence_length)`.
+     * Attentions weights after the attention softmax, used to compute the weighted average in the self-attention heads.
      */
-    constructor({ logits }) {
+    constructor({ logits, ...attentions }) {
         super();
         this.logits = logits;
+        const attentions_list = Object.values(attentions);
+        if (attentions_list.length > 0) {
+            // Only set attentions if they are not empty
+            this.attentions = attentions_list;
+        }
     }
 }
 
