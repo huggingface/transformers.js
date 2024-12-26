@@ -9,6 +9,8 @@
 
 import {
     interpolate_data,
+    max,
+    min,
     permute_data
 } from './maths.js';
 
@@ -757,6 +759,40 @@ export class Tensor {
 
     mean(dim = null, keepdim = false) {
         return mean(this, dim, keepdim);
+    }
+
+    min(dim = null, keepdim = false) {
+        if (dim !== null) {
+            throw new Error("`dim !== null` not yet implemented.");
+        }
+        // @ts-ignore
+        const value = min(this.data)[0];
+        return new Tensor(this.type, [value], []);
+    }
+    max(dim = null, keepdim = false) {
+        if (dim !== null) {
+            throw new Error("`dim !== null` not yet implemented.");
+        }
+        // @ts-ignore
+        const value = max(this.data)[0];
+        return new Tensor(this.type, [value], []);
+    }
+
+    argmin(dim = null, keepdim = false) {
+        if (dim !== null) {
+            throw new Error("`dim !== null` not yet implemented.");
+        }
+        // @ts-ignore
+        const index = min(this.data)[1];
+        return new Tensor('int64', [BigInt(index)], []);
+    }
+    argmax(dim = null, keepdim = false) {
+        if (dim !== null) {
+            throw new Error("`dim !== null` not yet implemented.");
+        }
+        // @ts-ignore
+        const index = max(this.data)[1];
+        return new Tensor('int64', [BigInt(index)], []);
     }
 
     /**
