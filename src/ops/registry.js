@@ -36,6 +36,16 @@ export class TensorOpRegistry {
         // executionProviders: ['webgpu'],
     };
 
+    static get nearest_interpolate_4d() {
+        if (!this._nearest_interpolate_4d) {
+            this._nearest_interpolate_4d = wrap(
+                [8, 10, 18, 0, 58, 129, 1, 10, 41, 10, 1, 120, 10, 0, 10, 0, 10, 1, 115, 18, 1, 121, 34, 6, 82, 101, 115, 105, 122, 101, 42, 18, 10, 4, 109, 111, 100, 101, 34, 7, 110, 101, 97, 114, 101, 115, 116, 160, 1, 3, 18, 1, 114, 90, 31, 10, 1, 120, 18, 26, 10, 24, 8, 1, 18, 20, 10, 3, 18, 1, 98, 10, 3, 18, 1, 99, 10, 3, 18, 1, 104, 10, 3, 18, 1, 119, 90, 15, 10, 1, 115, 18, 10, 10, 8, 8, 7, 18, 4, 10, 2, 8, 4, 98, 31, 10, 1, 121, 18, 26, 10, 24, 8, 1, 18, 20, 10, 3, 18, 1, 98, 10, 3, 18, 1, 99, 10, 3, 18, 1, 104, 10, 3, 18, 1, 119, 66, 2, 16, 21],
+                this.session_options,
+                'y',
+            );
+        }
+        return this._nearest_interpolate_4d;
+    }
     static get bilinear_interpolate_4d() {
         if (!this._bilinear_interpolate_4d) {
             this._bilinear_interpolate_4d = wrap(

@@ -892,7 +892,7 @@ export function interpolate(input, [out_height, out_width], mode = 'bilinear', a
  * @param {Tensor} input the input tensor
  * @param {Object} options the options for the interpolation
  * @param {[number, number]|[number, number, number]|[number, number, number, number]} [options.size=null] output spatial size.
- * @param {"bilinear"|"bicubic"} [options.mode='bilinear'] algorithm used for upsampling
+ * @param {"nearest"|"bilinear"|"bicubic"} [options.mode='bilinear'] algorithm used for upsampling
  * @returns {Promise<Tensor>} The interpolated tensor.
  */
 export async function interpolate_4d(input, {
@@ -922,7 +922,9 @@ export async function interpolate_4d(input, {
     }
 
     let op;
-    if (mode === 'bilinear') {
+    if (mode === 'nearest') {
+        op = await TensorOpRegistry.nearest_interpolate_4d;
+    } else if (mode === 'bilinear') {
         op = await TensorOpRegistry.bilinear_interpolate_4d;
     } else if (mode === 'bicubic') {
         op = await TensorOpRegistry.bicubic_interpolate_4d;
@@ -963,13 +965,13 @@ export async function rfft(x, a) {
  * Returns the k largest elements of the given input tensor.
  * Inspired by https://pytorch.org/docs/stable/generated/torch.topk.html
  * @param {Tensor} x the input tensor
- * @param {number} k the k in "top-k"
+ * @param {number} [k] the k in "top-k"
  * @returns {Promise<[Tensor, Tensor]>} the output tuple of (Tensor, LongTensor) of top-k elements and their indices.
  */
 export async function topk(x, k) {
     const op = await TensorOpRegistry.top_k;
 
-    if (k === null) {
+    if (k == null) {
         k = x.dims.at(-1);
     } else {
         k = Math.min(k, x.dims.at(-1));
@@ -998,10 +1000,10 @@ const arrayToIndexTensor = (array) => new Tensor('int64', array, [array.length])
 export async function slice(data, starts, ends, axes, steps) {
     const op = await TensorOpRegistry.slice;
     return await op({
-        x: data, 
-        s: arrayToIndexTensor(starts), 
-        e: arrayToIndexTensor(ends), 
-        a: arrayToIndexTensor(axes), 
+        x: data,
+        s: arrayToIndexTensor(starts),
+        e: arrayToIndexTensor(ends),
+        a: arrayToIndexTensor(axes),
         t: arrayToIndexTensor(steps ?? new Array(axes.length).fill(1)),
     });
 }
