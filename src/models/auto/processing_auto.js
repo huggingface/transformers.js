@@ -51,12 +51,11 @@ export class AutoProcessor {
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
-     * @param {import('../../utils/hub.js').PretrainedOptions} options Additional options for loading the processor.
+     * @param {import('../../base/processing_utils.js').PretrainedProcessorOptions} options Additional options for loading the processor.
      * 
      * @returns {Promise<Processor>} A new instance of the Processor class.
      */
 
-    /** @type {typeof Processor.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options={}) {
 
         // TODO: first check for processor.json 
