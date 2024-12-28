@@ -41,6 +41,7 @@ export class PaliGemmaProcessor extends Processor {
         }
 
         const bos_token = this.tokenizer.bos_token;
+        // @ts-expect-error TS2339
         const image_seq_length = this.image_processor.config.image_seq_length;
         let input_strings;
         if (text.some((t) => t.includes(IMAGE_TOKEN))) {

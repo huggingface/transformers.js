@@ -28,6 +28,7 @@ export class Qwen2VLProcessor extends Processor {
         }
 
         if (image_grid_thw) {
+            // @ts-expect-error TS2551
             let merge_length = this.image_processor.config.merge_size ** 2;
             let index = 0;
 

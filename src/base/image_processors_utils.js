@@ -604,14 +604,20 @@ export class ImageProcessor extends Callable {
         this.do_thumbnail = config.do_thumbnail;
         this.size = config.size ?? config.image_size;
         this.do_resize = config.do_resize ?? (this.size !== undefined);
+        // @ts-expect-error TS2339
         this.size_divisibility = config.size_divisibility ?? config.size_divisor;
 
         this.do_center_crop = config.do_center_crop;
+        // @ts-expect-error TS2339
         this.crop_size = config.crop_size;
+        // @ts-expect-error TS2339
         this.do_convert_rgb = config.do_convert_rgb ?? true;
+        // @ts-expect-error TS2339
         this.do_crop_margin = config.do_crop_margin;
 
+        // @ts-expect-error TS2339
         this.pad_size = config.pad_size;
+        // @ts-expect-error TS2339
         this.do_pad = config.do_pad;
 
         if (this.do_pad && !this.pad_size && this.size && this.size.width !== undefined && this.size.height !== undefined) {
@@ -820,6 +826,7 @@ export class ImageProcessor extends Callable {
         // Support both formats for backwards compatibility
         else if (Number.isInteger(size)) {
             shortest_edge = size;
+            // @ts-expect-error TS2339
             longest_edge = this.config.max_size ?? shortest_edge;
 
         } else if (size !== undefined) {
@@ -888,6 +895,7 @@ export class ImageProcessor extends Callable {
         } else if (size.min_pixels !== undefined && size.max_pixels !== undefined) {
             // Custom resize logic for Qwen2-VL models
             const { min_pixels, max_pixels } = size;
+            // @ts-expect-error TS2339
             const factor = this.config.patch_size * this.config.merge_size;
             return smart_resize(srcHeight, srcWidth, factor, min_pixels, max_pixels);
         } else {
@@ -903,6 +911,7 @@ export class ImageProcessor extends Callable {
     async resize(image) {
         const [newWidth, newHeight] = this.get_resize_output_image_size(image, this.size);
         return await image.resize(newWidth, newHeight, {
+            // @ts-expect-error TS2322
             resample: this.resample,
         });
     }
@@ -953,6 +962,7 @@ export class ImageProcessor extends Callable {
 
         // Resize the image using thumbnail method.
         if (this.do_thumbnail) {
+            // @ts-expect-error TS2345
             image = await this.thumbnail(image, this.size, this.resample);
         }
 
@@ -977,6 +987,7 @@ export class ImageProcessor extends Callable {
         // NOTE: All pixel-level manipulation (i.e., modifying `pixelData`)
         // occurs with data in the hwc format (height, width, channels), 
         // to emulate the behavior of the original Python code (w/ numpy).
+        /** @type {Float32Array} */
         let pixelData = Float32Array.from(image.data);
         let imgDims = [image.height, image.width, image.channels];
 
