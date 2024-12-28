@@ -466,8 +466,6 @@ export class Tensor {
         return this.permute(...dims);
     }
 
-    // TODO add .max() and .min() methods
-
     /**
      * Returns the sum of each row of the input tensor in the given dimension dim.
      *
@@ -765,7 +763,6 @@ export class Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
-        // @ts-ignore
         const value = min(this.data)[0];
         return new Tensor(this.type, [value], []);
     }
@@ -773,7 +770,6 @@ export class Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
-        // @ts-ignore
         const value = max(this.data)[0];
         return new Tensor(this.type, [value], []);
     }
@@ -782,7 +778,6 @@ export class Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
-        // @ts-ignore
         const index = min(this.data)[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
@@ -790,7 +785,6 @@ export class Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
-        // @ts-ignore
         const index = max(this.data)[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
