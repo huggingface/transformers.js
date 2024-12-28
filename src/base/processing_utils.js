@@ -84,6 +84,11 @@ export class Processor extends Callable {
         });
     }
 
+    /**
+     * Calls the processor with the given input.
+     * @param {...any} args Additional arguments.
+     * @returns {any} The processed input.
+     */
     batch_decode(...args) {
         if (!this.tokenizer) {
             throw new Error('Unable to decode without a tokenizer.');
