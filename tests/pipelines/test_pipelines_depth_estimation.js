@@ -1,4 +1,4 @@
-import { pipeline, DepthEstimationPipeline, RawImage } from "../../src/transformers.js";
+import { pipeline, DepthEstimationPipeline } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import { load_cached_image } from "../asset_cache.js";
@@ -25,7 +25,7 @@ export default () => {
         "default",
         async () => {
           const output = await pipe(images[0]);
-          expect(output.predicted_depth.dims).toEqual([32, 32]);
+          expect(output.predicted_depth.dims).toEqual([224, 224]);
           expect(output.predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 6);
           expect(output.depth.size).toEqual(images[0].size);
         },
@@ -39,10 +39,10 @@ export default () => {
         async () => {
           const output = await pipe(images);
           expect(output).toHaveLength(images.length);
-          expect(output[0].predicted_depth.dims).toEqual([32, 32]);
+          expect(output[0].predicted_depth.dims).toEqual([224, 224]);
           expect(output[0].predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 6);
           expect(output[0].depth.size).toEqual(images[0].size);
-          expect(output[1].predicted_depth.dims).toEqual([32, 32]);
+          expect(output[1].predicted_depth.dims).toEqual([224, 224]);
           expect(output[1].predicted_depth.mean().item()).toBeCloseTo(0.0000014548650142387487, 6);
           expect(output[1].depth.size).toEqual(images[1].size);
         },
