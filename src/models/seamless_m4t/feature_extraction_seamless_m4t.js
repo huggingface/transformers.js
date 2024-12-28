@@ -133,8 +133,8 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
                         'int64',
                         new BigInt64Array(numPaddedFrames),
                         [1, numPaddedFrames],
-                    )
-                    padded_attention_mask.data.fill(1n, 0, num_frames);
+                    );
+                    /** @type {BigInt64Array} */ (padded_attention_mask.data).fill(1n, 0, num_frames);
                 }
             }
         }

@@ -146,6 +146,8 @@ export class Idefics3ImageProcessor extends ImageProcessor {
 
                     const start_offset = i * pixel_attention_mask_stride + num_patches * h * w;
                     const end_offset = (i + 1) * pixel_attention_mask_stride;
+
+                    // @ts-expect-error
                     pixel_attention_mask_data.fill(false, start_offset, end_offset);
                 }
             }

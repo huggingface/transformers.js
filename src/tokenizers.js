@@ -535,7 +535,7 @@ class Unigram extends TokenizerModel {
      * Create a new Unigram tokenizer model.
      * @param {Object} config The configuration object for the Unigram model.
      * @param {number} config.unk_id The ID of the unknown token
-     * @param {any[][]} config.vocab A 2D array representing a mapping of tokens to scores.
+     * @param {[string, number][]} config.vocab A 2D array representing a mapping of tokens to scores.
      * @param {Object} moreConfig Additional configuration object for the Unigram model.
      */
     constructor(config, moreConfig) {
@@ -543,11 +543,10 @@ class Unigram extends TokenizerModel {
 
         const vocabSize = config.vocab.length;
         this.vocab = new Array(vocabSize);
+        /** @type {number[]} */
         this.scores = new Array(vocabSize);
         for (let i = 0; i < vocabSize; ++i) {
-            const piece = config.vocab[i];
-            this.vocab[i] = piece[0];
-            this.scores[i] = piece[1];
+            [this.vocab[i], this.scores[i]] = config.vocab[i];
         }
 
         this.unk_token_id = config.unk_id;
