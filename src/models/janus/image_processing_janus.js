@@ -13,6 +13,7 @@ export class VLMImageProcessor extends ImageProcessor {
             },
             ...config,
         });
+        // @ts-expect-error TS2339
         this.constant_values = this.config.background_color.map(x => x * this.rescale_factor)
     }
 

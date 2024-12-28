@@ -121,7 +121,7 @@ class FileResponse {
      */
     async arrayBuffer() {
         const data = await fs.promises.readFile(this.filePath);
-        return data.buffer;
+        return /** @type {ArrayBuffer} */ (data.buffer);
     }
 
     /**

@@ -270,8 +270,11 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     } else if (session_options.externalData !== undefined) {
         externalDataPromises = session_options.externalData.map(async (ext) => {
             // if the external data is a string, fetch the file and replace the string with its content
+            // @ts-expect-error TS2339
             if (typeof ext.data === "string") {
+                // @ts-expect-error TS2339
                 const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
+                // @ts-expect-error TS2698
                 return { ...ext, data: ext_buffer };
             }
             return ext;
@@ -1519,6 +1522,7 @@ export class PreTrainedModel extends Callable {
                 if (this.config.model_type === 'musicgen') {
                     // Custom logic (TODO: move to Musicgen class)
                     decoder_input_ids = Array.from({
+                        // @ts-expect-error TS2339
                         length: batch_size * this.config.decoder.num_codebooks
                     }, () => [decoder_start_token_id]);
 
@@ -1848,11 +1852,13 @@ export class PreTrainedModel extends Callable {
     async encode_image({ pixel_values }) {
         // image_inputs === { pixel_values }
         const features = (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
+        // @ts-expect-error TS2339
         if (!this.config.num_image_tokens) {
             console.warn(
                 'The number of image tokens was not set in the model configuration. ' +
                 `Setting it to the number of features detected by the vision encoder (${features.dims[1]}).`
             )
+            // @ts-expect-error TS2339
             this.config.num_image_tokens = features.dims[1];
         }
         return features;
@@ -3280,6 +3286,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 
         if (generation_config.return_token_timestamps) {
             outputs["token_timestamps"] = this._extract_token_timestamps(
+                // @ts-expect-error TS2345
                 outputs,
                 generation_config.alignment_heads,
                 generation_config.num_frames,
@@ -3315,6 +3322,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             );
         }
 
+        // @ts-expect-error TS2339
         let median_filter_width = this.config.median_filter_width;
         if (median_filter_width === undefined) {
             console.warn("Model config has no `median_filter_width`, using default value of 7.")
@@ -3325,6 +3333,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         const batch = generate_outputs.cross_attentions;
         // Create a list with `decoder_layers` elements, each a tensor of shape
         // (batch size, attention_heads, output length, input length).
+        // @ts-expect-error TS2339
         const cross_attentions = Array.from({ length: this.config.decoder_layers },
             // Concatenate the cross attentions for each layer across sequence length dimension.
             (_, i) => cat(batch.map(x => x[i]), 2)
@@ -3468,6 +3477,7 @@ export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
         attention_mask,
     }) {
 
+        // @ts-expect-error TS2339
         const image_token_index = this.config.image_token_index;
 
         const idsList = input_ids.tolist();
@@ -6201,10 +6211,12 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
 
         const { encoder_outputs, encoder_attention_mask } = await encoderForward(this, model_inputs);
 
+        // @ts-expect-error TS2339
         const r = encoder_outputs.dims[1] / this.config.reduction_factor;
         const maxlen = Math.floor(r * maxlenratio);
         const minlen = Math.floor(r * minlenratio);
 
+        // @ts-expect-error TS2339
         const num_mel_bins = this.config.num_mel_bins;
 
         let spectrogramParts = [];
@@ -6569,11 +6581,13 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel { // NOTE:
      */
     _apply_and_filter_by_delay_pattern_mask(outputs) {
         const [bs_x_codebooks, seqLength] = outputs.dims;
+        // @ts-expect-error TS2339
         const num_codebooks = this.config.decoder.num_codebooks;
         const upperBound = (seqLength - num_codebooks);
 
         let newDataSize = 0;
         for (let i = 0; i < outputs.size; ++i) {
+            // @ts-expect-error TS2339
             if (outputs.data[i] === this.config.decoder.pad_token_id) {
                 continue;
             }
@@ -6603,7 +6617,9 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel { // NOTE:
         let clonedInputIds = structuredClone(input_ids);
         for (let i = 0; i < clonedInputIds.length; ++i) {
             for (let j = 0; j < clonedInputIds[i].length; ++j) {
+                // @ts-expect-error TS2339
                 if ((i % this.config.decoder.num_codebooks) >= j) {
+                    // @ts-expect-error TS2339
                     clonedInputIds[i][j] = BigInt(this.config.decoder.pad_token_id);
                 }
             }
@@ -6760,6 +6776,9 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         'past_key_values',
     ];
 
+    /**
+     * @param {ConstructorParameters<typeof MultiModalityPreTrainedModel>} args
+     */
     constructor(...args) {
         super(...args);
 
