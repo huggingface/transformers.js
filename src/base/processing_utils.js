@@ -121,8 +121,8 @@ export class Processor extends Callable {
     /**
      * Instantiate one of the processor classes of the library from a pretrained model.
      * 
-     * The processor class to instantiate is selected based on the `feature_extractor_type` property of the config object
-     * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
+     * The processor class to instantiate is selected based on the `image_processor_type` (or `feature_extractor_type`; legacy)
+     * property of the config object (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      * 
      * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
      * - A string, the *model id* of a pretrained processor hosted inside a model repo on huggingface.co.
