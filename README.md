@@ -47,7 +47,7 @@ npm i @huggingface/transformers
 Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. For example, using [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), you can import the library with:
 ```html
 <script type="module">
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.3';
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.4';
 </script>
 ```
 
@@ -155,7 +155,7 @@ Check out the Transformers.js [template](https://huggingface.co/new-space?templa
 
 
 
-By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.3/dist/), which should work out-of-the-box. You can customize this as follows:
+By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.2.4/dist/), which should work out-of-the-box. You can customize this as follows:
 
 ### Settings
 
