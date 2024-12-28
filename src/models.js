@@ -4453,6 +4453,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 const image_nums = vision_tokens.filter(x => x == image_token_id).length;
                 const video_nums = vision_tokens.filter(x => x == video_token_id).length;
 
+                /** @type {number[][]} */
                 let llm_pos_ids_list = [];
                 let st = 0;
                 let remain_images = image_nums;
@@ -4522,6 +4523,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 // NOTE: Each item in llm_pos_ids_list is an array of shape (3, text_len),
                 // meaning to perform concatenation along dim=1, we can do the following:
                 const num_items = llm_pos_ids_list.reduce((acc, x) => acc + x.length, 0);
+                /** @type {number[]} */
                 const llm_positions = new Array(num_items);
                 let index = 0;
                 for (let x = 0; x < 3; ++x) {
@@ -4562,9 +4564,10 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                     { length: 3 * data.length },
                     (_, i) => data[i % data.length]
                 );
+                /** @type {bigint[]} */
                 const mrope_position_deltas = Array.from(
                     { length: dims[0] },
-                    (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1 + dims[1]
+                    (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n + BigInt(dims[1])
                 );
 
                 return [
