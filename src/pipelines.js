@@ -69,7 +69,7 @@ import {
 import {
     Tensor,
     mean_pooling,
-    interpolate,
+    interpolate_4d,
     quantize_embeddings,
     topk,
 } from './utils/tensor.js';
@@ -2886,11 +2886,23 @@ export class DepthEstimationPipeline extends (/** @type {new (options: ImagePipe
 
         const toReturn = [];
         for (let i = 0; i < preparedImages.length; ++i) {
-            const prediction = interpolate(predicted_depth[i], preparedImages[i].size.reverse(), 'bilinear', false);
-            const formatted = prediction.mul_(255 / max(prediction.data)[0]).to('uint8');
+            const batch = predicted_depth[i];
+            const [height, width] = batch.dims.slice(-2);
+            const [new_width, new_height] = preparedImages[i].size;
+
+            // Interpolate to original size
+            const prediction = (await interpolate_4d(batch.view(1, 1, height, width), {
+                size: [new_height, new_width],
+                mode: 'bilinear',
+            })).view(new_height, new_width);
+
+            const minval = /** @type {number} */(prediction.min().item());
+            const maxval = /** @type {number} */(prediction.max().item());
+            const formatted = prediction.sub(minval).div_(maxval - minval).mul_(255).to('uint8').unsqueeze(0);
+            const depth = RawImage.fromTensor(formatted);
             toReturn.push({
-                predicted_depth: predicted_depth[i],
-                depth: RawImage.fromTensor(formatted),
+                predicted_depth: prediction,
+                depth,
             });
         }
 

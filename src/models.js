@@ -5135,7 +5135,7 @@ export class DPTModel extends DPTPreTrainedModel { }
  * 
  * **Example:** Depth estimation w/ `Xenova/dpt-hybrid-midas`.
  * ```javascript
- * import { DPTForDepthEstimation, AutoProcessor, RawImage, interpolate, max } from '@huggingface/transformers';
+ * import { DPTForDepthEstimation, AutoProcessor, RawImage, interpolate_4d } from '@huggingface/transformers';
  * 
  * // Load model and processor
  * const model_id = 'Xenova/dpt-hybrid-midas';
@@ -5144,7 +5144,7 @@ export class DPTModel extends DPTPreTrainedModel { }
  * 
  * // Load image from URL
  * const url = 'http://images.cocodataset.org/val2017/000000039769.jpg';
- * const image = await RawImage.fromURL(url);
+ * const image = await RawImage.read(url);
  * 
  * // Prepare image for the model
  * const inputs = await processor(image);
@@ -5153,10 +5153,15 @@ export class DPTModel extends DPTPreTrainedModel { }
  * const { predicted_depth } = await model(inputs);
  * 
  * // Interpolate to original size
- * const prediction = interpolate(predicted_depth, image.size.reverse(), 'bilinear', false);
+ * const prediction = (await interpolate_4d(predicted_depth.unsqueeze(1), {
+     * size: image.size.reverse(),
+     * mode: 'bilinear',
+ * })).squeeze(1);
  * 
  * // Visualize the prediction
- * const formatted = prediction.mul_(255 / max(prediction.data)[0]).to('uint8');
+ * const min = prediction.min().item();
+ * const max = prediction.max().item();
+ * const formatted = prediction.sub_(min).div_(max - min).mul_(255).to('uint8');
  * const depth = RawImage.fromTensor(formatted);
  * // RawImage {
  * //   data: Uint8Array(307200) [ 85, 85, 84, ... ],
@@ -5206,11 +5211,7 @@ export class GLPNPreTrainedModel extends PreTrainedModel { }
 export class GLPNModel extends GLPNPreTrainedModel { }
 
 /**
- * GLPN Model transformer with a lightweight depth estimation head on top e.g. for KITTI, NYUv2.
- * 
- * **Example:** Depth estimation w/ `Xenova/glpn-kitti`.
- * ```javascript
- * import { GLPNForDepthEstimation, AutoProcessor, RawImage, interpolate, max } from '@huggingface/transformers';
+ * import { GLPNForDepthEstimation, AutoProcessor, RawImage, interpolate_4d } from '@huggingface/transformers';
  * 
  * // Load model and processor
  * const model_id = 'Xenova/glpn-kitti';
@@ -5219,7 +5220,7 @@ export class GLPNModel extends GLPNPreTrainedModel { }
  * 
  * // Load image from URL
  * const url = 'http://images.cocodataset.org/val2017/000000039769.jpg';
- * const image = await RawImage.fromURL(url);
+ * const image = await RawImage.read(url);
  * 
  * // Prepare image for the model
  * const inputs = await processor(image);
@@ -5228,13 +5229,18 @@ export class GLPNModel extends GLPNPreTrainedModel { }
  * const { predicted_depth } = await model(inputs);
  * 
  * // Interpolate to original size
- * const prediction = interpolate(predicted_depth, image.size.reverse(), 'bilinear', false);
+ * const prediction = (await interpolate_4d(predicted_depth.unsqueeze(1), {
+     * size: image.size.reverse(),
+     * mode: 'bilinear',
+ * })).squeeze(1);
  * 
  * // Visualize the prediction
- * const formatted = prediction.mul_(255 / max(prediction.data)[0]).to('uint8');
+ * const min = prediction.min().item();
+ * const max = prediction.max().item();
+ * const formatted = prediction.sub_(min).div_(max - min).mul_(255).to('uint8');
  * const depth = RawImage.fromTensor(formatted);
  * // RawImage {
- * //   data: Uint8Array(307200) [ 207, 169, 154, ... ],
+ * //   data: Uint8Array(307200) [ 85, 85, 84, ... ],
  * //   width: 640,
  * //   height: 480,
  * //   channels: 1
