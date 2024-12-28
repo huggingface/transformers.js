@@ -47,10 +47,8 @@ import {
 import { Template } from '@huggingface/jinja';
 
 import {
-    WHISPER_LANGUAGE_MAPPING,
-    whisper_language_to_code,
+    WHISPER_LANGUAGE_MAPPING
 } from './models/whisper/common_whisper.js';
-import { GITHUB_ISSUE_URL } from './utils/constants.js';
 
 /**
  * @typedef {Object} TokenizerProperties Additional tokenizer-specific properties.
