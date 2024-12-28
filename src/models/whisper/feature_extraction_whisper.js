@@ -44,7 +44,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         )
 
         const data = features.data;
-        const maxValue = max(data)[0];
+        const maxValue = max(/** @type {Float32Array} */(data))[0];
 
         for (let i = 0; i < data.length; ++i) {
             data[i] = (Math.max(data[i], maxValue - 8.0) + 4.0) / 4.0;

@@ -52,6 +52,7 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
 
             let current_speaker = -1;
             for (let i = 0; i < scores.length; ++i) {
+                /** @type {number[]} */
                 const probabilities = softmax(scores[i]);
                 const [score, id] = max(probabilities);
                 const [start, end] = [i, i + 1];
