@@ -14,7 +14,7 @@ export class Phi3VProcessor extends Processor {
      * 
      * @param {string|string[]} text 
      * @param {RawImage|RawImage[]} images 
-     * @param  {...any} args 
+     * @param  { { padding?: boolean, truncation?: boolean, num_crops?: number } | undefined } options
      * @returns {Promise<any>}
      */
     async _call(text, images = null, {
