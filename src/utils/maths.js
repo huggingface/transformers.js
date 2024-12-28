@@ -225,9 +225,9 @@ export function magnitude(arr) {
 
 /**
  * Returns the value and index of the minimum element in an array.
- * @template {number[]|bigint[]|TypedArray} T
+ * @template {number[]|bigint[]|AnyTypedArray} T
  * @param {T} arr array of numbers.
- * @returns {T extends bigint[] ? [bigint, number] : [number, number]} the value and index of the minimum element, of the form: [valueOfMin, indexOfMin]
+ * @returns {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} the value and index of the minimum element, of the form: [valueOfMin, indexOfMin]
  * @throws {Error} If array is empty.
  */
 export function min(arr) {
@@ -240,15 +240,15 @@ export function min(arr) {
             indexOfMin = i;
         }
     }
-    return /** @type {T extends bigint[] ? [bigint, number] : [number, number]} */([min, indexOfMin]);
+    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([min, indexOfMin]);
 }
 
 
 /**
  * Returns the value and index of the maximum element in an array.
- * @template {number[]|bigint[]|TypedArray} T
+ * @template {number[]|bigint[]|AnyTypedArray} T
  * @param {T} arr array of numbers.
- * @returns {T extends bigint[] ? [bigint, number] : [number, number]} the value and index of the maximum element, of the form: [valueOfMax, indexOfMax]
+ * @returns {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} the value and index of the maximum element, of the form: [valueOfMax, indexOfMax]
  * @throws {Error} If array is empty.
  */
 export function max(arr) {
@@ -261,7 +261,7 @@ export function max(arr) {
             indexOfMax = i;
         }
     }
-    return /** @type {T extends bigint[] ? [bigint, number] : [number, number]} */([max, indexOfMax]);
+    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([max, indexOfMax]);
 }
 
 function isPowerOfTwo(number) {
