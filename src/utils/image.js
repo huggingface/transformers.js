@@ -687,10 +687,9 @@ export class RawImage {
      * Performs a Gaussian blur on the image.
      * @param {number} kernelSize - Kernel size (must be odd).
      * @param {number} sigma - Standard deviation of the Gaussian.
-     * @param {number} numChunks - Number of chunks to divide the image into for parallel processing.
      * @returns {Promise<RawImage>} - The blurred image.
      */
-    async gaussianBlur(kernelSize = 3, sigma = 1, numChunks = 4) {
+    async gaussianBlur(kernelSize = 3, sigma = 1) {
         const kernel = this.generateGaussianKernel(kernelSize, sigma);
         const halfSize = Math.floor(kernelSize / 2);
 
@@ -705,6 +704,7 @@ export class RawImage {
         const horizontalPass = new Float32Array(this.data.length);
         const verticalPass = new Uint8ClampedArray(this.data.length);
 
+        const numChunks = navigator.hardwareConcurrency || 4;
         const chunkHeight = Math.ceil(height / numChunks);
 
         // Process horizontal pass in chunks.
