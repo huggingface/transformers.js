@@ -58,7 +58,7 @@ We can achieve both of these goals by using a [Web Worker](https://developer.moz
 
 1. Create a file called `worker.js` in the `src` directory. This script will do all the heavy-lifing for us, including loading and running of the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class which use the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and use this pipeline for all subsequent calls:
     ```javascript
-    import { pipeline } from '@huggingface/transformers';
+    import { pipeline, TextStreamer } from '@huggingface/transformers';
 
     class MyTranslationPipeline {
       static task = 'translation';
@@ -423,18 +423,25 @@ self.addEventListener('message', async (event) => {
       self.postMessage(x);
   });
 
+  // Capture partial output as it streams from the pipeline
+  const streamer = new TextStreamer(pipeline.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      callback_function: function (text) {
+          self.postMessage({
+              status: 'update',
+              output: text
+          });
+      }
+  });
+
   // Actually perform the translation
   let output = await translator(event.data.text, {
       tgt_lang: event.data.tgt_lang,
       src_lang: event.data.src_lang,
 
-      // Allows for partial output
-      callback_function: x => {
-          self.postMessage({
-              status: 'update',
-              output: translator.tokenizer.decode(x[0].output_token_ids, { skip_special_tokens: true })
-          });
-      }
+      // Allows for partial output to be captured
+      streamer
   });
 
   // Send the output back to the main thread
@@ -482,7 +489,7 @@ const onMessageReceived = (e) => {
 
     case 'update':
       // Generation update: update the output text.
-      setOutput(e.data.output);
+      setOutput((o => o + e.data.output);
       break;
 
     case 'complete':
