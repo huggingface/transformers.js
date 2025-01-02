@@ -792,6 +792,264 @@ export class Tensor {
     }
 
     /**
+     * Normalizes the anchor point for a structuring element.
+     *
+     * @param {Object} anchor - The anchor point {x, y}.
+     * @param {Object} size - The size of the kernel {width, height}.
+     * @returns {Object} The normalized anchor point.
+     */
+    normalizeAnchor(anchor, size) {
+        if (anchor.x === -1) {
+            anchor.x = Math.floor(size.width / 2);
+        }
+        if (anchor.y === -1) {
+            anchor.y = Math.floor(size.height / 2);
+        }
+        if (
+            anchor.x < 0 || anchor.x >= size.width ||
+            anchor.y < 0 || anchor.y >= size.height
+        ) {
+            throw new Error("Anchor is out of bounds for the given kernel size.");
+        }
+        return anchor;
+    }
+
+    /**
+     * Creates a structuring element for morphological operations.
+     *
+     * @typedef {'MORPH_RECT' | 'MORPH_CROSS' | 'MORPH_ELLIPSE'} Shape
+     * @typedef {{width: number, height: number}} Size
+     *
+     * @param {Shape} shape - The shape of the kernel.
+     * @param {number | Array<number> | Size} kernelSize - The size of the kernel {width, height}.
+     * @param {Object} [anchor={x: -1, y: -1}] - The anchor point {x, y}.
+     * @returns {number[][]} The structuring element as a 2D array.
+     * @throws {Error} If the shape is invalid or the size is invalid.
+     */
+    getStructuringElement(shape, kernelSize, anchor = { x: -1, y: -1 }) {
+        if (!['MORPH_RECT', 'MORPH_CROSS', 'MORPH_ELLIPSE'].includes(shape)) {
+            throw new Error("Invalid shape. Must be 'MORPH_RECT', 'MORPH_CROSS', or 'MORPH_ELLIPSE'.");
+        }
+
+        if (typeof kernelSize === 'number' && Number.isInteger(kernelSize)) {
+            kernelSize = { width: kernelSize, height: kernelSize };
+        } else if (Array.isArray(kernelSize) && kernelSize.length === 2) {
+            kernelSize = { width: kernelSize[0], height: kernelSize[1] };
+        } else if (
+            typeof kernelSize !== 'object' ||
+            !('width' in kernelSize) ||
+            !('height' in kernelSize) ||
+            typeof kernelSize.width !== 'number' ||
+            typeof kernelSize.height !== 'number'
+        ) {
+            throw new Error("Invalid kernel size. Must be a number, numeric array of length 2, or an object with 'width' and 'height' properties.");
+        }
+
+        if (!Number.isInteger(kernelSize.width) || !Number.isInteger(kernelSize.height)) {
+            throw new Error('Invalid kernel size. Must be an integer.');
+        } else if (kernelSize.width % 2 === 0 || kernelSize.height % 2 === 0) {
+            throw new Error('Invalid kernel size. Must be an odd number.');
+        }
+
+        // Normalize anchor to default to the center if not specified
+        anchor = this.normalizeAnchor(anchor, kernelSize);
+
+        // If the kernel size is 1x1, treat as a rectangle
+        if (kernelSize.width === 1 && kernelSize.height === 1) {
+            shape = 'MORPH_RECT';
+        }
+
+        let rowRadius = 0, // Radius along the height
+            colRadius = 0, // Radius along the width
+            inverseRowRadiusSquared = 0; // Inverse squared radius for ellipses
+
+        if (shape === 'MORPH_ELLIPSE') {
+            // Calculate radii and inverse squared radius for the ellipse equation
+            rowRadius = Math.floor(kernelSize.height / 2);
+            colRadius = Math.floor(kernelSize.width / 2);
+            inverseRowRadiusSquared = rowRadius > 0 ? 1 / (rowRadius * rowRadius) : 0;
+        }
+
+        // Create a 2D array to represent the kernel
+        const kernel = Array.from({ length: kernelSize.height }, () => Array(kernelSize.width).fill(0));
+
+        for (let row = 0; row < kernelSize.height; row++) {
+            let startColumn = 0, // Start column for the current row
+                endColumn = 0; // End column for the current row
+
+            if (shape === 'MORPH_RECT' || (shape === 'MORPH_CROSS' && row === anchor.y)) {
+                // Full width for rectangle or horizontal line for cross shape
+                endColumn = kernelSize.width;
+            } else if (shape === 'MORPH_CROSS') {
+                // Single column for cross shape
+                startColumn = anchor.x;
+                endColumn = startColumn + 1;
+            } else if (shape === 'MORPH_ELLIPSE') {
+                // Calculate elliptical bounds for this row
+                const verticalOffset = row - rowRadius; // Distance from center row
+                if (Math.abs(verticalOffset) <= rowRadius) {
+                    // Solve for horizontal bounds using the ellipse equation: x^2/a^2 + y^2/b^2 = 1
+                    const horizontalRadius = Math.floor(
+                        colRadius * Math.sqrt(Math.max(0, rowRadius * rowRadius - verticalOffset * verticalOffset) * inverseRowRadiusSquared)
+                    );
+                    startColumn = Math.max(colRadius - horizontalRadius, 0); // Left bound of the ellipse
+                    endColumn = Math.min(colRadius + horizontalRadius + 1, kernelSize.width); // Right bound of the ellipse
+                }
+            }
+
+            // Fill the kernel row with 1s within the range [startColumn, endColumn)
+            for (let col = startColumn; col < endColumn; col++) {
+                kernel[row][col] = 1;
+            }
+        }
+
+        return kernel;
+    }
+
+    // https://github.com/egonSchiele/OpenCV/blob/master/modules/imgproc/src/morph.cpp#L1087
+    dilate(kernelSize = 3) {
+        return this.morphologicalOperation(kernelSize, 'dilate');
+    }
+
+    // https://github.com/egonSchiele/OpenCV/blob/master/modules/imgproc/src/morph.cpp#L1079
+    erode(kernelSize = 3) {
+        return this.morphologicalOperation(kernelSize, 'erode');
+    }
+
+    /**
+     * Performs a morphological operation on the input image.
+     *
+     * @param {'ERODE' | 'DILATE' | 'OPEN' | 'CLOSE' | 'GRADIENT' | 'TOPHAT' | 'BLACKHAT'} op
+     * @param {number} kernelSize
+     */
+    async morphologyEx(op, kernelSize, anchor = { x: -1, y: -1 }, iterations = 1, borderType = 0, borderValue = 0) {
+        switch (op) {
+            case 'ERODE':
+                // Perform erosion
+                await this.erode(kernelSize, anchor, iterations, borderType, borderValue);
+                break;
+
+            case 'DILATE':
+                // Perform dilation
+                await this.dilate(kernelSize, anchor, iterations, borderType, borderValue);
+                break;
+
+            case 'OPEN':
+                // Opening: erosion followed by dilation
+                this.erode(kernelSize, anchor, iterations, borderType, borderValue);
+                this.dilate(kernelSize, anchor, iterations, borderType, borderValue);
+                break;
+
+            case 'CLOSE':
+                // Closing: dilation followed by erosion
+                this.dilate(kernelSize, anchor, iterations, borderType, borderValue);
+                this.erode(dst, dst, kernelSize, anchor, iterations, borderType, borderValue);
+                break;
+
+            case 'GRADIENT':
+                // Gradient: difference between dilation and erosion
+                temp = this.erode(src, temp, kernelSize, anchor, iterations, borderType, borderValue);
+                this.dilate(kernelSize, anchor, iterations, borderType, borderValue);
+                subtractMatrices(dst, temp, dst); // Element-wise subtraction
+                break;
+
+            case 'TOPHAT':
+                // Tophat: original image minus opening
+                if (src !== dst) temp = dst;
+                this.erode(src, temp, kernelSize, anchor, iterations, borderType, borderValue);
+                this.dilate(temp, temp, kernelSize, anchor, iterations, borderType, borderValue);
+                subtractMatrices(src, temp, dst);
+                break;
+
+            case 'BLACKHAT':
+                // Blackhat: closing minus original image
+                if (src !== dst) temp = dst;
+                dilate(src, temp, kernelSize, anchor, iterations, borderType, borderValue);
+                erode(temp, temp, kernelSize, anchor, iterations, borderType, borderValue);
+                subtractMatrices(temp, src, dst);
+                break;
+
+            default:
+                throw new Error("Unknown morphological operation");
+        }
+    }
+
+    /**
+     * Applies a morphological operation to this tensor.
+     *
+     * @param {number} kernelSize The size of the kernel.
+     * @param {'dilate' | 'erode'} operation The operation to apply.
+     * @returns {Promise<Tensor>} The cloned, modified output tensor.
+     */
+    async morphologicalOperation(kernelSize, operation) {
+        // Kernel must be odd because each pixel must sit evenly in the middle.
+        if (kernelSize % 2 === 0) {
+            throw new Error('Kernel size must be odd.');
+        }
+
+        const [batches, rows, cols] = this.dims;
+        const paddingSize = Math.floor(kernelSize / 2);
+        const outputData = new Float32Array(this.data.length);
+        const operationFunction = (operationType => {
+            switch (operationType) {
+                case 'dilate':
+                    return Math.max;
+                case 'erode':
+                    return Math.min;
+                default:
+                    throw new Error(`Unknown operation: ${operationType}`);
+            }
+        })(operation);
+
+        const processChunk = async (chunk) => {
+            for (const { batchIndex, rowIndex, colIndex } of chunk) {
+                const kernelValues = [];
+
+                // Collect values in the kernel window
+                for (let kernelRowOffset = -paddingSize; kernelRowOffset <= paddingSize; kernelRowOffset++) {
+                    for (let kernelColOffset = -paddingSize; kernelColOffset <= paddingSize; kernelColOffset++) {
+                        const neighborRowIndex = rowIndex + kernelRowOffset;
+                        const neighborColIndex = colIndex + kernelColOffset;
+                        if (neighborRowIndex >= 0 && neighborRowIndex < rows && neighborColIndex >= 0 && neighborColIndex < cols) {
+                            const neighborIndex = batchIndex * rows * cols + neighborRowIndex * cols + neighborColIndex;
+                            kernelValues.push(this.data[neighborIndex]);
+                        }
+                    }
+                }
+
+                // Apply operation (e.g., max for dilation, min for erosion)
+                const outputIndex = batchIndex * rows * cols + rowIndex * cols + colIndex;
+                outputData[outputIndex] = operationFunction(...kernelValues);
+            }
+        };
+
+        // Divide work into chunks for parallel processing
+        const chunks = [];
+        const chunkSize = Math.ceil((batches * rows * cols) / (navigator.hardwareConcurrency || 4));
+        let currentChunk = [];
+
+        for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
+            for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+                for (let colIndex = 0; colIndex < cols; colIndex++) {
+                    currentChunk.push({ batchIndex, rowIndex, colIndex });
+                    if (currentChunk.length >= chunkSize) {
+                        chunks.push([...currentChunk]);
+                        currentChunk = [];
+                    }
+                }
+            }
+        }
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk);
+        }
+
+        // Process all chunks in parallel
+        await Promise.all(chunks.map(chunk => processChunk(chunk)));
+
+        return new Tensor(this.type, outputData, this.dims);
+    }
+
+    /**
      * Performs Tensor dtype conversion.
      * @param {DataType} type The desired data type.
      * @returns {Tensor} The converted tensor.
