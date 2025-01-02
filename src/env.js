@@ -35,13 +35,18 @@ const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = typeof navigator !== 'undefined' && 'gpu' in navigator;
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 
-const EXPOSED_RUNTIME_SYMBOL = Symbol.for('onnxruntime');
-const IS_EXPOSED_RUNTIME_ENV = EXPOSED_RUNTIME_SYMBOL in globalThis;
-
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
+
+const IS_DENO_ENV = typeof Deno !== 'undefined';
+
+const EXPOSED_RUNTIME_SYMBOL = Symbol.for('onnxruntime');
+const IS_EXPOSED_RUNTIME_ENV = EXPOSED_RUNTIME_SYMBOL in globalThis && (
+  IS_PROCESS_AVAILABLE && process?.env?.HF_TRANSFORMERS_USE_EXPOSED_RUNTIME
+  || IS_DENO_ENV && Deno?.env?.get('HF_TRANSFORMERS_USE_EXPOSED_RUNTIME')
+);
 
 /**
  * A read-only object containing information about the APIs available in the current environment.
