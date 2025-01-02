@@ -61,16 +61,13 @@ if (apis.IS_EXPOSED_RUNTIME_ENV) {
 
     // ensure that the runtime implements the necessary functions
     // consider use array map if need to check more required members.
-    if (!Object.hasOwn(onnxruntime, 'Tensor')) {
-        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}]" definition. Missing required exported member "Tensor".`)
-    }
+    ['Tensor', 'InferenceSession', 'InferenceSession.create'].forEach(propPath => {
+        const hasProp = propPath.split('.').reduce((acc, key) => acc?.[key], onnxruntime) !== undefined;
 
-    if (!Object.hasOwn(onnxruntime, 'InferenceSession')) {
-        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}]" definition. Missing required exported member "InferenceSession".`)
-    }
-    if(!Object.hasOwn(onnxruntime?.InferenceSession, 'create')) {
-        throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}].InferenceSession" definition. Missing required exported member "InferenceSession.create".`)
-    }
+        if (!hasProp) {
+            throw new Error(`Invalid "globalThis[${String(apis.EXPOSED_RUNTIME_SYMBOL)}]" definition. Missing required exported member "${propPath}".`)
+        }
+    });
 
     ONNX = onnxruntime;
 } else if (apis.IS_NODE_ENV) {
