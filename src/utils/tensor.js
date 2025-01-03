@@ -797,57 +797,63 @@ export class Tensor {
     }
 
     /**
-     * A morphological operation that performs a dilation on the input tensor.
-     * A kernel will be applied to each element and maximum value will be used.
+     * Mutates the data through a dilation morphological operation.
      *
-     * @param {DataArray} data The input tensor data.
      * @param {KernelSize} kernelSize The width and height of the kernel.
      * @param {Shape} [shape='RECT'] The shape of the kernel.
      * @param {Point} [anchor={x: -1, y: -1}] The central position of the kernel.
-     * @returns {Promise<DataArray>} The cloned, modified output tensor.
+     * @returns {Promise<Tensor>} Returns `this`.
      */
-    async _dilate(data, kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
-        return this.morphologicalOperation('DILATE', data, kernelSize, shape, anchor);
+    async dilate_(kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
+        const this_data = this.data;
+        const data = await this.morphologicalOperation('DILATE', this_data, kernelSize, shape, anchor);
+        for (let i = 0; i < this_data.length; ++i) {
+            this.data[i] = data[i];
+        }
+        return this;
     }
 
     /**
-     * Performs {@link Tensor._dilate} and returns a new Tensor.
+     * Returns a new Tensor where the data is mutated through a dilation
+     * morphological operation.
      *
      * @param {KernelSize} kernelSize The width and height of the kernel.
      * @param {Shape} [shape='RECT'] The shape of the kernel.
      * @param {Point} [anchor={x: -1, y: -1}] The central position of the kernel.
-     * @returns {Promise<Tensor>} The cloned, modified output tensor.
+     * @returns {Promise<Tensor>} The new Tensor.
      */
     async dilate(kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
-        const data = await this._dilate(this.data, kernelSize, shape, anchor);
-        return new Tensor(this.type, data, this.dims);
+        return this.clone().dilate_(kernelSize, shape, anchor);
     }
 
     /**
-     * A morphological operation that performs an erosion on the input tensor.
-     * A kernel will be applied to each element and minimum value will be used.
+     * * Mutates the data through a erosion morphological operation.
      *
-     * @param {DataArray} data The input tensor data.
      * @param {KernelSize} kernelSize The width and height of the kernel.
      * @param {Shape} [shape='RECT'] The shape of the kernel.
      * @param {Point} [anchor={x: -1, y: -1}] The central position of the kernel.
-     * @returns {Promise<DataArray>} The cloned, modified output tensor.
+     * @returns {Promise<Tensor>} Returns `this`.
      */
-    async _erode(data, kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
-        return this.morphologicalOperation('ERODE', data, kernelSize, shape, anchor);
+    async erode_(kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
+        const this_data = this.data;
+        const data = await this.morphologicalOperation('ERODE', this_data, kernelSize, shape, anchor);
+        for (let i = 0; i < this_data.length; ++i) {
+            this.data[i] = data[i];
+        }
+        return this;
     }
 
     /**
-     * Performs {@link Tensor._erode} and returns a new Tensor.
+     * Returns a new Tensor where the data is mutated through a erosion
+     * morphological operation.
      *
      * @param {KernelSize} kernelSize The width and height of the kernel.
      * @param {Shape} [shape='RECT'] The shape of the kernel.
      * @param {Point} [anchor={x: -1, y: -1}] The central position of the kernel.
-     * @returns {Promise<Tensor>} The cloned, modified output tensor.
+     * @returns {Promise<Tensor>} The new Tensor.
      */
     async erode(kernelSize = 3, shape = 'RECT', anchor = { x: -1, y: -1 }) {
-        const data = await this._erode(this.data, kernelSize, shape, anchor);
-        return new Tensor(this.type, data, this.dims);
+        return this.clone().erode_(kernelSize, shape, anchor);
     }
 
     /**
@@ -958,19 +964,15 @@ export class Tensor {
             case 'DILATE':
                 return this.dilate(kernelSize, shape, anchor);
 
-            case 'OPEN': {
-                let data = this.data;
-                data = await this._erode(data, kernelSize, shape, anchor);
-                data = await this._dilate(data, kernelSize, shape, anchor);
-                return new Tensor(this.type, data, this.dims);
-            }
+            case 'OPEN':
+                return (await this
+                    .erode_(kernelSize, shape, anchor))
+                    .dilate_(kernelSize, shape, anchor);
 
-            case 'CLOSE': {
-                let data = this.data;
-                data = await this._dilate(data, kernelSize, shape, anchor);
-                data = await this._erode(data, kernelSize, shape, anchor);
-                return new Tensor(this.type, data, this.dims);
-            }
+            case 'CLOSE':
+                return (await this
+                    .dilate_(kernelSize, shape, anchor))
+                    .erode_(kernelSize, shape, anchor);
 
             default:
                 throw new Error("Unknown morphological operation");
