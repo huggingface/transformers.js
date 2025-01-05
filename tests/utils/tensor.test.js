@@ -294,6 +294,137 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("sigmoid", () => {
+    it("should apply the sigmoid function to each element in the tensor", () => {
+      const t1 = new Tensor("float32", [0, 1, -1, 5, -5], [5]);
+      const target = new Tensor("float32", [0.5, 1 / (1 + Math.exp(-1)), 1 / (1 + Math.exp(1)), 1 / (1 + Math.exp(-5)), 1 / (1 + Math.exp(5))], [5]);
+
+      const result = t1.sigmoid();
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("tolist", () => {
+    it("should return nested arrays for a 2D tensor", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const arr = t1.tolist();
+      compare(arr, [
+        [1, 2],
+        [3, 4],
+      ]);
+    });
+  });
+
+  describe("mul", () => {
+    it("should multiply constant", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const target = new Tensor("float32", [2, 4, 6, 8], [2, 2]);
+
+      const result = t1.mul(2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("div", () => {
+    it("should divide constant", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const target = new Tensor("float32", [0.5, 1, 1.5, 2], [2, 2]);
+
+      const result = t1.div(2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("add", () => {
+    it("should add constant", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const target = new Tensor("float32", [3, 4, 5, 6], [2, 2]);
+
+      const result = t1.add(2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("sub", () => {
+    it("should subtract constant", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const target = new Tensor("float32", [-1, 0, 1, 2], [2, 2]);
+
+      const result = t1.sub(2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("squeeze", () => {
+    it("should remove all dimensions of size 1", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [1, 4]);
+      const target = new Tensor("float32", [1, 2, 3, 4], [4]);
+
+      const result = t1.squeeze();
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("unsqueeze", () => {
+    it("should add a dimension at the specified axis", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [4]);
+      const target = new Tensor("float32", [1, 2, 3, 4], [1, 4]);
+
+      const result = t1.unsqueeze(0);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("flatten", () => {
+    it("should flatten a 2D tensor into 1D by default", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [6]);
+
+      const result = t1.flatten();
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("neg", () => {
+    it("should compute the negative of each element in the tensor", () => {
+      const t1 = new Tensor("float32", [1, -2, 0, 3], [4]);
+      const target = new Tensor("float32", [-1, 2, -0, -3], [4]);
+
+      const result = t1.neg();
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("view", () => {
+    it("should reshape the tensor to the specified dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+
+      const result = t1.view(3, 2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("clamp", () => {
+    it("should clamp values between min and max", () => {
+      const t1 = new Tensor("float32", [-2, -1, 0, 1, 2, 3], [6]);
+      const target = new Tensor("float32", [-1, -1, 0, 1, 2, 2], [6]);
+
+      const result = t1.clamp(-1, 2);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("round", () => {
+    it("should round elements to the nearest integer", () => {
+      const t1 = new Tensor("float32", [0.1, 1.4, 2.5, 3.9, -1.2], [5]);
+      const target = new Tensor("float32", [0, 1, 3, 4, -1], [5]);
+
+      const result = t1.round();
+      compare(result, target, 1e-3);
+    });
+  });
+
   describe("to", () => {
     it("float32 to int32 (number to number)", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
