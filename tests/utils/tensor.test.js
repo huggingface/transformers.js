@@ -403,6 +403,19 @@ describe("Tensor operations", () => {
       const result = t1.view(3, 2);
       compare(result, target, 1e-3);
     });
+
+    it("should reshape the tensor with an inferred dimension (-1)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [1, 6]);
+
+      const result = t1.view(1, -1);
+      compare(result, target, 1e-3);
+    });
+
+    it("should throw if multiple inferred dimensions are used", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.view(-1, -1)).toThrow();
+    });
   });
 
   describe("clamp", () => {
