@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand } from "../../src/transformers.js";
 import { init } from "../init.js";
 import { compare } from "../test_utils.js";
 
@@ -435,6 +435,46 @@ describe("Tensor operations", () => {
 
       const result = t1.round();
       compare(result, target, 1e-3);
+    });
+  });
+
+  describe("ones_like", () => {
+    it("should create a tensor of all ones with the same shape as the input", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const result = ones_like(t1);
+      const target = new Tensor("int64", [1n, 1n, 1n, 1n], [2, 2]);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("zeros_like", () => {
+    it("should create a tensor of all zeros with the same shape as the input", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const result = zeros_like(t1);
+      const target = new Tensor("int64", [0n, 0n, 0n, 0n], [2, 2]);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("full_like", () => {
+    it("should create a tensor filled with a specified value, matching the shape of the original", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const result = full_like(t1, 10);
+      const target = new Tensor("float32", [10, 10, 10, 10], [2, 2]);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("rand", () => {
+    it("should create a tensor of random values between 0 and 1 with the given shape", () => {
+      const shape = [2, 2];
+      const random = rand(shape);
+      expect(random.type).toBe("float32");
+      expect(random.dims).toEqual(shape);
+      random.data.forEach((val) => {
+        expect(val).toBeGreaterThanOrEqual(0);
+        expect(val).toBeLessThan(1);
+      });
     });
   });
 
