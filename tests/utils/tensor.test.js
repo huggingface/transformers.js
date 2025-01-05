@@ -363,6 +363,23 @@ describe("Tensor operations", () => {
       compare(result, target, 1e-3);
     });
   });
+  describe("gt", () => {
+    it("should perform element-wise greater than comparison with a scalar", () => {
+      const t1 = new Tensor("float32", [1, 5, 3, 7], [4]);
+      const target = new Tensor("bool", [0, 1, 0, 1], [4]);
+      const result = t1.gt(4);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("lt", () => {
+    it("should perform element-wise less than comparison with a scalar", () => {
+      const t1 = new Tensor("float32", [1, 5, 3, 7], [4]);
+      const target = new Tensor("bool", [1, 0, 1, 0], [4]);
+      const result = t1.lt(4);
+      compare(result, target, 1e-3);
+    });
+  });
 
   describe("squeeze", () => {
     it("should remove all dimensions of size 1", () => {
