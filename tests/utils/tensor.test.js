@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 import { compare } from "../test_utils.js";
 
@@ -193,6 +193,15 @@ describe("Tensor operations", () => {
     it("should calculate mean over dimension -1", () => {
       const target2 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       compare(t1.mean(-1), target2, 1e-3);
+    });
+  });
+
+  describe("std_mean", () => {
+    it("should return std_mean for the entire tensor", () => {
+      const t = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const [stdVal, meanVal] = std_mean(t);
+      compare(stdVal, new Tensor("float32", [1.8708287477493286], []), 1e-3);
+      compare(meanVal, new Tensor("float32", [3.5], []), 1e-3);
     });
   });
 
@@ -457,10 +466,23 @@ describe("Tensor operations", () => {
   });
 
   describe("full_like", () => {
-    it("should create a tensor filled with a specified value, matching the shape of the original", () => {
+    it("should create a tensor filled with a number, matching the shape of the original", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
       const result = full_like(t1, 10);
       const target = new Tensor("float32", [10, 10, 10, 10], [2, 2]);
+      compare(result, target, 1e-3);
+    });
+    it("should create a boolean tensor with the same shape", () => {
+      const t2 = new Tensor("bool", [true, false], [2]);
+      const result = full_like(t2, true);
+      const target = new Tensor("bool", [true, true], [2]);
+      compare(result, target, 1e-3);
+    });
+
+    it("should create a bigint tensor with the same shape", () => {
+      const t3 = new Tensor("int64", [1n, 2n], [2]);
+      const result = full_like(t3, 123n);
+      const target = new Tensor("int64", [123n, 123n], [2]);
       compare(result, target, 1e-3);
     });
   });
