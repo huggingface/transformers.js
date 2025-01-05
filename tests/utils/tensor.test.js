@@ -197,6 +197,38 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("min", () => {
+    it("should return the minimum over the entire tensor", async () => {
+      const t1 = new Tensor("float32", [3, -2, 5, 0], [2, 2]);
+      const target = new Tensor("float32", [-2], []);
+      const result = t1.min();
+      compare(result, target, 1e-3);
+    });
+
+    it("should return the minimum over dimension 1", async () => {
+      const t2 = new Tensor("float32", [4, 2, -1, 0, 6, 5], [3, 2]);
+      const target = new Tensor("float32", [2, -1, 5], [3]);
+      const result = t2.min(1);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("max", () => {
+    it("should return the maximum over the entire tensor", async () => {
+      const t1 = new Tensor("float32", [3, 10, -2, 7], [2, 2]);
+      const target = new Tensor("float32", [10], []);
+      const result = t1.max();
+      compare(result, target, 1e-3);
+    });
+
+    it("should return the maximum over dimension 0", async () => {
+      const t2 = new Tensor("float32", [1, 2, 4, 5, 9, 3], [3, 2]);
+      const target = new Tensor("float32", [9, 5], [2]);
+      const result = t2.max(0);
+      compare(result, target, 1e-3);
+    });
+  });
+
   describe("sum", () => {
     it("should calculate sum over entire tensor", async () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
