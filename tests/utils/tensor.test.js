@@ -1,4 +1,4 @@
-import { Tensor, cat, mean, stack, layer_norm } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm } from "../../src/transformers.js";
 import { init } from "../init.js";
 import { compare } from "../test_utils.js";
 
@@ -174,18 +174,25 @@ describe("Tensor operations", () => {
   });
 
   describe("mean", () => {
-    it("should calculate mean", () => {
-      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3, 1]);
-
+    const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3, 1]);
+    it("should calculate mean over the entire tensor", () => {
       const target = new Tensor("float32", [3.5], []);
-      const target0 = new Tensor("float32", [2.5, 3.5, 4.5], [3, 1]);
-      const target1 = new Tensor("float32", [2, 5], [2, 1]);
-      const target2 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
-
       compare(t1.mean(), target, 1e-3);
+    });
+
+    it("should calculate mean over dimension 0", () => {
+      const target0 = new Tensor("float32", [2.5, 3.5, 4.5], [3, 1]);
       compare(t1.mean(0), target0, 1e-3);
+    });
+
+    it("should calculate mean over dimension 1", () => {
+      const target1 = new Tensor("float32", [2, 5], [2, 1]);
       compare(t1.mean(1), target1, 1e-3);
-      compare(t1.mean(2), target2, 1e-3);
+    });
+
+    it("should calculate mean over dimension -1", () => {
+      const target2 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      compare(t1.mean(-1), target2, 1e-3);
     });
   });
 
