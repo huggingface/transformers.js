@@ -39,8 +39,8 @@ export class GroundingDinoProcessor extends Processor {
      */
     async _call(images, text, options = {}) {
 
-        const image_inputs = await this.image_processor(images, options);
-        const text_inputs = this.tokenizer(text, options);
+        const image_inputs = images ? await this.image_processor(images, options) : {};
+        const text_inputs = text ? this.tokenizer(text, options) : {};
 
         return {
             ...text_inputs,

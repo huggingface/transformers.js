@@ -537,12 +537,18 @@ async function encoderForward(self, model_inputs) {
         }
         // Assign default `token_type_ids` (all zeroes) to the `encoderFeeds` if the model expects it,
         // but they weren't created by the tokenizer.
-        encoderFeeds.token_type_ids = new Tensor(
-            'int64',
-            new BigInt64Array(encoderFeeds.input_ids.data.length),
-            encoderFeeds.input_ids.dims
-        )
+        encoderFeeds.token_type_ids = zeros_like(encoderFeeds.input_ids);
     }
+    if (session.inputNames.includes('pixel_mask') && !encoderFeeds.pixel_mask) {
+        if (!encoderFeeds.pixel_values) {
+            throw new Error('Both `pixel_values` and `pixel_mask` are missing in the model inputs.');
+        }
+        // Assign default `pixel_mask` (all ones) to the `encoderFeeds` if the model expects it,
+        // but they weren't created by the processor.
+        const dims = encoderFeeds.pixel_values.dims;
+        encoderFeeds.pixel_mask = ones([dims[0], dims[2], dims[3]]);
+    }
+    
     return await sessionRun(session, encoderFeeds);
 }
 
