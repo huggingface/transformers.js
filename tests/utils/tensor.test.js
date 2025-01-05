@@ -372,6 +372,12 @@ describe("Tensor operations", () => {
       const result = t1.squeeze();
       compare(result, target, 1e-3);
     });
+    it("should remove a specified dimension", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [1, 1, 2, 2]);
+      const result = t1.squeeze(1);
+      const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      compare(result, target, 1e-3);
+    });
   });
 
   describe("unsqueeze", () => {
