@@ -197,6 +197,61 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("sum", () => {
+    it("should calculate sum over entire tensor", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [21], []);
+      const result = t1.sum();
+      compare(result, target, 1e-3);
+    });
+
+    it("should calculate sum over dimension 0", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [5, 7, 9], [3]);
+      const result = t1.sum(0);
+      compare(result, target, 1e-3);
+    });
+
+    it("should calculate sum over dimension 1", async () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const target = new Tensor("float32", [6, 15], [2]);
+      const result = t1.sum(1);
+      compare(result, target, 1e-3);
+    });
+  });
+
+  describe("norm", () => {
+    it("should calculate L2 norm over entire tensor", async () => {
+      const t1 = new Tensor("float32", [3, 4], [2]);
+      const target = new Tensor("float32", [5], []);
+      const result = t1.norm();
+      compare(result, target, 1e-3);
+    });
+
+    it("should calculate L2 norm over dimension 0", async () => {
+      const t1 = new Tensor("float32", [3, 4, 6, 8], [2, 2]);
+      const target = new Tensor("float32", [6.7082, 8.9443], [2]);
+      const result = t1.norm(2, 0);
+      compare(result, target, 1e-2);
+    });
+  });
+
+  describe("normalize", () => {
+    it("should normalize a vector correctly", async () => {
+      const t1 = new Tensor("float32", [3, 4], [1, 2]);
+      const target = new Tensor("float32", [0.6, 0.8], [1, 2]);
+      const normalized = t1.normalize();
+      compare(normalized, target, 1e-3);
+    });
+
+    it("should normalize along dimension", async () => {
+      const t1 = new Tensor("float32", [1, 2, 2, 3], [2, 2]);
+      const target = new Tensor("float32", [0.4472, 0.8944, 0.5547, 0.8321], [2, 2]);
+      const normalized = t1.normalize();
+      compare(normalized, target, 1e-3);
+    });
+  });
+
   describe("layer_norm", () => {
     it("should calculate layer norm", async () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
