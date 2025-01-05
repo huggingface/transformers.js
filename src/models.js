@@ -532,6 +532,9 @@ async function encoderForward(self, model_inputs) {
         encoderFeeds.inputs_embeds = await self.encode_text({ input_ids: model_inputs.input_ids });
     }
     if (session.inputNames.includes('token_type_ids') && !encoderFeeds.token_type_ids) {
+        if (!encoderFeeds.input_ids) {
+            throw new Error('Both `input_ids` and `token_type_ids` are missing in the model inputs.');
+        }
         // Assign default `token_type_ids` (all zeroes) to the `encoderFeeds` if the model expects it,
         // but they weren't created by the tokenizer.
         encoderFeeds.token_type_ids = new Tensor(
@@ -5428,6 +5431,8 @@ export class Dinov2WithRegistersForImageClassification extends Dinov2WithRegiste
     }
 }
 //////////////////////////////////////////////////
+export class GroundingDinoPreTrainedModel extends PreTrainedModel { }
+export class GroundingDinoForObjectDetection extends GroundingDinoPreTrainedModel { }
 
 //////////////////////////////////////////////////
 export class YolosPreTrainedModel extends PreTrainedModel { }
@@ -7333,6 +7338,7 @@ const MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES = new Map([
 const MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES = new Map([
     ['owlvit', ['OwlViTForObjectDetection', OwlViTForObjectDetection]],
     ['owlv2', ['Owlv2ForObjectDetection', Owlv2ForObjectDetection]],
+    ['grounding-dino', ['GroundingDinoForObjectDetection', GroundingDinoForObjectDetection]],
 ]);
 
 const MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES = new Map([
