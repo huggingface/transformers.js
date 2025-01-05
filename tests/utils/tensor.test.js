@@ -378,6 +378,12 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
       compare(result, target, 1e-3);
     });
+    it("should remove multiple dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [1, 1, 2, 1, 2]);
+      const result = t1.squeeze([0, 3]);
+      const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      compare(result, target, 1e-3);
+    });
   });
 
   describe("unsqueeze", () => {
