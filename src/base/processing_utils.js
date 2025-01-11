@@ -101,6 +101,17 @@ export class Processor extends Callable {
         return this.tokenizer.batch_decode(...args);
     }
 
+    /**
+     * @param {Parameters<PreTrainedTokenizer['decode']>} args
+     * @returns {ReturnType<PreTrainedTokenizer['decode']>}
+     */
+    decode(...args) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to decode without a tokenizer.');
+        }
+        return this.tokenizer.decode(...args);
+    }
+
 
     /**
      * Calls the feature_extractor function with the given input.

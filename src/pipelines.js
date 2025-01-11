@@ -2552,13 +2552,35 @@ export class ZeroShotObjectDetectionPipeline extends (/** @type {new (options: T
             // Run model with both text and pixel inputs
             const output = await this.model({ ...text_inputs, pixel_values });
 
-            // @ts-ignore
-            const processed = this.processor.image_processor.post_process_object_detection(output, threshold, imageSize, true)[0];
-            let result = processed.boxes.map((box, i) => ({
-                score: processed.scores[i],
-                label: candidate_labels[processed.classes[i]],
-                box: get_bounding_box(box, !percentage),
-            })).sort((a, b) => b.score - a.score);
+            let result;
+            if('post_process_grounded_object_detection' in this.processor) {
+                // @ts-ignore
+                const processed = this.processor.post_process_grounded_object_detection(
+                    output,
+                    text_inputs.input_ids,
+                    {
+                        // TODO: support separate threshold values
+                        box_threshold: threshold,
+                        text_threshold: threshold,
+                        target_sizes: imageSize,
+                    },
+                )[0];
+                result = processed.boxes.map((box, i) => ({
+                    score: processed.scores[i],
+                    label: processed.labels[i],
+                    box: get_bounding_box(box, !percentage),
+                }))
+            } else {
+                // @ts-ignore
+                const processed = this.processor.image_processor.post_process_object_detection(output, threshold, imageSize, true)[0];
+                result = processed.boxes.map((box, i) => ({
+                    score: processed.scores[i],
+                    label: candidate_labels[processed.classes[i]],
+                    box: get_bounding_box(box, !percentage),
+                }))
+            }
+            result.sort((a, b) => b.score - a.score);
+
             if (top_k !== null) {
                 result = result.slice(0, top_k);
             }
