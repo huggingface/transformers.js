@@ -190,9 +190,9 @@ export function calculateReflectOffset(i, w) {
 }
 
 /**
- * Save blob file in web.
- * @param {string} path filename
- * @param {Blob} blob
+ * Save blob file on the web.
+ * @param {string} path The path to save the blob to
+ * @param {Blob} blob The blob to save
  */
 export function saveBlob(path, blob){
     // Convert the canvas content to a data URL
@@ -210,6 +210,9 @@ export function saveBlob(path, blob){
 
     // Clean up: remove the anchor element from the DOM
     downloadLink.remove();
+
+    // Revoke the Object URL to free up memory
+    URL.revokeObjectURL(dataURL);
 }
 
 /**
