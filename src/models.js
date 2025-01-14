@@ -6126,6 +6126,9 @@ export class WavLMForAudioFrameClassification extends WavLMPreTrainedModel {
     }
 }
 
+export class StyleTextToSpeechPreTrainedModel extends PreTrainedModel { }
+export class StyleTextToSpeechModel extends StyleTextToSpeechPreTrainedModel { }
+
 //////////////////////////////////////////////////
 // SpeechT5 models
 /**
@@ -7089,6 +7092,8 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
 
     ['maskformer', ['MaskFormerModel', MaskFormerModel]],
     ['mgp-str', ['MgpstrForSceneTextRecognition', MgpstrForSceneTextRecognition]],
+
+    ['style_tts', ['StyleTextToSpeechModel', StyleTextToSpeechModel]],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
