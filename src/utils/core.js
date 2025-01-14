@@ -190,6 +190,29 @@ export function calculateReflectOffset(i, w) {
 }
 
 /**
+ * Save blob file in web.
+ * @param {string} path filename
+ * @param {Blob} blob
+ */
+export function saveBlob(path, blob){
+    // Convert the canvas content to a data URL
+    const dataURL = URL.createObjectURL(blob);
+
+    // Create an anchor element with the data URL as the href attribute
+    const downloadLink = document.createElement('a');
+    downloadLink.href = dataURL;
+
+    // Set the download attribute to specify the desired filename for the downloaded image
+    downloadLink.download = path;
+
+    // Trigger the download
+    downloadLink.click();
+
+    // Clean up: remove the anchor element from the DOM
+    downloadLink.remove();
+}
+
+/**
  *
  * @param {Object} o
  * @param {string[]} props

@@ -64,7 +64,8 @@ import {
     round,
 } from './utils/maths.js';
 import {
-    read_audio
+    read_audio,
+    RawAudio
 } from './utils/audio.js';
 import {
     Tensor,
@@ -2678,7 +2679,7 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  * const synthesizer = await pipeline('text-to-speech', 'Xenova/speecht5_tts', { quantized: false });
  * const speaker_embeddings = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin';
  * const out = await synthesizer('Hello, my dog is cute', { speaker_embeddings });
- * // {
+ * // RawAudio {
  * //   audio: Float32Array(26112) [-0.00005657337896991521, 0.00020583874720614403, ...],
  * //   sampling_rate: 16000
  * // }
@@ -2698,7 +2699,7 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  * ```javascript
  * const synthesizer = await pipeline('text-to-speech', 'Xenova/mms-tts-fra');
  * const out = await synthesizer('Bonjour');
- * // {
+ * // RawAudio {
  * //   audio: Float32Array(23808) [-0.00037693005288019776, 0.0003325853613205254, ...],
  * //   sampling_rate: 16000
  * // }
@@ -2745,10 +2746,10 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
 
         // @ts-expect-error TS2339
         const sampling_rate = this.model.config.sampling_rate;
-        return {
-            audio: waveform.data,
+        return new RawAudio(
+            waveform.data,
             sampling_rate,
-        }
+        )
     }
 
     async _call_text_to_spectrogram(text_inputs, { speaker_embeddings }) {
@@ -2788,10 +2789,10 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
         const { waveform } = await this.model.generate_speech(input_ids, speaker_embeddings, { vocoder: this.vocoder });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        return {
-            audio: waveform.data,
+        return new RawAudio(
+            waveform.data,
             sampling_rate,
-        }
+        )
     }
 }
 
