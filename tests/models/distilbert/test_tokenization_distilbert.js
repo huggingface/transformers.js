@@ -305,7 +305,7 @@ export const TEST_CONFIG = {
   },
   // `model.type` field missing in tokenizer.json
   "distilbert/distilbert-base-multilingual-cased": {
-    CURRENCY: {
+    CHINESE_LATIN_MIXED: {
       text: BERT_TEST_STRINGS.CHINESE_LATIN_MIXED,
       tokens: ["ah", "\u535a", "\u63a8", "z", "##z"],
       ids: [101, 69863, 2684, 4163, 194, 10305, 102],

@@ -1334,7 +1334,7 @@ export const TEST_CONFIG = {
   },
   // `model.type` field missing in tokenizer.json
   "google-bert/bert-base-cased": {
-    CURRENCY: {
+    CHINESE_LATIN_MIXED: {
       text: BERT_TEST_STRINGS.CHINESE_LATIN_MIXED,
       tokens: ["ah", "[UNK]", "[UNK]", "z", "##z"],
       ids: [101, 18257, 100, 100, 195, 1584, 102],
