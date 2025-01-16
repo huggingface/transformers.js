@@ -1,5 +1,5 @@
 import { DistilBertTokenizer } from "../../../src/tokenizers.js";
-import { BASE_TEST_STRINGS } from "../test_strings.js";
+import { BASE_TEST_STRINGS, BERT_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = DistilBertTokenizer;
 export const TEST_CONFIG = {
@@ -301,6 +301,15 @@ export const TEST_CONFIG = {
       tokens: ["wei", "##rd", "\uff5e", "edge", "\uff5e", "case"],
       ids: [101, 86981, 12023, 10096, 30599, 10096, 13474, 102],
       decoded: "[CLS] weird \uff5e edge \uff5e case [SEP]",
+    },
+  },
+  // `model.type` field missing in tokenizer.json
+  "distilbert/distilbert-base-multilingual-cased": {
+    CURRENCY: {
+      text: BERT_TEST_STRINGS.CHINESE_LATIN_MIXED,
+      tokens: ["ah", "\u535a", "\u63a8", "z", "##z"],
+      ids: [101, 69863, 2684, 4163, 194, 10305, 102],
+      decoded: "[CLS] ah \u535a \u63a8 zz [SEP]",
     },
   },
 };

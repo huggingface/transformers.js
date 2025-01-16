@@ -1332,4 +1332,13 @@ export const TEST_CONFIG = {
       decoded: "[CLS] test $ 1 r2 # 3 [UNK] [UNK] [UNK] [UNK] [UNK] [UNK] test [SEP]",
     },
   },
+  // `model.type` field missing in tokenizer.json
+  "google-bert/bert-base-cased": {
+    CURRENCY: {
+      text: BERT_TEST_STRINGS.CHINESE_LATIN_MIXED,
+      tokens: ["ah", "[UNK]", "[UNK]", "z", "##z"],
+      ids: [101, 18257, 100, 100, 195, 1584, 102],
+      decoded: "[CLS] ah [UNK] [UNK] zz [SEP]",
+    },
+  },
 };

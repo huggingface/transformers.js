@@ -364,13 +364,15 @@ export class TokenizerModel extends Callable {
                 return new BPE(config);
 
             default:
-                // Some tokenizers, like for google-t5/t5-small, do not have a `type` field.
-                // In this case, we can infer the tokenizer type based on the structure of the `vocab` field.
+                // Some older tokenizers, like `google-t5/t5-small` and `distilbert/distilbert-base-uncased`, do not have a `type` field.
+                // In this case, we can infer the tokenizer type based on the structure of the `vocab` field and other properties.
                 if (config.vocab) {
                     if (Array.isArray(config.vocab)) {
                         // config.vocab is of type `[string, number][]`
                         // @ts-ignore
                         return new Unigram(config, ...args);
+                    } else if (typeof config.vocab === 'object' && config.continuing_subword_prefix && config.unk_token) {
+                        return new WordPieceTokenizer(config);
                     } else {
                         // @ts-ignore
                         return new LegacyTokenizerModel(config, ...args);
