@@ -196,12 +196,17 @@ function getNormalizedConfig(config) {
             mapping['encoder_hidden_size'] = mapping['decoder_hidden_size'] = 'd_model';
             break;
         case 'musicgen_decoder':
-        case 'moonshine':
             mapping['num_encoder_layers'] = mapping['num_decoder_layers'] = 'num_hidden_layers';
             mapping['num_encoder_heads'] = mapping['num_decoder_heads'] = 'num_attention_heads';
             mapping['encoder_hidden_size'] = mapping['decoder_hidden_size'] = 'hidden_size';
             break;
-
+        case 'moonshine':
+            mapping['num_decoder_layers'] = 'decoder_num_hidden_layers';
+            mapping['num_decoder_heads'] = 'decoder_num_key_value_heads';
+            mapping['num_encoder_layers'] = 'encoder_num_hidden_layers';
+            mapping['num_encoder_heads'] = 'encoder_num_key_value_heads';
+            mapping['encoder_hidden_size'] = mapping['decoder_hidden_size'] = 'hidden_size';
+            break;
         case 'vision-encoder-decoder':
             // @ts-expect-error TS2339
             const decoderConfig = getNormalizedConfig(config.decoder);
