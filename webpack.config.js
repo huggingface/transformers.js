@@ -48,7 +48,7 @@ class PostBuildPlugin {
             // - https://github.com/huggingface/transformers.js/issues/980
             // - https://github.com/huggingface/transformers.js/issues/1021
             // - https://github.com/huggingface/transformers.js/issues/1026
-            new RegExp('new URL\\(["\'].\\\/["\'],\\s*import\\.meta\\.url\\)', 'gm'),
+            new RegExp('new URL\\(["\']\\.\\\/["\'],\\s*import\\.meta\\.url\\)', 'gm'),
             "new URL(import.meta.url)",
           );
           fs.writeFileSync(filePath, content, 'utf8');
