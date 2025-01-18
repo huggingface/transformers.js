@@ -13,4 +13,5 @@ export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './sam/processing_sam.js';
 export * from './speecht5/processing_speecht5.js';
 export * from './wav2vec2/processing_wav2vec2.js';
+export * from './wav2vec2_with_lm/processing_wav2vec2_with_lm.js';
 export * from './whisper/processing_whisper.js';

@@ -2,7 +2,7 @@ import { AutoTokenizer } from "../../tokenizers.js";
 import { AutoFeatureExtractor } from "../auto/feature_extraction_auto.js";
 import { Processor } from "../../base/processing_utils.js";
 
-export class Wav2Vec2Processor extends Processor {
+export class Wav2Vec2ProcessorWithLM extends Processor {
     static tokenizer_class = AutoTokenizer
     static feature_extractor_class = AutoFeatureExtractor
 
