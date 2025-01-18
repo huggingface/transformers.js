@@ -4285,6 +4285,19 @@ export class LlamaModel extends LlamaPreTrainedModel { }
 export class LlamaForCausalLM extends LlamaPreTrainedModel { }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// Helium models
+export class HeliumPreTrainedModel extends PreTrainedModel { }
+export class HeliumModel extends HeliumPreTrainedModel { }
+export class HeliumForCausalLM extends HeliumPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Glm models
+export class GlmPreTrainedModel extends PreTrainedModel { }
+export class GlmModel extends GlmPreTrainedModel { }
+export class GlmForCausalLM extends GlmPreTrainedModel { }
+//////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 // EXAONE models
@@ -7131,6 +7144,8 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['gpt_neox', ['GPTNeoXModel', GPTNeoXModel]],
     ['codegen', ['CodeGenModel', CodeGenModel]],
     ['llama', ['LlamaModel', LlamaModel]],
+    ['helium', ['HeliumModel', HeliumModel]],
+    ['glm', ['GlmModel', GlmModel]],
     ['exaone', ['ExaoneModel', ExaoneModel]],
     ['olmo', ['OlmoModel', OlmoModel]],
     ['olmo2', ['Olmo2Model', Olmo2Model]],
@@ -7227,6 +7242,8 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gpt_neox', ['GPTNeoXForCausalLM', GPTNeoXForCausalLM]],
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
+    ['helium', ['HeliumForCausalLM', HeliumForCausalLM]],
+    ['glm', ['GlmForCausalLM', GlmForCausalLM]],
     ['exaone', ['ExaoneForCausalLM', ExaoneForCausalLM]],
     ['olmo', ['OlmoForCausalLM', OlmoForCausalLM]],
     ['olmo2', ['Olmo2ForCausalLM', Olmo2ForCausalLM]],
