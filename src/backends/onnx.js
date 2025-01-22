@@ -38,6 +38,9 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     webgpu: 'webgpu', // WebGPU
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
+    xnnpack: 'xnnpack', // XNNPACK
+    nnapi: 'nnapi', // NNAPI
+    coreml: 'coreml', // CoreML
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
@@ -54,12 +57,28 @@ const supportedDevices = [];
 /** @type {ONNXExecutionProviders[]} */
 let defaultDevices;
 let ONNX;
+let devicesPromise = Promise.resolve();
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
 if (ORT_SYMBOL in globalThis) {
   // If the JS runtime exposes their own ONNX runtime, use it
   ONNX = globalThis[ORT_SYMBOL];
 
+} else if (apis.IS_REACT_NATIVE_ENV) {
+    ONNX = ONNX_NODE.default ?? ONNX_NODE;
+
+    devicesPromise = import('react-native').then(({ Platform }) => {
+        if (Platform.OS === 'android') {
+            supportedDevices.push('nnapi', 'xnnpack', 'cpu');
+            defaultDevices = ['nnapi', 'cpu'];
+        } else if (Platform.OS === 'ios') {
+            supportedDevices.push('coreml', 'xnnpack', 'cpu');
+            defaultDevices = ['coreml', 'cpu'];
+        } else {
+            supportedDevices.push('xnnpack', 'cpu');
+            defaultDevices = ['cpu'];
+        }
+    });
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
@@ -107,9 +126,11 @@ const InferenceSession = ONNX.InferenceSession;
 /**
  * Map a device to the execution providers to use for the given device.
  * @param {import("../utils/devices.js").DeviceType|"auto"|null} [device=null] (Optional) The device to run the inference on.
- * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.
+ * @returns {Promise<ONNXExecutionProviders[]>} The execution providers to use for the given device.
  */
-export function deviceToExecutionProviders(device = null) {
+export async function deviceToExecutionProviders(device = null) {
+    await devicesPromise;
+
     // Use the default execution providers if the user hasn't specified anything
     if (!device) return defaultDevices;
 
@@ -141,19 +162,19 @@ let wasmInitPromise = null;
 
 /**
  * Create an ONNX inference session.
- * @param {Uint8Array} buffer The ONNX model buffer.
+ * @param {Uint8Array|string} bufferOrPath The ONNX model buffer.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
-export async function createInferenceSession(buffer, session_options, session_config) {
+export async function createInferenceSession(bufferOrPath, session_options, session_config) {
     if (wasmInitPromise) {
         // A previous session has already initialized the WASM runtime
         // so we wait for it to resolve before creating this new session.
         await wasmInitPromise;
     }
 
-    const sessionPromise = InferenceSession.create(buffer, session_options);
+    const sessionPromise = InferenceSession.create(bufferOrPath, session_options);
     wasmInitPromise ??= sessionPromise;
     const session = await sessionPromise;
     session.config = session_config;

@@ -22,6 +22,7 @@
  * @module env
  */
 
+import * as NativeFS from 'native-universal-fs';
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
@@ -37,8 +38,10 @@ const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator
 
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
-const IS_FS_AVAILABLE = !isEmpty(fs);
+const IS_FS_AVAILABLE = !isEmpty(fs) || !isEmpty(NativeFS);
 const IS_PATH_AVAILABLE = !isEmpty(path);
+
+const IS_REACT_NATIVE_ENV = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 
 /**
  * A read-only object containing information about the APIs available in the current environment.
@@ -49,6 +52,9 @@ export const apis = Object.freeze({
 
     /** Whether we are running in a web worker environment */
     IS_WEBWORKER_ENV,
+
+    /** Whether we are running in a React Native environment */
+    IS_REACT_NATIVE_ENV,
 
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
@@ -75,11 +81,14 @@ export const apis = Object.freeze({
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
 
 let dirname__ = './';
-if (RUNNING_LOCALLY) {
-    // NOTE: We wrap `import.meta` in a call to `Object` to prevent Webpack from trying to bundle it in CommonJS.
-    // Although we get the warning: "Accessing import.meta directly is unsupported (only property access or destructuring is supported)",
-    // it is safe to ignore since the bundled value (`{}`) isn't used for CommonJS environments (we use __dirname instead).
-    const _import_meta_url = Object(import.meta).url;
+if (IS_REACT_NATIVE_ENV) {
+    dirname__ = NativeFS.DocumentDirectoryPath;
+} else if (RUNNING_LOCALLY) {
+    // NOTE: Use eval to avoid SyntaxError and prevent Webpack from bundling it in CommonJS.
+    let _import_meta_url = null;
+    try {
+        _import_meta_url = eval('import.meta.url');
+    } catch {}
 
     if (_import_meta_url) {
         dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))) // ESM
@@ -115,6 +124,7 @@ const localModelPath = RUNNING_LOCALLY
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
+ * @property {boolean} rnUseCanvas Whether to use the Canvas API to load images on React Native. By default, it is `true`.
  * @property {string} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {Object} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
@@ -128,7 +138,7 @@ export const env = {
     /////////////////// Backends settings ///////////////////
     // NOTE: These will be populated later by the backends themselves.
     backends: {
-        // onnxruntime-web/onnxruntime-node
+        // onnxruntime-web/onnxruntime-node/onnxruntime-react-native
         onnx: {},
     },
 
@@ -140,6 +150,8 @@ export const env = {
     allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV),
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
+
+    rnUseCanvas: true,
 
     /////////////////// Cache settings ///////////////////
     useBrowserCache: IS_WEB_CACHE_AVAILABLE,

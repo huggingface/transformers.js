@@ -56,9 +56,15 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.3.2",
+    "image-codecs": "^0.1.0",
+    "native-universal-fs": "^0.2.0",
     "onnxruntime-node": "1.20.1",
+    "onnxruntime-react-native": "1.20.1",
     "onnxruntime-web": "1.21.0-dev.20250114-228dd16893",
     "sharp": "^0.33.5"
+  },
+  "optionalDependencies": {
+    "path-browserify": "^1.0.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -82,12 +88,27 @@
     "README.md",
     "LICENSE"
   ],
+  "react-native": {
+    "react-native": "react-native",
+    "fs": false,
+    "onnxruntime-web": false,
+    "onnxruntime-node": "onnxruntime-react-native",
+    "native-universal-fs": "native-universal-fs",
+    "image-codecs": "image-codecs",
+    "sharp": false,
+    "path": "path-browserify",
+    "stream/web": false
+  },
   "browser": {
     "fs": false,
+    "native-universal-fs": false,
+    "image-codecs": false,
+    "react-native": false,
     "path": false,
     "url": false,
     "sharp": false,
-    "onnxruntime-node": false
+    "onnxruntime-node": false,
+    "node-wav": false
   },
   "publishConfig": {
     "access": "public"
