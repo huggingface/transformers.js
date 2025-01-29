@@ -57,8 +57,8 @@ let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
 if (ORT_SYMBOL in globalThis) {
-  // If the JS runtime exposes their own ONNX runtime, use it
-  ONNX = globalThis[ORT_SYMBOL];
+    // If the JS runtime exposes their own ONNX runtime, use it
+    ONNX = globalThis[ORT_SYMBOL];
 
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
@@ -175,11 +175,20 @@ const ONNX_ENV = ONNX?.env;
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
-    // (Optional) Set path to wasm files. This is needed when running in a web worker.
-    // https://onnxruntime.ai/docs/api/js/interfaces/Env.WebAssemblyFlags.html#wasmPaths
-    // We use remote wasm files by default to make it easier for newer users.
-    // In practice, users should probably self-host the necessary .wasm files.
-    ONNX_ENV.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${env.version}/dist/`;
+    // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
+    // Currently, this behavior is disabled. To enable it, uncomment the following code.
+
+    // // Override the wasm search path if:
+    // // 1. We are not in a service worker.
+    // // 2. ONNX Runtime Web version is defined.
+    // // 3. The wasmPaths are not already set.
+    // //
+    // // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
+    // if (!(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope)
+    //     && typeof ONNX?.versions?.web === 'string'
+    //     && !ONNX_ENV.wasm.wasmPaths) {
+    //     ONNX_ENV.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX.versions.web}/dist/`;
+    // }
 
     // TODO: Add support for loading WASM files from cached buffer when we upgrade to onnxruntime-web@1.19.0
     // https://github.com/microsoft/onnxruntime/pull/21534
@@ -187,11 +196,6 @@ if (ONNX_ENV?.wasm) {
     // Users may wish to proxy the WASM backend to prevent the UI from freezing,
     // However, this is not necessary when using WebGPU, so we default to false.
     ONNX_ENV.wasm.proxy = false;
-
-    // https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated
-    if (typeof crossOriginIsolated === 'undefined' || !crossOriginIsolated) {
-        ONNX_ENV.wasm.numThreads = 1;
-    }
 }
 
 if (ONNX_ENV?.webgpu) {
