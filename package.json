@@ -55,9 +55,9 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
-    "@huggingface/jinja": "^0.3.2",
+    "@huggingface/jinja": "^0.3.3",
     "onnxruntime-node": "1.20.1",
-    "onnxruntime-web": "1.21.0-dev.20250114-228dd16893",
+    "onnxruntime-web": "1.21.0-dev.20250206-d981b153d3",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
