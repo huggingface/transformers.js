@@ -24,35 +24,12 @@ class PostBuildPlugin {
         const file = path.join(dist, ORT_BUNDLE_FILE);
         if (fs.existsSync(file)) fs.unlinkSync(file);
       }
-      
+
       // 2. Copy unbundled JSEP file
       {
         const src = path.join(__dirname, 'node_modules/onnxruntime-web/dist', ORT_JSEP_FILE);
         const dest = path.join(dist, ORT_JSEP_FILE);
         fs.copyFileSync(src, dest);
-      }
-
-      // 3. Replace strings in certain files
-      {
-        const files = ['transformers.js', 'transformers.min.js'];
-        for (const file of files) {
-          const filePath = path.join(dist, file);
-          let content = fs.readFileSync(filePath, 'utf8');
-          content = content.replace(
-            // Replace all instances of `new URL("./", import.meta.url)` with `new URL(import.meta.url)`,
-            // as it causes several issues with build tools and bundlers.
-            // 
-            // See the following issues for more information:
-            // - https://github.com/huggingface/transformers.js/issues/911
-            // - https://github.com/huggingface/transformers.js/issues/984
-            // - https://github.com/huggingface/transformers.js/issues/980
-            // - https://github.com/huggingface/transformers.js/issues/1021
-            // - https://github.com/huggingface/transformers.js/issues/1026
-            new RegExp('new URL\\(["\']\\.\\\/["\'],\\s*import\\.meta\\.url\\)', 'gm'),
-            "new URL(import.meta.url)",
-          );
-          fs.writeFileSync(filePath, content, 'utf8');
-        }
       }
     });
   }
@@ -98,7 +75,7 @@ function buildConfig({
         type,
       },
       assetModuleFilename: "[name][ext]",
-      chunkFormat: "module",
+      chunkFormat: false,
     },
     optimization: {
       minimize: true,
@@ -157,6 +134,7 @@ const NODE_IGNORE_MODULES = ["onnxruntime-web"];
 // NOTE: This is necessary for both type="module" and type="commonjs",
 // and will be ignored when building for web (only used for node/deno)
 const NODE_EXTERNAL_MODULES = [
+  "onnxruntime-common",
   "onnxruntime-node",
   "sharp",
   "fs",
@@ -164,8 +142,25 @@ const NODE_EXTERNAL_MODULES = [
   "url",
 ];
 
+// Do not bundle onnxruntime-node when packaging for the web.
+const WEB_IGNORE_MODULES = ["onnxruntime-node"];
+
+// Do not bundle the following modules with webpack (mark as external)
+const WEB_EXTERNAL_MODULES = [
+  "onnxruntime-common",
+  "onnxruntime-web",
+];
+
 // Web-only build
 const WEB_BUILD = buildConfig({
+  name: ".web",
+  type: "module",
+  ignoreModules: WEB_IGNORE_MODULES,
+  externalModules: WEB_EXTERNAL_MODULES,
+});
+
+// Web-only build, bundled with onnxruntime-web
+const BUNDLE_BUILD = buildConfig({
   type: "module",
   plugins: [new PostBuildPlugin()],
 });
@@ -173,12 +168,14 @@ const WEB_BUILD = buildConfig({
 // Node-compatible builds
 const NODE_BUILDS = [
   buildConfig({
+    name: ".node",
     suffix: ".mjs",
     type: "module",
     ignoreModules: NODE_IGNORE_MODULES,
     externalModules: NODE_EXTERNAL_MODULES,
   }),
   buildConfig({
+    name: ".node",
     suffix: ".cjs",
     type: "commonjs",
     ignoreModules: NODE_IGNORE_MODULES,
@@ -188,6 +185,6 @@ const NODE_BUILDS = [
 
 // When running with `webpack serve`, only build the web target.
 const BUILDS = process.env.WEBPACK_SERVE
-  ? [WEB_BUILD]
-  : [WEB_BUILD, ...NODE_BUILDS];
+  ? [BUNDLE_BUILD]
+  : [BUNDLE_BUILD, WEB_BUILD, ...NODE_BUILDS];
 export default BUILDS;
