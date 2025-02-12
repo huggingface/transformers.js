@@ -17,7 +17,7 @@ export function Token({ text, position, margin }) {
     ));
     return (<span
         style={{ marginLeft: margin }}
-        className={`leading-5 ${textWithLineBreaks.length === 1 ? 'inline-block ' : ''}${COLOURS[position % COLOURS.length]}`}>
+        className={`leading-5 text-white/[0.87] ${textWithLineBreaks.length === 1 ? 'inline-block ' : ''}${COLOURS[position % COLOURS.length]}`}>
         {textWithLineBreaks}
     </span>)
 }

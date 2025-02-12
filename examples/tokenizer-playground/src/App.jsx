@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Token } from './components/Token'
 import './App.css'
 
@@ -93,12 +93,16 @@ function App() {
     worker.current.postMessage({ model_id, text: textareaRef.current.value });
   }, []);
 
+  const hasColoredBackground = useMemo(() => {
+    return outputOption === 'text';
+  }, [outputOption]);
+
   return (
     <div className='w-full max-w-[720px] flex flex-col gap-4 items-center'>
 
       <div>
         <h1 className='text-5xl font-bold mb-2'>The Tokenizer Playground</h1>
-        <h2 className='text-lg font-normal'>Experiment with different tokenizers (running <a className="text-gray-900 underline" href="https://github.com/huggingface/transformers.js" target="_blank">locally</a> in your browser).</h2>
+        <h2 className='text-lg font-normal'>Experiment with different tokenizers (running <a className="text-blue-500 underline" href="https://github.com/huggingface/transformers.js" target="_blank">locally</a> in your browser).</h2>
       </div>
 
       <div>
@@ -146,7 +150,7 @@ function App() {
         </div>
       </div>
 
-      <div ref={outputRef} className='font-mono text-lg p-2.5 w-full bg-gray-100 rounded-lg border border-gray-200 whitespace-pre-wrap text-left h-[200px] overflow-y-auto'>
+      <div ref={outputRef} className={`font-mono text-lg p-2.5 w-full bg-gray-100 rounded-lg border border-gray-200 whitespace-pre-wrap text-left h-[200px] overflow-y-auto text-gray-600`}>
         {outputOption === 'text' ? (
           decodedTokens.map(
             (token, index) => <Token key={index} text={token} position={index} margin={margins[index]} />
