@@ -3301,6 +3301,7 @@ export async function pipeline(
         dtype = null,
         model_file_name = null,
         session_options = {},
+        request_options = {}
     } = {}
 ) {
     // Helper method to construct pipeline
@@ -3331,6 +3332,7 @@ export async function pipeline(
         dtype,
         model_file_name,
         session_options,
+        request_options,
     }
 
     const classes = new Map([
