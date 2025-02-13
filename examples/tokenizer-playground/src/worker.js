@@ -1,7 +1,7 @@
 // Although not strictly necessary, we delegate the tokenization to a worker thread to avoid
 // any potential issues with the tokenizer blocking the main thread (especially for large inputs).
 
-import { env, AutoTokenizer } from '@xenova/transformers'
+import { env, AutoTokenizer } from '@huggingface/transformers'
 
 env.allowLocalModels = false;
 
