@@ -154,3 +154,16 @@ export class InterruptableStoppingCriteria extends StoppingCriteria {
         return new Array(input_ids.length).fill(this.interrupted);
     }
 }
+
+/**
+ * This class can be used to always stop generation after one pass.
+ */
+export class AlwaysStopCriteria extends StoppingCriteria {
+    constructor() {
+        super();
+    }
+
+    _call(input_ids, scores) {
+        return new Array(input_ids.length).fill(true);
+    }
+}
