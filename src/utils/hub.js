@@ -191,14 +191,18 @@ function isValidUrl(string, protocols = null, validHosts = null) {
  */
 export async function getFile(urlOrPath, request_options) {
 
+    /**
+     * @type {Headers} The headers to use when making the request.
+     */
+    let headers
+    
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(urlOrPath);
-
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
 
-        const headers = new Headers();
+        headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
         // Check whether we are making a request to the Hugging Face Hub.
@@ -212,13 +216,23 @@ export async function getFile(urlOrPath, request_options) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers, ...request_options });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath, request_options);
     }
+
+    /**
+     * @type {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>}  A custom fetch function to use. Defaults to `null`. Note: this must be a function which
+     */
+    let resolvedFetch;
+    if (env.customFetch) {
+        resolvedFetch = env.customFetch;
+    } else {
+        resolvedFetch = fetch
+    }
+
+    return resolvedFetch(urlOrPath, {headers, ...request_options});
 }
 
 const ERROR_MAPPING = {

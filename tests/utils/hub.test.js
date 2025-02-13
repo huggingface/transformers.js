@@ -47,5 +47,24 @@ describe("Hub", () => {
         expect(error.name).toBe("AbortError");
       }
     }, MAX_TEST_EXECUTION_TIME + 1000);
+
+    it("should cancel multiple model loading", async () => {
+      const controller = new AbortController();
+      const signal = controller.signal;
+      setTimeout(() => controller.abort(), 10);
+
+      try {
+        await AutoModel.from_pretrained("hf-internal-testing/this-model-does-not-exist", { ...DEFAULT_MODEL_OPTIONS, request_options: { signal } })
+      } catch (error) {
+        expect(error.name).toBe("AbortError");
+      }
+
+      try {
+        await AutoModel.from_pretrained("hf-internal-testing/this-model-does-not-exist", { ...DEFAULT_MODEL_OPTIONS, request_options: { signal } })
+      } catch (error) {
+        expect(error.name).toBe("AbortError");
+      }
+
+    }, MAX_TEST_EXECUTION_TIME + 1000);
   });
 });
