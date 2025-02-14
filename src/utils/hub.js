@@ -22,6 +22,7 @@ import { dispatchCallback } from './core.js';
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
+ * @property {AbortSignal} [abort_signal=undefined] An optional AbortSignal to cancel the request.
  */
 
 /**
@@ -58,9 +59,11 @@ class FileResponse {
     /**
      * Creates a new `FileResponse` object.
      * @param {string|URL} filePath
+     * @param {AbortSignal} abort_signal An optional AbortSignal to cancel the request.
      */
-    constructor(filePath) {
+    constructor(filePath, abort_signal) {
         this.filePath = filePath;
+        this.abort_signal = abort_signal;
         this.headers = new Headers();
 
         this.exists = fs.existsSync(filePath);
@@ -79,9 +82,16 @@ class FileResponse {
                     self.arrayBuffer().then(buffer => {
                         controller.enqueue(new Uint8Array(buffer));
                         controller.close();
-                    })
+                    }).catch(error => {
+                        controller.error(error);
+                    });
+
+                    abort_signal?.addEventListener('abort', () => {
+                        controller.error(new Error('Request aborted'));
+                    });
                 }
             });
+            
         } else {
             this.status = 404;
             this.statusText = 'Not Found';
@@ -105,7 +115,7 @@ class FileResponse {
      * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
      */
     clone() {
-        let response = new FileResponse(this.filePath);
+        let response = new FileResponse(this.filePath, this.abort_signal);
         response.exists = this.exists;
         response.status = this.status;
         response.statusText = this.statusText;
@@ -185,12 +195,13 @@ function isValidUrl(string, protocols = null, validHosts = null) {
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {AbortSignal} abort_signal An optional AbortSignal to cancel the request.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
+export async function getFile(urlOrPath, abort_signal) {
 
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
-        return new FileResponse(urlOrPath);
+        return new FileResponse(urlOrPath, abort_signal);
 
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
@@ -210,12 +221,12 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers });
+        return fetch(urlOrPath, { headers, signal: abort_signal });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
+        return fetch(urlOrPath, { signal: abort_signal });
     }
 }
 
@@ -263,13 +274,15 @@ class FileCache {
 
     /**
      * Checks whether the given request is in the cache.
-     * @param {string} request 
+     * @param {string} request
+     * @param {Object} options An object containing the following properties:
+     * @param {AbortSignal} [options.abort_signal] An optional AbortSignal to cancel the request.
      * @returns {Promise<FileResponse | undefined>}
      */
-    async match(request) {
+    async match(request, { abort_signal = undefined } = {}) {
 
         let filePath = path.join(this.path, request);
-        let file = new FileResponse(filePath);
+        let file = new FileResponse(filePath, abort_signal);
 
         if (file.exists) {
             return file;
@@ -309,13 +322,14 @@ class FileCache {
 /**
  * 
  * @param {FileCache|Cache} cache The cache to search
+ * @param {AbortSignal} abort_signal An optional AbortSignal to cancel the request.
  * @param {string[]} names The names of the item to search for
  * @returns {Promise<FileResponse|Response|undefined>} The item from the cache, or undefined if not found.
  */
-async function tryCache(cache, ...names) {
+async function tryCache(cache, abort_signal, ...names) {
     for (let name of names) {
         try {
-            let result = await cache.match(name);
+            let result = await cache.match(name, {abort_signal});
             if (result) return result;
         } catch (e) {
             continue;
@@ -433,7 +447,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         //  1. We first try to get from cache using the local path. In some environments (like deno),
         //     non-URL cache keys are not allowed. In these cases, `response` will be undefined.
         //  2. If no response is found, we try to get from cache using the remote URL or file system cache.
-        response = await tryCache(cache, localPath, proposedCacheKey);
+        response = await tryCache(cache, options?.abort_signal, localPath, proposedCacheKey);
     }
 
     const cacheHit = response !== undefined;
@@ -447,7 +461,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             const isURL = isValidUrl(requestURL, ['http:', 'https:']);
             if (!isURL) {
                 try {
-                    response = await getFile(localPath);
+                    response = await getFile(localPath, options?.abort_signal);
                     cacheKey = localPath; // Update the cache key to be the local path
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
@@ -479,7 +493,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             }
 
             // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            response = await getFile(remoteURL, options?.abort_signal);
 
             if (response.status !== 200) {
                 return handleError(response.status, remoteURL, fatal);
