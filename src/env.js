@@ -40,6 +40,14 @@ const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
 
+const IS_DENO_ENV = typeof Deno !== 'undefined';
+
+const EXPOSED_RUNTIME_SYMBOL = Symbol.for('onnxruntime');
+const IS_EXPOSED_RUNTIME_ENV = EXPOSED_RUNTIME_SYMBOL in globalThis && (
+  IS_PROCESS_AVAILABLE && process?.env?.HF_TRANSFORMERS_USE_EXPOSED_RUNTIME
+  || IS_DENO_ENV && Deno?.env?.get('HF_TRANSFORMERS_USE_EXPOSED_RUNTIME')
+);
+
 /**
  * A read-only object containing information about the APIs available in the current environment.
  */
@@ -58,6 +66,12 @@ export const apis = Object.freeze({
 
     /** Whether the WebNN API is available */
     IS_WEBNN_AVAILABLE,
+
+    /** Symbol from JS environment that exposes their own ONNX runtime */
+    EXPOSED_RUNTIME_SYMBOL,
+
+    /** Whether we are running in a JS environment that exposes their own ONNX runtime */
+    IS_EXPOSED_RUNTIME_ENV,
 
     /** Whether the Node.js process API is available */
     IS_PROCESS_AVAILABLE,
