@@ -3691,7 +3691,7 @@ export class Idefics3PreTrainedModel extends PreTrainedModel {
 }
 
 /**
- * The LLAVA model which consists of a vision backbone and a language model.
+ * The Idefics3 model which consists of a vision backbone and a language model.
  */
 export class Idefics3ForConditionalGeneration extends Idefics3PreTrainedModel {
 
@@ -3714,6 +3714,13 @@ export class Idefics3ForConditionalGeneration extends Idefics3PreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+/**
+ * The SmolVLM Model with a language modeling head.
+ * It is made up a SigLIP vision encoder, with a language modeling head on top.
+ */
+export class SmolVLMForConditionalGeneration extends Idefics3ForConditionalGeneration { }
+
+//////////////////////////////////////////////////
 export class Phi3VPreTrainedModel extends PreTrainedModel {
     forward_params = [
         'input_ids',
@@ -7315,6 +7322,7 @@ const MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
 const MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = new Map([
     ['vision-encoder-decoder', ['VisionEncoderDecoderModel', VisionEncoderDecoderModel]],
     ['idefics3', ['Idefics3ForConditionalGeneration', Idefics3ForConditionalGeneration]],
+    ['smolvlm', ['SmolVLMForConditionalGeneration', SmolVLMForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
@@ -7324,6 +7332,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['florence2', ['Florence2ForConditionalGeneration', Florence2ForConditionalGeneration]],
     ['qwen2-vl', ['Qwen2VLForConditionalGeneration', Qwen2VLForConditionalGeneration]],
     ['idefics3', ['Idefics3ForConditionalGeneration', Idefics3ForConditionalGeneration]],
+    ['smolvlm', ['SmolVLMForConditionalGeneration', SmolVLMForConditionalGeneration]],
     ['paligemma', ['PaliGemmaForConditionalGeneration', PaliGemmaForConditionalGeneration]],
 ]);
 
