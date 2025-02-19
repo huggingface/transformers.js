@@ -1,4 +1,3 @@
-
 /**
  * @file Core utility functions/classes for Transformers.js.
  *
@@ -14,6 +13,11 @@
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
+export interface InitiateProgressInfo {
+    status: 'initiate';
+    name: string; // The model id or directory path
+    file: string; // The name of the file
+}
 
 /**
  * @typedef {Object} DownloadProgressInfo
@@ -21,6 +25,11 @@
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
+export interface DownloadProgressInfo {
+    status: 'download';
+    name: string;
+    file: string;
+}
 
 /**
  * @typedef {Object} ProgressStatusInfo
@@ -31,6 +40,14 @@
  * @property {number} loaded The number of bytes loaded.
  * @property {number} total The total number of bytes to be loaded.
  */
+export interface ProgressStatusInfo {
+    status: 'progress';
+    name: string;
+    file: string;
+    progress: number;
+    loaded: number;
+    total: number;
+}
 
 /**
  * @typedef {Object} DoneProgressInfo
@@ -38,6 +55,11 @@
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
+export interface DoneProgressInfo {
+    status: 'done';
+    name: string;
+    file: string;
+}
 
 /**
  * @typedef {Object} ReadyProgressInfo
@@ -45,10 +67,16 @@
  * @property {string} task The loaded task.
  * @property {string} model The loaded model.
  */
+export interface ReadyProgressInfo {
+    status: 'ready';
+    task: string;
+    model: string;
+}
 
 /**
  * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo} ProgressInfo
  */
+export type ProgressInfo = InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo;
 
 /**
  * A callback function that is called with progress information.
@@ -56,6 +84,7 @@
  * @param {ProgressInfo} progressInfo
  * @returns {void}
  */
+export type ProgressCallback = (progressInfo: ProgressInfo) => void;
 
 /**
  * Helper function to dispatch progress callbacks.
@@ -65,7 +94,7 @@
  * @returns {void}
  * @private
  */
-export function dispatchCallback(progress_callback, data) {
+export function dispatchCallback(progress_callback: ProgressCallback | null | undefined, data: ProgressInfo): void {
     if (progress_callback) progress_callback(data);
 }
 
@@ -76,7 +105,7 @@ export function dispatchCallback(progress_callback, data) {
  * @returns {Object} The reversed object.
  * @see https://ultimatecourses.com/blog/reverse-object-keys-and-values-in-javascript
  */
-export function reverseDictionary(data) {
+export function reverseDictionary(data: Record<string, any>): Record<string, any> {
     // https://ultimatecourses.com/blog/reverse-object-keys-and-values-in-javascript
     return Object.fromEntries(Object.entries(data).map(([key, value]) => [value, key]));
 }
@@ -87,7 +116,7 @@ export function reverseDictionary(data) {
  * @param {string} string The string to escape.
  * @returns {string} The escaped string.
  */
-export function escapeRegExp(string) {
+export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
@@ -98,7 +127,7 @@ export function escapeRegExp(string) {
  *
  * Adapted from https://stackoverflow.com/a/71091338/13989043
  */
-export function isTypedArray(val) {
+export function isTypedArray(val: any): boolean {
     return val?.prototype?.__proto__?.constructor?.name === 'TypedArray';
 }
 
@@ -108,7 +137,7 @@ export function isTypedArray(val) {
  * @param {*} x The value to check.
  * @returns {boolean} True if the value is a string, false otherwise.
  */
-export function isIntegralNumber(x) {
+export function isIntegralNumber(x: any): boolean {
     return Number.isInteger(x) || typeof x === 'bigint'
 }
 
@@ -117,7 +146,7 @@ export function isIntegralNumber(x) {
  * @param {*} x The value to check.
  * @returns {boolean} True if the value is `null`, `undefined` or `-1`, false otherwise.
  */
-export function isNullishDimension(x) {
+export function isNullishDimension(x: any): boolean {
     return x === null || x === undefined || x === -1;
 }
 
@@ -127,7 +156,7 @@ export function isNullishDimension(x) {
  * @param {any[]} arr The nested array to calculate dimensions for.
  * @returns {number[]} An array containing the dimensions of the input array.
  */
-export function calculateDimensions(arr) {
+export function calculateDimensions(arr: any[]): number[] {
     const dimensions = [];
     let current = arr;
     while (Array.isArray(current)) {
@@ -145,7 +174,7 @@ export function calculateDimensions(arr) {
  * @returns {*} The value of the popped key.
  * @throws {Error} If the key does not exist and no default value is provided.
  */
-export function pop(obj, key, defaultValue = undefined) {
+export function pop<T>(obj: Record<string, T>, key: string, defaultValue?: T): T {
     const value = obj[key];
     if (value !== undefined) {
         delete obj[key];
@@ -163,7 +192,7 @@ export function pop(obj, key, defaultValue = undefined) {
  * @param  {Array[]} arrs Arrays to merge.
  * @returns {Array} The merged array.
  */
-export function mergeArrays(...arrs) {
+export function mergeArrays<T>(...arrs: T[][]): T[] {
     return Array.prototype.concat.apply([], arrs);
 }
 
@@ -173,7 +202,7 @@ export function mergeArrays(...arrs) {
  * @returns {Array} Returns the computed Cartesian product as an array
  * @private
  */
-export function product(...a) {
+export function product<T>(...a: any[]): [] {
     // Cartesian product of items
     // Adapted from https://stackoverflow.com/a/43053803
     return a.reduce((a, b) => a.flatMap(d => b.map(e => [d, e])));
@@ -185,7 +214,7 @@ export function product(...a) {
  * @param {number} w The window size.
  * @returns {number} The index offset.
  */
-export function calculateReflectOffset(i, w) {
+export function calculateReflectOffset(i: number, w: number): number {
     return Math.abs((i + w) % (2 * w) - w);
 }
 
@@ -194,7 +223,7 @@ export function calculateReflectOffset(i, w) {
  * @param {string} path The path to save the blob to
  * @param {Blob} blob The blob to save
  */
-export function saveBlob(path, blob){
+export function saveBlob(path: string, blob: Blob): void {
     // Convert the canvas content to a data URL
     const dataURL = URL.createObjectURL(blob);
 
@@ -221,7 +250,7 @@ export function saveBlob(path, blob){
  * @param {string[]} props
  * @returns {Object}
  */
-export function pick(o, props) {
+export function pick<T extends Record<string, any>, K extends keyof T>(o: T, props: K[]): Pick<T, K> {
     return Object.assign(
         {},
         ...props.map((prop) => {
@@ -238,7 +267,7 @@ export function pick(o, props) {
  * @param {string} s The string to calculate the length of.
  * @returns {number} The length of the string.
  */
-export function len(s) {
+export function len(s: string): number {
     let length = 0;
     for (const c of s) ++length;
     return length;
@@ -250,7 +279,7 @@ export function len(s) {
  * @param {any[]|string} arr The array or string to search.
  * @param {any} value The value to count.
  */
-export function count(arr, value) {
+export function count<T>(arr: T[] | string, value: T): number {
     let count = 0;
     for (const v of arr) {
         if (v === value) ++count;

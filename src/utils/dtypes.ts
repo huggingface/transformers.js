@@ -44,6 +44,7 @@ export const DATA_TYPES = Object.freeze({
     q4f16: 'q4f16', // fp16 model with int4 block weight quantization
 });
 /** @typedef {keyof typeof DATA_TYPES} DataType */
+export type DataType = keyof typeof DATA_TYPES;
 
 export const DEFAULT_DEVICE_DTYPE_MAPPING = Object.freeze({
     // NOTE: If not specified, will default to fp32

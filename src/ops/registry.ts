@@ -1,7 +1,7 @@
 import { createInferenceSession, isONNXProxy } from "../backends/onnx.js";
 import { Tensor } from "../utils/tensor.js";
 import { apis } from "../env.js";
-
+import type { InferenceSession } from "onnxruntime-common";
 const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
 /**
  * Asynchronously creates a wrapper function for running an ONNX inference session.
@@ -14,15 +14,16 @@ const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
  * @returns {Promise<function(Record<string, Tensor>): Promise<T extends string ? Tensor : T extends string[] ? { [K in keyof T]: Tensor } : never>>}
  * The wrapper function for running the ONNX inference session.
  */
-const wrap = async (session_bytes, session_options, names) => {
+const wrap = async <T>(session_bytes: number[], session_options: InferenceSession.SessionOptions, names: T): Promise<((arg0: Record<string, Tensor>) => Promise<T extends string ? Tensor : T extends string[] ? {
+    [K in keyof T]: Tensor;
+} : never>)> => {
     const session = await createInferenceSession(
-        new Uint8Array(session_bytes), session_options,
+        new Uint8Array(session_bytes), session_options, {}
     );
 
-    /** @type {Promise<any>} */
-    let chain = Promise.resolve();
+    let chain: Promise<any> = Promise.resolve();
 
-    return /** @type {any} */(async (/** @type {Record<string, Tensor>} */ inputs) => {
+    return (async (inputs: Record<string, Tensor>) => {
         const proxied = isONNXProxy();
         const ortFeed = Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, (proxied ? v.clone() : v).ort_tensor]));
 
@@ -32,18 +33,28 @@ const wrap = async (session_bytes, session_options, names) => {
         if (Array.isArray(names)) {
             return names.map((n) => new Tensor(outputs[n]));
         } else {
-            return new Tensor(outputs[/** @type {string} */(names)]);
+            return new Tensor(outputs[names]);
         }
-    })
+    }) as any;
 }
 
 // In-memory registry of initialized ONNX operators
 export class TensorOpRegistry {
+    private static _nearest_interpolate_4d: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _bilinear_interpolate_4d: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _bicubic_interpolate_4d: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _matmul: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _stft: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _rfft: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _slice: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor>> | undefined;
+    private static _top_k: Promise<(arg0: Record<string, Tensor>) => Promise<Tensor[]>> | undefined;
+    
+
     static session_options = {
         // TODO: Allow for multiple execution providers
         // executionProviders: ['webgpu'],
     };
-
+    
     static get nearest_interpolate_4d() {
         if (!this._nearest_interpolate_4d) {
             this._nearest_interpolate_4d = wrap(
@@ -114,8 +125,8 @@ export class TensorOpRegistry {
             this._top_k = wrap(
                 [8, 10, 18, 0, 58, 73, 10, 18, 10, 1, 120, 10, 1, 107, 18, 1, 118, 18, 1, 105, 34, 4, 84, 111, 112, 75, 18, 1, 116, 90, 9, 10, 1, 120, 18, 4, 10, 2, 8, 1, 90, 15, 10, 1, 107, 18, 10, 10, 8, 8, 7, 18, 4, 10, 2, 8, 1, 98, 9, 10, 1, 118, 18, 4, 10, 2, 8, 1, 98, 9, 10, 1, 105, 18, 4, 10, 2, 8, 7, 66, 2, 16, 21],
                 this.session_options,
-                [ /* Values */ 'v', /* Indices */ 'i']
-            )
+                ['v', 'i']
+            );
         }
         return this._top_k;
     }

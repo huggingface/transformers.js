@@ -1,3 +1,15 @@
+/**
+ * Type definition for a callable function that can be instantiated
+ */
+export type CallableFunction = {
+    (...args: any[]): any;
+    _call(...args: any[]): any;
+}
+
+/**
+ * Type definition for the callable constructor
+ */
+export type CallableConstructor = new () => CallableFunction;
 
 /**
  * A base class for creating callable objects.
@@ -5,7 +17,7 @@
  * 
  * @type {new () => {(...args: any[]): any, _call(...args: any[]): any}}
  */
-export const Callable = /** @type {any} */ (class {
+export const Callable: CallableConstructor = class {
     /**
     * Creates a new instance of the Callable class.
     */
@@ -16,10 +28,14 @@ export const Callable = /** @type {any} */ (class {
          * @param {...any} args Zero or more arguments to pass to the '_call' method.
          * @returns {*} The result of calling the '_call' method.
          */
-        let closure = function (...args) {
-            return closure._call(...args)
-        }
-        return Object.setPrototypeOf(closure, new.target.prototype)
+        const closure: CallableFunction = Object.assign(
+            function (this: CallableFunction, ...args: any[]): any {
+                return this._call(...args);
+            },
+            { _call: this._call }
+        );
+
+        return Object.setPrototypeOf(closure, new.target.prototype);
     }
 
     /**
@@ -29,7 +45,7 @@ export const Callable = /** @type {any} */ (class {
      * @param {any[]} args
      * @throws {Error} If the subclass does not implement the `_call` method.
      */
-    _call(...args) {
-        throw Error('Must implement _call method in subclass')
+    _call(...args: any[]): any {
+        throw Error('Must implement _call method in subclass');
     }
-});
+} as unknown as CallableConstructor;

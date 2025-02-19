@@ -1,4 +1,3 @@
-
 /**
  * @file Helper module for image processing.
  *
@@ -16,13 +15,15 @@ import { Tensor } from './tensor.js';
 // Will be empty (or not used) if running in browser or web-worker
 import sharp from 'sharp';
 
+export type ImageChannels = 1 | 2 | 3 | 4;
+
 let createCanvasFunction;
 let ImageDataClass;
 let loadImageFunction;
 const IS_BROWSER_OR_WEBWORKER = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
 if (IS_BROWSER_OR_WEBWORKER) {
     // Running in browser or web-worker
-    createCanvasFunction = (/** @type {number} */ width, /** @type {number} */ height) => {
+    createCanvasFunction = (width: number, height: number) => {
         if (!self.OffscreenCanvas) {
             throw new Error('OffscreenCanvas not supported by this browser.');
         }
@@ -34,7 +35,7 @@ if (IS_BROWSER_OR_WEBWORKER) {
 } else if (sharp) {
     // Running in Node.js, electron, or other non-browser environment
 
-    loadImageFunction = async (/**@type {sharp.Sharp}*/img) => {
+    loadImageFunction = async (img: sharp.Sharp) => {
         const metadata = await img.metadata();
         const rawChannels = metadata.channels;
 
@@ -75,6 +76,10 @@ const CONTENT_TYPE_MAP = new Map([
 ]);
 
 export class RawImage {
+    data: Uint8ClampedArray | Uint8Array;
+    width: number;
+    height: number;
+    channels: ImageChannels;
 
     /**
      * Create a new `RawImage` object.
@@ -83,7 +88,7 @@ export class RawImage {
      * @param {number} height The height of the image.
      * @param {1|2|3|4} channels The number of channels.
      */
-    constructor(data, width, height, channels) {
+    constructor(data: Uint8ClampedArray | Uint8Array, width: number, height: number, channels: ImageChannels) {
         this.data = data;
         this.width = width;
         this.height = height;
@@ -94,7 +99,7 @@ export class RawImage {
      * Returns the size of the image (width, height).
      * @returns {[number, number]} The size of the image (width, height).
      */
-    get size() {
+    get size(): [number, number] {
         return [this.width, this.height];
     }
 
@@ -114,7 +119,7 @@ export class RawImage {
      * // }
      * ```
      */
-    static async read(input) {
+    static async read(input: RawImage | string | URL) {
         if (input instanceof RawImage) {
             return input;
         } else if (typeof input === 'string' || input instanceof URL) {
@@ -129,12 +134,12 @@ export class RawImage {
      * @param {HTMLCanvasElement|OffscreenCanvas} canvas The canvas to read the image from.
      * @returns {RawImage} The image object.
      */
-    static fromCanvas(canvas) {
+    static fromCanvas(canvas: HTMLCanvasElement | OffscreenCanvas): RawImage {
         if (!IS_BROWSER_OR_WEBWORKER) {
             throw new Error('fromCanvas() is only supported in browser environments.')
         }
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         return new RawImage(data, canvas.width, canvas.height, 4);
     }
@@ -144,7 +149,7 @@ export class RawImage {
      * @param {string|URL} url The URL or file path to read the image from.
      * @returns {Promise<RawImage>} The image object.
      */
-    static async fromURL(url) {
+    static async fromURL(url: string | URL): Promise<RawImage> {
         const response = await getFile(url);
         if (response.status !== 200) {
             throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);
@@ -158,7 +163,7 @@ export class RawImage {
      * @param {Blob} blob The blob to read the image from.
      * @returns {Promise<RawImage>} The image object.
      */
-    static async fromBlob(blob) {
+    static async fromBlob(blob: Blob): Promise<RawImage> {
         if (IS_BROWSER_OR_WEBWORKER) {
             // Running in environment with canvas
             const img = await loadImageFunction(blob);
@@ -182,7 +187,7 @@ export class RawImage {
      * Helper method to create a new Image from a tensor
      * @param {Tensor} tensor
      */
-    static fromTensor(tensor, channel_format = 'CHW') {
+    static fromTensor(tensor: Tensor, channel_format = 'CHW') {
         if (tensor.dims.length !== 3) {
             throw new Error(`Tensor should have 3 dimensions, but has ${tensor.dims.length} dimensions.`);
         }
@@ -212,7 +217,7 @@ export class RawImage {
      * Convert the image to grayscale format.
      * @returns {RawImage} `this` to support chaining.
      */
-    grayscale() {
+    grayscale(): RawImage {
         if (this.channels === 1) {
             return this;
         }
@@ -239,7 +244,7 @@ export class RawImage {
      * Convert the image to RGB format.
      * @returns {RawImage} `this` to support chaining.
      */
-    rgb() {
+    rgb(): RawImage {
         if (this.channels === 3) {
             return this;
         }
@@ -272,7 +277,7 @@ export class RawImage {
      * Convert the image to RGBA format.
      * @returns {RawImage} `this` to support chaining.
      */
-    rgba() {
+    rgba(): RawImage {
         if (this.channels === 4) {
             return this;
         }
@@ -311,7 +316,7 @@ export class RawImage {
      * @throws {Error} If the image does not have 4 channels.
      * @throws {Error} If the mask is not a single channel.
      */
-    putAlpha(mask) {
+    putAlpha(mask: RawImage): RawImage {
         if (mask.width !== this.width || mask.height !== this.height) {
             throw new Error(`Expected mask size to be ${this.width}x${this.height}, but got ${mask.width}x${mask.height}`);
         }
@@ -351,9 +356,9 @@ export class RawImage {
      * @param {0|1|2|3|4|5|string} [options.resample] The resampling method to use.
      * @returns {Promise<RawImage>} `this` to support chaining.
      */
-    async resize(width, height, {
+    async resize(width: number, height: number, {
         resample = 2,
-    } = {}) {
+    }: { resample?: 0 | 1 | 2 | 3 | 4 | 5 | string; } = {}): Promise<RawImage> {
 
         // Do nothing if the image already has the desired size
         if (this.width === width && this.height === height) {
@@ -703,11 +708,10 @@ export class RawImage {
      * Inspired by PIL's `Image.split()` [function](https://pillow.readthedocs.io/en/latest/reference/Image.html#PIL.Image.Image.split).
      * @returns {RawImage[]} An array containing bands.
      */
-    split() {
+    split(): RawImage[] {
         const { data, width, height, channels } = this;
 
-        /** @type {typeof Uint8Array | typeof Uint8ClampedArray} */
-        const data_type = /** @type {any} */(data.constructor);
+        const data_type: typeof Uint8Array | typeof Uint8ClampedArray = data.constructor as typeof Uint8Array | typeof Uint8ClampedArray;
         const per_channel_length = data.length / channels;
 
         // Pre-allocate buffers for each channel
@@ -734,7 +738,7 @@ export class RawImage {
      * @param {1|2|3|4|null} [channels] The new number of channels of the image.
      * @private
      */
-    _update(data, width, height, channels = null) {
+    _update(data: Uint8ClampedArray, width: number, height: number, channels: ImageChannels | null = null) {
         this.data = data;
         this.width = width;
         this.height = height;
@@ -748,7 +752,7 @@ export class RawImage {
      * Clone the image
      * @returns {RawImage} The cloned image
      */
-    clone() {
+    clone(): RawImage {
         return new RawImage(this.data.slice(), this.width, this.height, this.channels);
     }
 
@@ -757,7 +761,7 @@ export class RawImage {
      * @param {number} numChannels The number of channels. Must be 1, 3, or 4.
      * @returns {RawImage} `this` to support chaining.
      */
-    convert(numChannels) {
+    convert(numChannels: number): RawImage {
         if (this.channels === numChannels) return this; // Already correct number of channels
 
         switch (numChannels) {
@@ -780,7 +784,7 @@ export class RawImage {
      * Save the image to the given path.
      * @param {string} path The path to save the image to.
      */
-    async save(path) {
+    async save(path: string) {
 
         if (IS_BROWSER_OR_WEBWORKER) {
             if (apis.IS_WEBWORKER_ENV) {

@@ -25,12 +25,13 @@
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
+import { Env } from 'onnxruntime-common';
 
 const VERSION = '3.3.3';
 
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof window !== "undefined" && typeof window.document !== "undefined";
-const IS_WEBWORKER_ENV = typeof self !== "undefined"  && self.constructor?.name === 'DedicatedWorkerGlobalScope';
+const IS_WEBWORKER_ENV = typeof self !== "undefined" && self.constructor?.name === 'DedicatedWorkerGlobalScope';
 const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = typeof navigator !== 'undefined' && 'gpu' in navigator;
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
@@ -43,38 +44,42 @@ const IS_PATH_AVAILABLE = !isEmpty(path);
 /**
  * A read-only object containing information about the APIs available in the current environment.
  */
-export const apis = Object.freeze({
+type APIs = {
     /** Whether we are running in a browser environment (and not a web worker) */
-    IS_BROWSER_ENV,
-
+    IS_BROWSER_ENV: boolean;
     /** Whether we are running in a web worker environment */
-    IS_WEBWORKER_ENV,
-
+    IS_WEBWORKER_ENV: boolean;
     /** Whether the Cache API is available */
-    IS_WEB_CACHE_AVAILABLE,
-
+    IS_WEB_CACHE_AVAILABLE: boolean;
     /** Whether the WebGPU API is available */
-    IS_WEBGPU_AVAILABLE,
-
+    IS_WEBGPU_AVAILABLE: boolean;
     /** Whether the WebNN API is available */
-    IS_WEBNN_AVAILABLE,
-
+    IS_WEBNN_AVAILABLE: boolean;
     /** Whether the Node.js process API is available */
-    IS_PROCESS_AVAILABLE,
-
+    IS_PROCESS_AVAILABLE: boolean;
     /** Whether we are running in a Node.js environment */
-    IS_NODE_ENV,
-
+    IS_NODE_ENV: boolean;
     /** Whether the filesystem API is available */
-    IS_FS_AVAILABLE,
-
+    IS_FS_AVAILABLE: boolean;
     /** Whether the path API is available */
+    IS_PATH_AVAILABLE: boolean;
+};
+
+export const apis: Readonly<APIs> = Object.freeze({
+    IS_BROWSER_ENV,
+    IS_WEBWORKER_ENV,
+    IS_WEB_CACHE_AVAILABLE,
+    IS_WEBGPU_AVAILABLE,
+    IS_WEBNN_AVAILABLE,
+    IS_PROCESS_AVAILABLE,
+    IS_NODE_ENV,
+    IS_FS_AVAILABLE,
     IS_PATH_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
 
-let dirname__ = './';
+let dirname__: string = './';
 if (RUNNING_LOCALLY) {
     // NOTE: We wrap `import.meta` in a call to `Object` to prevent Webpack from trying to bundle it in CommonJS.
     // Although we get the warning: "Accessing import.meta directly is unsupported (only property access or destructuring is supported)",
@@ -121,8 +126,25 @@ const localModelPath = RUNNING_LOCALLY
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache
  */
 
-/** @type {TransformersEnvironment} */
-export const env = {
+export interface TransformersEnvironment {
+    version: string;
+    backends: {
+        onnx: Partial<Env>;
+    };
+    allowRemoteModels: boolean;
+    remoteHost: string;
+    remotePathTemplate: string;
+    allowLocalModels: boolean;
+    localModelPath: string;
+    useFS: boolean;
+    useBrowserCache: boolean;
+    useFSCache: boolean;
+    cacheDir: string | null;
+    useCustomCache: boolean;
+    customCache: { match: Function; put: Function } | null;
+}
+
+export const env: TransformersEnvironment = {
     version: VERSION,
 
     /////////////////// Backends settings ///////////////////
@@ -152,11 +174,10 @@ export const env = {
     //////////////////////////////////////////////////////
 }
 
-
 /**
  * @param {Object} obj
  * @private
  */
-function isEmpty(obj) {
+function isEmpty(obj: Record<string, any>): boolean {
     return Object.keys(obj).length === 0;
 }

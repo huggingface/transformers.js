@@ -1,4 +1,3 @@
-
 /**
  * @file Helper module for mathematical processing. 
  * 
@@ -14,10 +13,26 @@
  * @typedef {TypedArray | BigTypedArray} AnyTypedArray
  */
 
+export type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
+export type BigTypedArray = BigInt64Array | BigUint64Array;
+export type AnyTypedArray = TypedArray | BigTypedArray;
+
+
+// convert to original type
+export function toOriginalArrType<T extends TypedArray|number[]>(originalArr: T, newArr: number[]): T {
+    return newArr as T;
+    if (Array.isArray(originalArr)) {
+        return newArr as T;
+    } else {
+        // @ts-ignore
+        return new (originalArr.constructor)(newArr) as T;
+    }
+}
+
 /**
  * @param {TypedArray} input
  */
-export function interpolate_data(input, [in_channels, in_height, in_width], [out_height, out_width], mode = 'bilinear', align_corners = false) {
+export function interpolate_data(input: TypedArray, [in_channels, in_height, in_width]: [number, number, number], [out_height, out_width]: [number, number], mode = 'bilinear', align_corners = false): TypedArray {
     // TODO use mode and align_corners
 
     // Output image dimensions
@@ -95,7 +110,7 @@ export function interpolate_data(input, [in_channels, in_height, in_width], [out
  * @param {number[]} axes 
  * @returns {[T, number[]]} The permuted array and the new shape.
  */
-export function permute_data(array, dims, axes) {
+export function permute_data<T extends AnyTypedArray>(array: T, dims: number[], axes: number[]): [T, number[]] {
     // Calculate the new shape of the permuted array
     // and the stride of the original array
     const shape = new Array(axes.length);
@@ -134,21 +149,20 @@ export function permute_data(array, dims, axes) {
  * @param {T} arr The array of numbers to compute the softmax of.
  * @returns {T} The softmax array.
  */
-export function softmax(arr) {
+export function softmax<T extends TypedArray|number[]>(arr: T): T {
     // Compute the maximum value in the array
     const maxVal = max(arr)[0];
 
     // Compute the exponentials of the array values
-    const exps = arr.map(x => Math.exp(x - maxVal));
+    const exps = Array.from(arr, x => Math.exp(x - maxVal));
 
     // Compute the sum of the exponentials
-    // @ts-ignore
     const sumExps = exps.reduce((acc, val) => acc + val, 0);
 
     // Compute the softmax values
     const softmaxArr = exps.map(x => x / sumExps);
 
-    return /** @type {T} */(softmaxArr);
+    return toOriginalArrType<T>(arr, softmaxArr);
 }
 
 /**
@@ -157,7 +171,7 @@ export function softmax(arr) {
  * @param {T} arr The input array to calculate the log_softmax function for.
  * @returns {T} The resulting log_softmax array.
  */
-export function log_softmax(arr) {
+export function log_softmax<T extends TypedArray|number[]>(arr: T): T {
     // Compute the maximum value in the array
     const maxVal = max(arr)[0];
 
@@ -171,9 +185,9 @@ export function log_softmax(arr) {
     const logSum = Math.log(sumExps);
 
     // Compute the softmax values
-    const logSoftmaxArr = arr.map(x => x - maxVal - logSum);
+    const logSoftmaxArr = Array.from(arr, x => x - maxVal - logSum);
 
-    return /** @type {T} */(logSoftmaxArr);
+    return toOriginalArrType<T>(arr, logSoftmaxArr);
 }
 
 /**
@@ -182,7 +196,7 @@ export function log_softmax(arr) {
  * @param {number[]} arr2 The second array.
  * @returns {number} The dot product of arr1 and arr2.
  */
-export function dot(arr1, arr2) {
+export function dot(arr1: number[], arr2: number[]): number {
     let result = 0;
     for (let i = 0; i < arr1.length; ++i) {
         result += arr1[i] * arr2[i];
@@ -197,7 +211,7 @@ export function dot(arr1, arr2) {
  * @param {number[]} arr2 The second array.
  * @returns {number} The cosine similarity between the two arrays.
  */
-export function cos_sim(arr1, arr2) {
+export function cos_sim(arr1: number[], arr2: number[]): number {
     // Calculate dot product of the two arrays
     const dotProduct = dot(arr1, arr2);
 
@@ -218,7 +232,7 @@ export function cos_sim(arr1, arr2) {
  * @param {number[]} arr The array to calculate the magnitude of.
  * @returns {number} The magnitude of the array.
  */
-export function magnitude(arr) {
+export function magnitude(arr: number[]): number {
     return Math.sqrt(arr.reduce((acc, val) => acc + val * val, 0));
 }
 
@@ -230,7 +244,7 @@ export function magnitude(arr) {
  * @returns {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} the value and index of the minimum element, of the form: [valueOfMin, indexOfMin]
  * @throws {Error} If array is empty.
  */
-export function min(arr) {
+export function min<T extends number[]|bigint[]|AnyTypedArray>(arr: T): T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number] {
     if (arr.length === 0) throw Error('Array must not be empty');
     let min = arr[0];
     let indexOfMin = 0;
@@ -240,7 +254,8 @@ export function min(arr) {
             indexOfMin = i;
         }
     }
-    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([min, indexOfMin]);
+    // @ts-ignore - We know this is safe due to the type constraint and return type
+    return [min, indexOfMin];
 }
 
 
@@ -251,7 +266,7 @@ export function min(arr) {
  * @returns {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} the value and index of the maximum element, of the form: [valueOfMax, indexOfMax]
  * @throws {Error} If array is empty.
  */
-export function max(arr) {
+export function max<T extends number[]|bigint[]|AnyTypedArray>(arr: T): T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number] {
     if (arr.length === 0) throw Error('Array must not be empty');
     let max = arr[0];
     let indexOfMax = 0;
@@ -261,10 +276,11 @@ export function max(arr) {
             indexOfMax = i;
         }
     }
-    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([max, indexOfMax]);
+    // @ts-ignore - We know this is safe due to the type constraint and return type
+    return [max, indexOfMax];
 }
 
-function isPowerOfTwo(number) {
+function isPowerOfTwo(number: number): boolean {
     // Check if the number is greater than 0 and has only one bit set to 1
     return (number > 0) && ((number & (number - 1)) === 0);
 }
@@ -277,11 +293,17 @@ function isPowerOfTwo(number) {
  * Code adapted from https://www.npmjs.com/package/fft.js
  */
 class P2FFT {
+    private size: number;
+    private _csize: number;
+    private table: Float64Array;
+    private _width: number;
+    private _bitrev: Int32Array;
+
     /**
      * @param {number} size The size of the input array. Must be a power of two larger than 1.
      * @throws {Error} FFT size must be a power of two larger than 1.
      */
-    constructor(size) {
+    constructor(size: number) {
         this.size = size | 0; // convert to a 32-bit signed integer
         if (this.size <= 1 || !isPowerOfTwo(this.size))
             throw new Error('FFT size must be a power of two larger than 1');
@@ -321,7 +343,7 @@ class P2FFT {
      *
      * @returns {Float64Array} A complex number array with size `2 * size`
      */
-    createComplexArray() {
+    createComplexArray(): Float64Array {
         return new Float64Array(this._csize);
     }
 
@@ -332,7 +354,7 @@ class P2FFT {
      * @param {number[]} [storage] An optional array to store the result in.
      * @returns {number[]} An array of real numbers representing the input complex number representation.
      */
-    fromComplexArray(complex, storage) {
+    fromComplexArray(complex: Float64Array, storage: number[]): number[] {
         const res = storage || new Array(complex.length >>> 1);
         for (let i = 0; i < complex.length; i += 2)
             res[i >>> 1] = complex[i];
@@ -345,7 +367,7 @@ class P2FFT {
      * @param {Float64Array} [storage] Optional buffer to store the output array.
      * @returns {Float64Array} The complex-valued output array.
      */
-    toComplexArray(input, storage) {
+    toComplexArray(input: Float64Array, storage: Float64Array): Float64Array {
         const res = storage || this.createComplexArray();
         for (let i = 0; i < res.length; i += 2) {
             res[i] = input[i >>> 1];
@@ -364,7 +386,7 @@ class P2FFT {
      * 
      * @returns {void}
      */
-    transform(out, data) {
+    transform(out: Float64Array, data: Float64Array): void {
         if (out === data)
             throw new Error('Input and output buffers must be different');
 
@@ -381,7 +403,7 @@ class P2FFT {
      *
      * @throws {Error} If the input and output buffers are the same.
      */
-    realTransform(out, data) {
+    realTransform(out: Float64Array, data: Float64Array) {
         if (out === data)
             throw new Error('Input and output buffers must be different');
 
@@ -398,7 +420,7 @@ class P2FFT {
      * @throws {Error} If `out` and `data` refer to the same buffer.
      * @returns {void}
      */
-    inverseTransform(out, data) {
+    inverseTransform(out: Float64Array, data: Float64Array): void {
         if (out === data)
             throw new Error('Input and output buffers must be different');
 
@@ -415,7 +437,7 @@ class P2FFT {
      * @param {number} inv A scaling factor to apply to the transform.
      * @returns {void}
      */
-    _transform4(out, data, inv) {
+    _transform4(out: Float64Array, data: Float64Array, inv: number): void {
         // radix-4 implementation
 
         const size = this._csize;
@@ -425,8 +447,8 @@ class P2FFT {
         let step = 1 << width;
         let len = (size / step) << 1;
 
-        let outOff;
-        let t;
+        let outOff: number;
+        let t: number;
         const bitrev = this._bitrev;
         if (len === 4) {
             for (outOff = 0, t = 0; outOff < size; outOff += len, ++t) {
@@ -516,7 +538,7 @@ class P2FFT {
      * @param {number} step The step size for indexing the input data.
      * @returns {void}
      */
-    _singleTransform2(data, out, outOff, off, step) {
+    _singleTransform2(data: Float64Array, out: Float64Array, outOff: number, off: number, step: number): void {
         // radix-2 implementation
         // NOTE: Only called for len=4
 
@@ -543,7 +565,7 @@ class P2FFT {
      * 
      * @returns {void}
      */
-    _singleTransform4(data, out, outOff, off, step, inv) {
+    _singleTransform4(data: Float64Array, out: Float64Array, outOff: number, off: number, step: number, inv: number): void {
         // radix-4
         // NOTE: Only called for len=8
         const step2 = step * 2;
@@ -586,7 +608,7 @@ class P2FFT {
      * @param {Float64Array} data Input array of real data to be transformed
      * @param {number} inv The scale factor used to normalize the inverse transform
      */
-    _realTransform4(out, data, inv) {
+    _realTransform4(out: Float64Array, data: Float64Array, inv: number) {
         // Real input radix-4 implementation
         const size = this._csize;
 
@@ -595,8 +617,8 @@ class P2FFT {
         let step = 1 << width;
         let len = (size / step) << 1;
 
-        let outOff;
-        let t;
+        let outOff: number;
+        let t: number;
         const bitrev = this._bitrev;
         if (len === 4) {
             for (outOff = 0, t = 0; outOff < size; outOff += len, ++t) {
@@ -713,7 +735,7 @@ class P2FFT {
      * 
      * @returns {void}
      */
-    _singleRealTransform2(data, out, outOff, off, step) {
+    _singleRealTransform2(data: Float64Array, out: Float64Array, outOff: number, off: number, step: number): void {
         // radix-2 implementation
         // NOTE: Only called for len=4
 
@@ -737,7 +759,7 @@ class P2FFT {
      * @param {number} step The step size for the input array.
      * @param {number} inv The value of inverse.
      */
-    _singleRealTransform4(data, out, outOff, off, step, inv) {
+    _singleRealTransform4(data: Float64Array, out: Float64Array, outOff: number, off: number, step: number, inv: number) {
         // radix-4
         // NOTE: Only called for len=8
         const step2 = step * 2;
@@ -774,12 +796,21 @@ class P2FFT {
  * For more information, see: https://math.stackexchange.com/questions/77118/non-power-of-2-ffts/77156#77156
  */
 class NP2FFT {
+    public bufferSize: number;
+    private _a: number;
+    private _chirpBuffer: Float64Array;
+    private _buffer1: Float64Array;
+    private _buffer2: Float64Array;
+    private _outBuffer1: Float64Array;
+    private _outBuffer2: Float64Array;
+    private _slicedChirpBuffer: Float64Array;
+    private _f: P2FFT;
 
     /**
      * Constructs a new NP2FFT object.
      * @param {number} fft_length The length of the FFT
      */
-    constructor(fft_length) {
+    constructor(fft_length: number) {
         // Helper variables
         const a = 2 * (fft_length - 1);
         const b = 2 * (2 * fft_length - 1);
@@ -829,7 +860,7 @@ class NP2FFT {
         this._f.transform(this._chirpBuffer, ichirp);
     }
 
-    _transform(output, input, real) {
+    _transform(output: number[], input: number[], real: boolean) {
         const ib1 = this._buffer1;
         const ib2 = this._buffer2;
         const ob2 = this._outBuffer1;
@@ -887,7 +918,12 @@ class NP2FFT {
 }
 
 export class FFT {
-    constructor(fft_length) {
+    private fft_length: number;
+    private isPowerOfTwo: boolean;
+    private fft: P2FFT | NP2FFT;
+    public outputBufferSize: number;
+
+    constructor(fft_length: number) {
         this.fft_length = fft_length;
         this.isPowerOfTwo = isPowerOfTwo(fft_length);
         if (this.isPowerOfTwo) {
@@ -914,7 +950,7 @@ export class FFT {
  * @param {AnyTypedArray} data The input array
  * @param {number} windowSize The window size
  */
-export function medianFilter(data, windowSize) {
+export function medianFilter(data: AnyTypedArray, windowSize: number): AnyTypedArray {
 
     if (windowSize % 2 === 0 || windowSize <= 0) {
         throw new Error('Window size must be a positive odd number');
@@ -955,7 +991,7 @@ export function medianFilter(data, windowSize) {
  * @param {number} decimals The number of decimals
  * @returns {number} The rounded number
  */
-export function round(num, decimals) {
+export function round(num: number, decimals: number): number {
     const pow = Math.pow(10, decimals);
     return Math.round(num * pow) / pow;
 }
@@ -968,7 +1004,7 @@ export function round(num, decimals) {
  * @param {number} x The number to round
  * @returns {number} The rounded number
  */
-export function bankers_round(x) {
+export function bankers_round(x: number): number {
     const r = Math.round(x);
     const br = Math.abs(x) % 1 === 0.5 ? (r % 2 === 0 ? r : r - 1) : r;
     return br;
@@ -981,7 +1017,7 @@ export function bankers_round(x) {
  * @param {number[][]} matrix 
  * @returns {number[][]}
  */
-export function dynamic_time_warping(matrix) {
+export function dynamic_time_warping(matrix: number[][]): number[][] {
     const output_length = matrix.length;
     const input_length = matrix[0].length;
 
@@ -1004,7 +1040,7 @@ export function dynamic_time_warping(matrix) {
             const c1 = cost[i - 1][j];
             const c2 = cost[i][j - 1];
 
-            let c, t;
+            let c: number, t: number;
             if (c0 < c1 && c0 < c2) {
                 c = c0;
                 t = 0;

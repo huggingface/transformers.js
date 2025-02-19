@@ -4,7 +4,7 @@
  */
 
 import { mergeArrays } from '../utils/core.js';
-import { is_chinese_char } from '../tokenizers.js';
+import { is_chinese_char, PreTrainedTokenizer } from '../tokenizers.js';
 import { apis } from '../env.js';
 
 export class BaseStreamer {
@@ -12,7 +12,7 @@ export class BaseStreamer {
      * Function that is called by `.generate()` to push new tokens
      * @param {bigint[][]} value 
      */
-    put(value) {
+    put(value: bigint[][]) {
         throw Error('Not implemented');
     }
 
@@ -32,6 +32,15 @@ const stdout_write = apis.IS_PROCESS_AVAILABLE
  * Simple text streamer that prints the token(s) to stdout as soon as entire words are formed.
  */
 export class TextStreamer extends BaseStreamer {
+    tokenizer: PreTrainedTokenizer;
+    skip_prompt: boolean;
+    callback_function: (arg0: string) => void;
+    token_callback_function: (arg0: bigint[]) => void;
+    decode_kwargs: object;
+    token_cache: bigint[];
+    print_len: number;
+    next_tokens_are_prompt: boolean;
+
     /**
      * 
      * @param {import('../tokenizers.js').PreTrainedTokenizer} tokenizer
@@ -42,14 +51,14 @@ export class TextStreamer extends BaseStreamer {
      * @param {function(bigint[]): void} [options.token_callback_function=null] Function to call when a new token is generated
      * @param {Object} [options.decode_kwargs={}] Additional keyword arguments to pass to the tokenizer's decode method
      */
-    constructor(tokenizer, {
+    constructor(tokenizer: PreTrainedTokenizer, {
         skip_prompt = false,
         callback_function = null,
         token_callback_function = null,
         skip_special_tokens = true,
         decode_kwargs = {},
         ...kwargs
-    } = {}) {
+    }: { skip_prompt?: boolean; skip_special_tokens?: boolean; callback_function?: (arg0: string) => void; token_callback_function?: (arg0: bigint[]) => void; decode_kwargs?: object; } = {}) {
         super();
         this.tokenizer = tokenizer;
         this.skip_prompt = skip_prompt;
@@ -67,7 +76,7 @@ export class TextStreamer extends BaseStreamer {
      * Receives tokens, decodes them, and prints them to stdout as soon as they form entire words.
      * @param {bigint[][]} value 
      */
-    put(value) {
+    put(value: bigint[][]) {
         if (value.length > 1) {
             throw Error('TextStreamer only supports batch size of 1');
         }
@@ -126,7 +135,7 @@ export class TextStreamer extends BaseStreamer {
      * @param {string} text 
      * @param {boolean} stream_end 
      */
-    on_finalized_text(text, stream_end) {
+    on_finalized_text(text: string, stream_end: boolean) {
         if (text.length > 0) {
             this.callback_function?.(text);
         }
@@ -145,6 +154,13 @@ export class TextStreamer extends BaseStreamer {
  *  - The stream is finalized (on_finalize)
  */
 export class WhisperTextStreamer extends TextStreamer {
+    timestamp_begin: number;
+    on_chunk_start: (arg0: number) => void;
+    on_chunk_end: (arg0: number) => void;
+    on_finalize: () => void;
+    time_precision: number;
+    waiting_for_timestamp: boolean;
+
     /**
      * @param {import('../tokenizers.js').WhisperTokenizer} tokenizer
      * @param {Object} options
@@ -158,7 +174,7 @@ export class WhisperTextStreamer extends TextStreamer {
      * @param {boolean} [options.skip_special_tokens=true] Whether to skip special tokens when decoding
      * @param {Object} [options.decode_kwargs={}] Additional keyword arguments to pass to the tokenizer's decode method
      */
-    constructor(tokenizer, {
+    constructor(tokenizer: import('../tokenizers.js').WhisperTokenizer, {
         skip_prompt = false,
         callback_function = null,
         token_callback_function = null,
@@ -168,7 +184,7 @@ export class WhisperTextStreamer extends TextStreamer {
         time_precision = 0.02,
         skip_special_tokens = true,
         decode_kwargs = {},
-    } = {}) {
+    }: { skip_prompt?: boolean; callback_function?: (arg0: string) => void; token_callback_function?: (arg0: bigint[]) => void; on_chunk_start?: (arg0: number) => void; on_chunk_end?: (arg0: number) => void; on_finalize?: () => void; time_precision?: number; skip_special_tokens?: boolean; decode_kwargs?: object; } = {}) {
         super(tokenizer, {
             skip_prompt,
             skip_special_tokens,
@@ -190,7 +206,7 @@ export class WhisperTextStreamer extends TextStreamer {
     /**
      * @param {bigint[][]} value 
      */
-    put(value) {
+    put(value: bigint[][]) {
         if (value.length > 1) {
             throw Error('WhisperTextStreamer only supports batch size of 1');
         }

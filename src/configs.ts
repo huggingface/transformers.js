@@ -1,4 +1,3 @@
-
 /**
  * @file Helper module for using model configs. For more information, see the corresponding
  * [Python documentation](https://huggingface.co/docs/transformers/main/en/model_doc/auto#transformers.AutoConfig).
@@ -28,41 +27,97 @@
  */
 
 import { pick } from './utils/core.js';
-import {
-    getModelJSON,
-} from './utils/hub.js';
+import { getModelJSON } from './utils/hub.js';
+import { DEVICE_TYPES } from './utils/devices.js';
+import { DATA_TYPES } from './utils/dtypes.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
  */
+import type { PretrainedOptions } from './utils/hub.js';
 
 /**
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  */
+export type { ProgressCallback } from './utils/core.js';
 
 /**
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
  */
+export type { ProgressInfo } from './utils/core.js';
+
+/**
+ * Transformers.js-specific configuration, possibly present in config.json under the key `transformers.js_config`.
+ * @typedef {Object} TransformersJSConfig
+ * @property {import('./utils/tensor.js').DataType|Record<import('./utils/dtypes.js').DataType, import('./utils/tensor.js').DataType>} [kv_cache_dtype] The data type of the key-value cache.
+ * @property {Record<string, number>} [free_dimension_overrides] Override the free dimensions of the model.
+ * See https://onnxruntime.ai/docs/tutorials/web/env-flags-and-session-options.html#freedimensionoverrides
+ * for more information.
+ * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
+ * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
+ * @property {boolean|Record<string, boolean>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
+ */
+export type TransformersJSConfig = {
+    kv_cache_dtype?: keyof typeof DATA_TYPES | Record<keyof typeof DATA_TYPES, keyof typeof DATA_TYPES>;
+    free_dimension_overrides?: Record<string, number>;
+    device?: keyof typeof DEVICE_TYPES;
+    dtype?: keyof typeof DATA_TYPES | Record<string, keyof typeof DATA_TYPES>;
+    use_external_data_format?: boolean | Record<string, boolean>;
+};
+
+// Add interface for config object
+export interface ConfigObject {
+    model_type: string;
+    is_encoder_decoder: boolean;
+    text_config?: ConfigObject;
+    phi_config?: ConfigObject;
+    decoder?: ConfigObject;
+    language_config?: ConfigObject;
+    [key: string]: any;
+}
+
+// Add interface for normalized config
+export interface NormalizedConfig {
+    model_type: string;
+    is_encoder_decoder: boolean;
+    num_heads?: number;
+    num_layers?: number;
+    hidden_size?: number;
+    num_attention_heads?: number;
+    num_key_value_heads?: number;
+    head_dim?: number;
+    num_decoder_layers?: number;
+    num_decoder_heads?: number;
+    decoder_hidden_size?: number;
+    num_encoder_layers?: number;
+    num_encoder_heads?: number;
+    encoder_hidden_size?: number;
+    encoder_dim_kv?: number;
+    decoder_dim_kv?: number;
+    dim_kv?: number;
+    multi_query?: boolean;
+    [key: string]: any;
+}
 
 /**
  * Loads a config from the specified path.
  * @param {string} pretrained_model_name_or_path The path to the config directory.
  * @param {PretrainedOptions} options Additional options for loading the config.
- * @returns {Promise<Object>} A promise that resolves with information about the loaded config.
+ * @returns {Promise<ConfigObject>} A promise that resolves with information about the loaded config.
  */
-async function loadConfig(pretrained_model_name_or_path, options) {
-    return await getModelJSON(pretrained_model_name_or_path, 'config.json', true, options);
+async function loadConfig(pretrained_model_name_or_path: string, options: PretrainedOptions): Promise<ConfigObject> {
+    return await getModelJSON(pretrained_model_name_or_path, 'config.json', true, options) as ConfigObject;
 }
 
 /**
  * 
- * @param {PretrainedConfig} config 
- * @returns {Object} The normalized configuration.
+ * @param {ConfigObject} config 
+ * @returns {NormalizedConfig} The normalized configuration.
  */
-function getNormalizedConfig(config) {
-    const mapping = {};
+function getNormalizedConfig(config: ConfigObject): NormalizedConfig {
+    const mapping: Record<string, string> = {};
 
-    let init_normalized_config = {};
+    let init_normalized_config: Partial<NormalizedConfig> = {};
     switch (config.model_type) {
         // Sub-configs
         case 'llava':
@@ -70,20 +125,16 @@ function getNormalizedConfig(config) {
         case 'florence2':
         case 'llava_onevision':
         case 'idefics3':
-            // @ts-expect-error TS2339
-            init_normalized_config = getNormalizedConfig(config.text_config);
+            init_normalized_config = getNormalizedConfig(config.text_config!);
             break;
         case 'moondream1':
-            // @ts-expect-error TS2339
-            init_normalized_config = getNormalizedConfig(config.phi_config);
+            init_normalized_config = getNormalizedConfig(config.phi_config!);
             break;
         case 'musicgen':
-            // @ts-expect-error TS2339
-            init_normalized_config = getNormalizedConfig(config.decoder);
+            init_normalized_config = getNormalizedConfig(config.decoder!);
             break;
         case 'multi_modality':
-            // @ts-expect-error TS2339
-            init_normalized_config = getNormalizedConfig(config.language_config);
+            init_normalized_config = getNormalizedConfig(config.language_config!);
             break;
 
         // Decoder-only models
@@ -210,11 +261,10 @@ function getNormalizedConfig(config) {
             mapping['encoder_hidden_size'] = mapping['decoder_hidden_size'] = 'hidden_size';
             break;
         case 'vision-encoder-decoder':
-            // @ts-expect-error TS2339
-            const decoderConfig = getNormalizedConfig(config.decoder);
+            const decoderConfig = getNormalizedConfig(config.decoder!);
 
             const add_encoder_pkv = 'num_decoder_layers' in decoderConfig;
-            const result = pick(config, ['model_type', 'is_encoder_decoder']);
+            const result: NormalizedConfig = pick<NormalizedConfig, 'model_type' | 'is_encoder_decoder'>(config, ['model_type', 'is_encoder_decoder']);
             if (add_encoder_pkv) {
                 // Decoder is part of an encoder-decoder model
                 result.num_decoder_layers = decoderConfig.num_decoder_layers;
@@ -231,7 +281,6 @@ function getNormalizedConfig(config) {
                 result.hidden_size = decoderConfig.hidden_size;
             }
             return result;
-
     }
 
     // NOTE: If `num_attention_heads` is not set, it is assumed to be equal to `num_heads`
@@ -250,12 +299,12 @@ function getNormalizedConfig(config) {
  * @param {PretrainedConfig} config 
  * @returns {Record<string, number[]>}
  */
-export function getKeyValueShapes(config, {
+export function getKeyValueShapes(config: PretrainedConfig, {
     prefix = 'past_key_values',
-    batch_size=1,
-} = {}) {
+    batch_size = 1,
+} = {}): Record<string, number[]> {
     /** @type {Record<string, number[]>} */
-    const decoderFeeds = {};
+    const decoderFeeds: Record<string, number[]> = {};
     const normalized_config = config.normalized_config;
 
     if (normalized_config.is_encoder_decoder && (
@@ -324,32 +373,36 @@ export function getKeyValueShapes(config, {
 
     return decoderFeeds;
 }
+
 /**
  * Base class for all configuration classes. For more information, see the corresponding
  * [Python documentation](https://huggingface.co/docs/transformers/main/en/main_classes/configuration#transformers.PretrainedConfig).
  */
 export class PretrainedConfig {
-    // NOTE: Typo in original
+   // NOTE: Typo in original
 
     /** @type {string|null} */
-    model_type = null;
+    model_type: string | null = null;
 
     /** @type {boolean} */
-    is_encoder_decoder = false;
+    is_encoder_decoder: boolean = false;
 
     /** @type {number} */
-    max_position_embeddings;
+    max_position_embeddings!: number;
 
     /** @type {TransformersJSConfig} */
-    'transformers.js_config';
+    'transformers.js_config'!: TransformersJSConfig;
+
+    /** @type {NormalizedConfig} */
+    normalized_config!: NormalizedConfig;
 
     /**
      * Create a new PreTrainedTokenizer instance.
-     * @param {Object} configJSON The JSON of the config.
+     * @param {ConfigObject} configJSON The JSON of the config.
      */
-    constructor(configJSON) {
+    constructor(configJSON: ConfigObject) {
         Object.assign(this, configJSON);
-        this.normalized_config = getNormalizedConfig(this);
+        this.normalized_config = getNormalizedConfig(this as ConfigObject);
     }
 
     /**
@@ -361,15 +414,15 @@ export class PretrainedConfig {
      * 
      * @returns {Promise<PretrainedConfig>} A new instance of the `PretrainedConfig` class.
      */
-    static async from_pretrained(pretrained_model_name_or_path, {
+    static async from_pretrained(pretrained_model_name_or_path: string, {
         progress_callback = null,
         config = null,
         cache_dir = null,
         local_files_only = false,
         revision = 'main',
-    } = {}) {
+    }: PretrainedOptions = {}): Promise<PretrainedConfig> {
         if (config && !(config instanceof PretrainedConfig)) {
-            config = new PretrainedConfig(config);
+            config = new PretrainedConfig(config as ConfigObject);
         }
 
         const data = config ?? await loadConfig(pretrained_model_name_or_path, {
@@ -378,7 +431,7 @@ export class PretrainedConfig {
             cache_dir,
             local_files_only,
             revision,
-        })
+        });
         return new this(data);
     }
 }
@@ -391,19 +444,7 @@ export class PretrainedConfig {
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */
-    static async from_pretrained(...args) {
-        return PretrainedConfig.from_pretrained(...args);
+    static async from_pretrained(pretrained_model_name_or_path: string, options: PretrainedOptions = {}): Promise<PretrainedConfig> {
+        return PretrainedConfig.from_pretrained(pretrained_model_name_or_path, options);
     }
 }
-
-/**
- * Transformers.js-specific configuration, possibly present in config.json under the key `transformers.js_config`.
- * @typedef {Object} TransformersJSConfig
- * @property {import('./utils/tensor.js').DataType|Record<import('./utils/dtypes.js').DataType, import('./utils/tensor.js').DataType>} [kv_cache_dtype] The data type of the key-value cache.
- * @property {Record<string, number>} [free_dimension_overrides] Override the free dimensions of the model.
- * See https://onnxruntime.ai/docs/tutorials/web/env-flags-and-session-options.html#freedimensionoverrides
- * for more information.
- * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
- * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
- * @property {boolean|Record<string, boolean>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
- */

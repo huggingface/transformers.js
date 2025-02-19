@@ -21,13 +21,18 @@ export class StoppingCriteria extends Callable {
      * or scores for each vocabulary token after SoftMax.
      * @returns {boolean[]} A list of booleans indicating whether each sequence should be stopped.
      */
-    _call(input_ids, scores) {
+    _call(input_ids: number[][], scores: number[][]): boolean[] {
         throw Error("StoppingCriteria needs to be subclassed");
     }
 }
 /**
  */
 export class StoppingCriteriaList extends Callable {
+    /**
+     * @type {StoppingCriteria[]}
+     */
+    criteria: StoppingCriteria[];
+
     /**
      * Constructs a new instance of `StoppingCriteriaList`.
      */
@@ -41,7 +46,7 @@ export class StoppingCriteriaList extends Callable {
      *
      * @param {StoppingCriteria} item The stopping criterion to add.
      */
-    push(item) {
+    push(item: StoppingCriteria) {
         this.criteria.push(item);
     }
 
@@ -50,7 +55,7 @@ export class StoppingCriteriaList extends Callable {
      *
      * @param {StoppingCriteria|StoppingCriteriaList|StoppingCriteria[]} items The stopping criteria to add.
      */
-    extend(items) {
+    extend(items: StoppingCriteria | StoppingCriteriaList | StoppingCriteria[]) {
         if (items instanceof StoppingCriteriaList) {
             items = items.criteria;
         } else if (items instanceof StoppingCriteria) {
@@ -59,7 +64,7 @@ export class StoppingCriteriaList extends Callable {
         this.criteria.push(...items);
     }
 
-    _call(input_ids, scores) {
+    _call(input_ids: number[][], scores: number[][]): boolean[] {
         const is_done = new Array(input_ids.length).fill(false);
         for (const criterion of this.criteria) {
             const criterion_done = criterion(input_ids, scores);
@@ -80,19 +85,21 @@ export class StoppingCriteriaList extends Callable {
  * Keep in mind for decoder-only type of transformers, this will include the initial prompted tokens.
  */
 export class MaxLengthCriteria extends StoppingCriteria {
+    max_length: number;
+    max_position_embeddings: number | null;
 
     /**
      * 
      * @param {number} max_length The maximum length that the output sequence can have in number of tokens.
      * @param {number} [max_position_embeddings=null] The maximum model length, as defined by the model's `config.max_position_embeddings` attribute.
      */
-    constructor(max_length, max_position_embeddings = null) {
+    constructor(max_length: number, max_position_embeddings: number = null) {
         super();
         this.max_length = max_length;
         this.max_position_embeddings = max_position_embeddings;
     }
 
-    _call(input_ids) {
+    _call(input_ids: number[][]): boolean[] {
         return input_ids.map(ids => ids.length >= this.max_length);
     }
 }
@@ -104,13 +111,13 @@ export class MaxLengthCriteria extends StoppingCriteria {
  * By default, it uses the `model.generation_config.eos_token_id`.
  */
 export class EosTokenCriteria extends StoppingCriteria {
-
+    eos_token_id: number[];
     /**
      * 
      * @param {number|number[]} eos_token_id The id of the *end-of-sequence* token.
      * Optionally, use a list to set multiple *end-of-sequence* tokens.
      */
-    constructor(eos_token_id) {
+    constructor(eos_token_id: number | number[]) {
         super();
         if (!Array.isArray(eos_token_id)) {
             eos_token_id = [eos_token_id];
@@ -124,7 +131,7 @@ export class EosTokenCriteria extends StoppingCriteria {
      * @param {number[][]} scores 
      * @returns {boolean[]}
      */
-    _call(input_ids, scores) {
+    _call(input_ids: number[][], scores: number[][]): boolean[] {
         return input_ids.map(ids => {
             const last = ids.at(-1);
             // NOTE: We use == instead of === to allow for number/bigint comparison
@@ -137,6 +144,8 @@ export class EosTokenCriteria extends StoppingCriteria {
  * This class can be used to stop generation whenever the user interrupts the process.
  */
 export class InterruptableStoppingCriteria extends StoppingCriteria {
+    interrupted: boolean;
+
     constructor() {
         super();
         this.interrupted = false;
@@ -150,7 +159,7 @@ export class InterruptableStoppingCriteria extends StoppingCriteria {
         this.interrupted = false;
     }
 
-    _call(input_ids, scores) {
+    _call(input_ids: number[][], scores: number[][]): boolean[] {
         return new Array(input_ids.length).fill(this.interrupted);
     }
 }

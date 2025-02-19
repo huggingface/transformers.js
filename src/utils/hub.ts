@@ -1,4 +1,3 @@
-
 /**
  * @file Utility functions to interact with the Hugging Face Hub (https://huggingface.co/models)
  * 
@@ -10,6 +9,11 @@ import path from 'path';
 
 import { env } from '../env.js';
 import { dispatchCallback } from './core.js';
+import { type DeviceType } from './devices.js';
+import { type DataType } from './dtypes.js';
+import { type ProgressCallback } from './core.js';
+import { type PretrainedConfig } from '../configs.js';
+import { type InferenceSession } from 'onnxruntime-common';
 
 /**
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.     
@@ -23,6 +27,13 @@ import { dispatchCallback } from './core.js';
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
  */
+export interface PretrainedOptions {
+    progress_callback?: ProgressCallback;
+    config?: PretrainedConfig;
+    cache_dir?: string;
+    local_files_only?: boolean;
+    revision?: string;
+}
 
 /**
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
@@ -34,15 +45,24 @@ import { dispatchCallback } from './core.js';
  * @property {boolean|Record<string, boolean>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
  * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
  */
+export interface ModelSpecificPretrainedOptions {
+    subfolder: string;
+    model_file_name?: string | null;
+    device?: DeviceType | Record<string, DeviceType> | null;
+    dtype?: DataType | Record<string, DataType> | null;
+    use_external_data_format?: boolean | Record<string, boolean> | false;
+    session_options?: InferenceSession.SessionOptions;
+}
 
 /**
  * @typedef {PretrainedOptions & ModelSpecificPretrainedOptions} PretrainedModelOptions Options for loading a pretrained model.
  */
+export type PretrainedModelOptions = PretrainedOptions & ModelSpecificPretrainedOptions;
 
 /**
  * Mapping from file extensions to MIME types.
  */
-const CONTENT_TYPE_MAP = {
+const CONTENT_TYPE_MAP: Record<string, string> = {
     'txt': 'text/plain',
     'html': 'text/html',
     'css': 'text/css',
@@ -52,23 +72,30 @@ const CONTENT_TYPE_MAP = {
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
     'gif': 'image/gif',
-}
+} as const;
+
 class FileResponse {
+    private filePath: string;
+    public headers: Headers;
+    public exists: boolean;
+    public status: number;
+    public statusText: string;
+    public body: ReadableStream<Uint8Array> | null;
 
     /**
      * Creates a new `FileResponse` object.
      * @param {string|URL} filePath
      */
-    constructor(filePath) {
-        this.filePath = filePath;
+    constructor(filePath: string | URL) {
+        this.filePath = filePath.toString();
         this.headers = new Headers();
 
-        this.exists = fs.existsSync(filePath);
+        this.exists = fs.existsSync(this.filePath);
         if (this.exists) {
             this.status = 200;
             this.statusText = 'OK';
 
-            let stats = fs.statSync(filePath);
+            let stats = fs.statSync(this.filePath);
             this.headers.set('content-length', stats.size.toString());
 
             this.updateContentType();
@@ -94,9 +121,9 @@ class FileResponse {
      * the file specified by the filePath property of the current object.
      * @returns {void}
      */
-    updateContentType() {
+    private updateContentType(): void {
         // Set content-type header based on file extension
-        const extension = this.filePath.toString().split('.').pop().toLowerCase();
+        const extension = this.filePath.toString().split('.').pop()?.toLowerCase() ?? '';
         this.headers.set('content-type', CONTENT_TYPE_MAP[extension] ?? 'application/octet-stream');
     }
 
@@ -104,7 +131,7 @@ class FileResponse {
      * Clone the current FileResponse object.
      * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
      */
-    clone() {
+    clone(): FileResponse {
         let response = new FileResponse(this.filePath);
         response.exists = this.exists;
         response.status = this.status;
@@ -119,9 +146,9 @@ class FileResponse {
      * @returns {Promise<ArrayBuffer>} A Promise that resolves with an ArrayBuffer containing the file's contents.
      * @throws {Error} If the file cannot be read.
      */
-    async arrayBuffer() {
+    async arrayBuffer(): Promise<ArrayBufferLike> {
         const data = await fs.promises.readFile(this.filePath);
-        return /** @type {ArrayBuffer} */ (data.buffer);
+        return data.buffer;
     }
 
     /**
@@ -130,7 +157,7 @@ class FileResponse {
      * @returns {Promise<Blob>} A Promise that resolves with a Blob containing the file's contents.
      * @throws {Error} If the file cannot be read.
      */
-    async blob() {
+    async blob(): Promise<Blob> {
         const data = await fs.promises.readFile(this.filePath);
         return new Blob([data], { type: this.headers.get('content-type') });
     }
@@ -141,7 +168,7 @@ class FileResponse {
      * @returns {Promise<string>} A Promise that resolves with a string containing the file's contents.
      * @throws {Error} If the file cannot be read.
      */
-    async text() {
+    async text(): Promise<string> {
         const data = await fs.promises.readFile(this.filePath, 'utf8');
         return data;
     }
@@ -153,7 +180,7 @@ class FileResponse {
      * @returns {Promise<Object>} A Promise that resolves with a parsed JavaScript object containing the file's contents.
      * @throws {Error} If the file cannot be read.
      */
-    async json() {
+    async json(): Promise<Object> {
         return JSON.parse(await this.text());
     }
 }
@@ -165,8 +192,8 @@ class FileResponse {
  * @param {string[]} [validHosts=null] A list of valid hostnames. If specified, the URL's hostname must be in this list.
  * @returns {boolean} True if the string is a valid URL, false otherwise.
  */
-function isValidUrl(string, protocols = null, validHosts = null) {
-    let url;
+function isValidUrl(string: string | URL, protocols: string[] | null = null, validHosts: string[] | null = null): boolean {
+    let url: URL;
     try {
         url = new URL(string);
     } catch (_) {
@@ -187,8 +214,7 @@ function isValidUrl(string, protocols = null, validHosts = null) {
  * @param {URL|string} urlOrPath The URL/path of the file to get.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
-
+export async function getFile(urlOrPath: URL | string): Promise<FileResponse | Response> {
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(urlOrPath);
 
@@ -210,16 +236,16 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers });
+        return fetch(urlOrPath.toString(), { headers });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
+        return fetch(urlOrPath.toString());
     }
 }
 
-const ERROR_MAPPING = {
+const ERROR_MAPPING: Record<number, string> = {
     // 4xx errors (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses)
     400: 'Bad request error occurred while trying to load file',
     401: 'Unauthorized access to file',
@@ -232,7 +258,8 @@ const ERROR_MAPPING = {
     502: 'Bad gateway error occurred while trying to load file',
     503: 'Service unavailable error occurred while trying to load file',
     504: 'Gateway timeout error occurred while trying to load file',
-}
+} as const;
+
 /**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
@@ -241,7 +268,7 @@ const ERROR_MAPPING = {
  * @returns {null} Returns `null` if `fatal = true`.
  * @throws {Error} If `fatal = false`.
  */
-function handleError(status, remoteURL, fatal) {
+function handleError(status: number, remoteURL: string, fatal: boolean): null {
     if (!fatal) {
         // File was not loaded correctly, but it is optional.
         // TODO in future, cache the response?
@@ -253,11 +280,13 @@ function handleError(status, remoteURL, fatal) {
 }
 
 class FileCache {
+    private path: string;
+
     /**
      * Instantiate a `FileCache` object.
      * @param {string} path 
      */
-    constructor(path) {
+    constructor(path: string) {
         this.path = path;
     }
 
@@ -266,8 +295,7 @@ class FileCache {
      * @param {string} request 
      * @returns {Promise<FileResponse | undefined>}
      */
-    async match(request) {
-
+    async match(request: string): Promise<FileResponse | undefined> {
         let filePath = path.join(this.path, request);
         let file = new FileResponse(filePath);
 
@@ -284,7 +312,7 @@ class FileCache {
      * @param {Response|FileResponse} response 
      * @returns {Promise<void>}
      */
-    async put(request, response) {
+    async put(request: string, response: Response | FileResponse): Promise<void> {
         const buffer = Buffer.from(await response.arrayBuffer());
 
         let outputPath = path.join(this.path, request);
@@ -307,12 +335,12 @@ class FileCache {
 }
 
 /**
- * 
+ * Helper function to try to get a file from cache.
  * @param {FileCache|Cache} cache The cache to search
  * @param {string[]} names The names of the item to search for
  * @returns {Promise<FileResponse|Response|undefined>} The item from the cache, or undefined if not found.
  */
-async function tryCache(cache, ...names) {
+async function tryCache(cache: FileCache | Cache, ...names: string[]): Promise<FileResponse | Response | undefined> {
     for (let name of names) {
         try {
             let result = await cache.match(name);
@@ -337,9 +365,14 @@ async function tryCache(cache, ...names) {
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * 
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<Uint8Array>} A Promise that resolves with the file content as a buffer.
+ * @returns {Promise<Uint8Array | null>} A Promise that resolves with the file content as a buffer.
  */
-export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}) {
+export async function getModelFile(
+    path_or_repo_id: string,
+    filename: string,
+    fatal: boolean = true,
+    options: PretrainedOptions = {}
+): Promise<Uint8Array | null> {
 
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
@@ -360,7 +393,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 
     // First, check if the a caching backend is available
     // If no caching mechanism available, will download the file every time
-    let cache;
+    let cache: FileCache | Cache | undefined;
     if (!cache && env.useBrowserCache) {
         if (typeof caches === 'undefined') {
             throw Error('Browser cache is not available in this environment.')
@@ -418,15 +451,13 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // If a specific revision is requested, we account for this in the cache key.
     let fsCacheKey = revision === 'main' ? requestURL : pathJoin(path_or_repo_id, revision, filename);
 
-    /** @type {string} */
-    let cacheKey;
+    let cacheKey: string;
     let proposedCacheKey = cache instanceof FileCache ? fsCacheKey : remoteURL;
 
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|FileResponse|undefined} */
-    let response;
+    let response: Response | FileResponse | undefined;
 
     if (cache) {
         // A caching system is available, so we try to get the file from it.
@@ -504,8 +535,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename
     })
 
-    /** @type {Uint8Array} */
-    let buffer;
+    let buffer: Uint8Array;
 
     if (!options.progress_callback) {
         // If no progress callback is specified, we can use the `.arrayBuffer()`
@@ -580,7 +610,12 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
  * @returns {Promise<Object>} The JSON data parsed into a JavaScript object.
  * @throws Will throw an error if the file is not found and `fatal` is true.
  */
-export async function getModelJSON(modelPath, fileName, fatal = true, options = {}) {
+export async function getModelJSON(
+    modelPath: string,
+    fileName: string,
+    fatal: boolean = true,
+    options: PretrainedOptions = {}
+): Promise<Object> {
     let buffer = await getModelFile(modelPath, fileName, fatal, options);
     if (buffer === null) {
         // Return empty object
@@ -592,6 +627,7 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
 
     return JSON.parse(jsonData);
 }
+
 /**
  * Read and track progress when reading a Response object
  *
@@ -599,7 +635,10 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
-async function readResponse(response, progress_callback) {
+async function readResponse(
+    response: Response | FileResponse,
+    progress_callback: (data: { progress: number, loaded: number, total: number }) => void
+): Promise<Uint8Array> {
 
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
@@ -610,7 +649,7 @@ async function readResponse(response, progress_callback) {
     let loaded = 0;
 
     const reader = response.body.getReader();
-    async function read() {
+    async function read(): Promise<void> {
         const { done, value } = await reader.read();
         if (done) return;
 
@@ -654,7 +693,7 @@ async function readResponse(response, progress_callback) {
  * @param {...string} parts Multiple parts of a path.
  * @returns {string} A string representing the joined path.
  */
-function pathJoin(...parts) {
+function pathJoin(...parts: string[]): string {
     // https://stackoverflow.com/a/55142565
     parts = parts.map((part, index) => {
         if (index) {

@@ -1,4 +1,3 @@
-
 /**
  * @module generation/configuration_utils
  */
@@ -17,14 +16,14 @@ export class GenerationConfig {
      * @type {number}
      * @default 20
      */
-    max_length = 20;
+    max_length: number = 20;
 
     /**
      * The maximum numbers of tokens to generate, ignoring the number of tokens in the prompt.
      * @type {number}
      * @default null
      */
-    max_new_tokens = null;
+    max_new_tokens: number = null;
 
     /**
      * The minimum length of the sequence to be generated.
@@ -33,14 +32,14 @@ export class GenerationConfig {
      * @type {number}
      * @default 0
      */
-    min_length = 0;
+    min_length: number = 0;
 
     /**
      * The minimum numbers of tokens to generate, ignoring the number of tokens in the prompt.
      * @type {number}
      * @default null
      */
-    min_new_tokens = null;
+    min_new_tokens: number = null;
 
     /**
      * Controls the stopping condition for beam-based methods, like beam-search. It accepts the following values:
@@ -50,7 +49,7 @@ export class GenerationConfig {
      * @type {boolean|"never"}
      * @default false
      */
-    early_stopping = false;
+    early_stopping: boolean | "never" = false;
 
     /**
      * The maximum amount of time you allow the computation to run for in seconds.
@@ -58,7 +57,7 @@ export class GenerationConfig {
      * @type {number}
      * @default null
      */
-    max_time = null;
+    max_time: number = null;
 
     // Parameters that control the generation strategy used
     /**
@@ -66,14 +65,14 @@ export class GenerationConfig {
      * @type {boolean}
      * @default false
      */
-    do_sample = false;
+    do_sample: boolean = false;
 
     /**
      * Number of beams for beam search. 1 means no beam search.
      * @type {number}
      * @default 1
      */
-    num_beams = 1;
+    num_beams: number = 1;
 
     /**
      * Number of groups to divide `num_beams` into in order to ensure diversity among different groups of beams.
@@ -81,21 +80,21 @@ export class GenerationConfig {
      * @type {number}
      * @default 1
      */
-    num_beam_groups = 1;
+    num_beam_groups: number = 1;
 
     /**
      * The values balance the model confidence and the degeneration penalty in contrastive search decoding.
      * @type {number}
      * @default null
      */
-    penalty_alpha = null;
+    penalty_alpha: number = null;
 
     /**
      * Whether or not the model should use the past last key/values attentions (if applicable to the model) to speed up decoding.
      * @type {boolean}
      * @default true
      */
-    use_cache = true;
+    use_cache: boolean = true;
 
     // Parameters for manipulation of the model output logits
     /**
@@ -103,21 +102,21 @@ export class GenerationConfig {
      * @type {number}
      * @default 1.0
      */
-    temperature = 1.0;
+    temperature: number = 1.0;
 
     /**
      * The number of highest probability vocabulary tokens to keep for top-k-filtering.
      * @type {number}
      * @default 50
      */
-    top_k = 50;
+    top_k: number = 50;
 
     /**
      * If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to `top_p` or higher are kept for generation.
      * @type {number}
      * @default 1.0
      */
-    top_p = 1.0;
+    top_p: number = 1.0;
 
     /**
      * Local typicality measures how similar the conditional probability of predicting a target token next is to the expected conditional probability of predicting a random token next, given the partial text already generated.
@@ -126,7 +125,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 1.0
      */
-    typical_p = 1.0;
+    typical_p: number = 1.0;
 
     /**
      * If set to float strictly between 0 and 1, only tokens with a conditional probability greater than `epsilon_cutoff` will be sampled.
@@ -135,7 +134,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 0.0
      */
-    epsilon_cutoff = 0.0;
+    epsilon_cutoff: number = 0.0;
 
     /**
      * Eta sampling is a hybrid of locally typical sampling and epsilon sampling.
@@ -145,7 +144,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 0.0
      */
-    eta_cutoff = 0.0;
+    eta_cutoff: number = 0.0;
 
     /**
      * This value is subtracted from a beam's score if it generates a token same as any beam from other group at a particular time.
@@ -153,7 +152,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 0.0
      */
-    diversity_penalty = 0.0;
+    diversity_penalty: number = 0.0;
 
     /**
      * The parameter for repetition penalty. 1.0 means no penalty.
@@ -161,7 +160,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 1.0
      */
-    repetition_penalty = 1.0;
+    repetition_penalty: number = 1.0;
 
     /**
      * The paramater for encoder_repetition_penalty.
@@ -170,7 +169,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 1.0
      */
-    encoder_repetition_penalty = 1.0;
+    encoder_repetition_penalty: number = 1.0;
 
     /**
      * Exponential penalty to the length that is used with beam-based generation.
@@ -179,14 +178,14 @@ export class GenerationConfig {
      * @type {number}
      * @default 1.0
      */
-    length_penalty = 1.0;
+    length_penalty: number = 1.0;
 
     /**
      * If set to int > 0, all ngrams of that size can only occur once.
      * @type {number}
      * @default 0
      */
-    no_repeat_ngram_size = 0;
+    no_repeat_ngram_size: number = 0;
 
     /**
      * List of token ids that are not allowed to be generated.
@@ -195,7 +194,7 @@ export class GenerationConfig {
      * @type {number[][]}
      * @default null
      */
-    bad_words_ids = null;
+    bad_words_ids: number[][] = null;
 
     /**
      * List of token ids that must be generated.
@@ -204,7 +203,7 @@ export class GenerationConfig {
      * @type {number[][]|number[][][]}
      * @default null
      */
-    force_words_ids = null;
+    force_words_ids: number[][] | number[][][] = null;
 
     /**
      * Whether to renormalize the logits after applying all the logits processors or warpers (including the custom ones).
@@ -212,14 +211,14 @@ export class GenerationConfig {
      * @type {boolean}
      * @default false
      */
-    renormalize_logits = false;
+    renormalize_logits: boolean = false;
 
     /**
      * Custom constraints that can be added to the generation to ensure that the output will contain the use of certain tokens as defined by `Constraint` objects, in the most sensible way possible.
      * @type {Object[]}
      * @default null
      */
-    constraints = null;
+    constraints: object[] = null;
 
     /**
      * The id of the token to force as the first generated token after the `decoder_start_token_id`.
@@ -227,7 +226,7 @@ export class GenerationConfig {
      * @type {number}
      * @default null
      */
-    forced_bos_token_id = null;
+    forced_bos_token_id: number = null;
 
     /**
      * The id of the token to force as the last generated token when `max_length` is reached.
@@ -235,13 +234,13 @@ export class GenerationConfig {
      * @type {number|number[]}
      * @default null
      */
-    forced_eos_token_id = null;
+    forced_eos_token_id: number | number[] = null;
 
     /**
      * Whether to remove possible *nan* and *inf* outputs of the model to prevent the generation method to crash. Note that using `remove_invalid_values` can slow down generation.
      * @type {boolean}
      */
-    remove_invalid_values = false;
+    remove_invalid_values: boolean = false;
 
     /**
      * This Tuple adds an exponentially increasing length penalty, after a certain amount of tokens have been generated.
@@ -249,7 +248,7 @@ export class GenerationConfig {
      * @type {[number, number]}
      * @default null
      */
-    exponential_decay_length_penalty = null;
+    exponential_decay_length_penalty: [number, number] = null;
 
     /**
      * A list of tokens that will be suppressed at generation.
@@ -257,14 +256,14 @@ export class GenerationConfig {
      * @type {number[]}
      * @default null
      */
-    suppress_tokens = null;
+    suppress_tokens: number[] = null;
 
     /**
      * A streamer that will be used to stream the generation.
      * @type {import('./streamers.js').TextStreamer}
      * @default null
      */
-    streamer = null;
+    streamer: import('./streamers.js').TextStreamer = null;
 
     /**
      * A list of tokens that will be suppressed at the beginning of the generation.
@@ -272,7 +271,7 @@ export class GenerationConfig {
      * @type {number[]}
      * @default null
      */
-    begin_suppress_tokens = null;
+    begin_suppress_tokens: number[] = null;
 
     /**
      * A list of pairs of integers which indicates a mapping from generation indices to token indices that will be forced before sampling.
@@ -280,7 +279,7 @@ export class GenerationConfig {
      * @type {[number, number][]}
      * @default null
      */
-    forced_decoder_ids = null;
+    forced_decoder_ids: [number, number][] = null;
 
     /**
      * The guidance scale for classifier free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
@@ -289,7 +288,7 @@ export class GenerationConfig {
      * @type {number}
      * @default null
      */
-    guidance_scale = null;
+    guidance_scale: number = null;
 
     // Parameters that define the output variables of `generate`
     /**
@@ -297,7 +296,7 @@ export class GenerationConfig {
      * @type {number}
      * @default 1
      */
-    num_return_sequences = 1;
+    num_return_sequences: number = 1;
 
     /**
      * Whether or not to return the attentions tensors of all attention layers.
@@ -305,7 +304,7 @@ export class GenerationConfig {
      * @type {boolean}
      * @default false
      */
-    output_attentions = false;
+    output_attentions: boolean = false;
 
     /**
      * Whether or not to return the hidden states of all layers.
@@ -313,7 +312,7 @@ export class GenerationConfig {
      * @type {boolean}
      * @default false
      */
-    output_hidden_states = false;
+    output_hidden_states: boolean = false;
 
     /**
      * Whether or not to return the prediction scores.
@@ -321,14 +320,14 @@ export class GenerationConfig {
      * @type {boolean}
      * @default false
      */
-    output_scores = false;
+    output_scores: boolean = false;
 
     /**
      * Whether or not to return a `ModelOutput` instead of a plain tuple.
      * @type {boolean}
      * @default false
      */
-    return_dict_in_generate = false;
+    return_dict_in_generate: boolean = false;
 
     // Special tokens that can be used at generation time
     /**
@@ -336,14 +335,14 @@ export class GenerationConfig {
      * @type {number}
      * @default null
      */
-    pad_token_id = null;
+    pad_token_id: number = null;
 
     /**
      * The id of the *beginning-of-sequence* token.
      * @type {number}
      * @default null
      */
-    bos_token_id = null;
+    bos_token_id: number = null;
 
     /**
      * The id of the *end-of-sequence* token.
@@ -351,7 +350,7 @@ export class GenerationConfig {
      * @type {number|number[]}
      * @default null
      */
-    eos_token_id = null;
+    eos_token_id: number | number[] = null;
 
     // Generation parameters exclusive to encoder-decoder models
     /**
@@ -359,14 +358,14 @@ export class GenerationConfig {
      * @type {number}
      * @default 0
      */
-    encoder_no_repeat_ngram_size = 0;
+    encoder_no_repeat_ngram_size: number = 0;
 
     /**
      * If an encoder-decoder model starts decoding with a different token than *bos*, the id of that token.
      * @type {number}
      * @default null
      */
-    decoder_start_token_id = null;
+    decoder_start_token_id: number = null;
 
     // Wild card
     /**
@@ -375,14 +374,14 @@ export class GenerationConfig {
      * @type {Object}
      * @default {}
      */
-    generation_kwargs = {};
+    generation_kwargs: object = {};
 
     /**
      * 
      * @param {GenerationConfig|import('../configs.js').PretrainedConfig} config 
      */
-    constructor(config) {
-        Object.assign(this, pick(config, Object.getOwnPropertyNames(this)));
+    constructor(config: GenerationConfig | import('../configs.js').PretrainedConfig) {
+        Object.assign(this, pick(config as GenerationConfig, Object.getOwnPropertyNames(this) as Array<keyof GenerationConfig>));
     }
 }
 

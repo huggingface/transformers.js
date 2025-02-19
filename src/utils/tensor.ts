@@ -11,7 +11,9 @@ import {
     interpolate_data,
     max,
     min,
-    permute_data
+    permute_data,
+    AnyTypedArray,
+    TypedArray
 } from './maths.js';
 
 import {
@@ -36,68 +38,71 @@ const DataTypeMap = Object.freeze({
     bool: Uint8Array,
     uint4: Uint8Array,
     int4: Int8Array,
-});
+} as const);
 
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
-
+export type DataType = keyof typeof DataTypeMap;
+export type DataArray = AnyTypedArray | any[];
 
 export class Tensor {
+    public ort_tensor: ONNXTensor;
+
     /** @type {number[]} Dimensions of the tensor. */
-    get dims() {
+    get dims(): number[] {
         // @ts-ignore
         return this.ort_tensor.dims;
     }
-    set dims(value) {
+    set dims(value: number[]) {
         // FIXME: ONNXTensor declares dims as readonly so one needs to use the constructor() if dims change.
         // @ts-ignore
         this.ort_tensor.dims = value;
     }
 
     /** @type {DataType} Type of the tensor. */
-    get type() {
+    get type(): DataType {
         return this.ort_tensor.type;
-    };
+    }
 
     /** @type {DataArray} The data stored in the tensor. */
-    get data() {
+    get data(): DataArray {
         return this.ort_tensor.data;
     }
 
-    /** @type {number} The number of elements in the tensor. */
-    get size() {
+   /** @type {number} The number of elements in the tensor. */
+    get size(): number {
         return this.ort_tensor.size;
-    };
+    }
 
     /** @type {string} The location of the tensor data. */
-    get location() {
+    get location(): string {
         return this.ort_tensor.location;
-    };
+    }
 
-    ort_tensor;
 
     /**
      * Create a new Tensor or copy an existing Tensor.
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
      */
-    constructor(...args) {
+    constructor(...args: [DataType, DataArray, number[]] | [ONNXTensor]) {
         if (isONNXTensor(args[0])) {
-            this.ort_tensor = /** @type {ONNXTensor} */ (args[0]);
+            // @ts-ignore
+            this.ort_tensor = args[0];
         } else {
             // Create new tensor
             this.ort_tensor = new ONNXTensor(
-                /** @type {DataType} */(args[0]),
-                /** @type {Exclude<import('./maths.js').AnyTypedArray, Uint8ClampedArray>} */(args[1]),
+                args[0] as DataType,
+                args[1] as Exclude<AnyTypedArray, Uint8ClampedArray>,
                 args[2]
             );
         }
 
         return new Proxy(this, {
-            get: (obj, key) => {
+            get: (obj: Tensor, key: string | symbol): any => {
                 if (typeof key === 'string') {
-                    let index = Number(key);
+                    const index = Number(key);
                     if (Number.isInteger(index)) {
                         // key is an integer (i.e., index)
                         return obj._getitem(index);
@@ -106,16 +111,16 @@ export class Tensor {
                 // @ts-ignore
                 return obj[key];
             },
-            set: (obj, key, value) => {
+            set: (obj: Tensor, key: string | symbol, value: any): boolean => {
                 // TODO allow setting of data
-
+                
                 // @ts-ignore
                 return obj[key] = value;
             }
         });
     }
 
-    dispose() {
+    dispose(): void {
         this.ort_tensor.dispose();
         // this.ort_tensor = undefined;
     }
@@ -125,7 +130,7 @@ export class Tensor {
      * If the tensor has more than one dimension, the iterator will yield subarrays.
      * @returns {Iterator} An iterator object for iterating over the tensor data in row-major order.
      */
-    *[Symbol.iterator]() {
+    *[Symbol.iterator](): Iterator<Tensor | number | bigint> {
         const [iterLength, ...iterDims] = this.dims;
 
         if (iterDims.length > 0) {
@@ -134,9 +139,8 @@ export class Tensor {
                 yield this._subarray(i, iterSize, iterDims);
             }
         } else {
-            yield* this.data
+            yield* this.data;
         }
-
     }
 
     /**
@@ -144,7 +148,7 @@ export class Tensor {
      * @param {number} index The index to access.
      * @returns {Tensor} The data at the specified index.
      */
-    _getitem(index) {
+    private _getitem(index: number): Tensor {
         const [iterLength, ...iterDims] = this.dims;
 
         index = safeIndex(index, iterLength);
@@ -161,11 +165,10 @@ export class Tensor {
      * @param {number|bigint} item The item to search for in the tensor
      * @returns {number} The index of the first occurrence of item in the tensor data.
      */
-    indexOf(item) {
-        const this_data = this.data;
-        for (let index = 0; index < this_data.length; ++index) {
+    indexOf(item: number | bigint): number {
+        for (let index = 0; index < this.data.length; ++index) {
             // Note: == instead of === so we can match Ints with BigInts
-            if (this_data[index] == item) {
+            if (this.data[index] == item) {
                 return index;
             }
         }
@@ -178,15 +181,14 @@ export class Tensor {
      * @param {any} iterDims
      * @returns {Tensor}
      */
-    _subarray(index, iterSize, iterDims) {
+    private _subarray(index: number, iterSize: number, iterDims: number[]): Tensor {
         const o1 = index * iterSize;
         const o2 = (index + 1) * iterSize;
 
         // We use subarray if available (typed array), otherwise we use slice (normal array)
-        const data =
-            ('subarray' in this.data)
-                ? this.data.subarray(o1, o2)
-                : this.data.slice(o1, o2);
+        const data = 'subarray' in this.data
+            ? (this.data as AnyTypedArray).subarray(o1, o2)
+            : this.data.slice(o1, o2);
         return new Tensor(this.type, data, iterDims);
     }
 
@@ -196,27 +198,26 @@ export class Tensor {
      * @returns {number|bigint} The value of this tensor as a standard JavaScript Number.
      * @throws {Error} If the tensor has more than one element.
      */
-    item() {
-        const this_data = this.data;
-        if (this_data.length !== 1) {
-            throw new Error(`a Tensor with ${this_data.length} elements cannot be converted to Scalar`);
+    item(): number | bigint {
+        if (this.data.length !== 1) {
+            throw new Error(`a Tensor with ${this.data.length} elements cannot be converted to Scalar`);
         }
-        return this_data[0];
+        return this.data[0];
     }
 
     /**
      * Convert tensor data to a n-dimensional JS list
      * @returns {Array}
      */
-    tolist() {
-        return reshape(this.data, this.dims)
+    tolist(): any[] {
+        return reshape(this.data, this.dims);
     }
 
     /**
      * Return a new Tensor with the sigmoid function applied to each element.
      * @returns {Tensor} The tensor with the sigmoid function applied.
      */
-    sigmoid() {
+    sigmoid(): Tensor {
         return this.clone().sigmoid_();
     }
 
@@ -224,10 +225,9 @@ export class Tensor {
      * Applies the sigmoid function to the tensor in place.
      * @returns {Tensor} Returns `this`.
      */
-    sigmoid_() {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = 1 / (1 + Math.exp(-this_data[i]));
+    sigmoid_(): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] = 1 / (1 + Math.exp(-this.data[i]));
         }
         return this;
     }
@@ -238,7 +238,7 @@ export class Tensor {
      *                              the current element, its index, and the tensor's data array.
      * @returns {Tensor} A new Tensor with the callback function applied to each element.
      */
-    map(callback) {
+    map(callback: (value: number, index: number, array: DataArray) => number): Tensor {
         return this.clone().map_(callback);
     }
 
@@ -248,10 +248,9 @@ export class Tensor {
      *                              the current element, its index, and the tensor's data array.
      * @returns {Tensor} Returns `this`.
      */
-    map_(callback) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = callback(this_data[i], i, this_data);
+    map_(callback: (value: number, index: number, array: DataArray) => number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] = callback(this.data[i], i, this.data);
         }
         return this;
     }
@@ -261,7 +260,7 @@ export class Tensor {
      * @param {number} val The value to multiply by.
      * @returns {Tensor} The new tensor.
      */
-    mul(val) {
+    mul(val: number): Tensor {
         return this.clone().mul_(val);
     }
 
@@ -270,10 +269,9 @@ export class Tensor {
      * @param {number} val The value to multiply by.
      * @returns {Tensor} Returns `this`.
      */
-    mul_(val) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] *= val;
+    mul_(val: number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] *= val;
         }
         return this;
     }
@@ -283,7 +281,7 @@ export class Tensor {
      * @param {number} val The value to divide by.
      * @returns {Tensor} The new tensor.
      */
-    div(val) {
+    div(val: number): Tensor {
         return this.clone().div_(val);
     }
 
@@ -292,10 +290,9 @@ export class Tensor {
      * @param {number} val The value to divide by.
      * @returns {Tensor} Returns `this`.
      */
-    div_(val) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] /= val;
+    div_(val: number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] /= val;
         }
         return this;
     }
@@ -305,7 +302,7 @@ export class Tensor {
      * @param {number} val The value to add by.
      * @returns {Tensor} The new tensor.
      */
-    add(val) {
+    add(val: number): Tensor {
         return this.clone().add_(val);
     }
 
@@ -314,10 +311,9 @@ export class Tensor {
      * @param {number} val The value to add by.
      * @returns {Tensor} Returns `this`.
      */
-    add_(val) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] += val;
+    add_(val: number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] += val;
         }
         return this;
     }
@@ -327,7 +323,7 @@ export class Tensor {
      * @param {number} val The value to subtract by.
      * @returns {Tensor} The new tensor.
      */
-    sub(val) {
+    sub(val: number): Tensor {
         return this.clone().sub_(val);
     }
 
@@ -336,20 +332,22 @@ export class Tensor {
      * @param {number} val The value to subtract by.
      * @returns {Tensor} Returns `this`.
      */
-    sub_(val) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] -= val;
+    sub_(val: number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] -= val;
         }
         return this;
     }
 
     /**
      * Creates a deep copy of the current Tensor.
-     * @returns {Tensor} A new Tensor with the same type, data, and dimensions as the original.
      */
-    clone() {
-        return new Tensor(this.type, this.data.slice(), this.dims.slice());
+    clone(): Tensor {
+        return new Tensor(
+            this.type,
+            this.data.slice(),
+            this.dims.slice()
+        );
     }
 
     /**
@@ -381,13 +379,10 @@ export class Tensor {
      * @returns {Tensor} A new Tensor containing the selected elements.
      * @throws {Error} If the slice input is invalid.
      */
-    slice(...slices) {
-        // This allows for slicing with ranges and numbers
-        const newTensorDims = [];
-        const newOffsets = [];
+    slice(...slices: (number | [number, number] | null)[]): Tensor {
+        const newTensorDims: number[] = [];
+        const newOffsets: [number, number][] = [];
 
-        // slices is an array of numbers or arrays of numbers
-        // e.g., slices = [0, [1, 3], null, [0, 3]]
         for (let sliceIndex = 0; sliceIndex < this.dims.length; ++sliceIndex) {
             let slice = slices[sliceIndex];
 
@@ -398,7 +393,6 @@ export class Tensor {
 
             } else if (typeof slice === 'number') {
                 slice = safeIndex(slice, this.dims[sliceIndex], sliceIndex);
-
                 // A number means take a single element
                 newOffsets.push([slice, slice + 1]);
 
@@ -416,7 +410,7 @@ export class Tensor {
                     throw new Error(`Invalid slice: ${slice}`);
                 }
 
-                const offsets = [
+                const offsets: [number, number] = [
                     Math.max(start, 0),
                     Math.min(end, this.dims[sliceIndex])
                 ];
@@ -432,10 +426,8 @@ export class Tensor {
         const newDims = newOffsets.map(([start, end]) => end - start);
         const newBufferSize = newDims.reduce((a, b) => a * b);
 
-        const this_data = this.data;
         // Allocate memory
-        // @ts-ignore
-        const data = new this_data.constructor(newBufferSize);
+        const data = new (this.data.constructor as new (length: number) => DataArray)(newBufferSize);
 
         // Precompute strides
         const stride = this.stride();
@@ -447,7 +439,7 @@ export class Tensor {
                 originalIndex += ((num % size) + newOffsets[j][0]) * stride[j];
                 num = Math.floor(num / size);
             }
-            data[i] = this_data[originalIndex];
+            data[i] = this.data[originalIndex];
         }
         return new Tensor(this.type, data, newTensorDims);
     }
@@ -457,12 +449,15 @@ export class Tensor {
      * @param  {...number} dims Dimensions to permute.
      * @returns {Tensor} The permuted tensor.
      */
-    permute(...dims) {
+    permute(...dims: number[]): Tensor {
         return permute(this, dims);
     }
 
-    // TODO: implement transpose. For now (backwards compatibility), it's just an alias for permute()
-    transpose(...dims) {
+    /**
+     * Alias for permute()
+     * TODO: implement transpose. For now (backwards compatibility), it's just an alias for permute()
+    */
+    transpose(...dims: number[]): Tensor {
         return this.permute(...dims);
     }
 
@@ -473,7 +468,7 @@ export class Tensor {
      * @param {boolean} keepdim Whether the output tensor has `dim` retained or not.
      * @returns The summed tensor
      */
-    sum(dim = null, keepdim = false) {
+    sum(dim: number | null = null, keepdim: boolean = false): Tensor {
         return this.norm(1, dim, keepdim);
     }
 
@@ -485,7 +480,7 @@ export class Tensor {
      * @param {boolean} [keepdim=false] Whether the output tensors have dim retained or not.
      * @returns {Tensor} The norm of the tensor.
      */
-    norm(p = 'fro', dim = null, keepdim = false) {
+    norm(p: number | string = 'fro', dim: number | null = null, keepdim: boolean = false): Tensor {
         if (p === 'fro') {
             // NOTE: Since we only support integer dims, Frobenius norm produces the same result as p=2.
             p = 2;
@@ -493,12 +488,11 @@ export class Tensor {
             throw Error(`Unsupported norm: ${p}`);
         }
 
-        const this_data = this.data;
         const fn = (a, b) => a + (b ** p);
 
         if (dim === null) {
             // @ts-ignore
-            const val = this_data.reduce(fn, 0) ** (1 / p);
+            const val = this.data.reduce(fn, 0) ** (1 / p);
             return new Tensor(this.type, [val], []);
         }
 
@@ -518,14 +512,13 @@ export class Tensor {
      * @param {number} [dim=1] The dimension to reduce
      * @returns {Tensor} `this` for operation chaining.
      */
-    normalize_(p = 2.0, dim = 1) {
+    normalize_(p: number = 2.0, dim: number = 1): Tensor {
         dim = safeIndex(dim, this.dims.length);
 
         const norm = this.norm(p, dim, true);
 
-        const this_data = this.data;
         const norm_data = norm.data;
-        for (let i = 0; i < this_data.length; ++i) {
+        for (let i = 0; i < this.data.length; ++i) {
 
             // Calculate the index in the resulting array
             let resultIndex = 0;
@@ -541,7 +534,7 @@ export class Tensor {
             }
 
             // Divide by normalized value
-            this_data[i] /= norm_data[resultIndex];
+            this.data[i] /= norm_data[resultIndex];
         }
 
         return this;
@@ -553,7 +546,7 @@ export class Tensor {
      * @param {number} [dim=1] The dimension to reduce
      * @returns {Tensor} The normalized tensor.
      */
-    normalize(p = 2.0, dim = 1) {
+    normalize(p: number = 2.0, dim: number = 1): Tensor {
         return this.clone().normalize_(p, dim);
     }
 
@@ -562,7 +555,7 @@ export class Tensor {
      * Stride is the jump necessary to go from one element to the next one in the specified dimension dim.
      * @returns {number[]} The stride of this tensor.
      */
-    stride() {
+    stride(): number[] {
         return dimsToStride(this.dims);
     }
 
@@ -572,21 +565,21 @@ export class Tensor {
      * NOTE: The returned tensor shares the storage with the input tensor, so changing the contents of one will change the contents of the other.
      * If you would like a copy, use `tensor.clone()` before squeezing.
      *
-     * @param {number|number[]} [dim=null] If given, the input will be squeezed only in the specified dimensions.
+     * @param {number|number[]|null} [dim=null] If given, the input will be squeezed only in the specified dimensions.
      * @returns {Tensor} The squeezed tensor
      */
-    squeeze(dim = null) {
+    squeeze(dim: number | number[] | null = null): Tensor {
         return new Tensor(
             this.type,
             this.data,
             calc_squeeze_dims(this.dims, dim)
-        )
+        );
     }
 
     /**
-     * In-place version of @see {@link Tensor.squeeze}
+     * In-place version of squeeze
      */
-    squeeze_(dim = null) {
+    squeeze_(dim: number | number[] | null = null): Tensor {
         this.dims = calc_squeeze_dims(this.dims, dim);
         return this;
     }
@@ -599,7 +592,7 @@ export class Tensor {
      * @param {number} dim The index at which to insert the singleton dimension
      * @returns {Tensor} The unsqueezed tensor
      */
-    unsqueeze(dim = null) {
+    unsqueeze(dim: number): Tensor {
         return new Tensor(
             this.type,
             this.data,
@@ -608,25 +601,24 @@ export class Tensor {
     }
 
     /**
-     * In-place version of @see {@link Tensor.unsqueeze}
+     * In-place version of unsqueeze
      */
-    unsqueeze_(dim = null) {
+    unsqueeze_(dim: number): Tensor {
         this.dims = calc_unsqueeze_dims(this.dims, dim);
         return this;
     }
 
     /**
-     * In-place version of @see {@link Tensor.flatten}
+     * In-place version of flatten
      */
-    flatten_(start_dim = 0, end_dim = -1) {
-        // TODO validate inputs
+    flatten_(start_dim: number = 0, end_dim: number = -1): Tensor {
         end_dim = (end_dim + this.dims.length) % this.dims.length;
 
-        let dimsToKeepBefore = this.dims.slice(0, start_dim);
-        let dimsToFlatten = this.dims.slice(start_dim, end_dim + 1);
-        let dimsToKeepAfter = this.dims.slice(end_dim + 1);
+        const dimsToKeepBefore = this.dims.slice(0, start_dim);
+        const dimsToFlatten = this.dims.slice(start_dim, end_dim + 1);
+        const dimsToKeepAfter = this.dims.slice(end_dim + 1);
 
-        this.dims = [...dimsToKeepBefore, dimsToFlatten.reduce((a, b) => a * b, 1), ...dimsToKeepAfter]
+        this.dims = [...dimsToKeepBefore, dimsToFlatten.reduce((a, b) => a * b, 1), ...dimsToKeepAfter];
         return this;
     }
 
@@ -638,7 +630,7 @@ export class Tensor {
      * @param {number} end_dim the last dim to flatten
      * @returns {Tensor} The flattened tensor.
      */
-    flatten(start_dim = 0, end_dim = -1) {
+    flatten(start_dim: number = 0, end_dim: number = -1): Tensor {
         return this.clone().flatten_(start_dim, end_dim);
     }
 
@@ -647,8 +639,7 @@ export class Tensor {
      * @param  {...number} dims the desired size
      * @returns {Tensor} The tensor with the same data but different shape
      */
-    view(...dims) {
-        // TODO: validate dims
+    view(...dims: number[]): Tensor {
         let inferredIndex = -1;
         for (let i = 0; i < dims.length; ++i) {
             if (dims[i] === -1) {
@@ -659,26 +650,31 @@ export class Tensor {
             }
         }
 
-        const this_data = this.data;
         if (inferredIndex !== -1) {
             // Some dimension must be inferred
             const productOther = dims.reduce((product, curr, index) => {
-                return index !== inferredIndex ? product * curr : product
+                return index !== inferredIndex ? product * curr : product;
             }, 1);
 
-            dims[inferredIndex] = this_data.length / productOther;
+            dims[inferredIndex] = this.data.length / productOther;
         }
-        return new Tensor(this.type, this_data, dims); // NOTE: uses same underlying storage
+        return new Tensor(this.type, this.data, dims); // NOTE: uses same underlying storage
     }
 
-    neg_() {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = -this_data[i];
+    /**
+     * Negate the tensor in place
+     */
+    neg_(): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] = -this.data[i];
         }
         return this;
     }
-    neg() {
+
+    /**
+     * Return a new negated tensor
+     */
+    neg(): Tensor {
         return this.clone().neg_();
     }
 
@@ -687,11 +683,10 @@ export class Tensor {
      * @param {number} val The value to compare with.
      * @returns {Tensor} A boolean tensor that is `true` where input is greater than other and `false` elsewhere.
      */
-    gt(val) {
+    gt(val: number): Tensor {
         const mask = new Uint8Array(this.data.length);
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            mask[i] = this_data[i] > val ? 1 : 0;
+        for (let i = 0; i < this.data.length; ++i) {
+            mask[i] = this.data[i] > val ? 1 : 0;
         }
         return new Tensor('bool', mask, this.dims);
     }
@@ -701,22 +696,20 @@ export class Tensor {
      * @param {number} val The value to compare with.
      * @returns {Tensor} A boolean tensor that is `true` where input is less than other and `false` elsewhere.
      */
-    lt(val) {
+    lt(val: number): Tensor {
         const mask = new Uint8Array(this.data.length);
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            mask[i] = this_data[i] < val ? 1 : 0;
+        for (let i = 0; i < this.data.length; ++i) {
+            mask[i] = this.data[i] < val ? 1 : 0;
         }
         return new Tensor('bool', mask, this.dims);
     }
 
     /**
-     * In-place version of @see {@link Tensor.clamp}
+     * In-place version of clamp
      */
-    clamp_(min, max) {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = Math.min(Math.max(this_data[i], min), max);
+    clamp_(min: number, max: number): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] = Math.min(Math.max(this.data[i], min), max);
         }
         return this;
     }
@@ -727,17 +720,16 @@ export class Tensor {
      * @param {number} max upper-bound of the range to be clamped to
      * @returns {Tensor} the output tensor.
      */
-    clamp(min, max) {
+    clamp(min: number, max: number): Tensor {
         return this.clone().clamp_(min, max);
     }
 
     /**
-     * In-place version of @see {@link Tensor.round}
+     * In-place version of round
      */
-    round_() {
-        const this_data = this.data;
-        for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = Math.round(this_data[i]);
+    round_(): Tensor {
+        for (let i = 0; i < this.data.length; ++i) {
+            this.data[i] = Math.round(this.data[i]);
         }
         return this;
     }
@@ -746,42 +738,79 @@ export class Tensor {
      * Rounds elements of input to the nearest integer.
      * @returns {Tensor} the output tensor.
      */
-    round() {
+    round(): Tensor {
         return this.clone().round_();
     }
 
-    mean(dim = null, keepdim = false) {
+    /**
+     * Returns the mean value of each row of the input tensor in the given dimension.
+     */
+    mean(dim: number | null = null, keepdim = false): Tensor {
         return mean(this, dim, keepdim);
     }
 
-    min(dim = null, keepdim = false) {
+    /**
+     * Returns the minimum value of the tensor.
+     */
+    min(dim: number | null = null, keepdim = false): Tensor {
         if (dim === null) {
             // None to reduce over all dimensions.
             const val = min(this.data)[0];
             return new Tensor(this.type, [val], [/* scalar */]);
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.min(a, b), this, dim, keepdim, Infinity);
+        const [type, result, resultDims] = reduce_helper(
+            (a: number, b: number) => Math.min(a, b), 
+            this, 
+            dim, 
+            keepdim, 
+            Infinity
+        );
         return new Tensor(type, result, resultDims);
     }
 
-    max(dim = null, keepdim = false) {
+    /**
+     * Returns the maximum value of the tensor.
+     * @param {number} [dim=null] The dimension or dimensions to reduce. If `null`, all dimensions are reduced.
+     * @param {boolean} keepdim Whether the output tensors have `dim` retained or not.
+     * @returns {Tensor} The maximum value of the tensor.
+     */
+    max(dim: number | null = null, keepdim: boolean = false): Tensor {
         if (dim === null) {
             // None to reduce over all dimensions.
             const val = max(this.data)[0];
             return new Tensor(this.type, [val], [/* scalar */]);
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.max(a, b), this, dim, keepdim, -Infinity);
+        const [type, result, resultDims] = reduce_helper(
+            (a: number, b: number) => Math.max(a, b), 
+            this, 
+            dim, 
+            keepdim, 
+            -Infinity
+        );
         return new Tensor(type, result, resultDims);
     }
 
-    argmin(dim = null, keepdim = false) {
+    /**
+     * Returns the indices of the minimum values along a dimension.
+     * @param {number} [dim=null] The dimension or dimensions to reduce. If `null`, all dimensions are reduced.
+     * @param {boolean} keepdim Whether the output tensors have `dim` retained or not.
+     * @returns {Tensor} The indices of the minimum values along a dimension.
+     */
+    argmin(dim: number | null = null, keepdim: boolean = false): Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
         const index = min(this.data)[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
-    argmax(dim = null, keepdim = false) {
+
+    /**
+     * Returns the indices of the maximum values along a dimension.
+     * @param {number} [dim=null] The dimension or dimensions to reduce. If `null`, all dimensions are reduced.
+     * @param {boolean} keepdim Whether the output tensors have `dim` retained or not.
+     * @returns {Tensor} The indices of the maximum values along a dimension.
+     */
+    argmax(dim: number | null = null, keepdim: boolean = false): Tensor {
         if (dim !== null) {
             throw new Error("`dim !== null` not yet implemented.");
         }
@@ -794,7 +823,7 @@ export class Tensor {
      * @param {DataType} type The desired data type.
      * @returns {Tensor} The converted tensor.
      */
-    to(type) {
+    to(type: DataType): Tensor {
         // If the self Tensor already has the correct dtype, then self is returned.
         if (this.type === type) return this;
 
@@ -824,33 +853,38 @@ export class Tensor {
  * This creates a nested array of a given type and depth (see examples).
  *
  * @example
- *   NestArray<string, 1>; // string[]
- * @example
- *   NestArray<number, 2>; // number[][]
- * @example
- *   NestArray<string, 3>; // string[][][] etc.
- * @template T
- * @template {number} Depth
- * @template {never[]} [Acc=[]]
- * @typedef {Acc['length'] extends Depth ? T : NestArray<T[], Depth, [...Acc, never]>} NestArray
- */
+*   NestArray<string, 1>; // string[]
+* @example
+*   NestArray<number, 2>; // number[][]
+* @example
+*   NestArray<string, 3>; // string[][][] etc.
+* @template T
+* @template {number} Depth
+* @template {never[]} [Acc=[]]
+* @typedef {Acc['length'] extends Depth ? T : NestArray<T[], Depth, [...Acc, never]>} NestArray
+*/
+
+type NestArray<T, Depth extends number, Acc extends never[] = []> = 
+    Acc['length'] extends Depth 
+        ? T 
+        : NestArray<T[], Depth, [...Acc, never]>;
+
 
 /**
  * Reshapes a 1-dimensional array into an n-dimensional array, according to the provided dimensions.
  *
  * @example
- *   reshape([10                    ], [1      ]); // Type: number[]      Value: [10]
- *   reshape([1, 2, 3, 4            ], [2, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4]]
- *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]); // Type: number[][][]  Value: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
- *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [4, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4], [5, 6], [7, 8]]
- * @param {T[]|DataArray} data The input array to reshape.
- * @param {DIM} dimensions The target shape/dimensions.
- * @template T
- * @template {[number]|number[]} DIM
- * @returns {NestArray<T, DIM["length"]>} The reshaped array.
- */
-function reshape(data, dimensions) {
-
+*   reshape([10                    ], [1      ]); // Type: number[]      Value: [10]
+*   reshape([1, 2, 3, 4            ], [2, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4]]
+*   reshape([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]); // Type: number[][][]  Value: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+*   reshape([1, 2, 3, 4, 5, 6, 7, 8], [4, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4], [5, 6], [7, 8]]
+* @param {T[]|DataArray} data The input array to reshape.
+* @param {DIM} dimensions The target shape/dimensions.
+* @template T
+* @template {[number]|number[]} DIM
+* @returns {NestArray<T, DIM["length"]>} The reshaped array.
+*/
+function reshape<T>(data: ArrayLike<T>, dimensions: number[]): NestArray<T, typeof dimensions['length']> {
     const totalElements = data.length;
     const dimensionSize = dimensions.reduce((a, b) => a * b);
 
@@ -858,24 +892,17 @@ function reshape(data, dimensions) {
         throw Error(`cannot reshape array of size ${totalElements} into shape (${dimensions})`);
     }
 
-    /** @type {any} */
-    let reshapedArray = data;
+    let reshapedArray: any = Array.from(data);
 
     for (let i = dimensions.length - 1; i >= 0; i--) {
-        reshapedArray = reshapedArray.reduce((acc, val) => {
-            let lastArray = acc[acc.length - 1];
-
-            if (lastArray.length < dimensions[i]) {
-                lastArray.push(val);
-            } else {
-                acc.push([val]);
-            }
-
-            return acc;
-        }, [[]]);
+        const temp: any[] = [];
+        for (let j = 0; j < reshapedArray.length; j += dimensions[i]) {
+            temp.push(reshapedArray.slice(j, j + dimensions[i]));
+        }
+        reshapedArray = temp;
     }
 
-    return reshapedArray[0];
+    return reshapedArray;
 }
 
 /**
@@ -884,11 +911,10 @@ function reshape(data, dimensions) {
  * @param {Array} axes The axes to permute the tensor along.
  * @returns {Tensor} The permuted tensor.
  */
-export function permute(tensor, axes) {
-    const [permutedData, shape] = permute_data(tensor.data, tensor.dims, axes);
+export function permute(tensor: Tensor, axes: number[]): Tensor {
+    const [permutedData, shape] = permute_data(tensor.data as TypedArray, tensor.dims, axes);
     return new Tensor(tensor.type, permutedData, shape);
 }
-
 
 /**
  * Interpolates an Tensor to the given size.
@@ -898,15 +924,19 @@ export function permute(tensor, axes) {
  * @param {boolean} align_corners Whether to align corners.
  * @returns {Tensor} The interpolated tensor.
  */
-export function interpolate(input, [out_height, out_width], mode = 'bilinear', align_corners = false) {
-
+export function interpolate(
+    input: Tensor, 
+    [out_height, out_width]: [number, number], 
+    mode: string = 'bilinear', 
+    align_corners: boolean = false
+): Tensor {
     // Input image dimensions
     const in_channels = input.dims.at(-3) ?? 1;
     const in_height = input.dims.at(-2);
     const in_width = input.dims.at(-1);
 
     let output = interpolate_data(
-        /** @type {import('./maths.js').TypedArray}*/(input.data),
+        input.data as TypedArray,
         [in_channels, in_height, in_width],
         [out_height, out_width],
         mode,
@@ -914,7 +944,6 @@ export function interpolate(input, [out_height, out_width], mode = 'bilinear', a
     );
     return new Tensor(input.type, output, [in_channels, out_height, out_width]);
 }
-
 
 /**
  * Down/up samples the input.
@@ -925,11 +954,13 @@ export function interpolate(input, [out_height, out_width], mode = 'bilinear', a
  * @param {"nearest"|"bilinear"|"bicubic"} [options.mode='bilinear'] algorithm used for upsampling
  * @returns {Promise<Tensor>} The interpolated tensor.
  */
-export async function interpolate_4d(input, {
+export async function interpolate_4d(input: Tensor, {
     size = null,
     mode = 'bilinear',
-} = {}) {
-
+}: {
+    size?: [number, number] | [number, number, number] | [number, number, number, number] | null,
+    mode?: 'nearest' | 'bilinear' | 'bicubic'
+} = {}): Promise<Tensor> {
     // Error checking
     if (input.dims.length !== 4) {
         throw new Error('`interpolate_4d` currently only supports 4D input.');
@@ -940,7 +971,7 @@ export async function interpolate_4d(input, {
     }
 
     // Fill in missing dimensions
-    let targetDims;
+    let targetDims: number[];
     if (size.length === 2) {
         targetDims = [...input.dims.slice(0, 2), ...size];
     } else if (size.length === 3) {
@@ -973,7 +1004,7 @@ export async function interpolate_4d(input, {
  * @param {Tensor} b the second tensor to be multiplied
  * @returns {Promise<Tensor>} The matrix product of the two tensors.
  */
-export async function matmul(a, b) {
+export async function matmul(a: Tensor, b: Tensor): Promise<Tensor> {
     const op = await TensorOpRegistry.matmul;
     return await op({ a, b });
 }
@@ -985,11 +1016,10 @@ export async function matmul(a, b) {
  * @param {Tensor} a The dimension along which to take the one dimensional real FFT.
  * @returns {Promise<Tensor>} the output tensor.
  */
-export async function rfft(x, a) {
+export async function rfft(x: Tensor, a: Tensor): Promise<Tensor> {
     const op = await TensorOpRegistry.rfft;
     return await op({ x, a });
 }
-
 
 /**
  * Returns the k largest elements of the given input tensor.
@@ -998,7 +1028,7 @@ export async function rfft(x, a) {
  * @param {number} [k] the k in "top-k"
  * @returns {Promise<[Tensor, Tensor]>} the output tuple of (Tensor, LongTensor) of top-k elements and their indices.
  */
-export async function topk(x, k) {
+export async function topk(x: Tensor, k?: number): Promise<[Tensor, Tensor]> {
     const op = await TensorOpRegistry.top_k;
 
     if (k == null) {
@@ -1016,8 +1046,13 @@ export async function topk(x, k) {
     });
 }
 
+/**
+ * Helper function to convert array to index tensor
+ */
+function arrayToIndexTensor(array: number[]): Tensor {
+    return new Tensor('int64', array.map(BigInt), [array.length]);
+}
 
-const arrayToIndexTensor = (array) => new Tensor('int64', array, [array.length]);
 /**
  * Slice a multidimensional float32 tensor.
  * @param {Tensor} data: Tensor of data to extract slices from
@@ -1027,7 +1062,13 @@ const arrayToIndexTensor = (array) => new Tensor('int64', array, [array.length])
  * @param {number[]} [steps]: 1-D array of slice step of corresponding axis in axes.
  * @returns {Promise<Tensor>} Sliced data tensor.
  */
-export async function slice(data, starts, ends, axes, steps) {
+export async function slice(
+    data: Tensor,
+    starts: number[],
+    ends: number[],
+    axes: number[],
+    steps?: number[]
+): Promise<Tensor> {
     const op = await TensorOpRegistry.slice;
     return await op({
         x: data,
@@ -1038,23 +1079,21 @@ export async function slice(data, starts, ends, axes, steps) {
     });
 }
 
-
 /**
  * Perform mean pooling of the last hidden state followed by a normalization step.
  * @param {Tensor} last_hidden_state Tensor of shape [batchSize, seqLength, embedDim]
  * @param {Tensor} attention_mask Tensor of shape [batchSize, seqLength]
  * @returns {Tensor} Returns a new Tensor of shape [batchSize, embedDim].
  */
-export function mean_pooling(last_hidden_state, attention_mask) {
+export function mean_pooling(last_hidden_state: Tensor, attention_mask: Tensor): Tensor {
     // last_hidden_state: [batchSize, seqLength, embedDim]
     // attention_mask:    [batchSize, seqLength]
-    const lastHiddenStateData = last_hidden_state.data;
+    const lastHiddenStateData = last_hidden_state.data as number[];
     const attentionMaskData = attention_mask.data;
 
     const shape = [last_hidden_state.dims[0], last_hidden_state.dims[2]];
 
-    // @ts-ignore
-    const returnedData = new lastHiddenStateData.constructor(shape[0] * shape[1]);
+    const returnedData = new (lastHiddenStateData.constructor as new (length: number) => typeof lastHiddenStateData)(shape[0] * shape[1]);
     const [batchSize, seqLength, embedDim] = last_hidden_state.dims;
 
     let outIndex = 0;
@@ -1085,7 +1124,7 @@ export function mean_pooling(last_hidden_state, attention_mask) {
         last_hidden_state.type,
         returnedData,
         shape
-    )
+    );
 }
 
 /**
@@ -1096,9 +1135,15 @@ export function mean_pooling(last_hidden_state, attention_mask) {
  * @param {number} [options.eps=1e-5] A value added to the denominator for numerical stability.
  * @returns {Tensor} The normalized tensor.
  */
-export function layer_norm(input, normalized_shape, {
-    eps = 1e-5,
-} = {}) {
+export function layer_norm(
+    input: Tensor, 
+    normalized_shape: number[], 
+    {
+        eps = 1e-5,
+    }: {
+        eps?: number
+    } = {}
+): Tensor {
     if (input.dims.length !== 2) {
         throw new Error('`layer_norm` currently only supports 2D input.');
     }
@@ -1110,13 +1155,12 @@ export function layer_norm(input, normalized_shape, {
     }
 
     const [std, mean] = std_mean(input, 1, 0, true);
-    const stdData = /** @type {Float32Array} */(std.data);
-    const meanData = /** @type {Float32Array} */(mean.data);
+    const stdData = std.data as Float32Array;
+    const meanData = mean.data as Float32Array;
 
-    const inputData = /** @type {Float32Array} */(input.data);
+    const inputData = input.data as Float32Array;
 
-    // @ts-ignore
-    const returnedData = new inputData.constructor(inputData.length);
+    const returnedData = new (inputData.constructor as new (length: number) => typeof inputData)(inputData.length);
 
     for (let i = 0; i < batchSize; ++i) {
         const offset = i * featureDim;
@@ -1126,7 +1170,7 @@ export function layer_norm(input, normalized_shape, {
         }
     }
     return new Tensor(input.type, returnedData, input.dims);
-}
+} 
 
 /**
  * Helper function to calculate new dimensions when performing a squeeze operation.
@@ -1135,7 +1179,7 @@ export function layer_norm(input, normalized_shape, {
  * @returns {number[]} The new dimensions.
  * @private
  */
-function calc_squeeze_dims(dims, dim) {
+function calc_squeeze_dims(dims: number[], dim: number | number[] | null): number[] {
     dims = dims.slice();
     if (dim === null) {
         dims = dims.filter((d) => d !== 1);
@@ -1158,7 +1202,7 @@ function calc_squeeze_dims(dims, dim) {
  * @returns {number[]} The new dimensions.
  * @private
  */
-function calc_unsqueeze_dims(dims, dim) {
+function calc_unsqueeze_dims(dims: number[], dim: number): number[] {
     // Dimension out of range (e.g., "expected to be in range of [-4, 3], but got 4")
     // + 1 since we allow inserting at the end (i.e. dim = -1)
     dim = safeIndex(dim, dims.length + 1);
@@ -1178,7 +1222,7 @@ function calc_unsqueeze_dims(dims, dim) {
  * @throws {Error} If the index is out of range.
  * @private
  */
-function safeIndex(index, size, dimension = null, boundsCheck = true) {
+function safeIndex(index: number, size: number, dimension: number = null, boundsCheck = true): number {
     if (boundsCheck && (index < -size || index >= size)) {
         throw new Error(`IndexError: index ${index} is out of bounds for dimension${dimension === null ? '' : ' ' + dimension} with size ${size}`);
     }
@@ -1196,7 +1240,7 @@ function safeIndex(index, size, dimension = null, boundsCheck = true) {
  * @param {number} dim The dimension to concatenate along.
  * @returns {Tensor} The concatenated tensor.
  */
-export function cat(tensors, dim = 0) {
+export function cat(tensors: Tensor[], dim: number = 0): Tensor {
     dim = safeIndex(dim, tensors[0].dims.length);
 
     // TODO do validation of shapes
@@ -1214,16 +1258,13 @@ export function cat(tensors, dim = 0) {
 
     if (dim === 0) {
         // Handle special case for performance reasons
-
         let offset = 0;
         for (const tensor of tensors) {
             const tensorData = tensor.data;
             result.set(tensorData, offset);
             offset += tensorData.length;
         }
-
     } else {
-
         let currentDim = 0;
 
         for (let t = 0; t < tensors.length; ++t) {
@@ -1260,41 +1301,48 @@ export function cat(tensors, dim = 0) {
  * @param {number} dim The dimension to stack along.
  * @returns {Tensor} The stacked tensor.
  */
-export function stack(tensors, dim = 0) {
+export function stack(tensors: Tensor[], dim: number = 0): Tensor {
     // TODO do validation of shapes
     // NOTE: stack expects each tensor to be equal size
     return cat(tensors.map(t => t.unsqueeze(dim)), dim);
 }
-
 
 /**
  * @param {(previousValue: any, currentValue: any, currentIndex?: number, resultIndex?: number) => any} callbackfn
  * @param {Tensor} input the input tensor.
  * @param {number|null} dim the dimension to reduce.
  * @param {boolean} keepdim whether the output tensor has dim retained or not.
- * @returns {[DataType, any, number[]]} The reduced tensor data.
+ * @returns {[DataType, DataArray, number[]]} The reduced tensor data.
  */
-function reduce_helper(callbackfn, input, dim = null, keepdim = false, initialValue = null) {
+function reduce_helper(
+    callbackfn: (previousValue: any, currentValue: any, currentIndex?: number, resultIndex?: number) => any,
+    input: Tensor,
+    dim: number | null = null,
+    keepdim: boolean = false,
+    initialValue: number | bigint | null = null
+): [DataType, DataArray, number[]] {
     const inputData = input.data;
     const inputDims = input.dims;
 
     // Negative indexing
-    dim = safeIndex(dim, inputDims.length);
+    dim = dim !== null ? safeIndex(dim, inputDims.length) : null;
 
     // Calculate the shape of the resulting array after summation
     const resultDims = inputDims.slice(); // Copy the original dimensions
-    resultDims[dim] = 1; // Remove the specified axis
+    if (dim !== null) {
+        resultDims[dim] = 1; // Remove the specified axis
+    }
 
     // Create a new array to store the accumulated values
-    // @ts-ignore
-    const result = new inputData.constructor(inputData.length / inputDims[dim]);
+    const result = new (inputData.constructor as new (length: number) => typeof inputData)(
+        inputData.length / (dim !== null ? inputDims[dim] : 1)
+    );
     if (initialValue !== null) {
         result.fill(initialValue);
     }
 
     // Iterate over the data array
     for (let i = 0; i < inputData.length; ++i) {
-
         // Calculate the index in the resulting array
         let resultIndex = 0;
 
@@ -1312,12 +1360,13 @@ function reduce_helper(callbackfn, input, dim = null, keepdim = false, initialVa
         result[resultIndex] = callbackfn(result[resultIndex], inputData[i], i, resultIndex);
     }
 
-    if (!keepdim) resultDims.splice(dim, 1);
+    if (!keepdim && dim !== null) resultDims.splice(dim, 1);
 
     return [input.type, result, resultDims];
 }
 
 
+/**
 /**
  * Calculates the standard deviation and mean over the dimensions specified by dim. dim can be a single dimension or `null` to reduce over all dimensions.
  * @param {Tensor} input the input tenso
@@ -1326,8 +1375,13 @@ function reduce_helper(callbackfn, input, dim = null, keepdim = false, initialVa
  * @param {boolean} keepdim whether the output tensor has dim retained or not.
  * @returns {Tensor[]} A tuple of (std, mean) tensors.
  */
-export function std_mean(input, dim = null, correction = 1, keepdim = false) {
-    const inputData = /** @type {Float32Array} */(input.data);
+export function std_mean(
+    input: Tensor,
+    dim: number | null = null,
+    correction: number = 1,
+    keepdim: boolean = false
+): [Tensor, Tensor] {
+    const inputData = input.data as Float32Array;
     const inputDims = input.dims;
 
     if (dim === null) {
@@ -1343,10 +1397,15 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
     }
     dim = safeIndex(dim, inputDims.length);
     const meanTensor = mean(input, dim, keepdim);
-    const meanTensorData = meanTensor.data;
+    const meanTensorData = meanTensor.data as number[];
 
     // Compute squared sum
-    const [type, result, resultDims] = reduce_helper((a, b, i, j) => a + (b - meanTensorData[j]) ** 2, input, dim, keepdim);
+    const [type, result, resultDims] = reduce_helper(
+        (a: number, b: number, i: number, j: number) => a + (b - meanTensorData[j]) ** 2,
+        input,
+        dim,
+        keepdim
+    );
 
     // Square root of the squared sum
     for (let i = 0; i < result.length; ++i) {
@@ -1365,9 +1424,9 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
  * @param {boolean} keepdim whether the output tensor has dim retained or not.
  * @returns {Tensor} A new tensor with means taken along the specified dimension.
  */
-export function mean(input, dim = null, keepdim = false) {
+export function mean(input: Tensor, dim: number | null = null, keepdim: boolean = false): Tensor {
     const inputDims = input.dims;
-    const inputData = /** @type {Float32Array} */(input.data);
+    const inputData = input.data as number[];
 
     if (dim === null) {
         // None to reduce over all dimensions.
@@ -1377,7 +1436,7 @@ export function mean(input, dim = null, keepdim = false) {
     dim = safeIndex(dim, inputDims.length);
 
     // Compute sum
-    const [type, result, resultDims] = reduce_helper((a, b) => a + b, input, dim, keepdim);
+    const [type, result, resultDims] = reduce_helper((a: number, b: number) => a + b, input, dim, keepdim);
 
     // Divide by number of elements in the dimension
     if (inputDims[dim] !== 1) {
@@ -1389,8 +1448,10 @@ export function mean(input, dim = null, keepdim = false) {
     return new Tensor(type, result, resultDims);
 }
 
-
-function dimsToStride(dims) {
+/**
+ * Helper function to calculate strides from dimensions
+ */
+function dimsToStride(dims: number[]): number[] {
     const stride = new Array(dims.length);
     for (let i = dims.length - 1, s2 = 1; i >= 0; --i) {
         stride[i] = s2;
@@ -1399,13 +1460,21 @@ function dimsToStride(dims) {
     return stride;
 }
 
-function fullHelper(size, fill_value, dtype, cls) {
+/**
+ * Helper function for creating filled tensors
+ */
+function fullHelper<T>(
+    size: number[],
+    fill_value: T,
+    dtype: DataType,
+    cls: new (length: number) => { fill(value: T): any }
+): Tensor {
     const numElements = size.reduce((a, b) => a * b, 1);
     return new Tensor(
         dtype,
         new cls(numElements).fill(fill_value),
         size
-    )
+    );
 }
 
 /**
@@ -1414,9 +1483,10 @@ function fullHelper(size, fill_value, dtype, cls) {
  * @param {number|bigint|boolean} fill_value The value to fill the output tensor with.
  * @returns {Tensor} The filled tensor.
  */
-export function full(size, fill_value) {
-    let dtype;
-    let typedArrayCls;
+export function full(size: number[], fill_value: number | bigint | boolean): Tensor {
+    let dtype: DataType;
+    let typedArrayCls: new (length: number) => { fill(value: any): any };
+    
     if (typeof fill_value === 'number') {
         dtype = 'float32';
         typedArrayCls = Float32Array;
@@ -1433,7 +1503,10 @@ export function full(size, fill_value) {
     return fullHelper(size, fill_value, dtype, typedArrayCls);
 }
 
-export function full_like(tensor, fill_value) {
+/**
+ * Returns a tensor filled with a scalar value, with the same size as input.
+ */
+export function full_like(tensor: Tensor, fill_value: number | bigint | boolean): Tensor {
     return full(tensor.dims, fill_value);
 }
 
@@ -1442,7 +1515,7 @@ export function full_like(tensor, fill_value) {
  * @param {number[]} size A sequence of integers defining the shape of the output tensor.
  * @returns {Tensor} The ones tensor.
  */
-export function ones(size) {
+export function ones(size: number[]): Tensor {
     return fullHelper(size, 1n, 'int64', BigInt64Array);
 }
 
@@ -1451,7 +1524,7 @@ export function ones(size) {
  * @param {Tensor} tensor The size of input will determine size of the output tensor.
  * @returns {Tensor} The ones tensor.
  */
-export function ones_like(tensor) {
+export function ones_like(tensor: Tensor): Tensor {
     return ones(tensor.dims);
 }
 
@@ -1460,7 +1533,7 @@ export function ones_like(tensor) {
  * @param {number[]} size A sequence of integers defining the shape of the output tensor.
  * @returns {Tensor} The zeros tensor.
  */
-export function zeros(size) {
+export function zeros(size: number[]): Tensor {
     return fullHelper(size, 0n, 'int64', BigInt64Array);
 }
 
@@ -1469,7 +1542,7 @@ export function zeros(size) {
  * @param {Tensor} tensor The size of input will determine size of the output tensor.
  * @returns {Tensor} The zeros tensor.
  */
-export function zeros_like(tensor) {
+export function zeros_like(tensor: Tensor): Tensor {
     return zeros(tensor.dims);
 }
 
@@ -1478,13 +1551,13 @@ export function zeros_like(tensor) {
  * @param {number[]} size A sequence of integers defining the shape of the output tensor.
  * @returns {Tensor} The random tensor.
  */
-export function rand(size) {
+export function rand(size: number[]): Tensor {
     const length = size.reduce((a, b) => a * b, 1);
     return new Tensor(
         "float32",
         Float32Array.from({ length }, () => Math.random()),
         size,
-    )
+    );
 }
 
 /**
@@ -1493,15 +1566,12 @@ export function rand(size) {
  * @param {'binary'|'ubinary'} precision The precision to use for quantization.
  * @returns {Tensor} The quantized tensor.
  */
-export function quantize_embeddings(tensor, precision) {
+export function quantize_embeddings(tensor: Tensor, precision: 'binary' | 'ubinary'): Tensor {
     if (tensor.dims.length !== 2) {
         throw new Error("The tensor must have 2 dimensions");
     }
     if (tensor.dims.at(-1) % 8 !== 0) {
         throw new Error("The last dimension of the tensor must be a multiple of 8");
-    }
-    if (!['binary', 'ubinary'].includes(precision)) {
-        throw new Error("The precision must be either 'binary' or 'ubinary'");
     }
 
     const signed = precision === 'binary';
@@ -1509,7 +1579,7 @@ export function quantize_embeddings(tensor, precision) {
 
     // Create a typed array to store the packed bits
     const cls = signed ? Int8Array : Uint8Array;
-    const inputData = tensor.data;
+    const inputData = tensor.data as number[];
     const outputData = new cls(inputData.length / 8);
 
     // Iterate over each number in the array
@@ -1526,7 +1596,8 @@ export function quantize_embeddings(tensor, precision) {
         if (signed && bitPosition === 0) {
             outputData[arrayIndex] -= 128;
         }
-    };
+    }
 
     return new Tensor(dtype, outputData, [tensor.dims[0], tensor.dims[1] / 8]);
 }
+
