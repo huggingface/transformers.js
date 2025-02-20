@@ -195,7 +195,7 @@ describe("Streamers", () => {
     it(
       "batch_size=1",
       async () => {
-        const target_chunks = ["helloerdingsdelete ", "melytabular ", "Stadiumoba ", "alcune ", "drug"];
+        const target_chunks = ["hello", "erdingsdelete ", "melytabular ", "Stadiumoba ", "alcune ", "drug"];
         const chunks = [];
         const callback_function = (text) => {
           chunks.push(text);
