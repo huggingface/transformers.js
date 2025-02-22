@@ -15,9 +15,9 @@ from onnxruntime.quantization.onnx_quantizer import ONNXQuantizer
 from onnxruntime.quantization.registry import IntegerOpsRegistry
 from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
 from onnxruntime.quantization.matmul_bnb4_quantizer import MatMulBnb4Quantizer
-import float16
 import onnx_graphsurgeon as gs
 
+from . import float16
 
 class QuantMode(Enum):
     # F32 = 'fp32'
