@@ -405,7 +405,9 @@ def process_node_in_block_list(
     op_block_list: list,
     node_block_list: list,
 ):
-    for node in graph.node:
+    # NB: Important to create a copy of the nodes in the graph to avoid modifying
+    # the graph in-place while iterating (causing an infinite loop)
+    for node in list(graph.node):
         if (node.op_type in op_block_list) or (node.name in node_block_list):
             insert_cast32_before_node(graph, node, global_input_name_dict)
             insert_cast16_after_node(graph, node, global_input_name_dict)
