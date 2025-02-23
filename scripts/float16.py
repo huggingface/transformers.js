@@ -344,33 +344,55 @@ def process_graph_input(
 def process_graph_output(
     graph: onnx_proto.GraphProto, is_top_level: bool, is_io_fp32: bool
 ):
-    if is_top_level and is_io_fp32:  # the output dtype is float32, need to cast to fp16
-        for i, graph_output in enumerate(graph.output):
-            if graph_output.type.tensor_type.elem_type == onnx_proto.TensorProto.FLOAT:
-                upstream_nodes = find_upstream_node_by_output_name(
-                    graph, graph_output.name
+    if is_top_level and is_io_fp32:  # the output dtype is fp32, need to cast from fp16
+        new_outputs = []
+        # Process each output value info
+        old_outputs = list(graph.output)
+        # Clear current outputs because we will reassign new ones
+        del graph.output[:]
+        for output in old_outputs:
+            if output.type.tensor_type.elem_type == onnx_proto.TensorProto.FLOAT:
+                original_name = output.name
+                fp16_name = f"{original_name}_fp16"
+
+                # An output node can also have downstream nodes that depend on it (i.e., use it as input)
+                downstream_nodes = find_downstream_node_by_input_name(
+                    graph,
+                    original_name,
+                    include_subgraphs=False,
                 )
-                for u_node in upstream_nodes:
-                    cast_node_name = u_node.name + "_cast_to_" + graph_output.name
-                    cast_node_output_name = (
-                        u_node.name + "_cast_to_" + graph_output.name
-                    )
-                    add_cast_node(
-                        graph,
-                        [cast_node_output_name],
-                        [graph_output.name],
-                        cast_node_name,
-                        FLOAT32,
-                    )
-                    add_new_value_info(
-                        graph,
-                        graph_output,
-                        cast_node_output_name,
-                        onnx_proto.TensorProto.FLOAT16,
-                    )
-                    for i, output_name in enumerate(u_node.output):
-                        if output_name == graph_output.name:
-                            u_node.output[i] = cast_node_output_name
+                for d_node in downstream_nodes:
+                    for i, input_name in enumerate(d_node.input):
+                        if input_name == original_name:
+                            d_node.input[i] = fp16_name
+
+                output.name = fp16_name
+
+                upstream_nodes = find_upstream_node_by_output_name(graph, original_name)
+                for up_node in upstream_nodes:
+                    for i, output_name in enumerate(up_node.output):
+                        if output_name == original_name:
+                            up_node.output[i] = fp16_name
+
+                # Create a cast node from fp16 to fp32 (restore original name)
+                add_cast_node(
+                    graph,
+                    [fp16_name],
+                    [original_name],
+                    fp16_name + "_cast_to_" + original_name,
+                    onnx_proto.TensorProto.FLOAT,
+                )
+
+                # Set the new output: the cast node output will be the final output.
+                new_output = helper.make_tensor_value_info(
+                    original_name, onnx_proto.TensorProto.FLOAT, None
+                )
+                new_outputs.append(new_output)
+            else:
+                new_outputs.append(output)
+
+        graph.output.extend(new_outputs)
+
     else:  # change the output dtype to fp16 in tensor
         for graph_output in graph.output:
             if graph_output.type.tensor_type.elem_type == onnx_proto.TensorProto.FLOAT:
@@ -570,13 +592,18 @@ def find_upstream_node_by_output_name(graph: onnx_proto.GraphProto, output_name:
 
 
 # Find the node that has the specified input name, including in subgraphs
-def find_downstream_node_by_input_name(graph: onnx_proto.GraphProto, input_name: str):
+def find_downstream_node_by_input_name(
+    graph: onnx_proto.GraphProto, input_name: str, include_subgraphs=True
+):
     nodes = []
 
     # Check nodes in current graph
     for node in graph.node:
         if input_name in node.input:
             nodes.append(node)
+
+        if not include_subgraphs:
+            continue
 
         # Recursively check subgraphs in node attributes
         for attr in node.attribute:
@@ -698,7 +725,7 @@ def sort_graph_node(graph_proto):
 
 
 # The input graph should be mode.graph
-# Recursevly sort the topology for each sub-graph
+# Recursively sort the topology for each sub-graph
 def sort_topology(graph_proto):
     assert isinstance(graph_proto, onnx_proto.GraphProto)
     sort_graph_node(graph_proto)  # sort global graph
