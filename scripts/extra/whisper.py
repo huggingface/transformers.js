@@ -2,6 +2,9 @@ from optimum.exporters.onnx.model_configs import WhisperOnnxConfig
 
 from optimum.exporters.onnx.base import ConfigBehavior
 from typing import Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 # List of [layer, head] pairs that select the cross-attention heads that are highly correlated to word-level timing.
 # Source: https://gist.github.com/hollance/42e32852f24243b748ae6bc1f985b13a
@@ -57,12 +60,13 @@ def get_main_export_kwargs(config, task):
 
 def get_alignment_heads(config):
     if getattr(config, '_name_or_path', None) is None:
-        raise ValueError(
+        logger.warning(
             "Unable to determine model type from config. Please specify `_name_or_path` in the config.")
+        return None
 
     for model_name, heads in ALIGNMENT_HEADS_MAPPING.items():
         if model_name in config._name_or_path:
             return heads
 
-    raise ValueError(
-        f"Unknown model type: {config._name_or_path}. Please add one of the following model types to `_name_or_path` in the config file: {list(ALIGNMENT_HEADS_MAPPING.keys())}")
+    logger.warning(f"Unknown model type: {config._name_or_path}. Please add one of the following model types to `_name_or_path` in the config file: {list(ALIGNMENT_HEADS_MAPPING.keys())}")
+    return None
