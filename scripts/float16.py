@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 
+from typing import Optional
 import itertools
 import numpy as np
 import onnx
@@ -344,54 +345,50 @@ def process_graph_input(
 def process_graph_output(
     graph: onnx_proto.GraphProto, is_top_level: bool, is_io_fp32: bool
 ):
-    if is_top_level and is_io_fp32:  # the output dtype is fp32, need to cast from fp16
-        new_outputs = []
-        # Process each output value info
-        old_outputs = list(graph.output)
-        # Clear current outputs because we will reassign new ones
-        del graph.output[:]
-        for output in old_outputs:
-            if output.type.tensor_type.elem_type == onnx_proto.TensorProto.FLOAT:
-                original_name = output.name
-                fp16_name = f"{original_name}_fp16"
+    if is_top_level and is_io_fp32:  # the output dtype is float32, need to cast to fp16
+        for i, graph_output in enumerate(graph.output):
+            if graph_output.type.tensor_type.elem_type == onnx_proto.TensorProto.FLOAT:
+                new_producer_name = graph_output.name + "_fp16"
+                original_name = graph_output.name  # The correct output name
 
-                # An output node can also have downstream nodes that depend on it (i.e., use it as input)
+                # Get the node(s) that produce the model output
+                # These will most likely be fp16, but could be fp32 if the previous node is in block_list
+                upstream_nodes = find_upstream_node_by_output_name(graph, original_name)
+                assert len(upstream_nodes) == 1  # Should be only one node
+
+                producer_node = upstream_nodes[0]
+
+                for i, output_name in enumerate(producer_node.output):
+                    if output_name == original_name:
+                        producer_node.output[i] = new_producer_name
+
+                cast_node_name = new_producer_name + "_input_cast" + str(i)
+                add_cast_node(
+                    graph,
+                    [new_producer_name],
+                    [original_name],
+                    cast_node_name,
+                    onnx_proto.TensorProto.FLOAT,
+                )
+                for value_info in graph.value_info:
+                    if original_name == value_info.name:
+                        value_info.type.tensor_type.elem_type = (
+                            onnx_proto.TensorProto.FLOAT
+                        )
+
+                # Get the node(s) that consume the model output
                 downstream_nodes = find_downstream_node_by_input_name(
                     graph,
                     original_name,
                     include_subgraphs=False,
                 )
+
+                # It is possible that the producer node is also input to downstream nodes
+                # So, we update the inputs of these downstream nodes
                 for d_node in downstream_nodes:
                     for i, input_name in enumerate(d_node.input):
                         if input_name == original_name:
-                            d_node.input[i] = fp16_name
-
-                output.name = fp16_name
-
-                upstream_nodes = find_upstream_node_by_output_name(graph, original_name)
-                for up_node in upstream_nodes:
-                    for i, output_name in enumerate(up_node.output):
-                        if output_name == original_name:
-                            up_node.output[i] = fp16_name
-
-                # Create a cast node from fp16 to fp32 (restore original name)
-                add_cast_node(
-                    graph,
-                    [fp16_name],
-                    [original_name],
-                    fp16_name + "_cast_to_" + original_name,
-                    onnx_proto.TensorProto.FLOAT,
-                )
-
-                # Set the new output: the cast node output will be the final output.
-                new_output = helper.make_tensor_value_info(
-                    original_name, onnx_proto.TensorProto.FLOAT, None
-                )
-                new_outputs.append(new_output)
-            else:
-                new_outputs.append(output)
-
-        graph.output.extend(new_outputs)
+                            d_node.input[i] = new_producer_name
 
     else:  # change the output dtype to fp16 in tensor
         for graph_output in graph.output:
@@ -482,7 +479,13 @@ def process_tensor_in_node(
 ):
     value_info_block_list = set()  # This is for later use, not in this step
     for node in graph.node:
-        if (node.op_type in op_block_list) or (node.name in node_block_list):
+        # NOTE: "Cast" operation cannot change its output type because it is strongly typed.
+        if (
+            (node.op_type in op_block_list)
+            or (node.name in node_block_list)
+            or (node.op_type == "Cast")
+        ):
+            # if (node.op_type in op_block_list) or (node.name in node_block_list):
             # Only need to block the output value_info changing
             for output_name in node.output:
                 value_info_block_list.add(output_name)
@@ -796,10 +799,31 @@ def remove_unnecessary_cast_node(graph_proto: onnx_proto.GraphProto):
         if upstream_node.op_type == "Constant":
             cast_node_list.remove(cast_node)
 
-    # 4. find the cast(to16) node which downstream is Cast(to32)
+    # 4. find (cast_to_fp16, cast_to_fp32) pairs where --fp32--> cast_to_fp16 --fp16--> cast_to_fp32.
     remove_candidate = []
+
+    name_to_value_info = {
+        value_info.name: value_info
+        for value_info in itertools.chain(graph_proto.value_info, graph_proto.input)
+    }
+
+    def get_type(name: str) -> Optional[int]:
+        if name in name_to_value_info:
+            return name_to_value_info[name].type
+        else:
+            # `name` has no value info.
+            return None
+
     for cast_node_name, downstream_node in cast_node_downstream_dict.items():
         cast_node = name_to_node_dict[cast_node_name]
+        if len(cast_node.input) != 1:
+            raise RuntimeError(
+                f"Cast node {cast_node_name} should have only one input, but has {len(cast_node.input)}."
+            )
+
+        input_type = get_type(cast_node.input[0])
+        if input_type != onnx_proto.TensorProto.FLOAT:
+            continue
         if isinstance(downstream_node, list):
             for dn in downstream_node:
                 if (
@@ -820,7 +844,8 @@ def remove_unnecessary_cast_node(graph_proto: onnx_proto.GraphProto):
             ):
                 remove_candidate.append((cast_node, downstream_node))
 
-    # 5. change the connection of "upstream->cast16->cast32->downstream" to "upstream->downstream"
+    # 5. change "upstream --fp32--> cast_to_fp16 --fp16--> cast_to_fp32 --fp32--> downstream" to
+    # "upstream --fp32--> downstream".
     for cast_node_pair in remove_candidate:
         first_cast_node = cast_node_pair[0]
         second_cast_node = cast_node_pair[1]

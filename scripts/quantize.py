@@ -14,7 +14,7 @@ from onnxruntime.quantization.onnx_quantizer import ONNXQuantizer
 from onnxruntime.quantization.registry import IntegerOpsRegistry
 from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
 from onnxruntime.quantization.matmul_bnb4_quantizer import MatMulBnb4Quantizer
-import onnxslim
+import onnx_graphsurgeon as gs
 
 from . import float16
 from .utils import check_and_save_model
@@ -222,8 +222,9 @@ def quantize_fp16(
         op_block_list=blocked_ops,
     )
 
-    # Topologically sort and slim the model
-    model_fp16 = onnxslim.slim(model_fp16)
+    graph = gs.import_onnx(model_fp16)
+    graph.toposort()
+    model_fp16 = gs.export_onnx(graph)
     check_and_save_model(model_fp16, save_path)
 
 

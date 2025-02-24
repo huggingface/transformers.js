@@ -4,3 +4,4 @@ optimum@git+https://github.com/huggingface/optimum.git@ce533cf1a9e144d4040581947
 onnx==1.17.0
 tqdm==4.67.1
 onnxslim==0.1.48
+onnx-graphsurgeon==0.5.5
