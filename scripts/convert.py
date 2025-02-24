@@ -446,7 +446,9 @@ def main():
 
         generation_config = GenerationConfig.from_pretrained(
             model_id, **from_pretrained_kwargs)
-        generation_config.alignment_heads = get_alignment_heads(config)
+        alignment_heads = get_alignment_heads(config)
+        if alignment_heads:
+            generation_config.alignment_heads = alignment_heads
         generation_config.save_pretrained(output_model_folder)
 
 
