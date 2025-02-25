@@ -20,9 +20,11 @@ import {
 
 import { TensorOpRegistry } from '../ops/registry.js';
 
-const DataTypeMap = Object.freeze({
+export const DataTypeMap = Object.freeze({
     float32: Float32Array,
-    float16: Uint16Array,
+    // @ts-expect-error ts(2552) Limited availability of Float16Array across browsers:
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Float16Array
+    float16: typeof Float16Array !== "undefined" ? Float16Array: Uint16Array,
     float64: Float64Array,
     string: Array, // string[]
     int8: Int8Array,
