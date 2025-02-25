@@ -108,6 +108,7 @@ import {
     stack,
     std_mean,
     Tensor,
+    DataTypeMap,
 } from './utils/tensor.js';
 import { RawImage } from './utils/image.js';
 
@@ -1847,7 +1848,7 @@ export class PreTrainedModel extends Callable {
         } else {
             const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
             const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-            const empty = (dtype === 'float16') ? new Uint16Array() : [];
+            const empty = (dtype === 'float16') ? new DataTypeMap.float16() : [];
 
             const batch_size = (decoderFeeds[this.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
             const shapes = getKeyValueShapes(this.config, { batch_size });

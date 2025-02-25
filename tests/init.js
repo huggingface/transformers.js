@@ -22,7 +22,7 @@ export function init() {
   let registerBackend = ONNX_COMMON.registerBackend;
 
   // Define the constructors to monkey-patch
-  const TYPED_ARRAYS_CONSTRUCTOR_NAMES = ["Int8Array", "Int16Array", "Int32Array", "BigInt64Array", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "BigUint64Array", "Float32Array", "Float64Array"];
+  const TYPED_ARRAYS_CONSTRUCTOR_NAMES = ["Int8Array", "Int16Array", "Int32Array", "BigInt64Array", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "BigUint64Array", "Float16Array", "Float32Array", "Float64Array"];
 
   // Keep a reference to the original initialization method
   const originalMethod = onnxruntimeBackend.init;
@@ -36,6 +36,7 @@ export function init() {
     for (const ctorName of TYPED_ARRAYS_CONSTRUCTOR_NAMES) {
       // Get the constructor from the current context
       const ctor = globalThis[ctorName];
+      if (ctor === undefined) continue; // If unavailable, skip the patching
 
       // Get the corresponding test function from the `util` module
       const value = types[`is${ctorName}`].bind(types);
