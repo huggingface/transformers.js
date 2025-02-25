@@ -132,6 +132,7 @@ const MODEL_TYPES = {
     Musicgen: 7,
     MultiModality: 8,
     Phi3V: 9,
+    AudioTextToText: 10,
 }
 //////////////////////////////////////////////////
 
@@ -548,7 +549,7 @@ async function encoderForward(self, model_inputs) {
         const dims = encoderFeeds.pixel_values.dims;
         encoderFeeds.pixel_mask = ones([dims[0], dims[2], dims[3]]);
     }
-    
+
     return await sessionRun(session, encoderFeeds);
 }
 
@@ -586,6 +587,38 @@ async function decoderForward(self, model_inputs, is_encoder_decoder = false) {
 
 
 
+function default_merge_input_ids_with_features({
+    modality_token_id,
+    inputs_embeds,
+    modality_features,
+    input_ids,
+    attention_mask,
+}) {
+    const token_positions = input_ids.tolist().map(ids =>
+        ids.reduce((acc, x, idx) => {
+            if (x == modality_token_id) acc.push(idx);
+            return acc;
+        }, [])
+    );
+    const n_tokens = token_positions.reduce((acc, x) => acc + x.length, 0);
+    const n_features = modality_features.dims[0];
+    if (n_tokens !== n_features) {
+        throw new Error(`Number of tokens and features do not match: tokens: ${n_tokens}, features ${n_features}`);
+    }
+
+    // Equivalent to performing a masked_scatter
+    let img = 0;
+    for (let i = 0; i < token_positions.length; ++i) {
+        const tokens = token_positions[i];
+        const embeds = inputs_embeds[i];
+        for (let j = 0; j < tokens.length; ++j) {
+            embeds[tokens[j]].data.set(modality_features[img++].data)
+        }
+    }
+    return { inputs_embeds, attention_mask }
+}
+
+
 function default_merge_input_ids_with_image_features({
     image_token_id,
     inputs_embeds,
@@ -593,51 +626,59 @@ function default_merge_input_ids_with_image_features({
     input_ids,
     attention_mask,
 }) {
-    const image_tokens = input_ids.tolist().map(ids =>
-        ids.reduce((acc, x, idx) => {
-            if (x == image_token_id) acc.push(idx);
-            return acc;
-        }, [])
-    );
-    const n_image_tokens = image_tokens.reduce((acc, x) => acc + x.length, 0);
-    const n_image_features = image_features.dims[0];
-    if (n_image_tokens !== n_image_features) {
-        throw new Error(`Image features and image tokens do not match: tokens: ${n_image_tokens}, features ${n_image_features}`);
-    }
-
-    // Equivalent to performing a masked_scatter
-    let img = 0;
-    for (let i = 0; i < image_tokens.length; ++i) {
-        const tokens = image_tokens[i];
-        const embeds = inputs_embeds[i];
-        for (let j = 0; j < tokens.length; ++j) {
-            embeds[tokens[j]].data.set(image_features[img++].data)
-        }
-    }
-    return { inputs_embeds, attention_mask }
+    return default_merge_input_ids_with_features({
+        modality_token_id: image_token_id,
+        inputs_embeds,
+        modality_features: image_features,
+        input_ids,
+        attention_mask,
+    })
 }
 
+function default_merge_input_ids_with_audio_features({
+    audio_token_id,
+    inputs_embeds,
+    audio_features,
+    input_ids,
+    attention_mask,
+}) {
+    return default_merge_input_ids_with_features({
+        modality_token_id: audio_token_id,
+        inputs_embeds,
+        modality_features: audio_features,
+        input_ids,
+        attention_mask,
+    })
+}
 
 /**
- * Forward pass of an image-text-to-text model.
- * @param {Object} self The image-text-to-text model model.
- * @param {Object} model_inputs The input data to be used for the forward pass.
- * @param {Tensor} [model_inputs.input_ids=null]
- * @param {Tensor} [model_inputs.attention_mask=null]
- * @param {Tensor} [model_inputs.pixel_values=null]
- * @param {Tensor} [model_inputs.position_ids=null]
- * @param {Tensor} [model_inputs.inputs_embeds=null]
- * @param {Tensor} [model_inputs.past_key_values=null]
- * @param {Object} [model_inputs.generation_config=null]
- * @param {Object} [model_inputs.logits_processor=null]
+ * Abstract forward pass function for image-text-to-text or audio-text-to-text models.
+ * @param {Object} self The model object.
+ * @param {Object} params Additional parameters.
+ * @param {Function} [params.encode_function] The function to encode the modality values.
+ * @param {Function} [params.merge_function] The function to merge the modality features with the input embeddings.
+ * @param {string} [params.modality_input_name] The modality input name.
+ * @param {string} [params.modality_output_name] The modality output name.
+ * @param {Tensor} [params.input_ids=null]
+ * @param {Tensor} [params.attention_mask=null]
+ * @param {Tensor} [params.position_ids=null]
+ * @param {Tensor} [params.inputs_embeds=null]
+ * @param {Tensor} [params.past_key_values=null]
+ * @param {Object} [params.generation_config=null]
+ * @param {Object} [params.logits_processor=null]
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
-async function imageTextToTextForward(self, {
+async function genericTextToTextForward(self, {
+    // Generic parameters:
+    encode_function,
+    merge_function,
+    modality_input_name,
+    modality_output_name,
+
     // Produced by the tokenizer/processor:
     input_ids = null,
     attention_mask = null,
-    pixel_values = null,
 
     // Used during generation:
     position_ids = null,
@@ -648,27 +689,31 @@ async function imageTextToTextForward(self, {
     generation_config = null,
     logits_processor = null,
 
-    // TODO: needed?
+    // Additional parameters
     ...kwargs
 }) {
-
+    const modality_values = kwargs[modality_input_name];
     if (!inputs_embeds) {
-        // 1. Extract the input embeddings
+        // 1. Extract the text embeddings.
         inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
 
-        // 2. Possibly, merge text and images
-        if (pixel_values && input_ids.dims[1] !== 1) {
-            const image_features = await self.encode_image({ pixel_values, ...kwargs });
-
-            ({ inputs_embeds, attention_mask } = self._merge_input_ids_with_image_features({
-                image_features,
+        // 2. Possibly, merge text and modality values
+        if (modality_values && input_ids.dims[1] !== 1) {
+            const modality_features = await encode_function({
+                // Pass the modality values under its expected key.
+                // The caller knows whether this is audio or image.
+                [modality_input_name]: modality_values,
+                ...kwargs
+            });
+            ({ inputs_embeds, attention_mask } = merge_function({
+                [modality_output_name]: modality_features,
                 inputs_embeds,
                 input_ids,
                 attention_mask,
             }));
 
-        } else if (past_key_values && pixel_values && input_ids.dims[1] === 1) {
-            // This is the case when we are generating with cache
+        } else if (past_key_values && modality_values && input_ids.dims[1] === 1) {
+            // This branch handles the cache case.
             const target_length = input_ids.dims[1]; // always 1
             const past_length = Object.values(past_key_values)[0].dims.at(-2);
 
@@ -689,6 +734,7 @@ async function imageTextToTextForward(self, {
         }
     }
 
+    // 3. Call the decoder forward using the updated inputs.
     const outputs = await decoderForward(self, {
         inputs_embeds,
         past_key_values,
@@ -698,6 +744,40 @@ async function imageTextToTextForward(self, {
         logits_processor,
     }, true);
     return outputs;
+}
+
+/**
+ * Forward pass of an audio-text-to-text model.
+ * @param {Object} self The audio-text-to-text model.
+ * @param {Object} params The inputs for the audio-text-to-text forward pass.
+ * @returns {Promise<Tensor>} The model's output tensor.
+ * @private
+ */
+async function audioTextToTextForward(self, params) {
+    return await genericTextToTextForward(self, {
+        ...params,
+        modality_input_name: 'audio_values',
+        modality_output_name: 'audio_features',
+        encode_function: self.encode_audio.bind(self),
+        merge_function: self._merge_input_ids_with_audio_features.bind(self),
+    });
+}
+
+/**
+ * Forward pass of an image-text-to-text model.
+ * @param {Object} self The image-text-to-text model.
+ * @param {Object} params The inputs for the image-text-to-text forward pass.
+ * @returns {Promise<Tensor>} The model's output tensor.
+ * @private
+ */
+async function imageTextToTextForward(self, params) {
+    return await genericTextToTextForward(self, {
+        ...params,
+        modality_input_name: 'pixel_values',
+        modality_output_name: 'image_features',
+        encode_function: self.encode_image.bind(self),
+        merge_function: self._merge_input_ids_with_image_features.bind(self),
+    });
 }
 
 /**
@@ -813,7 +893,7 @@ function encoder_decoder_prepare_inputs_for_generation(self, input_ids, model_in
     };
 }
 
-function image_text_to_text_prepare_inputs_for_generation(self, ...args) {
+function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
     if (self.config.is_encoder_decoder) {
         return encoder_decoder_prepare_inputs_for_generation(self, ...args);
     } else {
@@ -917,11 +997,16 @@ export class PreTrainedModel extends Callable {
             case MODEL_TYPES.ImageTextToText:
                 this.can_generate = true;
                 this._forward = imageTextToTextForward;
-                this._prepare_inputs_for_generation = image_text_to_text_prepare_inputs_for_generation;
+                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
+                break;
+            case MODEL_TYPES.AudioTextToText:
+                this.can_generate = true;
+                this._forward = audioTextToTextForward;
+                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
                 break;
             case MODEL_TYPES.Phi3V:
                 this.can_generate = true;
-                this._prepare_inputs_for_generation = image_text_to_text_prepare_inputs_for_generation;
+                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
                 break;
 
             case MODEL_TYPES.MultiModality:
@@ -1052,6 +1137,19 @@ export class PreTrainedModel extends Callable {
             }
             if (config.is_encoder_decoder) {
                 sessions['model'] = 'encoder_model';
+            }
+            info = await Promise.all([
+                constructSessions(pretrained_model_name_or_path, sessions, options),
+                getOptionalConfigs(pretrained_model_name_or_path, {
+                    generation_config: 'generation_config.json',
+                }, options),
+            ]);
+
+        } else if (modelType === MODEL_TYPES.AudioTextToText) {
+            const sessions = {
+                embed_tokens: 'embed_tokens',
+                audio_encoder: 'audio_encoder',
+                decoder_model_merged: 'decoder_model_merged',
             }
             info = await Promise.all([
                 constructSessions(pretrained_model_name_or_path, sessions, options),
@@ -1876,6 +1974,11 @@ export class PreTrainedModel extends Callable {
     async encode_text({ input_ids }) {
         // text_inputs === { input_ids, attention_mask }
         return (await sessionRun(this.sessions['embed_tokens'], { input_ids })).inputs_embeds;
+    }
+
+    async encode_audio({ audio_values }) {
+        // audio_inputs === { audio_values }
+        return (await sessionRun(this.sessions['audio_encoder'], { audio_values })).audio_features;
     }
 }
 
@@ -6963,6 +7066,34 @@ export class PatchTSMixerModel extends PatchTSMixerPreTrainedModel { }
 export class PatchTSMixerForPrediction extends PatchTSMixerPreTrainedModel { }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+export class UltravoxPreTrainedModel extends PreTrainedModel {
+    forward_params = [
+        'input_ids',
+        'attention_mask',
+        'position_ids',
+        'audio_values',
+        'past_key_values',
+    ];
+}
+
+export class UltravoxModel extends UltravoxPreTrainedModel {
+
+    _merge_input_ids_with_audio_features(kwargs) {
+        const audio_hidden_size = kwargs.audio_features.dims.at(-1);
+        const reshaped_audio_features = kwargs.audio_features.view(-1, audio_hidden_size);
+
+        return default_merge_input_ids_with_audio_features({
+            // @ts-ignore
+            audio_token_id: this.config.ignore_index,
+            ...kwargs,
+            audio_features: reshaped_audio_features,
+        })
+    }
+}
+//////////////////////////////////////////////////
+
+
 
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
@@ -7327,6 +7458,11 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['paligemma', ['PaliGemmaForConditionalGeneration', PaliGemmaForConditionalGeneration]],
 ]);
 
+const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
+    ['ultravox', ['UltravoxModel', UltravoxModel]],
+]);
+
+
 const MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
     ['vision-encoder-decoder', ['VisionEncoderDecoderModel', VisionEncoderDecoderModel]],
 ]);
@@ -7470,6 +7606,7 @@ const MODEL_CLASS_TYPE_MAPPING = [
     [MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES, MODEL_TYPES.Vision2Seq],
     [MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES, MODEL_TYPES.ImageTextToText],
+    [MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES, MODEL_TYPES.AudioTextToText],
     [MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
@@ -7759,6 +7896,14 @@ export class AutoModelForPoseEstimation extends PretrainedMixin {
 
 export class AutoModelForImageFeatureExtraction extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES];
+}
+
+export class AutoModelForImageTextToText extends PretrainedMixin {
+    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES];
+}
+
+export class AutoModelForAudioTextToText extends PretrainedMixin {
+    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
 }
 
 //////////////////////////////////////////////////

@@ -39,7 +39,10 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
                 log_mel: 'log10',
 
                 // Custom
-                max_num_frames: this.config.nb_max_frames, // 3000
+                max_num_frames: Math.min(
+                    Math.floor(waveform.length / this.config.hop_length),
+                    this.config.nb_max_frames, // 3000
+                )
             }
         )
 
@@ -58,7 +61,9 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
      * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
      * @returns {Promise<{ input_features: Tensor }>} A Promise resolving to an object containing the extracted input features as a Tensor.
      */
-    async _call(audio) {
+    async _call(audio, {
+        max_length = null,
+    } = {}) {
         validate_audio_inputs(audio, 'WhisperFeatureExtractor');
 
         let waveform;
@@ -71,7 +76,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
             waveform = audio.slice(0, this.config.n_samples);
         } else {
             // pad with zeros
-            waveform = new Float32Array(this.config.n_samples);
+            waveform = new Float32Array(max_length ?? this.config.n_samples);
             waveform.set(audio);
         }
 
