@@ -71,6 +71,7 @@ function getNormalizedConfig(config) {
         case 'llava_onevision':
         case 'idefics3':
         case 'ultravox':
+        case 'smolvlm':
             // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;

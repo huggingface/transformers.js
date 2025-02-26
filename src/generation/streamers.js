@@ -72,9 +72,10 @@ export class TextStreamer extends BaseStreamer {
             throw Error('TextStreamer only supports batch size of 1');
         }
 
-        if (this.skip_prompt && this.next_tokens_are_prompt) {
+        const is_prompt = this.next_tokens_are_prompt;
+        if (is_prompt) {
             this.next_tokens_are_prompt = false;
-            return;
+            if (this.skip_prompt) return;
         }
 
         const tokens = value[0];
@@ -85,7 +86,7 @@ export class TextStreamer extends BaseStreamer {
         const text = this.tokenizer.decode(this.token_cache, this.decode_kwargs);
 
         let printable_text;
-        if (text.endsWith('\n')) {
+        if (is_prompt || text.endsWith('\n')) {
             // After the symbol for a new line, we flush the cache.
             printable_text = text.slice(this.print_len);
             this.token_cache = [];
