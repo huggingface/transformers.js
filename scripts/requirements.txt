@@ -1,9 +1,7 @@
-transformers[torch]==4.46.3
+transformers[torch]==4.48.3
 onnxruntime==1.20.1
-optimum==1.23.3
-onnx==1.16.2
-onnxconverter-common==1.14.0
-tqdm==4.66.6
-onnxslim==0.1.42
---extra-index-url https://pypi.ngc.nvidia.com
-onnx_graphsurgeon==0.5.2
+optimum@git+https://github.com/huggingface/optimum.git@ce533cf1a9e144d4040581947f301dc3f454b279
+onnx==1.17.0
+tqdm==4.67.1
+onnxslim==0.1.48
+onnx-graphsurgeon==0.5.5
