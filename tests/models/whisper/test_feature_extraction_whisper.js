@@ -29,5 +29,39 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it(
+      "max_length (max_length < audio.length < max_num_samples)",
+      async () => {
+        const audio = await load_cached_audio("mlk");
+        const { input_features } = await feature_extractor(audio, { max_length: 5 * 16000 });
+        const { dims, data } = input_features;
+        expect(dims).toEqual([1, 80, 500]);
+        expect(input_features.mean().item()).toBeCloseTo(0.20474646985530853);
+        expect(data[0]).toBeCloseTo(0.33168578147888184);
+        expect(data[1]).toBeCloseTo(0.30986475944519043);
+        expect(data[81]).toBeCloseTo(0.10727238655090332);
+        expect(data[3001]).toBeCloseTo(0.4018087387084961);
+        expect(data.at(-1)).toBeCloseTo(-0.41003990173339844);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "max_length (audio.length < max_length < max_num_samples)",
+      async () => {
+        const audio = await load_cached_audio("mlk");
+        const { input_features } = await feature_extractor(audio, { max_length: 25 * 16000 });
+        const { dims, data } = input_features;
+        expect(dims).toEqual([1, 80, 2500]);
+        expect(input_features.mean().item()).toBeCloseTo(-0.20426231622695923);
+        expect(data[0]).toBeCloseTo(0.33168578147888184);
+        expect(data[1]).toBeCloseTo(0.30986475944519043);
+        expect(data[81]).toBeCloseTo(0.10727238655090332);
+        expect(data[3001]).toBeCloseTo(0.18040966987609863);
+        expect(data.at(-1)).toBeCloseTo(-0.6668410897254944);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 };

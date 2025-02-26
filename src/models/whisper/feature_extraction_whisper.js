@@ -67,16 +67,19 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         validate_audio_inputs(audio, 'WhisperFeatureExtractor');
 
         let waveform;
-        if (audio.length > this.config.n_samples) {
-            console.warn(
-                "Attempting to extract features for audio longer than 30 seconds. " +
-                "If using a pipeline to extract transcript from a long audio clip, " +
-                "remember to specify `chunk_length_s` and/or `stride_length_s`."
-            );
-            waveform = audio.slice(0, this.config.n_samples);
+        const length = max_length ?? this.config.n_samples;
+        if (audio.length > length) {
+            if (audio.length > this.config.n_samples) {
+                console.warn(
+                    "Attempting to extract features for audio longer than 30 seconds. " +
+                    "If using a pipeline to extract transcript from a long audio clip, " +
+                    "remember to specify `chunk_length_s` and/or `stride_length_s`."
+                );
+            }
+            waveform = audio.slice(0, length);
         } else {
             // pad with zeros
-            waveform = new Float32Array(max_length ?? this.config.n_samples);
+            waveform = new Float32Array(length);
             waveform.set(audio);
         }
 
