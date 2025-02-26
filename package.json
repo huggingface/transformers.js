@@ -9,16 +9,16 @@
     "node": {
       "import": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.mjs"
+        "default": "./dist/transformers.node.mjs"
       },
       "require": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.cjs"
+        "default": "./dist/transformers.node.cjs"
       }
     },
     "default": {
       "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.js"
+      "default": "./dist/transformers.web.js"
     }
   },
   "scripts": {
