@@ -1342,7 +1342,7 @@ export const TEST_CONFIG = {
     },
   },
   // NFD normalizer
-  "alexneakameni/language_detection": {
+  "onnx-community/language_detection-ONNX": {
     DEFAULT_EXAMPLE: {
       text: NORMALIZATION_TEST_STRINGS.DEFAULT_EXAMPLE,
       tokens: ["ame", "##lie", "|", "ame", "##lie"],
