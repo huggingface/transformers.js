@@ -995,6 +995,8 @@ class Normalizer extends Callable {
                 return new Replace(config);
             case 'NFC':
                 return new NFC(config);
+            case 'NFD':
+                return new NFD(config);
             case 'NFKC':
                 return new NFKC(config);
             case 'NFKD':
@@ -1053,50 +1055,62 @@ class Replace extends Normalizer {
 }
 
 /**
- * A normalizer that applies Unicode normalization form C (NFC) to the input text.
+ * A normalizer that applies Unicode normalization to the input text.
  * @extends Normalizer
+ * @abstract
  */
-class NFC extends Normalizer {
+class UnicodeNormalizer extends Normalizer {
     /**
-     * Normalize the input text by applying Unicode normalization form C (NFC).
+     * @type {string} The Unicode normalization form to apply.
+     * Should be one of: 'NFC', 'NFD', 'NFKC', or 'NFKD'.
+     */
+    form = undefined;
+
+    /**
+     * Normalize the input text by applying Unicode normalization.
      * @param {string} text The input text to be normalized.
      * @returns {string} The normalized text.
      */
     normalize(text) {
-        text = text.normalize('NFC')
+        text = text.normalize(this.form)
         return text;
     }
 }
 
 /**
- * NFKC Normalizer.
- * @extends Normalizer
+ * A normalizer that applies Unicode normalization form C (NFC) to the input text.
+ * Canonical Decomposition, followed by Canonical Composition.
+ * @extends UnicodeNormalizer
  */
-class NFKC extends Normalizer {
-    /**
-     * Normalize text using NFKC normalization.
-     * @param {string} text The text to be normalized.
-     * @returns {string} The normalized text.
-     */
-    normalize(text) {
-        text = text.normalize('NFKC')
-        return text;
-    }
+class NFC extends UnicodeNormalizer {
+    form = 'NFC';
 }
+
 /**
- * NFKD Normalizer.
- * @extends Normalizer
+ * A normalizer that applies Unicode normalization form D (NFD) to the input text.
+ * Canonical Decomposition.
+ * @extends UnicodeNormalizer
  */
-class NFKD extends Normalizer {
-    /**
-     * Normalize text using NFKD normalization.
-     * @param {string} text The text to be normalized.
-     * @returns {string} The normalized text.
-     */
-    normalize(text) {
-        text = text.normalize('NFKD')
-        return text;
-    }
+class NFD extends UnicodeNormalizer {
+    form = 'NFD';
+}
+
+/**
+ * A normalizer that applies Unicode normalization form KC (NFKC) to the input text.
+ * Compatibility Decomposition, followed by Canonical Composition.
+ * @extends UnicodeNormalizer
+ */
+class NFKC extends UnicodeNormalizer {
+    form = 'NFKC';
+}
+
+/**
+ * A normalizer that applies Unicode normalization form KD (NFKD) to the input text.
+ * Compatibility Decomposition.
+ * @extends UnicodeNormalizer
+ */
+class NFKD extends UnicodeNormalizer {
+    form = 'NFKD';
 }
 
 /**

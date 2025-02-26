@@ -113,3 +113,13 @@ export const M2M_100_TEST_STRINGS = {
   HIDNI_TEXT: "जीवन एक चॉकलेट बॉक्स की तरह है।",
   CHINESE_TEXT: "生活就像一盒巧克力。",
 };
+
+// Test strings adapted from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
+export const NORMALIZATION_TEST_STRINGS = {
+  DEFAULT_EXAMPLE: "\u0041\u006d\u00e9\u006c\u0069\u0065 | \u0041\u006d\u0065\u0301\u006c\u0069\u0065",
+  CANONICAL_EQUIVALENCE_NORMALIZATION: "\u00F1 | \u006E\u0303",
+  COMPATIBILITY_NORMALIZATION: "\uFB00 | \u0066\u0066",
+
+  // Original | NFC | NFD | NFKC | NFKD
+  COMBINED_EXAMPLE: "\u1E9B\u0323 | \u1E9B\u0323 | \u017F\u0323\u0307 | \u1E69 | \u0073\u0323\u0307",
+};
