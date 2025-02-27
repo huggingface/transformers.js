@@ -68,6 +68,7 @@ import {
 import {
     getModelFile,
     getModelJSON,
+    MAX_EXTERNAL_DATA_CHUNKS,
 } from './utils/hub.js';
 
 import {
@@ -268,6 +269,9 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         }
 
         const num_chunks = +external_data_format; // (false=0, true=1, number remains the same)
+        if (num_chunks > MAX_EXTERNAL_DATA_CHUNKS) {
+            throw new Error(`The number of external data chunks (${num_chunks}) exceeds the maximum allowed value (${MAX_EXTERNAL_DATA_CHUNKS}).`);
+        }
         for (let i = 0; i < num_chunks; ++i) {
             const path = `${fileName}${suffix}.onnx_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;

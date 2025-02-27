@@ -16,6 +16,7 @@ import { dispatchCallback } from './core.js';
  * If `true`, the model will be loaded using the external data format.
  * If a number, this many chunks will be loaded using the external data format (of the form: "model.onnx_data[_{chunk_number}]").
  */
+export const MAX_EXTERNAL_DATA_CHUNKS = 100;
 
 /**
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.     
