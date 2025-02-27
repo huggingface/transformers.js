@@ -251,23 +251,31 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
     /** @type {Promise<{path: string, data: Uint8Array}>[]} */
     let externalDataPromises = [];
-    if (use_external_data_format && (
-        use_external_data_format === true ||
-        (
-            typeof use_external_data_format === 'object' &&
-            use_external_data_format.hasOwnProperty(fileName) &&
-            use_external_data_format[fileName] === true
-        )
-    )) {
+    if (use_external_data_format) {
         if (apis.IS_NODE_ENV) {
             throw new Error('External data format is not yet supported in Node.js');
         }
-        const path = `${fileName}${suffix}.onnx_data`;
-        const fullPath = `${options.subfolder ?? ''}/${path}`;
-        externalDataPromises.push(new Promise(async (resolve, reject) => {
-            const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options);
-            resolve({ path, data })
-        }));
+
+        let external_data_format;
+        if (typeof use_external_data_format === 'object') {
+            if (use_external_data_format.hasOwnProperty(fileName)) {
+                external_data_format = use_external_data_format[fileName];
+            } else {
+                external_data_format = false;
+            }
+        } else {
+            external_data_format = use_external_data_format;
+        }
+
+        const num_chunks = +external_data_format; // (false=0, true=1, number remains the same)
+        for (let i = 0; i < num_chunks; ++i) {
+            const path = `${fileName}${suffix}.onnx_data${i === 0 ? '' : '_' + i}`;
+            const fullPath = `${options.subfolder ?? ''}/${path}`;
+            externalDataPromises.push(new Promise(async (resolve, reject) => {
+                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options);
+                resolve({ path, data })
+            }));
+        }
 
     } else if (session_options.externalData !== undefined) {
         externalDataPromises = session_options.externalData.map(async (ext) => {
