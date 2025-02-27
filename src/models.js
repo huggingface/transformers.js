@@ -1071,6 +1071,7 @@ export class PreTrainedModel extends Callable {
         dtype = null,
         use_external_data_format = null,
         session_options = {},
+        request_options = {}
     } = {}) {
 
         let options = {
@@ -1085,6 +1086,7 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            request_options
         }
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -7138,6 +7140,7 @@ export class PretrainedMixin {
         dtype = null,
         use_external_data_format = null,
         session_options = {},
+        request_options = {}
     } = {}) {
 
         const options = {
@@ -7152,6 +7155,7 @@ export class PretrainedMixin {
             dtype,
             use_external_data_format,
             session_options,
+            request_options,
         }
         options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
