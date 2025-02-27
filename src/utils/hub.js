@@ -410,8 +410,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const revision = options.revision ?? 'main';
 
     let requestURL = pathJoin(path_or_repo_id, filename);
-    let localPath = pathJoin(env.localModelPath, requestURL);
+    let cachePath = pathJoin(env.localModelPath, requestURL);
 
+    let localPath = requestURL;
     let remoteURL = pathJoin(
         env.remoteHost,
         env.remotePathTemplate
@@ -440,7 +441,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         //  1. We first try to get from cache using the local path. In some environments (like deno),
         //     non-URL cache keys are not allowed. In these cases, `response` will be undefined.
         //  2. If no response is found, we try to get from cache using the remote URL or file system cache.
-        response = await tryCache(cache, localPath, proposedCacheKey);
+        response = await tryCache(cache, cachePath, proposedCacheKey);
     }
 
     const cacheHit = response !== undefined;
@@ -462,9 +463,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                     console.warn(`Unable to load from local path "${localPath}": "${e}"`);
                 }
             } else if (options.local_files_only) {
-                throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
+                throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${localPath}.`);
             } else if (!env.allowRemoteModels) {
-                throw new Error(`\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${requestURL}.`);
+                throw new Error(`\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${localPath}.`);
             }
         }
 
