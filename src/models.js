@@ -67,6 +67,7 @@ import {
 
 import {
     getModelFile,
+    getModelPath,
     getModelJSON,
 } from './utils/hub.js';
 
@@ -120,6 +121,7 @@ import { apis } from './env.js';
 import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 import { whisper_language_to_code } from './models/whisper/common_whisper.js';
 
+
 //////////////////////////////////////////////////
 // Model types: used internally
 const MODEL_TYPES = {
@@ -152,7 +154,7 @@ const MODEL_CLASS_TO_NAME_MAPPING = new Map();
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
- * @returns {Promise<{buffer: Uint8Array, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
+ * @returns {Promise<{bufferOrPath: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
 async function getSession(pretrained_model_name_or_path, fileName, options) {
@@ -169,7 +171,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        device ?? (apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV ? 'cpu' : 'wasm')
     );
     const executionProviders = deviceToExecutionProviders(selectedDevice);
 
@@ -245,66 +247,110 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const bufferPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options);
+    let bufferOrPath;
 
-    // handle onnx external data files
-    const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
-    /** @type {Promise<{path: string, data: Uint8Array}>[]} */
-    let externalDataPromises = [];
-    if (use_external_data_format && (
-        use_external_data_format === true ||
-        (
-            typeof use_external_data_format === 'object' &&
-            use_external_data_format.hasOwnProperty(fileName) &&
-            use_external_data_format[fileName] === true
-        )
-    )) {
-        if (apis.IS_NODE_ENV) {
-            throw new Error('External data format is not yet supported in Node.js');
-        }
-        const path = `${fileName}${suffix}.onnx_data`;
-        const fullPath = `${options.subfolder ?? ''}/${path}`;
-        externalDataPromises.push(new Promise(async (resolve, reject) => {
-            const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options);
-            resolve({ path, data })
-        }));
+    if (apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV) {
 
-    } else if (session_options.externalData !== undefined) {
-        externalDataPromises = session_options.externalData.map(async (ext) => {
-            // if the external data is a string, fetch the file and replace the string with its content
-            // @ts-expect-error TS2339
-            if (typeof ext.data === "string") {
+        const pathPromise = getModelPath(pretrained_model_name_or_path, modelFileName, true, options);
+
+        // handle onnx external data files
+        const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
+        /** @type {Promise<{path: string, data: string}>[]} */
+        let externalDataPromises = [];
+        if (use_external_data_format && (
+            use_external_data_format === true ||
+            (
+                typeof use_external_data_format === 'object' &&
+                use_external_data_format.hasOwnProperty(fileName) &&
+                use_external_data_format[fileName] === true
+            )
+        )) {
+            const path = `${fileName}${suffix}.onnx_data`;
+            const fullPath = `${options.subfolder ?? ''}/${path}`;
+            externalDataPromises.push(new Promise(async (resolve, reject) => {
+                const data = await getModelPath(pretrained_model_name_or_path, fullPath, true, options);
+                resolve({ path, data })
+            }));
+
+        } else if (session_options.externalData !== undefined) {
+            externalDataPromises = session_options.externalData.map(async (ext) => {
+                // if the external data is a string, fetch the file and replace the string with its content
                 // @ts-expect-error TS2339
-                const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
-                // @ts-expect-error TS2698
-                return { ...ext, data: ext_buffer };
-            }
-            return ext;
-        });
-    }
-
-    if (externalDataPromises.length > 0) {
-        session_options.externalData = await Promise.all(externalDataPromises);
-    }
-
-    if (selectedDevice === 'webgpu') {
-        const shapes = getKeyValueShapes(options.config, {
-            prefix: 'present',
-        });
-        if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
-            // Only set preferredOutputLocation if shapes are present and we aren't proxying ONNX
-            /** @type {Record<string, import('onnxruntime-common').Tensor.DataLocation>} */
-            const preferredOutputLocation = {};
-            for (const key in shapes) {
-                preferredOutputLocation[key] = 'gpu-buffer';
-            }
-            session_options.preferredOutputLocation = preferredOutputLocation;
+                if (typeof ext.data === "string") {
+                    // @ts-expect-error TS2339
+                    const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
+                    // @ts-expect-error TS2698
+                    return { ...ext, data: ext_buffer };
+                }
+                return ext;
+            });
         }
+
+        if (externalDataPromises.length > 0) {
+            session_options.externalData = await Promise.all(externalDataPromises);
+        }
+
+        bufferOrPath = await pathPromise;
+    } else {
+
+        const bufferPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options);
+
+        // handle onnx external data files
+        const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
+        /** @type {Promise<{path: string, data: Uint8Array}>[]} */
+        let externalDataPromises = [];
+        if (use_external_data_format && (
+            use_external_data_format === true ||
+            (
+                typeof use_external_data_format === 'object' &&
+                use_external_data_format.hasOwnProperty(fileName) &&
+                use_external_data_format[fileName] === true
+            )
+        )) {
+            const path = `${fileName}${suffix}.onnx_data`;
+            const fullPath = `${options.subfolder ?? ''}/${path}`;
+            externalDataPromises.push(new Promise(async (resolve, reject) => {
+                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options);
+                resolve({ path, data })
+            }));
+
+        } else if (session_options.externalData !== undefined) {
+            externalDataPromises = session_options.externalData.map(async (ext) => {
+                // if the external data is a string, fetch the file and replace the string with its content
+                // @ts-expect-error TS2339
+                if (typeof ext.data === "string") {
+                    // @ts-expect-error TS2339
+                    const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
+                    // @ts-expect-error TS2698
+                    return { ...ext, data: ext_buffer };
+                }
+                return ext;
+            });
+        }
+
+        if (externalDataPromises.length > 0) {
+            session_options.externalData = await Promise.all(externalDataPromises);
+        }
+
+        if (selectedDevice === 'webgpu') {
+            const shapes = getKeyValueShapes(options.config, {
+                prefix: 'present',
+            });
+            if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
+                // Only set preferredOutputLocation if shapes are present and we aren't proxying ONNX
+                /** @type {Record<string, import('onnxruntime-common').Tensor.DataLocation>} */
+                const preferredOutputLocation = {};
+                for (const key in shapes) {
+                    preferredOutputLocation[key] = 'gpu-buffer';
+                }
+                session_options.preferredOutputLocation = preferredOutputLocation;
+            }
+        }
+
+        bufferOrPath = await bufferPromise;
     }
 
-    const buffer = await bufferPromise;
-
-    return { buffer, session_options, session_config };
+    return { bufferOrPath, session_options, session_config };
 }
 
 /**
@@ -319,8 +365,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 async function constructSessions(pretrained_model_name_or_path, names, options) {
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
-            const { buffer, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
-            const session = await createInferenceSession(buffer, session_options, session_config);
+            const { bufferOrPath, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
+            const session = await createInferenceSession(bufferOrPath, session_options, session_config);
             return [name, session];
         })
     ));
