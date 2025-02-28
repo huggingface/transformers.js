@@ -153,7 +153,7 @@ const MODEL_CLASS_TO_NAME_MAPPING = new Map();
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
- * @returns {Promise<{buffer: Uint8Array, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
+ * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
 async function getSession(pretrained_model_name_or_path, fileName, options) {
@@ -246,17 +246,13 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const bufferPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options);
+    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, apis.IS_NODE_ENV);
 
     // handle onnx external data files
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
     /** @type {Promise<{path: string, data: Uint8Array}>[]} */
     let externalDataPromises = [];
     if (use_external_data_format) {
-        if (apis.IS_NODE_ENV) {
-            throw new Error('External data format is not yet supported in Node.js');
-        }
-
         let external_data_format;
         if (typeof use_external_data_format === 'object') {
             if (use_external_data_format.hasOwnProperty(fileName)) {
@@ -296,7 +292,11 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     }
 
     if (externalDataPromises.length > 0) {
-        session_options.externalData = await Promise.all(externalDataPromises);
+        const externalData = await Promise.all(externalDataPromises);
+        if (!apis.IS_NODE_ENV) {
+            session_options.externalData = externalData;
+        }
+        console.log('externalData ready')
     }
 
     if (selectedDevice === 'webgpu') {
@@ -314,9 +314,9 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         }
     }
 
-    const buffer = await bufferPromise;
+    let buffer_or_path = await bufferOrPathPromise;
 
-    return { buffer, session_options, session_config };
+    return { buffer_or_path, session_options, session_config };
 }
 
 /**
@@ -331,8 +331,9 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 async function constructSessions(pretrained_model_name_or_path, names, options) {
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
-            const { buffer, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
-            const session = await createInferenceSession(buffer, session_options, session_config);
+            const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
+            console.log( { buffer_or_path, session_options, session_config } )
+            const session = await createInferenceSession(buffer_or_path, session_options, session_config);
             return [name, session];
         })
     ));

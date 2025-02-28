@@ -64,7 +64,7 @@ class FileResponse {
 
     /**
      * Creates a new `FileResponse` object.
-     * @param {string|URL} filePath
+     * @param {string} filePath
      */
     constructor(filePath) {
         this.filePath = filePath;
@@ -332,21 +332,21 @@ async function tryCache(cache, ...names) {
 }
 
 /**
- * 
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
  * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
- * 
+ *
  * @param {string} path_or_repo_id This can be either:
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to locate in `path_or_repo`.
  * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
- * 
+ * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
+ *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<Uint8Array>} A Promise that resolves with the file content as a buffer.
+ * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
-export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}) {
+export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
 
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
@@ -566,14 +566,25 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 // Rather, log a warning and proceed with execution.
                 console.warn(`Unable to add response to browser cache: ${err}.`);
             });
-
     }
-
     dispatchCallback(options.progress_callback, {
         status: 'done',
         name: path_or_repo_id,
         file: filename
     });
+
+    if (return_path) {
+        if (response instanceof FileResponse) {
+            return response.filePath;
+        } else {
+            const path = await cache.match(cacheKey);
+            if (path instanceof FileResponse) {
+                return path.filePath;
+            } else {
+                throw new Error("Unable to return path for response.");
+            }
+        }
+    }
 
     return buffer;
 }
@@ -589,14 +600,14 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
  * @throws Will throw an error if the file is not found and `fatal` is true.
  */
 export async function getModelJSON(modelPath, fileName, fatal = true, options = {}) {
-    let buffer = await getModelFile(modelPath, fileName, fatal, options);
+    let buffer = await getModelFile(modelPath, fileName, fatal, options, false);
     if (buffer === null) {
         // Return empty object
         return {}
     }
 
     let decoder = new TextDecoder('utf-8');
-    let jsonData = decoder.decode(buffer);
+    let jsonData = decoder.decode(/** @type {Uint8Array} */(buffer));
 
     return JSON.parse(jsonData);
 }

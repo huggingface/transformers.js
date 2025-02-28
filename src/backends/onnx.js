@@ -141,19 +141,19 @@ let wasmInitPromise = null;
 
 /**
  * Create an ONNX inference session.
- * @param {Uint8Array} buffer The ONNX model buffer.
+ * @param {Uint8Array|string} buffer_or_path The ONNX model buffer or path.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
-export async function createInferenceSession(buffer, session_options, session_config) {
+export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     if (wasmInitPromise) {
         // A previous session has already initialized the WASM runtime
         // so we wait for it to resolve before creating this new session.
         await wasmInitPromise;
     }
 
-    const sessionPromise = InferenceSession.create(buffer, session_options);
+    const sessionPromise = InferenceSession.create(buffer_or_path, session_options);
     wasmInitPromise ??= sessionPromise;
     const session = await sessionPromise;
     session.config = session_config;
