@@ -197,7 +197,7 @@ function isValidUrl(string, protocols = null, validHosts = null) {
 export async function getFile(urlOrPath) {
 
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
-        return new FileResponse(urlOrPath);
+        return new FileResponse(urlOrPath.toString());
 
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;

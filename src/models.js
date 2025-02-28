@@ -272,7 +272,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             const path = `${fileName}${suffix}.onnx_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(new Promise(async (resolve, reject) => {
-                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options);
+                const data = /** @type {Uint8Array} */ (await getModelFile(pretrained_model_name_or_path, fullPath, true, options, false));
                 resolve({ path, data })
             }));
         }
