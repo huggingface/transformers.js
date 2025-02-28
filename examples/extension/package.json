@@ -15,6 +15,6 @@
     "webpack": "^5.79.0"
   },
   "dependencies": {
-    "@xenova/transformers": "^2.0.0"
+    "@huggingface/transformers": "^3.4.0"
   }
 }

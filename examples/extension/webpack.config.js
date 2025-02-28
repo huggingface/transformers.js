@@ -11,7 +11,10 @@ const config = {
     mode: 'development',
     devtool: 'inline-source-map',
     entry: {
-        background: './src/background.js',
+        background: {
+            import: './src/background.js',
+            chunkLoading: `import-scripts`,
+        },
         popup: './src/popup.js',
         content: './src/content.js',
     },
