@@ -228,7 +228,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // Construct the model file name
     const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype];
-    const modelFileName = `${options.subfolder ?? ''}/${fileName}${suffix}.onnx`;
+    const baseName = `${fileName}${suffix}.onnx`;
+    const modelFileName = `${options.subfolder ?? ''}/${baseName}`;
 
     const session_options = { ...options.session_options };
 
@@ -255,7 +256,9 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     if (use_external_data_format) {
         let external_data_format;
         if (typeof use_external_data_format === 'object') {
-            if (use_external_data_format.hasOwnProperty(fileName)) {
+            if (use_external_data_format.hasOwnProperty(baseName)) {
+                external_data_format = use_external_data_format[baseName];
+            } else if (use_external_data_format.hasOwnProperty(fileName)) {
                 external_data_format = use_external_data_format[fileName];
             } else {
                 external_data_format = false;
@@ -269,7 +272,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             throw new Error(`The number of external data chunks (${num_chunks}) exceeds the maximum allowed value (${MAX_EXTERNAL_DATA_CHUNKS}).`);
         }
         for (let i = 0; i < num_chunks; ++i) {
-            const path = `${fileName}${suffix}.onnx_data${i === 0 ? '' : '_' + i}`;
+            const path = `${baseName}_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(new Promise(async (resolve, reject) => {
                 const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
@@ -313,7 +316,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         }
     }
 
-    let buffer_or_path = await bufferOrPathPromise;
+    const buffer_or_path = await bufferOrPathPromise;
 
     return { buffer_or_path, session_options, session_config };
 }
