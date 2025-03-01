@@ -296,7 +296,6 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         if (!apis.IS_NODE_ENV) {
             session_options.externalData = externalData;
         }
-        console.log('externalData ready')
     }
 
     if (selectedDevice === 'webgpu') {
@@ -332,7 +331,6 @@ async function constructSessions(pretrained_model_name_or_path, names, options) 
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
             const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
-            console.log( { buffer_or_path, session_options, session_config } )
             const session = await createInferenceSession(buffer_or_path, session_options, session_config);
             return [name, session];
         })
