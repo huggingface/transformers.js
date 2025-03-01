@@ -3300,7 +3300,7 @@ export async function pipeline(
         device = null,
         dtype = null,
         subfolder = 'onnx',
-        use_external_data_format = false,
+        use_external_data_format = null,
         model_file_name = null,
         session_options = {},
     } = {}
