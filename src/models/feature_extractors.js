@@ -1,5 +1,6 @@
 
 export * from './audio_spectrogram_transformer/feature_extraction_audio_spectrogram_transformer.js';
+export * from './encodec/feature_extraction_encodec.js';
 export * from './clap/feature_extraction_clap.js';
 export * from './moonshine/feature_extraction_moonshine.js';
 export * from './pyannote/feature_extraction_pyannote.js';

@@ -134,6 +134,7 @@ const MODEL_TYPES = {
     MultiModality: 8,
     Phi3V: 9,
     AudioTextToText: 10,
+    AutoEncoder: 11,
 }
 //////////////////////////////////////////////////
 
@@ -552,6 +553,12 @@ async function encoderForward(self, model_inputs) {
     }
 
     return await sessionRun(session, encoderFeeds);
+}
+
+async function autoEncoderForward(self, model_inputs) {
+    const encoded = await self.encode(model_inputs);
+    const decoded = await self.decode(encoded);
+    return decoded;
 }
 
 /**
@@ -1009,12 +1016,13 @@ export class PreTrainedModel extends Callable {
                 this.can_generate = true;
                 this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
                 break;
-
             case MODEL_TYPES.MultiModality:
                 this.can_generate = true;
                 this._prepare_inputs_for_generation = multimodality_prepare_inputs_for_generation;
                 break;
-
+            case MODEL_TYPES.AutoEncoder:
+                this._forward = autoEncoderForward;
+                break;
             default:
                 // should be MODEL_TYPES.EncoderOnly
                 this._forward = encoderForward;
@@ -1197,7 +1205,13 @@ export class PreTrainedModel extends Callable {
                     generation_config: 'generation_config.json',
                 }, options),
             ]);
-
+        } else if (modelType === MODEL_TYPES.AutoEncoder) {
+            info = await Promise.all([
+                constructSessions(pretrained_model_name_or_path, {
+                    encoder_model: 'encoder_model',
+                    decoder_model: 'decoder_model',
+                }, options),
+            ]);
         } else { // should be MODEL_TYPES.EncoderOnly
             if (modelType !== MODEL_TYPES.EncoderOnly) {
                 const type = modelName ?? config?.model_type;
@@ -7101,7 +7115,77 @@ export class UltravoxModel extends UltravoxPreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+export class MimiPreTrainedModel extends PreTrainedModel {
+    main_input_name = 'input_values';
+    forward_params = ['input_values'];
+}
 
+export class MimiEncoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
+     */
+    constructor({ audio_codes }) {
+        super();
+        this.audio_codes = audio_codes;
+    }
+}
+
+export class MimiDecoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
+     */
+    constructor({ audio_values }) {
+        super();
+        this.audio_values = audio_values;
+    }
+}
+
+/**
+ * The Mimi neural audio codec model.
+ */
+export class MimiModel extends MimiPreTrainedModel {
+    /**
+     * Encodes the input audio waveform into discrete codes.
+     * @param {Object} inputs Model inputs
+     * @param {Tensor} [inputs.input_values] Float values of the input audio waveform, of shape `(batch_size, channels, sequence_length)`).
+     * @returns {Promise<MimiEncoderOutput>} The output tensor of shape `(batch_size, num_codebooks, sequence_length)`.
+     */
+    async encode(inputs) {
+        return new MimiEncoderOutput(await sessionRun(this.sessions['encoder_model'], inputs));
+    }
+
+    /**
+     * Decodes the given frames into an output audio waveform.
+     * @param {MimiEncoderOutput} inputs The encoded audio codes.
+     * @returns {Promise<MimiDecoderOutput>} The output tensor of shape `(batch_size, num_channels, sequence_length)`.
+     */
+    async decode(inputs) {
+        return new MimiDecoderOutput(await sessionRun(this.sessions['decoder_model'], inputs));
+    }
+}
+
+export class MimiEncoderModel extends MimiPreTrainedModel {
+    /** @type {typeof PreTrainedModel.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'encoder_model',
+        });
+    }
+}
+export class MimiDecoderModel extends MimiPreTrainedModel {
+    /** @type {typeof PreTrainedModel.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        return super.from_pretrained(pretrained_model_name_or_path, {
+            ...options,
+            // Update default model file name if not provided
+            model_file_name: options.model_file_name ?? 'decoder_model',
+        });
+    }
+}
 
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
@@ -7272,6 +7356,9 @@ const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
     ['blenderbot-small', ['BlenderbotSmallModel', BlenderbotSmallModel]],
 ]);
 
+const MODEL_MAPPING_NAMES_AUTO_ENCODER = new Map([
+    ['mimi', ['MimiModel', MimiModel]],
+]);
 
 const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['bloom', ['BloomModel', BloomModel]],
@@ -7603,9 +7690,12 @@ const MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES = new Map([
 ])
 
 const MODEL_CLASS_TYPE_MAPPING = [
+    // MODEL_MAPPING_NAMES:
     [MODEL_MAPPING_NAMES_ENCODER_ONLY, MODEL_TYPES.EncoderOnly],
     [MODEL_MAPPING_NAMES_ENCODER_DECODER, MODEL_TYPES.EncoderDecoder],
     [MODEL_MAPPING_NAMES_DECODER_ONLY, MODEL_TYPES.DecoderOnly],
+    [MODEL_MAPPING_NAMES_AUTO_ENCODER, MODEL_TYPES.AutoEncoder],
+
     [MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES, MODEL_TYPES.Seq2Seq],
