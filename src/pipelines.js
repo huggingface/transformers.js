@@ -3300,6 +3300,7 @@ export async function pipeline(
         device = null,
         dtype = null,
         model_file_name = null,
+        use_external_data_format,
         session_options = {},
     } = {}
 ) {
@@ -3330,6 +3331,7 @@ export async function pipeline(
         device,
         dtype,
         model_file_name,
+        use_external_data_format,
         session_options,
     }
 
