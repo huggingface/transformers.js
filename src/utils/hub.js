@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { env } from '../env.js';
+import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
 
 /**
@@ -288,29 +288,61 @@ class FileCache {
     /**
      * Adds the given response to the cache.
      * @param {string} request 
-     * @param {Response|FileResponse} response 
+     * @param {Response} response 
+     * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
+     * The function to call with progress updates
      * @returns {Promise<void>}
      */
-    async put(request, response) {
-        const buffer = Buffer.from(await response.arrayBuffer());
-
-        let outputPath = path.join(this.path, request);
+    async put(request, response, progress_callback = undefined) {
+        let filePath = path.join(this.path, request);
 
         try {
-            await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
-            await fs.promises.writeFile(outputPath, buffer);
+            const contentLength = response.headers.get('Content-Length');
+            const total = parseInt(contentLength ?? '0');
+            let loaded = 0;
 
-        } catch (err) {
-            console.warn('An error occurred while writing the file to cache:', err)
+            await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+            const fileStream = fs.createWriteStream(filePath);
+            const reader = response.body.getReader();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                await new Promise((resolve, reject) => {
+                    fileStream.write(value, (err) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+                        resolve();
+                    });
+                });
+
+                loaded += value.length;
+                const progress = total ? (loaded / total) * 100 : 0;
+
+                progress_callback?.({ progress, loaded, total });
+            }
+
+            fileStream.close();
+        } catch (error) {
+            // Clean up the file if an error occurred during download
+            try {
+                await fs.promises.unlink(filePath);
+            } catch { }
+            throw error;
         }
-    }
 
-    // TODO add the rest?
-    // addAll(requests: RequestInfo[]): Promise<void>;
-    // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
-    // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
-    // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
-    // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
+        // TODO add the rest?
+        // addAll(requests: RequestInfo[]): Promise<void>;
+        // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
+        // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
+        // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
+        // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
+    }
 }
 
 /**
@@ -512,41 +544,45 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename
     })
 
-    /** @type {Uint8Array} */
-    let buffer;
+    let result;
+    if (!(apis.IS_NODE_ENV && return_path)) {
+        /** @type {Uint8Array} */
+        let buffer;
 
-    if (!options.progress_callback) {
-        // If no progress callback is specified, we can use the `.arrayBuffer()`
-        // method to read the response.
-        buffer = new Uint8Array(await response.arrayBuffer());
+        if (!options.progress_callback) {
+            // If no progress callback is specified, we can use the `.arrayBuffer()`
+            // method to read the response.
+            buffer = new Uint8Array(await response.arrayBuffer());
 
-    } else if (
-        cacheHit // The item is being read from the cache
-        &&
-        typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent) // We are in Firefox
-    ) {
-        // Due to bug in Firefox, we cannot display progress when loading from cache.
-        // Fortunately, since this should be instantaneous, this should not impact users too much.
-        buffer = new Uint8Array(await response.arrayBuffer());
+        } else if (
+            cacheHit // The item is being read from the cache
+            &&
+            typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent) // We are in Firefox
+        ) {
+            // Due to bug in Firefox, we cannot display progress when loading from cache.
+            // Fortunately, since this should be instantaneous, this should not impact users too much.
+            buffer = new Uint8Array(await response.arrayBuffer());
 
-        // For completeness, we still fire the final progress callback
-        dispatchCallback(options.progress_callback, {
-            status: 'progress',
-            name: path_or_repo_id,
-            file: filename,
-            progress: 100,
-            loaded: buffer.length,
-            total: buffer.length,
-        })
-    } else {
-        buffer = await readResponse(response, data => {
+            // For completeness, we still fire the final progress callback
             dispatchCallback(options.progress_callback, {
                 status: 'progress',
                 name: path_or_repo_id,
                 file: filename,
-                ...data,
+                progress: 100,
+                loaded: buffer.length,
+                total: buffer.length,
             })
-        })
+        } else {
+            buffer = await readResponse(response, data => {
+                dispatchCallback(options.progress_callback, {
+                    status: 'progress',
+                    name: path_or_repo_id,
+                    file: filename,
+                    ...data,
+                })
+            })
+        }
+        result = buffer;
     }
 
     if (
@@ -557,15 +593,20 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         // Check again whether request is in cache. If not, we add the response to the cache
         (await cache.match(cacheKey) === undefined)
     ) {
-        // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
-        await cache.put(cacheKey, new Response(buffer, {
-            headers: response.headers
-        }))
-            .catch(err => {
-                // Do not crash if unable to add to cache (e.g., QuotaExceededError).
-                // Rather, log a warning and proceed with execution.
-                console.warn(`Unable to add response to browser cache: ${err}.`);
-            });
+        if (!result) {
+            // We haven't yet read the response body, so we need to do so now.
+            await cache.put(cacheKey, /** @type {Response} */(response), options.progress_callback);
+        } else {
+            // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
+            await cache.put(cacheKey, new Response(result, {
+                headers: response.headers
+            }))
+                .catch(err => {
+                    // Do not crash if unable to add to cache (e.g., QuotaExceededError).
+                    // Rather, log a warning and proceed with execution.
+                    console.warn(`Unable to add response to browser cache: ${err}.`);
+                });
+        }
     }
     dispatchCallback(options.progress_callback, {
         status: 'done',
@@ -573,20 +614,22 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename
     });
 
-    if (return_path) {
-        if (response instanceof FileResponse) {
-            return response.filePath;
-        } else {
-            const path = await cache.match(cacheKey);
-            if (path instanceof FileResponse) {
-                return path.filePath;
-            } else {
-                throw new Error("Unable to return path for response.");
-            }
+    if (result) {
+        if (return_path) {
+            throw new Error("Cannot return path in a browser environment.")
         }
+        return result;
+    }
+    if (response instanceof FileResponse) {
+        return response.filePath;
     }
 
-    return buffer;
+    const path = await cache.match(cacheKey);
+    if (path instanceof FileResponse) {
+        return path.filePath;
+    }
+    throw new Error("Unable to return path for response.");
+
 }
 
 /**

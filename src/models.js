@@ -250,7 +250,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // handle onnx external data files
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
-    /** @type {Promise<{path: string, data: Uint8Array}>[]} */
+    /** @type {Promise<string|{path: string, data: Uint8Array}>[]} */
     let externalDataPromises = [];
     if (use_external_data_format) {
         let external_data_format;
@@ -272,8 +272,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             const path = `${fileName}${suffix}.onnx_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(new Promise(async (resolve, reject) => {
-                const data = /** @type {Uint8Array} */ (await getModelFile(pretrained_model_name_or_path, fullPath, true, options, false));
-                resolve({ path, data })
+                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
+                resolve(data instanceof Uint8Array ? { path, data } : path);
             }));
         }
 
