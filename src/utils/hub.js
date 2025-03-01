@@ -80,13 +80,15 @@ class FileResponse {
 
             this.updateContentType();
 
-            let self = this;
+            const stream = fs.createReadStream(filePath);
             this.body = new ReadableStream({
                 start(controller) {
-                    self.arrayBuffer().then(buffer => {
-                        controller.enqueue(new Uint8Array(buffer));
-                        controller.close();
-                    })
+                    stream.on('data', (chunk) => controller.enqueue(chunk));
+                    stream.on('end', () => controller.close());
+                    stream.on('error', (err) => controller.error(err));
+                },
+                cancel() {
+                    stream.destroy();
                 }
             });
         } else {
