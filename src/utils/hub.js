@@ -645,14 +645,14 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
  * @throws Will throw an error if the file is not found and `fatal` is true.
  */
 export async function getModelJSON(modelPath, fileName, fatal = true, options = {}) {
-    let buffer = await getModelFile(modelPath, fileName, fatal, options, false);
+    const buffer = await getModelFile(modelPath, fileName, fatal, options, false);
     if (buffer === null) {
         // Return empty object
         return {}
     }
 
-    let decoder = new TextDecoder('utf-8');
-    let jsonData = decoder.decode(/** @type {Uint8Array} */(buffer));
+    const decoder = new TextDecoder('utf-8');
+    const jsonData = decoder.decode(/** @type {Uint8Array} */(buffer));
 
     return JSON.parse(jsonData);
 }
@@ -678,30 +678,26 @@ async function readResponse(response, progress_callback) {
         const { done, value } = await reader.read();
         if (done) return;
 
-        let newLoaded = loaded + value.length;
+        const newLoaded = loaded + value.length;
         if (newLoaded > total) {
             total = newLoaded;
 
             // Adding the new data will overflow buffer.
             // In this case, we extend the buffer
-            let newBuffer = new Uint8Array(total);
+            const newBuffer = new Uint8Array(total);
 
             // copy contents
             newBuffer.set(buffer);
 
             buffer = newBuffer;
         }
-        buffer.set(value, loaded)
+        buffer.set(value, loaded);
         loaded = newLoaded;
 
         const progress = (loaded / total) * 100;
 
         // Call your function here
-        progress_callback({
-            progress: progress,
-            loaded: loaded,
-            total: total,
-        })
+        progress_callback({ progress, loaded, total });
 
         return read();
     }
