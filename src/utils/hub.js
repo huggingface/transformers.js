@@ -337,14 +337,14 @@ class FileCache {
             } catch { }
             throw error;
         }
-
-        // TODO add the rest?
-        // addAll(requests: RequestInfo[]): Promise<void>;
-        // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
-        // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
-        // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
-        // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
     }
+
+    // TODO add the rest?
+    // addAll(requests: RequestInfo[]): Promise<void>;
+    // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
+    // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
+    // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
+    // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
 }
 
 /**
