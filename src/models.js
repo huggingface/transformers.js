@@ -7831,6 +7831,11 @@ const CUSTOM_MAPPING = [
     ['JinaCLIPTextModel', JinaCLIPTextModel, MODEL_TYPES.EncoderOnly],
     ['ClapTextModelWithProjection', ClapTextModelWithProjection, MODEL_TYPES.EncoderOnly],
     ['ClapAudioModelWithProjection', ClapAudioModelWithProjection, MODEL_TYPES.EncoderOnly],
+
+    ['DacEncoderModel', DacEncoderModel, MODEL_TYPES.EncoderOnly],
+    ['DacDecoderModel', DacDecoderModel, MODEL_TYPES.EncoderOnly],
+    ['MimiEncoderModel', MimiEncoderModel, MODEL_TYPES.EncoderOnly],
+    ['MimiDecoderModel', MimiDecoderModel, MODEL_TYPES.EncoderOnly],
 ]
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);
