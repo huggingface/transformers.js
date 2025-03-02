@@ -7115,6 +7115,8 @@ export class UltravoxModel extends UltravoxPreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// Mimi models
 export class MimiPreTrainedModel extends PreTrainedModel {
     main_input_name = 'input_values';
     forward_params = ['input_values'];
@@ -7186,6 +7188,7 @@ export class MimiDecoderModel extends MimiPreTrainedModel {
         });
     }
 }
+//////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 // AutoModels, used to simplify construction of PreTrainedModels
