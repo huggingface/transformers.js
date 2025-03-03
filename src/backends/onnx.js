@@ -176,17 +176,13 @@ if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
     // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
-
-    // Override the wasm search path if:
-    // 1. We are not in a service worker.
-    // 2. ONNX Runtime Web version is defined.
-    // 3. The wasmPaths are not already set.
-    //
-    // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
-    if (!(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope)
-        && typeof ONNX?.versions?.web === 'string'
-        && !ONNX_ENV.wasm.wasmPaths) {
-        ONNX_ENV.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX.versions.web}/dist/`;
+    // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
+    if (
+        // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
+        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope)
+        && !ONNX_ENV.wasm.wasmPaths
+    ) {
+        ONNX_ENV.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${env.version}/dist/`;
     }
 
     // TODO: Add support for loading WASM files from cached buffer when we upgrade to onnxruntime-web@1.19.0
