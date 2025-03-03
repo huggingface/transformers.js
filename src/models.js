@@ -5223,6 +5223,7 @@ export class SwinForImageClassification extends SwinPreTrainedModel {
         return new SequenceClassifierOutput(await super._call(model_inputs));
     }
 }
+export class SwinForSemanticSegmentation extends SwinPreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -6825,6 +6826,8 @@ export class MobileNetV1ForImageClassification extends MobileNetV1PreTrainedMode
         return new SequenceClassifierOutput(await super._call(model_inputs));
     }
 }
+
+export class MobileNetV1ForSemanticSegmentation extends MobileNetV1PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -6848,6 +6851,7 @@ export class MobileNetV2ForImageClassification extends MobileNetV2PreTrainedMode
         return new SequenceClassifierOutput(await super._call(model_inputs));
     }
 }
+export class MobileNetV2ForSemanticSegmentation extends MobileNetV2PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -6871,6 +6875,7 @@ export class MobileNetV3ForImageClassification extends MobileNetV3PreTrainedMode
         return new SequenceClassifierOutput(await super._call(model_inputs));
     }
 }
+export class MobileNetV3ForSemanticSegmentation extends MobileNetV3PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -6894,6 +6899,7 @@ export class MobileNetV4ForImageClassification extends MobileNetV4PreTrainedMode
         return new SequenceClassifierOutput(await super._call(model_inputs));
     }
 }
+export class MobileNetV4ForSemanticSegmentation extends MobileNetV4PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -7158,20 +7164,29 @@ export class PretrainedMixin {
         if (!this.MODEL_CLASS_MAPPINGS) {
             throw new Error("`MODEL_CLASS_MAPPINGS` not implemented for this type of `AutoClass`: " + this.name);
         }
-
+        const model_type = options.config.model_type;
         for (const MODEL_CLASS_MAPPING of this.MODEL_CLASS_MAPPINGS) {
-            const modelInfo = MODEL_CLASS_MAPPING.get(options.config.model_type);
+            let modelInfo = MODEL_CLASS_MAPPING.get(model_type);
             if (!modelInfo) {
-                continue; // Item not found in this mapping
+                // As a fallback, we check if model_type is specified as the exact class
+                for (const cls of MODEL_CLASS_MAPPING.values()) {
+                    if (cls[0] === model_type) {
+                        modelInfo = cls;
+                        break;
+                    }
+                }
+                if (!modelInfo) continue; // Item not found in this mapping
             }
             return await modelInfo[1].from_pretrained(pretrained_model_name_or_path, options);
         }
 
         if (this.BASE_IF_FAIL) {
-            console.warn(`Unknown model class "${options.config.model_type}", attempting to construct from base class.`);
+            if (!(CUSTOM_ARCHITECTURES.has(model_type))) {
+                console.warn(`Unknown model class "${model_type}", attempting to construct from base class.`);
+            }
             return await PreTrainedModel.from_pretrained(pretrained_model_name_or_path, options);
         } else {
-            throw Error(`Unsupported model type: ${options.config.model_type}`)
+            throw Error(`Unsupported model type: ${model_type}`)
         }
     }
 }
@@ -7524,6 +7539,12 @@ const MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES = new Map([
 const MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES = new Map([
     ['segformer', ['SegformerForSemanticSegmentation', SegformerForSemanticSegmentation]],
     ['sapiens', ['SapiensForSemanticSegmentation', SapiensForSemanticSegmentation]],
+
+    ['swin', ['SwinForSemanticSegmentation', SwinForSemanticSegmentation]],
+    ['mobilenet_v1', ['MobileNetV1ForSemanticSegmentation', MobileNetV1ForSemanticSegmentation]],
+    ['mobilenet_v2', ['MobileNetV2ForSemanticSegmentation', MobileNetV2ForSemanticSegmentation]],
+    ['mobilenet_v3', ['MobileNetV3ForSemanticSegmentation', MobileNetV3ForSemanticSegmentation]],
+    ['mobilenet_v4', ['MobileNetV4ForSemanticSegmentation', MobileNetV4ForSemanticSegmentation]],
 ]);
 
 const MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES = new Map([
@@ -7666,6 +7687,19 @@ for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);
     MODEL_CLASS_TO_NAME_MAPPING.set(model, name);
     MODEL_NAME_TO_CLASS_MAPPING.set(name, model);
+}
+
+const CUSTOM_ARCHITECTURES = new Map([
+    ['modnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
+    ['birefnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
+    ['isnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
+    ['ben', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
+]);
+for (const [name, mapping] of CUSTOM_ARCHITECTURES.entries()) {
+    mapping.set(name, ['PreTrainedModel', PreTrainedModel])
+    MODEL_TYPE_MAPPING.set(name, MODEL_TYPES.EncoderOnly);
+    MODEL_CLASS_TO_NAME_MAPPING.set(PreTrainedModel, name);
+    MODEL_NAME_TO_CLASS_MAPPING.set(name, PreTrainedModel);
 }
 
 
