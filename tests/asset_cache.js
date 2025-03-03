@@ -24,6 +24,7 @@ const TEST_IMAGES = Object.freeze({
   book_cover: BASE_URL + "book-cover.png",
   corgi: BASE_URL + "corgi.jpg",
   man_on_car: BASE_URL + "young-man-standing-and-leaning-on-car.jpg",
+  portrait_of_woman: BASE_URL + "portrait-of-woman_small.jpg",
 });
 
 const TEST_AUDIOS = {
