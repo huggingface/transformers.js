@@ -181,13 +181,12 @@ DEFAULT_OP_BLOCK_LIST = [
     "Upsample",
     # NEW:
     "RandomNormalLike",
-
     # TODO: Ideally, "Cast" nodes should not be here, for the following reasons:
     #  - It breaks the semantics that the default list contains "ops that are not supported for float16 in ONNX Runtime".
     #  - When fp32 casts already exist in the model (e.g., for rotary embeddings), this script will insert redundant casts around it.
     # However, without it, the graphs produced are invalid. Eventually, we will resolve this.
     "Cast",
-]     
+]
 
 
 def initial_checking(model, disable_shape_infer):
@@ -333,7 +332,7 @@ def process_graph_input(
                             graph,
                             [graph_input.name],
                             [cast_node_output_name],
-                            cast_node_output_name, # Set node name same as output name
+                            cast_node_output_name,  # Set node name same as output name
                             FLOAT16,
                         )
                         add_new_value_info(
@@ -388,7 +387,9 @@ def process_graph_output(
                 )
                 for value_info in graph.value_info:
                     if original_name == value_info.name:
-                        value_info.type.tensor_type.elem_type = onnx_proto.TensorProto.FLOAT
+                        value_info.type.tensor_type.elem_type = (
+                            onnx_proto.TensorProto.FLOAT
+                        )
 
                 # Get the node(s) that consume the model output
                 downstream_nodes = find_downstream_node_by_input_name(
@@ -545,7 +546,11 @@ def process_initializers(
     initializer_block_list = set()
     for node in graph.node:
         if (node.op_type in op_block_list) or (node.name in node_block_list):
-            for input_name in node.input:  # some is initializer, some is value_info, can't distinguish but doesn't matter
+            for (
+                input_name
+            ) in (
+                node.input
+            ):  # some is initializer, some is value_info, can't distinguish but doesn't matter
                 initializer_block_list.add(input_name)
     # Process initializers
     for initializer in graph.initializer:
