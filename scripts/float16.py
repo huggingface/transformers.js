@@ -430,7 +430,6 @@ def insert_cast32_before_node(
     graph: onnx_proto.GraphProto, node: onnx_proto.NodeProto, global_input_name_dict
 ):
     for i, input_name in enumerate(node.input):
-        input_name = node.input[i]
         for value_info in itertools.chain(graph.value_info, graph.input):
             if input_name == value_info.name:
                 if (
@@ -459,7 +458,6 @@ def insert_cast16_after_node(
     graph: onnx_proto.GraphProto, node: onnx_proto.NodeProto, global_input_name_dict
 ):
     for i, output_name in enumerate(node.output):
-        output_name = node.output[i]
         for value_info in itertools.chain(graph.value_info, graph.output):
             if output_name == value_info.name:
                 if (
