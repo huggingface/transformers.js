@@ -1730,6 +1730,7 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
     async _call(audio, kwargs = {}) {
         switch (this.model.config.model_type) {
             case 'whisper':
+            case 'lite-whisper':
                 return this._call_whisper(audio, kwargs)
             case 'wav2vec2':
             case 'wav2vec2-bert':

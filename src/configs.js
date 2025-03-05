@@ -175,6 +175,7 @@ function getNormalizedConfig(config) {
         case 'mbart':
         case 'marian':
         case 'whisper':
+        case 'lite-whisper':
         case 'm2m_100':
         case 'blenderbot':
         case 'blenderbot-small':

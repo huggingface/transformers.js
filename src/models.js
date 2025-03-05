@@ -3538,6 +3538,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 }
 //////////////////////////////////////////////////
 
+export class LiteWhisperForConditionalGeneration extends WhisperForConditionalGeneration { }
 
 //////////////////////////////////////////////////
 // Moonshine models
@@ -7475,6 +7476,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
 const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['speecht5', ['SpeechT5ForSpeechToText', SpeechT5ForSpeechToText]],
     ['whisper', ['WhisperForConditionalGeneration', WhisperForConditionalGeneration]],
+    ['lite-whisper', ['LiteWhisperForConditionalGeneration', LiteWhisperForConditionalGeneration]],
     ['moonshine', ['MoonshineForConditionalGeneration', MoonshineForConditionalGeneration]],
 ]);
 
