@@ -180,9 +180,14 @@ DEFAULT_OP_BLOCK_LIST = [
     "Max",
     "Upsample",
     # NEW:
-    "Cast",
     "RandomNormalLike",
-]
+
+    # TODO: Ideally, "Cast" nodes should not be here, for the following reasons:
+    #  - It breaks the semantics that the default list contains "ops that are not supported for float16 in ONNX Runtime".
+    #  - When fp32 casts already exist in the model (e.g., for rotary embeddings), this script will insert redundant casts around it.
+    # However, without it, the graphs produced are invalid. Eventually, we will resolve this.
+    "Cast",
+]     
 
 
 def initial_checking(model, disable_shape_infer):
@@ -317,21 +322,26 @@ def process_graph_input(
                     graph, graph_input.name
                 )
                 for d_node in downstream_nodes:
-                    cast_node_name = graph_input.name + "_cast_to_" + d_node.name
-                    cast_node_output_name = graph_input.name + "_cast_to_" + d_node.name
-                    add_cast_node(
-                        graph,
-                        [graph_input.name],
-                        [cast_node_output_name],
-                        cast_node_name,
-                        FLOAT16,
-                    )
-                    add_new_value_info(
-                        graph,
-                        graph_input,
-                        cast_node_output_name,
-                        onnx_proto.TensorProto.FLOAT16,
-                    )
+                    # More than one node may consume the model input, so we only create
+                    # a single cast node, and then reuse this node when needed.
+                    cast_exists = graph_input.name in global_input_name_dict
+                    if cast_exists:
+                        cast_node_output_name = global_input_name_dict[graph_input.name]
+                    else:
+                        cast_node_output_name = graph_input.name + "_fp16"
+                        add_cast_node(
+                            graph,
+                            [graph_input.name],
+                            [cast_node_output_name],
+                            cast_node_output_name, # Set node name same as output name
+                            FLOAT16,
+                        )
+                        add_new_value_info(
+                            graph,
+                            graph_input,
+                            cast_node_output_name,
+                            onnx_proto.TensorProto.FLOAT16,
+                        )
                     for i, input_name in enumerate(d_node.input):
                         if input_name == graph_input.name:
                             d_node.input[i] = (
@@ -378,9 +388,7 @@ def process_graph_output(
                 )
                 for value_info in graph.value_info:
                     if original_name == value_info.name:
-                        value_info.type.tensor_type.elem_type = (
-                            onnx_proto.TensorProto.FLOAT
-                        )
+                        value_info.type.tensor_type.elem_type = onnx_proto.TensorProto.FLOAT
 
                 # Get the node(s) that consume the model output
                 downstream_nodes = find_downstream_node_by_input_name(
@@ -420,7 +428,7 @@ def process_node_in_block_list(
 def insert_cast32_before_node(
     graph: onnx_proto.GraphProto, node: onnx_proto.NodeProto, global_input_name_dict
 ):
-    for i in range(len(node.input)):
+    for i, input_name in enumerate(node.input):
         input_name = node.input[i]
         for value_info in itertools.chain(graph.value_info, graph.input):
             if input_name == value_info.name:
@@ -449,7 +457,7 @@ def insert_cast32_before_node(
 def insert_cast16_after_node(
     graph: onnx_proto.GraphProto, node: onnx_proto.NodeProto, global_input_name_dict
 ):
-    for i in range(len(node.output)):
+    for i, output_name in enumerate(node.output):
         output_name = node.output[i]
         for value_info in itertools.chain(graph.value_info, graph.output):
             if output_name == value_info.name:
@@ -537,11 +545,7 @@ def process_initializers(
     initializer_block_list = set()
     for node in graph.node:
         if (node.op_type in op_block_list) or (node.name in node_block_list):
-            for (
-                input_name
-            ) in (
-                node.input
-            ):  # some is initializer, some is value_info, can't distinguish but doesn't matter
+            for input_name in node.input:  # some is initializer, some is value_info, can't distinguish but doesn't matter
                 initializer_block_list.add(input_name)
     # Process initializers
     for initializer in graph.initializer:
@@ -793,8 +797,8 @@ def remove_unnecessary_cast_node(graph_proto: onnx_proto.GraphProto):
         else:
             if (
                 downstream_node.op_type == "Cast"
-                and cast_node.attribute[0].i == 10
-                and downstream_node.attribute[0].i == 1
+                and cast_node.attribute[0].i == FLOAT16
+                and downstream_node.attribute[0].i == FLOAT32
                 and downstream_node in cast_node_list
                 and cast_node in cast_node_list
             ):
