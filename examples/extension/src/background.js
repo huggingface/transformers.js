@@ -1,6 +1,6 @@
 // background.js - Handles requests from the UI, runs the model, then sends back a response
 
-import { pipeline, env } from '@huggingface/transformers';
+import { pipeline } from '@huggingface/transformers';
 
 class PipelineSingleton {
     static task = 'text-classification';
