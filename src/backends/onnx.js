@@ -152,7 +152,12 @@ export async function createInferenceSession(buffer, session_options, session_co
         // so we wait for it to resolve before creating this new session.
         await wasmInitPromise;
     }
-
+    if (ONNX_ENV?.webgpu) {
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+        if (adapter) {
+            ONNX_ENV.webgpu.device = await adapter.requestDevice();
+        }
+    }
     const sessionPromise = InferenceSession.create(buffer, session_options);
     wasmInitPromise ??= sessionPromise;
     const session = await sessionPromise;
@@ -192,10 +197,6 @@ if (ONNX_ENV?.wasm) {
     if (typeof crossOriginIsolated === 'undefined' || !crossOriginIsolated) {
         ONNX_ENV.wasm.numThreads = 1;
     }
-}
-
-if (ONNX_ENV?.webgpu) {
-    ONNX_ENV.webgpu.powerPreference = 'high-performance';
 }
 
 /**
