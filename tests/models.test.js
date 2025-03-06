@@ -2,24 +2,7 @@
  * Test that models loaded outside of the `pipeline` function work correctly (e.g., `AutoModel.from_pretrained(...)`);
  */
 
-import {
-  AutoTokenizer,
-  AutoProcessor,
-  BertForMaskedLM,
-  GPT2LMHeadModel,
-  T5ForConditionalGeneration,
-  BertTokenizer,
-  GPT2Tokenizer,
-  T5Tokenizer,
-  LlamaTokenizer,
-  LlamaForCausalLM,
-  WhisperForConditionalGeneration,
-  WhisperProcessor,
-  AutoModelForMaskedLM,
-  AutoModelForCausalLM,
-  AutoModelForSeq2SeqLM,
-  AutoModelForSpeechSeq2Seq,
-} from "../src/transformers.js";
+import { AutoTokenizer, AutoProcessor, BertForMaskedLM, GPT2LMHeadModel, T5ForConditionalGeneration, BertTokenizer, GPT2Tokenizer, T5Tokenizer, LlamaTokenizer, LlamaForCausalLM, WhisperForConditionalGeneration, WhisperProcessor, AutoModelForMaskedLM, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSpeechSeq2Seq } from "../src/transformers.js";
 import { init, MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "./init.js";
 import { compare, collect_and_execute_tests } from "./test_utils.js";
 
@@ -55,7 +38,7 @@ describe("Loading different architecture types", () => {
           const tests = [
             texts[0], // single
             texts, // batched
-          ]
+          ];
 
           const { model_type } = model.config;
           const tokenizer = model_type === "whisper" ? processor.tokenizer : processor;
