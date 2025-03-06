@@ -34,12 +34,12 @@ describe("Loading different architecture types", () => {
     ["hf-internal-testing/tiny-random-GPT2LMHeadModel", [AutoModelForCausalLM, GPT2LMHeadModel], [AutoTokenizer, GPT2Tokenizer]], // Decoder-only
     ["hf-internal-testing/tiny-random-T5ForConditionalGeneration", [AutoModelForSeq2SeqLM, T5ForConditionalGeneration], [AutoTokenizer, T5Tokenizer]], // Encoder-decoder
     ["onnx-internal-testing/tiny-random-LlamaForCausalLM-ONNX_external", [AutoModelForCausalLM, LlamaForCausalLM], [AutoTokenizer, LlamaTokenizer]], // Decoder-only w/ external data
-    ["onnx-internal-testing/tiny-random-WhisperForConditionalGeneration-ONNX_external", [AutoModelForSpeechSeq2Seq, WhisperForConditionalGeneration], [AutoProcessor, WhisperProcessor], {}, "audio"], // Encoder-decoder-only w/ external data
+    ["onnx-internal-testing/tiny-random-WhisperForConditionalGeneration-ONNX_external", [AutoModelForSpeechSeq2Seq, WhisperForConditionalGeneration], [AutoProcessor, WhisperProcessor], {}], // Encoder-decoder-only w/ external data
   ];
 
   const texts = ["Once upon a time", "I like to eat apples"];
 
-  for (const [model_id, models, processors, modelOptions, modality] of models_to_test) {
+  for (const [model_id, models, processors, modelOptions] of models_to_test) {
     // Test that both the auto model and the specific model work
     for (let i = 0; i < processors.length; ++i) {
       const processorClassToTest = processors[i];
@@ -52,22 +52,24 @@ describe("Loading different architecture types", () => {
           const processor = await processorClassToTest.from_pretrained(model_id);
           const model = await modelClassToTest.from_pretrained(model_id, modelOptions ?? DEFAULT_MODEL_OPTIONS);
 
-          const tests = modality === "audio"
-            ? [new Float32Array(16000)]
-            : [
-              texts[0], // single
-              texts, // batched
-            ]
+          const tests = [
+            texts[0], // single
+            texts, // batched
+          ]
+
+          const { model_type } = model.config;
+          const tokenizer = model_type === "whisper" ? processor.tokenizer : processor;
+          const feature_extractor = model_type === "whisper" ? processor.feature_extractor : null;
 
           for (const test of tests) {
-            const inputs = await processor(test, { truncation: true, padding: true });
+            const inputs = await tokenizer(test, { truncation: true, padding: true });
             if (model.config.is_encoder_decoder) {
-              if (model.config.model_type === "whisper") {
-                inputs.decoder_input_ids = processor.tokenizer(texts[0]).input_ids;
-              } else {
-                inputs.decoder_input_ids = inputs.input_ids;
-              }
+              inputs.decoder_input_ids = inputs.input_ids;
             }
+            if (feature_extractor) {
+              Object.assign(inputs, await feature_extractor(new Float32Array(16000)));
+            }
+
             const output = await model(inputs);
 
             if (output.logits) {
