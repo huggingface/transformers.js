@@ -20,6 +20,7 @@ import { dispatchCallback } from './core.js';
  * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
  * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model).
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
+ * @property {RequestInit} [request_options] The options to use when making the request.
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
  */
@@ -185,18 +186,23 @@ function isValidUrl(string, protocols = null, validHosts = null) {
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {RequestInit} [request_options] The options to use when making the request.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
+export async function getFile(urlOrPath, request_options) {
 
+    /**
+     * @type {Headers} The headers to use when making the request.
+     */
+    let headers
+    
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(urlOrPath);
-
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
 
-        const headers = new Headers();
+        headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
         // Check whether we are making a request to the Hugging Face Hub.
@@ -210,13 +216,23 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
     }
+
+    /**
+     * @type {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>}  A custom fetch function to use. Defaults to `null`. Note: this must be a function which
+     */
+    let resolvedFetch;
+    if (env.customFetch) {
+        resolvedFetch = env.customFetch;
+    } else {
+        resolvedFetch = fetch
+    }
+
+    return resolvedFetch(urlOrPath, {headers, ...request_options});
 }
 
 const ERROR_MAPPING = {
@@ -447,7 +463,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             const isURL = isValidUrl(requestURL, ['http:', 'https:']);
             if (!isURL) {
                 try {
-                    response = await getFile(localPath);
+                    response = await getFile(localPath, options.request_options);
                     cacheKey = localPath; // Update the cache key to be the local path
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
@@ -479,7 +495,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             }
 
             // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            response = await getFile(remoteURL, options.request_options);
 
             if (response.status !== 200) {
                 return handleError(response.status, remoteURL, fatal);

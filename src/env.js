@@ -118,6 +118,7 @@ const localModelPath = RUNNING_LOCALLY
  * @property {string} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {Object} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
+ * @property {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>} customFetch A custom fetch function to use. Defaults to `null`. Note: this must be a function which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache
  */
 
@@ -149,6 +150,10 @@ export const env = {
 
     useCustomCache: false,
     customCache: null,
+    //////////////////////////////////////////////////////
+
+    /////////////////// custom settings ///////////////////
+    customFetch: null,
     //////////////////////////////////////////////////////
 }
 
