@@ -1,14 +1,6 @@
 // background.js - Handles requests from the UI, runs the model, then sends back a response
 
-import { pipeline, env } from '@xenova/transformers';
-
-// Skip initial check for local models, since we are not loading any local models.
-env.allowLocalModels = false;
-
-// Due to a bug in onnxruntime-web, we must disable multithreading for now.
-// See https://github.com/microsoft/onnxruntime/issues/14445 for more information.
-env.backends.onnx.wasm.numThreads = 1;
-
+import { pipeline } from '@huggingface/transformers';
 
 class PipelineSingleton {
     static task = 'text-classification';
@@ -16,9 +8,7 @@ class PipelineSingleton {
     static instance = null;
 
     static async getInstance(progress_callback = null) {
-        if (this.instance === null) {
-            this.instance = pipeline(this.task, this.model, { progress_callback });
-        }
+        this.instance ??= pipeline(this.task, this.model, { progress_callback });
 
         return this.instance;
     }
