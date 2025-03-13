@@ -67,6 +67,7 @@ function getNormalizedConfig(config) {
         // Sub-configs
         case 'llava':
         case 'paligemma':
+        case 'gemma3':
         case 'florence2':
         case 'llava_onevision':
         case 'idefics3':
@@ -126,6 +127,7 @@ function getNormalizedConfig(config) {
             break;
         case 'gemma':
         case 'gemma2':
+        case 'gemma3_text':
         case 'glm':
         case 'helium':
             mapping['num_heads'] = 'num_key_value_heads';
