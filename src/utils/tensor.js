@@ -1182,8 +1182,12 @@ function calc_unsqueeze_dims(dims, dim) {
  * @private
  */
 function safeIndex(index, size, dimension = null, boundsCheck = true) {
-    if (boundsCheck && (index < -size || index >= size)) {
-        throw new Error(`IndexError: index ${index} is out of bounds for dimension${dimension === null ? '' : ' ' + dimension} with size ${size}`);
+    if (index < -size || index >= size) {
+        if (boundsCheck) {
+            throw new Error(`IndexError: index ${index} is out of bounds for dimension${dimension === null ? '' : ' ' + dimension} with size ${size}`);
+        } else {
+            return index < -size ? 0 : size;
+        }
     }
 
     if (index < 0) {
