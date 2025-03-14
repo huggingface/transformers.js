@@ -40,6 +40,8 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  */
 export class AutoProcessor {
 
+    static PROCESSOR_CLASS_MAPPING = {...AllProcessors};
+
     /** @type {typeof Processor.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options={}) {
 
@@ -47,8 +49,8 @@ export class AutoProcessor {
         const preprocessorConfig = await getModelJSON(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME, true, options);
 
         const { image_processor_type, feature_extractor_type, processor_class } = preprocessorConfig;
-        if (processor_class && AllProcessors[processor_class]) {
-            return AllProcessors[processor_class].from_pretrained(pretrained_model_name_or_path, options);
+        if (processor_class && this.PROCESSOR_CLASS_MAPPING[processor_class]) {
+            return this.PROCESSOR_CLASS_MAPPING[processor_class].from_pretrained(pretrained_model_name_or_path, options);
         }
 
         if (!image_processor_type && !feature_extractor_type) {
