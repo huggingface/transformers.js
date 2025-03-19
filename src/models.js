@@ -594,8 +594,8 @@ async function decoderForward(self, model_inputs, is_encoder_decoder = false) {
         new_model_inputs.use_cache_branch = boolTensor(!!past_key_values);
     }
     if (session.inputNames.includes('position_ids') && new_model_inputs.attention_mask && !new_model_inputs.position_ids) {
-        // NOTE: Handle a special case for paligemma models, where positions are 1-indexed
-        const start_index = self.config.model_type === 'paligemma' ? 1 : 0;
+        // NOTE: Handle a special case for paligemma/gemma3 models, where positions are 1-indexed
+        const start_index = ['paligemma', 'gemma3_text', 'gemma3'].includes(self.config.model_type) ? 1 : 0;
         new_model_inputs.position_ids = createPositionIds(new_model_inputs, past_key_values, start_index);
     }
 
@@ -4520,6 +4520,23 @@ export class Gemma2Model extends Gemma2PreTrainedModel { }
 export class Gemma2ForCausalLM extends Gemma2PreTrainedModel { }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+// Gemma3 models
+
+/**
+ * The bare Gemma3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma3PreTrainedModel extends PreTrainedModel { }
+/**
+ * The bare Gemma3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma3Model extends Gemma3PreTrainedModel { }
+
+export class Gemma3ForCausalLM extends Gemma3PreTrainedModel { }
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 export class OpenELMPreTrainedModel extends PreTrainedModel { }
 export class OpenELMModel extends OpenELMPreTrainedModel { }
@@ -7488,6 +7505,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['cohere', ['CohereModel', CohereModel]],
     ['gemma', ['GemmaModel', GemmaModel]],
     ['gemma2', ['Gemma2Model', Gemma2Model]],
+    ['gemma3_text', ['Gemma3Model', Gemma3Model]],
     ['helium', ['HeliumModel', HeliumModel]],
     ['glm', ['GlmModel', GlmModel]],
     ['openelm', ['OpenELMModel', OpenELMModel]],
@@ -7587,6 +7605,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['cohere', ['CohereForCausalLM', CohereForCausalLM]],
     ['gemma', ['GemmaForCausalLM', GemmaForCausalLM]],
     ['gemma2', ['Gemma2ForCausalLM', Gemma2ForCausalLM]],
+    ['gemma3_text', ['Gemma3ForCausalLM', Gemma3ForCausalLM]],
     ['helium', ['HeliumForCausalLM', HeliumForCausalLM]],
     ['glm', ['GlmForCausalLM', GlmForCausalLM]],
     ['openelm', ['OpenELMForCausalLM', OpenELMForCausalLM]],
