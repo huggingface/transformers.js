@@ -143,12 +143,12 @@ export class MgpstrProcessor extends Processor {
         }
     }
     /** @type {typeof Processor.from_pretrained} */
-    static async from_pretrained(...args) {
-        const base = await super.from_pretrained(...args);
+    static async from_pretrained(pretrained_model_name_or_path, options) {
+        const base = await super.from_pretrained(pretrained_model_name_or_path, options);
 
         // Load Transformers.js-compatible versions of the BPE and WordPiece tokenizers
-        const bpe_tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2") // openai-community/gpt2
-        const wp_tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased") // google-bert/bert-base-uncased
+        const bpe_tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2", { abort_signal: options?.abort_signal }) // openai-community/gpt2
+        const wp_tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased", { abort_signal: options?.abort_signal }) // google-bert/bert-base-uncased
 
         // Update components
         base.components = {
