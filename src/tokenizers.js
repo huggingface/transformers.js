@@ -1682,13 +1682,15 @@ class BertProcessing extends PostProcessor {
      * @param {Object} config The configuration for the post-processor.
      * @param {string[]} config.cls The special tokens to add to the beginning of the input.
      * @param {string[]} config.sep The special tokens to add to the end of the input.
+     * @param {boolean} config.trim_offsets should trim remaining spaces from a token. 
+     * @param {boolean} config.add_prefix_space token has one space before and after. Depends on `trim_offsets` being true.
      */
     constructor(config) {
         super(config);
-        // TODO use all of config: add_prefix_space, trim_offsets
-
         this.cls = config.cls[0];
         this.sep = config.sep[0];
+        this.add_prefix_space = config.add_prefix_space;
+        this.trim_offsets = config.trim_offsets;
     }
 
     /**
@@ -1700,12 +1702,14 @@ class BertProcessing extends PostProcessor {
     post_process(tokens, tokens_pair = null, {
         add_special_tokens = true,
     } = {}) {
+        if (this.trim_offsets) { this.trimOffsetsWithConfig(tokens) }
         if (add_special_tokens) {
             tokens = mergeArrays([this.cls], tokens, [this.sep]);
         }
 
         let token_type_ids = new Array(tokens.length).fill(0);
         if (tokens_pair !== null) {
+            if (this.trim_offsets) { this.trimOffsetsWithConfig(tokens_pair) }
             // NOTE: It is intended to add 2 EOS tokens after the first set of tokens
             // https://github.com/huggingface/tokenizers/issues/983
             const middle = (add_special_tokens && this instanceof RobertaProcessing)
@@ -1717,6 +1721,67 @@ class BertProcessing extends PostProcessor {
             token_type_ids = mergeArrays(token_type_ids, new Array(tokens_pair.length + middle.length + after.length).fill(1));
         }
         return { tokens, token_type_ids };
+    }
+
+    /**
+     * Trim offsets from each tokens as configured.
+     * @param {string[]} tokens The input tokens.
+     */
+    trimOffsetsWithConfig(tokens) {
+        if (this.add_prefix_space) {
+            for (let i = 0; i<tokens.length; ++i) {
+                tokens[i] = this.trimExtraSpace(tokens[i]);
+            }
+        } else {
+            for (let i = 0; i<tokens.length; ++i) {
+                tokens[i] = tokens[i].trim();
+            }
+        }
+    }
+
+    /**
+     * Trim extra space from token, excluding one space character that was 
+     * added from the pretokenizer.
+     * @param {string} text input text to be trimmed.
+     */
+    trimExtraSpace(text) {
+        const prefix = this.findExtraSpacePrefixIndex(text);
+        const suffix = this.findExtraSpaceSuffixIndex(text);
+        return text.substring(prefix, suffix + 1);
+    }
+
+    /**
+     * Find the index of the first space character to be removed. 
+     * @param {string} text input to scan.
+     */
+    findExtraSpacePrefixIndex(text) {
+        if (text === null || text.length === 0) return 0;
+        if (text[0] !== " ") return 0;
+
+        let prefixIndex = 0;
+        for (let i = 1; i < text.length; ++i) {
+            if (text[i] !== " ") break;
+            prefixIndex += 1;
+        }
+
+        return prefixIndex;
+    }
+
+    /**
+     * Find the index of the last space character to be removed. 
+     * @param {string} text input to scan.
+     */
+    findExtraSpaceSuffixIndex(text) {
+        if (text === null || text.length === 0) return 0;
+        if (text[text.length - 1] !== " ") return text.length - 1;
+
+        let suffixIndex = text.length - 1;
+        for (let i = text.length - 2; i > 0; --i) {
+            if (text[i] !== " ") break;
+            suffixIndex -= 1;
+        }
+
+        return suffixIndex;
     }
 }
 class RobertaProcessing extends BertProcessing { } // NOTE: extends BertProcessing
