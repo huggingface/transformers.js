@@ -100,7 +100,7 @@ export class RawImage {
 
     /**
      * Helper method for reading an image from a variety of input types.
-     * @param {RawImage|string|URL} input
+     * @param {RawImage|string|URL|Blob|HTMLCanvasElement|OffscreenCanvas} input
      * @returns The image object.
      *
      * **Example:** Read image from a URL.
@@ -119,6 +119,10 @@ export class RawImage {
             return input;
         } else if (typeof input === 'string' || input instanceof URL) {
             return await this.fromURL(input);
+        } else if (input instanceof Blob) {
+            return await this.fromBlob(input);
+        } else if (input instanceof HTMLCanvasElement || input instanceof OffscreenCanvas) {
+            return await this.fromCanvas(input);
         } else {
             throw new Error(`Unsupported input type: ${typeof input}`);
         }
