@@ -180,12 +180,12 @@ if (ONNX_ENV?.wasm) {
     if (
         // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
         !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope)
-        && !env.backends.onnx.versions?.web
+        && env.backends.onnx.versions?.web
         && !ONNX_ENV.wasm.wasmPaths
     ) {
         const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${env.backends.onnx.versions.web}/dist/`;
 
-        ONNX_ENV.wasm.wasmPaths = environmentIsSafari ? {
+        ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI ? {
             "mjs": `${wasmPathPrefix}/ort-wasm-simd-threaded.mjs`,
             "wasm": `${wasmPathPrefix}/ort-wasm-simd-threaded.wasm`,
         }
