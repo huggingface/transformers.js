@@ -5373,6 +5373,16 @@ export class DepthProForDepthEstimation extends DepthProPreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+export class Metric3DPreTrainedModel extends PreTrainedModel { }
+export class Metric3DForDepthEstimation extends Metric3DPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class Metric3Dv2PreTrainedModel extends PreTrainedModel { }
+export class Metric3Dv2ForDepthEstimation extends Metric3Dv2PreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 export class MaskFormerPreTrainedModel extends PreTrainedModel { }
 export class MaskFormerModel extends MaskFormerPreTrainedModel { }
 export class MaskFormerForInstanceSegmentation extends MaskFormerPreTrainedModel { }
@@ -7788,6 +7798,8 @@ const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
     ['glpn', ['GLPNForDepthEstimation', GLPNForDepthEstimation]],
     ['sapiens', ['SapiensForDepthEstimation', SapiensForDepthEstimation]],
     ['depth_pro', ['DepthProForDepthEstimation', DepthProForDepthEstimation]],
+    ['metric3d', ['Metric3DForDepthEstimation', Metric3DForDepthEstimation]],
+    ['metric3dv2', ['Metric3Dv2ForDepthEstimation', Metric3Dv2ForDepthEstimation]],
 ])
 
 const MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES = new Map([
