@@ -2204,12 +2204,17 @@ export class ImageSegmentationPipeline extends (/** @type {new (options: ImagePi
         /** @type {ImageSegmentationPipelineOutput[]} */
         const annotation = [];
         if (!subtask) {
+            // We define an epsilon to safeguard against numerical/precision issues when detecting
+            // the normalization mode of the output (i.e., sigmoid already applied, or not).
+            // See https://github.com/microsoft/onnxruntime/issues/23943 for more information.
+            const epsilon = 1e-5;
+
             // Perform standard image segmentation
             const result = output[outputNames[0]];
             for (let i = 0; i < imageSizes.length; ++i) {
                 const size = imageSizes[i];
                 const item = result[i];
-                if (item.data.some(x => x < 0 || x > 1)) {
+                if (item.data.some(x => x < -epsilon || x > 1 + epsilon)) {
                     item.sigmoid_();
                 }
                 const mask = await RawImage.fromTensor(item.mul_(255).to('uint8')).resize(size[1], size[0]);
