@@ -58,7 +58,7 @@ The `pipeline()` function is a great way to quickly use a pretrained model for i
 
 <!-- TODO: Replace 'Xenova/whisper-small.en' with 'openai/whisper-small.en' -->
 ```javascript
-// Allocate a pipeline for Automatic Speech Recognition
+// Create a pipeline for Automatic Speech Recognition
 const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small.en');
 
 // Transcribe an audio file, loaded from a URL.
@@ -71,19 +71,20 @@ const result = await transcriber('https://huggingface.co/datasets/Narsil/asr_dum
 ### Loading
 
 We offer a variety of options to control how models are loaded from the Hugging Face Hub (or locally).
-By default, the *quantized* version of the model is used, which is smaller and faster, but usually less accurate.
-To override this behaviour (i.e., use the unquantized model), you can use a custom `PretrainedOptions` object
-as the third parameter to the `pipeline` function:
+By default, when running in-browser, a *quantized* version of the model is used, which is smaller and faster,
+but usually less accurate. To override this behaviour (i.e., use the unquantized model), you can use a custom
+`PretrainedOptions` object as the third parameter to the `pipeline` function:
 
 ```javascript
-// Allocation a pipeline for feature extraction, using the unquantized model
+// Create a pipeline for feature extraction, using the full-precision model (fp32)
 const pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-    quantized: false,
+    dtype: "fp32",
 });
 ```
+Check out the section on [quantization](./guides/dtypes) to learn more.
 
 You can also specify which revision of the model to use, by passing a `revision` parameter.
-Since the Hugging Face Hub uses a git-based versioning system, you can use any valid git revision specifier (e.g., branch name or commit hash)
+Since the Hugging Face Hub uses a git-based versioning system, you can use any valid git revision specifier (e.g., branch name or commit hash).
 
 ```javascript
 const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
@@ -99,7 +100,7 @@ Many pipelines have additional options that you can specify. For example, when u
 
 <!-- TODO: Replace 'Xenova/nllb-200-distilled-600M' with 'facebook/nllb-200-distilled-600M' -->
 ```javascript
-// Allocation a pipeline for translation
+// Create a pipeline for translation
 const translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
 
 // Translate from English to Greek
@@ -124,7 +125,7 @@ For example, to generate a poem using `LaMini-Flan-T5-783M`, you can do:
 <!-- TODO: Replace 'Xenova/LaMini-Flan-T5-783M' with 'MBZUAI/LaMini-Flan-T5-783M' -->
 
 ```javascript
-// Allocate a pipeline for text2text-generation
+// Create a pipeline for text2text-generation
 const poet = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-783M');
 const result = await poet('Write me a love poem about cheese.', {
     max_new_tokens: 200,
