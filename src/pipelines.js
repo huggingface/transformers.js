@@ -2277,7 +2277,7 @@ export class ImageSegmentationPipeline extends (/** @type {new (options: ImagePi
 
 
 /**
- * @typedef {ImageSegmentationPipelineOptions} BackgroundRemovalPipelineOptions Parameters specific to image segmentation pipelines.
+ * @typedef {Object} BackgroundRemovalPipelineOptions Parameters specific to image segmentation pipelines.
  *
  * @callback BackgroundRemovalPipelineCallback Segment the input images.
  * @param {ImagePipelineInputs} images The input images.
