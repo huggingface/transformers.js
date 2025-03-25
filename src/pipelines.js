@@ -2301,7 +2301,7 @@ export class ImageSegmentationPipeline extends (/** @type {new (options: ImagePi
  * // ]
  * ```
  */
-export class BackgroundRemovalPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageSegmentationPipelineType} */ (ImageSegmentationPipeline)) {
+export class BackgroundRemovalPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => BackgroundRemovalPipelineType} */ (/** @type {any} */(ImageSegmentationPipeline))) {
     /**
      * Create a new BackgroundRemovalPipeline.
      * @param {ImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
