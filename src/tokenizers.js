@@ -2696,6 +2696,7 @@ export class PreTrainedTokenizer extends Callable {
         local_files_only = false,
         revision = 'main',
         legacy = null,
+        abort_signal = null,
     } = {}) {
 
         const info = await loadTokenizer(pretrained_model_name_or_path, {
@@ -2705,6 +2706,7 @@ export class PreTrainedTokenizer extends Callable {
             local_files_only,
             revision,
             legacy,
+            abort_signal,
         })
 
         // @ts-ignore
@@ -4365,6 +4367,7 @@ export class AutoTokenizer {
         local_files_only = false,
         revision = 'main',
         legacy = null,
+        abort_signal = null,
     } = {}) {
 
         const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {
@@ -4374,6 +4377,7 @@ export class AutoTokenizer {
             local_files_only,
             revision,
             legacy,
+            abort_signal,
         })
 
         // Some tokenizers are saved with the "Fast" suffix, so we remove that if present.

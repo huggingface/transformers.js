@@ -18,6 +18,7 @@ export class VLChatProcessor extends Processor {
         this.image_start_tag = this.config.image_start_tag;
         this.image_end_tag = this.config.image_end_tag;
         this.num_image_tokens = this.config.num_image_tokens;
+        this.abort_signal = this.config.abort_signal;
     }
 
     /**
@@ -50,7 +51,7 @@ export class VLChatProcessor extends Processor {
                 conversation
                     .filter((msg) => msg.images)
                     .flatMap((msg) => msg.images)
-                    .map((img) => RawImage.read(img))
+                    .map((img) => RawImage.read(img, { abort_signal: this.abort_signal }))
             );
         } else if (!Array.isArray(images)) {
             images = [images];

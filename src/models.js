@@ -1088,6 +1088,7 @@ export class PreTrainedModel extends Callable {
         local_files_only = false,
         revision = 'main',
         model_file_name = null,
+        abort_signal = null,
         subfolder = 'onnx',
         device = null,
         dtype = null,
@@ -1107,6 +1108,7 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            abort_signal,
         }
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -7376,6 +7378,7 @@ export class PretrainedMixin {
         dtype = null,
         use_external_data_format = null,
         session_options = {},
+        abort_signal = null,
     } = {}) {
 
         const options = {
@@ -7390,6 +7393,7 @@ export class PretrainedMixin {
             dtype,
             use_external_data_format,
             session_options,
+            abort_signal,
         }
         options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
