@@ -83,6 +83,7 @@ if (ORT_SYMBOL in globalThis) {
             break;
     }
 
+    supportedDevices.push('webgpu');
     supportedDevices.push('cpu');
     defaultDevices = ['cpu'];
 } else {
