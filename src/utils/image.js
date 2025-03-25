@@ -121,8 +121,12 @@ export class RawImage {
             return await this.fromURL(input);
         } else if (input instanceof Blob) {
             return await this.fromBlob(input);
-        } else if (input instanceof HTMLCanvasElement || input instanceof OffscreenCanvas) {
-            return await this.fromCanvas(input);
+        } else if (
+            (typeof HTMLCanvasElement !== "undefined" && input instanceof HTMLCanvasElement)
+            ||
+            (typeof OffscreenCanvas !== "undefined" && input instanceof OffscreenCanvas)
+        ) {
+            return this.fromCanvas(input);
         } else {
             throw new Error(`Unsupported input type: ${typeof input}`);
         }
