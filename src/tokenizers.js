@@ -42,6 +42,7 @@ import {
     PriorityQueue,
     TokenLattice,
     CharTrie,
+    DictionarySplitter,
 } from './utils/data-structures.js';
 
 import { Template } from '@huggingface/jinja';
@@ -2597,13 +2598,20 @@ export class PreTrainedTokenizer extends Callable {
             this.decoder.end_of_word_suffix = this.model.end_of_word_suffix;
         }
 
-        this.added_tokens_regex = this.added_tokens.length > 0 ? new RegExp(
-            this.added_tokens.slice()
+        // Divide added tokens into those that left/right strip, and those that don't
+        const added_tokens_with_strip = this.added_tokens.filter(x => x.rstrip || x.lstrip);
+        const added_tokens_without_strip = this.added_tokens.filter(x => !x.rstrip && !x.lstrip);
+        const split_regex = added_tokens_with_strip.length > 0 ? new RegExp(
+            added_tokens_with_strip.slice()
                 // Sort by length (desc) to avoid early partial matches
                 .sort((a, b) => b.content.length - a.content.length)
                 .map(x => `${x.lstrip ? '\\s*' : ''}(${escapeRegExp(x.content)})${x.rstrip ? '\\s*' : ''}`)
                 .join('|')
         ) : null;
+        this.added_tokens_splitter = new DictionarySplitter(
+            added_tokens_without_strip.map(x => x.content),
+            split_regex,
+        );
 
         // Set mask token if present (otherwise will be undefined, which is fine)
         this.mask_token = this.getToken('mask_token');
@@ -2898,8 +2906,7 @@ export class PreTrainedTokenizer extends Callable {
         // Actual function which does encoding, for a single text
         // First, we take care of special tokens. Needed to avoid issues arising from
         // normalization and/or pretokenization (which may not preserve special tokens)
-        const sections = this.added_tokens_regex ? text.split(this.added_tokens_regex).filter(x => x) : [text];
-
+        const sections = this.added_tokens_splitter.split(text);
         const tokens = sections.map((x, section_index) => {
             const addedToken = this.added_tokens.find(t => t.content === x);
             if (addedToken !== undefined) {
