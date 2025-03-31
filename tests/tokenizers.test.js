@@ -292,6 +292,14 @@ describe("Edge cases", () => {
     },
     MAX_TEST_EXECUTION_TIME,
   );
+
+  it("many added tokens", async () => {
+    let tokenizer = await AutoTokenizer.from_pretrained("onnx-community/orpheus-3b-0.1-ft-ONNX");
+
+    let text = "hello world!";
+    let token_ids = tokenizer.encode(text);
+    compare(token_ids, [128000, 15339, 1917, 0]);
+  }, 5000); // NOTE: 5 seconds
 });
 
 describe("Extra decoding tests", () => {
