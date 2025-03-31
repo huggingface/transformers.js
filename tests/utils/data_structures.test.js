@@ -1,4 +1,4 @@
-import { PriorityQueue } from "../../src/utils/data-structures.js";
+import { PriorityQueue, DictionarySplitter } from "../../src/utils/data-structures.js";
 
 describe("Priority queue", () => {
   const EXAMPLE_ARRAY = [2, 5, 3, 1, 4];
@@ -29,5 +29,39 @@ describe("Priority queue", () => {
       expect(queue.pop()).toBe(max);
       expect(queue.size).toBeLessThanOrEqual(size);
     }
+  });
+});
+
+describe("Dictionary splitter", () => {
+  it("should split on a defined dictionary", () => {
+    const splitter = new DictionarySplitter(
+      ["a", "b", "c", "abc"],
+      null, // no split regex
+    );
+    const text = ".a.b.cc.abcdef.";
+    const expected = [".", "a", ".", "b", ".", "c", "c", ".", "abc", "def."];
+    const result = splitter.split(text);
+    expect(result).toEqual(expected);
+  });
+  it("should split on a defined dictionary w/ split regex", () => {
+    const splitter = new DictionarySplitter(
+      ["a", "b", "c", "abc"],
+      /\s+/, // split on whitespace
+    );
+    const text = "a  b  c";
+    const expected = ["a", "b", "c"];
+    const result = splitter.split(text);
+    expect(result).toEqual(expected);
+  });
+
+  it("should handle multi-byte characters", () => {
+    const text = "before🤗after\ud83etest";
+    const splitter = new DictionarySplitter(
+      ["🤗" /* '\ud83e\udd17' */, "\ud83e"],
+      null, // no split regex
+    );
+    const expected = ["before", "🤗", "after", "\ud83e", "test"];
+    const result = splitter.split(text);
+    expect(result).toEqual(expected);
   });
 });
