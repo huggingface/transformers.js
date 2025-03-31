@@ -446,6 +446,12 @@ class TokenLatticeNode {
     }
 }
 
+/**
+ * A data structure which uses a trie to split a string into tokens based on a dictionary.
+ * It can also use a regular expression to preprocess the input text before splitting.
+ * 
+ * NOTE: To ensure multi-byte characters are handled correctly, we operate at byte-level instead of character-level.
+ */
 export class DictionarySplitter {
     /**
      * @param {string[]} dictionary The dictionary of words to use for splitting.
@@ -466,14 +472,9 @@ export class DictionarySplitter {
         const trie = Object.create(null);
         for (const word of dictionary) {
             let node = trie;
-            for (let i = 0, len = word.length; i < len; ++i) {
-                const char = word[i];
-                if (!node[char]) {
-                    node[char] = Object.create(null);
-                }
-                node = node[char];
+            for (let i = 0; i < word.length; ++i) {
+                node = (node[word[i]] ??= Object.create(null));
             }
-            // Mark the end of a word.
             node.end = word;
         }
         return trie;
@@ -509,8 +510,7 @@ export class DictionarySplitter {
             let match = null;
             let j = i;
 
-            while (j < n && node[text[j]]) {
-                node = node[text[j]];
+            while (j < n && (node = node[text[j]])) {
                 if (node.end) {
                     // Always keep the last (i.e., longest) match.
                     match = node.end;
