@@ -460,9 +460,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
-    // NOTE: `path_or_repo_id` could be:
-    //   1. A valid model ID (e.g., `google-bert/bert-base-uncased`)
-    //   2. A valid path (e.g., `./path/to/model/`)
     const localPath = isValidHfModelId(path_or_repo_id)
         ? pathJoin(env.localModelPath, requestURL)
         : requestURL;
