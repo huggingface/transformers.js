@@ -460,7 +460,8 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
-    const localPath = isValidHfModelId(path_or_repo_id)
+    const validModelId = isValidHfModelId(path_or_repo_id);
+    const localPath = validModelId
         ? pathJoin(env.localModelPath, requestURL)
         : requestURL;
     const remoteURL = pathJoin(
@@ -533,6 +534,11 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                     // TODO in future, cache the response?
                     return null;
                 }
+            }
+            if (!validModelId) {
+                // Before making any requests to the remote server, we check if the model ID is valid.
+                // This prevents unnecessary network requests for invalid model IDs.
+                throw Error(`Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`);
             }
 
             // File not found locally, so we try to download it from the remote server
