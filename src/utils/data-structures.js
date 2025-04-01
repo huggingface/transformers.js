@@ -455,11 +455,9 @@ class TokenLatticeNode {
 export class DictionarySplitter {
     /**
      * @param {string[]} dictionary The dictionary of words to use for splitting.
-     * @param {RegExp} [splitRegex] Optional split regex for preprocessing the input text.
      */
-    constructor(dictionary, splitRegex = null) {
+    constructor(dictionary) {
         this.trie = this._buildTrie(dictionary);
-        this.splitRegex = splitRegex;
     }
 
     /**
@@ -486,20 +484,6 @@ export class DictionarySplitter {
      * @returns {string[]} An array of tokens.
      */
     split(text) {
-        return this.splitRegex ?
-            text.split(this.splitRegex)
-                .filter(x => x)
-                .flatMap(x => this._splitSingle(x))
-            : this._splitSingle(text)
-    }
-
-    /**
-     * Helper function to split a single text string into tokens.
-     * @param {string} text The input text to split.
-     * @returns {string[]} An array of tokens.
-     * @private
-     */
-    _splitSingle(text) {
         const result = [];
         const n = text.length;
         let start = 0;
