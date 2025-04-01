@@ -503,7 +503,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             }
         }
 
-        if (response === undefined || response.status === 404) {
+        else if (response === undefined || response.status === 404) {
             // File not found locally. This means either:
             // - The user has disabled local file access (`env.allowLocalModels=false`)
             // - the path is a valid HTTP url (`response === undefined`)
