@@ -1,0 +1,132 @@
+function mobileTabletCheck() {
+  let check = false;
+  (function (a: string) {
+    if (
+      /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|ipad|playbook|silk/i.test(a) ||
+      /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s/.test(a.substr(0, 4))
+    )
+      check = true;
+  })(navigator.userAgent || navigator.vendor || "");
+  return check;
+}
+
+
+const LANGUAGES = {
+  en: "english",
+  zh: "chinese",
+  de: "german",
+  es: "spanish/castilian",
+  ru: "russian",
+  ko: "korean",
+  fr: "french",
+  ja: "japanese",
+  pt: "portuguese",
+  tr: "turkish",
+  pl: "polish",
+  ca: "catalan/valencian",
+  nl: "dutch/flemish",
+  ar: "arabic",
+  sv: "swedish",
+  it: "italian",
+  id: "indonesian",
+  hi: "hindi",
+  fi: "finnish",
+  vi: "vietnamese",
+  he: "hebrew",
+  uk: "ukrainian",
+  el: "greek",
+  ms: "malay",
+  cs: "czech",
+  ro: "romanian/moldavian/moldovan",
+  da: "danish",
+  hu: "hungarian",
+  ta: "tamil",
+  no: "norwegian",
+  th: "thai",
+  ur: "urdu",
+  hr: "croatian",
+  bg: "bulgarian",
+  lt: "lithuanian",
+  la: "latin",
+  mi: "maori",
+  ml: "malayalam",
+  cy: "welsh",
+  sk: "slovak",
+  te: "telugu",
+  fa: "persian",
+  lv: "latvian",
+  bn: "bengali",
+  sr: "serbian",
+  az: "azerbaijani",
+  sl: "slovenian",
+  kn: "kannada",
+  et: "estonian",
+  mk: "macedonian",
+  br: "breton",
+  eu: "basque",
+  is: "icelandic",
+  hy: "armenian",
+  ne: "nepali",
+  mn: "mongolian",
+  bs: "bosnian",
+  kk: "kazakh",
+  sq: "albanian",
+  sw: "swahili",
+  gl: "galician",
+  mr: "marathi",
+  pa: "punjabi/panjabi",
+  si: "sinhala/sinhalese",
+  km: "khmer",
+  sn: "shona",
+  yo: "yoruba",
+  so: "somali",
+  af: "afrikaans",
+  oc: "occitan",
+  ka: "georgian",
+  be: "belarusian",
+  tg: "tajik",
+  sd: "sindhi",
+  gu: "gujarati",
+  am: "amharic",
+  yi: "yiddish",
+  lo: "lao",
+  uz: "uzbek",
+  fo: "faroese",
+  ht: "haitian creole/haitian",
+  ps: "pashto/pushto",
+  tk: "turkmen",
+  nn: "nynorsk",
+  mt: "maltese",
+  sa: "sanskrit",
+  lb: "luxembourgish/letzeburgesch",
+  my: "myanmar/burmese",
+  bo: "tibetan",
+  tl: "tagalog",
+  mg: "malagasy",
+  as: "assamese",
+  tt: "tatar",
+  haw: "hawaiian",
+  ln: "lingala",
+  ha: "hausa",
+  ba: "bashkir",
+  jw: "javanese",
+  su: "sundanese",
+};
+
+const isMobileOrTablet = mobileTabletCheck();
+
+export const constants = {
+  WHISPER_SAMPLING_RATE: 16_000,
+  DEFAULT_AUDIO_URL: `https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/${
+    isMobileOrTablet ? "jfk" : "ted_60_16k"
+  }.wav`,
+  DEFAULT_MODEL: "Xenova/whisper-tiny",
+  DEFAULT_SUBTASK: "transcribe",
+  DEFAULT_LANGUAGE: "english",
+  DEFAULT_QUANTIZED: isMobileOrTablet,
+  DEFAULT_MULTILINGUAL: false,
+  MAX_AUDIO_LENGTH:30,
+  
+} as const
+
+
