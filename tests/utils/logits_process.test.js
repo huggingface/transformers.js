@@ -81,6 +81,61 @@ describe("Logits Processors", () => {
       );
     });
 
+    describe("good_words_ids", () => {
+      it(
+        "generates nothing given empty good_words_ids",
+        async () => {
+          const text_input = "hello";
+          const generated_text_target = "";
+          const text_target = [{ generated_text: text_input + generated_text_target }];
+          const output = await pipe(text_input, {
+            max_new_tokens: 5,
+            good_words_ids: [
+              [],
+            ],
+          });
+          compare(output, text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "passes basic test",
+        async () => {
+          const text_input = "hello";
+          // Default output tokens for this input: 22172,18547,8136,18547,8136
+          // Default output text for this input: helloerdingsAndroid Load Между ligger
+          const generated_text_target = "Android helloAndroid hello hello";
+          const text_target = [{ generated_text: text_input + generated_text_target }];
+          const output = await pipe(text_input, {
+            max_new_tokens: 5,
+            good_words_ids: [
+              [22172, 8136], // hello, Android
+            ],
+          });
+          compare(output, text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "passes test with many good words",
+        async () => {
+          const text_input = "hello";
+          const generated_text_target = "erdingsAndroidierraég migli";
+          const text_target = [{ generated_text: text_input + generated_text_target }];
+          const good_words_ids = [];
+          for (let i = 0; i < 100000; ++i) {
+            good_words_ids.push([i * 2 + 1]); // allow all odd numbers
+          }
+          good_words_ids.push([22172, 8136]);
+          const output = await pipe(text_input, { max_new_tokens: 5, good_words_ids });
+          compare(output, text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
