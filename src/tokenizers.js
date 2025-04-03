@@ -65,8 +65,8 @@ import {
 async function loadTokenizer(pretrained_model_name_or_path, options) {
 
     const info = await Promise.all([
-        getModelJSON(pretrained_model_name_or_path, `${options.subfolder ?? ''}/tokenizer.json`, true, options),
-        getModelJSON(pretrained_model_name_or_path, `${options.subfolder ?? ''}/tokenizer_config.json`, true, options),
+        getModelJSON(pretrained_model_name_or_path, `${options.subfolder || ''}/tokenizer.json`, true, options),
+        getModelJSON(pretrained_model_name_or_path, `${options.subfolder || ''}/tokenizer_config.json`, true, options),
     ])
 
     // Override legacy option if `options.legacy` is not null
