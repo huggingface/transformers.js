@@ -191,7 +191,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         // Try to choose the auto dtype based on the custom config
         let config_dtype = custom_config.dtype;
         if (typeof config_dtype !== 'string') {
-            config_dtype = config_dtype[fileName];
+            config_dtype = config_dtype?.[fileName];
         }
 
         if (config_dtype && config_dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(config_dtype)) {
