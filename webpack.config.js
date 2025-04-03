@@ -1,5 +1,6 @@
 import TerserPlugin from "terser-webpack-plugin";
 import { fileURLToPath } from "url";
+import webpack from "webpack";
 import path from "path";
 import fs from "fs";
 
@@ -119,6 +120,12 @@ function buildConfig({
         },
       },
     };
+
+    config.plugins = [
+      new webpack.DefinePlugin({
+        __filename: 'new URL(import.meta.url).pathname',
+      }),
+    ];
   } else {
     config.externalsType = "commonjs";
   }
@@ -128,7 +135,7 @@ function buildConfig({
 
 // Do not bundle onnxruntime-web when packaging for Node.js.
 // Instead, we use the native library (onnxruntime-node).
-const NODE_IGNORE_MODULES = ["onnxruntime-web"];
+const NODE_IGNORE_MODULES = ["onnxruntime-web", "native-universal-fs", "react-native"];
 
 // Do not bundle the following modules with webpack (mark as external)
 // NOTE: This is necessary for both type="module" and type="commonjs",
