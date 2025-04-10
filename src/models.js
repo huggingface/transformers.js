@@ -121,6 +121,7 @@ import { apis } from './env.js';
 import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 import { whisper_language_to_code } from './models/whisper/common_whisper.js';
 
+
 //////////////////////////////////////////////////
 // Model types: used internally
 const MODEL_TYPES = {
@@ -171,7 +172,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        device ?? (apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV ? 'cpu' : 'wasm')
     );
     const executionProviders = deviceToExecutionProviders(selectedDevice);
 
@@ -248,7 +249,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, apis.IS_NODE_ENV);
+    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV);
 
     // handle onnx external data files
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
@@ -276,7 +277,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             const path = `${baseName}_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(new Promise(async (resolve, reject) => {
-                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
+                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV);
                 resolve(data instanceof Uint8Array ? { path, data } : path);
             }));
         }
