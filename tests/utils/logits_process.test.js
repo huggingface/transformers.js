@@ -92,7 +92,7 @@ describe("Logits Processors", () => {
             max_new_tokens: 5,
             bad_words_ids: [
               // default: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
-              [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // never triggers (longer than input sequence)
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3931], // should never trigger (longer than input sequence)
 
               // block #1: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
               [3931, 14756, 7811],
