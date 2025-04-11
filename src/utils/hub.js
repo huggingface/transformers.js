@@ -638,7 +638,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     });
 
     if (result) {
-        if (return_path) {
+        if (!apis.IS_NODE_ENV && return_path) {
             throw new Error("Cannot return path in a browser environment.")
         }
         return result;
@@ -647,7 +647,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         return response.filePath;
     }
 
-    const path = await cache.match(cacheKey);
+    const path = await cache?.match(cacheKey);
     if (path instanceof FileResponse) {
         return path.filePath;
     }
