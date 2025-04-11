@@ -578,12 +578,17 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             buffer = new Uint8Array(await response.arrayBuffer());
 
         } else if (
-            cacheHit // The item is being read from the cache
-            &&
-            typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent) // We are in Firefox
+            (
+                // Due to bug in Firefox, we cannot display progress when loading from cache.
+                // Fortunately, since this should be instantaneous, this should not impact users too much.
+                cacheHit // The item is being read from the cache
+                &&
+                typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent) // We are in Firefox
+            ) || (
+                // The `body` property may not be available on a Response object to do streaming, e.g., when using a fetch polyfill
+                typeof response.body === 'undefined'
+            )
         ) {
-            // Due to bug in Firefox, we cannot display progress when loading from cache.
-            // Fortunately, since this should be instantaneous, this should not impact users too much.
             buffer = new Uint8Array(await response.arrayBuffer());
 
             // For completeness, we still fire the final progress callback
