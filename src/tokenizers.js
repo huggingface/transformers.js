@@ -43,6 +43,7 @@ import {
     TokenLattice,
     CharTrie,
     DictionarySplitter,
+    LRUCache,
 } from './utils/data-structures.js';
 
 import { Template } from '@huggingface/jinja';
@@ -727,8 +728,24 @@ class BPE extends TokenizerModel {
 
         this.ignore_merges = this.config.ignore_merges ?? false;
 
-        /** @type {Map<string, string[]>} */
-        this.cache = new Map();
+        /**
+         * The maximum length we should cache in a model.
+         * Strings that are too long have minimal chances to cache hit anyway
+         */
+        this.max_length_to_cache = 256;
+
+        /**
+         * The default capacity for a `BPE`'s internal cache.
+         */
+        this.cache_capacity = 10000;
+        this.cache = new LRUCache(this.cache_capacity);
+    }
+
+    /**
+     * Clears the cache.
+     */
+    clear_cache() {
+        this.cache.clear();
     }
 
     /**
@@ -855,8 +872,10 @@ class BPE extends TokenizerModel {
             }
         }
 
-        // Save the result to the cache
-        this.cache.set(token, result);
+        if (token.length < this.max_length_to_cache) {
+            // Save the result to the cache
+            this.cache.put(token, result);
+        }
 
         return result;
     }
