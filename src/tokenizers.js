@@ -2790,17 +2790,16 @@ export class PreTrainedTokenizer extends Callable {
         // At this point, tokens is batched: [batch_size, tokens]
         // However, array may be jagged. So, we pad to max_length
 
-        if (max_length === null) {
-            if (padding === 'max_length') {
-                max_length = this.model_max_length;
-            } else {
-                // Calculate max length from sequences
-                max_length = max(encodedTokens.map(x => x.input_ids.length))[0];
-            }
-        } else {
-            if (!truncation) {
-                console.warn(`Truncation was not explicitly activated but \`max_length\` is provided a specific value, please use \`truncation=true\` to explicitly truncate examples to max length.`)
-            }
+        if (truncation && max_length === null) {
+            max_length = this.model_max_length;
+        } else if (max_length && truncation === null) {
+            console.warn(`Truncation was not explicitly activated but \`max_length\` is provided a specific value, please use \`truncation=true\` to explicitly truncate examples to max length.`)
+        }
+
+        // padding: 'max_length' doesn't require any additional calculation
+        // but padding: true has to calculate max_length from the sequences
+        if (padding === true) {
+            max_length = Math.min(max(encodedTokens.map(x => x.input_ids.length))[0], max_length ?? Infinity);
         }
 
         // Ensure it is less than model max length
