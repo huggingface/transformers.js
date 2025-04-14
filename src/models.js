@@ -116,7 +116,7 @@ import { RawImage } from './utils/image.js';
 import { dynamic_time_warping, max, medianFilter } from './utils/maths.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
 import { LogitsSampler } from './generation/logits_sampler.js';
-import { apis } from './env.js';
+import { apis, env } from './env.js';
 
 import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 import { whisper_language_to_code } from './models/whisper/common_whisper.js';
@@ -248,7 +248,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, apis.IS_NODE_ENV);
+    const return_path = apis.IS_NODE_ENV && (env.useFSCache || env.useCustomCache);
+    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, return_path);
 
     // handle onnx external data files
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
@@ -276,7 +277,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             const path = `${baseName}_data${i === 0 ? '' : '_' + i}`;
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(new Promise(async (resolve, reject) => {
-                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
+                const data = await getModelFile(pretrained_model_name_or_path, fullPath, true, options, return_path);
                 resolve(data instanceof Uint8Array ? { path, data } : path);
             }));
         }

@@ -407,7 +407,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             throw Error("Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.")
         }
     }
-    return_path &&= env.useFSCache || env.useCustomCache;
 
     // Initiate file retrieval
     dispatchCallback(options.progress_callback, {
