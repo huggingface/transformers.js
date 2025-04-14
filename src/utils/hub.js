@@ -647,12 +647,18 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         return response.filePath;
     }
 
-    const path = await cache?.match(cacheKey);
-    if (path instanceof FileResponse) {
-        return path.filePath;
+    // Otherwise, return the cached response (most likely a `FileResponse`).
+    // NOTE: A custom cache may return a Response, or a string (file path)
+    const cachedResponse = await cache?.match(cacheKey);
+    if (cachedResponse instanceof FileResponse) {
+        return cachedResponse.filePath;
+    } else if (cachedResponse instanceof Response) {
+        return new Uint8Array(await cachedResponse.arrayBuffer());
+    } else if (typeof cachedResponse === 'string') {
+        return cachedResponse;
     }
-    throw new Error("Unable to return path for response.");
 
+    throw new Error("Unable to get model file path or buffer.");
 }
 
 /**

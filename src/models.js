@@ -248,7 +248,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const return_path = apis.IS_NODE_ENV && (env.useFSCache || env.useCustomCache);
+    const return_path = apis.IS_NODE_ENV && env.useFSCache;
     const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, return_path);
 
     // handle onnx external data files

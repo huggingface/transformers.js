@@ -118,7 +118,8 @@ const localModelPath = RUNNING_LOCALLY
  * @property {string} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {Object} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
- * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache
+ * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
+ * If you wish, you may also return a `Promise<string>` from the `match` function if you'd like to use a file path instead of `Promise<Response>`.
  */
 
 /** @type {TransformersEnvironment} */
