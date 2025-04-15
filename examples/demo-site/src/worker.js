@@ -4,7 +4,7 @@
 // Needed to ensure the UI thread is not blocked when running  //
 /////////////////////////////////////////////////////////////////
 
-import { pipeline, env } from "@xenova/transformers";
+import { pipeline, env, TextStreamer } from "@huggingface/transformers";
 env.allowLocalModels = false;
 
 // Define task function mapping
@@ -158,19 +158,25 @@ async function translate(data) {
     // Doing it this way prevents the same model from being loaded multiple times
     pipeline.task = `translation_${data.languageFrom}_to_${data.languageTo}`;
 
-    return await pipeline(data.text, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
-                data: decodedText
+                data: allText.trim()
             });
         }
+    })
+
+    return await pipeline(data.text, {
+        ...data.generation,
+        streamer
     })
 }
 
@@ -186,19 +192,25 @@ async function text_generation(data) {
 
     let text = data.text.trim();
 
-    return await pipeline(text, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
-                data: decodedText
+                data: allText.trim()
             });
         }
+    })
+
+    return await pipeline(text, {
+        ...data.generation,
+        streamer
     })
 }
 
@@ -214,20 +226,26 @@ async function code_completion(data) {
 
     let text = data.text;
 
-    return await pipeline(text, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
                 targetType: data.targetType,
-                data: decodedText
+                data: allText.trim()
             });
         }
+    })
+
+    return await pipeline(text, {
+        ...data.generation,
+        streamer
     })
 }
 
@@ -395,19 +413,25 @@ async function summarize(data) {
         });
     })
 
-    return await pipeline(data.text, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
-                data: decodedText.trim()
+                data: allText
             });
         }
+    })
+
+    return await pipeline(data.text, {
+        ...data.generation,
+        streamer
     })
 }
 
@@ -420,23 +444,30 @@ async function speech_to_text(data) {
         });
     })
 
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
+
+            self.postMessage({
+                type: 'update',
+                target: data.elementIdToUpdate,
+                data: allText
+            });
+        }
+    })
+
     return await pipeline(data.audio, {
         // Choose good defaults for the demo
         chunk_length_s: 30,
         stride_length_s: 5,
 
         ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
 
-            self.postMessage({
-                type: 'update',
-                target: data.elementIdToUpdate,
-                data: decodedText.trim()
-            });
-        }
+        streamer
     })
 }
 
@@ -449,19 +480,25 @@ async function image_to_text(data) {
         });
     })
 
-    return await pipeline(data.image, {
-        ...data.generation,
-        callback_function: function (beams) {
-            const decodedText = pipeline.tokenizer.decode(beams[0].output_token_ids, {
-                skip_special_tokens: true,
-            })
+    let allText = "";
+
+    const streamer = new TextStreamer(pipeline.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: function (newText) {
+            allText += newText;
 
             self.postMessage({
                 type: 'update',
                 target: data.elementIdToUpdate,
-                data: decodedText.trim()
+                data: allText
             });
         }
+    })
+
+    return await pipeline(data.image, {
+        ...data.generation,
+        streamer
     })
 }
 
