@@ -434,13 +434,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
-    if (!cache && env.useFSCache) {
-        // TODO throw error if not available
-
-        // If `cache_dir` is not specified, use the default cache directory
-        cache = new FileCache(options.cache_dir ?? env.cacheDir);
-    }
-
     if (!cache && env.useCustomCache) {
         // Allow the user to specify a custom cache system.
         if (!env.customCache) {
@@ -455,6 +448,13 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             )
         }
         cache = env.customCache;
+    }
+
+    if (!cache && env.useFSCache) {
+        // TODO throw error if not available
+
+        // If `cache_dir` is not specified, use the default cache directory
+        cache = new FileCache(options.cache_dir ?? env.cacheDir);
     }
 
     const revision = options.revision ?? 'main';
