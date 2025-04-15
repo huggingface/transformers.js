@@ -451,7 +451,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     }
 
     if (!cache && env.useFSCache) {
-        // TODO throw error if not available
+        if (!apis.IS_FS_AVAILABLE) {
+            throw Error('File System Cache is not available in this environment.');
+        }
 
         // If `cache_dir` is not specified, use the default cache directory
         cache = new FileCache(options.cache_dir ?? env.cacheDir);
