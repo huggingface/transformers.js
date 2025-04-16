@@ -215,8 +215,7 @@ function isValidHfModelId(string) {
 export async function getFile(urlOrPath) {
 
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
-        return new FileResponse(urlOrPath.toString());
-
+        return new FileResponse(urlOrPath instanceof URL ? urlOrPath.pathname : urlOrPath);
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
