@@ -106,7 +106,7 @@ def main():
         return f'({link})'
 
     result = README_TEMPLATE.format(**file_data)
-    result = re.sub(LINK_RE, replace_fn, result, 0, re.MULTILINE)
+    result = re.sub(LINK_RE, replace_fn, result, count=0, flags=re.MULTILINE)
 
     with open('README.md', 'w', encoding='utf-8') as f:
         f.write(result)
