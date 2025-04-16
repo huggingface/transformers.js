@@ -180,6 +180,53 @@ describe("Tokenizer padding/truncation", () => {
           [0n, 0n],
         ]);
       }
+
+      {
+        // padding: true should pad encodings to match the longest encoding in the batch,
+        // regardless of what is set in max_length
+        const { input_ids, attention_mask, token_type_ids } = tokenizer(inputs, {
+          padding: true,
+          truncation: true,
+          add_special_tokens: false,
+          max_length: 3,
+        });
+
+        expect(input_ids.tolist()).toEqual([
+          [1037n, 0n],
+          [1038n, 1039n],
+        ]);
+        expect(attention_mask.tolist()).toEqual([
+          [1n, 0n],
+          [1n, 1n],
+        ]);
+        expect(token_type_ids.tolist()).toEqual([
+          [0n, 0n],
+          [0n, 0n],
+        ]);
+      }
+
+      {
+        // padding: 'max_length' should pad encodings to match max_length
+        const { input_ids, attention_mask, token_type_ids } = tokenizer(inputs, {
+          padding: 'max_length',
+          truncation: true,
+          add_special_tokens: false,
+          max_length: 3,
+        });
+
+        expect(input_ids.tolist()).toEqual([
+          [1037n, 0n, 0n],
+          [1038n, 1039n, 0n],
+        ]);
+        expect(attention_mask.tolist()).toEqual([
+          [1n, 0n, 0n],
+          [1n, 1n, 0n],
+        ]);
+        expect(token_type_ids.tolist()).toEqual([
+          [0n, 0n, 0n],
+          [0n, 0n, 0n],
+        ]);
+      }
     },
     MAX_TEST_EXECUTION_TIME,
   );
