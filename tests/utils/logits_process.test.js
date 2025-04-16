@@ -79,6 +79,31 @@ describe("Logits Processors", () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "different lengths",
+        async () => {
+          const text_input = "this is a test";
+
+          const generated_text_target = "кт México constructed lake user";
+          const text_target = [{ generated_text: text_input + generated_text_target }];
+
+          const output = await pipe(text_input, {
+            max_new_tokens: 5,
+            bad_words_ids: [
+              // default: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
+              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3931], // should never trigger (longer than input sequence)
+
+              // block #1: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
+              [3931, 14756, 7811],
+
+              // result: [445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 1404n]
+            ],
+          });
+          compare(output, text_target);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     afterAll(async () => {

@@ -302,6 +302,23 @@ describe("Edge cases", () => {
   }, 5000); // NOTE: 5 seconds
 });
 
+describe("Memory leak tests", () => {
+  it("should not leak memory", async () => {
+    const id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0";
+    const tokenizer = await AutoTokenizer.from_pretrained(id);
+
+    const startMemory = process.memoryUsage().heapUsed;
+    for (let i = 0; i < 2500; ++i) {
+      const s = `${i} ${i} `.repeat(i);
+      tokenizer.encode(s);
+    }
+    const endMemory = process.memoryUsage().heapUsed;
+    const memoryUsed = endMemory - startMemory;
+    const memoryLimit = 100 * 1024 * 1024; // 100 MB
+    expect(memoryUsed).toBeLessThan(memoryLimit);
+  }, 30000); // Increase timeout to accommodate the memory leak test
+});
+
 describe("Extra decoding tests", () => {
   it(
     "should be able to decode the output of encode",

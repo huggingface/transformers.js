@@ -235,7 +235,8 @@ function linspace(start, end, num) {
  * various implementation exist, which differ in the number of filters, the shape of the filters, the way the filters
  * are spaced, the bandwidth of the filters, and the manner in which the spectrum is warped. The goal of these
  * features is to approximate the non-linear human perception of the variation in pitch with respect to the frequency.
- * @param {number} num_frequency_bins Number of frequencies used to compute the spectrogram (should be the same as in `stft`).
+ * @param {number} num_frequency_bins Number of frequency bins (should be the same as `n_fft // 2 + 1`
+ * where `n_fft` is the size of the Fourier Transform used to compute the spectrogram).
  * @param {number} num_mel_filters Number of mel filters to generate.
  * @param {number} min_frequency Lowest frequency of interest in Hz.
  * @param {number} max_frequency Highest frequency of interest in Hz. This should not exceed `sampling_rate / 2`.
@@ -261,6 +262,14 @@ export function mel_filter_bank(
         throw new Error('norm must be one of null or "slaney"');
     }
 
+    if (num_frequency_bins < 2) {
+        throw new Error(`Require num_frequency_bins: ${num_frequency_bins} >= 2`);
+    }
+
+    if (min_frequency > max_frequency) {
+        throw new Error(`Require min_frequency: ${min_frequency} <= max_frequency: ${max_frequency}`);
+    }
+
     const mel_min = hertz_to_mel(min_frequency, mel_scale);
     const mel_max = hertz_to_mel(max_frequency, mel_scale);
     const mel_freqs = linspace(mel_min, mel_max, num_mel_filters + 2);
@@ -269,7 +278,7 @@ export function mel_filter_bank(
     let fft_freqs; // frequencies of FFT bins in Hz
 
     if (triangularize_in_mel_space) {
-        const fft_bin_width = sampling_rate / (num_frequency_bins * 2);
+        const fft_bin_width = sampling_rate / ((num_frequency_bins - 1) * 2);
         fft_freqs = hertz_to_mel(Float64Array.from({ length: num_frequency_bins }, (_, i) => i * fft_bin_width), mel_scale);
         filter_freqs = mel_freqs;
     } else {

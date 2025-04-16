@@ -10,7 +10,7 @@ export class ASTFeatureExtractor extends FeatureExtractor {
 
         const sampling_rate = this.config.sampling_rate;
         const mel_filters = mel_filter_bank(
-            256, // num_frequency_bins
+            257, // num_frequency_bins
             this.config.num_mel_bins, // num_mel_filters
             20, // min_frequency
             Math.floor(sampling_rate / 2), // max_frequency
@@ -19,11 +19,6 @@ export class ASTFeatureExtractor extends FeatureExtractor {
             "kaldi", // mel_scale
             true, // triangularize_in_mel_space
         );
-
-        // Do padding:
-        for (let i = 0; i < mel_filters.length; ++i) {
-            mel_filters[i].push(0);
-        }
         this.mel_filters = mel_filters;
 
         this.window = window_function(400, 'hann', {

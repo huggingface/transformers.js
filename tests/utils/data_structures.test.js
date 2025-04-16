@@ -1,4 +1,4 @@
-import { PriorityQueue, DictionarySplitter } from "../../src/utils/data-structures.js";
+import { PriorityQueue, DictionarySplitter, LRUCache } from "../../src/utils/data-structures.js";
 
 describe("Priority queue", () => {
   const EXAMPLE_ARRAY = [2, 5, 3, 1, 4];
@@ -47,5 +47,75 @@ describe("Dictionary splitter", () => {
     const expected = ["before", "🤗", "after", "\ud83e", "test"];
     const result = splitter.split(text);
     expect(result).toEqual(expected);
+  });
+});
+
+describe("LRUCache", () => {
+  it("should return undefined for non-existent keys", () => {
+    const cache = new LRUCache(2);
+    expect(cache.get("nonexistent")).toEqual(undefined);
+  });
+
+  it("should store and retrieve values correctly", () => {
+    const cache = new LRUCache(2);
+    cache.put("a", 1);
+    cache.put("b", 2);
+    expect(cache.get("a")).toEqual(1);
+    expect(cache.get("b")).toEqual(2);
+  });
+
+  it("should update the value and refresh the usage", () => {
+    const cache = new LRUCache(2);
+    cache.put("a", 1);
+    cache.put("b", 2);
+    // Update key "a"
+    cache.put("a", 10);
+    expect(cache.get("a")).toEqual(10);
+    // Access "a" so "b" becomes the LRU
+    cache.get("a");
+    cache.put("c", 3);
+    // "b" should be evicted since it is the least recently used.
+    expect(cache.get("b")).toEqual(undefined);
+    expect(cache.get("c")).toEqual(3);
+  });
+
+  it("should evict the least recently used item when capacity is exceeded", () => {
+    const cache = new LRUCache(3);
+    cache.put("a", 1);
+    cache.put("b", 2);
+    cache.put("c", 3);
+    // Access "a" to refresh its recentness.
+    cache.get("a");
+    // Insert a new key, this should evict "b" as it is the least recently used.
+    cache.put("d", 4);
+    expect(cache.get("b")).toEqual(undefined);
+    expect(cache.get("a")).toEqual(1);
+    expect(cache.get("c")).toEqual(3);
+    expect(cache.get("d")).toEqual(4);
+  });
+
+  it("should update the usage order on get", () => {
+    const cache = new LRUCache(3);
+    cache.put("a", "apple");
+    cache.put("b", "banana");
+    cache.put("c", "cherry");
+    // Access "a" making it most recently used.
+    expect(cache.get("a")).toEqual("apple");
+    // Insert new element to evict the least recently used ("b").
+    cache.put("d", "date");
+    expect(cache.get("b")).toEqual(undefined);
+    // "a", "c", and "d" should be present.
+    expect(cache.get("a")).toEqual("apple");
+    expect(cache.get("c")).toEqual("cherry");
+    expect(cache.get("d")).toEqual("date");
+  });
+
+  it("should clear the cache", () => {
+    const cache = new LRUCache(2);
+    cache.put("a", 1);
+    cache.put("b", 2);
+    cache.clear();
+    expect(cache.get("a")).toEqual(undefined);
+    expect(cache.get("b")).toEqual(undefined);
   });
 });

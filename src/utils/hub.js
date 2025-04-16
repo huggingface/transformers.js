@@ -418,6 +418,22 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // First, check if the a caching backend is available
     // If no caching mechanism available, will download the file every time
     let cache;
+    if (!cache && env.useCustomCache) {
+        // Allow the user to specify a custom cache system.
+        if (!env.customCache) {
+            throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.')
+        }
+
+        // Check that the required methods are defined:
+        if (!env.customCache.match || !env.customCache.put) {
+            throw new Error(
+                "`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. " +
+                "For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache"
+            )
+        }
+        cache = env.customCache;
+    }
+
     if (!cache && env.useBrowserCache) {
         if (typeof caches === 'undefined') {
             throw Error('Browser cache is not available in this environment.')
@@ -435,26 +451,12 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     }
 
     if (!cache && env.useFSCache) {
-        // TODO throw error if not available
+        if (!apis.IS_FS_AVAILABLE) {
+            throw Error('File System Cache is not available in this environment.');
+        }
 
         // If `cache_dir` is not specified, use the default cache directory
         cache = new FileCache(options.cache_dir ?? env.cacheDir);
-    }
-
-    if (!cache && env.useCustomCache) {
-        // Allow the user to specify a custom cache system.
-        if (!env.customCache) {
-            throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.')
-        }
-
-        // Check that the required methods are defined:
-        if (!env.customCache.match || !env.customCache.put) {
-            throw new Error(
-                "`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. " +
-                "For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache"
-            )
-        }
-        cache = env.customCache;
     }
 
     const revision = options.revision ?? 'main';
@@ -638,7 +640,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     });
 
     if (result) {
-        if (return_path) {
+        if (!apis.IS_NODE_ENV && return_path) {
             throw new Error("Cannot return path in a browser environment.")
         }
         return result;
@@ -647,12 +649,18 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         return response.filePath;
     }
 
-    const path = await cache.match(cacheKey);
-    if (path instanceof FileResponse) {
-        return path.filePath;
+    // Otherwise, return the cached response (most likely a `FileResponse`).
+    // NOTE: A custom cache may return a Response, or a string (file path)
+    const cachedResponse = await cache?.match(cacheKey);
+    if (cachedResponse instanceof FileResponse) {
+        return cachedResponse.filePath;
+    } else if (cachedResponse instanceof Response) {
+        return new Uint8Array(await cachedResponse.arrayBuffer());
+    } else if (typeof cachedResponse === 'string') {
+        return cachedResponse;
     }
-    throw new Error("Unable to return path for response.");
 
+    throw new Error("Unable to get model file path or buffer.");
 }
 
 /**
