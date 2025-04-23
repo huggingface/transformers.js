@@ -237,6 +237,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     const session_config = {
         dtype: selectedDtype,
         kv_cache_dtype,
+        device: selectedDevice,
     }
 
     // Construct the model file name
@@ -417,6 +418,10 @@ function validateInputs(session, inputs) {
     return checkedInputs;
 }
 
+// Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
+// For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
+let webInferenceChain = Promise.resolve();
+
 /**
  * Executes an InferenceSession using the specified inputs.
  * NOTE: `inputs` must contain at least the input names of the model.
@@ -433,17 +438,28 @@ async function sessionRun(session, inputs) {
     try {
         // pass the original ort tensor
         const ortFeed = Object.fromEntries(Object.entries(checkedInputs).map(([k, v]) => [k, v.ort_tensor]));
-        let output = await session.run(ortFeed);
-        output = replaceTensors(output);
-        return output;
+        const run = () => session.run(ortFeed);
+        const output = await ((apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV)
+            ? (webInferenceChain = webInferenceChain.then(run))
+            : run());
+        return replaceTensors(output);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
         // we apply minor formatting to show the most important information
         const formatted = Object.fromEntries(Object.entries(checkedInputs)
-            .map(([k, { type, dims, data }]) => [k, {
+            .map(([k, tensor]) => {
                 // Extract these properties from the underlying ORT tensor
-                type, dims, data,
-            }]));
+                const unpacked = {
+                    type: tensor.type,
+                    dims: tensor.dims,
+                    location: tensor.location,
+                }
+                if (unpacked.location !== "gpu-buffer") {
+                    // Only return the data if it's not a GPU buffer
+                    unpacked.data = tensor.data;
+                }
+                return [k, unpacked];
+            }));
 
         // This usually occurs when the inputs are of the wrong type.
         console.error(`An error occurred during model execution: "${e}".`);
@@ -5207,7 +5223,7 @@ export class RTDetrV2ForObjectDetection extends RTDetrV2PreTrainedModel {
     }
 }
 
-export class RTDetrV2ObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
+export class RTDetrV2ObjectDetectionOutput extends RTDetrObjectDetectionOutput { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -5222,7 +5238,7 @@ export class RFDetrForObjectDetection extends RFDetrPreTrainedModel {
     }
 }
 
-export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
+export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
