@@ -117,7 +117,6 @@ function getNormalizedConfig(config) {
         case 'starcoder2':
         case 'qwen2':
         case 'qwen2_vl':
-        case 'qwen3':
         case 'phi':
         case 'phi3':
         case 'phi3_v':
@@ -126,6 +125,7 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
+        case 'qwen3':
         case 'gemma':
         case 'gemma2':
         case 'gemma3_text':
