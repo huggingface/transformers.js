@@ -117,6 +117,7 @@ function getNormalizedConfig(config) {
         case 'starcoder2':
         case 'qwen2':
         case 'qwen2_vl':
+        case 'qwen3':
         case 'phi':
         case 'phi3':
         case 'phi3_v':
