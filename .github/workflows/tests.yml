@@ -13,6 +13,9 @@ on:
       - synchronize
       - ready_for_review
 
+env:
+  TESTING_REMOTELY: true
+
 jobs:
   build:
     if: github.event.pull_request.draft == false
