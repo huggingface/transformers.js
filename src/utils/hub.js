@@ -219,7 +219,7 @@ export async function getFile(urlOrPath) {
           urlOrPath instanceof URL
             ? urlOrPath.protocol === "file:"
               ? urlOrPath.pathname
-              : urlOrPath
+              : urlOrPath.toString()
             : urlOrPath,
         );
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
