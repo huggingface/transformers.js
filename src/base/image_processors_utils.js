@@ -619,6 +619,10 @@ export class ImageProcessor extends Callable {
         this.pad_size = config.pad_size;
         // @ts-expect-error TS2339
         this.do_pad = config.do_pad;
+        // @ts-expect-error TS2339
+        this.min_pixels = config.min_pixels;
+        // @ts-expect-error TS2339
+        this.max_pixels = config.max_pixels;
 
         if (this.do_pad && !this.pad_size && this.size && this.size.width !== undefined && this.size.height !== undefined) {
             // Should pad, but no pad size specified
@@ -892,12 +896,11 @@ export class ImageProcessor extends Callable {
 
         } else if (this.size_divisibility !== undefined) {
             return enforce_size_divisibility([srcWidth, srcHeight], this.size_divisibility);
-        } else if (size.min_pixels !== undefined && size.max_pixels !== undefined) {
+        } else if (this.min_pixels !== undefined && this.max_pixels !== undefined) {
             // Custom resize logic for Qwen2-VL models
-            const { min_pixels, max_pixels } = size;
             // @ts-expect-error TS2339
             const factor = this.config.patch_size * this.config.merge_size;
-            return smart_resize(srcHeight, srcWidth, factor, min_pixels, max_pixels);
+            return smart_resize(srcHeight, srcWidth, factor, this.min_pixels, this.max_pixels);
         } else {
             throw new Error(`Could not resize image due to unsupported \`this.size\` option in config: ${JSON.stringify(size)}`);
         }
