@@ -2787,13 +2787,21 @@ export class PreTrainedTokenizer extends Callable {
             // For single input, we just wrap in an array, and then unwrap later.
             encodedTokens = [this._encode_plus(text, { text_pair, add_special_tokens, return_token_type_ids })];
         }
-        // At this point, tokens is batched: [batch_size, tokens]
-        // However, array may be jagged. So, we pad to max_length
-
-        if (truncation && max_length === null) {
+        // At this point, `encodedTokens` is batched, of shape [batch_size, tokens].
+        // However, array may be jagged. So, we may need pad to max_length.
+        if (max_length === null) {
             max_length = this.model_max_length;
         } else if (max_length && truncation === null) {
-            console.warn(`Truncation was not explicitly activated but \`max_length\` is provided a specific value, please use \`truncation=true\` to explicitly truncate examples to max length.`)
+            if (padding === true) {
+                console.warn(
+                    "`max_length` is ignored when `padding: true` and there is no truncation strategy. " +
+                    "To pad to max length, use `padding: 'max_length'`."
+                )
+                max_length = this.model_max_length;
+            } else if (padding === false) {
+                console.warn("Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation: true` to explicitly truncate examples to max length.");
+                truncation = true;
+            }
         }
 
         // padding: 'max_length' doesn't require any additional calculation
