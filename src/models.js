@@ -5258,6 +5258,19 @@ export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+export class DFinePreTrainedModel extends PreTrainedModel { }
+export class DFineModel extends DFinePreTrainedModel { }
+export class DFineForObjectDetection extends DFinePreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new RTDetrObjectDetectionOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 export class TableTransformerPreTrainedModel extends PreTrainedModel { }
 
 /**
@@ -7566,6 +7579,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['rt_detr', ['RTDetrModel', RTDetrModel]],
     ['rt_detr_v2', ['RTDetrV2Model', RTDetrV2Model]],
     ['rf_detr', ['RFDetrModel', RFDetrModel]],
+    ['d_fine', ['DFineModel', DFineModel]],
     ['table-transformer', ['TableTransformerModel', TableTransformerModel]],
     ['vit', ['ViTModel', ViTModel]],
     ['ijepa', ['IJepaModel', IJepaModel]],
@@ -7869,6 +7883,7 @@ const MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES = new Map([
     ['rt_detr', ['RTDetrForObjectDetection', RTDetrForObjectDetection]],
     ['rt_detr_v2', ['RTDetrV2ForObjectDetection', RTDetrV2ForObjectDetection]],
     ['rf_detr', ['RFDetrForObjectDetection', RFDetrForObjectDetection]],
+    ['d_fine', ['DFineForObjectDetection', DFineForObjectDetection]],
     ['table-transformer', ['TableTransformerForObjectDetection', TableTransformerForObjectDetection]],
     ['yolos', ['YolosForObjectDetection', YolosForObjectDetection]],
 ]);
