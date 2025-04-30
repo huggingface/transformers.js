@@ -2791,7 +2791,7 @@ export class PreTrainedTokenizer extends Callable {
         // However, array may be jagged. So, we may need pad to max_length.
         if (max_length === null) {
             max_length = this.model_max_length;
-        } else if (max_length && truncation === null) {
+        } else if (truncation === null) {
             if (padding === true) {
                 console.warn(
                     "`max_length` is ignored when `padding: true` and there is no truncation strategy. " +
