@@ -1,0 +1,187 @@
+# Building a Svelte application
+
+In this tutorial, we'll build a simple [Svelte](https://svelte.dev/docs/introduction) application that performs sentiment analysis using Transformers.js!
+The final product will look something like this:
+
+![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/svelte-transformersjs.gif)
+
+Useful links:
+
+- Demo site: [client-side](https://huggingface.co/spaces/radames/transformers-js-svelte-example-app)
+- Source code: [client-side](https://github.com/xenova/transformers.js/tree/main/examples/svelte)
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/en/) version 16.8+
+
+### Step 1: Initialise the project
+
+We will be using [Vite.js](https://vitejs.dev/) as the build tool for our app. Vite.js will run a local development server
+with hot reloading and build our production application.
+Start by creating a new Svelte application using [Vite build tool](https://vitejs.dev/guide/#scaffolding-your-first-vite-project):
+
+```bash
+npm create vite@latest
+```
+
+We'll select a simple JavaScript template for this demo, but you can choose one with TypeScript or SvelteKit following our [another guide](sveltekit).
+In addition, we'll be adding Tailwind CSS following their [official guide](https://tailwindcss.com/docs/guides/vite#svelte).
+
+### Step 2: Install and configure Transformers.js
+
+You can install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+
+```bash
+npm i @xenova/transformers
+```
+
+Next, we'll create a new [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) script where we'll place all ML-related code. This ensures that the main thread is not blocked while the model is loading and performing inference.
+For this application, we'll be using [`Xenova/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english),
+a ~67M parameter model finetuned on the [Stanford Sentiment Treebank](https://huggingface.co/datasets/sst) dataset. Add the following code to `./src/lib/worker.js`:
+
+```js
+import { pipeline, env } from "@xenova/transformers";
+
+// Skip local model check
+env.allowLocalModels = false;
+
+// Use the Singleton pattern to enable lazy construction of the pipeline.
+class PipelineSingleton {
+  static task = "text-classification";
+  static model = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      this.instance = pipeline(this.task, this.model, { progress_callback });
+    }
+    return this.instance;
+  }
+}
+
+// Listen for messages from the main thread
+self.addEventListener("message", async (event) => {
+  // Retrieve the classification pipeline. When called for the first time,
+  // this will load the pipeline and save it for future use.
+  let classifier = await PipelineSingleton.getInstance((x) => {
+    // We also add a progress callback to the pipeline so that we can
+    // track model loading.
+    self.postMessage(x);
+  });
+
+  // Actually perform the classification
+  let output = await classifier(event.data.text);
+
+  // Send the output back to the main thread
+  self.postMessage({
+    status: "complete",
+    output: output,
+  });
+});
+```
+
+### Step 3: Design the user interface
+
+We'll define our application's main interface and logic on the single root app component `./src/src/App.svelte`.
+The app will be mounted on the `#app` element in `./index.html`, according to the entry point `./src/main.js`.
+
+Let's start by loading the Web Worker once the page is mounted. In Svelte, the `onMount` function can run code when the component is mounted.
+To reference the worker code, we use the alias `./lib/worker.js?worker`. As Svelte is built with Vite.js, we can use the syntax `?worker` to specify that the file should be loaded as a Web Worker. Read more here [Vite.js Web Workers](https://vitejs.dev/guide/features.html#web-workers).
+
+```jsx
+<script>
+  import { onMount } from "svelte";
+
+  // Create a global variable to store the worker.
+  let pipelineWorker;
+
+  // reactive variables to store the result and the ready state.
+  let result = null;
+  let ready = null;
+
+  onMount(async () => {
+    // onMount set up the worker as soon as the Svelte page component is mounted.
+    if (!pipelineWorker) {
+      // Create the worker if it does not yet exist.
+      const Worker = await import("./lib/worker.js?worker");
+      pipelineWorker = new Worker.default();
+
+      const onMessageReceived = (e) => {
+        switch (e.data.status) {
+          case "initiate":
+            ready = false;
+            break;
+          case "ready":
+            ready = true;
+            break;
+          case "complete":
+            result = e.data.output[0];
+            break;
+        }
+      };
+
+      // Attach the callback function as an event listener.
+      pipelineWorker.addEventListener("message", onMessageReceived);
+    }
+  });
+
+  // main classify function that sends messages with the text to the worker.
+  function classify(text) {
+    if (pipelineWorker) {
+      pipelineWorker.postMessage({ text });
+    }
+  }
+</script>
+```
+
+Now we only need to design the UI with HTML, CSS, and attach the `classify` function to the input element.
+For every input change event, we call the `classify` function with the input text.
+
+```jsx
+<main class="flex min-h-screen flex-col items-center justify-center p-12">
+  <h1 class="text-5xl font-bold mb-2 text-center">Transformers.js</h1>
+  <h2 class="text-2xl mb-4 text-center">SvelteKit Static template (client-side)</h2>
+  <input
+    type="text"
+    class="w-full max-w-xs p-2 border border-gray-300 rounded mb-4 dark:text-black"
+    placeholder="Enter text here"
+    on:input={(e) => {
+      classify(e.target.value);
+    }}
+  />
+
+  {#if ready !== null}
+    <pre class="bg-gray-100 dark:bg-gray-800 p-2 rounded">{!ready || !result
+        ? 'Loading...'
+        : JSON.stringify(result, null, 2)}</pre>
+  {/if}
+</main>
+```
+
+You can run your appplication on development mode with the following command:
+
+```bash
+npm run dev
+```
+
+View the application at [http://localhost:5173/](http://localhost:5173/)
+
+### (Optional) Step 4: Build and deploy
+
+To build your application, simply run:
+
+```bash
+npm run build
+```
+
+All the static files will be generated in the `./build` folder.
+
+You can now deploy your application as a static [Hugging Face Space](https://huggingface.co/docs/hub/spaces), or to any other static hosting service of your choice.
+You can create a free Hugging Face account [here](https://huggingface.co/join) if you haven't already.
+
+1. Visit [https://huggingface.co/new-space](https://huggingface.co/new-space) and fill in the form. Remember to select "Static" as the space type.
+2. Click the "Create space" button at the bottom of the page.
+3. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from the `build` folder into the upload box and click "Upload".
+   After they have uploaded, scroll down to the button and click "Commit changes to main".
+
+**That's it!** Your application should now be live at `https://huggingface.co/spaces/<your-username>/<your-space-name>`!
