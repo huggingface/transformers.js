@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { distance } from "fastest-levenshtein";
+
 export async function loadAudio(url) {
   // NOTE: Since the Web Audio API is not available in Node.js, we will need to use the `wavefile` library to obtain the raw audio data.
   // For more information, see: https://huggingface.co/docs/transformers.js/guides/node-audio-processing
@@ -66,6 +68,22 @@ export function compare(val1, val2, tol = 0.1) {
       expect(val1).toEqual(val2);
     }
   }
+}
+
+/**
+ * Compare two strings adding some tolerance for variation between model outputs.
+ * 
+ * Similarity score is computing using Levenshtein distance (n_diff) between the two strings, as a fraction of the first string's length:
+ *   similarity score = 1 - n_diff / str1.length.
+ *
+ * @param {string} str1 The first string
+ * @param {string} str2 The second string
+ * @param {number} tol Tolerance score for similarity between strings, from -Infinity to 1.0 (100% match).
+ */
+export function compareString(str1, str2, tol = 0.9) {
+  const dist = distance(str1, str2);
+  const score = 1 - dist / (str1.length ?? 1);
+  expect(score).toBeGreaterThanOrEqual(tol);
 }
 
 const __filename = fileURLToPath(import.meta.url);

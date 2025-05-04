@@ -91,6 +91,7 @@ import {
     TopKLogitsWarper,
     TopPLogitsWarper,
     ClassifierFreeGuidanceLogitsProcessor,
+    OnlyGoodWordsLogitsProcessor,
 } from './generation/logits_process.js';
 
 import {
@@ -114,7 +115,7 @@ import {
 import { RawImage } from './utils/image.js';
 
 import { dynamic_time_warping, max, medianFilter } from './utils/maths.js';
-import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
+import { AlwaysStopCriteria, EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from './generation/stopping_criteria.js';
 import { LogitsSampler } from './generation/logits_sampler.js';
 import { apis, env } from './env.js';
 
@@ -1378,6 +1379,10 @@ export class PreTrainedModel extends Callable {
 
         if (generation_config.bad_words_ids !== null) {
             processors.push(new NoBadWordsLogitsProcessor(generation_config.bad_words_ids, generation_config.eos_token_id));
+        }
+
+        if (generation_config.good_words_ids !== null) {
+            processors.push(new OnlyGoodWordsLogitsProcessor(generation_config.good_words_ids, generation_config.eos_token_id));
         }
 
         if (generation_config.min_length !== null && generation_config.eos_token_id !== null && generation_config.min_length > 0) {
@@ -3338,10 +3343,48 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
     }
 
     /**
+     * Detects language by running input through the model and checking for language tokens in the output.
      * 
-     * @param {WhisperGenerationConfig} generation_config 
+     * @param {import('./models/whisper/generation_whisper.js').WhisperGenerationFunctionParameters} options
+     * @returns {Promise<number[]>} A list of language token IDs detected.
      */
-    _retrieve_init_tokens(generation_config) {
+    async _detect_language(options) {
+        const inputs = options.inputs
+        const generation_config = options.generation_config;
+        const batch_size = inputs?.dims?.[0]
+        if (!inputs || batch_size <= 0 || inputs.size <= 0) {
+            throw new Error("Cannot detect language for empty input");
+        }
+        const start_of_transcript = generation_config.decoder_start_token_id;
+        const decoder_input_ids = full([batch_size, 1], Number(1.0)).mul_(start_of_transcript).tolist();
+        const all_lang_ids = Object.values(generation_config.lang_to_id);
+        if (!all_lang_ids || all_lang_ids.length <= 0) {
+            throw new Error("Cannot detect language without language code to token ID map for model");
+        }
+        const stopping_criteria = new StoppingCriteriaList();
+        stopping_criteria.push(new AlwaysStopCriteria());
+        const good_words_ids = [all_lang_ids];
+        const output = await this.generate({
+            ...options,
+            generation_config: {
+                ...generation_config,
+                good_words_ids,
+                num_beams: 1,
+                do_sample: false,
+            },
+            stopping_criteria,
+            decoder_input_ids,
+        });
+        const sane = Array.from((/**@type {Tensor}**/(output)).data).flatMap(x => Number(x));
+        const lang_ids = sane.filter(x => Object.values(generation_config.lang_to_id).includes(x));
+        return lang_ids;
+    }
+
+    /**
+     * @param {import('./models/whisper/generation_whisper.js').WhisperGenerationFunctionParameters} options
+     */
+    async _retrieve_init_tokens(options) {
+        const generation_config = options.generation_config
         // prefix tokens are of the form: 
         //  - Multilingual: <|startoftranscript|> <|lang_id|> <|task|> [<|notimestamps|>]
         //  - English-only: <|startoftranscript|> [<|notimestamps|>]
@@ -3353,16 +3396,26 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         let language = generation_config.language;
         const task = generation_config.task;
         if (generation_config.is_multilingual) {
+            let lang_id;
             if (!language) {
-                // TODO: Implement language detection
-                console.warn('No language specified - defaulting to English (en).');
-                language = 'en';
+                try {
+                    const lang_token_ids = await this._detect_language(options);
+                    lang_id = lang_token_ids[0];
+                    if (!lang_id) {
+                        throw new Error("No language detected");
+                    }
+                } catch (err) {
+                    console.warn("No language detected - defaulting to English (en).");
+                    language = "en";
+                }
             }
-
-            // Add language token
-            const language_code = whisper_language_to_code(language);
-            const language_token = `<|${language_code}|>`;
-            init_tokens.push(generation_config.lang_to_id[language_token])
+            if (language) {
+                // Add language token
+                const language_code = whisper_language_to_code(language);
+                const language_token = `<|${language_code}|>`;
+                lang_id = generation_config.lang_to_id[language_token];
+            }
+            init_tokens.push(lang_id);
 
             // Add task token
             // NOTE: Defaults to 'transcribe' if no task is specified
@@ -3399,22 +3452,24 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
      * @param {import('./models/whisper/generation_whisper.js').WhisperGenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
-    async generate({
-        inputs = null,
-        generation_config = null,
-        logits_processor = null,
-        stopping_criteria = null,
+    async generate(options) {
+        let {
+            inputs = null,
+            generation_config = null,
+            logits_processor = null,
+            //stopping_criteria = null,
 
-        // Whisper-specific options (passed to kwargs)
-        // prompt_ids = null,
-        // language = null,
-        // task = null,
+            // Whisper-specific options (passed to kwargs)
+            // prompt_ids = null,
+            // language = null,
+            // task = null,
 
-        ...kwargs
-    }) {
+            ...kwargs
+        } = options;
+
         generation_config = this._prepare_generation_config(generation_config, kwargs);
 
-        const init_tokens = kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config);
+        const init_tokens = kwargs.decoder_input_ids ?? await this._retrieve_init_tokens({ ...options, generation_config });
 
         if (generation_config.return_timestamps) {
             logits_processor ??= new LogitsProcessorList();
