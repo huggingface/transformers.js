@@ -5467,6 +5467,12 @@ export class DepthAnythingForDepthEstimation extends DepthAnythingPreTrainedMode
 
 
 //////////////////////////////////////////////////
+export class PromptDepthAnythingPreTrainedModel extends PreTrainedModel { }
+export class PromptDepthAnythingForDepthEstimation extends PromptDepthAnythingPreTrainedModel { }
+//////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////
 export class SapiensPreTrainedModel extends PreTrainedModel { }
 export class SapiensForSemanticSegmentation extends SapiensPreTrainedModel { }
 export class SapiensForDepthEstimation extends SapiensPreTrainedModel { }
@@ -7966,6 +7972,7 @@ const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([
 const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
     ['dpt', ['DPTForDepthEstimation', DPTForDepthEstimation]],
     ['depth_anything', ['DepthAnythingForDepthEstimation', DepthAnythingForDepthEstimation]],
+    ['prompt_depth_anything', ['PromptDepthAnythingForDepthEstimation', PromptDepthAnythingForDepthEstimation]],
     ['glpn', ['GLPNForDepthEstimation', GLPNForDepthEstimation]],
     ['sapiens', ['SapiensForDepthEstimation', SapiensForDepthEstimation]],
     ['depth_pro', ['DepthProForDepthEstimation', DepthProForDepthEstimation]],
