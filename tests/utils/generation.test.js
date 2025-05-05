@@ -282,6 +282,67 @@ describe("PKV caching", () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 
+  describe("LlamaForCausalLM (onnxruntime-genai)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-LlamaForCausalLM-GQA";
+    /** @type {LlamaForCausalLM} */
+    let model;
+    /** @type {LlamaTokenizer} */
+    let tokenizer;
+    beforeAll(async () => {
+      model = await LlamaForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await LlamaTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "batch_size=1",
+      async () => {
+        const inputs = tokenizer("1");
+
+        // Generate first sequence w/o PKV
+        // NOTE: `return_dict_in_generate=true` is required to get PKV
+        const { past_key_values, sequences } = await model.generate({
+          ...inputs,
+          max_new_tokens: 5,
+          do_sample: false,
+          return_dict_in_generate: true,
+        });
+
+        // Update output with new text
+        const decoded = tokenizer.batch_decode(sequences, {
+          skip_special_tokens: false,
+        })[0];
+        const new_inputs = tokenizer(decoded + "2", {
+          add_special_tokens: false,
+        });
+
+        // Run w/o PKV
+        const generated_ids = await model.generate({
+          ...new_inputs,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        // Run w/ PKV
+        const generated_ids_pkv = await model.generate({
+          ...new_inputs,
+          past_key_values,
+          max_new_tokens: 3,
+          do_sample: false,
+        });
+
+        const target = [[128000n, 16n, 34732n, 98805n, 116404n, 68265n, 99392n, 17n, 21855n, 60933n, 14285n]];
+
+        expect(generated_ids.tolist()).toEqual(target);
+        expect(generated_ids_pkv.tolist()).toEqual(target);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
   describe("LlavaForConditionalGeneration", () => {
     const model_id = "Xenova/tiny-random-LlavaForConditionalGeneration";
     /** @type {LlavaForConditionalGeneration} */

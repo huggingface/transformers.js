@@ -237,6 +237,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     const session_config = {
         dtype: selectedDtype,
         kv_cache_dtype,
+        device: selectedDevice,
     }
 
     // Construct the model file name
@@ -417,6 +418,10 @@ function validateInputs(session, inputs) {
     return checkedInputs;
 }
 
+// Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
+// For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
+let webInferenceChain = Promise.resolve();
+
 /**
  * Executes an InferenceSession using the specified inputs.
  * NOTE: `inputs` must contain at least the input names of the model.
@@ -433,17 +438,28 @@ async function sessionRun(session, inputs) {
     try {
         // pass the original ort tensor
         const ortFeed = Object.fromEntries(Object.entries(checkedInputs).map(([k, v]) => [k, v.ort_tensor]));
-        let output = await session.run(ortFeed);
-        output = replaceTensors(output);
-        return output;
+        const run = () => session.run(ortFeed);
+        const output = await ((apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV)
+            ? (webInferenceChain = webInferenceChain.then(run))
+            : run());
+        return replaceTensors(output);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
         // we apply minor formatting to show the most important information
         const formatted = Object.fromEntries(Object.entries(checkedInputs)
-            .map(([k, { type, dims, data }]) => [k, {
+            .map(([k, tensor]) => {
                 // Extract these properties from the underlying ORT tensor
-                type, dims, data,
-            }]));
+                const unpacked = {
+                    type: tensor.type,
+                    dims: tensor.dims,
+                    location: tensor.location,
+                }
+                if (unpacked.location !== "gpu-buffer") {
+                    // Only return the data if it's not a GPU buffer
+                    unpacked.data = tensor.data;
+                }
+                return [k, unpacked];
+            }));
 
         // This usually occurs when the inputs are of the wrong type.
         console.error(`An error occurred during model execution: "${e}".`);
@@ -4572,6 +4588,22 @@ export class Qwen2Model extends Qwen2PreTrainedModel { }
 export class Qwen2ForCausalLM extends Qwen2PreTrainedModel { }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+// Qwen3 models
+
+/**
+ * The bare Qwen3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen3PreTrainedModel extends PreTrainedModel { }
+/**
+ * The bare Qwen3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen3Model extends Qwen3PreTrainedModel { }
+
+export class Qwen3ForCausalLM extends Qwen3PreTrainedModel { }
+//////////////////////////////////////////////////
+
 export class Qwen2VLPreTrainedModel extends PreTrainedModel {
     forward_params = [
         // Text inputs
@@ -5207,7 +5239,7 @@ export class RTDetrV2ForObjectDetection extends RTDetrV2PreTrainedModel {
     }
 }
 
-export class RTDetrV2ObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
+export class RTDetrV2ObjectDetectionOutput extends RTDetrObjectDetectionOutput { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -5222,7 +5254,20 @@ export class RFDetrForObjectDetection extends RFDetrPreTrainedModel {
     }
 }
 
-export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
+export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class DFinePreTrainedModel extends PreTrainedModel { }
+export class DFineModel extends DFinePreTrainedModel { }
+export class DFineForObjectDetection extends DFinePreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new RTDetrObjectDetectionOutput(await super._call(model_inputs));
+    }
+}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -7534,6 +7579,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['rt_detr', ['RTDetrModel', RTDetrModel]],
     ['rt_detr_v2', ['RTDetrV2Model', RTDetrV2Model]],
     ['rf_detr', ['RFDetrModel', RFDetrModel]],
+    ['d_fine', ['DFineModel', DFineModel]],
     ['table-transformer', ['TableTransformerModel', TableTransformerModel]],
     ['vit', ['ViTModel', ViTModel]],
     ['ijepa', ['IJepaModel', IJepaModel]],
@@ -7621,6 +7667,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['glm', ['GlmModel', GlmModel]],
     ['openelm', ['OpenELMModel', OpenELMModel]],
     ['qwen2', ['Qwen2Model', Qwen2Model]],
+    ['qwen3', ['Qwen3Model', Qwen3Model]],
     ['phi', ['PhiModel', PhiModel]],
     ['phi3', ['Phi3Model', Phi3Model]],
     ['mpt', ['MptModel', MptModel]],
@@ -7721,6 +7768,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['glm', ['GlmForCausalLM', GlmForCausalLM]],
     ['openelm', ['OpenELMForCausalLM', OpenELMForCausalLM]],
     ['qwen2', ['Qwen2ForCausalLM', Qwen2ForCausalLM]],
+    ['qwen3', ['Qwen3ForCausalLM', Qwen3ForCausalLM]],
     ['phi', ['PhiForCausalLM', PhiForCausalLM]],
     ['phi3', ['Phi3ForCausalLM', Phi3ForCausalLM]],
     ['mpt', ['MptForCausalLM', MptForCausalLM]],
@@ -7835,6 +7883,7 @@ const MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES = new Map([
     ['rt_detr', ['RTDetrForObjectDetection', RTDetrForObjectDetection]],
     ['rt_detr_v2', ['RTDetrV2ForObjectDetection', RTDetrV2ForObjectDetection]],
     ['rf_detr', ['RFDetrForObjectDetection', RFDetrForObjectDetection]],
+    ['d_fine', ['DFineForObjectDetection', DFineForObjectDetection]],
     ['table-transformer', ['TableTransformerForObjectDetection', TableTransformerForObjectDetection]],
     ['yolos', ['YolosForObjectDetection', YolosForObjectDetection]],
 ]);

@@ -125,6 +125,7 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
+        case 'qwen3':
         case 'gemma':
         case 'gemma2':
         case 'gemma3_text':
