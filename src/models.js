@@ -154,10 +154,11 @@ const MODEL_CLASS_TO_NAME_MAPPING = new Map();
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {boolean} [is_decoder=false] Whether the model is a decoder model.
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
-async function getSession(pretrained_model_name_or_path, fileName, options) {
+async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder=false) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
     let device = options.device ?? custom_config.device;
@@ -316,7 +317,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         }
     }
 
-    if (selectedDevice === 'webgpu') {
+    if (is_decoder && selectedDevice === 'webgpu') {
         const shapes = getKeyValueShapes(options.config, {
             prefix: 'present',
         });
@@ -342,13 +343,14 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {Record<string, string>} names The names of the model files to load.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {string} [decoder_name] The name of the decoder model, if any.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-async function constructSessions(pretrained_model_name_or_path, names, options) {
+async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name=undefined) {
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
-            const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
+            const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options, name === decoder_name);
             const session = await createInferenceSession(buffer_or_path, session_options, session_config);
             return [name, session];
         })
@@ -1148,7 +1150,7 @@ export class PreTrainedModel extends Callable {
             info = await Promise.all([
                 constructSessions(pretrained_model_name_or_path, {
                     model: options.model_file_name ?? 'model',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1159,7 +1161,7 @@ export class PreTrainedModel extends Callable {
                 constructSessions(pretrained_model_name_or_path, {
                     model: 'encoder_model',
                     decoder_model_merged: 'decoder_model_merged',
-                }, options),
+                }, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1178,7 +1180,7 @@ export class PreTrainedModel extends Callable {
                 constructSessions(pretrained_model_name_or_path, {
                     model: 'encoder_model',
                     decoder_model_merged: 'decoder_model_merged',
-                }, options),
+                }, options, 'decoder_model_merged'),
             ]);
 
         } else if (modelType === MODEL_TYPES.ImageTextToText) {
@@ -1191,7 +1193,7 @@ export class PreTrainedModel extends Callable {
                 sessions['model'] = 'encoder_model';
             }
             info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
+                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1204,7 +1206,7 @@ export class PreTrainedModel extends Callable {
                 decoder_model_merged: 'decoder_model_merged',
             }
             info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
+                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1216,7 +1218,7 @@ export class PreTrainedModel extends Callable {
                     model: 'text_encoder',
                     decoder_model_merged: 'decoder_model_merged',
                     encodec_decode: 'encodec_decode',
-                }, options),
+                }, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1231,7 +1233,7 @@ export class PreTrainedModel extends Callable {
                     gen_head: 'gen_head',
                     gen_img_embeds: 'gen_img_embeds',
                     image_decode: 'image_decode',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1243,7 +1245,7 @@ export class PreTrainedModel extends Callable {
                     prepare_inputs_embeds: 'prepare_inputs_embeds',
                     model: 'model',
                     vision_encoder: 'vision_encoder',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
