@@ -54,7 +54,6 @@ describe("Tokenizer padding/truncation", () => {
   }, MAX_TOKENIZER_LOAD_TIME);
 
   describe("return_tensor=false (jagged array)", () => {
-
     test("jagged array output when return_tensor is false", () => {
       const output = tokenizer(inputs, {
         return_tensor: false,
@@ -105,7 +104,6 @@ describe("Tokenizer padding/truncation", () => {
       compare(output, expected);
     });
 
-
     test("No padding, max_length=3 (implicit truncation strategy)", () => {
       const output = tokenizer(inputs_2, {
         padding: false,
@@ -129,9 +127,18 @@ describe("Tokenizer padding/truncation", () => {
         return_tensor: false,
       });
       const expected = {
-        input_ids: [[1037, 0, 0, 0, 0], [1038, 1039, 1040, 1041, 1042]],
-        token_type_ids: [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]],
-        attention_mask: [[1, 0, 0, 0, 0], [1, 1, 1, 1, 1]],
+        input_ids: [
+          [1037, 0, 0, 0, 0],
+          [1038, 1039, 1040, 1041, 1042],
+        ],
+        token_type_ids: [
+          [0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0],
+        ],
+        attention_mask: [
+          [1, 0, 0, 0, 0],
+          [1, 1, 1, 1, 1],
+        ],
       };
       compare(output, expected);
     });
@@ -161,48 +168,75 @@ describe("Tokenizer padding/truncation", () => {
         return_tensor: false,
       });
       const expected = {
-        input_ids: [[1037, 0, 0], [1038, 1039, 1040]],
-        token_type_ids: [[0, 0, 0], [0, 0, 0]],
-        attention_mask: [[1, 0, 0], [1, 1, 1]],
+        input_ids: [
+          [1037, 0, 0],
+          [1038, 1039, 1040],
+        ],
+        token_type_ids: [
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+        attention_mask: [
+          [1, 0, 0],
+          [1, 1, 1],
+        ],
       };
       compare(output, expected);
     });
 
     test("Padding 'max_length' without truncation, max_length=3", () => {
       const output = tokenizer(inputs_2, {
-        padding: 'max_length',
+        padding: "max_length",
         truncation: false,
         max_length: 3,
         add_special_tokens: false,
         return_tensor: false,
       });
       const expected = {
-        input_ids: [[1037, 0, 0], [1038, 1039, 1040, 1041, 1042]],
-        token_type_ids: [[0, 0, 0], [0, 0, 0, 0, 0]],
-        attention_mask: [[1, 0, 0], [1, 1, 1, 1, 1]],
+        input_ids: [
+          [1037, 0, 0],
+          [1038, 1039, 1040, 1041, 1042],
+        ],
+        token_type_ids: [
+          [0, 0, 0],
+          [0, 0, 0, 0, 0],
+        ],
+        attention_mask: [
+          [1, 0, 0],
+          [1, 1, 1, 1, 1],
+        ],
       };
       compare(output, expected);
     });
 
     test("Padding 'max_length' with truncation, max_length=3", () => {
       const output = tokenizer(inputs_2, {
-        padding: 'max_length',
+        padding: "max_length",
         truncation: true,
         max_length: 3,
         add_special_tokens: false,
         return_tensor: false,
       });
       const expected = {
-        input_ids: [[1037, 0, 0], [1038, 1039, 1040]],
-        token_type_ids: [[0, 0, 0], [0, 0, 0]],
-        attention_mask: [[1, 0, 0], [1, 1, 1]],
+        input_ids: [
+          [1037, 0, 0],
+          [1038, 1039, 1040],
+        ],
+        token_type_ids: [
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+        attention_mask: [
+          [1, 0, 0],
+          [1, 1, 1],
+        ],
       };
       compare(output, expected);
     });
 
     test("Padding 'max_length' without truncation and max_length=null", () => {
       const output = tokenizer(inputs_2, {
-        padding: 'max_length',
+        padding: "max_length",
         truncation: false,
         max_length: null,
         add_special_tokens: false,
@@ -211,15 +245,15 @@ describe("Tokenizer padding/truncation", () => {
       const expected = {
         input_ids: [
           [1037, ...Array(511).fill(0)],
-          [1038, 1039, 1040, 1041, 1042, ...Array(507).fill(0)]
+          [1038, 1039, 1040, 1041, 1042, ...Array(507).fill(0)],
         ],
         token_type_ids: [
           [0, ...Array(511).fill(0)],
-          [0, 0, 0, 0, 0, ...Array(507).fill(0)]
+          [0, 0, 0, 0, 0, ...Array(507).fill(0)],
         ],
         attention_mask: [
           [1, ...Array(511).fill(0)],
-          [1, 1, 1, 1, 1, ...Array(507).fill(0)]
+          [1, 1, 1, 1, 1, ...Array(507).fill(0)],
         ],
       };
       compare(output, expected);
@@ -227,7 +261,6 @@ describe("Tokenizer padding/truncation", () => {
   });
 
   describe("return_tensor=true", () => {
-
     test("throws error when tensor output is requested for a jagged array", () => {
       expect(() => tokenizer(inputs)).toThrow("Unable to create tensor");
     });
@@ -329,7 +362,7 @@ describe("Tokenizer padding/truncation", () => {
 
     test("padding:'max_length' pads to the specified max_length", () => {
       const { input_ids, attention_mask, token_type_ids } = tokenizer(inputs, {
-        padding: 'max_length',
+        padding: "max_length",
         truncation: true,
         add_special_tokens: false,
         max_length: 3,
@@ -347,7 +380,7 @@ describe("Tokenizer padding/truncation", () => {
         [0n, 0n, 0n],
       ]);
     });
-  })
+  });
 });
 
 describe("Token type ids", () => {
