@@ -460,3 +460,6 @@ export const TEST_CONFIG = {
     },
   },
 };
+
+// Test that tokenizer type can be inferred (`type: "BPE"` is missing)
+TEST_CONFIG["openai-community/gpt2"] = TEST_CONFIG["Xenova/gpt2"];
