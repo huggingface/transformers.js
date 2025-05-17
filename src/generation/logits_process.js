@@ -410,7 +410,7 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
  * This penalty is applied at most once per token. Note that, for decoder-only models like most LLMs,
  * the considered tokens include the prompt.
  * 
- * In the original [paper](https://arxiv.org/pdf/1909.05858.pdf), the authors suggest the use of a
+ * In the original [paper](https://huggingface.co/papers/1909.05858), the authors suggest the use of a
  * penalty of around 1.2 to achieve a good balance between truthful generation and lack of repetition.
  * To penalize and reduce repetition, use `penalty` values above 1.0, where a higher value penalizes
  * more strongly. To reward and encourage repetition, use `penalty` values between 0.0 and 1.0, where
@@ -580,7 +580,7 @@ export class NoBadWordsLogitsProcessor extends LogitsProcessor {
  * correspond to the unconditional logits (predicted from an empty or 'null' prompt). The processor computes a
  * weighted average across the conditional and unconditional logits, parameterised by the `guidance_scale`.
  * 
- * See [the paper](https://arxiv.org/abs/2306.05284) for more information.
+ * See [the paper](https://huggingface.co/papers/2306.05284) for more information.
  */
 export class ClassifierFreeGuidanceLogitsProcessor extends LogitsProcessor {
 

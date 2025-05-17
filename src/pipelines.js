@@ -1912,7 +1912,7 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);
 
-            // According to the [paper](https://arxiv.org/pdf/2410.15608):
+            // According to the [paper](https://huggingface.co/papers/2410.15608):
             // "We use greedy decoding, with a heuristic limit of 6 output tokens
             // per second of audio to avoid repeated output sequences."
             const max_new_tokens = Math.floor(aud.length / sampling_rate) * 6;
