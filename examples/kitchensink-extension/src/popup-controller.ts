@@ -1,89 +1,73 @@
-// popup-controller.ts - Popup interface logic
+/**
+ * PopupController - Main controller for the popup interface
+ * Coordinates between UI manager and analyzer components
+ */
+
 /// <reference types="chrome"/>
 
-import { AnalysisResult, ExtensionMessage, PipelineStatus, PageContent } from './types';
-
-interface PopupElements {
-    pipelineStatus: HTMLElement;
-    textInput: HTMLTextAreaElement;
-    resultsSection: HTMLElement;
-    resultsContent: HTMLElement;
-    openSidepanel: HTMLButtonElement;
-    analyzeSentiment: HTMLButtonElement;
-    extractEntities: HTMLButtonElement;
-    summarizeText: HTMLButtonElement;
-    analyzePage: HTMLButtonElement;
-    extractMainContent: HTMLButtonElement;
-    customClassify: HTMLButtonElement;
-    askQuestion: HTMLButtonElement;
-    openOptions: HTMLButtonElement;
-    showHelp: HTMLButtonElement;
-}
+import { ExtensionMessage, PipelineStatusData } from './types';
+import { PopupUIManager } from './popup-ui-manager';
+import { PopupAnalyzer } from './popup-analyzer';
 
 export class PopupController {
-    private elements!: PopupElements;
+    private uiManager: PopupUIManager;
+    private analyzer: PopupAnalyzer;
 
     constructor() {
-        this.initializeElements();
+        this.uiManager = new PopupUIManager();
+        this.analyzer = new PopupAnalyzer();
         this.attachEventListeners();
         this.checkPipelineStatus();
     }
 
-    private initializeElements(): void {
-        this.elements = {
-            pipelineStatus: document.getElementById('pipeline-status')!,
-            textInput: document.getElementById('text-input') as HTMLTextAreaElement,
-            resultsSection: document.getElementById('results-section')!,
-            resultsContent: document.getElementById('results-content')!,
-            openSidepanel: document.getElementById('open-sidepanel') as HTMLButtonElement,
-            analyzeSentiment: document.getElementById('analyze-sentiment') as HTMLButtonElement,
-            extractEntities: document.getElementById('extract-entities') as HTMLButtonElement,
-            summarizeText: document.getElementById('summarize-text') as HTMLButtonElement,
-            analyzePage: document.getElementById('analyze-page') as HTMLButtonElement,
-            extractMainContent: document.getElementById('extract-main-content') as HTMLButtonElement,
-            customClassify: document.getElementById('custom-classify') as HTMLButtonElement,
-            askQuestion: document.getElementById('ask-question') as HTMLButtonElement,
-            openOptions: document.getElementById('open-options') as HTMLButtonElement,
-            showHelp: document.getElementById('show-help') as HTMLButtonElement
-        };
-    }
-
     private attachEventListeners(): void {
-        this.elements.openSidepanel.addEventListener('click', () => {
+        const elements = this.uiManager.getElements();
+
+        elements.openSidepanel.addEventListener('click', () => {
             chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
         });
-        this.elements.analyzeSentiment.addEventListener('click', () => {
-            this.analyzeText(['text-classification']);
+
+        elements.analyzeSentiment.addEventListener('click', () => {
+            this.handleAnalyzeText(['text-classification']);
         });
-        this.elements.extractEntities.addEventListener('click', () => {
-            this.analyzeText(['token-classification']);
+
+        elements.extractEntities.addEventListener('click', () => {
+            this.handleAnalyzeText(['token-classification']);
         });
-        this.elements.summarizeText.addEventListener('click', () => {
-            this.analyzeText(['summarization']);
+
+        elements.summarizeText.addEventListener('click', () => {
+            this.handleAnalyzeText(['summarization']);
         });
-        this.elements.analyzePage.addEventListener('click', () => {
-            this.analyzeCurrentPage();
+
+        elements.analyzePage.addEventListener('click', () => {
+            this.handleAnalyzePage();
         });
-        this.elements.extractMainContent.addEventListener('click', () => {
-            this.extractMainContent();
+
+        elements.extractMainContent.addEventListener('click', () => {
+            this.handleExtractMainContent();
         });
-        this.elements.customClassify.addEventListener('click', () => {
-            this.showCustomClassification();
+
+        elements.customClassify.addEventListener('click', () => {
+            this.handleCustomClassification();
         });
-        this.elements.askQuestion.addEventListener('click', () => {
-            this.showQuestionInterface();
+
+        elements.askQuestion.addEventListener('click', () => {
+            this.handleQuestionAnswering();
         });
-        this.elements.openOptions.addEventListener('click', (e) => {
+
+        elements.openOptions.addEventListener('click', (e) => {
             e.preventDefault();
             chrome.runtime.openOptionsPage();
         });
-        this.elements.showHelp.addEventListener('click', (e) => {
+
+        elements.showHelp.addEventListener('click', (e) => {
             e.preventDefault();
-            this.showHelp();
+            this.uiManager.showHelp();
         });
-        this.elements.textInput.addEventListener('keydown', (e) => {
+
+        elements.textInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) {
-                this.analyzeText(['text-classification', 'token-classification']);
+                this.handleAnalyzeText(['text-classification', 'token-classification']);
             }
         });
     }
@@ -95,114 +79,56 @@ export class PopupController {
             } as ExtensionMessage);
 
             if (response.success) {
-                const { loaded, loading } = response.data as PipelineStatus;
-                this.updatePipelineStatus(loaded, loading);
+                const { loaded, loading } = response.data as PipelineStatusData;
+                this.uiManager.updatePipelineStatus(loaded, loading);
             }
         } catch (error) {
             console.error('Error checking pipeline status:', error);
-            this.updatePipelineStatus([], [], 'Error connecting to AI service');
+            this.uiManager.updatePipelineStatus([], [], 'Error connecting to AI service');
         }
     }
 
-    private updatePipelineStatus(loaded: string[], loading: string[], error: string | null = null): void {
-        const statusDot = this.elements.pipelineStatus.querySelector('.status-dot') as HTMLElement;
-        const statusText = this.elements.pipelineStatus.querySelector('span:last-child') as HTMLElement;
-
-        if (error) {
-            statusDot.className = 'status-dot error';
-            statusText.textContent = error;
-            return;
-        }
-
-        if (loading.length > 0) {
-            statusDot.className = 'status-dot loading';
-            statusText.textContent = `Loading AI models... (${loading.length})`;
-        } else if (loaded.length > 0) {
-            statusDot.className = 'status-dot';
-            statusText.textContent = `AI Ready (${loaded.length} models loaded)`;
-        } else {
-            statusDot.className = 'status-dot loading';
-            statusText.textContent = 'AI models not loaded';
-        }
-    }
-
-    private async analyzeText(tasks: string[]): Promise<void> {
-        const text = this.elements.textInput.value.trim();
+    private async handleAnalyzeText(tasks: string[]): Promise<void> {
+        const text = this.uiManager.getTextInputValue();
         if (!text) {
-            this.showError('Please enter some text to analyze');
+            this.uiManager.showError('Please enter some text to analyze');
             return;
         }
-        this.showLoading('Analyzing text...');
+
+        this.uiManager.showLoading('Analyzing text...');
         try {
-            const response = await chrome.runtime.sendMessage({
-                action: 'analyze-text',
-                text: text,
-                options: { tasks: tasks }
-            } as ExtensionMessage);
-            if (response.success) {
-                this.displayResults(response.data as AnalysisResult);
-            } else {
-                this.showError(response.error || 'Analysis failed');
-            }
+            const result = await this.analyzer.analyzeText(text, tasks);
+            this.uiManager.displayResults(result);
         } catch (error) {
             console.error('Text analysis error:', error);
-            this.showError('Failed to analyze text');
+            this.uiManager.showError(error instanceof Error ? error.message : 'Failed to analyze text');
         }
     }
 
-    private async analyzeCurrentPage(): Promise<void> {
-        this.showLoading('Analyzing page...');
+    private async handleAnalyzePage(): Promise<void> {
+        this.uiManager.showLoading('Analyzing page...');
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            const response = await chrome.tabs.sendMessage(tab.id!, {
-                action: 'extract-page-content'
-            } as ExtensionMessage);
-            if (response && response.success) {
-                const pageContent = response.data as PageContent;
-                const analysisResponse = await chrome.runtime.sendMessage({
-                    action: 'analyze-text',
-                    text: pageContent.mainContent,
-                    options: { 
-                        tasks: ['text-classification', 'summarization', 'token-classification'],
-                        title: pageContent.title
-                    }
-                } as ExtensionMessage);
-                if (analysisResponse.success) {
-                    this.displayResults(analysisResponse.data as AnalysisResult, 'Page Analysis');
-                } else {
-                    this.showError(analysisResponse.error || 'Page analysis failed');
-                }
-            } else {
-                this.showError('Could not extract page content');
-            }
+            const { data, title } = await this.analyzer.analyzeCurrentPage();
+            this.uiManager.displayResults(data, title);
         } catch (error) {
             console.error('Page analysis error:', error);
-            this.showError('Failed to analyze page');
+            this.uiManager.showError(error instanceof Error ? error.message : 'Failed to analyze page');
         }
     }
 
-    private async extractMainContent(): Promise<void> {
-        this.showLoading('Extracting content...');
+    private async handleExtractMainContent(): Promise<void> {
+        this.uiManager.showLoading('Extracting content...');
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            const response = await chrome.tabs.sendMessage(tab.id!, {
-                action: 'extract-page-content'
-            } as ExtensionMessage);
-            if (response && response.success) {
-                const pageContent = response.data as PageContent;
-                this.elements.textInput.value = pageContent.mainContent.substring(0, 1000) + 
-                    (pageContent.mainContent.length > 1000 ? '...' : '');
-                this.hideResults();
-            } else {
-                this.showError('Could not extract page content');
-            }
+            const content = await this.analyzer.extractMainContent();
+            this.uiManager.setTextInputValue(content);
+            this.uiManager.hideResults();
         } catch (error) {
             console.error('Content extraction error:', error);
-            this.showError('Failed to extract content');
+            this.uiManager.showError(error instanceof Error ? error.message : 'Failed to extract content');
         }
     }
 
-    private showCustomClassification(): void {
+    private handleCustomClassification(): void {
         const labels = prompt('Enter classification labels (comma-separated):\nExample: positive, negative, neutral');
         if (labels) {
             const labelArray = labels.split(',').map(l => l.trim()).filter(l => l);
@@ -213,33 +139,23 @@ export class PopupController {
     }
 
     private async analyzeWithCustomLabels(labels: string[]): Promise<void> {
-        const text = this.elements.textInput.value.trim();
+        const text = this.uiManager.getTextInputValue();
         if (!text) {
-            this.showError('Please enter some text to classify');
+            this.uiManager.showError('Please enter some text to classify');
             return;
         }
-        this.showLoading('Classifying...');
+
+        this.uiManager.showLoading('Classifying...');
         try {
-            const response = await chrome.runtime.sendMessage({
-                action: 'analyze-text',
-                text: text,
-                options: { 
-                    tasks: ['zero-shot-classification'],
-                    labels: labels
-                }
-            } as ExtensionMessage);
-            if (response.success) {
-                this.displayResults(response.data as AnalysisResult);
-            } else {
-                this.showError(response.error || 'Classification failed');
-            }
+            const result = await this.analyzer.analyzeWithCustomLabels(text, labels);
+            this.uiManager.displayResults(result);
         } catch (error) {
             console.error('Custom classification error:', error);
-            this.showError('Failed to classify text');
+            this.uiManager.showError(error instanceof Error ? error.message : 'Failed to classify text');
         }
     }
 
-    private showQuestionInterface(): void {
+    private handleQuestionAnswering(): void {
         const question = prompt('Ask a question about the text:');
         if (question) {
             this.answerQuestion(question);
@@ -247,164 +163,19 @@ export class PopupController {
     }
 
     private async answerQuestion(question: string): Promise<void> {
-        const text = this.elements.textInput.value.trim();
+        const text = this.uiManager.getTextInputValue();
         if (!text) {
-            this.showError('Please enter some text to ask questions about');
+            this.uiManager.showError('Please enter some text to ask questions about');
             return;
         }
-        this.showLoading('Finding answer...');
+
+        this.uiManager.showLoading('Finding answer...');
         try {
-            const response = await chrome.runtime.sendMessage({
-                action: 'analyze-text',
-                text: text,
-                options: { 
-                    tasks: ['question-answering'],
-                    question: question
-                }
-            } as ExtensionMessage);
-            if (response.success) {
-                this.displayResults(response.data as AnalysisResult);
-            } else {
-                this.showError(response.error || 'Question answering failed');
-            }
+            const result = await this.analyzer.answerQuestion(text, question);
+            this.uiManager.displayResults(result);
         } catch (error) {
             console.error('Question answering error:', error);
-            this.showError('Failed to answer question');
+            this.uiManager.showError(error instanceof Error ? error.message : 'Failed to answer question');
         }
-    }
-
-    private displayResults(data: AnalysisResult, title: string = 'Analysis Results'): void {
-        this.elements.resultsContent.innerHTML = '';
-        this.elements.resultsSection.style.display = 'block';
-        const titleEl = document.createElement('div');
-        titleEl.className = 'result-label';
-        titleEl.textContent = title;
-        this.elements.resultsContent.appendChild(titleEl);
-        Object.entries(data).forEach(([key, value]) => {
-            if (key.endsWith('_error')) {
-                this.addResultItem(key.replace('_error', ''), `Error: ${value}`, 'error');
-                return;
-            }
-            switch (key) {
-                case 'sentiment':
-                    this.addSentimentResult(value);
-                    break;
-                case 'entities':
-                    this.addEntitiesResult(value);
-                    break;
-                case 'summary':
-                    this.addSummaryResult(value);
-                    break;
-                case 'classification':
-                    this.addClassificationResult(value);
-                    break;
-                case 'answer':
-                    this.addAnswerResult(value);
-                    break;
-                default:
-                    this.addGenericResult(key, value);
-            }
-        });
-        this.elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    private addSentimentResult(sentiment: any): void {
-        if (Array.isArray(sentiment) && sentiment.length > 0) {
-            const result = sentiment[0];
-            this.addResultItem('Sentiment', result.label, 'sentiment', result.score);
-        }
-    }
-
-    private addEntitiesResult(entities: any): void {
-        if (Array.isArray(entities) && entities.length > 0) {
-            const entityText = entities.map((e: any) => `${e.word} (${e.entity})`).join(', ');
-            this.addResultItem('Entities', entityText, 'entities');
-        } else {
-            this.addResultItem('Entities', 'No entities found', 'entities');
-        }
-    }
-
-    private addSummaryResult(summary: any): void {
-        if (Array.isArray(summary) && summary.length > 0) {
-            this.addResultItem('Summary', summary[0].summary_text, 'summary');
-        }
-    }
-
-    private addClassificationResult(classification: any): void {
-        if (classification && classification.labels) {
-            const topResult = `${classification.labels[0]} (${(classification.scores[0] * 100).toFixed(1)}%)`;
-            this.addResultItem('Classification', topResult, 'classification');
-        }
-    }
-
-    private addAnswerResult(answer: any): void {
-        if (answer && answer.answer) {
-            this.addResultItem('Answer', answer.answer, 'answer', answer.score);
-        }
-    }
-
-    private addGenericResult(key: string, value: any): void {
-        const displayValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-        this.addResultItem(key, displayValue, 'generic');
-    }
-
-    private addResultItem(label: string, value: string, type: string = 'default', confidence: number | null = null): void {
-        const item = document.createElement('div');
-        item.className = 'result-item';
-        const labelEl = document.createElement('div');
-        labelEl.className = 'result-label';
-        labelEl.textContent = label;
-        const valueEl = document.createElement('div');
-        valueEl.className = 'result-value';
-        valueEl.textContent = value;
-        item.appendChild(labelEl);
-        item.appendChild(valueEl);
-        if (confidence !== null && confidence !== undefined) {
-            const confidenceEl = document.createElement('span');
-            confidenceEl.className = 'confidence-score';
-            confidenceEl.textContent = `${(confidence * 100).toFixed(1)}%`;
-            valueEl.appendChild(confidenceEl);
-        }
-        this.elements.resultsContent.appendChild(item);
-    }
-
-    private showLoading(message: string): void {
-        this.elements.resultsSection.style.display = 'block';
-        this.elements.resultsContent.innerHTML = `
-            <div class="result-item">
-                <div class="result-label">
-                    <span class="spinner"></span> ${message}
-                </div>
-            </div>
-        `;
-    }
-
-    private showError(message: string): void {
-        this.elements.resultsSection.style.display = 'block';
-        this.elements.resultsContent.innerHTML = `
-            <div class="result-item" style="background: #f8d7da; color: #721c24;">
-                <div class="result-label">Error</div>
-                <div class="result-value">${message}</div>
-            </div>
-        `;
-    }
-
-    private hideResults(): void {
-        this.elements.resultsSection.style.display = 'none';
-    }
-
-    private showHelp(): void {
-        this.elements.resultsSection.style.display = 'block';
-        this.elements.resultsContent.innerHTML = `
-            <div class="result-item">
-                <div class="result-label">How to Use</div>
-                <div class="result-value">
-                    • Enter text and click analysis buttons<br>
-                    • Right-click on any page to analyze content<br>
-                    • Use Ctrl+Enter in text box for quick analysis<br>
-                    • Open side panel for advanced features
-                </div>
-            </div>
-        `;
     }
 }
