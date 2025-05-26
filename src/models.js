@@ -887,8 +887,26 @@ function createPositionIds(model_inputs, past_key_values = null, start_index = 0
 }
 
 function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
+    const past_length = model_inputs.past_key_values
+        ? Object.values(model_inputs.past_key_values)[0].dims.at(-2)
+        : 0;
+
+    if (!model_inputs.attention_mask) {
+        // If the attention mask is not provided, we attempt to infer based on provided inputs
+        let dims;
+        for (const key of ['input_ids', 'inputs_embeds', 'position_ids']) {
+            if (model_inputs[key]) {
+                dims = model_inputs[key].dims;
+                break;
+            }
+        }
+        if (!dims) {
+            throw new Error("attention_mask is not provided, and unable to infer its shape from model inputs.");
+        }
+        model_inputs.attention_mask = ones([dims[0], past_length + dims[1]]);
+    }
+
     if (model_inputs.past_key_values) {
-        const past_length = Object.values(model_inputs.past_key_values)[0].dims.at(-2);
         const { input_ids, attention_mask } = model_inputs;
 
         // Keep only the unprocessed tokens:
@@ -909,24 +927,7 @@ function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, ge
         }
         // 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
         else {
-            if (
-                // NOTE: Only used by VLMs (!= so that null matches undefined)
-                self.config.image_token_index != null &&
-                // Equivalent to `self.config.image_token_index in input_ids` (== so that int matches bigint)
-                input_ids.data.some(x => x == self.config.image_token_index)
-            ) {
-                // TODO: Support multiple image tokens
-                const num_image_tokens = self.config.num_image_tokens;
-                if (!num_image_tokens) {
-                    throw new Error('`num_image_tokens` is missing in the model configuration.');
-                }
 
-                const num_new_tokens = input_ids.dims[1] - (past_length - num_image_tokens);
-                model_inputs.input_ids = input_ids.slice(null, [-num_new_tokens, null]);
-
-                // TODO: The attention mask should be formed from the attention mask passed in model_inputs
-                model_inputs.attention_mask = ones([1, past_length + num_new_tokens]);
-            }
         }
     }
 
@@ -2016,17 +2017,7 @@ export class PreTrainedModel extends Callable {
 
     async encode_image({ pixel_values }) {
         // image_inputs === { pixel_values }
-        const features = (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
-        // @ts-expect-error TS2339
-        if (!this.config.num_image_tokens) {
-            console.warn(
-                'The number of image tokens was not set in the model configuration. ' +
-                `Setting it to the number of features detected by the vision encoder (${features.dims[1]}).`
-            )
-            // @ts-expect-error TS2339
-            this.config.num_image_tokens = features.dims[1];
-        }
-        return features;
+        return (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
     }
 
     async encode_text({ input_ids }) {
@@ -3640,65 +3631,16 @@ export class LlavaPreTrainedModel extends PreTrainedModel {
  * The LLAVA model which consists of a vision backbone and a language model.
  */
 export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
+    _merge_input_ids_with_image_features(kwargs) {
+        const vision_hidden_size = kwargs.image_features.dims.at(-1);
+        const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);
 
-    _merge_input_ids_with_image_features({
-        inputs_embeds,
-        image_features,
-        input_ids,
-        attention_mask,
-    }) {
-
-        // @ts-expect-error TS2339
-        const image_token_index = this.config.image_token_index;
-
-        const idsList = input_ids.tolist();
-
-        // NOTE: we use .findIndex instead of .indexOf to perform weak comparison (==) between BigInt and Number
-        const indexOfImage = idsList.map(x => x.findIndex(x => x == image_token_index));
-
-        const noImages = indexOfImage.every(x => x === -1);
-        const allImages = indexOfImage.every(x => x !== -1);
-        if (!noImages && !allImages) {
-            // Check for padding reasons
-            throw new Error('Every input should contain either 0 or 1 image token.');
-        }
-
-        if (noImages) {
-            return {
-                inputs_embeds,
-                attention_mask,
-            }
-        }
-
-        const stacked = [];
-        const stacked_attention_mask = [];
-        for (let i = 0; i < indexOfImage.length; ++i) {
-            const index = indexOfImage[i];
-
-            const e = inputs_embeds[i];
-            const im = image_features[i];
-            const am = attention_mask[i];
-            stacked.push(
-                cat([
-                    e.slice([0, index]),
-                    im,
-                    e.slice([index + 1, e.dims[0]]),
-                ], 0)
-            );
-
-            stacked_attention_mask.push(
-                cat([
-                    am.slice([0, index]),
-                    ones([im.dims[0]]),
-                    am.slice([index + 1, am.dims[0]])
-                ], 0)
-            )
-        }
-
-        return {
-            inputs_embeds: stack(stacked, 0),
-            attention_mask: stack(stacked_attention_mask, 0),
-        }
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_index,
+            ...kwargs,
+            image_features: reshaped_image_hidden_states,
+        })
     }
 }
 //////////////////////////////////////////////////
