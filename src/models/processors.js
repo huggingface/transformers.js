@@ -13,6 +13,7 @@ export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './sam/processing_sam.js';
 export * from './smolvlm/processing_smolvlm.js';
 export * from './speecht5/processing_speecht5.js';
+export * from './u2net/processing_u2net.js';
 export * from './ultravox/processing_ultravox.js';
 export * from './wav2vec2/processing_wav2vec2.js';
 export * from './wav2vec2_with_lm/processing_wav2vec2_with_lm.js';
