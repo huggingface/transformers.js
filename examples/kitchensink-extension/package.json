@@ -1,0 +1,26 @@
+{
+  "name": "ai-context-copilot",
+  "version": "1.0.0",
+  "description": "AI Context Copilot - Your intelligent browsing companion powered by Transformers.js",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "clean": "rm -rf dist"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@types/chrome": "latest",
+    "@types/node": "latest",
+    "rollup": "^2.79.2",
+    "rollup-plugin-copy": "^3.5.0",
+    "rollup-plugin-empty-dir": "^1.0.5",
+    "typescript": "latest"
+  },
+  "dependencies": {
+    "@xenova/transformers": "latest"
+  }
+}

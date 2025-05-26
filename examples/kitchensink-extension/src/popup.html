@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Context Copilot</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <header class="popup-header">
+            <h1>🤖 AI Copilot</h1>
+            <button id="open-sidepanel" class="btn-icon" title="Open Side Panel">📋</button>
+        </header>
+
+        <div class="status-section">
+            <div id="pipeline-status" class="status-indicator">
+                <span class="status-dot loading"></span>
+                <span>Initializing AI...</span>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <h3>Quick Actions</h3>
+            
+            <div class="action-group">
+                <h4>Text Analysis</h4>
+                <textarea id="text-input" placeholder="Enter text to analyze..." rows="3"></textarea>
+                <div class="button-group">
+                    <button id="analyze-sentiment" class="btn-secondary">Sentiment</button>
+                    <button id="extract-entities" class="btn-secondary">Entities</button>
+                    <button id="summarize-text" class="btn-secondary">Summary</button>
+                </div>
+            </div>
+
+            <div class="action-group">
+                <h4>Page Analysis</h4>
+                <div class="button-group">
+                    <button id="analyze-page" class="btn-primary">Analyze Current Page</button>
+                    <button id="extract-main-content" class="btn-secondary">Extract Main Content</button>
+                </div>
+            </div>
+
+            <div class="action-group">
+                <h4>AI Tools</h4>
+                <div class="button-group">
+                    <button id="custom-classify" class="btn-secondary">Custom Classification</button>
+                    <button id="ask-question" class="btn-secondary">Ask Question</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section" id="results-section" style="display: none;">
+            <h3>Results</h3>
+            <div id="results-content"></div>
+        </div>
+
+        <footer class="popup-footer">
+            <div class="footer-links">
+                <a href="#" id="open-options">Settings</a>
+                <span>•</span>
+                <a href="#" id="show-help">Help</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

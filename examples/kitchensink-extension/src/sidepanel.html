@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Context Copilot</title>
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+    <div class="sidepanel-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">
+                <span class="icon">🤖</span>
+                <h1>AI Context Copilot</h1>
+            </div>
+            <div class="status-indicator" id="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">Initializing...</span>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-button active" data-tab="analysis">Analysis</button>
+            <button class="tab-button" data-tab="conversation">Chat</button>
+            <button class="tab-button" data-tab="memory">Memory</button>
+            <button class="tab-button" data-tab="tools">Tools</button>
+        </div>
+
+        <!-- Analysis Tab -->
+        <div class="tab-content active" id="analysis-tab">
+            <!-- Page Summary -->
+            <div class="section">
+                <h3>📄 Page Summary</h3>
+                <div class="page-info" id="page-info">
+                    <div class="loading">Analyzing page content...</div>
+                </div>
+                <button class="btn btn-primary" id="analyze-page">Re-analyze Page</button>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="section">
+                <h3>⚡ Quick Actions</h3>
+                <div class="action-grid">
+                    <button class="action-btn" id="summarize-page">
+                        <span class="action-icon">📝</span>
+                        <span class="action-text">Summarize</span>
+                    </button>
+                    <button class="action-btn" id="extract-entities">
+                        <span class="action-icon">🏷️</span>
+                        <span class="action-text">Find Entities</span>
+                    </button>
+                    <button class="action-btn" id="analyze-sentiment">
+                        <span class="action-icon">😊</span>
+                        <span class="action-text">Sentiment</span>
+                    </button>
+                    <button class="action-btn" id="translate-page">
+                        <span class="action-icon">🌍</span>
+                        <span class="action-text">Translate</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analysis Results -->
+            <div class="section">
+                <h3>📊 Results</h3>
+                <div class="results-container" id="analysis-results">
+                    <div class="empty-state">
+                        Select an action above to analyze the current page
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversation Tab -->
+        <div class="tab-content" id="conversation-tab">
+            <div class="section">
+                <h3>💬 AI Conversation</h3>
+                <div class="chat-container" id="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message ai-message">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                Hi! I'm your AI Context Copilot. I can analyze this page, answer questions about the content, and help you understand what you're reading. What would you like to know?
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" 
+                               id="chat-input" 
+                               placeholder="Ask me anything about this page..."
+                               maxlength="500">
+                        <button id="send-message" class="btn btn-primary">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Context Information -->
+            <div class="section">
+                <h3>📋 Current Context</h3>
+                <div class="context-info" id="context-info">
+                    <div class="context-item">
+                        <strong>Page:</strong> <span id="current-url">Loading...</span>
+                    </div>
+                    <div class="context-item">
+                        <strong>Word Count:</strong> <span id="word-count">0</span>
+                    </div>
+                    <div class="context-item">
+                        <strong>Language:</strong> <span id="page-language">Unknown</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memory Tab -->
+        <div class="tab-content" id="memory-tab">
+            <div class="section">
+                <h3>🧠 AI Memory</h3>
+                <p class="section-description">
+                    Your AI assistant remembers insights and analyses from your browsing session.
+                </p>
+                
+                <div class="memory-stats">
+                    <div class="stat-item">
+                        <div class="stat-number" id="pages-analyzed">0</div>
+                        <div class="stat-label">Pages Analyzed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="insights-generated">0</div>
+                        <div class="stat-label">Insights Generated</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="entities-found">0</div>
+                        <div class="stat-label">Entities Found</div>
+                    </div>
+                </div>
+
+                <div class="memory-timeline" id="memory-timeline">
+                    <div class="empty-state">
+                        No memories yet. Start analyzing pages to build your AI's knowledge!
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" id="clear-memory">Clear Memory</button>
+            </div>
+        </div>
+
+        <!-- Tools Tab -->
+        <div class="tab-content" id="tools-tab">
+            <!-- Custom Analysis -->
+            <div class="section">
+                <h3>🔧 Custom Analysis</h3>
+                <div class="tool-item">
+                    <label for="custom-prompt">Custom Analysis Prompt:</label>
+                    <textarea id="custom-prompt" 
+                              placeholder="Enter your custom analysis prompt... e.g., 'Find all the technical terms in this article' or 'Extract pricing information'"
+                              rows="3"></textarea>
+                    <button class="btn btn-primary" id="run-custom-analysis">Analyze</button>
+                </div>
+            </div>
+
+            <!-- Text Processing -->
+            <div class="section">
+                <h3>📝 Text Processing</h3>
+                <div class="tool-item">
+                    <label for="text-input">Text to Process:</label>
+                    <textarea id="text-input" 
+                              placeholder="Paste text here for analysis..."
+                              rows="4"></textarea>
+                    <div class="processing-options">
+                        <button class="btn btn-outline" data-process="sentiment">Sentiment</button>
+                        <button class="btn btn-outline" data-process="entities">Entities</button>
+                        <button class="btn btn-outline" data-process="summarize">Summarize</button>
+                        <button class="btn btn-outline" data-process="classify">Classify</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pipeline Status -->
+            <div class="section">
+                <h3>⚙️ AI Pipeline Status</h3>
+                <div class="pipeline-status" id="pipeline-status">
+                    <div class="loading">Loading pipeline information...</div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="section">
+                <h3>💾 Export Data</h3>
+                <div class="export-options">
+                    <button class="btn btn-outline" id="export-json">Export as JSON</button>
+                    <button class="btn btn-outline" id="export-markdown">Export as Markdown</button>
+                    <button class="btn btn-outline" id="export-csv">Export as CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="sidepanel.js"></script>
+</body>
+</html>
