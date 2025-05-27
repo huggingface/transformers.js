@@ -53,15 +53,29 @@ export default () => {
         it(
           "language unset; task unset",
           async () => {
-            // language defaults to 'en'
+            // language defaults to detect, falling back to 'en'
             // task defaults to 'transcribe'
-
             const outputs = await model.generate({
               input_features,
               max_new_tokens: 1,
             });
 
             expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, 50363n, /* Generated */ 45084n]]);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
+
+        it(
+          "language unset; task set",
+          async () => {
+            // language defaults to detect, falling back to 'en'
+            const outputs = await model.generate({
+              input_features,
+              max_new_tokens: 1,
+              task: "translate",
+            });
+
+            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50358n, 50363n, /* Generated */ 45084n]]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
