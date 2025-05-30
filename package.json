@@ -27,7 +27,7 @@
     "typegen": "tsc --build",
     "dev": "webpack serve --no-client-overlay",
     "build": "webpack && npm run typegen",
-    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose",
+    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
@@ -55,10 +55,10 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
-    "@huggingface/jinja": "^0.4.1",
-    "onnxruntime-node": "1.21.0",
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
-    "sharp": "^0.34.1"
+    "@huggingface/jinja": "^0.5.0",
+    "onnxruntime-node": "1.23.0-dev.20250522-ad7b0e368d",
+    "onnxruntime-web": "1.23.0-dev.20250522-ad7b0e368d",
+    "sharp": "^0.34.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
