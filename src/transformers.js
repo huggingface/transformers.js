@@ -41,8 +41,10 @@ export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
 
+// Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
  * @typedef {import('./base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
+ * @typedef {import('./utils/devices.js').DeviceType} DeviceType
  */
