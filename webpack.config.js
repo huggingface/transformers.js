@@ -137,9 +137,9 @@ const NODE_EXTERNAL_MODULES = [
   "onnxruntime-common",
   "onnxruntime-node",
   "sharp",
-  "fs",
-  "path",
-  "url",
+  "node:fs",
+  "node:path",
+  "node:url",
 ];
 
 // Do not bundle onnxruntime-node when packaging for the web.

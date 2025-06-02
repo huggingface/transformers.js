@@ -15,9 +15,8 @@ import {
     calculateReflectOffset, saveBlob,
 } from './core.js';
 import { apis } from '../env.js';
-import fs from 'fs';
 import { Tensor, matmul } from './tensor.js';
-
+import fs from 'node:fs';
 
 /**
  * Helper function to read audio from a path/URL.
