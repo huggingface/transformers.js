@@ -2,6 +2,7 @@ import TerserPlugin from "terser-webpack-plugin";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import webpack from "webpack";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -142,8 +143,8 @@ const NODE_EXTERNAL_MODULES = [
   "node:url",
 ];
 
-// Do not bundle onnxruntime-node when packaging for the web.
-const WEB_IGNORE_MODULES = ["onnxruntime-node"];
+// Do not bundle onnxruntime-node or sharp when packaging for the web.
+const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp"];
 
 // Do not bundle the following modules with webpack (mark as external)
 const WEB_EXTERNAL_MODULES = [
@@ -157,12 +158,23 @@ const WEB_BUILD = buildConfig({
   type: "module",
   ignoreModules: WEB_IGNORE_MODULES,
   externalModules: WEB_EXTERNAL_MODULES,
+  plugins: [
+    new webpack.IgnorePlugin({
+      resourceRegExp: /^node:/,
+    }),
+  ]
 });
 
 // Web-only build, bundled with onnxruntime-web
 const BUNDLE_BUILD = buildConfig({
   type: "module",
-  plugins: [new PostBuildPlugin()],
+  ignoreModules: WEB_IGNORE_MODULES,
+  plugins: [
+    new webpack.IgnorePlugin({
+      resourceRegExp: /^node:/,
+    }),
+    new PostBuildPlugin(),
+  ],
 });
 
 // Node-compatible builds
