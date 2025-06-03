@@ -7,6 +7,30 @@ import webpack from "webpack";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * Plugin to strip the "node:" prefix from module requests.
+ * 
+ * This is necessary to ensure both web and node builds work correctly,
+ * otherwise we would get an error like:
+ * ```
+ * Module build failed: UnhandledSchemeError: Reading from "node:path" is not handled by plugins (Unhandled scheme).
+ * Webpack supports "data:" and "file:" URIs by default.
+ * You may need an additional plugin to handle "node:" URIs.
+ * ```
+ * 
+ * NOTE: We then do not need to use the `node:` prefix in the resolve.alias configuration.
+ */
+class StripNodePrefixPlugin extends webpack.NormalModuleReplacementPlugin {
+  constructor() {
+    super(
+      /^node:(.+)$/,
+      resource => {
+        resource.request = resource.request.replace(/^node:/, '');
+      }
+    );
+  }
+}
+
+/**
  * Plugin to post-process build files. Required to solve certain issues with ESM module output.
  * See https://github.com/webpack/webpack/issues/17121 for more information.
  * 
@@ -56,7 +80,6 @@ function buildConfig({
   plugins = [],
 } = {}) {
   const outputModule = type === "module";
-
   const alias = Object.fromEntries(
     ignoreModules.map((module) => [module, false]),
   );
@@ -77,6 +100,9 @@ function buildConfig({
       },
       assetModuleFilename: "[name][ext]",
       chunkFormat: false,
+
+      // https://github.com/huggingface/transformers.js/issues/926
+      publicPath: "",
     },
     optimization: {
       minimize: true,
@@ -144,7 +170,7 @@ const NODE_EXTERNAL_MODULES = [
 ];
 
 // Do not bundle onnxruntime-node or sharp when packaging for the web.
-const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp"];
+const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
 
 // Do not bundle the following modules with webpack (mark as external)
 const WEB_EXTERNAL_MODULES = [
@@ -159,9 +185,7 @@ const WEB_BUILD = buildConfig({
   ignoreModules: WEB_IGNORE_MODULES,
   externalModules: WEB_EXTERNAL_MODULES,
   plugins: [
-    new webpack.IgnorePlugin({
-      resourceRegExp: /^node:/,
-    }),
+    new StripNodePrefixPlugin()
   ]
 });
 
@@ -170,9 +194,7 @@ const BUNDLE_BUILD = buildConfig({
   type: "module",
   ignoreModules: WEB_IGNORE_MODULES,
   plugins: [
-    new webpack.IgnorePlugin({
-      resourceRegExp: /^node:/,
-    }),
+    new StripNodePrefixPlugin(),
     new PostBuildPlugin(),
   ],
 });
