@@ -3,6 +3,7 @@ __pycache__
 node_modules
 .cache
 .DS_STORE
+deno.lock
 
 # Do not track build artifacts/generated files
 /dist
