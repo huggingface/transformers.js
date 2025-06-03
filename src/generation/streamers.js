@@ -208,7 +208,11 @@ export class WhisperTextStreamer extends TextStreamer {
                     this.on_chunk_start?.(time);
                 }
                 this.waiting_for_timestamp = !this.waiting_for_timestamp; // Toggle
-                value = [[]]; // Skip timestamp
+
+                // NOTE: Timestamp tokens should not be printed. Although, since they
+                // aren't classified as "special tokens", we need to handle them here.
+                this.token_callback_function?.(tokens);
+                return;
             }
         }
         return super.put(value);

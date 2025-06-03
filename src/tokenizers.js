@@ -366,15 +366,19 @@ export class TokenizerModel extends Callable {
                 return new BPE(config);
 
             default:
-                // Some older tokenizers, like `google-t5/t5-small` and `distilbert/distilbert-base-uncased`, do not have a `type` field.
+                // Some older tokenizers, like `google-t5/t5-small`, `openai-community/gpt2`, and `distilbert/distilbert-base-uncased`, do not have a `type` field.
                 // In this case, we can infer the tokenizer type based on the structure of the `vocab` field and other properties.
                 if (config.vocab) {
                     if (Array.isArray(config.vocab)) {
                         // config.vocab is of type `[string, number][]`
                         // @ts-ignore
                         return new Unigram(config, ...args);
-                    } else if (typeof config.vocab === 'object' && config.continuing_subword_prefix && config.unk_token) {
-                        return new WordPieceTokenizer(config);
+                    } else if (Object.hasOwn(config, 'continuing_subword_prefix') && Object.hasOwn(config, 'unk_token')) {
+                        if (Object.hasOwn(config, 'merges')) {
+                            return new BPE(config);
+                        } else {
+                            return new WordPieceTokenizer(config);
+                        }
                     } else {
                         // @ts-ignore
                         return new LegacyTokenizerModel(config, ...args);
@@ -3515,7 +3519,7 @@ function _build_translation_inputs(self, raw_inputs, tokenizer_options, generate
  * between any pair of 200+ languages — including low-resource languages like Asturian,
  * Luganda, Urdu and more. It aims to help people communicate with anyone, anywhere,
  * regardless of their language preferences. For more information, check out their
- * [paper](https://arxiv.org/abs/2207.04672).
+ * [paper](https://huggingface.co/papers/2207.04672).
  * 
  * For a list of supported languages (along with their language codes),
  * @see {@link https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200}
@@ -3546,7 +3550,7 @@ export class NllbTokenizer extends PreTrainedTokenizer {
  * The M2M100Tokenizer class is used to tokenize text for M2M100 ("Many-to-Many") models.
  * 
  * M2M100 is a multilingual encoder-decoder (seq-to-seq) model trained for Many-to-Many
- * multilingual translation. It was introduced in this [paper](https://arxiv.org/abs/2010.11125)
+ * multilingual translation. It was introduced in this [paper](https://huggingface.co/papers/2010.11125)
  * and first released in [this](https://github.com/pytorch/fairseq/tree/master/examples/m2m_100) repository.
  * 
  * For a list of supported languages (along with their language codes),

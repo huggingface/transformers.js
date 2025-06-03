@@ -77,7 +77,7 @@ export class GenerationConfig {
 
     /**
      * Number of groups to divide `num_beams` into in order to ensure diversity among different groups of beams.
-     * See [this paper](https://arxiv.org/pdf/1610.02424.pdf) for more details.
+     * See [this paper](https://huggingface.co/papers/1610.02424) for more details.
      * @type {number}
      * @default 1
      */
@@ -122,7 +122,7 @@ export class GenerationConfig {
     /**
      * Local typicality measures how similar the conditional probability of predicting a target token next is to the expected conditional probability of predicting a random token next, given the partial text already generated.
      * If set to float < 1, the smallest set of the most locally typical tokens with probabilities that add up to `typical_p` or higher are kept for generation.
-     * See [this paper](https://arxiv.org/pdf/2202.00666.pdf) for more details.
+     * See [this paper](https://huggingface.co/papers/2202.00666) for more details.
      * @type {number}
      * @default 1.0
      */
@@ -131,7 +131,7 @@ export class GenerationConfig {
     /**
      * If set to float strictly between 0 and 1, only tokens with a conditional probability greater than `epsilon_cutoff` will be sampled.
      * In the paper, suggested values range from 3e-4 to 9e-4, depending on the size of the model.
-     * See [Truncation Sampling as Language Model Desmoothing](https://arxiv.org/abs/2210.15191) for more details.
+     * See [Truncation Sampling as Language Model Desmoothing](https://huggingface.co/papers/2210.15191) for more details.
      * @type {number}
      * @default 0.0
      */
@@ -141,7 +141,7 @@ export class GenerationConfig {
      * Eta sampling is a hybrid of locally typical sampling and epsilon sampling.
      * If set to float strictly between 0 and 1, a token is only considered if it is greater than either `eta_cutoff` or `sqrt(eta_cutoff) * exp(-entropy(softmax(next_token_logits)))`.
      * The latter term is intuitively the expected next token probability, scaled by `sqrt(eta_cutoff)`. In the paper, suggested values range from 3e-4 to 2e-3, depending on the size of the model.
-     * See [Truncation Sampling as Language Model Desmoothing](https://arxiv.org/abs/2210.15191) for more details.
+     * See [Truncation Sampling as Language Model Desmoothing](https://huggingface.co/papers/2210.15191) for more details.
      * @type {number}
      * @default 0.0
      */
@@ -157,7 +157,7 @@ export class GenerationConfig {
 
     /**
      * The parameter for repetition penalty. 1.0 means no penalty.
-     * See [this paper](https://arxiv.org/pdf/1909.05858.pdf) for more details.
+     * See [this paper](https://huggingface.co/papers/1909.05858) for more details.
      * @type {number}
      * @default 1.0
      */
