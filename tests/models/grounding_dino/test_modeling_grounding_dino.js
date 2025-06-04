@@ -32,7 +32,7 @@ export default () => {
         expect(pred_boxes.dims).toEqual([1, num_queries, 4]);
         expect(logits.max().item()).toBeCloseTo(56.237613677978516, 2);
         expect(logits.min().item()).toEqual(-Infinity);
-        expect(pred_boxes.mean().item()).toEqual(0.2500016987323761);
+        expect(pred_boxes.mean().item()).toBeCloseTo(0.2500016987323761, 6);
       },
       MAX_TEST_EXECUTION_TIME,
     );

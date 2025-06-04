@@ -121,7 +121,7 @@ export class Florence2Processor extends Processor {
         }
 
         const image_inputs = await this.image_processor(images, kwargs);
-        const text_inputs = text ? this.tokenizer(text, kwargs) : {};
+        const text_inputs = text ? this.tokenizer(this.construct_prompts(text), kwargs) : {};
 
         return {
             ...image_inputs,

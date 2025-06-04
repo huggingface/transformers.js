@@ -2,7 +2,7 @@ import { AutoProcessor, Florence2Processor } from "../../../src/transformers.js"
 import { MAX_TEST_EXECUTION_TIME, MAX_PROCESSOR_LOAD_TIME } from "../../init.js";
 import { load_cached_image } from "../../asset_cache.js";
 export default () => {
-  describe("FlorenceProcessor", () => {
+  describe("Florence2Processor", () => {
     const model_id = "Xenova/tiny-random-Florence2ForConditionalGeneration";
 
     /** @type {Florence2Processor} */
@@ -14,8 +14,43 @@ export default () => {
       images = {
         beetle: await load_cached_image("beetle"),
         book_cover: await load_cached_image("book_cover"),
+        white_image: await load_cached_image("white_image"),
       };
     }, MAX_PROCESSOR_LOAD_TIME);
+
+    describe("Processing", () => {
+      it(
+        "Process image and text (no task)",
+        async () => {
+          const inputs = await processor(images.white_image, "describe");
+          expect(inputs.input_ids.dims).toEqual([1, 4]);
+          expect(inputs.input_ids.tolist()).toEqual([[0n, 45091n, 21700n, 2n]]);
+
+          expect(inputs.attention_mask.dims).toEqual([1, 4]);
+          expect(inputs.attention_mask.tolist()).toEqual([[1n, 1n, 1n, 1n]]);
+
+          expect(inputs.pixel_values.dims).toEqual([1, 3, 768, 768]);
+          expect(inputs.pixel_values.mean().item()).toBeCloseTo(2.439159870147705, 1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "Process image and text (with task)",
+        async () => {
+          const inputs = await processor(images.white_image, "<OPEN_VOCABULARY_DETECTION>cat");
+          expect(inputs.input_ids.dims).toEqual([1, 9]);
+          expect(inputs.input_ids.tolist()).toEqual([[0n, 574n, 22486n, 4758n, 11n, 5n, 2274n, 4n, 2n]]);
+
+          expect(inputs.attention_mask.dims).toEqual([1, 9]);
+          expect(inputs.attention_mask.tolist()).toEqual([[1n, 1n, 1n, 1n, 1n, 1n, 1n, 1n, 1n]]);
+
+          expect(inputs.pixel_values.dims).toEqual([1, 3, 768, 768]);
+          expect(inputs.pixel_values.mean().item()).toBeCloseTo(2.439159870147705, 1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
 
     describe("Prompt construction", () => {
       it(
