@@ -1229,7 +1229,7 @@ export class ZeroShotClassificationPipeline extends (/** @type {new (options: Te
 
 /**
  * @typedef {Object} FeatureExtractionPipelineOptions Parameters specific to feature extraction pipelines.
- * @property {'none'|'mean'|'cls'} [pooling="none"] The pooling method to use.
+ * @property {'none'|'mean'|'cls'|'first_token'|'eos'|'last_token'} [pooling="none"] The pooling method to use.
  * @property {boolean} [normalize=false] Whether or not to normalize the embeddings in the last dimension.
  * @property {boolean} [quantize=false] Whether or not to quantize the embeddings.
  * @property {'binary'|'ubinary'} [precision='binary'] The precision to use for quantization.
@@ -1322,14 +1322,24 @@ export class FeatureExtractionPipeline extends (/** @type {new (options: TextPip
 
         /** @type {Tensor} */
         let result = outputs.last_hidden_state ?? outputs.logits ?? outputs.token_embeddings;
-        if (pooling === 'none') {
-            // Skip pooling
-        } else if (pooling === 'mean') {
-            result = mean_pooling(result, model_inputs.attention_mask);
-        } else if (pooling === 'cls') {
-            result = result.slice(null, 0);
-        } else {
-            throw Error(`Pooling method '${pooling}' not supported.`);
+
+        switch (pooling) {
+            case 'none':
+                // Skip pooling
+                break;
+            case 'mean':
+                result = mean_pooling(result, model_inputs.attention_mask);
+                break;
+            case 'first_token':
+            case 'cls':
+                result = result.slice(null, 0);
+                break;
+            case 'last_token':
+            case 'eos':
+                result = result.slice(null, -1);
+                break;
+            default:
+                throw Error(`Pooling method '${pooling}' not supported.`);
         }
 
         if (normalize) {
