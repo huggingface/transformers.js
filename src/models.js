@@ -158,7 +158,7 @@ const MODEL_CLASS_TO_NAME_MAPPING = new Map();
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
-async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder=false) {
+async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder = false) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
     let device = options.device ?? custom_config.device;
@@ -219,7 +219,14 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
         throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);
-    } else if (selectedDtype === DATA_TYPES.fp16 && selectedDevice === 'webgpu' && !(await isWebGpuFp16Supported())) {
+    } else if (
+        selectedDevice === 'webgpu' && (
+            // NOTE: Currently, we assume that the Native WebGPU EP always supports fp16. In future, we will add a check for this.
+            apis.IS_NODE_ENV
+            ||
+            (selectedDtype === DATA_TYPES.fp16 && !(await isWebGpuFp16Supported()))
+        )
+    ) {
         throw new Error(`The device (${selectedDevice}) does not support fp16.`);
     }
 
@@ -347,7 +354,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name=undefined) {
+async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name = undefined) {
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
             const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options, name === decoder_name);
