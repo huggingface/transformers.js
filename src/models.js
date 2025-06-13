@@ -222,8 +222,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     } else if (
         selectedDevice === 'webgpu' && (
             // NOTE: Currently, we assume that the Native WebGPU EP always supports fp16. In future, we will add a check for this.
-            apis.IS_NODE_ENV
-            ||
+            !apis.IS_NODE_ENV
+            &&
             (selectedDtype === DATA_TYPES.fp16 && !(await isWebGpuFp16Supported()))
         )
     ) {
