@@ -64,12 +64,12 @@ if (ORT_SYMBOL in globalThis) {
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
-    // Updated as of ONNX Runtime 1.22.0-dev.20250418-c19a49615b
+    // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
     // | EPs/Platforms         | Windows x64        | Windows arm64      | Linux x64          | Linux arm64        | MacOS x64          | MacOS arm64        |
     // | --------------------- | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ |
     // | CPU                   | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  |
-    // | WebGPU (experimental) | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  |
+    // | WebGPU (experimental) | ✔️                  | ✔️                  | ✔️                  | ❌                  | ✔️                  | ✔️                  |
     // | DirectML              | ✔️                  | ✔️                  | ❌                  | ❌                  | ❌                  | ❌                  |
     // | CUDA                  | ❌                  | ❌                  | ✔️ (CUDA v12)       | ❌                  | ❌                  | ❌                  |
     // | CoreML                | ❌                  | ❌                  | ❌                  | ❌                  | ✔️                  | ✔️                  |
