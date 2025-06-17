@@ -12,7 +12,7 @@ from transformers import HfArgumentParser
 from onnxruntime.quantization import QuantType, QuantizationMode
 from onnxruntime.quantization.onnx_quantizer import ONNXQuantizer
 from onnxruntime.quantization.registry import IntegerOpsRegistry
-from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
+from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 from onnxruntime.quantization.matmul_bnb4_quantizer import MatMulBnb4Quantizer
 
 from . import float16
@@ -107,7 +107,7 @@ class QuantizationArguments:
         },
     )
 
-    # MatMul4BitsQuantizer
+    # MatMulNBitsQuantizer
     is_symmetric: bool = field(
         default=True,
         metadata={"help": "Indicate whether to quantize the model symmetrically"},
@@ -234,7 +234,7 @@ def quantize_q4(
     Quantize the weights of the model from float32 to 4-bit int
     """
 
-    quantizer = MatMul4BitsQuantizer(
+    quantizer = MatMulNBitsQuantizer(
         model=model,
         block_size=block_size,
         is_symmetric=is_symmetric,
