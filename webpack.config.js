@@ -100,9 +100,6 @@ function buildConfig({
       },
       assetModuleFilename: "[name][ext]",
       chunkFormat: false,
-
-      // https://github.com/huggingface/transformers.js/issues/926
-      publicPath: "",
     },
     optimization: {
       minimize: true,
