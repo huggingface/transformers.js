@@ -166,7 +166,7 @@ const NODE_EXTERNAL_MODULES = [
   "node:url",
 ];
 
-// Do not bundle onnxruntime-node or sharp when packaging for the web.
+// Do not bundle node-only packages when bundling for the web.
 const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
 
 // Do not bundle the following modules with webpack (mark as external)
