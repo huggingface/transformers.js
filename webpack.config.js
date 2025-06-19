@@ -1,9 +1,34 @@
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import fs from "node:fs";
+import webpack from "webpack";
 import TerserPlugin from "terser-webpack-plugin";
-import { fileURLToPath } from "url";
-import path from "path";
-import fs from "fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Plugin to strip the "node:" prefix from module requests.
+ * 
+ * This is necessary to ensure both web and node builds work correctly,
+ * otherwise we would get an error like:
+ * ```
+ * Module build failed: UnhandledSchemeError: Reading from "node:path" is not handled by plugins (Unhandled scheme).
+ * Webpack supports "data:" and "file:" URIs by default.
+ * You may need an additional plugin to handle "node:" URIs.
+ * ```
+ * 
+ * NOTE: We then do not need to use the `node:` prefix in the resolve.alias configuration.
+ */
+class StripNodePrefixPlugin extends webpack.NormalModuleReplacementPlugin {
+  constructor() {
+    super(
+      /^node:(.+)$/,
+      resource => {
+        resource.request = resource.request.replace(/^node:/, '');
+      }
+    );
+  }
+}
 
 /**
  * Plugin to post-process build files. Required to solve certain issues with ESM module output.
@@ -55,7 +80,6 @@ function buildConfig({
   plugins = [],
 } = {}) {
   const outputModule = type === "module";
-
   const alias = Object.fromEntries(
     ignoreModules.map((module) => [module, false]),
   );
@@ -137,13 +161,15 @@ const NODE_EXTERNAL_MODULES = [
   "onnxruntime-common",
   "onnxruntime-node",
   "sharp",
-  "fs",
-  "path",
-  "url",
+  "node:fs",
+  "node:path",
+  "node:url",
 ];
 
-// Do not bundle onnxruntime-node when packaging for the web.
-const WEB_IGNORE_MODULES = ["onnxruntime-node"];
+// Do not bundle node-only packages when bundling for the web.
+// NOTE: We can exclude the "node:" prefix for built-in modules here,
+// since we apply the `StripNodePrefixPlugin` to strip it.
+const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
 
 // Do not bundle the following modules with webpack (mark as external)
 const WEB_EXTERNAL_MODULES = [
@@ -157,12 +183,19 @@ const WEB_BUILD = buildConfig({
   type: "module",
   ignoreModules: WEB_IGNORE_MODULES,
   externalModules: WEB_EXTERNAL_MODULES,
+  plugins: [
+    new StripNodePrefixPlugin()
+  ]
 });
 
 // Web-only build, bundled with onnxruntime-web
 const BUNDLE_BUILD = buildConfig({
   type: "module",
-  plugins: [new PostBuildPlugin()],
+  ignoreModules: WEB_IGNORE_MODULES,
+  plugins: [
+    new StripNodePrefixPlugin(),
+    new PostBuildPlugin(),
+  ],
 });
 
 // Node-compatible builds

@@ -1,7 +1,7 @@
 import { AutoModel, PreTrainedModel } from "../../src/models.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
-import fs from "fs";
+import fs from "node:fs";
 
 // TODO: Set cache folder to a temp directory
 
