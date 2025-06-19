@@ -41,7 +41,7 @@ const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
 const IS_BROWSER_ENV = typeof window !== "undefined" && typeof window.document !== "undefined";
 const IS_WEBWORKER_ENV = typeof self !== "undefined" && self.constructor?.name === 'DedicatedWorkerGlobalScope';
 const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
-const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || ( typeof navigator !== 'undefined' && 'gpu' in navigator);
+const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 
 /**
