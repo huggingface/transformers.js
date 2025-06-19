@@ -1,8 +1,8 @@
-import TerserPlugin from "terser-webpack-plugin";
-import { fileURLToPath } from "url";
-import path from "path";
-import fs from "fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import fs from "node:fs";
 import webpack from "webpack";
+import TerserPlugin from "terser-webpack-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -167,6 +167,8 @@ const NODE_EXTERNAL_MODULES = [
 ];
 
 // Do not bundle node-only packages when bundling for the web.
+// NOTE: We can exclude the "node:" prefix for built-in modules here,
+// since we apply the `StripNodePrefixPlugin` to strip it.
 const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
 
 // Do not bundle the following modules with webpack (mark as external)
