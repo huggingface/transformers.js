@@ -16,10 +16,6 @@
         "default": "./dist/transformers.node.cjs"
       }
     },
-    "worker": {
-      "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.js"
-    },
     "default": {
       "types": "./types/transformers.d.ts",
       "default": "./dist/transformers.web.js"
