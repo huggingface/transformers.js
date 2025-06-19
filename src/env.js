@@ -28,13 +28,6 @@ import url from 'node:url';
 
 const VERSION = '3.5.2';
 
-// Check if various APIs are available (depends on environment)
-const IS_BROWSER_ENV = typeof window !== "undefined" && typeof window.document !== "undefined";
-const IS_WEBWORKER_ENV = typeof self !== "undefined"  && self.constructor?.name === 'DedicatedWorkerGlobalScope';
-const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
-const IS_WEBGPU_AVAILABLE = typeof navigator !== 'undefined' && 'gpu' in navigator;
-const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
-
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
@@ -43,6 +36,41 @@ const IS_PATH_AVAILABLE = !isEmpty(path);
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
 const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
+
+// Check if various APIs are available (depends on environment)
+const IS_BROWSER_ENV = typeof window !== "undefined" && typeof window.document !== "undefined";
+const IS_WEBWORKER_ENV = typeof self !== "undefined" && self.constructor?.name === 'DedicatedWorkerGlobalScope';
+const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
+const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
+const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+
+/**
+ * Check if the current environment is Safari browser.
+ * Works in both browser and web worker contexts.
+ * @returns {boolean} Whether the current environment is Safari.
+ */
+const isSafari = () => {
+    // Check if we're in a browser environment
+    if (typeof navigator === 'undefined') {
+        return false;
+    }
+
+    const userAgent = navigator.userAgent;
+    const vendor = navigator.vendor || '';
+
+    // Safari has "Apple" in vendor string
+    const isAppleVendor = vendor.indexOf('Apple') > -1;
+
+    // Exclude Chrome on iOS (CriOS), Firefox on iOS (FxiOS), 
+    // Edge on iOS (EdgiOS), and other browsers
+    const notOtherBrowser =
+        !userAgent.match(/CriOS|FxiOS|EdgiOS|OPiOS|mercury|brave/i) &&
+        !userAgent.includes('Chrome') &&
+        !userAgent.includes('Android');
+
+    return isAppleVendor && notOtherBrowser;
+};
+const IS_SAFARI = isSafari();
 
 /**
  * A read-only object containing information about the APIs available in the current environment.
@@ -62,6 +90,9 @@ export const apis = Object.freeze({
 
     /** Whether the WebNN API is available */
     IS_WEBNN_AVAILABLE,
+
+    /** Whether we are running in a Safari browser */
+    IS_SAFARI,
 
     /** Whether the Node.js process API is available */
     IS_PROCESS_AVAILABLE,

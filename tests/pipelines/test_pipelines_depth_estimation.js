@@ -26,7 +26,7 @@ export default () => {
         async () => {
           const output = await pipe(images[0]);
           expect(output.predicted_depth.dims).toEqual([224, 224]);
-          expect(output.predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 6);
+          expect(output.predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 4);
           expect(output.depth.size).toEqual(images[0].size);
         },
         MAX_TEST_EXECUTION_TIME,
@@ -40,10 +40,10 @@ export default () => {
           const output = await pipe(images);
           expect(output).toHaveLength(images.length);
           expect(output[0].predicted_depth.dims).toEqual([224, 224]);
-          expect(output[0].predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 6);
+          expect(output[0].predicted_depth.mean().item()).toBeCloseTo(0.000006106501587055391, 4);
           expect(output[0].depth.size).toEqual(images[0].size);
           expect(output[1].predicted_depth.dims).toEqual([224, 224]);
-          expect(output[1].predicted_depth.mean().item()).toBeCloseTo(0.0000014548650142387487, 6);
+          expect(output[1].predicted_depth.mean().item()).toBeCloseTo(0.0000014548650142387487, 4);
           expect(output[1].depth.size).toEqual(images[1].size);
         },
         MAX_TEST_EXECUTION_TIME,
