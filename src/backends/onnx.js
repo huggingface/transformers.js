@@ -56,12 +56,15 @@ let defaultDevices;
 let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
+/** @type {"custom"|"node"|"web"} */
+let ort;
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
+    ort = 'custom';
 
-} else if (apis.IS_NODE_ENV) {
-    ONNX = ONNX_NODE.default ?? ONNX_NODE;
+} else if (apis.IS_NODE_ENV && (ONNX = ONNX_NODE.default ?? ONNX_NODE)?.InferenceSession) {
+    ort = 'node';
 
     // Updated as of ONNX Runtime 1.20.1
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
@@ -87,6 +90,7 @@ if (ORT_SYMBOL in globalThis) {
     defaultDevices = ['cpu'];
 } else {
     ONNX = ONNX_WEB;
+    ort = 'web';
 
     if (apis.IS_WEBNN_AVAILABLE) {
         // TODO: Only push supported providers (depending on available hardware)
@@ -168,6 +172,14 @@ export async function createInferenceSession(buffer_or_path, session_options, se
 export function isONNXTensor(x) {
     return x instanceof ONNX.Tensor;
 }
+
+/**
+ * The type of ONNX runtime being used.
+ * - 'node' for `onnxruntime-node`
+ * - 'web' for `onnxruntime-web`
+ * - 'custom' for a custom ONNX runtime
+ */
+export const runtime = ort;
 
 /** @type {import('onnxruntime-common').Env} */
 // @ts-ignore
