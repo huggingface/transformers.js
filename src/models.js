@@ -48,6 +48,7 @@ import {
     createInferenceSession,
     isONNXTensor,
     isONNXProxy,
+    runtime,
 } from './backends/onnx.js';
 import {
     DATA_TYPES,
@@ -172,7 +173,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        device ?? (runtime === "web" ? 'wasm' : 'cpu')
     );
 
     const executionProviders = deviceToExecutionProviders(selectedDevice);
