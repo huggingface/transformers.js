@@ -120,6 +120,7 @@ function getNormalizedConfig(config) {
         case 'phi':
         case 'phi3':
         case 'phi3_v':
+        case 'llava_qwen2':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';

@@ -3,6 +3,7 @@ export * from './grounding_dino/processing_grounding_dino.js';
 export * from './idefics3/processing_idefics3.js';
 export * from './janus/processing_janus.js';
 export * from './jina_clip/processing_jina_clip.js';
+export * from './llava/processing_llava.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './moonshine/processing_moonshine.js';
 export * from './owlvit/processing_owlvit.js';
