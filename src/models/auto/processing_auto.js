@@ -57,7 +57,8 @@ export class AutoProcessor {
 
         const components = {};
         if (image_processor_type) {
-            const image_processor_class = AllImageProcessors[image_processor_type];
+            // Some image processors are saved with the "Fast" suffix, so we remove that if present.
+            const image_processor_class = AllImageProcessors[image_processor_type.replace(/Fast$/, '')];
             if (!image_processor_class) {
                 throw new Error(`Unknown image_processor_type: '${image_processor_type}'.`);
             }
@@ -79,6 +80,6 @@ export class AutoProcessor {
         }
 
         const config = {};
-        return new Processor(config, components);
+        return new Processor(config, components, null);
     }
 }

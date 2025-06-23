@@ -73,6 +73,7 @@ function getNormalizedConfig(config) {
         case 'idefics3':
         case 'ultravox':
         case 'smolvlm':
+        case 'gemma3n':
             // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;
@@ -130,6 +131,7 @@ function getNormalizedConfig(config) {
         case 'gemma':
         case 'gemma2':
         case 'gemma3_text':
+        case 'gemma3n_text':
         case 'glm':
         case 'helium':
             mapping['num_heads'] = 'num_key_value_heads';
