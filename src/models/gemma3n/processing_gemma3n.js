@@ -1,13 +1,15 @@
 
 import { Processor } from "../../base/processing_utils.js";
 import { AutoImageProcessor } from "../auto/image_processing_auto.js";
+import { AutoFeatureExtractor } from "../auto/feature_extraction_auto.js";
 import { AutoTokenizer } from "../../tokenizers.js";
 import { RawImage } from "../../utils/image.js";
 import { RawAudio } from "../../utils/audio.js";
 
 export class Gemma3nProcessor extends Processor {
-    static image_processor_class = AutoImageProcessor
-    static tokenizer_class = AutoTokenizer
+    static image_processor_class = AutoImageProcessor;
+    static feature_extractor_class = AutoFeatureExtractor;
+    static tokenizer_class = AutoTokenizer;
     static uses_processor_config = true;
     static uses_chat_template_file = true;
 
