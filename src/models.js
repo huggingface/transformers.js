@@ -3808,6 +3808,7 @@ export class LlavaQwen2ForCausalLM extends LlavaPreTrainedModel {
         })
     }
 }
+
 export class Gemma3nPreTrainedModel extends PreTrainedModel {
     forward_params = [
         'input_ids',
