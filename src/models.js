@@ -3814,10 +3814,11 @@ export class Gemma3nPreTrainedModel extends PreTrainedModel {
         'attention_mask',
         'inputs_embeds',
         'per_layer_inputs',
-        
+
         'position_ids',
         'pixel_values',
         'input_features',
+        'input_features_mask',
         'past_key_values',
     ];
 }
@@ -3829,6 +3830,7 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
         attention_mask = null,
         pixel_values = null,
         input_features = null,
+        input_features_mask = null,
 
         // Used during generation:
         position_ids = null,
@@ -3866,6 +3868,7 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
                     // Encode the audio
                     const { audio_features } = await sessionRun(this.sessions['audio_encoder'], {
                         input_features,
+                        input_features_mask,
                     });
                     ({ inputs_embeds, attention_mask } = this._merge_input_ids_with_audio_features({
                         audio_features,
