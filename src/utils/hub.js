@@ -669,6 +669,26 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 }
 
 /**
+ * Fetches a text file from a given path and file name.
+ *
+ * @param {string} modelPath The path to the directory containing the file.
+ * @param {string} fileName The name of the file to fetch.
+ * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
+ * @returns {Promise<string|null>} The text content of the file.
+ * @throws Will throw an error if the file is not found and `fatal` is true.
+ */
+export async function getModelText(modelPath, fileName, fatal = true, options = {}) {
+    const buffer = await getModelFile(modelPath, fileName, fatal, options, false);
+    if (buffer === null) {
+        return null;
+    }
+
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(/** @type {Uint8Array} */(buffer));
+}
+
+/**
  * Fetches a JSON file from a given path and file name.
  *
  * @param {string} modelPath The path to the directory containing the file.
@@ -679,16 +699,13 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
  * @throws Will throw an error if the file is not found and `fatal` is true.
  */
 export async function getModelJSON(modelPath, fileName, fatal = true, options = {}) {
-    const buffer = await getModelFile(modelPath, fileName, fatal, options, false);
-    if (buffer === null) {
+    const text = await getModelText(modelPath, fileName, fatal, options);
+    if (text === null) {
         // Return empty object
-        return {}
+        return {};
     }
 
-    const decoder = new TextDecoder('utf-8');
-    const jsonData = decoder.decode(/** @type {Uint8Array} */(buffer));
-
-    return JSON.parse(jsonData);
+    return JSON.parse(text);
 }
 /**
  * Read and track progress when reading a Response object

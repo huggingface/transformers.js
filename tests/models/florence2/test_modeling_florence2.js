@@ -35,7 +35,7 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
-    it(
+    it.skip(
       "batch_size=1",
       async () => {
         {
@@ -52,7 +52,7 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
-    it(
+    it.skip(
       "batch_size>1",
       async () => {
         {

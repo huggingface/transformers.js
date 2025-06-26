@@ -19,11 +19,11 @@
  * 
  * @module processors
  */
-import { PROCESSOR_NAME } from '../utils/constants.js';
+import { PROCESSOR_NAME, CHAT_TEMPLATE_NAME } from '../utils/constants.js';
 import {
     Callable,
 } from '../utils/generic.js';
-import { getModelJSON } from '../utils/hub.js';
+import { getModelJSON, getModelText } from '../utils/hub.js';
 
 /**
  * @typedef {Object} ProcessorProperties Additional processor-specific properties.
@@ -42,16 +42,19 @@ export class Processor extends Callable {
         'feature_extractor_class',
     ]
     static uses_processor_config = false;
+    static uses_chat_template_file = false;
 
     /**
      * Creates a new Processor with the given components
      * @param {Object} config 
      * @param {Record<string, Object>} components 
+     * @param {string} chat_template
      */
-    constructor(config, components) {
+    constructor(config, components, chat_template) {
         super();
         this.config = config;
         this.components = components;
+        this.chat_template = chat_template;
     }
 
     /**
@@ -86,6 +89,7 @@ export class Processor extends Callable {
         }
         return this.tokenizer.apply_chat_template(messages, {
             tokenize: false, // default to false
+            chat_template: this.chat_template ?? undefined,
             ...options,
         });
     }
@@ -146,7 +150,7 @@ export class Processor extends Callable {
      */
     static async from_pretrained(pretrained_model_name_or_path, options) {
 
-        const [config, components] = await Promise.all([
+        const [config, components, chat_template] = await Promise.all([
             // TODO:
             this.uses_processor_config
                 ? getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options)
@@ -158,9 +162,12 @@ export class Processor extends Callable {
                         const component = await this[cls].from_pretrained(pretrained_model_name_or_path, options);
                         return [cls.replace(/_class$/, ''), component];
                     })
-            ).then(Object.fromEntries)
+            ).then(Object.fromEntries),
+            this.uses_chat_template_file
+                ? getModelText(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, true, options)
+                : null,
         ]);
 
-        return new this(config, components);
+        return new this(config, components, chat_template);
     }
 }

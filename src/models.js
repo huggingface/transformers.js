@@ -136,6 +136,7 @@ const MODEL_TYPES = {
     Phi3V: 9,
     AudioTextToText: 10,
     AutoEncoder: 11,
+    ImageAudioTextToText: 12,
 }
 //////////////////////////////////////////////////
 
@@ -896,8 +897,26 @@ function createPositionIds(model_inputs, past_key_values = null, start_index = 0
 }
 
 function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
+    const past_length = model_inputs.past_key_values
+        ? Object.values(model_inputs.past_key_values)[0].dims.at(-2)
+        : 0;
+
+    if (!model_inputs.attention_mask) {
+        // If the attention mask is not provided, we attempt to infer based on provided inputs
+        let dims;
+        for (const key of ['input_ids', 'inputs_embeds', 'position_ids']) {
+            if (model_inputs[key]) {
+                dims = model_inputs[key].dims;
+                break;
+            }
+        }
+        if (!dims) {
+            throw new Error("attention_mask is not provided, and unable to infer its shape from model inputs.");
+        }
+        model_inputs.attention_mask = ones([dims[0], past_length + dims[1]]);
+    }
+
     if (model_inputs.past_key_values) {
-        const past_length = Object.values(model_inputs.past_key_values)[0].dims.at(-2);
         const { input_ids, attention_mask } = model_inputs;
 
         // Keep only the unprocessed tokens:
@@ -918,24 +937,7 @@ function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, ge
         }
         // 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
         else {
-            if (
-                // NOTE: Only used by VLMs (!= so that null matches undefined)
-                self.config.image_token_index != null &&
-                // Equivalent to `self.config.image_token_index in input_ids` (== so that int matches bigint)
-                input_ids.data.some(x => x == self.config.image_token_index)
-            ) {
-                // TODO: Support multiple image tokens
-                const num_image_tokens = self.config.num_image_tokens;
-                if (!num_image_tokens) {
-                    throw new Error('`num_image_tokens` is missing in the model configuration.');
-                }
 
-                const num_new_tokens = input_ids.dims[1] - (past_length - num_image_tokens);
-                model_inputs.input_ids = input_ids.slice(null, [-num_new_tokens, null]);
-
-                // TODO: The attention mask should be formed from the attention mask passed in model_inputs
-                model_inputs.attention_mask = ones([1, past_length + num_new_tokens]);
-            }
         }
     }
 
@@ -1065,6 +1067,7 @@ export class PreTrainedModel extends Callable {
                 this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
                 break;
             case MODEL_TYPES.Phi3V:
+            case MODEL_TYPES.ImageAudioTextToText:
                 this.can_generate = true;
                 this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
                 break;
@@ -1218,7 +1221,19 @@ export class PreTrainedModel extends Callable {
                     generation_config: 'generation_config.json',
                 }, options),
             ]);
-
+        } else if (modelType === MODEL_TYPES.ImageAudioTextToText) {
+            const sessions = {
+                embed_tokens: 'embed_tokens',
+                audio_encoder: 'audio_encoder',
+                vision_encoder: 'vision_encoder',
+                decoder_model_merged: 'decoder_model_merged',
+            }
+            info = await Promise.all([
+                constructSessions(pretrained_model_name_or_path, sessions, options),
+                getOptionalConfigs(pretrained_model_name_or_path, {
+                    generation_config: 'generation_config.json',
+                }, options),
+            ]);
         } else if (modelType === MODEL_TYPES.Musicgen) {
             info = await Promise.all([
                 constructSessions(pretrained_model_name_or_path, {
@@ -2025,17 +2040,7 @@ export class PreTrainedModel extends Callable {
 
     async encode_image({ pixel_values }) {
         // image_inputs === { pixel_values }
-        const features = (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
-        // @ts-expect-error TS2339
-        if (!this.config.num_image_tokens) {
-            console.warn(
-                'The number of image tokens was not set in the model configuration. ' +
-                `Setting it to the number of features detected by the vision encoder (${features.dims[1]}).`
-            )
-            // @ts-expect-error TS2339
-            this.config.num_image_tokens = features.dims[1];
-        }
-        return features;
+        return (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
     }
 
     async encode_text({ input_ids }) {
@@ -3649,65 +3654,16 @@ export class LlavaPreTrainedModel extends PreTrainedModel {
  * The LLAVA model which consists of a vision backbone and a language model.
  */
 export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
+    _merge_input_ids_with_image_features(kwargs) {
+        const vision_hidden_size = kwargs.image_features.dims.at(-1);
+        const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);
 
-    _merge_input_ids_with_image_features({
-        inputs_embeds,
-        image_features,
-        input_ids,
-        attention_mask,
-    }) {
-
-        // @ts-expect-error TS2339
-        const image_token_index = this.config.image_token_index;
-
-        const idsList = input_ids.tolist();
-
-        // NOTE: we use .findIndex instead of .indexOf to perform weak comparison (==) between BigInt and Number
-        const indexOfImage = idsList.map(x => x.findIndex(x => x == image_token_index));
-
-        const noImages = indexOfImage.every(x => x === -1);
-        const allImages = indexOfImage.every(x => x !== -1);
-        if (!noImages && !allImages) {
-            // Check for padding reasons
-            throw new Error('Every input should contain either 0 or 1 image token.');
-        }
-
-        if (noImages) {
-            return {
-                inputs_embeds,
-                attention_mask,
-            }
-        }
-
-        const stacked = [];
-        const stacked_attention_mask = [];
-        for (let i = 0; i < indexOfImage.length; ++i) {
-            const index = indexOfImage[i];
-
-            const e = inputs_embeds[i];
-            const im = image_features[i];
-            const am = attention_mask[i];
-            stacked.push(
-                cat([
-                    e.slice([0, index]),
-                    im,
-                    e.slice([index + 1, e.dims[0]]),
-                ], 0)
-            );
-
-            stacked_attention_mask.push(
-                cat([
-                    am.slice([0, index]),
-                    ones([im.dims[0]]),
-                    am.slice([index + 1, am.dims[0]])
-                ], 0)
-            )
-        }
-
-        return {
-            inputs_embeds: stack(stacked, 0),
-            attention_mask: stack(stacked_attention_mask, 0),
-        }
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_index,
+            ...kwargs,
+            image_features: reshaped_image_hidden_states,
+        })
     }
 }
 //////////////////////////////////////////////////
@@ -3847,6 +3803,128 @@ export class PaliGemmaForConditionalGeneration extends PaliGemmaPreTrainedModel 
         })
     }
 }
+
+export class LlavaQwen2ForCausalLM extends LlavaPreTrainedModel {
+    _merge_input_ids_with_image_features(kwargs) {
+        const vision_hidden_size = kwargs.image_features.dims.at(-1);
+        const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);
+
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_index,
+            ...kwargs,
+            image_features: reshaped_image_hidden_states,
+        })
+    }
+}
+
+export class Gemma3nPreTrainedModel extends PreTrainedModel {
+    forward_params = [
+        'input_ids',
+        'attention_mask',
+        'inputs_embeds',
+        'per_layer_inputs',
+
+        'position_ids',
+        'pixel_values',
+        'input_features',
+        'input_features_mask',
+        'past_key_values',
+    ];
+}
+export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
+
+    async forward({
+        // Produced by the tokenizer/processor:
+        input_ids = null,
+        attention_mask = null,
+        pixel_values = null,
+        input_features = null,
+        input_features_mask = null,
+
+        // Used during generation:
+        position_ids = null,
+        inputs_embeds = null,
+        per_layer_inputs=null,
+        past_key_values = null,
+
+        // Generic generation parameters
+        generation_config = null,
+        logits_processor = null,
+
+        // TODO: needed?
+        ...kwargs
+    }) {
+        if (!inputs_embeds || !per_layer_inputs) {
+            // 1. Extract the text embeddings.
+            ({ inputs_embeds, per_layer_inputs} = await sessionRun(this.sessions['embed_tokens'], {
+                input_ids,
+            }));
+            if (input_ids.dims[1] !== 1) {
+                if (pixel_values) {
+                    // Encode the image
+                    const { image_features } = await sessionRun(this.sessions['vision_encoder'], {
+                        pixel_values,
+                    });
+                    ({ inputs_embeds, attention_mask } = this._merge_input_ids_with_image_features({
+                        image_features,
+                        inputs_embeds,
+                        input_ids,
+                        attention_mask,
+                    }));
+                }
+
+                if (input_features) {
+                    // Encode the audio
+                    const { audio_features } = await sessionRun(this.sessions['audio_encoder'], {
+                        input_features,
+                        input_features_mask,
+                    });
+                    ({ inputs_embeds, attention_mask } = this._merge_input_ids_with_audio_features({
+                        audio_features,
+                        inputs_embeds,
+                        input_ids,
+                        attention_mask,
+                    }));
+                }
+            }
+        }
+
+        const outputs = await decoderForward(this, {
+            inputs_embeds,
+            per_layer_inputs,
+            past_key_values,
+            attention_mask,
+            position_ids,
+            generation_config,
+            logits_processor,
+        }, true);
+        return outputs;
+    }
+
+    _merge_input_ids_with_image_features(kwargs) {
+        const vision_hidden_size = kwargs.image_features.dims.at(-1);
+        const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_id,
+            ...kwargs,
+            image_features: reshaped_image_hidden_states,
+        });
+    }
+    _merge_input_ids_with_audio_features(kwargs) {
+        const audio_hidden_size = kwargs.audio_features.dims.at(-1);
+        const reshaped_audio_features = kwargs.audio_features.view(-1, audio_hidden_size);
+
+        return default_merge_input_ids_with_audio_features({
+            // @ts-ignore
+            audio_token_id: this.config.audio_token_id,
+            ...kwargs,
+            audio_features: reshaped_audio_features,
+        })
+    }
+}
+        
 
 //////////////////////////////////////////////////
 // Idefics3 Models
@@ -7851,6 +7929,8 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['idefics3', ['Idefics3ForConditionalGeneration', Idefics3ForConditionalGeneration]],
     ['smolvlm', ['SmolVLMForConditionalGeneration', SmolVLMForConditionalGeneration]],
     ['paligemma', ['PaliGemmaForConditionalGeneration', PaliGemmaForConditionalGeneration]],
+    ['llava_qwen2', ['LlavaQwen2ForCausalLM', LlavaQwen2ForCausalLM]],
+    ['gemma3n', ['Gemma3nForConditionalGeneration', Gemma3nForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
@@ -8067,6 +8147,8 @@ const CUSTOM_MAPPING = [
     ['MimiDecoderModel', MimiDecoderModel, MODEL_TYPES.EncoderOnly],
     ['SnacEncoderModel', SnacEncoderModel, MODEL_TYPES.EncoderOnly],
     ['SnacDecoderModel', SnacDecoderModel, MODEL_TYPES.EncoderOnly],
+
+    ['Gemma3nForConditionalGeneration', Gemma3nForConditionalGeneration, MODEL_TYPES.ImageAudioTextToText],
 ]
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);

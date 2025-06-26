@@ -450,6 +450,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * @param {boolean} [options.onesided=true] If `true`, only computes the positive frequencies and returns a spectrogram containing `fft_length // 2 + 1`
  * frequency bins. If `false`, also computes the negative frequencies and returns `fft_length` frequency bins.
  * @param {number} [options.preemphasis=null] Coefficient for a low-pass filter that applies pre-emphasis before the DFT.
+ * @param {boolean} [options.preemphasis_htk_flavor=true] Whether to apply the pre-emphasis filter in the HTK flavor.
  * @param {number[][]} [options.mel_filters=null] The mel filter bank of shape `(num_freq_bins, num_mel_filters)`.
  * If supplied, applies this filter bank to create a mel spectrogram.
  * @param {number} [options.mel_floor=1e-10] Minimum value of mel frequency banks.
@@ -483,6 +484,7 @@ export async function spectrogram(
         pad_mode = "reflect",
         onesided = true,
         preemphasis = null,
+        preemphasis_htk_flavor = true,
         mel_filters = null,
         mel_floor = 1e-10,
         log_mel = null,
@@ -518,6 +520,12 @@ export async function spectrogram(
         throw new Error(
             "You have provided `mel_filters` but `power` is `None`. Mel spectrogram computation is not yet supported for complex-valued spectrogram. " +
             "Specify `power` to fix this issue."
+        );
+    }
+
+    if (!preemphasis_htk_flavor) {
+        throw new Error(
+            "`preemphasis_htk_flavor=false` is not currently supported."
         );
     }
 
@@ -583,7 +591,7 @@ export async function spectrogram(
         }
 
         if (preemphasis !== null) {
-            // Done in reverse to avoid copies and distructive modification
+            // Done in reverse to avoid copies and destructive modification
             for (let j = buffer_size - 1; j >= 1; --j) {
                 inputBuffer[j] -= preemphasis * inputBuffer[j - 1];
             }
@@ -608,7 +616,7 @@ export async function spectrogram(
 
     if (power !== null && power !== 2) {
         // slight optimization to not sqrt
-        const pow = 2 / power; // we use 2 since we already squared
+        const pow = power / 2; // we use 2 since we already squared
         for (let i = 0; i < transposedMagnitudeData.length; ++i) {
             transposedMagnitudeData[i] **= pow;
         }

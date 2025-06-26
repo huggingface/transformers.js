@@ -13,7 +13,7 @@ export class AutoImageProcessor {
 
         // Determine image processor class
         const key = preprocessorConfig.image_processor_type ?? preprocessorConfig.feature_extractor_type;
-        let image_processor_class = AllImageProcessors[key];
+        let image_processor_class = AllImageProcessors[key?.replace(/Fast$/, '')];
 
         if (!image_processor_class) {
             if (key !== undefined) {

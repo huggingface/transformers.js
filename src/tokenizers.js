@@ -2577,7 +2577,7 @@ export class PreTrainedTokenizer extends Callable {
     constructor(tokenizerJSON, tokenizerConfig) {
         super();
 
-        this._tokenizer_config = tokenizerConfig;
+        this.config = tokenizerConfig;
 
         // Construct parts of the tokenizer from the JSON
         this.normalizer = Normalizer.fromConfig(tokenizerJSON.normalizer);
@@ -2686,7 +2686,7 @@ export class PreTrainedTokenizer extends Callable {
      */
     getToken(...keys) {
         for (const key of keys) {
-            const item = this._tokenizer_config[key];
+            const item = this.config[key];
 
             if (!item) continue;
 

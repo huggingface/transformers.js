@@ -11,8 +11,8 @@ export class VLChatProcessor extends Processor {
     static tokenizer_class = AutoTokenizer
     static uses_processor_config = true;
 
-    constructor(config, components) {
-        super(config, components);
+    constructor(config, components, chat_template) {
+        super(config, components, chat_template);
 
         this.image_tag = this.config.image_tag;
         this.image_start_tag = this.config.image_start_tag;
