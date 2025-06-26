@@ -450,7 +450,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * @param {boolean} [options.onesided=true] If `true`, only computes the positive frequencies and returns a spectrogram containing `fft_length // 2 + 1`
  * frequency bins. If `false`, also computes the negative frequencies and returns `fft_length` frequency bins.
  * @param {number} [options.preemphasis=null] Coefficient for a low-pass filter that applies pre-emphasis before the DFT.
- * @param {boolean} [options.preemphasis_htk_flavor=false] If `true`, applies the pre-emphasis filter in the HTK flavor.
+ * @param {boolean} [options.preemphasis_htk_flavor=true] Whether to apply the pre-emphasis filter in the HTK flavor.
  * @param {number[][]} [options.mel_filters=null] The mel filter bank of shape `(num_freq_bins, num_mel_filters)`.
  * If supplied, applies this filter bank to create a mel spectrogram.
  * @param {number} [options.mel_floor=1e-10] Minimum value of mel frequency banks.
