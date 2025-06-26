@@ -42,6 +42,7 @@ import {
     AutoModelForDepthEstimation,
     AutoModelForImageFeatureExtraction,
     PreTrainedModel,
+    AutoModelForImageTextToText,
 } from './models.js';
 import {
     AutoProcessor,
@@ -1991,6 +1992,85 @@ export class ImageToTextPipeline extends (/** @type {new (options: TextImagePipe
 }
 
 /**
+ * @callback ImageTextToTextPipelineCallback Assign labels to the image(s) passed as inputs.
+ * @param {ImagePipelineInputs} images The images to be captioned.
+ * TODO: support chat inputs (Chat|Chat[])
+ * @param {string|string[]} texts The text to be combined with the image. If a list of strings is passed, the length of the list should be the same as the number of images.
+ * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @returns {Promise<TextGenerationOutput|TextGenerationOutput[]>} An object (or array of objects) containing the generated text(s).
+ *
+ * @typedef {TextImagePipelineConstructorArgs & ImageTextToTextPipelineCallback & Disposable} ImageTextToTextPipelineType
+ */
+
+/**
+ * Image Text To Text pipeline using a `AutoModelForImageTextToText`. This pipeline infers text from a combination of text and image.
+ *
+ * **Example:** TODO
+ */
+export class ImageTextToTextPipeline extends (/** @type {new (options: TextImagePipelineConstructorArgs) => ImageTextToTextPipelineType} */ (Pipeline)) {
+
+    /**
+     * Create a new ImageToTextPipeline.
+     * @param {TextImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
+     */
+    constructor(options) {
+        super(options);
+    }
+
+    /** @type {ImageTextToTextPipelineCallback} */
+    async _call(images, texts, generate_kwargs = {}) {
+        const isBatchedImages = Array.isArray(images);
+        const isBatchedTexts = Array.isArray(texts);
+        const isBatched = isBatchedImages && isBatchedTexts;
+
+        if (isBatchedImages !== isBatchedTexts) {
+            throw Error("ImageTextToTextPipeline: If images are batched, texts must also be batched and vice versa.");
+        }
+
+        if (isBatched && images.length !== texts.length) {
+            throw Error("ImageTextToTextPipeline: If the images and texts are batched, they must have the same length.");
+        }
+
+        if (isBatched) {
+            // TODO: support batches
+            throw Error("ImageTextToTextPipeline: Batching is not supported yet.");
+        }
+
+        // if (isChat(texts) || isChat(images)) {
+        //     // TODO: support chat
+        //     throw Error("ImageTextToTextPipeline: Chat is not supported yet.");
+        // }
+        texts = !Array.isArray(texts) ? [texts] : texts;
+        const preparedTexts = texts.map((text, index) => {
+                const conversation = [
+                    {
+                        role: "user",
+                        content: "<|image_pad|>"
+                    },
+                    {
+                        role: "user",
+                        content: text
+                    }
+                ]
+                return this.processor.apply_chat_template(conversation, { add_generation_prompt: true, tokenize: false })
+            });
+        const preparedImages = await prepareImages(images);
+
+        // const image_inputs = await this.processor(preparedImages);
+        // const text_inputs = await this.tokenizer(preparedTexts);
+        const inputs = await this.processor(preparedTexts, preparedImages);
+
+        const outputs = await this.model.generate({...inputs, ...generate_kwargs, max_new_tokens: 128,});
+
+        const decoded = this.tokenizer.batch_decode(/** @type {Tensor} */(outputs), {
+            skip_special_tokens: true,
+        })
+
+        return decoded.map(x => ({ generated_text: x.trim() }));
+    }
+}
+
+/**
  * @typedef {Object} ImageClassificationSingle
  * @property {string} label The label identified by the model.
  * @property {number} score The score attributed by the model for that label.
@@ -3203,7 +3283,16 @@ const SUPPORTED_TASKS = Object.freeze({
         },
         "type": "multimodal",
     },
-
+    "image-text-to-text": {
+        "tokenizer": AutoTokenizer,
+        "pipeline": ImageTextToTextPipeline,
+        "model": AutoModelForImageTextToText,
+        "processor": AutoProcessor,
+        "default": {
+            "model": "onnx-community/Qwen2-VL-2B-Instruct"
+        },
+        "type": "multimodal",
+    },
     "image-classification": {
         // no tokenizer
         "pipeline": ImageClassificationPipeline,
@@ -3375,6 +3464,7 @@ const TASK_ALIASES = Object.freeze({
  *  - `"image-classification"`: will return a `ImageClassificationPipeline`.
  *  - `"image-segmentation"`: will return a `ImageSegmentationPipeline`.
  *  - `"image-to-text"`: will return a `ImageToTextPipeline`.
+ *  - `"image-text-to-text"`: will return a `ImageTextToTextPipeline`.
  *  - `"object-detection"`: will return a `ObjectDetectionPipeline`.
  *  - `"question-answering"`: will return a `QuestionAnsweringPipeline`.
  *  - `"summarization"`: will return a `SummarizationPipeline`.
