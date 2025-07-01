@@ -1098,7 +1098,7 @@ export class ImageProcessor extends Callable {
      * 
      * @returns {Promise<ImageProcessor>} A new instance of the Processor class.
      */
-    static async from_pretrained(pretrained_model_name_or_path, options) {
+    static async from_pretrained(pretrained_model_name_or_path, options={}) {
         const preprocessorConfig = await getModelJSON(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME, true, options);
         return new this(preprocessorConfig);
     }

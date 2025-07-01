@@ -148,7 +148,7 @@ export class Processor extends Callable {
      * 
      * @returns {Promise<Processor>} A new instance of the Processor class.
      */
-    static async from_pretrained(pretrained_model_name_or_path, options) {
+    static async from_pretrained(pretrained_model_name_or_path, options={}) {
 
         const [config, components, chat_template] = await Promise.all([
             // TODO:
