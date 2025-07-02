@@ -4,4 +4,4 @@ optimum@git+https://github.com/huggingface/optimum.git@b04feaea78cda58d79b8da67d
 onnx==1.17.0
 tqdm==4.67.1
 onnxslim==0.1.48
-numpy==2.2
+numpy==2.2.6
