@@ -142,7 +142,7 @@ export class RawImage {
             throw new Error('fromCanvas() is only supported in browser environments.')
         }
 
-        const ctx = canvas.getContext('2d');
+        const ctx = /** @type {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} */ (canvas.getContext('2d'));
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         return new RawImage(data, canvas.width, canvas.height, 4);
     }
