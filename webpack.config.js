@@ -41,20 +41,20 @@ class PostBuildPlugin {
   apply(compiler) {
     compiler.hooks.done.tap('PostBuildPlugin', () => {
       const dist = path.join(__dirname, 'dist');
-      const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.jsep.mjs';
-      const ORT_BUNDLE_FILE = 'ort.bundle.min.mjs';
+      const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.asyncify.mjs';
+      const ORT_BUNDLE_FILE = 'ort.webgpu.bundle.min.mjs';
 
-      // 1. Remove unnecessary files
-      {
-        const file = path.join(dist, ORT_BUNDLE_FILE);
-        if (fs.existsSync(file)) fs.unlinkSync(file);
-      }
-
-      // 2. Copy unbundled JSEP file
+      // 1. Copy unbundled asyncify file
       {
         const src = path.join(__dirname, 'node_modules/onnxruntime-web/dist', ORT_JSEP_FILE);
         const dest = path.join(dist, ORT_JSEP_FILE);
         fs.copyFileSync(src, dest);
+      }
+
+      // 2. Remove unnecessary files
+      {
+        const file = path.join(dist, ORT_BUNDLE_FILE);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
       }
     });
   }
