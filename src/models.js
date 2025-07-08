@@ -1100,9 +1100,7 @@ export class PreTrainedModel extends Callable {
     async dispose() {
         const promises = [];
         for (const session of Object.values(this.sessions)) {
-            if (session?.handler?.dispose) {
-                promises.push(session.handler.dispose())
-            }
+            promises.push(session.release?.());
         }
         return await Promise.all(promises);
     }
