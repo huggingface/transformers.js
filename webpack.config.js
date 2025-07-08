@@ -37,9 +37,15 @@ class StripNodePrefixPlugin extends webpack.NormalModuleReplacementPlugin {
  * @see https://webpack.js.org/contribute/writing-a-plugin/
  */
 class PostBuildPlugin {
+  static completed = false;
 
   apply(compiler) {
     compiler.hooks.done.tap('PostBuildPlugin', () => {
+      if (!process.env.WEBPACK_SERVE && !PostBuildPlugin.completed) {
+        // Ensure we only run this once
+        PostBuildPlugin.completed = true;
+        return;
+      }
       const dist = path.join(__dirname, 'dist');
       const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.asyncify.mjs';
       const ORT_BUNDLE_FILE = 'ort.webgpu.bundle.min.mjs';
@@ -184,7 +190,8 @@ const WEB_BUILD = buildConfig({
   ignoreModules: WEB_IGNORE_MODULES,
   externalModules: WEB_EXTERNAL_MODULES,
   plugins: [
-    new StripNodePrefixPlugin()
+    new StripNodePrefixPlugin(),
+    new PostBuildPlugin(),
   ]
 });
 
