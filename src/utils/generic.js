@@ -23,6 +23,17 @@ export const Callable = /** @type {any} */ (class {
     }
 
     /**
+     * This method is called when the object is called as a function.
+     * @param {any} thisArg The value of `this` provided for the call.
+     * @param {any[]} args The arguments passed to the call.
+     * @returns {*} The result of calling the `_call` method.
+     * @throws {Error} If the subclass does not implement the `_call` method.
+     */
+    apply(thisArg, args) {
+        return this._call(...args)
+    }
+
+    /**
      * This method should be implemented in subclasses to provide the
      * functionality of the callable object.
      *
