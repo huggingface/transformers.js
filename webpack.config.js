@@ -54,7 +54,21 @@ class PostBuildPlugin {
       {
         const src = path.join(__dirname, 'node_modules/onnxruntime-web/dist', ORT_JSEP_FILE);
         const dest = path.join(dist, ORT_JSEP_FILE);
-        fs.copyFileSync(src, dest);
+
+        // Transformers.js uses both onnxruntime-web and onnxruntime-node in the same package,
+        // and the runtime we use depends on the environment (onnxruntime-web for web, onnxruntime-node for Node.js).
+        // This means that we don't currently support using the WASM backend in Node.js, so we disable this behaviour in the JSEP file.
+        const content = fs.readFileSync(src, 'utf8');
+        const updatedContent = content
+          .replace(
+            `"object"==typeof process&&"object"==typeof process.versions&&"string"==typeof process.versions.node&&"renderer"!=process.type`,
+            "false",
+          )
+          .replace(
+            `typeof globalThis.process?.versions?.node == 'string'`,
+            "false",
+          )
+        fs.writeFileSync(dest, updatedContent);
       }
     });
   }
