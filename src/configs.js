@@ -109,6 +109,7 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             break;
         case 'llama':
+        case 'smollm3':
         case 'olmo':
         case 'olmo2':
         case 'mobilellm':
@@ -134,6 +135,7 @@ function getNormalizedConfig(config) {
         case 'gemma3n_text':
         case 'glm':
         case 'helium':
+        case 'ernie4_5':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'head_dim';
