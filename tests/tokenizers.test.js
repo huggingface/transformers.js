@@ -34,6 +34,9 @@ describe("Tokenizers (model-specific)", () => {
               }
             });
           }
+          afterAll(() => {
+            global.gc?.();
+          });
         });
       }
       // Run custom tests, if they exist
