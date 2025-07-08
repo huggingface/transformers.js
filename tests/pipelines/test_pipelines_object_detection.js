@@ -53,7 +53,7 @@ export default () => {
       );
 
       afterAll(async () => {
-        await pipe.dispose();
+        await pipe?.dispose();
       }, MAX_MODEL_DISPOSE_TIME);
     });
 
@@ -124,7 +124,7 @@ export default () => {
       // });
 
       afterAll(async () => {
-        await pipe.dispose();
+        await pipe?.dispose();
       }, MAX_MODEL_DISPOSE_TIME);
     });
   });
