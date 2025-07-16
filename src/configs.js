@@ -109,6 +109,7 @@ function getNormalizedConfig(config) {
             mapping['hidden_size'] = 'hidden_size';
             break;
         case 'llama':
+        case 'lfm2':
         case 'smollm3':
         case 'olmo':
         case 'olmo2':
@@ -261,9 +262,35 @@ function getNormalizedConfig(config) {
  * @param {PretrainedConfig} config 
  * @returns {Record<string, number[]>}
  */
-export function getKeyValueShapes(config, {
+export function getCacheShapes(config, options) {
+    if (config.model_type === 'lfm2') {
+        // Custom caching mechanism for LFM2
+        /** @type {Record<string, number[]>} */
+        const cache_values = {};
+        // @ts-expect-error TS2339
+        const { layer_types, num_attention_heads, num_key_value_heads, hidden_size, conv_L_cache } = config;
+        const head_dim = hidden_size / num_attention_heads;
+        const batch_size = options?.batch_size ?? 1;
+        for (let i = 0; i < layer_types.length; ++i) {
+            if (layer_types[i] === 'full_attention') {
+                for (const kv of ['key', 'value']) {
+                    cache_values[`past_key_values.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, head_dim];
+                }
+            } else if (layer_types[i] === 'conv') {
+                cache_values[`past_conv.${i}`] = [batch_size, hidden_size, conv_L_cache];
+            } else {
+                throw new Error(`Unsupported layer type: ${layer_types[i]}`);
+            }
+        }
+        return cache_values;
+    }
+    return getKeyValueShapes(config, options);
+}
+
+/** @type {typeof getKeyValueShapes} */
+function getKeyValueShapes(config, {
     prefix = 'past_key_values',
-    batch_size=1,
+    batch_size = 1,
 } = {}) {
     /** @type {Record<string, number[]>} */
     const decoderFeeds = {};

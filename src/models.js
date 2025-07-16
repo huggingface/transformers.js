@@ -40,7 +40,7 @@
 
 import {
     AutoConfig,
-    getKeyValueShapes,
+    getCacheShapes,
 } from './configs.js';
 
 import {
@@ -318,7 +318,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     }
 
     if (selectedDevice === 'webgpu') {
-        const shapes = getKeyValueShapes(options.config, {
+        const shapes = getCacheShapes(options.config, {
             prefix: 'present',
         });
         if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
@@ -1960,7 +1960,9 @@ export class PreTrainedModel extends Callable {
 
         for (const name in decoderResults) {
             if (name.startsWith('present')) {
-                const newName = name.replace('present', 'past_key_values');
+                const newName = name
+                    .replace('present_conv', 'past_conv') // Hybrid cache architecture (e.g., LFM2)
+                    .replace('present', 'past_key_values');
                 const is_encoder_pkv = name.includes('encoder');
                 if (is_encoder_pkv && pastKeyValues) {
                     // Optimization introduced by optimum to reuse past key values.
@@ -2017,14 +2019,14 @@ export class PreTrainedModel extends Callable {
             Object.assign(decoderFeeds, pastKeyValues)
         } else {
             const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
-            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-            const empty = (dtype === 'float16') ? new DataTypeMap.float16() : [];
-
             const batch_size = (decoderFeeds[this.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
-            const shapes = getKeyValueShapes(this.config, { batch_size });
 
+            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
+            const cls = (dtype === 'float16') ? DataTypeMap.float16 : DataTypeMap.float32;
+            const shapes = getCacheShapes(this.config, { batch_size });
             for (const name in shapes) {
-                decoderFeeds[name] = new Tensor(dtype, empty, shapes[name]);
+                const size = shapes[name].reduce((a, b) => a * b, 1);
+                decoderFeeds[name] = new Tensor(dtype, new cls(size), shapes[name]);
             }
         }
     }
@@ -4584,6 +4586,13 @@ export class LlamaPreTrainedModel extends PreTrainedModel { }
 export class LlamaModel extends LlamaPreTrainedModel { }
 
 export class LlamaForCausalLM extends LlamaPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LFM2 models
+export class Lfm2PreTrainedModel extends PreTrainedModel { }
+export class Lfm2Model extends Lfm2PreTrainedModel { }
+export class Lfm2ForCausalLM extends Lfm2PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -7803,6 +7812,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['gpt_neox', ['GPTNeoXModel', GPTNeoXModel]],
     ['codegen', ['CodeGenModel', CodeGenModel]],
     ['llama', ['LlamaModel', LlamaModel]],
+    ['lfm2', ['Lfm2Model', Lfm2Model]],
     ['smollm3', ['SmolLM3Model', SmolLM3Model]],
     ['exaone', ['ExaoneModel', ExaoneModel]],
     ['olmo', ['OlmoModel', OlmoModel]],
@@ -7908,6 +7918,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gpt_neox', ['GPTNeoXForCausalLM', GPTNeoXForCausalLM]],
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
+    ['lfm2', ['Lfm2ForCausalLM', Lfm2ForCausalLM]],
     ['smollm3', ['SmolLM3ForCausalLM', SmolLM3ForCausalLM]],
     ['exaone', ['ExaoneForCausalLM', ExaoneForCausalLM]],
     ['olmo', ['OlmoForCausalLM', OlmoForCausalLM]],
