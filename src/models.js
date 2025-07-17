@@ -40,7 +40,7 @@
 
 import {
     AutoConfig,
-    getKeyValueShapes,
+    getCacheShapes,
 } from './configs.js';
 
 import {
@@ -155,10 +155,11 @@ const MODEL_CLASS_TO_NAME_MAPPING = new Map();
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {boolean} [is_decoder=false] Whether the model is a decoder model.
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
-async function getSession(pretrained_model_name_or_path, fileName, options) {
+async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder = false) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
     let device = options.device ?? custom_config.device;
@@ -219,7 +220,14 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
         throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);
-    } else if (selectedDtype === DATA_TYPES.fp16 && selectedDevice === 'webgpu' && !(await isWebGpuFp16Supported())) {
+    } else if (
+        selectedDevice === 'webgpu' && (
+            // NOTE: Currently, we assume that the Native WebGPU EP always supports fp16. In future, we will add a check for this.
+            !apis.IS_NODE_ENV
+            &&
+            (selectedDtype === DATA_TYPES.fp16 && !(await isWebGpuFp16Supported()))
+        )
+    ) {
         throw new Error(`The device (${selectedDevice}) does not support fp16.`);
     }
 
@@ -317,8 +325,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         }
     }
 
-    if (selectedDevice === 'webgpu') {
-        const shapes = getKeyValueShapes(options.config, {
+    if (is_decoder && selectedDevice === 'webgpu') {
+        const shapes = getCacheShapes(options.config, {
             prefix: 'present',
         });
         if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
@@ -343,13 +351,14 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {Record<string, string>} names The names of the model files to load.
  * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {string} [decoder_name] The name of the decoder model, if any.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-async function constructSessions(pretrained_model_name_or_path, names, options) {
+async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name = undefined) {
     return Object.fromEntries(await Promise.all(
         Object.keys(names).map(async (name) => {
-            const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options);
+            const { buffer_or_path, session_options, session_config } = await getSession(pretrained_model_name_or_path, names[name], options, name === decoder_name);
             const session = await createInferenceSession(buffer_or_path, session_options, session_config);
             return [name, session];
         })
@@ -1091,9 +1100,7 @@ export class PreTrainedModel extends Callable {
     async dispose() {
         const promises = [];
         for (const session of Object.values(this.sessions)) {
-            if (session?.handler?.dispose) {
-                promises.push(session.handler.dispose())
-            }
+            promises.push(session.release?.());
         }
         return await Promise.all(promises);
     }
@@ -1151,7 +1158,7 @@ export class PreTrainedModel extends Callable {
             info = await Promise.all([
                 constructSessions(pretrained_model_name_or_path, {
                     model: options.model_file_name ?? 'model',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1162,7 +1169,7 @@ export class PreTrainedModel extends Callable {
                 constructSessions(pretrained_model_name_or_path, {
                     model: 'encoder_model',
                     decoder_model_merged: 'decoder_model_merged',
-                }, options),
+                }, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1181,7 +1188,7 @@ export class PreTrainedModel extends Callable {
                 constructSessions(pretrained_model_name_or_path, {
                     model: 'encoder_model',
                     decoder_model_merged: 'decoder_model_merged',
-                }, options),
+                }, options, 'decoder_model_merged'),
             ]);
 
         } else if (modelType === MODEL_TYPES.ImageTextToText) {
@@ -1194,7 +1201,7 @@ export class PreTrainedModel extends Callable {
                 sessions['model'] = 'encoder_model';
             }
             info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
+                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1207,7 +1214,7 @@ export class PreTrainedModel extends Callable {
                 decoder_model_merged: 'decoder_model_merged',
             }
             info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
+                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1231,7 +1238,7 @@ export class PreTrainedModel extends Callable {
                     model: 'text_encoder',
                     decoder_model_merged: 'decoder_model_merged',
                     encodec_decode: 'encodec_decode',
-                }, options),
+                }, options, 'decoder_model_merged'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1246,7 +1253,7 @@ export class PreTrainedModel extends Callable {
                     gen_head: 'gen_head',
                     gen_img_embeds: 'gen_img_embeds',
                     image_decode: 'image_decode',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1258,7 +1265,7 @@ export class PreTrainedModel extends Callable {
                     prepare_inputs_embeds: 'prepare_inputs_embeds',
                     model: 'model',
                     vision_encoder: 'vision_encoder',
-                }, options),
+                }, options, 'model'),
                 getOptionalConfigs(pretrained_model_name_or_path, {
                     generation_config: 'generation_config.json',
                 }, options),
@@ -1960,7 +1967,9 @@ export class PreTrainedModel extends Callable {
 
         for (const name in decoderResults) {
             if (name.startsWith('present')) {
-                const newName = name.replace('present', 'past_key_values');
+                const newName = name
+                    .replace('present_conv', 'past_conv') // Hybrid cache architecture (e.g., LFM2)
+                    .replace('present', 'past_key_values');
                 const is_encoder_pkv = name.includes('encoder');
                 if (is_encoder_pkv && pastKeyValues) {
                     // Optimization introduced by optimum to reuse past key values.
@@ -2017,14 +2026,14 @@ export class PreTrainedModel extends Callable {
             Object.assign(decoderFeeds, pastKeyValues)
         } else {
             const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
-            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-            const empty = (dtype === 'float16') ? new DataTypeMap.float16() : [];
-
             const batch_size = (decoderFeeds[this.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
-            const shapes = getKeyValueShapes(this.config, { batch_size });
 
+            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
+            const cls = (dtype === 'float16') ? DataTypeMap.float16 : DataTypeMap.float32;
+            const shapes = getCacheShapes(this.config, { batch_size });
             for (const name in shapes) {
-                decoderFeeds[name] = new Tensor(dtype, empty, shapes[name]);
+                const size = shapes[name].reduce((a, b) => a * b, 1);
+                decoderFeeds[name] = new Tensor(dtype, new cls(size), shapes[name]);
             }
         }
     }
@@ -4584,6 +4593,13 @@ export class LlamaPreTrainedModel extends PreTrainedModel { }
 export class LlamaModel extends LlamaPreTrainedModel { }
 
 export class LlamaForCausalLM extends LlamaPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LFM2 models
+export class Lfm2PreTrainedModel extends PreTrainedModel { }
+export class Lfm2Model extends Lfm2PreTrainedModel { }
+export class Lfm2ForCausalLM extends Lfm2PreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -7803,6 +7819,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['gpt_neox', ['GPTNeoXModel', GPTNeoXModel]],
     ['codegen', ['CodeGenModel', CodeGenModel]],
     ['llama', ['LlamaModel', LlamaModel]],
+    ['lfm2', ['Lfm2Model', Lfm2Model]],
     ['smollm3', ['SmolLM3Model', SmolLM3Model]],
     ['exaone', ['ExaoneModel', ExaoneModel]],
     ['olmo', ['OlmoModel', OlmoModel]],
@@ -7908,6 +7925,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gpt_neox', ['GPTNeoXForCausalLM', GPTNeoXForCausalLM]],
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
+    ['lfm2', ['Lfm2ForCausalLM', Lfm2ForCausalLM]],
     ['smollm3', ['SmolLM3ForCausalLM', SmolLM3ForCausalLM]],
     ['exaone', ['ExaoneForCausalLM', ExaoneForCausalLM]],
     ['olmo', ['OlmoForCausalLM', OlmoForCausalLM]],

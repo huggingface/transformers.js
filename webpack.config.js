@@ -37,24 +37,30 @@ class StripNodePrefixPlugin extends webpack.NormalModuleReplacementPlugin {
  * @see https://webpack.js.org/contribute/writing-a-plugin/
  */
 class PostBuildPlugin {
+  static completed = false;
 
   apply(compiler) {
     compiler.hooks.done.tap('PostBuildPlugin', () => {
-      const dist = path.join(__dirname, 'dist');
-      const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.jsep.mjs';
-      const ORT_BUNDLE_FILE = 'ort.bundle.min.mjs';
-
-      // 1. Remove unnecessary files
-      {
-        const file = path.join(dist, ORT_BUNDLE_FILE);
-        if (fs.existsSync(file)) fs.unlinkSync(file);
+      if (!process.env.WEBPACK_SERVE && !PostBuildPlugin.completed) {
+        // Ensure we only run this once
+        PostBuildPlugin.completed = true;
+        return;
       }
+      const dist = path.join(__dirname, 'dist');
+      const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.asyncify.mjs';
+      const ORT_BUNDLE_FILE = 'ort.webgpu.bundle.min.mjs';
 
-      // 2. Copy unbundled JSEP file
+      // 1. Copy unbundled asyncify file
       {
         const src = path.join(__dirname, 'node_modules/onnxruntime-web/dist', ORT_JSEP_FILE);
         const dest = path.join(dist, ORT_JSEP_FILE);
         fs.copyFileSync(src, dest);
+      }
+
+      // 2. Remove unnecessary files
+      {
+        const file = path.join(dist, ORT_BUNDLE_FILE);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
       }
     });
   }
@@ -184,7 +190,8 @@ const WEB_BUILD = buildConfig({
   ignoreModules: WEB_IGNORE_MODULES,
   externalModules: WEB_EXTERNAL_MODULES,
   plugins: [
-    new StripNodePrefixPlugin()
+    new StripNodePrefixPlugin(),
+    new PostBuildPlugin(),
   ]
 });
 
