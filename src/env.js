@@ -142,7 +142,7 @@ export const env = {
     remoteHost: 'https://huggingface.co/',
     remotePathTemplate: '{model}/resolve/{revision}/',
 
-    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV),
+    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_RUNTIME),
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
 
