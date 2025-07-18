@@ -2659,6 +2659,9 @@ export class PreTrainedTokenizer extends Callable {
             this.padding_side = tokenizerConfig.padding_side;
         }
 
+        this.add_bos_token = tokenizerConfig.add_bos_token;
+        this.add_eos_token = tokenizerConfig.add_eos_token;
+
         this.legacy = false;
 
         this.chat_template = tokenizerConfig.chat_template ?? null;

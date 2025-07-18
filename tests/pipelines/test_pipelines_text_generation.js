@@ -20,7 +20,7 @@ export default () => {
 
     describe("batch_size=1", () => {
       const text_input = "hello";
-      const generated_text_target = "erdingsAndroid Load";
+      const generated_text_target = "erdingsdelete mely";
       const text_target = [{ generated_text: text_input + generated_text_target }];
       const new_text_target = [{ generated_text: generated_text_target }];
 
