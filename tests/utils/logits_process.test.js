@@ -35,17 +35,17 @@ describe("Logits Processors", () => {
         async () => {
           const text_input = "hello";
 
-          const generated_text_target = " Bert explicit wed digasset";
+          const generated_text_target = "\uff0d Giuseppeitte natoud";
           const text_target = [{ generated_text: text_input + generated_text_target }];
 
           const output = await pipe(text_input, {
             max_new_tokens: 5,
             bad_words_ids: [
-              // default: [22172n, 18547n, 8136n, 16012n, 28064n, 11361n]
+              // default: [1n, 22172n, 18547n, 8143n, 22202n, 9456n, 17213n]
               [18547],
 
-              // block #1: [22172n, 16662n, 6261n, 18916n, 29109n, 799n]
-              [6261, 18916],
+              // block #1: [1n, 22172n, 31583n, 18824n, 16621n, 8136n, 16012n]
+              [18824, 16621],
             ],
           });
           compare(output, text_target);
@@ -58,22 +58,22 @@ describe("Logits Processors", () => {
         async () => {
           const text_input = "hello";
 
-          const generated_text_target = "erdingsdeletearus)?nor";
+          const generated_text_target = "erdingsdelete войsequ族";
           const text_target = [{ generated_text: text_input + generated_text_target }];
 
           // Construct long list of bad words
           const bad_words_ids = [];
-          // default:  [22172n, 18547n, 8136n, 16012n, 28064n, 11361n]
+          // default: [1n, 22172n, 18547n, 8143n, 22202n, 9456n, 17213n]
           for (let i = 0; i < 100000; ++i) {
             bad_words_ids.push([i * 2]); // block all even numbers
           }
-          // block #1: [22172n, 18547n, 8143n, 30327n, 20061n, 18193n]
+          // block #1: [1n, 22172n, 18547n, 8143n, 30327n, 624n, 2806n, 2004n]
           bad_words_ids.push([8143, 30327]);
 
-          // block #2: [22172n, 18547n, 8143n, 29485n, 3799n, 29331n]
+          // block #2: [1n, 22172n, 18547n, 8143n, 29485n, 3799n, 29331n]
           bad_words_ids.push([18547, 8143, 29485]);
 
-          // block #3: [22172n, 18547n, 8143n, 26465n, 6877n, 15459n]
+          // block #3: [1n, 22172n, 18547n, 8143n, 7587n, 6831n, 30999n]
           const output = await pipe(text_input, { max_new_tokens: 5, bad_words_ids });
           compare(output, text_target);
         },
@@ -85,19 +85,19 @@ describe("Logits Processors", () => {
         async () => {
           const text_input = "this is a test";
 
-          const generated_text_target = "кт México constructed lake user";
+          const generated_text_target = "кт México constructed lake års";
           const text_target = [{ generated_text: text_input + generated_text_target }];
 
           const output = await pipe(text_input, {
             max_new_tokens: 5,
             bad_words_ids: [
-              // default: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
+              // default: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 31252n]
               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3931], // should never trigger (longer than input sequence)
 
-              // block #1: [445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 16426n]
+              // block #1: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 31252n]
               [3931, 14756, 7811],
 
-              // result: [445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 1404n]
+              // result: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 21948n]
             ],
           });
           compare(output, text_target);

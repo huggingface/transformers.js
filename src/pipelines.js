@@ -996,6 +996,11 @@ export class TextGenerationPipeline extends (/** @type {new (options: TextPipeli
         let isBatched = false;
         let isChatInput = false;
 
+        // By default, do not add special tokens, unless the tokenizer specifies otherwise
+        let add_special_tokens = generate_kwargs.add_special_tokens
+            ?? (this.tokenizer.add_bos_token || this.tokenizer.add_eos_token)
+            ?? false;
+
         // Normalize inputs
         /** @type {string[]} */
         let inputs;
@@ -1021,10 +1026,8 @@ export class TextGenerationPipeline extends (/** @type {new (options: TextPipeli
                     add_generation_prompt: true,
                 })
             ));
+            add_special_tokens = false; // Chat template handles this already
         }
-
-        // By default, do not add special tokens
-        const add_special_tokens = generate_kwargs.add_special_tokens ?? false;
 
         // By default, return full text
         const return_full_text = isChatInput

@@ -9,7 +9,7 @@ const result = await generator("hello", { max_new_tokens: 3, return_full_text: f
 process.stdout.write(result[0].generated_text);
 `;
 
-const TARGET_OUTPUT = "erdingsAndroid Load";
+const TARGET_OUTPUT = "erdingsdelete mely";
 
 const wrap_async_iife = (code) => `(async function() { ${code} })();`;
 
@@ -17,9 +17,9 @@ const check = (code, module = false) => {
   const args = ["-e", code];
   if (module) args.push("--input-type=module");
   const { status, stdout, stderr } = spawnSync("node", args);
-  expect(stderr.toString()).toBe(""); // No warnings or errors are printed
-  expect(stdout.toString()).toBe(TARGET_OUTPUT); // The output should match
-  expect(status).toBe(0); // The process should exit cleanly
+  expect(stderr.toString()).toEqual(""); // No warnings or errors are printed
+  expect(stdout.toString()).toEqual(TARGET_OUTPUT); // The output should match
+  expect(status).toEqual(0); // The process should exit cleanly
 };
 
 describe("Testing the bundle", () => {
