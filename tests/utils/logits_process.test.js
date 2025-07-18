@@ -97,7 +97,7 @@ describe("Logits Processors", () => {
               // block #1: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 7811n, 21645n, 31252n]
               [3931, 14756, 7811],
 
-              // result: [445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 21948n]
+              // result: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 21948n]
             ],
           });
           compare(output, text_target);
