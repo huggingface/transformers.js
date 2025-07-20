@@ -2230,6 +2230,12 @@ export class ModernBertForTokenClassification extends ModernBertPreTrainedModel 
 }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// ModernBERT Decoder models
+export class ModernBertDecoderPreTrainedModel extends PreTrainedModel { }
+export class ModernBertDecoderModel extends ModernBertDecoderPreTrainedModel { }
+export class ModernBertDecoderForCausalLM extends ModernBertDecoderPreTrainedModel { }
+//////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 // NomicBert models
@@ -7837,6 +7843,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['starcoder2', ['Starcoder2Model', Starcoder2Model]],
     ['falcon', ['FalconModel', FalconModel]],
     ['stablelm', ['StableLmModel', StableLmModel]],
+    ['modernbert-decoder', ['ModernBertDecoderModel', ModernBertDecoderModel]],
 ]);
 
 const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
@@ -7945,6 +7952,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['falcon', ['FalconForCausalLM', FalconForCausalLM]],
     ['trocr', ['TrOCRForCausalLM', TrOCRForCausalLM]],
     ['stablelm', ['StableLmForCausalLM', StableLmForCausalLM]],
+    ['modernbert-decoder', ['ModernBertDecoderForCausalLM', ModernBertDecoderForCausalLM]],
 
     // Also image-text-to-text
     ['phi3_v', ['Phi3VForCausalLM', Phi3VForCausalLM]],

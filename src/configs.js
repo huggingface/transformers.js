@@ -104,6 +104,7 @@ function getNormalizedConfig(config) {
         case 'stablelm':
         case 'opt':
         case 'falcon':
+        case 'modernbert-decoder':
             mapping['num_heads'] = 'num_attention_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
