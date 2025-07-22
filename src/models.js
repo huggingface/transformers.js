@@ -4595,6 +4595,13 @@ export class LlamaForCausalLM extends LlamaPreTrainedModel { }
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+// Arcee models
+export class ArceePreTrainedModel extends PreTrainedModel { }
+export class ArceeModel extends ArceePreTrainedModel { }
+export class ArceeForCausalLM extends ArceePreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 // LFM2 models
 export class Lfm2PreTrainedModel extends PreTrainedModel { }
 export class Lfm2Model extends Lfm2PreTrainedModel { }
@@ -7820,6 +7827,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['gpt_neox', ['GPTNeoXModel', GPTNeoXModel]],
     ['codegen', ['CodeGenModel', CodeGenModel]],
     ['llama', ['LlamaModel', LlamaModel]],
+    ['arcee', ['ArceeModel', ArceeModel]],
     ['lfm2', ['Lfm2Model', Lfm2Model]],
     ['smollm3', ['SmolLM3Model', SmolLM3Model]],
     ['exaone', ['ExaoneModel', ExaoneModel]],
@@ -7927,6 +7935,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gpt_neox', ['GPTNeoXForCausalLM', GPTNeoXForCausalLM]],
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
+    ['arcee', ['ArceeForCausalLM', ArceeForCausalLM]],
     ['lfm2', ['Lfm2ForCausalLM', Lfm2ForCausalLM]],
     ['smollm3', ['SmolLM3ForCausalLM', SmolLM3ForCausalLM]],
     ['exaone', ['ExaoneForCausalLM', ExaoneForCausalLM]],
