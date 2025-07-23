@@ -66,8 +66,9 @@ class PostBuildPlugin {
  * @param {string} options.name Name of output file.
  * @param {string} options.suffix Suffix of output file.
  * @param {string} options.type Type of library.
- * @param {string} options.ignoreModules The list of modules to ignore.
- * @param {string} options.externalModules The list of modules to set as external.
+ * @param {string[]} options.ignoreModules The list of modules to ignore.
+ * @param {string[]|Record<string, string>} options.externalModules The list of modules to set as external.
+ * @param {Record<string, string>} options.aliasModules The list of modules to alias.
  * @param {Object[]} options.plugins List of plugins to use.
  * @returns {import('webpack').Configuration} One webpack target.
  */
@@ -77,12 +78,23 @@ function buildConfig({
   type = "module", // 'module' | 'commonjs'
   ignoreModules = [],
   externalModules = [],
+  aliasModules = {},
   plugins = [],
 } = {}) {
+  const isRN = name === ".native";
   const outputModule = type === "module";
-  const alias = Object.fromEntries(
-    ignoreModules.map((module) => [module, false]),
-  );
+  const alias = {
+    ...Object.fromEntries(
+      ignoreModules.map((module) => [module, false]),
+    ),
+    ...aliasModules,
+  };
+  const importsFields = [
+    isRN && "react-native",
+    "browser",
+    "module",
+    "main",
+  ].filter(Boolean);
 
   /** @type {import('webpack').Configuration} */
   const config = {
@@ -121,7 +133,11 @@ function buildConfig({
     experiments: {
       outputModule,
     },
-    resolve: { alias },
+    resolve: {
+      alias,
+      importsFields,
+      mainFields: importsFields,
+    },
 
     externals: externalModules,
 
@@ -143,6 +159,14 @@ function buildConfig({
         },
       },
     };
+
+    if (!isRN) {
+      config.plugins.push(
+        new webpack.DefinePlugin({
+          __filename: 'new URL(import.meta.url).pathname',
+        }),
+      );
+    }
   } else {
     config.externalsType = "commonjs";
   }
@@ -152,7 +176,7 @@ function buildConfig({
 
 // Do not bundle onnxruntime-web when packaging for Node.js.
 // Instead, we use the native library (onnxruntime-node).
-const NODE_IGNORE_MODULES = ["onnxruntime-web"];
+const NODE_IGNORE_MODULES = ["onnxruntime-web", "native-universal-fs", "react-native"];
 
 // Do not bundle the following modules with webpack (mark as external)
 // NOTE: This is necessary for both type="module" and type="commonjs",
@@ -169,7 +193,7 @@ const NODE_EXTERNAL_MODULES = [
 // Do not bundle node-only packages when bundling for the web.
 // NOTE: We can exclude the "node:" prefix for built-in modules here,
 // since we apply the `StripNodePrefixPlugin` to strip it.
-const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
+const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "native-universal-fs", "react-native"];
 
 // Do not bundle the following modules with webpack (mark as external)
 const WEB_EXTERNAL_MODULES = [
@@ -216,8 +240,44 @@ const NODE_BUILDS = [
   }),
 ];
 
+// React-Native builds
+const RN_IGNORE_MODULES = ["onnxruntime-web", "fs", "sharp"];
+const RN_EXTERNAL_MODULES = {
+  "onnxruntime-common": "onnxruntime-common",
+  "onnxruntime-node": "onnxruntime-react-native",
+  "native-universal-fs": "native-universal-fs",
+  "react-native": "react-native",
+};
+const RN_ALIAS_MODULES = {
+  "path": "path-browserify",
+};
+const RN_PLUGINS = [
+  new StripNodePrefixPlugin(),
+];
+
+const RN_BUILDS = [
+  buildConfig({
+    name: ".native",
+    suffix: ".mjs",
+    type: "module",
+    ignoreModules: RN_IGNORE_MODULES,
+    externalModules: RN_EXTERNAL_MODULES,
+    aliasModules: RN_ALIAS_MODULES,
+    plugins: RN_PLUGINS,
+  }),
+  buildConfig({
+    name: ".native",
+    suffix: ".cjs",
+    type: "commonjs",
+    ignoreModules: RN_IGNORE_MODULES,
+    externalModules: RN_EXTERNAL_MODULES,
+    aliasModules: RN_ALIAS_MODULES,
+    plugins: RN_PLUGINS,
+  }),
+];
+
 // When running with `webpack serve`, only build the web target.
 const BUILDS = process.env.WEBPACK_SERVE
   ? [BUNDLE_BUILD]
-  : [BUNDLE_BUILD, WEB_BUILD, ...NODE_BUILDS];
+  : [BUNDLE_BUILD, WEB_BUILD, ...NODE_BUILDS, ...RN_BUILDS];
 export default BUILDS;
