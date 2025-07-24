@@ -72,6 +72,7 @@ function getNormalizedConfig(config) {
         case 'llava_onevision':
         case 'idefics3':
         case 'ultravox':
+        case 'voxtral':
         case 'smolvlm':
         case 'gemma3n':
             // @ts-expect-error TS2339
@@ -104,6 +105,7 @@ function getNormalizedConfig(config) {
         case 'stablelm':
         case 'opt':
         case 'falcon':
+        case 'modernbert-decoder':
             mapping['num_heads'] = 'num_attention_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
@@ -128,6 +130,7 @@ function getNormalizedConfig(config) {
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
             mapping['num_attention_heads'] = 'num_attention_heads';
+            mapping['dim_kv'] = 'head_dim';
             break;
         case 'qwen3':
         case 'gemma':

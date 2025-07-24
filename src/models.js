@@ -2237,6 +2237,12 @@ export class ModernBertForTokenClassification extends ModernBertPreTrainedModel 
 }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// ModernBERT Decoder models
+export class ModernBertDecoderPreTrainedModel extends PreTrainedModel { }
+export class ModernBertDecoderModel extends ModernBertDecoderPreTrainedModel { }
+export class ModernBertDecoderForCausalLM extends ModernBertDecoderPreTrainedModel { }
+//////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 // NomicBert models
@@ -7408,13 +7414,15 @@ export class UltravoxModel extends UltravoxPreTrainedModel {
 
         return default_merge_input_ids_with_audio_features({
             // @ts-ignore
-            audio_token_id: this.config.ignore_index,
+            audio_token_id: this.config.ignore_index ?? this.config.audio_token_id,
             ...kwargs,
             audio_features: reshaped_audio_features,
         })
     }
 }
 //////////////////////////////////////////////////
+
+export class VoxtralForConditionalGeneration extends UltravoxModel { }
 
 //////////////////////////////////////////////////
 // Mimi models
@@ -7844,6 +7852,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['starcoder2', ['Starcoder2Model', Starcoder2Model]],
     ['falcon', ['FalconModel', FalconModel]],
     ['stablelm', ['StableLmModel', StableLmModel]],
+    ['modernbert-decoder', ['ModernBertDecoderModel', ModernBertDecoderModel]],
 ]);
 
 const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
@@ -7952,6 +7961,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['falcon', ['FalconForCausalLM', FalconForCausalLM]],
     ['trocr', ['TrOCRForCausalLM', TrOCRForCausalLM]],
     ['stablelm', ['StableLmForCausalLM', StableLmForCausalLM]],
+    ['modernbert-decoder', ['ModernBertDecoderForCausalLM', ModernBertDecoderForCausalLM]],
 
     // Also image-text-to-text
     ['phi3_v', ['Phi3VForCausalLM', Phi3VForCausalLM]],
@@ -8023,6 +8033,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['ultravox', ['UltravoxModel', UltravoxModel]],
+    ['voxtral', ['VoxtralForConditionalGeneration', VoxtralForConditionalGeneration]],
 ]);
 
 

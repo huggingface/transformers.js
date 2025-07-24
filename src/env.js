@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '3.6.3';
+const VERSION = '3.7.0';
 
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
