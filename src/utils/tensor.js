@@ -464,7 +464,7 @@ export class Tensor {
             } else if (Array.isArray(this_data)) {
                 // If this.data is a plain array, use slice
                 const slicedData = this_data.slice(start, end);
-                for (let i = 0; i < slicedData.length; i++) {
+                for (let i = 0; i < slicedData.length; ++i) {
                     data[i] = slicedData[i];
                 }
             } else {
