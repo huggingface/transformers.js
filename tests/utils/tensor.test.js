@@ -59,7 +59,6 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
       const t2 = t1.slice(1);
       const target = new Tensor("float32", [3, 4], [2]);
-
       compare(t2, target);
     });
 
@@ -67,7 +66,6 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
       const t2 = t1.slice([1, 3]);
       const target = new Tensor("float32", [3, 4, 5, 6], [2, 2]);
-
       compare(t2, target);
     });
 
@@ -78,9 +76,67 @@ describe("Tensor operations", () => {
         [4, 7],
       );
       const t2 = t1.slice([1, -1], [1, -1]);
-
       const target = new Tensor("float32", [9, 10, 11, 12, 13, 16, 17, 18, 19, 20], [2, 5]);
+      compare(t2, target);
+    });
 
+    it("should return the whole tensor when all indices are null/unset", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice();
+      compare(t2, t1);
+    });
+
+    it("should return the whole dimension when index is null", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(null);
+      compare(t2, t1);
+    });
+
+    it("should slice from index to end when [start, null] is used", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice([1, null]);
+      const target = new Tensor("float32", [3, 4, 5, 6], [2, 2]);
+      compare(t2, target);
+    });
+
+    it("should slice from beginning to index when [null, end] is used", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice([null, 2]);
+      const target = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      compare(t2, target);
+    });
+
+    it("should handle [null, null] as full slice", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice([null, null]);
+      compare(t2, t1);
+    });
+
+    it("should select a single element when a number is used in slice", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(2, 1);
+      const target = new Tensor("float32", [6], []);
+      compare(t2, target);
+    });
+
+    it("should select a single row when a number is used in slice", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(0);
+      const target = new Tensor("float32", [1, 2], [2]);
+      compare(t2, target);
+    });
+
+    it("should select a single column when a number is used in slice", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(null, 1);
+      const target = new Tensor("float32", [2, 4, 6], [3]);
+      compare(t2, target);
+    });
+
+    it("should handle negative indices in slice", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+      const t2 = t1.slice(-1);
+      const target = new Tensor("float32", [5, 6], [2]);
       compare(t2, target);
     });
   });

@@ -443,15 +443,46 @@ export class Tensor {
         // Precompute strides
         const stride = this.stride();
 
-        for (let i = 0; i < newBufferSize; ++i) {
-            let originalIndex = 0;
-            for (let j = newDims.length - 1, num = i; j >= 0; --j) {
-                const size = newDims[j];
-                originalIndex += ((num % size) + newOffsets[j][0]) * stride[j];
-                num = Math.floor(num / size);
+        // Detect if the slice is contiguous
+        let isContiguous = true;
+        for (let i = 1; i < newDims.length; ++i) {
+            if (newOffsets[i][0] !== 0 || newOffsets[i][1] !== this.dims[i]) {
+                isContiguous = false;
+                break;
             }
-            data[i] = this_data[originalIndex];
         }
+
+        if (isContiguous) {
+            // Perform bulk copy for contiguous slices to improve performance
+            const start = newOffsets[0][0] * stride[0];
+            const end = newOffsets[0][1] * stride[0];
+
+            if (ArrayBuffer.isView(this_data)) {
+                // If this.data is a TypedArray, use subarray
+                // @ts-ignore
+                data.set(this_data.subarray(start, end));
+            } else if (Array.isArray(this_data)) {
+                // If this.data is a plain array, use slice
+                const slicedData = this_data.slice(start, end);
+                for (let i = 0; i < slicedData.length; ++i) {
+                    data[i] = slicedData[i];
+                }
+            } else {
+                throw new Error("Unsupported data type for slicing");
+            }
+        } else {
+            // Fallback to manual copying for non-contiguous slices
+            for (let i = 0; i < newBufferSize; ++i) {
+                let originalIndex = 0;
+                for (let j = newDims.length - 1, num = i; j >= 0; --j) {
+                    const size = newDims[j];
+                    originalIndex += ((num % size) + newOffsets[j][0]) * stride[j];
+                    num = Math.floor(num / size);
+                }
+                data[i] = this_data[originalIndex];
+            }
+        }
+
         return new Tensor(this.type, data, newTensorDims);
     }
 
