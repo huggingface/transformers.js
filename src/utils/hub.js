@@ -1,4 +1,3 @@
-
 /**
  * @file Utility functions to interact with the Hugging Face Hub (https://huggingface.co/models)
  *
@@ -50,18 +49,17 @@ export const MAX_EXTERNAL_DATA_CHUNKS = 100;
  * Mapping from file extensions to MIME types.
  */
 const CONTENT_TYPE_MAP = {
-    'txt': 'text/plain',
-    'html': 'text/html',
-    'css': 'text/css',
-    'js': 'text/javascript',
-    'json': 'application/json',
-    'png': 'image/png',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'gif': 'image/gif',
-}
+    txt: 'text/plain',
+    html: 'text/html',
+    css: 'text/css',
+    js: 'text/javascript',
+    json: 'application/json',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+};
 class FileResponse {
-
     /**
      * Creates a new `FileResponse` object.
      * @param {string} filePath
@@ -89,7 +87,7 @@ class FileResponse {
                 },
                 cancel() {
                     stream.destroy();
-                }
+                },
             });
         } else {
             this.status = 404;
@@ -201,8 +199,8 @@ const REPO_ID_REGEX = /^(\b[\w\-.]+\b\/)?\b[\w\-.]{1,96}\b$/;
  */
 function isValidHfModelId(string) {
     if (!REPO_ID_REGEX.test(string)) return false;
-    if (string.includes("..") || string.includes("--")) return false;
-    if (string.endsWith(".git") || string.endsWith(".ipynb")) return false;
+    if (string.includes('..') || string.includes('--')) return false;
+    if (string.endsWith('.git') || string.endsWith('.ipynb')) return false;
     return true;
 }
 
@@ -213,14 +211,13 @@ function isValidHfModelId(string) {
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
 export async function getFile(urlOrPath) {
-
-    if (env.useFS && !isValidUrl(urlOrPath, ["http:", "https:", "blob:"])) {
+    if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
-          urlOrPath instanceof URL
-            ? urlOrPath.protocol === "file:"
-              ? urlOrPath.pathname
-              : urlOrPath.toString()
-            : urlOrPath,
+            urlOrPath instanceof URL
+                ? urlOrPath.protocol === 'file:'
+                    ? urlOrPath.pathname
+                    : urlOrPath.toString()
+                : urlOrPath,
         );
     } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
@@ -262,7 +259,7 @@ const ERROR_MAPPING = {
     502: 'Bad gateway error occurred while trying to load file',
     503: 'Service unavailable error occurred while trying to load file',
     504: 'Gateway timeout error occurred while trying to load file',
-}
+};
 /**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
@@ -297,7 +294,6 @@ class FileCache {
      * @returns {Promise<FileResponse | undefined>}
      */
     async match(request) {
-
         let filePath = path.join(this.path, request);
         let file = new FileResponse(filePath);
 
@@ -355,7 +351,7 @@ class FileCache {
             // Clean up the file if an error occurred during download
             try {
                 await fs.promises.unlink(filePath);
-            } catch { }
+            } catch {}
             throw error;
         }
     }
@@ -402,14 +398,17 @@ async function tryCache(cache, ...names) {
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
-
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
         if (options.local_files_only) {
-            throw Error("Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).")
+            throw Error(
+                'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
+            );
         } else if (!env.allowRemoteModels) {
-            throw Error("Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.")
+            throw Error(
+                'Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.',
+            );
         }
     }
 
@@ -417,8 +416,8 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     dispatchCallback(options.progress_callback, {
         status: 'initiate',
         name: path_or_repo_id,
-        file: filename
-    })
+        file: filename,
+    });
 
     // First, check if the a caching backend is available
     // If no caching mechanism available, will download the file every time
@@ -426,22 +425,22 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     if (!cache && env.useCustomCache) {
         // Allow the user to specify a custom cache system.
         if (!env.customCache) {
-            throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.')
+            throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.');
         }
 
         // Check that the required methods are defined:
         if (!env.customCache.match || !env.customCache.put) {
             throw new Error(
-                "`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. " +
-                "For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache"
-            )
+                '`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. ' +
+                    'For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache',
+            );
         }
         cache = env.customCache;
     }
 
     if (!cache && env.useBrowserCache) {
         if (typeof caches === 'undefined') {
-            throw Error('Browser cache is not available in this environment.')
+            throw Error('Browser cache is not available in this environment.');
         }
         try {
             // In some cases, the browser cache may be visible, but not accessible due to security restrictions.
@@ -468,25 +467,26 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const requestURL = pathJoin(path_or_repo_id, filename);
 
     const validModelId = isValidHfModelId(path_or_repo_id);
-    const localPath = validModelId
-        ? pathJoin(env.localModelPath, requestURL)
-        : requestURL;
+    const localPath = validModelId ? pathJoin(env.localModelPath, requestURL) : requestURL;
     const remoteURL = pathJoin(
         env.remoteHost,
         env.remotePathTemplate
             .replaceAll('{model}', path_or_repo_id)
             .replaceAll('{revision}', encodeURIComponent(revision)),
-        filename
+        filename,
     );
 
     /** @type {string} */
     let cacheKey;
-    const proposedCacheKey = cache instanceof FileCache
-        // Choose cache key for filesystem cache
-        // When using the main revision (default), we use the request URL as the cache key.
-        // If a specific revision is requested, we account for this in the cache key.
-        ? revision === 'main' ? requestURL : pathJoin(path_or_repo_id, revision, filename)
-        : remoteURL;
+    const proposedCacheKey =
+        cache instanceof FileCache
+            ? // Choose cache key for filesystem cache
+              // When using the main revision (default), we use the request URL as the cache key.
+              // If a specific revision is requested, we account for this in the cache key.
+              revision === 'main'
+                ? requestURL
+                : pathJoin(path_or_repo_id, revision, filename)
+            : remoteURL;
 
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
@@ -522,7 +522,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
             } else if (!env.allowRemoteModels) {
-                throw new Error(`\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${requestURL}.`);
+                throw new Error(
+                    `\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${requestURL}.`,
+                );
             }
         }
 
@@ -535,7 +537,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             if (options.local_files_only || !env.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
-                    throw Error(`\`local_files_only=true\` or \`env.allowRemoteModels=false\` and file was not found locally at "${localPath}".`);
+                    throw Error(
+                        `\`local_files_only=true\` or \`env.allowRemoteModels=false\` and file was not found locally at "${localPath}".`,
+                    );
                 } else {
                     // File not found, but this file is optional.
                     // TODO in future, cache the response?
@@ -545,7 +549,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             if (!validModelId) {
                 // Before making any requests to the remote server, we check if the model ID is valid.
                 // This prevents unnecessary network requests for invalid model IDs.
-                throw Error(`Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`);
+                throw Error(
+                    `Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`,
+                );
             }
 
             // File not found locally, so we try to download it from the remote server
@@ -561,18 +567,18 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 
         // Only cache the response if:
         toCacheResponse =
-            cache                              // 1. A caching system is available
-            && typeof Response !== 'undefined' // 2. `Response` is defined (i.e., we are in a browser-like environment)
-            && response instanceof Response    // 3. result is a `Response` object (i.e., not a `FileResponse`)
-            && response.status === 200         // 4. request was successful (status code 200)
+            cache && // 1. A caching system is available
+            typeof Response !== 'undefined' && // 2. `Response` is defined (i.e., we are in a browser-like environment)
+            response instanceof Response && // 3. result is a `Response` object (i.e., not a `FileResponse`)
+            response.status === 200; // 4. request was successful (status code 200)
     }
 
     // Start downloading
     dispatchCallback(options.progress_callback, {
         status: 'download',
         name: path_or_repo_id,
-        file: filename
-    })
+        file: filename,
+    });
 
     let result;
     if (!(apis.IS_NODE_ENV && return_path)) {
@@ -583,11 +589,10 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             // If no progress callback is specified, we can use the `.arrayBuffer()`
             // method to read the response.
             buffer = new Uint8Array(await response.arrayBuffer());
-
         } else if (
-            cacheHit // The item is being read from the cache
-            &&
-            typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent) // We are in Firefox
+            cacheHit && // The item is being read from the cache
+            typeof navigator !== 'undefined' &&
+            /firefox/i.test(navigator.userAgent) // We are in Firefox
         ) {
             // Due to bug in Firefox, we cannot display progress when loading from cache.
             // Fortunately, since this should be instantaneous, this should not impact users too much.
@@ -601,16 +606,16 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 progress: 100,
                 loaded: buffer.length,
                 total: buffer.length,
-            })
+            });
         } else {
-            buffer = await readResponse(response, data => {
+            buffer = await readResponse(response, (data) => {
                 dispatchCallback(options.progress_callback, {
                     status: 'progress',
                     name: path_or_repo_id,
                     file: filename,
                     ...data,
-                })
-            })
+                });
+            });
         }
         result = buffer;
     }
@@ -618,20 +623,24 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     if (
         // Only cache web responses
         // i.e., do not cache FileResponses (prevents duplication)
-        toCacheResponse && cacheKey
-        &&
+        toCacheResponse &&
+        cacheKey &&
         // Check again whether request is in cache. If not, we add the response to the cache
-        (await cache.match(cacheKey) === undefined)
+        (await cache.match(cacheKey)) === undefined
     ) {
         if (!result) {
             // We haven't yet read the response body, so we need to do so now.
-            await cache.put(cacheKey, /** @type {Response} */(response), options.progress_callback);
+            await cache.put(cacheKey, /** @type {Response} */ (response), options.progress_callback);
         } else {
             // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
-            await cache.put(cacheKey, new Response(result, {
-                headers: response.headers
-            }))
-                .catch(err => {
+            await cache
+                .put(
+                    cacheKey,
+                    new Response(result, {
+                        headers: response.headers,
+                    }),
+                )
+                .catch((err) => {
                     // Do not crash if unable to add to cache (e.g., QuotaExceededError).
                     // Rather, log a warning and proceed with execution.
                     console.warn(`Unable to add response to browser cache: ${err}.`);
@@ -641,12 +650,12 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     dispatchCallback(options.progress_callback, {
         status: 'done',
         name: path_or_repo_id,
-        file: filename
+        file: filename,
     });
 
     if (result) {
         if (!apis.IS_NODE_ENV && return_path) {
-            throw new Error("Cannot return path in a browser environment.")
+            throw new Error('Cannot return path in a browser environment.');
         }
         return result;
     }
@@ -665,7 +674,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         return cachedResponse;
     }
 
-    throw new Error("Unable to get model file path or buffer.");
+    throw new Error('Unable to get model file path or buffer.');
 }
 
 /**
@@ -685,7 +694,7 @@ export async function getModelText(modelPath, fileName, fatal = true, options = 
     }
 
     const decoder = new TextDecoder('utf-8');
-    return decoder.decode(/** @type {Uint8Array} */(buffer));
+    return decoder.decode(/** @type {Uint8Array} */ (buffer));
 }
 
 /**
@@ -715,10 +724,9 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
 async function readResponse(response, progress_callback) {
-
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.')
+        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
     let total = parseInt(contentLength ?? '0');
     let buffer = new Uint8Array(total);
@@ -775,6 +783,6 @@ function pathJoin(...parts) {
             part = part.replace(new RegExp('/$'), '');
         }
         return part;
-    })
+    });
     return parts.join('/');
 }

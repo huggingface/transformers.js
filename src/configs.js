@@ -1,10 +1,9 @@
-
 /**
  * @file Helper module for using model configs. For more information, see the corresponding
  * [Python documentation](https://huggingface.co/docs/transformers/main/en/model_doc/auto#transformers.AutoConfig).
- * 
+ *
  * **Example:** Load an `AutoConfig`.
- * 
+ *
  * ```javascript
  * import { AutoConfig } from '@huggingface/transformers';
  * const config = await AutoConfig.from_pretrained('bert-base-uncased');
@@ -23,14 +22,12 @@
  * //   ...
  * // }
  * ```
- * 
+ *
  * @module configs
  */
 
 import { pick } from './utils/core.js';
-import {
-    getModelJSON,
-} from './utils/hub.js';
+import { getModelJSON } from './utils/hub.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
@@ -55,8 +52,8 @@ async function loadConfig(pretrained_model_name_or_path, options) {
 }
 
 /**
- * 
- * @param {PretrainedConfig} config 
+ *
+ * @param {PretrainedConfig} config
  * @returns {Object} The normalized configuration.
  */
 function getNormalizedConfig(config) {
@@ -247,7 +244,6 @@ function getNormalizedConfig(config) {
                 result.hidden_size = decoderConfig.hidden_size;
             }
             return result;
-
     }
 
     // NOTE: If `num_attention_heads` is not set, it is assumed to be equal to `num_heads`
@@ -262,8 +258,8 @@ function getNormalizedConfig(config) {
 }
 
 /**
- * 
- * @param {PretrainedConfig} config 
+ *
+ * @param {PretrainedConfig} config
  * @returns {Record<string, number[]>}
  */
 export function getCacheShapes(config, options) {
@@ -295,23 +291,22 @@ export function getCacheShapes(config, options) {
 }
 
 /** @type {typeof getKeyValueShapes} */
-function getKeyValueShapes(config, {
-    prefix = 'past_key_values',
-    batch_size = 1,
-} = {}) {
+function getKeyValueShapes(config, { prefix = 'past_key_values', batch_size = 1 } = {}) {
     /** @type {Record<string, number[]>} */
     const decoderFeeds = {};
     const normalized_config = config.normalized_config;
 
-    if (normalized_config.is_encoder_decoder && (
-        'num_encoder_heads' in normalized_config && 'num_decoder_heads' in normalized_config
-    )) {
-        const encoder_dim_kv = normalized_config.encoder_dim_kv ?? (
-            normalized_config.encoder_hidden_size / normalized_config.num_encoder_heads
-        );
-        const decoder_dim_kv = normalized_config.decoder_dim_kv ?? (
-            normalized_config.decoder_hidden_size / normalized_config.num_decoder_heads
-        );
+    if (
+        normalized_config.is_encoder_decoder &&
+        'num_encoder_heads' in normalized_config &&
+        'num_decoder_heads' in normalized_config
+    ) {
+        const encoder_dim_kv =
+            normalized_config.encoder_dim_kv ??
+            normalized_config.encoder_hidden_size / normalized_config.num_encoder_heads;
+        const decoder_dim_kv =
+            normalized_config.decoder_dim_kv ??
+            normalized_config.decoder_hidden_size / normalized_config.num_decoder_heads;
 
         const encoder_dims = [batch_size, normalized_config.num_encoder_heads, 0, encoder_dim_kv];
         const decoder_dims = [batch_size, normalized_config.num_decoder_heads, 0, decoder_dim_kv];
@@ -321,23 +316,24 @@ function getKeyValueShapes(config, {
             decoderFeeds[`${prefix}.${i}.decoder.key`] = decoder_dims;
             decoderFeeds[`${prefix}.${i}.decoder.value`] = decoder_dims;
         }
-    } else { // Decoders
+    } else {
+        // Decoders
         const num_heads = normalized_config.num_heads;
         const num_layers = normalized_config.num_layers;
-        const dim_kv = normalized_config.dim_kv ?? (
-            normalized_config.hidden_size /
-            (normalized_config.num_attention_heads ?? num_heads)
-        );
+        const dim_kv =
+            normalized_config.dim_kv ??
+            normalized_config.hidden_size / (normalized_config.num_attention_heads ?? num_heads);
 
         if (normalized_config.model_type === 'falcon') {
             // NOTE: Custom implementation for Falcon
-            const dims = [batch_size * num_heads, 0, dim_kv]
+            const dims = [batch_size * num_heads, 0, dim_kv];
             for (let i = 0; i < num_layers; ++i) {
                 decoderFeeds[`${prefix}.${i}.key`] = dims;
                 decoderFeeds[`${prefix}.${i}.value`] = dims;
             }
-        } else if (normalized_config.multi_query) { // e.g., for `gpt_bigcode`
-            const dims = [batch_size * num_heads, 0, 2 * dim_kv]
+        } else if (normalized_config.multi_query) {
+            // e.g., for `gpt_bigcode`
+            const dims = [batch_size * num_heads, 0, 2 * dim_kv];
 
             for (let i = 0; i < num_layers; ++i) {
                 decoderFeeds[`${prefix}.${i}.key_value`] = dims;
@@ -345,21 +341,22 @@ function getKeyValueShapes(config, {
         } else if (normalized_config.model_type === 'bloom') {
             // NOTE: Custom implementation for Bloom
 
-            const keyDims = [batch_size * num_heads, dim_kv, 0] // [batch_size x num_heads,64,past_sequence_length]
-            const valueDims = [batch_size * num_heads, 0, dim_kv] // [batch_size x num_heads,past_sequence_length,64]
+            const keyDims = [batch_size * num_heads, dim_kv, 0]; // [batch_size x num_heads,64,past_sequence_length]
+            const valueDims = [batch_size * num_heads, 0, dim_kv]; // [batch_size x num_heads,past_sequence_length,64]
             for (let i = 0; i < num_layers; ++i) {
                 decoderFeeds[`${prefix}.${i}.key`] = keyDims;
                 decoderFeeds[`${prefix}.${i}.value`] = valueDims;
             }
         } else if (normalized_config.model_type === 'openelm') {
             for (let i = 0; i < num_layers; ++i) {
-                const dims = [batch_size, num_heads[i], 0, dim_kv]
+                const dims = [batch_size, num_heads[i], 0, dim_kv];
 
                 decoderFeeds[`${prefix}.${i}.key`] = dims;
                 decoderFeeds[`${prefix}.${i}.value`] = dims;
             }
-        } else { // Decoder-only
-            const dims = [batch_size, num_heads, 0, dim_kv]
+        } else {
+            // Decoder-only
+            const dims = [batch_size, num_heads, 0, dim_kv];
             for (let i = 0; i < num_layers; ++i) {
                 decoderFeeds[`${prefix}.${i}.key`] = dims;
                 decoderFeeds[`${prefix}.${i}.value`] = dims;
@@ -398,41 +395,40 @@ export class PretrainedConfig {
     }
 
     /**
-     * Loads a pre-trained config from the given `pretrained_model_name_or_path`. 
-     * 
+     * Loads a pre-trained config from the given `pretrained_model_name_or_path`.
+     *
      * @param {string} pretrained_model_name_or_path The path to the pre-trained config.
      * @param {PretrainedOptions} options Additional options for loading the config.
      * @throws {Error} Throws an error if the config.json is not found in the `pretrained_model_name_or_path`.
-     * 
+     *
      * @returns {Promise<PretrainedConfig>} A new instance of the `PretrainedConfig` class.
      */
-    static async from_pretrained(pretrained_model_name_or_path, {
-        progress_callback = null,
-        config = null,
-        cache_dir = null,
-        local_files_only = false,
-        revision = 'main',
-    } = {}) {
+    static async from_pretrained(
+        pretrained_model_name_or_path,
+        { progress_callback = null, config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+    ) {
         if (config && !(config instanceof PretrainedConfig)) {
             config = new PretrainedConfig(config);
         }
 
-        const data = config ?? await loadConfig(pretrained_model_name_or_path, {
-            progress_callback,
-            config,
-            cache_dir,
-            local_files_only,
-            revision,
-        })
+        const data =
+            config ??
+            (await loadConfig(pretrained_model_name_or_path, {
+                progress_callback,
+                config,
+                cache_dir,
+                local_files_only,
+                revision,
+            }));
         return new this(data);
     }
 }
 
 /**
  * Helper class which is used to instantiate pretrained configs with the `from_pretrained` function.
- * 
+ *
  * @example
- * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased'); 
+ * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */

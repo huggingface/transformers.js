@@ -1,9 +1,6 @@
-import {
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
 
 export class VitPoseImageProcessor extends ImageProcessor {
-
     /**
      * Transform the heatmaps into keypoint predictions and transform them back to the image.
      * NOTE: This is a naive implementation and does not include advanced post-processing techniques,
@@ -18,12 +15,16 @@ export class VitPoseImageProcessor extends ImageProcessor {
      *   keypoints: [number, number][]
      * }[][]} List of keypoints predictions for each image.
      */
-    post_process_pose_estimation(outputs, boxes, {
-        threshold = null,
-        // TODO:
-        // kernel_size = 11,
-        // target_sizes = null,
-    } = {}) {
+    post_process_pose_estimation(
+        outputs,
+        boxes,
+        {
+            threshold = null,
+            // TODO:
+            // kernel_size = 11,
+            // target_sizes = null,
+        } = {},
+    ) {
         // NOTE: boxes are 3D (batch_size, num_boxes, 4)
         const heatmaps = outputs.tolist();
         const [batch_size, num_classes, height, width] = outputs.dims;
@@ -59,7 +60,7 @@ export class VitPoseImageProcessor extends ImageProcessor {
                             // Get weighted sum of positions
                             // TODO: Determine best offsets
                             xWeightedSum += (x + 0.5) * value;
-                            yWeightedSum += (y) * value;
+                            yWeightedSum += y * value;
                         }
                     }
 
@@ -67,10 +68,7 @@ export class VitPoseImageProcessor extends ImageProcessor {
                     if (threshold != null && score < threshold) continue;
 
                     /** @type {[number, number]} */
-                    const keypoint = [
-                        xScale * xWeightedSum / sum,
-                        yScale * yWeightedSum / sum,
-                    ]
+                    const keypoint = [(xScale * xWeightedSum) / sum, (yScale * yWeightedSum) / sum];
                     keypoints.push(keypoint);
                     labels.push(c);
                     scores.push(score);

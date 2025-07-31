@@ -1,8 +1,8 @@
 /// <reference types="@webgpu/types" />
 
-import { apis } from "../env.js";
+import { apis } from '../env.js';
 
-import { DEVICE_TYPES } from "./devices.js";
+import { DEVICE_TYPES } from './devices.js';
 
 // TODO: Use the adapter from `env.backends.onnx.webgpu.adapter` to check for `shader-f16` support,
 // when available in https://github.com/microsoft/onnxruntime/pull/19940.

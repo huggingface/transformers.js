@@ -6,13 +6,13 @@
  * So, we just import both packages, and use the appropriate one based on the environment:
  *   - When running in node, we use `onnxruntime-node`.
  *   - When running in the browser, we use `onnxruntime-web` (`onnxruntime-node` is not bundled).
- * 
+ *
  * This module is not directly exported, but can be accessed through the environment variables:
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * console.log(env.backends.onnx);
  * ```
- * 
+ *
  * @module backends/onnx
  */
 
@@ -21,7 +21,7 @@ import { env, apis } from '../env.js';
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
-import * as ONNX_WEB from 'onnxruntime-web';
+import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 
 export { Tensor } from 'onnxruntime-common';
 
@@ -38,6 +38,7 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     webgpu: 'webgpu', // WebGPU
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
+    coreml: 'coreml', // CoreML
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
@@ -45,7 +46,7 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
-/** 
+/**
  * The list of supported devices, sorted by priority/performance.
  * @type {import("../utils/devices.js").DeviceType[]}
  */
@@ -59,17 +60,18 @@ const ORT_SYMBOL = Symbol.for('onnxruntime');
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
-
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 
-    // Updated as of ONNX Runtime 1.20.1
+    // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
-    // | EPs/Platforms | Windows x64 | Windows arm64 | Linux x64         | Linux arm64 | MacOS x64 | MacOS arm64 |
-    // | ------------- | ----------- | ------------- | ----------------- | ----------- | --------- | ----------- |
-    // | CPU           | ✔️          | ✔️            | ✔️                | ✔️          | ✔️        | ✔️          |
-    // | DirectML      | ✔️          | ✔️            | ❌                | ❌          | ❌        | ❌          |
-    // | CUDA          | ❌          | ❌            | ✔️ (CUDA v11.8)   | ❌          | ❌        | ❌          |
+    // | EPs/Platforms         | Windows x64        | Windows arm64      | Linux x64          | Linux arm64        | MacOS x64          | MacOS arm64        |
+    // | --------------------- | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ | ------------------ |
+    // | CPU                   | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  | ✔️                  |
+    // | WebGPU (experimental) | ✔️                  | ✔️                  | ✔️                  | ❌                  | ✔️                  | ✔️                  |
+    // | DirectML              | ✔️                  | ✔️                  | ❌                  | ❌                  | ❌                  | ❌                  |
+    // | CUDA                  | ❌                  | ❌                  | ✔️ (CUDA v12)       | ❌                  | ❌                  | ❌                  |
+    // | CoreML                | ❌                  | ❌                  | ❌                  | ❌                  | ✔️                  | ✔️                  |
     switch (process.platform) {
         case 'win32': // Windows x64 and Windows arm64
             supportedDevices.push('dml');
@@ -80,9 +82,11 @@ if (ORT_SYMBOL in globalThis) {
             }
             break;
         case 'darwin': // MacOS x64 and MacOS arm64
+            supportedDevices.push('coreml');
             break;
     }
 
+    supportedDevices.push('webgpu');
     supportedDevices.push('cpu');
     defaultDevices = ['cpu'];
 } else {
@@ -115,21 +119,18 @@ export function deviceToExecutionProviders(device = null) {
 
     // Handle overloaded cases
     switch (device) {
-        case "auto":
+        case 'auto':
             return supportedDevices;
-        case "gpu":
-            return supportedDevices.filter(x =>
-                ["webgpu", "cuda", "dml", "webnn-gpu"].includes(x),
-            );
+        case 'gpu':
+            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
     }
 
     if (supportedDevices.includes(device)) {
         return [DEVICE_TO_EXECUTION_PROVIDER_MAPPING[device] ?? device];
     }
 
-    throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevices.join(', ')}.`)
+    throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevices.join(', ')}.`);
 }
-
 
 /**
  * To prevent multiple calls to `initWasm()`, we store the first call in a Promise
@@ -179,10 +180,18 @@ if (ONNX_ENV?.wasm) {
     // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
     if (
         // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
-        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope)
-        && !ONNX_ENV.wasm.wasmPaths
+        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
+        env.backends.onnx.versions?.web &&
+        !ONNX_ENV.wasm.wasmPaths
     ) {
-        ONNX_ENV.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${env.version}/dist/`;
+        const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${env.backends.onnx.versions.web}/dist/`;
+
+        ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI
+            ? {
+                  mjs: `${wasmPathPrefix}/ort-wasm-simd-threaded.mjs`,
+                  wasm: `${wasmPathPrefix}/ort-wasm-simd-threaded.wasm`,
+              }
+            : wasmPathPrefix;
     }
 
     // TODO: Add support for loading WASM files from cached buffer when we upgrade to onnxruntime-web@1.19.0

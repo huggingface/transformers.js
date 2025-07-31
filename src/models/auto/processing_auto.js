@@ -1,5 +1,3 @@
-
-
 import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { getModelJSON } from '../../utils/hub.js';
 import { Processor } from '../../base/processing_utils.js';
@@ -11,12 +9,12 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
 /**
  * Helper class which is used to instantiate pretrained processors with the `from_pretrained` function.
  * The chosen processor class is determined by the type specified in the processor config.
- * 
+ *
  * **Example:** Load a processor using `from_pretrained`.
  * ```javascript
  * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
  * ```
- * 
+ *
  * **Example:** Run an image through a processor.
  * ```javascript
  * let processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
@@ -39,12 +37,15 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  * ```
  */
 export class AutoProcessor {
-
     /** @type {typeof Processor.from_pretrained} */
-    static async from_pretrained(pretrained_model_name_or_path, options={}) {
-
-        // TODO: first check for processor.json 
-        const preprocessorConfig = await getModelJSON(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME, true, options);
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        // TODO: first check for processor.json
+        const preprocessorConfig = await getModelJSON(
+            pretrained_model_name_or_path,
+            IMAGE_PROCESSOR_NAME,
+            true,
+            options,
+        );
 
         const { image_processor_type, feature_extractor_type, processor_class } = preprocessorConfig;
         if (processor_class && AllProcessors[processor_class]) {

@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "3.7.0",
+  "version": "4.0.0-alpha.0",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./src/transformers.js",
   "types": "./types/transformers.d.ts",
@@ -27,7 +27,7 @@
     "typegen": "tsc --build",
     "dev": "webpack serve --no-client-overlay",
     "build": "webpack && npm run typegen",
-    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose",
+    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
@@ -56,24 +56,23 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.5.1",
-    "onnxruntime-node": "1.21.0",
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
-    "sharp": "^0.34.1"
+    "onnxruntime-node": "1.23.0-dev.20250703-7fc6235861",
+    "onnxruntime-web": "1.23.0-dev.20250703-7fc6235861",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.1",
-    "@webgpu/types": "^0.1.51",
-    "catharsis": "github:xenova/catharsis",
-    "jest": "^30.0.0-alpha.6",
-    "jest-environment-node": "^30.0.0-alpha.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.11",
+    "@webgpu/types": "^0.1.64",
+    "jest": "^30.0.4",
+    "jest-environment-node": "^30.0.4",
     "jsdoc-to-markdown": "^9.1.1",
     "prettier": "3.4.2",
-    "typescript": "^5.8.2",
+    "typescript": "^5.8.3",
     "wavefile": "11.0.0",
-    "webpack": "^5.97.1",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
   },
   "files": [
     "src",

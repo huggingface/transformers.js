@@ -1,25 +1,22 @@
-
 /**
  * @file Custom data structures.
- * 
+ *
  * These are only used internally, meaning an end-user shouldn't
  * need to access anything here.
- * 
+ *
  * @module utils/data-structures
  */
-
 
 /**
  * Efficient Heap-based Implementation of a Priority Queue.
  * It uses an array-based binary heap, where the root is at index `0`, and the
  * children of node `i` are located at indices `2i + 1` and `2i + 2`, respectively.
- * 
+ *
  * Adapted from the following sources:
  * - https://stackoverflow.com/a/42919752/13989043 (original)
  * - https://github.com/belladoreai/llama-tokenizer-js (minor improvements)
  */
 export class PriorityQueue {
-
     /**
      * Create a new PriorityQueue.
      * @param {function(any, any): boolean} comparator Comparator function to determine priority. Defaults to a MaxHeap.
@@ -198,9 +195,10 @@ export class PriorityQueue {
             (this._left(node) < this.size && this._greater(this._left(node), node)) ||
             (this._right(node) < this.size && this._greater(this._right(node), node))
         ) {
-            const maxChild = (this._right(node) < this.size && this._greater(this._right(node), this._left(node)))
-                ? this._right(node)
-                : this._left(node);
+            const maxChild =
+                this._right(node) < this.size && this._greater(this._right(node), this._left(node))
+                    ? this._right(node)
+                    : this._left(node);
             this._swap(node, maxChild);
             node = maxChild;
         }
@@ -212,7 +210,7 @@ export class PriorityQueue {
      * @private
      */
     _smallest() {
-        return (2 ** (Math.floor(Math.log2(this.size))) - 1);
+        return 2 ** Math.floor(Math.log2(this.size)) - 1;
     }
 }
 
@@ -260,7 +258,7 @@ export class CharTrie {
         let node = this.root;
         if (node === undefined) return;
 
-        let prefix = "";
+        let prefix = '';
         for (const ch of text) {
             prefix += ch;
             node = node.children.get(ch);
@@ -404,7 +402,7 @@ export class TokenLattice {
      */
     tokens() {
         const nodes = this.viterbi();
-        return nodes.map(x => this.piece(x));
+        return nodes.map((x) => this.piece(x));
     }
 
     /**
@@ -412,7 +410,7 @@ export class TokenLattice {
      */
     tokenIds() {
         const nodes = this.viterbi();
-        return nodes.map(x => x.tokenId);
+        return nodes.map((x) => x.tokenId);
     }
 }
 class TokenLatticeNode {
@@ -449,7 +447,7 @@ class TokenLatticeNode {
 /**
  * A data structure which uses a trie to split a string into tokens based on a dictionary.
  * It can also use a regular expression to preprocess the input text before splitting.
- * 
+ *
  * NOTE: To ensure multi-byte characters are handled correctly, we operate at byte-level instead of character-level.
  */
 export class DictionarySplitter {
@@ -471,7 +469,7 @@ export class DictionarySplitter {
         for (const word of dictionary) {
             let node = trie;
             for (let i = 0; i < word.length; ++i) {
-                node = (node[word[i]] ??= Object.create(null));
+                node = node[word[i]] ??= Object.create(null);
             }
             node.end = word;
         }
@@ -521,10 +519,10 @@ export class DictionarySplitter {
 }
 
 /**
-* A simple Least Recently Used (LRU) cache implementation in JavaScript.
-* This cache stores key-value pairs and evicts the least recently used item
-* when the capacity is exceeded.
-*/
+ * A simple Least Recently Used (LRU) cache implementation in JavaScript.
+ * This cache stores key-value pairs and evicts the least recently used item
+ * when the capacity is exceeded.
+ */
 export class LRUCache {
     /**
      * Creates an LRUCache instance.
