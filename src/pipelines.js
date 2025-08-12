@@ -3381,6 +3381,7 @@ const TASK_ALIASES = Object.freeze({
  * @param {T} task The task defining which pipeline will be returned. Currently accepted tasks are:
  *  - `"audio-classification"`: will return a `AudioClassificationPipeline`.
  *  - `"automatic-speech-recognition"`: will return a `AutomaticSpeechRecognitionPipeline`.
+ *  - `"background-removal"`: will return a `BackgroundRemovalPipeline`.
  *  - `"depth-estimation"`: will return a `DepthEstimationPipeline`.
  *  - `"document-question-answering"`: will return a `DocumentQuestionAnsweringPipeline`.
  *  - `"feature-extraction"`: will return a `FeatureExtractionPipeline`.
