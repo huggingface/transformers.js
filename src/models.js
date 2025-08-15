@@ -5868,6 +5868,18 @@ export class Dinov2WithRegistersForImageClassification extends Dinov2WithRegiste
     }
 }
 //////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class DINOv3ViTPreTrainedModel extends PreTrainedModel { }
+export class DINOv3ViTModel extends DINOv3ViTPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class DINOv3ConvNextPreTrainedModel extends PreTrainedModel { }
+export class DINOv3ConvNextModel extends DINOv3ConvNextPreTrainedModel { }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 export class GroundingDinoPreTrainedModel extends PreTrainedModel { }
 export class GroundingDinoForObjectDetection extends GroundingDinoPreTrainedModel { }
 
@@ -7772,6 +7784,8 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['convnextv2', ['ConvNextV2Model', ConvNextV2Model]],
     ['dinov2', ['Dinov2Model', Dinov2Model]],
     ['dinov2_with_registers', ['Dinov2WithRegistersModel', Dinov2WithRegistersModel]],
+    ['dinov3_vit', ['DINOv3ViTModel', DINOv3ViTModel]],
+    ['dinov3_convnext', ['DINOv3ConvNextModel', DINOv3ConvNextModel]],
     ['resnet', ['ResNetModel', ResNetModel]],
     ['swin', ['SwinModel', SwinModel]],
     ['swin2sr', ['Swin2SRModel', Swin2SRModel]],
