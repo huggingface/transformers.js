@@ -198,6 +198,13 @@ export class GenerationConfig {
     bad_words_ids = null;
 
     /**
+     * List of token ids that are allowed to be generated.
+     * @type {number[][]}
+     * @default null
+     */
+    good_words_ids = null;
+
+    /**
      * List of token ids that must be generated.
      * If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite to `bad_words_ids`.
      * If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), where one can allow different forms of each word.
