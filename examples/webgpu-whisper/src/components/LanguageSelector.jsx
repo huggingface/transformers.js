@@ -121,7 +121,7 @@ export function LanguageSelector({ language, setLanguage }) {
 
     return (
         <select
-            className="border rounded-lg p-2 max-w-[100px]"
+            className="border rounded-lg p-2 max-w-[100px] bg-transparent"
             value={language} onChange={handleLanguageChange}>
             {Object.keys(LANGUAGES).map((key, i) => (
                 <option key={key} value={key}>
