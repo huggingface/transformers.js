@@ -1,0 +1,33 @@
+{
+	"name": "sveltekit-static",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"lint": "prettier --plugin-search-dir . --check . && eslint .",
+		"format": "prettier --plugin-search-dir . --write ."
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-static": "^2.0.3",
+		"@sveltejs/kit": "^1.20.4",
+		"autoprefixer": "^10.4.14",
+		"eslint": "^8.28.0",
+		"eslint-config-prettier": "^8.5.0",
+		"eslint-plugin-svelte": "^2.30.0",
+		"postcss": "^8.4.27",
+		"prettier": "^2.8.0",
+		"prettier-plugin-svelte": "^2.10.1",
+		"svelte": "^4.0.5",
+		"tailwindcss": "^3.3.3",
+		"vite": "^4.4.2"
+	},
+	"type": "module",
+	"dependencies": {
+		"@xenova/transformers": "^2.5.0"
+	},
+	"overrides": {
+		"protobufjs": "^7.2.4"
+	}
+}
