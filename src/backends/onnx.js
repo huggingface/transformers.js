@@ -160,6 +160,32 @@ export async function createInferenceSession(buffer_or_path, session_options, se
     return session;
 }
 
+
+/**
+ * Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
+ * For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
+ * @type {Promise<any>}
+ */
+let webInferenceChain = Promise.resolve();
+
+const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
+
+/**
+ * Run an inference session.
+ * @param {import('onnxruntime-common').InferenceSession} session The ONNX inference session.
+ * @param {Record<string, import('onnxruntime-common').Tensor>} ortFeed The input tensors.
+ * @returns {Promise<Record<string, import('onnxruntime-common').Tensor>>} The output tensors.
+ */
+export async function runInferenceSession(session, ortFeed) {
+    const run = () => session.run(ortFeed);
+    const output = await (IS_WEB_ENV
+        ? (webInferenceChain = webInferenceChain.then(run))
+        : run()
+    );
+    return output;
+}
+
+
 /**
  * Check if an object is an ONNX tensor.
  * @param {any} x The object to check

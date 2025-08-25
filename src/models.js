@@ -48,6 +48,7 @@ import {
     createInferenceSession,
     isONNXTensor,
     isONNXProxy,
+    runInferenceSession,
 } from './backends/onnx.js';
 import {
     DATA_TYPES,
@@ -419,10 +420,6 @@ function validateInputs(session, inputs) {
     return checkedInputs;
 }
 
-// Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
-// For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
-let webInferenceChain = Promise.resolve();
-
 /**
  * Executes an InferenceSession using the specified inputs.
  * NOTE: `inputs` must contain at least the input names of the model.
@@ -439,10 +436,7 @@ async function sessionRun(session, inputs) {
     try {
         // pass the original ort tensor
         const ortFeed = Object.fromEntries(Object.entries(checkedInputs).map(([k, v]) => [k, v.ort_tensor]));
-        const run = () => session.run(ortFeed);
-        const output = await ((apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV)
-            ? (webInferenceChain = webInferenceChain.then(run))
-            : run());
+        const output = await runInferenceSession(session, ortFeed);
         return replaceTensors(output);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
