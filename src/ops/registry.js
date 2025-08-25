@@ -1,8 +1,6 @@
-import { createInferenceSession, isONNXProxy } from "../backends/onnx.js";
+import { createInferenceSession, runInferenceSession, isONNXProxy } from "../backends/onnx.js";
 import { Tensor } from "../utils/tensor.js";
-import { apis } from "../env.js";
 
-const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
 /**
  * Asynchronously creates a wrapper function for running an ONNX inference session.
  *
@@ -19,16 +17,10 @@ const wrap = async (session_bytes, session_options, names) => {
         new Uint8Array(session_bytes), session_options,
     );
 
-    /** @type {Promise<any>} */
-    let chain = Promise.resolve();
-
     return /** @type {any} */(async (/** @type {Record<string, Tensor>} */ inputs) => {
         const proxied = isONNXProxy();
         const ortFeed = Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, (proxied ? v.clone() : v).ort_tensor]));
-
-        // When running in-browser via WASM, we need to chain calls to session.run to avoid "Error: Session already started"
-        const outputs = await (chain = IS_WEB_ENV ? chain.then(() => session.run(ortFeed)) : session.run(ortFeed));
-
+        const outputs = await runInferenceSession(session, ortFeed);
         if (Array.isArray(names)) {
             return names.map((n) => new Tensor(outputs[n]));
         } else {
