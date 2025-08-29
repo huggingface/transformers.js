@@ -625,7 +625,16 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     ) {
         if (!result) {
             // We haven't yet read the response body, so we need to do so now.
-            await cache.put(cacheKey, /** @type {Response} */(response), options.progress_callback);
+            // Ensure progress updates include consistent metadata.
+            const wrapped_progress = options.progress_callback
+                ? (data) => dispatchCallback(options.progress_callback, {
+                    status: 'progress',
+                    name: path_or_repo_id,
+                    file: filename,
+                    ...data,
+                })
+                : undefined;
+            await cache.put(cacheKey, /** @type {Response} */(response), wrapped_progress);
         } else {
             // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
             await cache.put(cacheKey, new Response(result, {
