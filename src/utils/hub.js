@@ -402,6 +402,45 @@ async function tryCache(cache, ...names) {
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
+    if (env.forceRemoteDownload) {
+        const revision = options.revision ?? 'main';
+        const remoteURL = pathJoin(
+            env.remoteHost,
+            env.remotePathTemplate
+                .replaceAll('{model}', path_or_repo_id)
+                .replaceAll('{revision}', encodeURIComponent(revision)),
+            filename
+        );
+
+        // --- check cache first ---
+        let cache;
+        if (env.useBrowserCache && typeof caches !== 'undefined') {
+            try {
+                cache = await caches.open('transformers-cache');
+                const cachedResponse = await cache.match(remoteURL);
+                if (cachedResponse) {
+                    return new Uint8Array(await cachedResponse.arrayBuffer());
+                }
+            } catch (e) {
+                console.warn('Browser cache not available:', e);
+            }
+        }
+
+        // --- fallback to remote fetch ---
+        const response = await getFile(remoteURL);
+        if (response.status !== 200) {
+            return handleError(response.status, remoteURL, fatal);
+        }
+        const buffer = new Uint8Array(await response.arrayBuffer());
+
+        // --- write to cache if possible ---
+        if (cache) {
+            await cache.put(remoteURL, new Response(buffer, { headers: response.headers }))
+                .catch(err => console.warn("Failed to cache remote file:", err));
+        }
+
+        return buffer;
+    }
 
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
