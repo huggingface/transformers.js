@@ -93,12 +93,12 @@ if (ORT_SYMBOL in globalThis) {
         supportedDevices.push('webnn-npu', 'webnn-gpu', 'webnn-cpu', 'webnn');
     }
 
-    if (apis.IS_WEBGPU_AVAILABLE) {
-        supportedDevices.push('webgpu');
-    }
-
     supportedDevices.push('wasm');
     defaultDevices = ['wasm'];
+}
+
+if (apis.IS_WEBGPU_AVAILABLE) {
+    supportedDevices.push('webgpu');
 }
 
 // @ts-ignore
