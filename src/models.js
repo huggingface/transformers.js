@@ -4711,6 +4711,12 @@ export class Gemma2Model extends Gemma2PreTrainedModel { }
 export class Gemma2ForCausalLM extends Gemma2PreTrainedModel { }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// VaultGemma models
+export class VaultGemmaPreTrainedModel extends PreTrainedModel { }
+export class VaultGemmaModel extends VaultGemmaPreTrainedModel { }
+export class VaultGemmaForCausalLM extends VaultGemmaPreTrainedModel { }
+//////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
 // Gemma3 models
@@ -7853,6 +7859,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['cohere', ['CohereModel', CohereModel]],
     ['gemma', ['GemmaModel', GemmaModel]],
     ['gemma2', ['Gemma2Model', Gemma2Model]],
+    ['vaultgemma', ['VaultGemmaModel', VaultGemmaModel]],
     ['gemma3_text', ['Gemma3Model', Gemma3Model]],
     ['helium', ['HeliumModel', HeliumModel]],
     ['glm', ['GlmModel', GlmModel]],
@@ -7962,6 +7969,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['cohere', ['CohereForCausalLM', CohereForCausalLM]],
     ['gemma', ['GemmaForCausalLM', GemmaForCausalLM]],
     ['gemma2', ['Gemma2ForCausalLM', Gemma2ForCausalLM]],
+    ['vaultgemma', ['VaultGemmaForCausalLM', VaultGemmaForCausalLM]],
     ['gemma3_text', ['Gemma3ForCausalLM', Gemma3ForCausalLM]],
     ['helium', ['HeliumForCausalLM', HeliumForCausalLM]],
     ['glm', ['GlmForCausalLM', GlmForCausalLM]],
