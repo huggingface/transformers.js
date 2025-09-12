@@ -4588,6 +4588,13 @@ export class LlamaModel extends LlamaPreTrainedModel { }
 export class LlamaForCausalLM extends LlamaPreTrainedModel { }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+export class Llama4PreTrainedModel extends PreTrainedModel { }
+export class Llama4ForCausalLM extends Llama4PreTrainedModel { }
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 // Arcee models
 export class ArceePreTrainedModel extends PreTrainedModel { }
@@ -7943,6 +7950,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gpt_neox', ['GPTNeoXForCausalLM', GPTNeoXForCausalLM]],
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
+    ['llama4_text', ['Llama4ForCausalLM', Llama4ForCausalLM]],
     ['arcee', ['ArceeForCausalLM', ArceeForCausalLM]],
     ['lfm2', ['Lfm2ForCausalLM', Lfm2ForCausalLM]],
     ['smollm3', ['SmolLM3ForCausalLM', SmolLM3ForCausalLM]],
