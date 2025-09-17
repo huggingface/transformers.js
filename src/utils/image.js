@@ -19,8 +19,8 @@ import sharp from 'sharp';
 let createCanvasFunction;
 let ImageDataClass;
 let loadImageFunction;
-const IS_BROWSER_OR_WEBWORKER = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
-if (IS_BROWSER_OR_WEBWORKER) {
+
+if (apis.IS_CANVAS_AVAILABLE) {
     // Running in browser or web-worker
     createCanvasFunction = (/** @type {number} */ width, /** @type {number} */ height) => {
         if (!self.OffscreenCanvas) {
@@ -138,7 +138,7 @@ export class RawImage {
      * @returns {RawImage} The image object.
      */
     static fromCanvas(canvas) {
-        if (!IS_BROWSER_OR_WEBWORKER) {
+        if (!apis.IS_CANVAS_AVAILABLE) {
             throw new Error('fromCanvas() is only supported in browser environments.')
         }
 
@@ -167,7 +167,7 @@ export class RawImage {
      * @returns {Promise<RawImage>} The image object.
      */
     static async fromBlob(blob) {
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             // Running in environment with canvas
             const img = await loadImageFunction(blob);
 
@@ -385,7 +385,7 @@ export class RawImage {
             height = (width / this.width) * this.height;
         }
 
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             // TODO use `resample` in browser environment
 
             // Store number of channels before resizing
@@ -458,7 +458,7 @@ export class RawImage {
             return this;
         }
 
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             // Store number of channels before padding
             const numChannels = this.channels;
 
@@ -507,7 +507,7 @@ export class RawImage {
         const crop_width = x_max - x_min + 1;
         const crop_height = y_max - y_min + 1;
 
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             // Store number of channels before resizing
             const numChannels = this.channels;
 
@@ -555,7 +555,7 @@ export class RawImage {
         const height_offset = (this.height - crop_height) / 2;
 
 
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             // Store number of channels before resizing
             const numChannels = this.channels;
 
@@ -660,7 +660,7 @@ export class RawImage {
     }
 
     async toBlob(type = 'image/png', quality = 1) {
-        if (!IS_BROWSER_OR_WEBWORKER) {
+        if (!apis.IS_CANVAS_AVAILABLE) {
             throw new Error('toBlob() is only supported in browser environments.')
         }
 
@@ -686,7 +686,7 @@ export class RawImage {
     }
 
     toCanvas() {
-        if (!IS_BROWSER_OR_WEBWORKER) {
+        if (!apis.IS_CANVAS_AVAILABLE) {
             throw new Error('toCanvas() is only supported in browser environments.')
         }
 
@@ -789,8 +789,7 @@ export class RawImage {
      * @param {string} path The path to save the image to.
      */
     async save(path) {
-
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             if (apis.IS_WEBWORKER_ENV) {
                 throw new Error('Unable to save an image from a Web Worker.')
             }
@@ -813,7 +812,7 @@ export class RawImage {
     }
 
     toSharp() {
-        if (IS_BROWSER_OR_WEBWORKER) {
+        if (apis.IS_CANVAS_AVAILABLE) {
             throw new Error('toSharp() is only supported in server-side environments.')
         }
 
