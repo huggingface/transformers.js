@@ -15,6 +15,10 @@
     title: Building a React Application
   - local: tutorials/next
     title: Building a Next.js Application
+  - local: tutorials/svelte
+    title: Building a Svelte Application
+  - local: tutorials/sveltekit
+    title: Building a SvelteKit Application
   - local: tutorials/browser-extension
     title: Building a Browser Extension
   - local: tutorials/electron
