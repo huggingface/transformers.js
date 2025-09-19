@@ -1,15 +1,11 @@
-
 /**
  * @module generation/logits_sampler
  */
 
-import { Callable } from "../utils/generic.js";
-import { Tensor, topk } from "../utils/tensor.js";
+import { Callable } from '../utils/generic.js';
+import { Tensor, topk } from '../utils/tensor.js';
 
-import {
-    max,
-    softmax,
-} from '../utils/maths.js';
+import { max, softmax } from '../utils/maths.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
 
 /**
@@ -43,7 +39,7 @@ export class LogitsSampler extends Callable {
      * @returns {Promise<[bigint, number][]>}
      */
     async sample(logits) {
-        throw Error("sample should be implemented in subclasses.")
+        throw Error('sample should be implemented in subclasses.');
     }
 
     /**
@@ -55,7 +51,7 @@ export class LogitsSampler extends Callable {
     getLogits(logits, index) {
         let vocabSize = logits.dims.at(-1);
 
-        let logs = /** @type {Float32Array} */(logits.data);
+        let logs = /** @type {Float32Array} */ (logits.data);
 
         if (index === -1) {
             logs = logs.slice(-vocabSize);
@@ -105,13 +101,13 @@ export class LogitsSampler extends Callable {
         // NOTE: beam search is implemented directly into the generation function
         if (generation_config.do_sample) {
             return new MultinomialSampler(generation_config);
-
         } else if (generation_config.num_beams > 1) {
             return new BeamSearchSampler(generation_config);
-
         } else {
             if (generation_config.num_return_sequences > 1) {
-                throw Error(`num_return_sequences has to be 1 when doing greedy search, but is ${generation_config.num_return_sequences}.`)
+                throw Error(
+                    `num_return_sequences has to be 1 when doing greedy search, but is ${generation_config.num_return_sequences}.`,
+                );
             }
             return new GreedySampler(generation_config);
         }
@@ -133,9 +129,7 @@ class GreedySampler extends LogitsSampler {
 
         // Note: score is meaningless in this context, since we are performing
         // greedy search (p = 1 => log(p) = 0)
-        return [
-            [BigInt(argmax), 0]
-        ];
+        return [[BigInt(argmax), 0]];
     }
 }
 
@@ -143,7 +137,6 @@ class GreedySampler extends LogitsSampler {
  * Class representing a MultinomialSampler.
  */
 class MultinomialSampler extends LogitsSampler {
-
     /**
      * Sample from the logits.
      * @param {Tensor} logits
@@ -159,7 +152,7 @@ class MultinomialSampler extends LogitsSampler {
         const [v, i] = await topk(logits, k);
 
         // Compute softmax over logits
-        const probabilities = softmax(/** @type {Float32Array} */(v.data));
+        const probabilities = softmax(/** @type {Float32Array} */ (v.data));
 
         return Array.from({ length: this.generation_config.num_beams }, () => {
             const sampledIndex = this.randomSelect(probabilities);
@@ -171,12 +164,10 @@ class MultinomialSampler extends LogitsSampler {
     }
 }
 
-
 /**
  * Class representing a BeamSearchSampler.
  */
 class BeamSearchSampler extends LogitsSampler {
-
     /**
      * Sample from the logits.
      * @param {Tensor} logits
@@ -192,7 +183,7 @@ class BeamSearchSampler extends LogitsSampler {
         const [v, i] = await topk(logits, k);
 
         // Compute softmax over logits
-        const probabilities = softmax(/** @type {Float32Array} */(v.data));
+        const probabilities = softmax(/** @type {Float32Array} */ (v.data));
 
         return Array.from({ length: this.generation_config.num_beams }, (_, x) => {
             return [

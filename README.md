@@ -47,7 +47,7 @@ npm i @huggingface/transformers
 Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. For example, using [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), you can import the library with:
 ```html
 <script type="module">
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.3';
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-alpha.0';
 </script>
 ```
 
@@ -126,36 +126,15 @@ const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncase
 });
 ```
 
+Ready to dive in? Explore our wide variety of demo applications and templates [here](https://github.com/huggingface/transformers.js-examples). You can also launch your own project instantly using the official Transformers.js [template](https://huggingface.co/new-space?template=static-templates%2Ftransformers.js) on Hugging Face!
 
-## Examples
-
-Want to jump straight in? Get started with one of our sample applications/templates, which can be found [here](https://github.com/huggingface/transformers.js-examples).
-
-| Name              | Description                      | Links                   |
-|-------------------|----------------------------------|-------------------------------|
-| Whisper Web       | Speech recognition w/ Whisper    | [code](https://github.com/xenova/whisper-web), [demo](https://huggingface.co/spaces/Xenova/whisper-web) |
-| Doodle Dash       | Real-time sketch-recognition game | [blog](https://huggingface.co/blog/ml-web-games), [code](https://github.com/xenova/doodle-dash), [demo](https://huggingface.co/spaces/Xenova/doodle-dash) |
-| Code Playground   | In-browser code completion website | [code](https://github.com/huggingface/transformers.js/tree/main/examples/code-completion/), [demo](https://huggingface.co/spaces/Xenova/ai-code-playground) |
-| Semantic Image Search (client-side) | Search for images with text | [code](https://github.com/huggingface/transformers.js/tree/main/examples/semantic-image-search-client/), [demo](https://huggingface.co/spaces/Xenova/semantic-image-search-client) |
-| Semantic Image Search (server-side) | Search for images with text (Supabase) | [code](https://github.com/huggingface/transformers.js/tree/main/examples/semantic-image-search/), [demo](https://huggingface.co/spaces/Xenova/semantic-image-search) |
-| Vanilla JavaScript | In-browser object detection     | [video](https://scrimba.com/scrim/cKm9bDAg), [code](https://github.com/huggingface/transformers.js/tree/main/examples/vanilla-js/), [demo](https://huggingface.co/spaces/Scrimba/vanilla-js-object-detector) |
-| React             | Multilingual translation website | [code](https://github.com/huggingface/transformers.js/tree/main/examples/react-translator/), [demo](https://huggingface.co/spaces/Xenova/react-translator) |
-| Text to speech (client-side) | In-browser speech synthesis | [code](https://github.com/huggingface/transformers.js/tree/main/examples/text-to-speech-client/), [demo](https://huggingface.co/spaces/Xenova/text-to-speech-client) |
-| Browser extension | Text classification extension    | [code](https://github.com/huggingface/transformers.js/tree/main/examples/extension/) |
-| Electron          | Text classification application  | [code](https://github.com/huggingface/transformers.js/tree/main/examples/electron/)  |
-| Next.js (client-side) | Sentiment analysis (in-browser inference) | [code](https://github.com/huggingface/transformers.js/tree/main/examples/next-client/), [demo](https://huggingface.co/spaces/Xenova/next-example-app) |
-| Next.js (server-side) | Sentiment analysis (Node.js inference) | [code](https://github.com/huggingface/transformers.js/tree/main/examples/next-server/), [demo](https://huggingface.co/spaces/Xenova/next-server-example-app) |
-| Node.js           | Sentiment analysis API           | [code](https://github.com/huggingface/transformers.js/tree/main/examples/node/)      |
-| Demo site         | A collection of demos | [code](https://github.com/huggingface/transformers.js/tree/main/examples/demo-site/), [demo](https://huggingface.github.io/transformers.js/) |
-
-Check out the Transformers.js [template](https://huggingface.co/new-space?template=static-templates%2Ftransformers.js) on Hugging Face to get started in one click!
 
 
 ## Custom usage
 
 
 
-By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.3/dist/), which should work out-of-the-box. You can customize this as follows:
+By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-alpha.0/dist/), which should work out-of-the-box. You can customize this as follows:
 
 ### Settings
 

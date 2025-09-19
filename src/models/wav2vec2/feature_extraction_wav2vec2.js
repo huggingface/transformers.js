@@ -1,18 +1,17 @@
-import { FeatureExtractor, validate_audio_inputs } from "../../base/feature_extraction_utils.js";
-import { Tensor } from "../../utils/tensor.js";
+import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extraction_utils.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class Wav2Vec2FeatureExtractor extends FeatureExtractor {
-
     /**
-     * @param {Float32Array} input_values 
-     * @returns {Float32Array} 
+     * @param {Float32Array} input_values
+     * @returns {Float32Array}
      */
     _zero_mean_unit_var_norm(input_values) {
         // TODO support batch?
         const sum = input_values.reduce((a, b) => a + b, 0);
         const mean = sum / input_values.length;
         const variance = input_values.reduce((a, b) => a + (b - mean) ** 2, 0) / input_values.length;
-        return input_values.map(x => (x - mean) / Math.sqrt(variance + 1e-7));
+        return input_values.map((x) => (x - mean) / Math.sqrt(variance + 1e-7));
     }
 
     /**
@@ -38,7 +37,7 @@ export class Wav2Vec2FeatureExtractor extends FeatureExtractor {
         const shape = [1, input_values.length];
         return {
             input_values: new Tensor('float32', input_values, shape),
-            attention_mask: new Tensor('int64', new BigInt64Array(input_values.length).fill(1n), shape)
+            attention_mask: new Tensor('int64', new BigInt64Array(input_values.length).fill(1n), shape),
         };
     }
 }

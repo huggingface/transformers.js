@@ -221,6 +221,6 @@ If you would like more control over the inference process, you can use the [`Aut
 
 <include>
 {
-    "path": "../snippets/5_supported-tasks.snippet"
+    "path": "../snippets/4_supported-tasks.snippet"
 }
 </include>

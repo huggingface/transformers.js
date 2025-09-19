@@ -1,0 +1,71 @@
+
+### Tasks
+
+#### Natural Language Processing
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Fill-Mask](https://huggingface.co/tasks/fill-mask)                     | `fill-mask`   | Masking some of the words in a sentence and predicting which words should replace those masks. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FillMaskPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=fill-mask&library=transformers.js) |
+| [Question Answering](https://huggingface.co/tasks/question-answering)   | `question-answering`   | Retrieve the answer to a question from a given text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.QuestionAnsweringPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=question-answering&library=transformers.js) |
+| [Sentence Similarity](https://huggingface.co/tasks/sentence-similarity) | `sentence-similarity`  | Determining how similar two texts are. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=sentence-similarity&library=transformers.js) |
+| [Summarization](https://huggingface.co/tasks/summarization)             |  `summarization`  | Producing a shorter version of a document while preserving its important information. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.SummarizationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=summarization&library=transformers.js) |
+| [Table Question Answering](https://huggingface.co/tasks/table-question-answering) |  `table-question-answering`  | Answering a question about information from a given table. | ❌ |
+| [Text Classification](https://huggingface.co/tasks/text-classification)      | `text-classification` or `sentiment-analysis`  | Assigning a label or class to a given text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js) |
+| [Text Generation](https://huggingface.co/tasks/text-generation#completion-generation-models)          | `text-generation`  | Producing new text by predicting the next word in a sequence. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextGenerationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers.js) |
+| [Text-to-text Generation](https://huggingface.co/tasks/text-generation#text-to-text-generation-models)  | `text2text-generation`  | Converting one text sequence into another text sequence. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.Text2TextGenerationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text2text-generation&library=transformers.js) |
+| [Token Classification](https://huggingface.co/tasks/token-classification)     | `token-classification` or `ner`  | Assigning a label to each token in a text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TokenClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=token-classification&library=transformers.js) |
+| [Translation](https://huggingface.co/tasks/translation)              |  `translation`  | Converting text from one language to another. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TranslationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=translation&library=transformers.js) |
+| [Zero-Shot Classification](https://huggingface.co/tasks/zero-shot-classification) | `zero-shot-classification`  | Classifying text into classes that are unseen during training.  | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=zero-shot-classification&library=transformers.js) |
+| [Feature Extraction](https://huggingface.co/tasks/feature-extraction)         |  `feature-extraction`  | Transforming raw data into numerical features that can be processed while preserving the information in the original dataset. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=feature-extraction&library=transformers.js) |
+
+#### Vision
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Background Removal](https://huggingface.co/tasks/image-segmentation#background-removal)       | `background-removal`   | Isolating the main subject of an image by removing or making the background transparent. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.BackgroundRemovalPipeline)<br>[(models)](https://huggingface.co/models?other=background-removal&library=transformers.js) |
+| [Depth Estimation](https://huggingface.co/tasks/depth-estimation)         |  `depth-estimation`  | Predicting the depth of objects present in an image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DepthEstimationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=depth-estimation&library=transformers.js) |
+| [Image Classification](https://huggingface.co/tasks/image-classification)                | `image-classification`   | Assigning a label or class to an entire image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-classification&library=transformers.js) |
+| [Image Segmentation](https://huggingface.co/tasks/image-segmentation)       | `image-segmentation`   | Divides an image into segments where each pixel is mapped to an object. This task has multiple variants such as instance segmentation, panoptic segmentation and semantic segmentation. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageSegmentationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-segmentation&library=transformers.js) |
+| [Image-to-Image](https://huggingface.co/tasks/image-to-image)      |  `image-to-image` | Transforming a source image to match the characteristics of a target image or a target image domain. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToImagePipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-to-image&library=transformers.js) |
+| [Mask Generation](https://huggingface.co/tasks/mask-generation)            |  `mask-generation`  | Generate masks for the objects in an image. | ❌ |
+| [Object Detection](https://huggingface.co/tasks/object-detection)            | `object-detection`   | Identify objects of certain defined classes within an image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ObjectDetectionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=object-detection&library=transformers.js) |
+| [Video Classification](https://huggingface.co/tasks/video-classification) |  n/a  | Assigning a label or class to an entire video. | ❌ |
+| [Unconditional Image Generation](https://huggingface.co/tasks/unconditional-image-generation)      |  n/a   | Generating images with no condition in any context (like a prompt text or another image). | ❌ |
+| [Image Feature Extraction](https://huggingface.co/tasks/image-feature-extraction)         |  `image-feature-extraction`  | Transforming raw data into numerical features that can be processed while preserving the information in the original image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageFeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-feature-extraction&library=transformers.js) |
+
+#### Audio
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Audio Classification](https://huggingface.co/tasks/audio-classification)         |  `audio-classification`  | Assigning a label or class to a given audio. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AudioClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=audio-classification&library=transformers.js) |
+| [Audio-to-Audio](https://huggingface.co/tasks/audio-to-audio)         |  n/a  | Generating audio from an input audio source. | ❌ |
+| [Automatic Speech Recognition](https://huggingface.co/tasks/automatic-speech-recognition)         | `automatic-speech-recognition`  | Transcribing a given audio into text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AutomaticSpeechRecognitionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=automatic-speech-recognition&library=transformers.js) |
+| [Text-to-Speech](https://huggingface.co/tasks/text-to-speech)         | `text-to-speech` or `text-to-audio` | Generating natural-sounding speech given text input. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextToAudioPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-to-audio&library=transformers.js) |
+
+
+#### Tabular
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Tabular Classification](https://huggingface.co/tasks/tabular-classification)         |  n/a  | Classifying a target category (a group) based on set of attributes. | ❌ |
+| [Tabular Regression](https://huggingface.co/tasks/tabular-regression)         |  n/a  | Predicting a numerical value given a set of attributes. | ❌ |
+
+
+#### Multimodal
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Document Question Answering](https://huggingface.co/tasks/document-question-answering)         | `document-question-answering`  | Answering questions on document images. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DocumentQuestionAnsweringPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=document-question-answering&library=transformers.js) |
+| [Image-to-Text](https://huggingface.co/tasks/image-to-text)         |  `image-to-text`  | Output text from a given image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToTextPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-to-text&library=transformers.js) |
+| [Text-to-Image](https://huggingface.co/tasks/text-to-image)         |  `text-to-image`  | Generates images from input text.  | ❌ |
+| [Visual Question Answering](https://huggingface.co/tasks/visual-question-answering)         |  `visual-question-answering`  | Answering open-ended questions based on an image. | ❌ |
+| [Zero-Shot Audio Classification](https://huggingface.co/learn/audio-course/chapter4/classification_models#zero-shot-audio-classification) | `zero-shot-audio-classification`  | Classifying audios into classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotAudioClassificationPipeline)<br>[(models)](https://huggingface.co/models?other=zero-shot-audio-classification&library=transformers.js) |
+| [Zero-Shot Image Classification](https://huggingface.co/tasks/zero-shot-image-classification) | `zero-shot-image-classification`  | Classifying images into classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotImageClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=zero-shot-image-classification&library=transformers.js) |
+| [Zero-Shot Object Detection](https://huggingface.co/tasks/zero-shot-object-detection) | `zero-shot-object-detection`  | Identify objects of classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotObjectDetectionPipeline)<br>[(models)](https://huggingface.co/models?other=zero-shot-object-detection&library=transformers.js) |
+
+
+#### Reinforcement Learning
+
+| Task                     | ID | Description | Supported? |
+|--------------------------|----|-------------|------------|
+| [Reinforcement Learning](https://huggingface.co/tasks/reinforcement-learning)   |  n/a  | Learning from actions by interacting with an environment through trial and error and receiving rewards (negative or positive) as feedback. | ✅ |

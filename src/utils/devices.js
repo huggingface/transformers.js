@@ -1,4 +1,3 @@
-
 /**
  * The list of devices supported by Transformers.js
  */
@@ -10,6 +9,7 @@ export const DEVICE_TYPES = Object.freeze({
     webgpu: 'webgpu', // WebGPU
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
+    coreml: 'coreml', // CoreML
 
     webnn: 'webnn', // WebNN (default)
     'webnn-npu': 'webnn-npu', // WebNN NPU

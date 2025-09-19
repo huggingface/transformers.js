@@ -1,8 +1,7 @@
-import { RawImage } from "./image.js";
-import { apis } from "../env.js";
+import { RawImage } from './image.js';
+import { apis } from '../env.js';
 
 export class RawVideoFrame {
-
     /**
      * @param {RawImage} image
      * @param {number} timestamp
@@ -21,7 +20,7 @@ export class RawVideo {
     constructor(frames, duration) {
         if (frames.length > 0 && frames[0] instanceof RawImage) {
             // Assume uniform timestamps
-            frames = frames.map((image, i) => new RawVideoFrame(image, (i + 1) / (frames.length + 1) * duration));
+            frames = frames.map((image, i) => new RawVideoFrame(image, ((i + 1) / (frames.length + 1)) * duration));
         }
         this.frames = /** @type {RawVideoFrame[]} */ (frames);
         this.duration = duration;
@@ -39,7 +38,6 @@ export class RawVideo {
     }
 }
 
-
 /**
  * Loads a video.
  *
@@ -52,19 +50,19 @@ export class RawVideo {
  */
 export async function load_video(src, { num_frames = null, fps = null } = {}) {
     if (!apis.IS_BROWSER_ENV) {
-        throw new Error("`load_video` is currently only supported in browser environments.");
+        throw new Error('`load_video` is currently only supported in browser environments.');
     }
 
     // TODO: Support efficiently loading all frames using the WebCodecs API.
     // Specfically, https://developer.mozilla.org/en-US/docs/Web/API/VideoDecoder
     if (num_frames == null && fps == null) {
-        throw new Error("Either num_frames or fps must be provided.");
+        throw new Error('Either num_frames or fps must be provided.');
     }
 
     const frames = [];
 
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
     video.muted = true; // mute to allow autoplay and seeking
 
     if (typeof src === 'string') {
@@ -74,17 +72,17 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
     } else if (src instanceof HTMLVideoElement) {
         video.src = src.src;
     } else {
-        throw new Error("Invalid URL or video element provided.");
+        throw new Error('Invalid URL or video element provided.');
     }
     // Wait for metadata to load to obtain duration
-    await new Promise((resolve) => video.onloadedmetadata = resolve);
+    await new Promise((resolve) => (video.onloadedmetadata = resolve));
 
     if (video.seekable.start(0) === video.seekable.end(0)) {
         // Fallback: Download entire video if not seekable
         const response = await fetch(video.src);
         const blob = await response.blob();
         video.src = URL.createObjectURL(blob);
-        await new Promise((resolve) => video.onloadedmetadata = resolve);
+        await new Promise((resolve) => (video.onloadedmetadata = resolve));
     }
 
     const duration = video.duration;
@@ -104,10 +102,10 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
         sampleTimes.push(num_frames === 1 ? duration / 2 : i * step);
     }
 
-    const canvas = document.createElement("canvas");
+    const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     for (const t of sampleTimes) {
         video.currentTime = t;
         await new Promise((resolve) => {

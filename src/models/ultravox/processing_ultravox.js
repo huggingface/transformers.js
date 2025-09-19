@@ -1,13 +1,13 @@
-import { AutoFeatureExtractor } from "../auto/feature_extraction_auto.js"
-import { AutoTokenizer } from "../../tokenizers.js"
-import { Processor } from "../../base/processing_utils.js"
+import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
+import { Processor } from '../../base/processing_utils.js';
 
 /**
  * Represents a UltravoxProcessor that extracts features from an audio input.
  */
 export class UltravoxProcessor extends Processor {
-    static tokenizer_class = AutoTokenizer
-    static feature_extractor_class = AutoFeatureExtractor
+    static tokenizer_class = AutoTokenizer;
+    static feature_extractor_class = AutoFeatureExtractor;
     static uses_processor_config = true;
 
     /**
@@ -17,7 +17,7 @@ export class UltravoxProcessor extends Processor {
     async _call(text, audio = null, kwargs = {}) {
         // TODO: Support batched inputs
         if (Array.isArray(text)) {
-            throw new Error("Batched inputs are not supported yet.");
+            throw new Error('Batched inputs are not supported yet.');
         }
 
         let audio_inputs = {};
@@ -31,8 +31,8 @@ export class UltravoxProcessor extends Processor {
 
             // NOTE: The python version appears to have an off-by-one error.
             const audio_embed_frames = 1 + Math.ceil(nb_encoder_frames / this.config.stack_factor);
-            audio_inputs["audio_token_len"] = [audio_embed_frames];
-            audio_inputs["audio_values"] = input_features;
+            audio_inputs['audio_token_len'] = [audio_embed_frames];
+            audio_inputs['audio_values'] = input_features;
 
             const image_token = this.config.audio_placeholder;
             if (!text.includes(image_token)) {
@@ -49,6 +49,6 @@ export class UltravoxProcessor extends Processor {
         return {
             ...text_inputs,
             ...audio_inputs,
-        }
+        };
     }
 }

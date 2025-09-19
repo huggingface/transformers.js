@@ -1,19 +1,15 @@
 /**
- * @file Helper module for audio processing. 
- * 
- * These functions and classes are only used internally, 
+ * @file Helper module for audio processing.
+ *
+ * These functions and classes are only used internally,
  * meaning an end-user shouldn't need to access anything here.
- * 
+ *
  * @module utils/audio
  */
 
-import {
-    getFile,
-} from './hub.js';
+import { getFile } from './hub.js';
 import { FFT, max } from './maths.js';
-import {
-    calculateReflectOffset, saveBlob,
-} from './core.js';
+import { calculateReflectOffset, saveBlob } from './core.js';
 import { apis } from '../env.js';
 import { Tensor, matmul } from './tensor.js';
 import fs from 'node:fs';
@@ -28,16 +24,16 @@ export async function read_audio(url, sampling_rate) {
     if (typeof AudioContext === 'undefined') {
         // Running in node or an environment without AudioContext
         throw Error(
-            "Unable to load audio from path/URL since `AudioContext` is not available in your environment. " +
-            "Instead, audio data should be passed directly to the pipeline/processor. " +
-            "For more information and some example code, see https://huggingface.co/docs/transformers.js/guides/node-audio-processing."
-        )
+            'Unable to load audio from path/URL since `AudioContext` is not available in your environment. ' +
+                'Instead, audio data should be passed directly to the pipeline/processor. ' +
+                'For more information and some example code, see https://huggingface.co/docs/transformers.js/guides/node-audio-processing.',
+        );
     }
 
     const response = await (await getFile(url)).arrayBuffer();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
     if (typeof sampling_rate === 'undefined') {
-        console.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`)
+        console.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`);
     }
     const decoded = await audioCTX.decodeAudioData(response);
 
@@ -68,9 +64,8 @@ export async function read_audio(url, sampling_rate) {
 
         audio = new Float32Array(left.length);
         for (let i = 0; i < decoded.length; ++i) {
-            audio[i] = SCALING_FACTOR * (left[i] + right[i]) / 2;
+            audio[i] = (SCALING_FACTOR * (left[i] + right[i])) / 2;
         }
-
     } else {
         // If the audio is not stereo, we can just use the first channel:
         audio = decoded.getChannelData(0);
@@ -95,7 +90,7 @@ function generalized_cosine_window(M, a_0) {
     }
 
     const a_1 = 1 - a_0;
-    const factor = 2 * Math.PI / (M - 1);
+    const factor = (2 * Math.PI) / (M - 1);
 
     const cos_vals = new Float64Array(M);
     for (let i = 0; i < M; ++i) {
@@ -115,7 +110,6 @@ export function hanning(M) {
     return generalized_cosine_window(M, 0.5);
 }
 
-
 /**
  * Generates a Hamming window of length M.
  * See https://numpy.org/doc/stable/reference/generated/numpy.hamming.html for more information.
@@ -127,74 +121,73 @@ export function hamming(M) {
     return generalized_cosine_window(M, 0.54);
 }
 
-
 const HERTZ_TO_MEL_MAPPING = {
-    "htk": (/** @type {number} */ freq) => 2595.0 * Math.log10(1.0 + (freq / 700.0)),
-    "kaldi": (/** @type {number} */ freq) => 1127.0 * Math.log(1.0 + (freq / 700.0)),
-    "slaney": (/** @type {number} */ freq, min_log_hertz = 1000.0, min_log_mel = 15.0, logstep = 27.0 / Math.log(6.4)) =>
-        freq >= min_log_hertz
-            ? min_log_mel + Math.log(freq / min_log_hertz) * logstep
-            : 3.0 * freq / 200.0,
-}
+    htk: (/** @type {number} */ freq) => 2595.0 * Math.log10(1.0 + freq / 700.0),
+    kaldi: (/** @type {number} */ freq) => 1127.0 * Math.log(1.0 + freq / 700.0),
+    slaney: (/** @type {number} */ freq, min_log_hertz = 1000.0, min_log_mel = 15.0, logstep = 27.0 / Math.log(6.4)) =>
+        freq >= min_log_hertz ? min_log_mel + Math.log(freq / min_log_hertz) * logstep : (3.0 * freq) / 200.0,
+};
 
 /**
- * @template {Float32Array|Float64Array|number} T 
- * @param {T} freq 
+ * @template {Float32Array|Float64Array|number} T
+ * @param {T} freq
  * @param {string} [mel_scale]
  * @returns {T}
  */
-function hertz_to_mel(freq, mel_scale = "htk") {
+function hertz_to_mel(freq, mel_scale = 'htk') {
     const fn = HERTZ_TO_MEL_MAPPING[mel_scale];
     if (!fn) {
         throw new Error('mel_scale should be one of "htk", "slaney" or "kaldi".');
     }
 
     // @ts-expect-error ts(2322)
-    return typeof freq === 'number' ? fn(freq) : freq.map(x => fn(x));
+    return typeof freq === 'number' ? fn(freq) : freq.map((x) => fn(x));
 }
 
 const MEL_TO_HERTZ_MAPPING = {
-    "htk": (/** @type {number} */ mels) => 700.0 * (10.0 ** (mels / 2595.0) - 1.0),
-    "kaldi": (/** @type {number} */ mels) => 700.0 * (Math.exp(mels / 1127.0) - 1.0),
-    "slaney": (/** @type {number} */ mels, min_log_hertz = 1000.0, min_log_mel = 15.0, logstep = Math.log(6.4) / 27.0) => mels >= min_log_mel
-        ? min_log_hertz * Math.exp(logstep * (mels - min_log_mel))
-        : 200.0 * mels / 3.0,
-}
+    htk: (/** @type {number} */ mels) => 700.0 * (10.0 ** (mels / 2595.0) - 1.0),
+    kaldi: (/** @type {number} */ mels) => 700.0 * (Math.exp(mels / 1127.0) - 1.0),
+    slaney: (/** @type {number} */ mels, min_log_hertz = 1000.0, min_log_mel = 15.0, logstep = Math.log(6.4) / 27.0) =>
+        mels >= min_log_mel ? min_log_hertz * Math.exp(logstep * (mels - min_log_mel)) : (200.0 * mels) / 3.0,
+};
 
 /**
- * @template {Float32Array|Float64Array|number} T 
- * @param {T} mels 
+ * @template {Float32Array|Float64Array|number} T
+ * @param {T} mels
  * @param {string} [mel_scale]
  * @returns {T}
  */
-function mel_to_hertz(mels, mel_scale = "htk") {
+function mel_to_hertz(mels, mel_scale = 'htk') {
     const fn = MEL_TO_HERTZ_MAPPING[mel_scale];
     if (!fn) {
         throw new Error('mel_scale should be one of "htk", "slaney" or "kaldi".');
     }
 
     // @ts-expect-error ts(2322)
-    return typeof mels === 'number' ? fn(mels) : mels.map(x => fn(x));
+    return typeof mels === 'number' ? fn(mels) : mels.map((x) => fn(x));
 }
 
 /**
-* Creates a triangular filter bank.
-*
-* Adapted from torchaudio and librosa.
-*
-* @param {Float64Array} fft_freqs Discrete frequencies of the FFT bins in Hz, of shape `(num_frequency_bins,)`.
-* @param {Float64Array} filter_freqs Center frequencies of the triangular filters to create, in Hz, of shape `(num_mel_filters,)`.
-* @returns {number[][]} of shape `(num_frequency_bins, num_mel_filters)`.
-*/
+ * Creates a triangular filter bank.
+ *
+ * Adapted from torchaudio and librosa.
+ *
+ * @param {Float64Array} fft_freqs Discrete frequencies of the FFT bins in Hz, of shape `(num_frequency_bins,)`.
+ * @param {Float64Array} filter_freqs Center frequencies of the triangular filters to create, in Hz, of shape `(num_mel_filters,)`.
+ * @returns {number[][]} of shape `(num_frequency_bins, num_mel_filters)`.
+ */
 function _create_triangular_filter_bank(fft_freqs, filter_freqs) {
     const filter_diff = Float64Array.from(
         { length: filter_freqs.length - 1 },
-        (_, i) => filter_freqs[i + 1] - filter_freqs[i]
+        (_, i) => filter_freqs[i + 1] - filter_freqs[i],
     );
 
-    const slopes = Array.from({
-        length: fft_freqs.length
-    }, () => new Array(filter_freqs.length));
+    const slopes = Array.from(
+        {
+            length: fft_freqs.length,
+        },
+        () => new Array(filter_freqs.length),
+    );
 
     for (let j = 0; j < fft_freqs.length; ++j) {
         const slope = slopes[j];
@@ -206,9 +199,11 @@ function _create_triangular_filter_bank(fft_freqs, filter_freqs) {
     const numFreqs = filter_freqs.length - 2;
     const ret = Array.from({ length: numFreqs }, () => new Array(fft_freqs.length));
 
-    for (let j = 0; j < fft_freqs.length; ++j) { // 201
+    for (let j = 0; j < fft_freqs.length; ++j) {
+        // 201
         const slope = slopes[j];
-        for (let i = 0; i < numFreqs; ++i) { // 80
+        for (let i = 0; i < numFreqs; ++i) {
+            // 80
             const down = -slope[i] / filter_diff[i];
             const up = slope[i + 2] / filter_diff[i + 1];
             ret[i][j] = Math.max(0, Math.min(down, up));
@@ -254,10 +249,10 @@ export function mel_filter_bank(
     max_frequency,
     sampling_rate,
     norm = null,
-    mel_scale = "htk",
+    mel_scale = 'htk',
     triangularize_in_mel_space = false,
 ) {
-    if (norm !== null && norm !== "slaney") {
+    if (norm !== null && norm !== 'slaney') {
         throw new Error('norm must be one of null or "slaney"');
     }
 
@@ -278,7 +273,10 @@ export function mel_filter_bank(
 
     if (triangularize_in_mel_space) {
         const fft_bin_width = sampling_rate / ((num_frequency_bins - 1) * 2);
-        fft_freqs = hertz_to_mel(Float64Array.from({ length: num_frequency_bins }, (_, i) => i * fft_bin_width), mel_scale);
+        fft_freqs = hertz_to_mel(
+            Float64Array.from({ length: num_frequency_bins }, (_, i) => i * fft_bin_width),
+            mel_scale,
+        );
         filter_freqs = mel_freqs;
     } else {
         fft_freqs = linspace(0, Math.floor(sampling_rate / 2), num_frequency_bins);
@@ -286,7 +284,7 @@ export function mel_filter_bank(
 
     const mel_filters = _create_triangular_filter_bank(fft_freqs, filter_freqs);
 
-    if (norm !== null && norm === "slaney") {
+    if (norm !== null && norm === 'slaney') {
         // Slaney-style mel is scaled to be approx constant energy per channel
         for (let i = 0; i < num_mel_filters; ++i) {
             const filter = mel_filters[i];
@@ -301,7 +299,6 @@ export function mel_filter_bank(
     // TODO warn if there is a zero row
 
     return mel_filters;
-
 }
 
 /**
@@ -335,11 +332,11 @@ function padReflect(array, left, right) {
 /**
  * Helper function to compute `amplitude_to_db` and `power_to_db`.
  * @template {Float32Array|Float64Array} T
- * @param {T} spectrogram 
- * @param {number} factor 
- * @param {number} reference 
- * @param {number} min_value 
- * @param {number} db_range 
+ * @param {T} spectrogram
+ * @param {number} factor
+ * @param {number} reference
+ * @param {number} min_value
+ * @param {number} db_range
  * @returns {T}
  */
 function _db_conversion_helper(spectrogram, factor, reference, min_value, db_range) {
@@ -355,7 +352,7 @@ function _db_conversion_helper(spectrogram, factor, reference, min_value, db_ran
 
     const logReference = Math.log10(reference);
     for (let i = 0; i < spectrogram.length; ++i) {
-        spectrogram[i] = factor * Math.log10(Math.max(min_value, spectrogram[i]) - logReference)
+        spectrogram[i] = factor * Math.log10(Math.max(min_value, spectrogram[i]) - logReference);
     }
 
     if (db_range !== null) {
@@ -374,12 +371,12 @@ function _db_conversion_helper(spectrogram, factor, reference, min_value, db_ran
 /**
  * Converts an amplitude spectrogram to the decibel scale. This computes `20 * log10(spectrogram / reference)`,
  * using basic logarithm properties for numerical stability. NOTE: Operates in-place.
- * 
+ *
  * The motivation behind applying the log function on the (mel) spectrogram is that humans do not hear loudness on a
  * linear scale. Generally to double the perceived volume of a sound we need to put 8 times as much energy into it.
  * This means that large variations in energy may not sound all that different if the sound is loud to begin with.
  * This compression operation makes the (mel) spectrogram features match more closely what humans actually hear.
- * 
+ *
  * @template {Float32Array|Float64Array} T
  * @param {T} spectrogram The input amplitude (mel) spectrogram.
  * @param {number} [reference=1.0] Sets the input spectrogram value that corresponds to 0 dB.
@@ -397,14 +394,14 @@ function amplitude_to_db(spectrogram, reference = 1.0, min_value = 1e-5, db_rang
 /**
  * Converts a power spectrogram to the decibel scale. This computes `10 * log10(spectrogram / reference)`,
  * using basic logarithm properties for numerical stability. NOTE: Operates in-place.
- * 
+ *
  * The motivation behind applying the log function on the (mel) spectrogram is that humans do not hear loudness on a
  * linear scale. Generally to double the perceived volume of a sound we need to put 8 times as much energy into it.
  * This means that large variations in energy may not sound all that different if the sound is loud to begin with.
  * This compression operation makes the (mel) spectrogram features match more closely what humans actually hear.
- * 
+ *
  * Based on the implementation of `librosa.power_to_db`.
- * 
+ *
  * @template {Float32Array|Float64Array} T
  * @param {T} spectrogram The input power (mel) spectrogram. Note that a power spectrogram has the amplitudes squared!
  * @param {number} [reference=1.0] Sets the input spectrogram value that corresponds to 0 dB.
@@ -421,7 +418,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
 
 /**
  * Calculates a spectrogram over one waveform using the Short-Time Fourier Transform.
- * 
+ *
  * This function can create the following kinds of spectrograms:
  *   - amplitude spectrogram (`power = 1.0`)
  *   - power spectrogram (`power = 2.0`)
@@ -431,9 +428,9 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  *   - log-mel spectrogram (provide `mel_filters` and `log_mel`)
  *
  * In this implementation, the window is assumed to be zero-padded to have the same size as the analysis frame.
- * A padded window can be obtained from `window_function()`. The FFT input buffer may be larger than the analysis frame, 
+ * A padded window can be obtained from `window_function()`. The FFT input buffer may be larger than the analysis frame,
  * typically the next power of two.
- * 
+ *
  * @param {Float32Array|Float64Array} waveform The input waveform of shape `(length,)`. This must be a single real-valued, mono waveform.
  * @param {Float32Array|Float64Array} window The windowing function to apply of shape `(frame_length,)`, including zero-padding if necessary. The actual window length may be
  * shorter than `frame_length`, but we're assuming the array has already been zero-padded.
@@ -481,7 +478,7 @@ export async function spectrogram(
         fft_length = null,
         power = 1.0,
         center = true,
-        pad_mode = "reflect",
+        pad_mode = 'reflect',
         onesided = true,
         preemphasis = null,
         preemphasis_htk_flavor = true,
@@ -498,14 +495,14 @@ export async function spectrogram(
         max_num_frames = null,
         do_pad = true,
         transpose = false,
-    } = {}
+    } = {},
 ) {
     const window_length = window.length;
     if (fft_length === null) {
         fft_length = frame_length;
     }
     if (frame_length > fft_length) {
-        throw Error(`frame_length (${frame_length}) may not be larger than fft_length (${fft_length})`)
+        throw Error(`frame_length (${frame_length}) may not be larger than fft_length (${fft_length})`);
     }
 
     if (window_length !== frame_length) {
@@ -513,47 +510,47 @@ export async function spectrogram(
     }
 
     if (hop_length <= 0) {
-        throw new Error("hop_length must be greater than zero");
+        throw new Error('hop_length must be greater than zero');
     }
 
     if (power === null && mel_filters !== null) {
         throw new Error(
-            "You have provided `mel_filters` but `power` is `None`. Mel spectrogram computation is not yet supported for complex-valued spectrogram. " +
-            "Specify `power` to fix this issue."
+            'You have provided `mel_filters` but `power` is `None`. Mel spectrogram computation is not yet supported for complex-valued spectrogram. ' +
+                'Specify `power` to fix this issue.',
         );
     }
 
     if (!preemphasis_htk_flavor) {
-        throw new Error(
-            "`preemphasis_htk_flavor=false` is not currently supported."
-        );
+        throw new Error('`preemphasis_htk_flavor=false` is not currently supported.');
     }
 
     if (center) {
         if (pad_mode !== 'reflect') {
-            throw new Error(`pad_mode="${pad_mode}" not implemented yet.`)
+            throw new Error(`pad_mode="${pad_mode}" not implemented yet.`);
         }
         const half_window = Math.floor((fft_length - 1) / 2) + 1;
         waveform = padReflect(waveform, half_window, half_window);
     }
 
     // split waveform into frames of frame_length size
-    let num_frames = Math.floor(1 + Math.floor((waveform.length - frame_length) / hop_length))
+    let num_frames = Math.floor(1 + Math.floor((waveform.length - frame_length) / hop_length));
     if (min_num_frames !== null && num_frames < min_num_frames) {
-        num_frames = min_num_frames
+        num_frames = min_num_frames;
     }
-    const num_frequency_bins = onesided ? Math.floor(fft_length / 2) + 1 : fft_length
+    const num_frequency_bins = onesided ? Math.floor(fft_length / 2) + 1 : fft_length;
 
     let d1 = num_frames;
     let d1Max = num_frames;
 
     // If maximum number of frames is provided, we must either pad or truncate
     if (max_num_frames !== null) {
-        if (max_num_frames > num_frames) { // input is too short, so we pad
+        if (max_num_frames > num_frames) {
+            // input is too short, so we pad
             if (do_pad) {
                 d1Max = max_num_frames;
             }
-        } else { // input is too long, so we truncate
+        } else {
+            // input is too long, so we truncate
             d1Max = d1 = max_num_frames;
         }
     }
@@ -639,7 +636,7 @@ export async function spectrogram(
         mel_spec = mel_spec.transpose(1, 0);
     }
 
-    const mel_spec_data = /** @type {Float32Array} */(mel_spec.data);
+    const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
     for (let i = 0; i < mel_spec_data.length; ++i) {
         mel_spec_data[i] = Math.max(mel_floor, mel_spec_data[i]);
     }
@@ -664,7 +661,7 @@ export async function spectrogram(
                 } else if (power === 2.0) {
                     power_to_db(mel_spec_data, reference, min_value, db_range);
                 } else {
-                    throw new Error(`Cannot use log_mel option '${log_mel}' with power ${power}`)
+                    throw new Error(`Cannot use log_mel option '${log_mel}' with power ${power}`);
                 }
                 break;
             default:
@@ -686,11 +683,7 @@ export async function spectrogram(
  * @param {boolean} [options.center=true] Whether to center the window inside the FFT buffer. Only used when `frame_length` is provided.
  * @returns {Float64Array} The window of shape `(window_length,)` or `(frame_length,)`.
  */
-export function window_function(window_length, name, {
-    periodic = true,
-    frame_length = null,
-    center = true,
-} = {}) {
+export function window_function(window_length, name, { periodic = true, frame_length = null, center = true } = {}) {
     const length = periodic ? window_length + 1 : window_length;
     let window;
     switch (name) {
@@ -705,7 +698,7 @@ export function window_function(window_length, name, {
             window = hamming(length);
             break;
         case 'povey':
-            window = hanning(length).map(x => Math.pow(x, 0.85));
+            window = hanning(length).map((x) => Math.pow(x, 0.85));
             break;
         default:
             throw new Error(`Unknown window type ${name}.`);
@@ -717,7 +710,9 @@ export function window_function(window_length, name, {
         return window;
     }
     if (window_length > frame_length) {
-        throw new Error(`Length of the window (${window_length}) may not be larger than frame_length (${frame_length})`);
+        throw new Error(
+            `Length of the window (${window_length}) may not be larger than frame_length (${frame_length})`,
+        );
     }
 
     return window;
@@ -726,7 +721,7 @@ export function window_function(window_length, name, {
 /**
  * Encode audio data to a WAV file.
  * WAV file specs : https://en.wikipedia.org/wiki/WAV#WAV_File_header
- * 
+ *
  * Adapted from https://www.npmjs.com/package/audiobuffer-to-wav
  * @param {Float32Array} samples The audio samples.
  * @param {number} rate The sample rate.
@@ -738,13 +733,13 @@ function encodeWAV(samples, rate) {
     const view = new DataView(buffer);
 
     /* RIFF identifier */
-    writeString(view, 0, "RIFF");
+    writeString(view, 0, 'RIFF');
     /* RIFF chunk length */
     view.setUint32(4, 36 + samples.length * 4, true);
     /* RIFF type */
-    writeString(view, 8, "WAVE");
+    writeString(view, 8, 'WAVE');
     /* format chunk identifier */
-    writeString(view, 12, "fmt ");
+    writeString(view, 12, 'fmt ');
     /* format chunk length */
     view.setUint32(16, 16, true);
     /* sample format (raw) */
@@ -760,7 +755,7 @@ function encodeWAV(samples, rate) {
     /* bits per sample */
     view.setUint16(34, 32, true);
     /* data chunk identifier */
-    writeString(view, 36, "data");
+    writeString(view, 36, 'data');
     /* data chunk length */
     view.setUint32(40, samples.length * 4, true);
 
@@ -777,17 +772,15 @@ function writeString(view, offset, string) {
     }
 }
 
-
 export class RawAudio {
-
     /**
      * Create a new `RawAudio` object.
      * @param {Float32Array} audio Audio data
      * @param {number} sampling_rate Sampling rate of the audio data
      */
     constructor(audio, sampling_rate) {
-        this.audio = audio
-        this.sampling_rate = sampling_rate
+        this.audio = audio;
+        this.sampling_rate = sampling_rate;
     }
 
     /**
@@ -795,7 +788,7 @@ export class RawAudio {
      * @returns {ArrayBuffer} The WAV file.
      */
     toWav() {
-        return encodeWAV(this.audio, this.sampling_rate)
+        return encodeWAV(this.audio, this.sampling_rate);
     }
 
     /**
@@ -817,18 +810,18 @@ export class RawAudio {
 
         if (apis.IS_BROWSER_ENV) {
             if (apis.IS_WEBWORKER_ENV) {
-                throw new Error('Unable to save a file from a Web Worker.')
+                throw new Error('Unable to save a file from a Web Worker.');
             }
             fn = saveBlob;
         } else if (apis.IS_FS_AVAILABLE) {
             fn = async (/** @type {string} */ path, /** @type {Blob} */ blob) => {
                 let buffer = await blob.arrayBuffer();
                 fs.writeFileSync(path, Buffer.from(buffer));
-            }
+            };
         } else {
-            throw new Error('Unable to save because filesystem is disabled in this environment.')
+            throw new Error('Unable to save because filesystem is disabled in this environment.');
         }
 
-        await fn(path, this.toBlob())
+        await fn(path, this.toBlob());
     }
 }

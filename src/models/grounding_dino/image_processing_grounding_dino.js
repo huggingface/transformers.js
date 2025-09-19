@@ -1,9 +1,5 @@
-
-import { 
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
 import { ones } from '../../utils/tensor.js';
-
 
 /**
  * @typedef {object} GroundingDinoFeatureExtractorResultProps

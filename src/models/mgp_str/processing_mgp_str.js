@@ -1,16 +1,16 @@
-import { Processor } from "../../base/processing_utils.js";
-import { AutoImageProcessor } from "../auto/image_processing_auto.js";
-import { AutoTokenizer } from "../../tokenizers.js";
-import { max, softmax } from "../../utils/maths.js";
+import { Processor } from '../../base/processing_utils.js';
+import { AutoImageProcessor } from '../auto/image_processing_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
+import { max, softmax } from '../../utils/maths.js';
 
 const DECODE_TYPE_MAPPING = {
-    'char': ['char_decode', 1],
-    'bpe': ['bpe_decode', 2],
-    'wp': ['wp_decode', 102],
-}
+    char: ['char_decode', 1],
+    bpe: ['bpe_decode', 2],
+    wp: ['wp_decode', 102],
+};
 export class MgpstrProcessor extends Processor {
-    static tokenizer_class = AutoTokenizer
-    static image_processor_class = AutoImageProcessor
+    static tokenizer_class = AutoTokenizer;
+    static image_processor_class = AutoImageProcessor;
 
     /**
      * @returns {import('../../tokenizers.js').MgpstrTokenizer} The character tokenizer.
@@ -69,9 +69,7 @@ export class MgpstrProcessor extends Processor {
                 ids.push(max_prob_index);
             }
 
-            const confidence_score = scores.length > 0
-                ? scores.reduce((a, b) => a * b, 1)
-                : 0;
+            const confidence_score = scores.length > 0 ? scores.reduce((a, b) => a * b, 1) : 0;
 
             all_ids.push(ids);
             conf_scores.push(confidence_score);
@@ -87,7 +85,7 @@ export class MgpstrProcessor extends Processor {
      * @returns {string[]} The list of char decoded sentences.
      */
     char_decode(sequences) {
-        return this.char_tokenizer.batch_decode(sequences).map(str => str.replaceAll(' ', ''));
+        return this.char_tokenizer.batch_decode(sequences).map((str) => str.replaceAll(' ', ''));
     }
 
     /**
@@ -96,7 +94,7 @@ export class MgpstrProcessor extends Processor {
      * @returns {string[]} The list of BPE decoded sentences.
      */
     bpe_decode(sequences) {
-        return this.bpe_tokenizer.batch_decode(sequences)
+        return this.bpe_tokenizer.batch_decode(sequences);
     }
 
     /**
@@ -105,7 +103,7 @@ export class MgpstrProcessor extends Processor {
      * @returns {string[]} The list of wp decoded sentences.
      */
     wp_decode(sequences) {
-        return this.wp_tokenizer.batch_decode(sequences).map(str => str.replaceAll(' ', ''));
+        return this.wp_tokenizer.batch_decode(sequences).map((str) => str.replaceAll(' ', ''));
     }
 
     /**
@@ -140,15 +138,15 @@ export class MgpstrProcessor extends Processor {
             char_preds,
             bpe_preds,
             wp_preds,
-        }
+        };
     }
     /** @type {typeof Processor.from_pretrained} */
     static async from_pretrained(...args) {
         const base = await super.from_pretrained(...args);
 
         // Load Transformers.js-compatible versions of the BPE and WordPiece tokenizers
-        const bpe_tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2") // openai-community/gpt2
-        const wp_tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased") // google-bert/bert-base-uncased
+        const bpe_tokenizer = await AutoTokenizer.from_pretrained('Xenova/gpt2'); // openai-community/gpt2
+        const wp_tokenizer = await AutoTokenizer.from_pretrained('Xenova/bert-base-uncased'); // google-bert/bert-base-uncased
 
         // Update components
         base.components = {
@@ -156,7 +154,7 @@ export class MgpstrProcessor extends Processor {
             char_tokenizer: base.tokenizer,
             bpe_tokenizer: bpe_tokenizer,
             wp_tokenizer: wp_tokenizer,
-        }
+        };
         return base;
     }
 
@@ -164,7 +162,7 @@ export class MgpstrProcessor extends Processor {
         const result = await this.image_processor(images);
 
         if (text) {
-            result.labels = this.tokenizer(text).input_ids
+            result.labels = this.tokenizer(text).input_ids;
         }
 
         return result;

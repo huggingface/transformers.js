@@ -1,14 +1,13 @@
-
-import { Processor } from "../../base/processing_utils.js";
-import { AutoImageProcessor } from "../auto/image_processing_auto.js";
-import { AutoTokenizer } from "../../tokenizers.js";
-import { mergeArrays } from "../../utils/core.js";
-import { Tensor } from "../../utils/tensor.js";
-import { RawImage } from "../../utils/image.js";
+import { Processor } from '../../base/processing_utils.js';
+import { AutoImageProcessor } from '../auto/image_processing_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
+import { mergeArrays } from '../../utils/core.js';
+import { Tensor } from '../../utils/tensor.js';
+import { RawImage } from '../../utils/image.js';
 
 export class VLChatProcessor extends Processor {
-    static image_processor_class = AutoImageProcessor
-    static tokenizer_class = AutoTokenizer
+    static image_processor_class = AutoImageProcessor;
+    static tokenizer_class = AutoTokenizer;
     static uses_processor_config = true;
 
     constructor(config, components, chat_template) {
@@ -41,16 +40,13 @@ export class VLChatProcessor extends Processor {
      * @param {string} [options.chat_template="default"] The chat template to use.
      * @returns {Promise<VLCChatProcessorResult | VLCChatProcessorResult & import('../../base/image_processors_utils.js').ImageProcessorResult>} The processed input.
      */
-    async _call(conversation, {
-        images = null,
-        chat_template = "default",
-    }={}) {
+    async _call(conversation, { images = null, chat_template = 'default' } = {}) {
         if (!images) {
             images = await Promise.all(
                 conversation
                     .filter((msg) => msg.images)
                     .flatMap((msg) => msg.images)
-                    .map((img) => RawImage.read(img))
+                    .map((img) => RawImage.read(img)),
             );
         } else if (!Array.isArray(images)) {
             images = [images];
@@ -64,18 +60,15 @@ export class VLChatProcessor extends Processor {
         });
 
         const encode = (text) => tokenizer.encode(text, { add_special_tokens: false });
-        const parts = (/** @type {string} */(result))
-            .split(this.image_tag);
+        const parts = /** @type {string} */ (result).split(this.image_tag);
         const num_images = parts.length - 1;
         if (images.length !== num_images) {
-            throw new Error(`Number of images provided (${images.length}) does not match number of "${this.image_tag}" image tags (${num_images})`);
+            throw new Error(
+                `Number of images provided (${images.length}) does not match number of "${this.image_tag}" image tags (${num_images})`,
+            );
         }
 
-        const [
-            image_placeholder_tag_id,
-            image_start_tag_id,
-            image_end_tag_id,
-        ] = tokenizer.model.convert_tokens_to_ids([
+        const [image_placeholder_tag_id, image_start_tag_id, image_end_tag_id] = tokenizer.model.convert_tokens_to_ids([
             this.image_tag,
             this.image_start_tag,
             this.image_end_tag,
@@ -88,13 +81,17 @@ export class VLChatProcessor extends Processor {
             const tokens = encode(parts[i]);
             input_ids = mergeArrays(
                 input_ids,
-                [image_start_tag_id], placeholder_image_tokens, [image_end_tag_id],
+                [image_start_tag_id],
+                placeholder_image_tokens,
+                [image_end_tag_id],
                 tokens,
             );
             const image_mask = new Array(this.num_image_tokens).fill(true);
             images_seq_mask = mergeArrays(
                 images_seq_mask,
-                [false], image_mask, [false],
+                [false],
+                image_mask,
+                [false],
                 new Array(tokens.length).fill(false),
             );
         }
@@ -104,12 +101,12 @@ export class VLChatProcessor extends Processor {
             input_ids: new Tensor('int64', input_ids, dims),
             attention_mask: new Tensor('int64', new Array(input_ids.length).fill(1), dims),
             images_seq_mask: new Tensor('bool', images_seq_mask, dims),
-            images_emb_mask: new Tensor(
-                'bool',
-                new Array(num_images * this.num_image_tokens).fill(true),
-                [1, num_images, this.num_image_tokens],
-            ),
-        }
+            images_emb_mask: new Tensor('bool', new Array(num_images * this.num_image_tokens).fill(true), [
+                1,
+                num_images,
+                this.num_image_tokens,
+            ]),
+        };
 
         if (images && images.length > 0) {
             const image_inputs = await this.image_processor(images);

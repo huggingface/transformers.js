@@ -1,7 +1,6 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 
-
 export class MoonshineFeatureExtractor extends FeatureExtractor {
     /**
      * Asynchronously extracts input values from a given audio using the provided configuration.
@@ -15,10 +14,7 @@ export class MoonshineFeatureExtractor extends FeatureExtractor {
             audio = new Float32Array(audio);
         }
 
-        const shape = [
-            1,            /* batch_size */
-            audio.length, /* num_samples */
-        ];
+        const shape = [1 /* batch_size */, audio.length /* num_samples */];
         return {
             input_values: new Tensor('float32', audio, shape),
         };
