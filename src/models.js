@@ -89,8 +89,6 @@ import {
     MinNewTokensLengthLogitsProcessor,
 
     TemperatureLogitsWarper,
-    TopKLogitsWarper,
-    TopPLogitsWarper,
     ClassifierFreeGuidanceLogitsProcessor,
 } from './generation/logits_process.js';
 
@@ -1311,32 +1309,6 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * This function returns a [`LogitsProcessorList`] list object that contains all relevant [`LogitsWarper`]
-     * instances used for multinomial sampling.
-     * @param {GenerationConfig} generation_config The generation config.
-     * @returns {LogitsProcessorList} generation_config 
-     */
-    _get_logits_warper(generation_config) {
-
-        // instantiate warpers list
-        const warpers = new LogitsProcessorList();
-
-        if (generation_config.temperature !== null && generation_config.temperature !== 1.0) {
-            warpers.push(new TemperatureLogitsWarper(generation_config.temperature));
-        }
-        if (generation_config.top_k !== null && generation_config.top_k !== 0) {
-            // TODO: add min_tokens_to_keep
-            warpers.push(new TopKLogitsWarper(generation_config.top_k));
-        }
-        if (generation_config.top_p !== null && generation_config.top_p < 1.0) {
-            // TODO: add min_tokens_to_keep
-            warpers.push(new TopPLogitsWarper(generation_config.top_p));
-        }
-
-        return warpers;
-    }
-
-    /**
      * @param {GenerationConfig} generation_config 
      * @param {number} input_ids_seq_length The starting sequence length for the input ids.
      * @returns {LogitsProcessorList}
@@ -1453,6 +1425,19 @@ export class PreTrainedModel extends Callable {
         // 8. prepare batched CFG externally
         if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
             processors.push(new ClassifierFreeGuidanceLogitsProcessor(generation_config.guidance_scale));
+        }
+
+        if (generation_config.do_sample) {
+            if (generation_config.temperature !== null && generation_config.temperature !== 1.0) {
+                processors.push(new TemperatureLogitsWarper(generation_config.temperature));
+            }
+            // TODO: Add TopPLogitsWarper and TopKLogitsWarper
+            // if (generation_config.top_k !== null && generation_config.top_k !== 0) {
+            //     processors.push(new TopKLogitsWarper(generation_config.top_k));
+            // }
+            // if (generation_config.top_p !== null && generation_config.top_p < 1.0) {
+            //     processors.push(new TopPLogitsWarper(generation_config.top_p));
+            // }
         }
 
         if (logits_processor !== null) {
