@@ -119,6 +119,7 @@ function getNormalizedConfig(config) {
         case 'olmo2':
         case 'mobilellm':
         case 'granite':
+        case 'granitemoehybrid':
         case 'cohere':
         case 'mistral':
         case 'starcoder2':
