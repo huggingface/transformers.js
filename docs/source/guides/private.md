@@ -3,7 +3,7 @@
 
 <Tip>
 
-Due to the possibility of leaking access tokens to users of your website or web application, we only support accessing private/gated models from server-side environments (e.g., Node.js) that have access to the process' environment variables.
+The `env.DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN` field makes the provided token visible to every user of your application. Only use this when the user is explicitly entering their own token. Do not embed your own token with this field and use it at your own risk.
 
 </Tip>
 
@@ -60,4 +60,14 @@ Alternatively, you can set the environment variable directly in your code:
 process.env.HF_TOKEN = 'hf_...';
 
 // ... rest of your code
+```
+
+In browser environments where environment variables are not available, you can set the token at runtime using the `env` object:
+
+```js
+import { env } from '@huggingface/transformers';
+
+// WARNING: This exposes the token to every user.
+// Only use when the user provides their own token.
+env.DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN = 'hf_...';
 ```
