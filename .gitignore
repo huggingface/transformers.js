@@ -4,6 +4,7 @@ node_modules
 .cache
 .DS_STORE
 deno.lock
+.idea
 
 # Do not track build artifacts/generated files
 /dist
