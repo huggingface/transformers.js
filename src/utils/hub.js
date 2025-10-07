@@ -618,7 +618,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     if (
         // Only cache web responses
         // i.e., do not cache FileResponses (prevents duplication)
-        toCacheResponse && cacheKey
+        response.url.startsWith('http') && toCacheResponse && cacheKey
         &&
         // Check again whether request is in cache. If not, we add the response to the cache
         (await cache.match(cacheKey) === undefined)
