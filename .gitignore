@@ -5,6 +5,7 @@ node_modules
 .DS_STORE
 deno.lock
 .idea
+demo
 
 # Do not track build artifacts/generated files
 /dist

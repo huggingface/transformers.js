@@ -13,7 +13,8 @@
     "declaration": true,
     "declarationMap": true,
     "noEmit": false,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "esModuleInterop": true
   },
   "typeAcquisition": {
     "include": ["jest"]

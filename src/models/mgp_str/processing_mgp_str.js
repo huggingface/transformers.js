@@ -110,7 +110,7 @@ export class MgpstrProcessor extends Processor {
 
     /**
      * Convert a list of lists of token ids into a list of strings by calling decode.
-     * @param {import('../../utils/tensor.js').Tensor[]} sequences List of tokenized input ids.
+     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} sequences List of tokenized input ids.
      * @returns {{generated_text: string[], scores: number[], char_preds: string[], bpe_preds: string[], wp_preds: string[]}}
      * Dictionary of all the outputs of the decoded results.
      * - generated_text: The final results after fusion of char, bpe, and wp.
@@ -119,8 +119,7 @@ export class MgpstrProcessor extends Processor {
      * - bpe_preds: The list of BPE decoded sentences.
      * - wp_preds: The list of wp decoded sentences.
      */
-    // @ts-expect-error The type of this method is not compatible with the one
-    // in the base class. It might be a good idea to fix this.
+    // @ts-expect-error The type of this method is not compatible with the one in the base class.
     batch_decode([char_logits, bpe_logits, wp_logits]) {
         const [char_preds, char_scores] = this._decode_helper(char_logits, 'char');
         const [bpe_preds, bpe_scores] = this._decode_helper(bpe_logits, 'bpe');
