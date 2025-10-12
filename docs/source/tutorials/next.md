@@ -29,13 +29,14 @@ npx create-next-app@latest
 
 On installation, you'll see various prompts. For this demo, we'll be selecting those shown below in bold:
 
-<pre>√ What is your project named? ... next
-√ Would you like to use TypeScript? ... <b>No</b> / Yes
-√ Would you like to use ESLint? ... No / <b>Yes</b>
-√ Would you like to use Tailwind CSS? ... No / <b>Yes</b>
-√ Would you like to use `src/` directory? ... No / <b>Yes</b>
-√ Would you like to use App Router? (recommended) ... No / <b>Yes</b>
-√ Would you like to customize the default import alias? ... <b>No</b> / Yes
+<pre>
+<span>√ What is your project named? ... next</span>
+<span>√ Would you like to use TypeScript? ... <span style="color: green;"><b>No</span></b> / Yes</span>
+<span>√ Would you like to use ESLint? ... No / <span style="color: green;"><b>Yes</b></span>
+<span>√ Would you like to use Tailwind CSS? ... No / <span style="color: green;"><b>Yes</b></span></span>
+<span>√ Would you like to use `src/` directory? ... No / <span style="color: green;"><b>Yes</b></span></span>
+<span>√ Would you like to use App Router? (recommended) ... No / <span style="color: green;"><b>Yes</b></span></span>
+</span>√ Would you like to customize the default import alias? ... <span style="color: green;"><b>No</b></span> / Yes</span>
 </pre>
 
 
