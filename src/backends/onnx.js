@@ -38,6 +38,7 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     webgpu: 'webgpu', // WebGPU
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
+    tensorrt: 'tensorrt', // TensorRT
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
