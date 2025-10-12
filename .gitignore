@@ -13,3 +13,4 @@ deno.lock
 
 # Do not track coverage reports
 /coverage
+.DS_Store
