@@ -15,8 +15,8 @@ from onnxruntime.quantization.registry import IntegerOpsRegistry
 from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
 from onnxruntime.quantization.matmul_bnb4_quantizer import MatMulBnb4Quantizer
 
-from . import float16
-from .utils import check_and_save_model
+import float16
+from utils import check_and_save_model
 
 class QuantMode(Enum):
     # F32 = 'fp32'
