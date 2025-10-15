@@ -229,23 +229,22 @@ export async function getFile(urlOrPath) {
         const headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
-        // Check whether we are making a request to the Hugging Face Hub.
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
-            // If an access token is present in the environment variables,
-            // we add it to the request headers.
-            // NOTE: We keep `HF_ACCESS_TOKEN` for backwards compatibility (as a fallback).
-            const token = process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN;
+            const token = env.DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN ?? process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN;
             if (token) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
         return fetch(urlOrPath, { headers });
     } else {
-        // Running in a browser-environment, so we use default headers
-        // NOTE: We do not allow passing authorization headers in the browser,
-        // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
+        const headers = new Headers();
+        const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
+        if (isHFURL && env.DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN) {
+            headers.set('Authorization', `Bearer ${env.DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN}`);
+        }
+        const options = headers.size > 0 ? { headers } : undefined;
+        return fetch(urlOrPath, options);
     }
 }
 
