@@ -1750,6 +1750,7 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
             case 'unispeech':
             case 'unispeech-sat':
             case 'hubert':
+            case 'parakeet_ctc':
                 return this._call_wav2vec2(audio, kwargs)
             case 'moonshine':
                 return this._call_moonshine(audio, kwargs)

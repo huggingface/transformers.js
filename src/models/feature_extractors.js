@@ -5,6 +5,7 @@ export * from './clap/feature_extraction_clap.js';
 export * from './dac/feature_extraction_dac.js';
 export * from './gemma3n/feature_extraction_gemma3n.js';
 export * from './moonshine/feature_extraction_moonshine.js';
+export * from './parakeet/feature_extraction_parakeet.js';
 export * from './pyannote/feature_extraction_pyannote.js';
 export * from './seamless_m4t/feature_extraction_seamless_m4t.js';
 export * from './snac/feature_extraction_snac.js';
