@@ -278,9 +278,14 @@ const BLOOM_SPLIT_CHARS = '.,!?\u2026\u3002\uff0c\u3001\u0964\u06d4\u060c';
 
 // A mapping of regex patterns to their equivalent (but possibly longer) JS-compatible versions.
 const PROBLEMATIC_REGEX_MAP = new Map([
-    // This uses the case insensitive group modifier, which is not supported in JavaScript.
+    // These use the case insensitive group modifier, which is not supported in JavaScript.
     // When parsing the regex, an "Invalid group" error is thrown.
     ["(?i:'s|'t|'re|'ve|'m|'ll|'d)", "(?:'([sS]|[tT]|[rR][eE]|[vV][eE]|[mM]|[lL][lL]|[dD]))"],
+    ["(?i:[sdmt]|ll|ve|re)", "(?:[sS]|[dD]|[mM]|[tT]|[lL][lL]|[vV][eE]|[rR][eE])"],
+
+    // JS doesn't support possessive quantifiers (these are used in recent OpenAI tokenizers).
+    ["[^\\r\\n\\p{L}\\p{N}]?+", "[^\\r\\n\\p{L}\\p{N}]?"],
+    ["[^\\s\\p{L}\\p{N}]++", "[^\\s\\p{L}\\p{N}]+"],
 
     // Used to override the default (invalid) regex of the bloom pretokenizer.
     // For more information, see https://github.com/huggingface/transformers.js/issues/94
