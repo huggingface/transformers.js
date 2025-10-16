@@ -6155,6 +6155,21 @@ export class Wav2Vec2ForAudioFrameClassification extends Wav2Vec2PreTrainedModel
 }
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+// Parakeet models
+export class ParakeetPreTrainedModel extends PreTrainedModel { };
+export class ParakeetForCTC extends ParakeetPreTrainedModel {
+    /**
+     * @param {Object} model_inputs
+     * @param {Tensor} model_inputs.input_values Float values of input raw speech waveform.
+     * @param {Tensor} model_inputs.attention_mask Mask to avoid performing convolution and attention on padding token indices. Mask values selected in [0, 1]
+     */
+    async _call(model_inputs) {
+        return new CausalLMOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
 
 //////////////////////////////////////////////////
 // PyAnnote models
@@ -8140,6 +8155,7 @@ const MODEL_FOR_CTC_MAPPING_NAMES = new Map([
     ['unispeech-sat', ['UniSpeechSatForCTC', UniSpeechSatForCTC]],
     ['wavlm', ['WavLMForCTC', WavLMForCTC]],
     ['hubert', ['HubertForCTC', HubertForCTC]],
+    ['parakeet_ctc', ['ParakeetForCTC', ParakeetForCTC]],
 ]);
 
 const MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES = new Map([

@@ -470,6 +470,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * @param {number} [options.min_num_frames=null] If provided, ensures the number of frames to compute is at least this value.
  * @param {boolean} [options.do_pad=true] If `true`, pads the output spectrogram to have `max_num_frames` frames.
  * @param {boolean} [options.transpose=false] If `true`, the returned spectrogram will have shape `(num_frames, num_frequency_bins/num_mel_filters)`. If `false`, the returned spectrogram will have shape `(num_frequency_bins/num_mel_filters, num_frames)`.
+ * @param {number} [options.mel_offset=0] Offset to add to the mel spectrogram to avoid taking the log of zero.
  * @returns {Promise<Tensor>} Spectrogram of shape `(num_frequency_bins, length)` (regular spectrogram) or shape `(num_mel_filters, length)` (mel spectrogram).
  */
 export async function spectrogram(
@@ -498,6 +499,7 @@ export async function spectrogram(
         max_num_frames = null,
         do_pad = true,
         transpose = false,
+        mel_offset = 0,
     } = {}
 ) {
     const window_length = window.length;
@@ -530,11 +532,23 @@ export async function spectrogram(
     }
 
     if (center) {
-        if (pad_mode !== 'reflect') {
-            throw new Error(`pad_mode="${pad_mode}" not implemented yet.`)
+        switch (pad_mode) {
+            case 'reflect': {
+                const half_window = Math.floor((fft_length - 1) / 2) + 1;
+                waveform = padReflect(waveform, half_window, half_window);
+                break;
+            }
+            case 'constant': {
+                const padding = Math.floor(fft_length / 2);
+                // @ts-expect-error ts(2351)
+                const padded = new waveform.constructor(waveform.length + 2 * padding);
+                padded.set(waveform, padding);
+                waveform = padded;
+                break;
+            }
+            default:
+                throw new Error(`pad_mode="${pad_mode}" not implemented yet.`);
         }
-        const half_window = Math.floor((fft_length - 1) / 2) + 1;
-        waveform = padReflect(waveform, half_window, half_window);
     }
 
     // split waveform into frames of frame_length size
@@ -641,7 +655,7 @@ export async function spectrogram(
 
     const mel_spec_data = /** @type {Float32Array} */(mel_spec.data);
     for (let i = 0; i < mel_spec_data.length; ++i) {
-        mel_spec_data[i] = Math.max(mel_floor, mel_spec_data[i]);
+        mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
     }
 
     if (power !== null && log_mel !== null) {
