@@ -4,7 +4,6 @@ import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio
 import { max } from '../../utils/maths.js';
 
 export class WhisperFeatureExtractor extends FeatureExtractor {
-
     constructor(config) {
         super(config);
 
@@ -15,8 +14,8 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
             0.0, // min_frequency
             8000.0, // max_frequency
             this.config.sampling_rate, // sampling_rate
-            "slaney", // norm
-            "slaney", // mel_scale
+            'slaney', // norm
+            'slaney', // mel_scale
         );
 
         this.window = window_function(this.config.n_fft, 'hann');
@@ -42,12 +41,12 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
                 max_num_frames: Math.min(
                     Math.floor(waveform.length / this.config.hop_length),
                     this.config.nb_max_frames, // 3000
-                )
-            }
-        )
+                ),
+            },
+        );
 
         const data = features.data;
-        const maxValue = max(/** @type {Float32Array} */(data))[0];
+        const maxValue = max(/** @type {Float32Array} */ (data))[0];
 
         for (let i = 0; i < data.length; ++i) {
             data[i] = (Math.max(data[i], maxValue - 8.0) + 4.0) / 4.0;
@@ -61,9 +60,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
      * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
      * @returns {Promise<{ input_features: Tensor }>} A Promise resolving to an object containing the extracted input features as a Tensor.
      */
-    async _call(audio, {
-        max_length = null,
-    } = {}) {
+    async _call(audio, { max_length = null } = {}) {
         validate_audio_inputs(audio, 'WhisperFeatureExtractor');
 
         let waveform;
@@ -71,9 +68,9 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         if (audio.length > length) {
             if (audio.length > this.config.n_samples) {
                 console.warn(
-                    "Attempting to extract features for audio longer than 30 seconds. " +
-                    "If using a pipeline to extract transcript from a long audio clip, " +
-                    "remember to specify `chunk_length_s` and/or `stride_length_s`."
+                    'Attempting to extract features for audio longer than 30 seconds. ' +
+                        'If using a pipeline to extract transcript from a long audio clip, ' +
+                        'remember to specify `chunk_length_s` and/or `stride_length_s`.',
                 );
             }
             waveform = audio.slice(0, length);
@@ -86,7 +83,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         const features = await this._extract_fbank_features(waveform);
 
         return {
-            input_features: features.unsqueeze_(0)
+            input_features: features.unsqueeze_(0),
         };
     }
 }

@@ -1,3 +1,4 @@
+export * from './chatterbox/processing_chatterbox.js';
 export * from './florence2/processing_florence2.js';
 export * from './gemma3n/processing_gemma3n.js';
 export * from './grounding_dino/processing_grounding_dino.js';

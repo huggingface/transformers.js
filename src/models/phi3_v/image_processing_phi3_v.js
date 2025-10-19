@@ -1,7 +1,5 @@
-import {
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
-import { cat, interpolate_4d, slice, stack, Tensor } from "../../utils/tensor.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { cat, interpolate_4d, slice, stack, Tensor } from '../../utils/tensor.js';
 
 const IMAGE_SIZE = 336;
 const SLICE_AXES = [2, 3]; // axes to slice on
@@ -23,13 +21,17 @@ export class Phi3VImageProcessor extends ImageProcessor {
     calc_num_image_tokens_from_image_size(width, height) {
         // @ts-expect-error
         const { num_img_tokens } = this.config;
-        return floor(((floor((height / IMAGE_SIZE)) * floor((width / IMAGE_SIZE)) + 1) * num_img_tokens) + 1 + (floor(height / IMAGE_SIZE) + 1) * sqrt(num_img_tokens));
+        return floor(
+            (floor(height / IMAGE_SIZE) * floor(width / IMAGE_SIZE) + 1) * num_img_tokens +
+                1 +
+                (floor(height / IMAGE_SIZE) + 1) * sqrt(num_img_tokens),
+        );
     }
 
     /** @type {ImageProcessor['get_resize_output_image_size']} */
     get_resize_output_image_size(image, size) {
         const hd_num = this._num_crops;
-        const [width, height] = image.size
+        const [width, height] = image.size;
 
         let ratio = width / height;
         let scale = 1;
@@ -44,9 +46,8 @@ export class Phi3VImageProcessor extends ImageProcessor {
         const new_w = Math.floor(scale * 336);
         const new_h = Math.floor(new_w / ratio);
 
-        return [new_w, new_h]
+        return [new_w, new_h];
     }
-
 
     /** @type {ImageProcessor['pad_image']} */
     pad_image(pixelData, imgDims, padSize, options = {}) {
@@ -59,20 +60,23 @@ export class Phi3VImageProcessor extends ImageProcessor {
 
         // NOTE: Since padding is done after normalization, we need to fill with the normalized values
         const constant_values = [1, 1, 1].map((x, i) => (x - this.image_mean[i]) / this.image_std[i]);
-        return super.pad_image(pixelData, imgDims, { width, height }, {
-            center: true,
-            constant_values,
-            ...options,
-        });
+        return super.pad_image(
+            pixelData,
+            imgDims,
+            { width, height },
+            {
+                center: true,
+                constant_values,
+                ...options,
+            },
+        );
     }
 
-    async _call(images, {
-        num_crops = null,
-    } = {}) {
+    async _call(images, { num_crops = null } = {}) {
         // @ts-expect-error
         this._num_crops = num_crops ??= this.config.num_crops;
         if (num_crops < 4 || sqrt(num_crops) % 1 !== 0) {
-            throw new Error("num_crops must be a square number >= 4");
+            throw new Error('num_crops must be a square number >= 4');
         }
 
         if (!Array.isArray(images)) {
@@ -80,10 +84,10 @@ export class Phi3VImageProcessor extends ImageProcessor {
         }
 
         const num_images = images.length;
-        const imageData = await Promise.all(images.map(x => this.preprocess(x)));
+        const imageData = await Promise.all(images.map((x) => this.preprocess(x)));
 
-        const original_sizes = imageData.map(x => x.original_size);
-        const reshaped_input_sizes = imageData.map(x => x.reshaped_input_size);
+        const original_sizes = imageData.map((x) => x.original_size);
+        const reshaped_input_sizes = imageData.map((x) => x.reshaped_input_size);
 
         // Process each image in batch
         const all_pixel_values = [];
@@ -106,14 +110,16 @@ export class Phi3VImageProcessor extends ImageProcessor {
                 for (let y = 0; y < sqrt_patches; ++y) {
                     for (let x = 0; x < sqrt_patches; ++x) {
                         let start_x, start_y, end_x, end_y;
-                        if (y === sqrt_patches - 1) { // At bottom
+                        if (y === sqrt_patches - 1) {
+                            // At bottom
                             start_y = height - patch_height;
                             end_y = height;
                         } else {
                             start_y = y * patch_height;
                             end_y = (y + 1) * patch_height;
                         }
-                        if (x === sqrt_patches - 1) { // At right
+                        if (x === sqrt_patches - 1) {
+                            // At right
                             start_x = width - patch_width;
                             end_x = width;
                         } else {
@@ -146,16 +152,12 @@ export class Phi3VImageProcessor extends ImageProcessor {
         const pixel_values = stack(all_pixel_values, 0);
 
         // Calculate padded image sizes
-        const sizes = reshaped_input_sizes.map(x => x.map(y => IMAGE_SIZE * ceil(y / IMAGE_SIZE)));
+        const sizes = reshaped_input_sizes.map((x) => x.map((y) => IMAGE_SIZE * ceil(y / IMAGE_SIZE)));
 
-        const image_sizes = new Tensor(
-            'int64',
-            sizes.flat(),
-            [num_images, 2],
-        );
+        const image_sizes = new Tensor('int64', sizes.flat(), [num_images, 2]);
 
-        const num_img_tokens = sizes.map(
-            ([height, width]) => this.calc_num_image_tokens_from_image_size(width, height),
+        const num_img_tokens = sizes.map(([height, width]) =>
+            this.calc_num_image_tokens_from_image_size(width, height),
         );
 
         return { pixel_values, original_sizes, reshaped_input_sizes, image_sizes, num_img_tokens };

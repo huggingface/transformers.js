@@ -1,6 +1,4 @@
-import { 
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
 
 export class DonutImageProcessor extends ImageProcessor {
     pad_image(pixelData, imgDims, padSize, options = {}) {
@@ -16,7 +14,7 @@ export class DonutImageProcessor extends ImageProcessor {
             image_std = new Array(imageChannels).fill(image_mean);
         }
 
-        const constant_values = image_mean.map((x, i) => - x / image_std[i]);
+        const constant_values = image_mean.map((x, i) => -x / image_std[i]);
 
         return super.pad_image(pixelData, imgDims, padSize, {
             center: true,
@@ -28,4 +26,4 @@ export class DonutImageProcessor extends ImageProcessor {
         });
     }
 }
-export class DonutFeatureExtractor extends DonutImageProcessor { }
+export class DonutFeatureExtractor extends DonutImageProcessor {}

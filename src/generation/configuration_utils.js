@@ -1,9 +1,8 @@
-
 /**
  * @module generation/configuration_utils
  */
 
-import { pick } from "../utils/core.js";
+import { pick } from '../utils/core.js';
 
 /**
  * Class that holds a configuration for a generation task.
@@ -378,11 +377,10 @@ export class GenerationConfig {
     generation_kwargs = {};
 
     /**
-     * 
-     * @param {GenerationConfig|import('../configs.js').PretrainedConfig} config 
+     *
+     * @param {GenerationConfig|import('../configs.js').PretrainedConfig} config
      */
     constructor(config) {
         Object.assign(this, pick(config, Object.getOwnPropertyNames(this)));
     }
 }
-

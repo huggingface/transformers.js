@@ -1,6 +1,4 @@
-import { 
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
 
 export class ConvNextImageProcessor extends ImageProcessor {
     constructor(config) {
@@ -10,7 +8,7 @@ export class ConvNextImageProcessor extends ImageProcessor {
          * Percentage of the image to crop. Only has an effect if this.size < 384.
          */
         // @ts-expect-error TS2339
-        this.crop_pct = this.config.crop_pct ?? (224 / 256);
+        this.crop_pct = this.config.crop_pct ?? 224 / 256;
     }
 
     async resize(image) {
@@ -43,4 +41,4 @@ export class ConvNextImageProcessor extends ImageProcessor {
         return image;
     }
 }
-export class ConvNextFeatureExtractor extends ConvNextImageProcessor { }
+export class ConvNextFeatureExtractor extends ConvNextImageProcessor {}

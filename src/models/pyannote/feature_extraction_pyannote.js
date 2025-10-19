@@ -2,7 +2,6 @@ import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extr
 import { Tensor } from '../../utils/tensor.js';
 import { max, softmax } from '../../utils/maths.js';
 
-
 export class PyAnnoteFeatureExtractor extends FeatureExtractor {
     /**
      * Asynchronously extracts features from a given audio using the provided configuration.
@@ -16,11 +15,7 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
             audio = new Float32Array(audio);
         }
 
-        const shape = [
-            1,            /* batch_size */
-            1,            /* num_channels */
-            audio.length, /* num_samples */
-        ];
+        const shape = [1 /* batch_size */, 1 /* num_channels */, audio.length /* num_samples */];
         return {
             input_values: new Tensor('float32', audio, shape),
         };
@@ -32,7 +27,7 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
      * @returns {number} The number of frames in the audio.
      */
     samples_to_frames(samples) {
-        return ((samples - this.config.offset) / this.config.step);
+        return (samples - this.config.offset) / this.config.step;
     }
 
     /**
@@ -42,9 +37,7 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
      * @returns {Array<Array<{ id: number, start: number, end: number, confidence: number }>>} The post-processed speaker diarization results.
      */
     post_process_speaker_diarization(logits, num_samples) {
-        const ratio = (
-            num_samples / this.samples_to_frames(num_samples)
-        ) / this.config.sampling_rate;
+        const ratio = num_samples / this.samples_to_frames(num_samples) / this.config.sampling_rate;
 
         const results = [];
         for (const scores of logits.tolist()) {
@@ -68,18 +61,19 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
                 }
             }
 
-            results.push(accumulated_segments.map(
-                // Convert frame-space to time-space
-                // and compute the confidence
-                ({ id, start, end, score }) => ({
-                    id,
-                    start: start * ratio,
-                    end: end * ratio,
-                    confidence: score / (end - start),
-                })
-            ));
+            results.push(
+                accumulated_segments.map(
+                    // Convert frame-space to time-space
+                    // and compute the confidence
+                    ({ id, start, end, score }) => ({
+                        id,
+                        start: start * ratio,
+                        end: end * ratio,
+                        confidence: score / (end - start),
+                    }),
+                ),
+            );
         }
         return results;
     }
-
 }

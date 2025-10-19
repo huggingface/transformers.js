@@ -1,15 +1,13 @@
-
-import { Processor } from "../../base/processing_utils.js";
-import { AutoImageProcessor } from "../auto/image_processing_auto.js";
-import { AutoTokenizer } from "../../tokenizers.js";
+import { Processor } from '../../base/processing_utils.js';
+import { AutoImageProcessor } from '../auto/image_processing_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
 
 export class JinaCLIPProcessor extends Processor {
-    static tokenizer_class = AutoTokenizer
-    static image_processor_class = AutoImageProcessor
+    static tokenizer_class = AutoTokenizer;
+    static image_processor_class = AutoImageProcessor;
 
-    async _call(text=null, images=null, kwargs = {}) {
-
-        if (!text && !images){
+    async _call(text = null, images = null, kwargs = {}) {
+        if (!text && !images) {
             throw new Error('Either text or images must be provided');
         }
 
@@ -19,6 +17,6 @@ export class JinaCLIPProcessor extends Processor {
         return {
             ...text_inputs,
             ...image_inputs,
-        }
+        };
     }
 }

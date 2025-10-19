@@ -2,9 +2,7 @@ import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extr
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
 
-
 export class WeSpeakerFeatureExtractor extends FeatureExtractor {
-
     constructor(config) {
         super(config);
 
@@ -16,14 +14,14 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
             Math.floor(sampling_rate / 2), // max_frequency
             sampling_rate, // sampling_rate
             null, // norm
-            "kaldi", // mel_scale
+            'kaldi', // mel_scale
             true, // triangularize_in_mel_space
         );
         this.mel_filters = mel_filters;
 
         this.window = window_function(400, 'hamming', {
             periodic: false,
-        })
+        });
         this.min_num_frames = this.config.min_num_frames;
     }
 
@@ -35,7 +33,7 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
     async _extract_fbank_features(waveform) {
         // Kaldi compliance: 16-bit signed integers
         // 32768 == 2 ** 15
-        waveform = waveform.map((/** @type {number} */ x) => x * 32768)
+        waveform = waveform.map((/** @type {number} */ x) => x * 32768);
 
         return spectrogram(
             waveform,
@@ -49,16 +47,15 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
                 preemphasis: 0.97,
                 mel_filters: this.mel_filters,
                 log_mel: 'log',
-                mel_floor: 1.192092955078125e-07,
+                mel_floor: 1.192092955078125e-7,
                 remove_dc_offset: true,
 
                 // Custom
                 transpose: true,
                 min_num_frames: this.min_num_frames,
-            }
-        )
+            },
+        );
     }
-
 
     /**
      * Asynchronously extracts features from a given audio using the provided configuration.
@@ -73,7 +70,7 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
         if (this.config.fbank_centering_span === null) {
             // center features with global average
             const meanData = /** @type {Float32Array} */ (features.mean(1).data);
-            const featuresData = /** @type {Float32Array} */(features.data);
+            const featuresData = /** @type {Float32Array} */ (features.data);
             const [batch_size, num_frames, feature_size] = features.dims;
 
             for (let i = 0; i < batch_size; ++i) {
@@ -89,7 +86,7 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
         }
 
         return {
-            input_features: features
+            input_features: features,
         };
     }
 }

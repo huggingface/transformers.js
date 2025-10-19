@@ -1,4 +1,3 @@
-
 /**
  * @module generation/streamers
  */
@@ -10,7 +9,7 @@ import { apis } from '../env.js';
 export class BaseStreamer {
     /**
      * Function that is called by `.generate()` to push new tokens
-     * @param {bigint[][]} value 
+     * @param {bigint[][]} value
      */
     put(value) {
         throw Error('Not implemented');
@@ -24,16 +23,14 @@ export class BaseStreamer {
     }
 }
 
-const stdout_write = apis.IS_PROCESS_AVAILABLE
-    ? x => process.stdout.write(x)
-    : x => console.log(x);
+const stdout_write = apis.IS_PROCESS_AVAILABLE ? (x) => process.stdout.write(x) : (x) => console.log(x);
 
 /**
  * Simple text streamer that prints the token(s) to stdout as soon as entire words are formed.
  */
 export class TextStreamer extends BaseStreamer {
     /**
-     * 
+     *
      * @param {import('../tokenizers.js').PreTrainedTokenizer} tokenizer
      * @param {Object} options
      * @param {boolean} [options.skip_prompt=false] Whether to skip the prompt tokens
@@ -42,14 +39,17 @@ export class TextStreamer extends BaseStreamer {
      * @param {function(bigint[]): void} [options.token_callback_function=null] Function to call when a new token is generated
      * @param {Object} [options.decode_kwargs={}] Additional keyword arguments to pass to the tokenizer's decode method
      */
-    constructor(tokenizer, {
-        skip_prompt = false,
-        callback_function = null,
-        token_callback_function = null,
-        skip_special_tokens = true,
-        decode_kwargs = {},
-        ...kwargs
-    } = {}) {
+    constructor(
+        tokenizer,
+        {
+            skip_prompt = false,
+            callback_function = null,
+            token_callback_function = null,
+            skip_special_tokens = true,
+            decode_kwargs = {},
+            ...kwargs
+        } = {},
+    ) {
         super();
         this.tokenizer = tokenizer;
         this.skip_prompt = skip_prompt;
@@ -65,7 +65,7 @@ export class TextStreamer extends BaseStreamer {
 
     /**
      * Receives tokens, decodes them, and prints them to stdout as soon as they form entire words.
-     * @param {bigint[][]} value 
+     * @param {bigint[][]} value
      */
     put(value) {
         if (value.length > 1) {
@@ -79,7 +79,7 @@ export class TextStreamer extends BaseStreamer {
         }
 
         const tokens = value[0];
-        this.token_callback_function?.(tokens)
+        this.token_callback_function?.(tokens);
 
         // Add the new token to the cache and decodes the entire thing.
         this.token_cache = mergeArrays(this.token_cache, tokens);
@@ -124,8 +124,8 @@ export class TextStreamer extends BaseStreamer {
 
     /**
      * Prints the new text to stdout. If the stream is ending, also prints a newline.
-     * @param {string} text 
-     * @param {boolean} stream_end 
+     * @param {string} text
+     * @param {boolean} stream_end
      */
     on_finalized_text(text, stream_end) {
         if (text.length > 0) {
@@ -159,17 +159,20 @@ export class WhisperTextStreamer extends TextStreamer {
      * @param {boolean} [options.skip_special_tokens=true] Whether to skip special tokens when decoding
      * @param {Object} [options.decode_kwargs={}] Additional keyword arguments to pass to the tokenizer's decode method
      */
-    constructor(tokenizer, {
-        skip_prompt = false,
-        callback_function = null,
-        token_callback_function = null,
-        on_chunk_start = null,
-        on_chunk_end = null,
-        on_finalize = null,
-        time_precision = 0.02,
-        skip_special_tokens = true,
-        decode_kwargs = {},
-    } = {}) {
+    constructor(
+        tokenizer,
+        {
+            skip_prompt = false,
+            callback_function = null,
+            token_callback_function = null,
+            on_chunk_start = null,
+            on_chunk_end = null,
+            on_finalize = null,
+            time_precision = 0.02,
+            skip_special_tokens = true,
+            decode_kwargs = {},
+        } = {},
+    ) {
         super(tokenizer, {
             skip_prompt,
             skip_special_tokens,
@@ -189,7 +192,7 @@ export class WhisperTextStreamer extends TextStreamer {
     }
 
     /**
-     * @param {bigint[][]} value 
+     * @param {bigint[][]} value
      */
     put(value) {
         if (value.length > 1) {
