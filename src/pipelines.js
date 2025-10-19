@@ -1791,7 +1791,7 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
             for (const item of logits) {
                 predicted_ids.push(max(item.data)[1])
             }
-            const predicted_sentences = this.tokenizer.decode(predicted_ids, { skip_special_tokens: true });
+            const predicted_sentences = this.tokenizer.decode(predicted_ids, { skip_special_tokens: true }).trim();
             toReturn.push({ text: predicted_sentences })
         }
         return single ? toReturn[0] : toReturn;
