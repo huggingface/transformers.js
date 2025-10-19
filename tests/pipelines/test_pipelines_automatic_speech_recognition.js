@@ -114,7 +114,7 @@ export default () => {
           "default",
           async () => {
             const output = await pipe(audios[0], { max_new_tokens });
-            const target = { text: "<unk>K" };
+            const target = { text: "K" };
             expect(output).toEqual(target);
           },
           MAX_TEST_EXECUTION_TIME,
