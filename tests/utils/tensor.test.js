@@ -378,6 +378,56 @@ describe("Tensor operations", () => {
         [3, 4],
       ]);
     });
+
+    it("should return nested arrays for a 3D tensor", () => {
+      const t1 = new Tensor(
+        "float32",
+        [1, 2, 3, 4, 5, 6, 7, 8],
+        [2, 2, 2],
+      );
+      const arr = t1.tolist();
+      compare(arr, [
+        [
+          [1, 2],
+          [3, 4],
+        ],
+        [
+          [5, 6],
+          [7, 8],
+        ],
+      ]);
+    });
+
+    it("should return nested arrays for a 4D tensor", () => {
+      const t1 = new Tensor(
+        "float32",
+        Array.from({ length: 16 }, (_, i) => i + 1),
+        [2, 2, 2, 2],
+      );
+      const arr = t1.tolist();
+      compare(arr, [
+        [
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          [
+            [5, 6],
+            [7, 8],
+          ],
+        ],
+        [
+          [
+            [9, 10],
+            [11, 12],
+          ],
+          [
+            [13, 14],
+            [15, 16],
+          ],
+        ],
+      ]);
+    });
   });
 
   describe("mul", () => {
