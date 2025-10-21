@@ -22,6 +22,7 @@ import { env, apis } from '../env.js';
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web';
+import * as RN from 'react-native';
 
 export { Tensor } from 'onnxruntime-common';
 
@@ -38,6 +39,9 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     webgpu: 'webgpu', // WebGPU
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
+    xnnpack: 'xnnpack', // XNNPACK
+    nnapi: 'nnapi', // NNAPI
+    coreml: 'coreml', // CoreML
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
@@ -60,6 +64,19 @@ if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
 
+} else if (apis.IS_REACT_NATIVE_ENV) {
+    ONNX = ONNX_NODE.default ?? ONNX_NODE;
+
+    if (RN?.Platform?.OS === 'android') {
+        supportedDevices.push('nnapi', 'xnnpack', 'cpu');
+        defaultDevices = ['nnapi', 'cpu'];
+    } else if (RN?.Platform?.OS === 'ios') {
+        supportedDevices.push('coreml', 'xnnpack', 'cpu');
+        defaultDevices = ['coreml', 'cpu'];
+    } else {
+        supportedDevices.push('xnnpack', 'cpu');
+        defaultDevices = ['cpu'];
+    }
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE.default ?? ONNX_NODE;
 

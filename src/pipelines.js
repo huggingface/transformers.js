@@ -75,6 +75,9 @@ import {
     topk,
 } from './utils/tensor.js';
 import { RawImage } from './utils/image.js';
+import {
+    fetchBinary
+} from './utils/hub.js';
 
 
 /**
@@ -2895,7 +2898,7 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
             speaker_embeddings = new Float32Array(
-                await (await fetch(speaker_embeddings)).arrayBuffer()
+                await (await fetchBinary(speaker_embeddings)).arrayBuffer()
             );
         }
 

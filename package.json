@@ -4,20 +4,24 @@
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./src/transformers.js",
   "types": "./types/transformers.d.ts",
+  "react-native": "./dist/transformers.native.mjs",
   "type": "module",
   "exports": {
     "node": {
       "import": {
         "types": "./types/transformers.d.ts",
+        "react-native": "./dist/transformers.native.mjs",
         "default": "./dist/transformers.node.mjs"
       },
       "require": {
         "types": "./types/transformers.d.ts",
+        "react-native": "./dist/transformers.native.cjs",
         "default": "./dist/transformers.node.cjs"
       }
     },
     "default": {
       "types": "./types/transformers.d.ts",
+      "react-native": "./dist/transformers.native.mjs",
       "default": "./dist/transformers.web.js"
     }
   },
@@ -56,7 +60,9 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.5.1",
+    "native-universal-fs": "^0.2.0",
     "onnxruntime-node": "1.21.0",
+    "onnxruntime-react-native": "1.22.0",
     "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
     "sharp": "^0.34.1"
   },
@@ -68,6 +74,7 @@
     "jest": "^30.0.0-alpha.6",
     "jest-environment-node": "^30.0.0-alpha.6",
     "jsdoc-to-markdown": "^9.1.1",
+    "path-browserify": "^1.0.1",
     "prettier": "3.4.2",
     "typescript": "^5.8.2",
     "wavefile": "11.0.0",
