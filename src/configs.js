@@ -179,6 +179,7 @@ function getNormalizedConfig(config) {
 
         // Encoder-decoder models
         case 't5':
+        case 'chronos2':
         case 'mt5':
         case 'longt5':
             mapping['num_decoder_layers'] = 'num_decoder_layers';
