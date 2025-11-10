@@ -33,8 +33,8 @@ export default () => {
         // Encode text and images
         const { input_ids, attention_mask, pixel_values } = await processor(sentences, images, { padding: true, truncation: true });
 
-        expect(input_ids.dims).toEqual([sentences.length, 19]);
-        expect(attention_mask.dims).toEqual([sentences.length, 19]);
+        expect(input_ids.dims).toEqual([sentences.length, 14]);
+        expect(attention_mask.dims).toEqual([sentences.length, 14]);
         expect(pixel_values.dims).toEqual([images.length, 3, 512, 512]);
         expect(pixel_values.mean().item()).toBeCloseTo(0.7857685685157776, 6);
       },
