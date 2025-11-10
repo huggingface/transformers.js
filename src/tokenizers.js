@@ -2287,7 +2287,7 @@ class MetaspacePreTokenizer extends PreTokenizer {
     constructor(config) {
         super();
 
-        this.addPrefixSpace = config.add_prefix_space;
+        this.addPrefixSpace = config.add_prefix_space ?? true;
         this.replacement = config.replacement;
         this.strRep = config.str_rep || this.replacement;
         this.prepend_scheme = config.prepend_scheme ?? 'always';
