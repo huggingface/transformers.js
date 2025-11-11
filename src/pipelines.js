@@ -270,7 +270,7 @@ export class Pipeline extends Callable {
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#text-classification
+ * See [Quickstart models](../good-first-models#text-classification)
  */
 export class TextClassificationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TextClassificationPipelineType} */ (Pipeline)) {
 
@@ -384,7 +384,7 @@ export class TextClassificationPipeline extends (/** @type {new (options: TextPi
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#token-classification
+ * See [Quickstart models](../good-first-models#token-classification)
  */
 export class TokenClassificationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TokenClassificationPipelineType} */ (Pipeline)) {
 
@@ -494,7 +494,7 @@ export class TokenClassificationPipeline extends (/** @type {new (options: TextP
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#question-answering
+ * See [Quickstart models](../good-first-models#question-answering)
  */
 export class QuestionAnsweringPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => QuestionAnsweringPipelineType} */ (Pipeline)) {
 
@@ -647,7 +647,7 @@ export class QuestionAnsweringPipeline extends (/** @type {new (options: TextPip
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#fill-mask
+ * See [Quickstart models](../good-first-models#fill-mask)
  */
 export class FillMaskPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => FillMaskPipelineType} */ (Pipeline)) {
 
@@ -835,7 +835,7 @@ export class Text2TextGenerationPipeline extends (/** @type {new (options: TextP
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#summarization
+ * See [Quickstart models](../good-first-models#summarization)
  */
 export class SummarizationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => SummarizationPipelineType} */ (/** @type {any} */ (Text2TextGenerationPipeline))) {
     /** @type {'summary_text'} */
@@ -910,7 +910,7 @@ export class SummarizationPipeline extends (/** @type {new (options: TextPipelin
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#translation
+ * See [Quickstart models](../good-first-models#translation)
  */
 export class TranslationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TranslationPipelineType} */ (/** @type {any} */ (Text2TextGenerationPipeline))) {
     /** @type {'translation_text'} */
@@ -1000,7 +1000,7 @@ function isChat(x) {
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#text-generation
+ * See [Quickstart models](../good-first-models#text-generation)
  */
 export class TextGenerationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TextGenerationPipelineType} */ (Pipeline)) {
 
@@ -1314,7 +1314,7 @@ export class ZeroShotClassificationPipeline extends (/** @type {new (options: Te
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#feature-extraction
+ * See [Quickstart models](../good-first-models#feature-extraction)
  */
 export class FeatureExtractionPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => FeatureExtractionPipelineType} */ (Pipeline)) {
     /**
@@ -1425,7 +1425,7 @@ export class FeatureExtractionPipeline extends (/** @type {new (options: TextPip
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#image-feature-extraction
+ * See [Quickstart models](../good-first-models#image-feature-extraction)
  */
 export class ImageFeatureExtractionPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageFeatureExtractionPipelineType} */ (Pipeline)) {
     /**
@@ -1516,7 +1516,7 @@ export class ImageFeatureExtractionPipeline extends (/** @type {new (options: Im
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#audio-classification
+ * See [Quickstart models](../good-first-models#audio-classification)
  */
 export class AudioClassificationPipeline extends (/** @type {new (options: AudioPipelineConstructorArgs) => AudioClassificationPipelineType} */ (Pipeline)) {
 
@@ -1760,7 +1760,7 @@ export class ZeroShotAudioClassificationPipeline extends (/** @type {new (option
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#automatic-speech-recognition
+ * See [Quickstart models](../good-first-models#automatic-speech-recognition)
  */
 export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options: TextAudioPipelineConstructorArgs) => AutomaticSpeechRecognitionPipelineType} */ (Pipeline)) {
 
@@ -2095,7 +2095,7 @@ export class ImageToTextPipeline extends (/** @type {new (options: TextImagePipe
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#image-classification
+ * See [Quickstart models](../good-first-models#image-classification)
  */
 export class ImageClassificationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageClassificationPipelineType} */ (Pipeline)) {
 
@@ -2183,7 +2183,7 @@ export class ImageClassificationPipeline extends (/** @type {new (options: Image
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#image-segmentation
+ * See [Quickstart models](../good-first-models#image-segmentation)
  */
 export class ImageSegmentationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageSegmentationPipelineType} */ (Pipeline)) {
     /**
@@ -2525,7 +2525,7 @@ export class ZeroShotImageClassificationPipeline extends (/** @type {new (option
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#object-detection
+ * See [Quickstart models](../good-first-models#object-detection)
  */
 export class ObjectDetectionPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ObjectDetectionPipelineType} */ (Pipeline)) {
 
@@ -2994,7 +2994,7 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#image-to-image
+ * See [Quickstart models](../good-first-models#image-to-image)
  */
 export class ImageToImagePipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageToImagePipelineType} */ (Pipeline)) {
     /**
@@ -3060,7 +3060,7 @@ export class ImageToImagePipeline extends (/** @type {new (options: ImagePipelin
  * ```
  *
  * ### Quickstart models
- * See ../good-first-models#depth-estimation
+ * See [Quickstart models](../good-first-models#depth-estimation)
  */
 export class DepthEstimationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => DepthEstimationPipelineType} */ (Pipeline)) {
     /**
