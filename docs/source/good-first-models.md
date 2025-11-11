@@ -23,31 +23,31 @@ const output = await classifier(url);
 
 ### Recommended Models for First-Time Trials
 
-#### onnx-community/Musical-genres-Classification-Hubert-V1-ONNX
+#### [onnx-community/Musical-genres-Classification-Hubert-V1-ONNX](https://huggingface.co/onnx-community/Musical-genres-Classification-Hubert-V1-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 264.4ms | Inference: 136.5ms | Downloads: 6 | Likes: 2
 
-#### Xenova/ast-finetuned-audioset-10-10-0.4593
+#### [Xenova/ast-finetuned-audioset-10-10-0.4593](https://huggingface.co/Xenova/ast-finetuned-audioset-10-10-0.4593)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 2827.1ms | Inference: 544.1ms | Downloads: 36
 
-#### Xenova/ast-finetuned-speech-commands-v2
+#### [Xenova/ast-finetuned-speech-commands-v2](https://huggingface.co/Xenova/ast-finetuned-speech-commands-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 3254.1ms | Inference: 759.0ms | Downloads: 16 | Likes: 2
 
-#### onnx-community/Speech-Emotion-Classification-ONNX
+#### [onnx-community/Speech-Emotion-Classification-ONNX](https://huggingface.co/onnx-community/Speech-Emotion-Classification-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 3070.4ms | Inference: 574.9ms | Downloads: 10 | Likes: 2
 
-#### Xenova/wav2vec2-base-superb-ks
+#### [Xenova/wav2vec2-base-superb-ks](https://huggingface.co/Xenova/wav2vec2-base-superb-ks)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -67,35 +67,35 @@ const output = await transcriber(url);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/whisper-tiny.en
+#### [Xenova/whisper-tiny.en](https://huggingface.co/Xenova/whisper-tiny.en)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1045.6ms | Inference: 1314.3ms | Downloads: 40.4k | Likes: 19
+**Metrics:** Load: 1045.6ms | Inference: 1314.3ms | Downloads: 40.6k | Likes: 19
 
-#### Xenova/whisper-tiny
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 1037.2ms | Inference: 1258.4ms | Downloads: 25.0k | Likes: 10
-
-#### onnx-community/moonshine-base-ONNX
+#### [Xenova/whisper-tiny](https://huggingface.co/Xenova/whisper-tiny)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1906.3ms | Inference: 889.1ms | Downloads: 10.7k | Likes: 30
+**Metrics:** Load: 1037.2ms | Inference: 1258.4ms | Downloads: 25.7k | Likes: 10
 
-#### onnx-community/whisper-base
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 1885.8ms | Inference: 878.9ms | Downloads: 15.8k | Likes: 22
-
-#### Xenova/whisper-base.en
+#### [onnx-community/moonshine-base-ONNX](https://huggingface.co/onnx-community/moonshine-base-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1591.3ms | Inference: 1941.5ms | Downloads: 27.9k | Likes: 1
+**Metrics:** Load: 1906.3ms | Inference: 889.1ms | Downloads: 10.9k | Likes: 29
+
+#### [onnx-community/whisper-base](https://huggingface.co/onnx-community/whisper-base)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 1885.8ms | Inference: 878.9ms | Downloads: 16.0k | Likes: 22
+
+#### [Xenova/whisper-base.en](https://huggingface.co/Xenova/whisper-base.en)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 1591.3ms | Inference: 1941.5ms | Downloads: 28.0k | Likes: 1
 
 ---
 
@@ -111,31 +111,31 @@ const out = await depth_estimator(url);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/depth-anything-small-hf
+#### [Xenova/depth-anything-small-hf](https://huggingface.co/Xenova/depth-anything-small-hf)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 414.3ms | Inference: 419.3ms | Downloads: 3.0k | Likes: 11
+**Metrics:** Load: 414.3ms | Inference: 419.3ms | Downloads: 3.1k | Likes: 11
 
-#### onnx-community/depth-anything-v2-small
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 450.0ms | Inference: 357.1ms | Downloads: 1.2k | Likes: 22
-
-#### onnx-community/metric3d-vit-small
+#### [onnx-community/depth-anything-v2-small](https://huggingface.co/onnx-community/depth-anything-v2-small)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 786.2ms | Inference: 515.7ms | Downloads: 22 | Likes: 2
+**Metrics:** Load: 450.0ms | Inference: 357.1ms | Downloads: 1.3k | Likes: 22
 
-#### Xenova/glpn-nyu
+#### [onnx-community/metric3d-vit-small](https://huggingface.co/onnx-community/metric3d-vit-small)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 786.2ms | Inference: 515.7ms | Downloads: 21 | Likes: 2
+
+#### [Xenova/glpn-nyu](https://huggingface.co/Xenova/glpn-nyu)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 1454.5ms | Inference: 1076.9ms | Downloads: 8
 
-#### Xenova/glpn-kitti
+#### [Xenova/glpn-kitti](https://huggingface.co/Xenova/glpn-kitti)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -154,31 +154,31 @@ const output = await extractor('This is a simple test.');
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/all-MiniLM-L6-v2
+#### [Xenova/all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 373.5ms | Inference: 143.9ms | Downloads: 411.8k | Likes: 89
+**Metrics:** Load: 373.5ms | Inference: 143.9ms | Downloads: 425.1k | Likes: 89
 
-#### Xenova/bge-base-en-v1.5
+#### [Xenova/bge-base-en-v1.5](https://huggingface.co/Xenova/bge-base-en-v1.5)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 3620.8ms | Inference: 816.4ms | Downloads: 1.1M | Likes: 8
 
-#### Xenova/gte-small
+#### [Xenova/gte-small](https://huggingface.co/Xenova/gte-small)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 588.7ms | Inference: 228.4ms | Downloads: 13.0k | Likes: 22
+**Metrics:** Load: 588.7ms | Inference: 228.4ms | Downloads: 13.5k | Likes: 22
 
-#### onnx-community/bert_uncased_L-2_H-128_A-2-ONNX
+#### [onnx-community/bert_uncased_L-2_H-128_A-2-ONNX](https://huggingface.co/onnx-community/bert_uncased_L-2_H-128_A-2-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 110.8ms | Inference: 49.2ms | Downloads: 8
 
-#### Xenova/paraphrase-albert-base-v2
+#### [Xenova/paraphrase-albert-base-v2](https://huggingface.co/Xenova/paraphrase-albert-base-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -197,35 +197,35 @@ const output = await unmasker('The goal of life is [MASK].');
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/distilbert-base-uncased
+#### [Xenova/distilbert-base-uncased](https://huggingface.co/Xenova/distilbert-base-uncased)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 769.8ms | Inference: 302.4ms | Downloads: 684 | Likes: 1
+**Metrics:** Load: 769.8ms | Inference: 302.4ms | Downloads: 702 | Likes: 1
 
-#### Xenova/bert-base-uncased
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 4432.7ms | Inference: 919.4ms | Downloads: 774 | Likes: 1
-
-#### Xenova/albert-base-v2
+#### [Xenova/bert-base-uncased](https://huggingface.co/Xenova/bert-base-uncased)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 324.9ms | Inference: 68.1ms | Downloads: 19 | Likes: 1
+**Metrics:** Load: 4432.7ms | Inference: 919.4ms | Downloads: 814 | Likes: 1
 
-#### Xenova/distilbert-base-cased
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 742.7ms | Inference: 301.1ms | Downloads: 20 | Likes: 1
-
-#### Xenova/albert-large-v2
+#### [Xenova/albert-base-v2](https://huggingface.co/Xenova/albert-base-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 499.6ms | Inference: 78.8ms | Downloads: 14
+**Metrics:** Load: 324.9ms | Inference: 68.1ms | Downloads: 12 | Likes: 1
+
+#### [Xenova/distilbert-base-cased](https://huggingface.co/Xenova/distilbert-base-cased)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 742.7ms | Inference: 301.1ms | Downloads: 15 | Likes: 1
+
+#### [Xenova/albert-large-v2](https://huggingface.co/Xenova/albert-large-v2)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 499.6ms | Inference: 78.8ms | Downloads: 11
 
 ---
 
@@ -241,35 +241,35 @@ const output = await classifier(url);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/vit-base-patch16-224
+#### [Xenova/vit-base-patch16-224](https://huggingface.co/Xenova/vit-base-patch16-224)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 2894.1ms | Inference: 476.3ms | Downloads: 5.1k | Likes: 2
+**Metrics:** Load: 2894.1ms | Inference: 476.3ms | Downloads: 5.3k | Likes: 2
 
-#### Xenova/facial_emotions_image_detection
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 2922.3ms | Inference: 479.3ms | Downloads: 346 | Likes: 6
-
-#### Xenova/resnet-18
+#### [Xenova/facial_emotions_image_detection](https://huggingface.co/Xenova/facial_emotions_image_detection)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 152.1ms | Inference: 90.8ms | Downloads: 23 | Likes: 2
+**Metrics:** Load: 2922.3ms | Inference: 479.3ms | Downloads: 375 | Likes: 6
 
-#### Xenova/resnet-50
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 304.9ms | Inference: 160.5ms | Downloads: 679
-
-#### onnx-community/mobilenet_v2_1.0_224
+#### [Xenova/resnet-18](https://huggingface.co/Xenova/resnet-18)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 90.7ms | Inference: 99.7ms | Downloads: 35 | Likes: 1
+**Metrics:** Load: 152.1ms | Inference: 90.8ms | Downloads: 27 | Likes: 2
+
+#### [Xenova/resnet-50](https://huggingface.co/Xenova/resnet-50)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 304.9ms | Inference: 160.5ms | Downloads: 677
+
+#### [onnx-community/mobilenet_v2_1.0_224](https://huggingface.co/onnx-community/mobilenet_v2_1.0_224)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 90.7ms | Inference: 99.7ms | Downloads: 40 | Likes: 1
 
 ---
 
@@ -285,31 +285,31 @@ const features = await image_feature_extractor(url);
 
 ### Recommended Models for First-Time Trials
 
-#### onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX
+#### [onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX](https://huggingface.co/onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 311.4ms | Inference: 352.4ms | Downloads: 1.4k | Likes: 13
 
-#### Xenova/dino-vits16
+#### [Xenova/dino-vits16](https://huggingface.co/Xenova/dino-vits16)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 321.7ms | Inference: 247.3ms | Downloads: 995
+**Metrics:** Load: 321.7ms | Inference: 247.3ms | Downloads: 1.1k
 
-#### onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX-MHA-scores
+#### [onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX-MHA-scores](https://huggingface.co/onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX-MHA-scores)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 342.8ms | Inference: 259.6ms | Downloads: 474 | Likes: 2
+**Metrics:** Load: 342.8ms | Inference: 259.6ms | Downloads: 489 | Likes: 2
 
-#### onnx-community/dinov2-small-ONNX
+#### [onnx-community/dinov2-small-ONNX](https://huggingface.co/onnx-community/dinov2-small-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 311.5ms | Inference: 264.2ms | Downloads: 3 | Likes: 1
 
-#### onnx-community/dinov2-with-registers-small
+#### [onnx-community/dinov2-with-registers-small](https://huggingface.co/onnx-community/dinov2-with-registers-small)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -329,35 +329,35 @@ const output = await segmenter(url);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/segformer-b0-finetuned-ade-512-512
+#### [Xenova/segformer-b0-finetuned-ade-512-512](https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 205.6ms | Inference: 1612.3ms | Downloads: 1.1M | Likes: 1
 
-#### Xenova/modnet
+#### [Xenova/modnet](https://huggingface.co/Xenova/modnet)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 144.6ms | Inference: 286.9ms | Downloads: 7.4k | Likes: 64
+**Metrics:** Load: 144.6ms | Inference: 286.9ms | Downloads: 7.4k | Likes: 65
 
-#### onnx-community/modnet-webnn
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 147.5ms | Inference: 223.2ms | Downloads: 15 | Likes: 4
-
-#### Xenova/segformer_b0_clothes
+#### [onnx-community/modnet-webnn](https://huggingface.co/onnx-community/modnet-webnn)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 203.9ms | Inference: 632.4ms | Downloads: 101 | Likes: 2
+**Metrics:** Load: 147.5ms | Inference: 223.2ms | Downloads: 16 | Likes: 4
 
-#### Xenova/segformer-b0-finetuned-cityscapes-1024-1024
+#### [Xenova/segformer_b0_clothes](https://huggingface.co/Xenova/segformer_b0_clothes)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 200.2ms | Inference: 519.0ms | Downloads: 6
+**Metrics:** Load: 203.9ms | Inference: 632.4ms | Downloads: 114 | Likes: 2
+
+#### [Xenova/segformer-b0-finetuned-cityscapes-1024-1024](https://huggingface.co/Xenova/segformer-b0-finetuned-cityscapes-1024-1024)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 200.2ms | Inference: 519.0ms | Downloads: 7
 
 ---
 
@@ -373,17 +373,17 @@ const output = await processor(url);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/2x_APISR_RRDB_GAN_generator-onnx
+#### [Xenova/2x_APISR_RRDB_GAN_generator-onnx](https://huggingface.co/Xenova/2x_APISR_RRDB_GAN_generator-onnx)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 117.5ms | Inference: 596.3ms | Downloads: 19 | Likes: 2
+**Metrics:** Load: 117.5ms | Inference: 596.3ms | Downloads: 18 | Likes: 2
 
-#### Xenova/4x_APISR_GRL_GAN_generator-onnx
+#### [Xenova/4x_APISR_GRL_GAN_generator-onnx](https://huggingface.co/Xenova/4x_APISR_GRL_GAN_generator-onnx)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 2712.5ms | Inference: 3362.6ms | Downloads: 34 | Likes: 14
+**Metrics:** Load: 2712.5ms | Inference: 3362.6ms | Downloads: 36 | Likes: 14
 
 ---
 
@@ -399,35 +399,35 @@ const output = await detector(img, { threshold: 0.9 });
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/detr-resnet-50
+#### [Xenova/detr-resnet-50](https://huggingface.co/Xenova/detr-resnet-50)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 718.2ms | Inference: 625.4ms | Downloads: 13.6k | Likes: 16
+**Metrics:** Load: 718.2ms | Inference: 625.4ms | Downloads: 16.5k | Likes: 16
 
-#### Xenova/yolos-tiny
+#### [Xenova/yolos-tiny](https://huggingface.co/Xenova/yolos-tiny)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 190.1ms | Inference: 904.3ms | Downloads: 815 | Likes: 6
+**Metrics:** Load: 190.1ms | Inference: 904.3ms | Downloads: 792 | Likes: 6
 
-#### onnx-community/rfdetr_base-ONNX
+#### [onnx-community/rfdetr_base-ONNX](https://huggingface.co/onnx-community/rfdetr_base-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 470.4ms | Inference: 420.9ms | Downloads: 5 | Likes: 2
 
-#### Xenova/yolos-small-300
+#### [Xenova/yolos-small-300](https://huggingface.co/Xenova/yolos-small-300)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 400.0ms | Inference: 1776.1ms | Downloads: 614
+**Metrics:** Load: 400.0ms | Inference: 1776.1ms | Downloads: 648
 
-#### onnx-community/rfdetr_medium-ONNX
+#### [onnx-community/rfdetr_medium-ONNX](https://huggingface.co/onnx-community/rfdetr_medium-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 578.1ms | Inference: 486.1ms | Downloads: 10 | Likes: 1
+**Metrics:** Load: 578.1ms | Inference: 486.1ms | Downloads: 5 | Likes: 1
 
 ---
 
@@ -444,31 +444,31 @@ const output = await answerer(question, context);
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/distilbert-base-cased-distilled-squad
+#### [Xenova/distilbert-base-cased-distilled-squad](https://huggingface.co/Xenova/distilbert-base-cased-distilled-squad)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 746.8ms | Inference: 164.3ms | Downloads: 5.7k | Likes: 4
+**Metrics:** Load: 746.8ms | Inference: 164.3ms | Downloads: 5.9k | Likes: 4
 
-#### onnx-community/rubert_tiny_qa_kontur-ONNX
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 411.4ms | Inference: 111.1ms | Downloads: 4
-
-#### Xenova/distilbert-base-uncased-distilled-squad
+#### [onnx-community/rubert_tiny_qa_kontur-ONNX](https://huggingface.co/onnx-community/rubert_tiny_qa_kontur-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 726.1ms | Inference: 204.5ms | Downloads: 886
+**Metrics:** Load: 411.4ms | Inference: 111.1ms | Downloads: 5
 
-#### onnx-community/xlm-roberta-base-squad2-distilled-ONNX
+#### [Xenova/distilbert-base-uncased-distilled-squad](https://huggingface.co/Xenova/distilbert-base-uncased-distilled-squad)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 726.1ms | Inference: 204.5ms | Downloads: 914
+
+#### [onnx-community/xlm-roberta-base-squad2-distilled-ONNX](https://huggingface.co/onnx-community/xlm-roberta-base-squad2-distilled-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 9046.6ms | Inference: 1201.1ms | Downloads: 21.9k
 
-#### onnx-community/mobilebert-uncased-squad-v2-ONNX
+#### [onnx-community/mobilebert-uncased-squad-v2-ONNX](https://huggingface.co/onnx-community/mobilebert-uncased-squad-v2-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -497,35 +497,35 @@ const output = await generator(text, {
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/distilbart-cnn-6-6
+#### [Xenova/distilbart-cnn-6-6](https://huggingface.co/Xenova/distilbart-cnn-6-6)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 9311.4ms | Inference: 2527.9ms | Downloads: 4.1k | Likes: 9
+**Metrics:** Load: 9311.4ms | Inference: 2527.9ms | Downloads: 4.2k | Likes: 9
 
-#### Xenova/distilbart-xsum-12-1
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 8184.2ms | Inference: 1283.7ms | Downloads: 29
-
-#### Xenova/distilbart-xsum-6-6
+#### [Xenova/distilbart-xsum-12-1](https://huggingface.co/Xenova/distilbart-xsum-12-1)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 8895.0ms | Inference: 1519.4ms | Downloads: 31 | Likes: 1
+**Metrics:** Load: 8184.2ms | Inference: 1283.7ms | Downloads: 25
 
-#### Xenova/distilbart-xsum-9-6
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 10079.9ms | Inference: 1730.8ms | Downloads: 26
-
-#### Xenova/distilbart-cnn-12-3
+#### [Xenova/distilbart-xsum-6-6](https://huggingface.co/Xenova/distilbart-xsum-6-6)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 8878.6ms | Inference: 2479.6ms | Downloads: 31
+**Metrics:** Load: 8895.0ms | Inference: 1519.4ms | Downloads: 28 | Likes: 1
+
+#### [Xenova/distilbart-xsum-9-6](https://huggingface.co/Xenova/distilbart-xsum-9-6)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 10079.9ms | Inference: 1730.8ms | Downloads: 24
+
+#### [Xenova/distilbart-cnn-12-3](https://huggingface.co/Xenova/distilbart-cnn-12-3)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 8878.6ms | Inference: 2479.6ms | Downloads: 29
 
 ---
 
@@ -540,35 +540,35 @@ const output = await classifier('I love transformers!');
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/distilbert-base-uncased-finetuned-sst-2-english
+#### [Xenova/distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 662.4ms | Inference: 245.3ms | Downloads: 8.3k | Likes: 11
+**Metrics:** Load: 662.4ms | Inference: 245.3ms | Downloads: 8.4k | Likes: 11
 
-#### Xenova/ms-marco-MiniLM-L-6-v2
+#### [Xenova/ms-marco-MiniLM-L-6-v2](https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 365.1ms | Inference: 146.6ms | Downloads: 7.0k | Likes: 4
+**Metrics:** Load: 365.1ms | Inference: 146.6ms | Downloads: 7.2k | Likes: 4
 
-#### Xenova/ms-marco-TinyBERT-L-2-v2
+#### [Xenova/ms-marco-TinyBERT-L-2-v2](https://huggingface.co/Xenova/ms-marco-TinyBERT-L-2-v2)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 115.1ms | Inference: 56.2ms | Downloads: 1.6k | Likes: 3
 
-#### Xenova/toxic-bert
+#### [Xenova/toxic-bert](https://huggingface.co/Xenova/toxic-bert)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 3789.0ms | Inference: 808.8ms | Downloads: 5.0k | Likes: 6
+**Metrics:** Load: 3789.0ms | Inference: 808.8ms | Downloads: 5.2k | Likes: 6
 
-#### onnx-community/language_detection-ONNX
+#### [onnx-community/language_detection-ONNX](https://huggingface.co/onnx-community/language_detection-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 338.1ms | Inference: 116.0ms | Downloads: 270 | Likes: 4
+**Metrics:** Load: 338.1ms | Inference: 116.0ms | Downloads: 278 | Likes: 4
 
 ---
 
@@ -583,31 +583,31 @@ const output = await generator('Once upon a time, there was', { max_new_tokens: 
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/distilgpt2
+#### [Xenova/distilgpt2](https://huggingface.co/Xenova/distilgpt2)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 3207.5ms | Inference: 469.7ms | Downloads: 7.6k | Likes: 9
+**Metrics:** Load: 3207.5ms | Inference: 469.7ms | Downloads: 7.7k | Likes: 9
 
-#### Xenova/llama2.c-stories15M
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 396.8ms | Inference: 251.4ms | Downloads: 1.7k | Likes: 7
-
-#### onnx-community/ettin-decoder-17m-ONNX
+#### [Xenova/llama2.c-stories15M](https://huggingface.co/Xenova/llama2.c-stories15M)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 328.2ms | Inference: 221.9ms | Downloads: 6 | Likes: 1
+**Metrics:** Load: 396.8ms | Inference: 251.4ms | Downloads: 1.9k | Likes: 7
 
-#### onnx-community/Lamina-extend-ONNX
+#### [onnx-community/ettin-decoder-17m-ONNX](https://huggingface.co/onnx-community/ettin-decoder-17m-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 141.9ms | Inference: 190.0ms | Downloads: 5
+**Metrics:** Load: 328.2ms | Inference: 221.9ms | Downloads: 3 | Likes: 1
 
-#### onnx-community/chess-llama-ONNX
+#### [onnx-community/Lamina-extend-ONNX](https://huggingface.co/onnx-community/Lamina-extend-ONNX)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 141.9ms | Inference: 190.0ms | Downloads: 6
+
+#### [onnx-community/chess-llama-ONNX](https://huggingface.co/onnx-community/chess-llama-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
@@ -626,35 +626,35 @@ const output = await classifier('My name is Sarah and I live in London');
 
 ### Recommended Models for First-Time Trials
 
-#### onnx-community/NeuroBERT-NER-ONNX
+#### [onnx-community/NeuroBERT-NER-ONNX](https://huggingface.co/onnx-community/NeuroBERT-NER-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 170.4ms | Inference: 61.6ms | Downloads: 5 | Likes: 2
+**Metrics:** Load: 170.4ms | Inference: 61.6ms | Downloads: 7 | Likes: 2
 
-#### onnx-community/TinyBERT-finetuned-NER-ONNX
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 261.7ms | Inference: 79.9ms | Downloads: 4 | Likes: 1
-
-#### Xenova/esm2_t6_8M_UR50D_rna_binding_site_predictor
+#### [onnx-community/TinyBERT-finetuned-NER-ONNX](https://huggingface.co/onnx-community/TinyBERT-finetuned-NER-ONNX)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 279.3ms | Inference: 118.6ms | Downloads: 6 | Likes: 1
+**Metrics:** Load: 261.7ms | Inference: 79.9ms | Downloads: 8 | Likes: 1
 
-#### onnx-community/distilbert-NER-ONNX
-
-**WebGPU Compatible:** ✅ Yes
-
-**Metrics:** Load: 682.0ms | Inference: 258.2ms | Downloads: 13 | Likes: 2
-
-#### onnx-community/small-e-czech-finetuned-ner-wikiann-ONNX
+#### [Xenova/esm2_t6_8M_UR50D_rna_binding_site_predictor](https://huggingface.co/Xenova/esm2_t6_8M_UR50D_rna_binding_site_predictor)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 271.3ms | Inference: 193.4ms | Downloads: 5
+**Metrics:** Load: 279.3ms | Inference: 118.6ms | Downloads: 5 | Likes: 1
+
+#### [onnx-community/distilbert-NER-ONNX](https://huggingface.co/onnx-community/distilbert-NER-ONNX)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 682.0ms | Inference: 258.2ms | Downloads: 17 | Likes: 2
+
+#### [onnx-community/small-e-czech-finetuned-ner-wikiann-ONNX](https://huggingface.co/onnx-community/small-e-czech-finetuned-ner-wikiann-ONNX)
+
+**WebGPU Compatible:** ✅ Yes
+
+**Metrics:** Load: 271.3ms | Inference: 193.4ms | Downloads: 6
 
 ---
 
@@ -672,35 +672,35 @@ const output = await translator('Life is like a box of chocolate.', {
 
 ### Recommended Models for First-Time Trials
 
-#### Xenova/opus-mt-en-es
+#### [Xenova/opus-mt-en-es](https://huggingface.co/Xenova/opus-mt-en-es)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1956.5ms | Inference: 617.7ms | Downloads: 1.9k | Likes: 3
+**Metrics:** Load: 1956.5ms | Inference: 617.7ms | Downloads: 2.0k | Likes: 3
 
-#### Xenova/opus-mt-zh-en
+#### [Xenova/opus-mt-zh-en](https://huggingface.co/Xenova/opus-mt-zh-en)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1964.7ms | Inference: 799.0ms | Downloads: 51 | Likes: 4
+**Metrics:** Load: 1964.7ms | Inference: 799.0ms | Downloads: 53 | Likes: 4
 
-#### Xenova/opus-mt-en-zh
+#### [Xenova/opus-mt-en-zh](https://huggingface.co/Xenova/opus-mt-en-zh)
 
 **WebGPU Compatible:** ✅ Yes
 
 **Metrics:** Load: 1830.0ms | Inference: 481.5ms | Downloads: 490 | Likes: 2
 
-#### Xenova/opus-mt-en-fr
+#### [Xenova/opus-mt-en-fr](https://huggingface.co/Xenova/opus-mt-en-fr)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1786.1ms | Inference: 446.7ms | Downloads: 383 | Likes: 2
+**Metrics:** Load: 1786.1ms | Inference: 446.7ms | Downloads: 373 | Likes: 2
 
-#### Xenova/opus-mt-ar-en
+#### [Xenova/opus-mt-ar-en](https://huggingface.co/Xenova/opus-mt-ar-en)
 
 **WebGPU Compatible:** ✅ Yes
 
-**Metrics:** Load: 1756.6ms | Inference: 733.8ms | Downloads: 338 | Likes: 2
+**Metrics:** Load: 1756.6ms | Inference: 733.8ms | Downloads: 326 | Likes: 2
 
 ---
 
