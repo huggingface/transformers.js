@@ -268,6 +268,9 @@ export class Pipeline extends Callable {
  * //   { label: 'severe_toxic', score: 0.005651099607348442 }
  * // ]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#text-classification
  */
 export class TextClassificationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TextClassificationPipelineType} */ (Pipeline)) {
 
@@ -379,6 +382,9 @@ export class TextClassificationPipeline extends (/** @type {new (options: TextPi
  * //   { entity: 'I-LOC', score: 0.9975294470787048, index: 8, word: 'America' }
  * // ]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#token-classification
  */
 export class TokenClassificationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TokenClassificationPipelineType} */ (Pipeline)) {
 
@@ -486,6 +492,9 @@ export class TokenClassificationPipeline extends (/** @type {new (options: TextP
  * //   score: 0.5768911502526741
  * // }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#question-answering
  */
 export class QuestionAnsweringPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => QuestionAnsweringPipelineType} */ (Pipeline)) {
 
@@ -636,6 +645,9 @@ export class QuestionAnsweringPipeline extends (/** @type {new (options: TextPip
  * const output = await unmasker('The Milky Way is a [MASK] galaxy.', { top_k: 1 });
  * // [{ token_str: 'spiral', score: 0.6299987435340881, token: 14061, sequence: 'The Milky Way is a spiral galaxy.' }]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#fill-mask
  */
 export class FillMaskPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => FillMaskPipelineType} */ (Pipeline)) {
 
@@ -821,6 +833,9 @@ export class Text2TextGenerationPipeline extends (/** @type {new (options: TextP
  * });
  * // [{ summary_text: ' The Eiffel Tower is about the same height as an 81-storey building and the tallest structure in Paris. It is the second tallest free-standing structure in France after the Millau Viaduct.' }]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#summarization
  */
 export class SummarizationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => SummarizationPipelineType} */ (/** @type {any} */ (Text2TextGenerationPipeline))) {
     /** @type {'summary_text'} */
@@ -893,6 +908,9 @@ export class SummarizationPipeline extends (/** @type {new (options: TextPipelin
  * });
  * // [{ translation_text: 'Le chef des Nations affirme qu 'il n 'y a military solution in Syria.' }]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#translation
  */
 export class TranslationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TranslationPipelineType} */ (/** @type {any} */ (Text2TextGenerationPipeline))) {
     /** @type {'translation_text'} */
@@ -980,6 +998,9 @@ function isChat(x) {
  * //     '        return fib(n-1) + fib(n-2)\n'
  * // }]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#text-generation
  */
 export class TextGenerationPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => TextGenerationPipelineType} */ (Pipeline)) {
 
@@ -1291,6 +1312,9 @@ export class ZeroShotClassificationPipeline extends (/** @type {new (options: Te
  * //   dims: [1, 48]
  * // }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#feature-extraction
  */
 export class FeatureExtractionPipeline extends (/** @type {new (options: TextPipelineConstructorArgs) => FeatureExtractionPipelineType} */ (Pipeline)) {
     /**
@@ -1399,6 +1423,9 @@ export class FeatureExtractionPipeline extends (/** @type {new (options: TextPip
  * //   size: 512
  * // }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#image-feature-extraction
  */
 export class ImageFeatureExtractionPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageFeatureExtractionPipelineType} */ (Pipeline)) {
     /**
@@ -1487,6 +1514,9 @@ export class ImageFeatureExtractionPipeline extends (/** @type {new (options: Im
  * //   { label: 'Animal', score: 0.08985692262649536 },
  * // ]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#audio-classification
  */
 export class AudioClassificationPipeline extends (/** @type {new (options: AudioPipelineConstructorArgs) => AudioClassificationPipelineType} */ (Pipeline)) {
 
@@ -1728,6 +1758,9 @@ export class ZeroShotAudioClassificationPipeline extends (/** @type {new (option
  * const output = await transcriber(url, { chunk_length_s: 30, stride_length_s: 5 });
  * // { text: " So in college, I was a government major, which means [...] So I'd start off light and I'd bump it up" }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#automatic-speech-recognition
  */
 export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options: TextAudioPipelineConstructorArgs) => AutomaticSpeechRecognitionPipelineType} */ (Pipeline)) {
 
@@ -2060,6 +2093,9 @@ export class ImageToTextPipeline extends (/** @type {new (options: TextImagePipe
  * //   ...
  * // ]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#image-classification
  */
 export class ImageClassificationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageClassificationPipelineType} */ (Pipeline)) {
 
@@ -2145,6 +2181,9 @@ export class ImageClassificationPipeline extends (/** @type {new (options: Image
  * //   { label: 'cat', score: 0.9994316101074219, mask: RawImage { ... } }
  * // ]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#image-segmentation
  */
 export class ImageSegmentationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageSegmentationPipelineType} */ (Pipeline)) {
     /**
@@ -2484,6 +2523,9 @@ export class ZeroShotImageClassificationPipeline extends (/** @type {new (option
  * //   box: { xmin: 331, ymin: 19, xmax: 649, ymax: 371 }
  * // }]
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#object-detection
  */
 export class ObjectDetectionPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ObjectDetectionPipelineType} */ (Pipeline)) {
 
@@ -2950,6 +2992,9 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
  * //   channels: 3
  * // }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#image-to-image
  */
 export class ImageToImagePipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => ImageToImagePipelineType} */ (Pipeline)) {
     /**
@@ -3013,6 +3058,9 @@ export class ImageToImagePipeline extends (/** @type {new (options: ImagePipelin
  * //   }
  * // }
  * ```
+ *
+ * ### Quickstart models
+ * See ../good-first-models#depth-estimation
  */
 export class DepthEstimationPipeline extends (/** @type {new (options: ImagePipelineConstructorArgs) => DepthEstimationPipelineType} */ (Pipeline)) {
     /**
