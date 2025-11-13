@@ -6111,7 +6111,7 @@ export class EdgeTamModel extends EdgeTamPreTrainedModel {
         const { num_feature_levels } = this.config.vision_config;
         const image_embeddings_name = Array.from({ length: num_feature_levels }, (_, i) => `image_embeddings.${i}`);
 
-        if (image_embeddings_name.some(name => !model_inputs[name]) || !model_inputs.image_positional_embeddings) {
+        if (image_embeddings_name.some(name => !model_inputs[name])) {
             // Compute the image embeddings if they are missing
             model_inputs = {
                 ...model_inputs,
