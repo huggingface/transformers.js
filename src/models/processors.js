@@ -13,6 +13,7 @@ export * from './paligemma/processing_paligemma.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './sam/processing_sam.js';
+export * from './sam2/processing_sam2.js';
 export * from './smolvlm/processing_smolvlm.js';
 export * from './speecht5/processing_speecht5.js';
 export * from './ultravox/processing_ultravox.js';

@@ -47,12 +47,12 @@ export class SamImageProcessor extends ImageProcessor {
 
         // Reshape input points
         for (let i = 0; i < input_points.length; ++i) { // batch_size
-            let originalImageSize = original_sizes[i];
-            let reshapedImageSize = reshaped_input_sizes[i];
+            const [originalHeight, originalWidth] = original_sizes[i];
+            const [reshapedHeight, reshapedWidth] = reshaped_input_sizes[i];
 
-            let resizeFactors = [
-                reshapedImageSize[0] / originalImageSize[0],
-                reshapedImageSize[1] / originalImageSize[1]
+            const resizeFactors = [
+                reshapedWidth / originalWidth,
+                reshapedHeight / originalHeight,
             ]
 
             for (let j = 0; j < input_points[i].length; ++j) { // point_batch_size
@@ -170,7 +170,7 @@ export class SamImageProcessor extends ImageProcessor {
 
         const output_masks = [];
 
-        pad_size = pad_size ?? this.pad_size;
+        pad_size = pad_size ?? this.pad_size ?? this.size;
 
         /** @type {[number, number]} */
         const target_image_size = [pad_size.height, pad_size.width];
