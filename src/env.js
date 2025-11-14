@@ -1,24 +1,24 @@
 /**
  * @file Module used to configure Transformers.js.
- * 
+ *
  * **Example:** Disable remote models.
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.allowRemoteModels = false;
  * ```
- * 
+ *
  * **Example:** Set local model path.
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.localModelPath = '/path/to/local/models/';
  * ```
- * 
+ *
  * **Example:** Set cache directory.
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.cacheDir = '/path/to/cache/directory/';
  * ```
- * 
+ *
  * @module env
  */
 
@@ -26,14 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '3.7.6';
-
-// Check if various APIs are available (depends on environment)
-const IS_BROWSER_ENV = typeof window !== "undefined" && typeof window.document !== "undefined";
-const IS_WEBWORKER_ENV = typeof self !== "undefined" && (['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(self.constructor?.name));
-const IS_WEB_CACHE_AVAILABLE = typeof self !== "undefined" && 'caches' in self;
-const IS_WEBGPU_AVAILABLE = typeof navigator !== 'undefined' && 'gpu' in navigator;
-const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+const VERSION = '4.0.0-alpha.0';
 
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
@@ -43,6 +36,45 @@ const IS_PATH_AVAILABLE = !isEmpty(path);
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
 const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
+
+// Check if various APIs are available (depends on environment)
+const IS_BROWSER_ENV = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+const IS_WEBWORKER_ENV =
+    typeof self !== 'undefined' &&
+    ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
+        self.constructor?.name,
+    );
+const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
+const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
+const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+
+/**
+ * Check if the current environment is Safari browser.
+ * Works in both browser and web worker contexts.
+ * @returns {boolean} Whether the current environment is Safari.
+ */
+const isSafari = () => {
+    // Check if we're in a browser environment
+    if (typeof navigator === 'undefined') {
+        return false;
+    }
+
+    const userAgent = navigator.userAgent;
+    const vendor = navigator.vendor || '';
+
+    // Safari has "Apple" in vendor string
+    const isAppleVendor = vendor.indexOf('Apple') > -1;
+
+    // Exclude Chrome on iOS (CriOS), Firefox on iOS (FxiOS),
+    // Edge on iOS (EdgiOS), and other browsers
+    const notOtherBrowser =
+        !userAgent.match(/CriOS|FxiOS|EdgiOS|OPiOS|mercury|brave/i) &&
+        !userAgent.includes('Chrome') &&
+        !userAgent.includes('Android');
+
+    return isAppleVendor && notOtherBrowser;
+};
+const IS_SAFARI = isSafari();
 
 /**
  * A read-only object containing information about the APIs available in the current environment.
@@ -62,6 +94,9 @@ export const apis = Object.freeze({
 
     /** Whether the WebNN API is available */
     IS_WEBNN_AVAILABLE,
+
+    /** Whether we are running in a Safari browser */
+    IS_SAFARI,
 
     /** Whether the Node.js process API is available */
     IS_PROCESS_AVAILABLE,
@@ -86,22 +121,18 @@ if (RUNNING_LOCALLY) {
     const _import_meta_url = Object(import.meta).url;
 
     if (_import_meta_url) {
-        dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))) // ESM
+        dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))); // ESM
     } else if (typeof __dirname !== 'undefined') {
-        dirname__ = path.dirname(__dirname) // CommonJS
+        dirname__ = path.dirname(__dirname); // CommonJS
     }
 }
 
 // Only used for environments with access to file system
-const DEFAULT_CACHE_DIR = RUNNING_LOCALLY
-    ? path.join(dirname__, '/.cache/')
-    : null;
+const DEFAULT_CACHE_DIR = RUNNING_LOCALLY ? path.join(dirname__, '/.cache/') : null;
 
 // Set local model path, based on available APIs
 const DEFAULT_LOCAL_MODEL_PATH = '/models/';
-const localModelPath = RUNNING_LOCALLY
-    ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH)
-    : DEFAULT_LOCAL_MODEL_PATH;
+const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 /**
  * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
@@ -119,9 +150,9 @@ const localModelPath = RUNNING_LOCALLY
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
- * @property {string} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
+ * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
- * @property {Object} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
+ * @property {Object|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
  * If you wish, you may also return a `Promise<string>` from the `match` function if you'd like to use a file path instead of `Promise<Response>`.
  */
@@ -155,8 +186,7 @@ export const env = {
     useCustomCache: false,
     customCache: null,
     //////////////////////////////////////////////////////
-}
-
+};
 
 /**
  * @param {Object} obj

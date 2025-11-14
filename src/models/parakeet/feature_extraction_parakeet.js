@@ -5,7 +5,6 @@ import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio
 const EPSILON = 1e-5;
 
 export class ParakeetFeatureExtractor extends FeatureExtractor {
-
     constructor(config) {
         super(config);
 
@@ -16,8 +15,8 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
             0.0, // min_frequency
             this.config.sampling_rate / 2, // max_frequency
             this.config.sampling_rate, // sampling_rate
-            "slaney", // norm
-            "slaney", // mel_scale
+            'slaney', // norm
+            'slaney', // mel_scale
         );
 
         const window = window_function(this.config.win_length, 'hann', {
@@ -59,8 +58,8 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
                 // Custom
                 transpose: true,
                 mel_offset: 2 ** -24,
-            }
-        )
+            },
+        );
 
         return features;
     }
@@ -76,7 +75,7 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
         const features = await this._extract_fbank_features(audio);
 
         const features_length = Math.floor(
-            (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length
+            (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length,
         );
 
         const features_data = /** @type {Float32Array} */ (features.data);

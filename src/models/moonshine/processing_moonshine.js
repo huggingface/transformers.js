@@ -1,13 +1,13 @@
-import { AutoFeatureExtractor } from "../auto/feature_extraction_auto.js"
-import { AutoTokenizer } from "../../tokenizers.js"
-import { Processor } from "../../base/processing_utils.js"
+import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
+import { Processor } from '../../base/processing_utils.js';
 
 /**
  * Represents a MoonshineProcessor that extracts features from an audio input.
  */
 export class MoonshineProcessor extends Processor {
-    static tokenizer_class = AutoTokenizer
-    static feature_extractor_class = AutoFeatureExtractor
+    static tokenizer_class = AutoTokenizer;
+    static feature_extractor_class = AutoFeatureExtractor;
 
     /**
      * Calls the feature_extractor function with the given audio input.

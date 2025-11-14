@@ -1,7 +1,4 @@
-import { 
-    ImageProcessor,
-    post_process_object_detection,
-} from "../../base/image_processors_utils.js";
+import { ImageProcessor, post_process_object_detection } from '../../base/image_processors_utils.js';
 
 export class OwlViTImageProcessor extends ImageProcessor {
     /** @type {typeof post_process_object_detection} */
@@ -9,4 +6,4 @@ export class OwlViTImageProcessor extends ImageProcessor {
         return post_process_object_detection(...args);
     }
 }
-export class OwlViTFeatureExtractor extends OwlViTImageProcessor { }
+export class OwlViTFeatureExtractor extends OwlViTImageProcessor {}

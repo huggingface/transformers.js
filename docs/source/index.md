@@ -42,13 +42,13 @@ You can refine your search by selecting the task you're interested in (e.g., [te
 
 <include>
 {
-    "path": "../snippets/5_supported-tasks.snippet"
+    "path": "../snippets/4_supported-tasks.snippet"
 }
 </include>
 
 
 <include>
 {
-    "path": "../snippets/6_supported-models.snippet"
+    "path": "../snippets/5_supported-models.snippet"
 }
 </include>
