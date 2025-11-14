@@ -120,6 +120,7 @@ import { apis, env } from './env.js';
 import { WhisperGenerationConfig } from './models/whisper/generation_whisper.js';
 import { whisper_language_to_code } from './models/whisper/common_whisper.js';
 
+
 //////////////////////////////////////////////////
 // Model types: used internally
 const MODEL_TYPES = {
@@ -172,7 +173,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */(
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        device ?? (apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV ? 'cpu' : 'wasm')
     );
 
     const executionProviders = deviceToExecutionProviders(selectedDevice);
@@ -261,7 +262,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         );
     }
 
-    const return_path = apis.IS_NODE_ENV && env.useFSCache;
+    const return_path = apis.IS_NODE_ENV && env.useFSCache || apis.IS_REACT_NATIVE_ENV;
     const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, return_path);
 
     // Handle onnx external data files
