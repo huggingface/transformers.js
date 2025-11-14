@@ -6012,6 +6012,8 @@ export class SamModel extends SamPreTrainedModel {
                 ...model_inputs,
                 ...(await this.get_image_embeddings(model_inputs))
             }
+        } else {
+            model_inputs = { ...model_inputs };
         }
 
         // Set default input labels if they are missing
@@ -6117,6 +6119,8 @@ export class EdgeTamModel extends EdgeTamPreTrainedModel {
                 ...model_inputs,
                 ...(await this.get_image_embeddings(model_inputs))
             }
+        } else {
+            model_inputs = { ...model_inputs };
         }
 
         if (model_inputs.input_points) {
