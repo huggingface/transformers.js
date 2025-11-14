@@ -7,6 +7,8 @@
     title: The pipeline API
   - local: custom_usage
     title: Custom usage
+  - local: good-first-models
+    title: Good-First Models
   title: Get started
 - sections:
   - local: tutorials/vanilla-js
