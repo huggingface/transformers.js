@@ -1006,7 +1006,7 @@ export class ImageProcessor extends Callable {
 
             let image_std = this.image_std;
             if (!Array.isArray(this.image_std)) {
-                image_std = new Array(image.channels).fill(image_mean);
+                image_std = new Array(image.channels).fill(image_std);
             }
 
             if (image_mean.length !== image.channels || image_std.length !== image.channels) {
