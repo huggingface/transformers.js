@@ -39,8 +39,8 @@ const bundleContext = await context({
   outfile: path.join(outdir, "transformers.js"),
   sourcemap: true,
   plugins: [
-    stripNodePrefixPlugin(),
     ignoreModulesPlugin(WEB_IGNORE_MODULES),
+    stripNodePrefixPlugin(),
     postBuildPlugin(outdir, rootDir),
     rebuildPlugin("Bundle"),
   ],
@@ -60,8 +60,8 @@ const webContext = await context({
   sourcemap: true,
   external: ["onnxruntime-common", "onnxruntime-web"],
   plugins: [
-    stripNodePrefixPlugin(),
     ignoreModulesPlugin(WEB_IGNORE_MODULES),
+    stripNodePrefixPlugin(),
     rebuildPlugin("Web"),
   ],
   logOverride: {

@@ -5,7 +5,14 @@
 export const ignoreModulesPlugin = (modules = []) => ({
   name: "ignore-modules",
   setup(build) {
-    const filter = new RegExp(`^(${modules.join("|")})$`);
+    // Escape special regex characters in module names
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedModules = modules.map(escapeRegex);
+
+    // Match both "module" and "node:module" patterns
+    const patterns = escapedModules.flatMap(mod => [mod, `node:${mod}`]);
+    const filter = new RegExp(`^(${patterns.join("|")})$`);
+
     build.onResolve({ filter }, (args) => {
       return { path: args.path, namespace: "ignore-modules" };
     });

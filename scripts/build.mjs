@@ -34,10 +34,12 @@ async function buildTarget({
   const regularFile = `transformers${name}${suffix}`;
   const minFile = `transformers${name}.min${suffix}`;
 
-  const plugins = [stripNodePrefixPlugin()];
+  const plugins = [];
+  // Add ignoreModulesPlugin FIRST so it can catch modules before stripNodePrefixPlugin marks them as external
   if (ignoreModules.length > 0) {
     plugins.push(ignoreModulesPlugin(ignoreModules));
   }
+  plugins.push(stripNodePrefixPlugin());
   if (usePostBuild) {
     plugins.push(postBuildPlugin(outdir, rootDir));
   }
