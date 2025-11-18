@@ -6083,13 +6083,8 @@ export class Sam2ImageSegmentationOutput extends ModelOutput {
     }
 }
 
-export class EdgeTamPreTrainedModel extends PreTrainedModel { }
-
-/**
- * EdgeTAM for generating segmentation masks, given an input image
- * and optional 2D location and bounding boxes.
- */
-export class EdgeTamModel extends EdgeTamPreTrainedModel {
+export class Sam2PreTrainedModel extends PreTrainedModel { }
+export class Sam2Model extends Sam2PreTrainedModel {
 
     /**
      * Compute image embeddings and positional image embeddings, given the pixel values of an image.
@@ -6159,6 +6154,7 @@ export class EdgeTamModel extends EdgeTamPreTrainedModel {
         return new Sam2ImageSegmentationOutput(await super._call(model_inputs));
     }
 }
+export class EdgeTamModel extends Sam2Model { } // NOTE: extends Sam2Model
 //////////////////////////////////////////////////
 
 
@@ -8242,6 +8238,7 @@ const MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_MASK_GENERATION_MAPPING_NAMES = new Map([
     ['sam', ['SamModel', SamModel]],
+    ['sam2', ['Sam2Model', Sam2Model]],
     ['edgetam', ['EdgeTamModel', EdgeTamModel]],
 ]);
 
