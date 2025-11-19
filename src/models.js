@@ -6155,6 +6155,7 @@ export class Sam2Model extends Sam2PreTrainedModel {
     }
 }
 export class EdgeTamModel extends Sam2Model { } // NOTE: extends Sam2Model
+export class Sam3TrackerModel extends Sam2Model { } // NOTE: extends Sam2Model
 //////////////////////////////////////////////////
 
 
@@ -8240,6 +8241,7 @@ const MODEL_FOR_MASK_GENERATION_MAPPING_NAMES = new Map([
     ['sam', ['SamModel', SamModel]],
     ['sam2', ['Sam2Model', Sam2Model]],
     ['edgetam', ['EdgeTamModel', EdgeTamModel]],
+    ['sam3_tracker', ['Sam3TrackerModel', Sam3TrackerModel]],
 ]);
 
 const MODEL_FOR_CTC_MAPPING_NAMES = new Map([
