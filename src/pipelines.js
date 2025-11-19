@@ -2792,8 +2792,9 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
  * @property {Tensor|Float32Array|string|URL} [speaker_embeddings=null] The speaker embeddings (if the model requires it).
- * @property {number} [num_inference_steps=5] The number of denoising steps (if the model supports it).
+ * @property {number} [num_inference_steps] The number of denoising steps (if the model supports it).
  * More denoising steps usually lead to higher quality audio but slower inference.
+ * @property {number} [speed] The speed of the generated audio (if the model supports it).
  *
  * @callback TextToAudioPipelineCallback Generates speech/audio from the inputs.
  * @param {string|string[]} texts The text(s) to generate.
@@ -2813,7 +2814,7 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  * const speaker_embeddings = 'https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/F1.bin';
  * const output = await synthesizer('Hello there, how are you doing?', { speaker_embeddings });
  * // RawAudio {
- * //   audio: Float32Array(101376) [-0.00006606941315112635, -0.00006774164648959413, ...],
+ * //   audio: Float32Array(95232) [-0.000482565927086398, -0.0004853440332226455, ...],
  * //   sampling_rate: 44100
  * // }
  * 
@@ -2870,7 +2871,8 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
     /** @type {TextToAudioPipelineCallback} */
     async _call(text_inputs, {
         speaker_embeddings = null,
-        num_inference_steps = 5,
+        num_inference_steps,
+        speed,
     } = {}) {
 
         // If this.processor is not set, we are using a `AutoModelForTextToWaveform` model
@@ -2879,13 +2881,13 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
         } else if (
             this.model.config.model_type === "supertonic"
         ) {
-            return this._call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps });
+            return this._call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps, speed });
         } else {
             return this._call_text_to_waveform(text_inputs);
         }
     }
 
-    async _call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps }) {
+    async _call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps, speed }) {
         if (!speaker_embeddings) {
             throw new Error("Speaker embeddings must be provided for Supertonic models.");
         }
@@ -2905,6 +2907,7 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
             ...inputs,
             style: speaker_embeddings,
             num_inference_steps,
+            speed,
         });
 
         return new RawAudio(

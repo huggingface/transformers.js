@@ -6882,6 +6882,7 @@ export class SupertonicForConditionalGeneration extends SupertonicPreTrainedMode
 
         // Optional inputs
         num_inference_steps = 5,
+        speed = 1.05,
     }) {
         // @ts-expect-error TS2339
         const { sampling_rate, chunk_compress_factor, base_chunk_size, latent_dim } = this.config;
@@ -6890,6 +6891,7 @@ export class SupertonicForConditionalGeneration extends SupertonicPreTrainedMode
         const { last_hidden_state, durations } = await sessionRun(this.sessions['text_encoder'], {
             input_ids, attention_mask, style,
         });
+        durations.div_(speed); // Apply speed factor to duration
 
         // 2. Latent Denoiser
         const wav_len_max = durations.max().item() * sampling_rate;
