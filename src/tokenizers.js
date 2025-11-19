@@ -1392,6 +1392,8 @@ class PreTokenizer extends Callable {
                 return new DigitsPreTokenizer(config);
             case 'Replace':
                 return new ReplacePreTokenizer(config);
+            case 'FixedLength':
+                return new FixedLengthPreTokenizer(config);
             default:
                 throw new Error(`Unknown PreTokenizer type: ${config.type}`);
         }
@@ -2507,6 +2509,31 @@ class ReplacePreTokenizer extends PreTokenizer {
             return [text];
         }
         return [text.replaceAll(this.pattern, this.config.content)];
+    }
+}
+
+class FixedLengthPreTokenizer extends PreTokenizer {
+    /**
+     * @param {Object} config The configuration options for the pre-tokenizer.
+     * @param {number} config.length The fixed length to split the text into.
+     */
+    constructor(config) {
+        super();
+        this._length = config.length;
+    }
+
+    /**
+     * Pre-tokenizes the input text by splitting it into fixed-length tokens.
+     * @param {string} text The text to be pre-tokenized.
+     * @param {Object} [options] Additional options for the pre-tokenization logic.
+     * @returns {string[]} An array of tokens produced by splitting the input text into fixed-length tokens.
+     */
+    pre_tokenize_text(text, options) {
+        const tokens = [];
+        for (let i = 0; i < text.length; i += this._length) {
+            tokens.push(text.slice(i, i + this._length));
+        }
+        return tokens;
     }
 }
 
