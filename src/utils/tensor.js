@@ -846,7 +846,11 @@ export class Tensor {
             map_fn = Number;
         } else if (!is_source_bigint && is_dest_bigint) {
             // TypeError: Cannot convert [x] to a BigInt
-            map_fn = BigInt;
+            if (['float16', 'float32', 'float64'].includes(this.type)) {
+                map_fn = (x) => BigInt(Math.floor(x));
+            } else {
+                map_fn = BigInt;
+            }
         }
 
         // @ts-ignore
@@ -1521,6 +1525,29 @@ export function rand(size) {
     return new Tensor(
         "float32",
         Float32Array.from({ length }, () => Math.random()),
+        size,
+    )
+}
+
+/**
+ * Returns a tensor filled with random numbers from a normal distribution with mean 0 and variance 1 (also called the standard normal distribution).
+ * @param {number[]} size A sequence of integers defining the shape of the output tensor.
+ * @returns {Tensor} The random tensor.
+ */
+export function randn(size) {
+    const length = size.reduce((a, b) => a * b, 1);
+
+    // Box-Muller transform
+    function boxMullerRandom() {
+        // NOTE: 1 - Math.random() is used to avoid log(0)
+        const u = 1 - Math.random();
+        const v = 1 - Math.random();
+        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+
+    return new Tensor(
+        "float32",
+        Float32Array.from({ length }, () => boxMullerRandom()),
         size,
     )
 }
