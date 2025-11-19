@@ -2807,31 +2807,24 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  * Text-to-audio generation pipeline using any `AutoModelForTextToWaveform` or `AutoModelForTextToSpectrogram`.
  * This pipeline generates an audio file from an input text and optional other conditional inputs.
  *
- * **Example:** Generate audio from text with `Xenova/speecht5_tts`.
+ * **Example:** Generate audio from text with `onnx-community/Supertonic-TTS-ONNX`.
  * ```javascript
- * const synthesizer = await pipeline('text-to-speech', 'Xenova/speecht5_tts', { quantized: false });
- * const speaker_embeddings = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin';
- * const out = await synthesizer('Hello, my dog is cute', { speaker_embeddings });
+ * const synthesizer = await pipeline('text-to-speech', 'onnx-community/Supertonic-TTS-ONNX');
+ * const speaker_embeddings = 'https://huggingface.co/onnx-community/Supertonic-TTS-ONNX/resolve/main/voices/F1.bin';
+ * const output = await synthesizer('Hello there, how are you doing?', { speaker_embeddings });
  * // RawAudio {
- * //   audio: Float32Array(26112) [-0.00005657337896991521, 0.00020583874720614403, ...],
- * //   sampling_rate: 16000
+ * //   audio: Float32Array(101376) [-0.00006606941315112635, -0.00006774164648959413, ...],
+ * //   sampling_rate: 44100
  * // }
- * ```
- *
- * You can then save the audio to a .wav file with the `wavefile` package:
- * ```javascript
- * import wavefile from 'wavefile';
- * import fs from 'fs';
- *
- * const wav = new wavefile.WaveFile();
- * wav.fromScratch(1, out.sampling_rate, '32f', out.audio);
- * fs.writeFileSync('out.wav', wav.toBuffer());
+ * 
+ * // Optional: Save the audio to a .wav file or Blob
+ * await output.save('output.wav'); // You can also use `output.toBlob()` to access the audio as a Blob
  * ```
  *
  * **Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See [here](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for the full list of available languages (1107).
  * ```javascript
  * const synthesizer = await pipeline('text-to-speech', 'Xenova/mms-tts-fra');
- * const out = await synthesizer('Bonjour');
+ * const output = await synthesizer('Bonjour');
  * // RawAudio {
  * //   audio: Float32Array(23808) [-0.00037693005288019776, 0.0003325853613205254, ...],
  * //   sampling_rate: 16000
