@@ -2792,6 +2792,8 @@ export class DocumentQuestionAnsweringPipeline extends (/** @type {new (options:
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
  * @property {Tensor|Float32Array|string|URL} [speaker_embeddings=null] The speaker embeddings (if the model requires it).
+ * @property {number} [num_inference_steps=5] The number of denoising steps (if the model supports it).
+ * More denoising steps usually lead to higher quality audio but slower inference.
  *
  * @callback TextToAudioPipelineCallback Generates speech/audio from the inputs.
  * @param {string|string[]} texts The text(s) to generate.
@@ -2850,18 +2852,72 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
         this.vocoder = options.vocoder ?? null;
     }
 
+    async _prepare_speaker_embeddings(speaker_embeddings) {
+        // Load speaker embeddings as Float32Array from path/URL
+        if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
+            // Load from URL with fetch
+            speaker_embeddings = new Float32Array(
+                await (await fetch(speaker_embeddings)).arrayBuffer()
+            );
+        }
+
+        if (speaker_embeddings instanceof Float32Array) {
+            speaker_embeddings = new Tensor(
+                'float32',
+                speaker_embeddings,
+                [speaker_embeddings.length]
+            )
+        } else if (!(speaker_embeddings instanceof Tensor)) {
+            throw new Error("Speaker embeddings must be a `Tensor`, `Float32Array`, `string`, or `URL`.")
+        }
+
+        return speaker_embeddings;
+    }
 
     /** @type {TextToAudioPipelineCallback} */
     async _call(text_inputs, {
         speaker_embeddings = null,
+        num_inference_steps = 5,
     } = {}) {
 
         // If this.processor is not set, we are using a `AutoModelForTextToWaveform` model
         if (this.processor) {
             return this._call_text_to_spectrogram(text_inputs, { speaker_embeddings });
+        } else if (
+            this.model.config.model_type === "supertonic"
+        ) {
+            return this._call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps });
         } else {
             return this._call_text_to_waveform(text_inputs);
         }
+    }
+
+    async _call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps }) {
+        if (!speaker_embeddings) {
+            throw new Error("Speaker embeddings must be provided for Supertonic models.");
+        }
+        speaker_embeddings = await this._prepare_speaker_embeddings(speaker_embeddings);
+
+        // @ts-expect-error TS2339
+        const { sampling_rate, style_dim } = this.model.config;
+
+        speaker_embeddings = (/** @type {Tensor} */ (speaker_embeddings)).view(1, -1, style_dim);
+        const inputs = this.tokenizer(text_inputs, {
+            padding: true,
+            truncation: true,
+        });
+
+        // @ts-expect-error TS2339
+        const { waveform } = await this.model.generate_speech({
+            ...inputs,
+            style: speaker_embeddings,
+            num_inference_steps,
+        });
+
+        return new RawAudio(
+            waveform.data,
+            sampling_rate,
+        )
     }
 
     async _call_text_to_waveform(text_inputs) {
@@ -2891,32 +2947,16 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
             this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
         }
 
-        // Load speaker embeddings as Float32Array from path/URL
-        if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
-            // Load from URL with fetch
-            speaker_embeddings = new Float32Array(
-                await (await fetch(speaker_embeddings)).arrayBuffer()
-            );
-        }
-
-        if (speaker_embeddings instanceof Float32Array) {
-            speaker_embeddings = new Tensor(
-                'float32',
-                speaker_embeddings,
-                [1, speaker_embeddings.length]
-            )
-        } else if (!(speaker_embeddings instanceof Tensor)) {
-            throw new Error("Speaker embeddings must be a `Tensor`, `Float32Array`, `string`, or `URL`.")
-        }
-
         // Run tokenization
         const { input_ids } = this.tokenizer(text_inputs, {
             padding: true,
             truncation: true,
         });
 
-        // NOTE: At this point, we are guaranteed that `speaker_embeddings` is a `Tensor`
-        // @ts-ignore
+        speaker_embeddings = await this._prepare_speaker_embeddings(speaker_embeddings);
+        speaker_embeddings = speaker_embeddings.view(1, -1);
+
+        // @ts-expect-error TS2339
         const { waveform } = await this.model.generate_speech(input_ids, speaker_embeddings, { vocoder: this.vocoder });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
