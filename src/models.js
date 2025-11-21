@@ -91,6 +91,7 @@ import {
     std_mean,
     Tensor,
     DataTypeMap,
+    randn,
 } from './utils/tensor.js';
 import { RawImage } from './utils/image.js';
 
@@ -118,7 +119,8 @@ const MODEL_TYPES = {
     AudioTextToText: 10,
     AutoEncoder: 11,
     ImageAudioTextToText: 12,
-    Chatterbox: 13,
+    Supertonic: 13,
+    Chatterbox: 14,
 };
 //////////////////////////////////////////////////
 
@@ -1394,8 +1396,15 @@ export class PreTrainedModel extends Callable {
                     options,
                 ),
             ]);
-        } else {
-            // should be MODEL_TYPES.EncoderOnly
+        } else if (modelType === MODEL_TYPES.Supertonic) {
+            info = await Promise.all([
+                constructSessions(pretrained_model_name_or_path, {
+                    text_encoder: 'text_encoder',
+                    latent_denoiser: 'latent_denoiser',
+                    voice_decoder: 'voice_decoder',
+                }, options),
+            ]);
+        } else { // should be MODEL_TYPES.EncoderOnly
             if (modelType !== MODEL_TYPES.EncoderOnly) {
                 const type = modelName ?? config?.model_type;
                 if (type !== 'custom') {
@@ -6211,13 +6220,8 @@ export class Sam2ImageSegmentationOutput extends ModelOutput {
     }
 }
 
-export class EdgeTamPreTrainedModel extends PreTrainedModel { }
-
-/**
- * EdgeTAM for generating segmentation masks, given an input image
- * and optional 2D location and bounding boxes.
- */
-export class EdgeTamModel extends EdgeTamPreTrainedModel {
+export class Sam2PreTrainedModel extends PreTrainedModel { }
+export class Sam2Model extends Sam2PreTrainedModel {
 
     /**
      * Compute image embeddings and positional image embeddings, given the pixel values of an image.
@@ -6287,6 +6291,8 @@ export class EdgeTamModel extends EdgeTamPreTrainedModel {
         return new Sam2ImageSegmentationOutput(await super._call(model_inputs));
     }
 }
+export class EdgeTamModel extends Sam2Model { } // NOTE: extends Sam2Model
+export class Sam3TrackerModel extends Sam2Model { } // NOTE: extends Sam2Model
 //////////////////////////////////////////////////
 
 
@@ -6985,6 +6991,62 @@ export class SpeechT5HifiGan extends PreTrainedModel {
     main_input_name = 'spectrogram';
 }
 //////////////////////////////////////////////////
+
+export class SupertonicPreTrainedModel extends PreTrainedModel { }
+export class SupertonicForConditionalGeneration extends SupertonicPreTrainedModel {
+
+    async generate_speech({
+        // Required inputs
+        input_ids,
+        attention_mask,
+        style,
+
+        // Optional inputs
+        num_inference_steps = 5,
+        speed = 1.05,
+    }) {
+        // @ts-expect-error TS2339
+        const { sampling_rate, chunk_compress_factor, base_chunk_size, latent_dim } = this.config;
+
+        // 1. Text Encoder
+        const { last_hidden_state, durations } = await sessionRun(this.sessions['text_encoder'], {
+            input_ids, attention_mask, style,
+        });
+        durations.div_(speed); // Apply speed factor to duration
+
+        // 2. Latent Denoiser
+        const wav_len_max = durations.max().item() * sampling_rate;
+        const chunk_size = base_chunk_size * chunk_compress_factor;
+        const latent_len = Math.floor((wav_len_max + chunk_size - 1) / chunk_size);
+        const batch_size = input_ids.dims[0];
+        const latent_mask = ones([batch_size, latent_len]);
+        const num_steps = full([batch_size], num_inference_steps);
+
+        let noisy_latents = randn([batch_size, latent_dim * chunk_compress_factor, latent_len]);
+        for (let step = 0; step < num_inference_steps; ++step) {
+            const timestep = full([batch_size], step);
+            ({ denoised_latents: noisy_latents } = await sessionRun(this.sessions['latent_denoiser'], {
+                style,
+                noisy_latents,
+                latent_mask,
+                encoder_outputs: last_hidden_state,
+                attention_mask,
+                timestep,
+                num_inference_steps: num_steps,
+            }));
+        }
+
+        // 3. Voice Decoder
+        const { waveform } = await sessionRun(this.sessions['voice_decoder'], {
+            latents: noisy_latents,
+        });
+        return {
+            waveform,
+            durations,
+        }
+    }
+}
+
 
 //////////////////////////////////////////////////
 // TrOCR models
@@ -8247,6 +8309,7 @@ const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([
 const MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES = new Map([
     ['vits', ['VitsModel', VitsModel]],
     ['musicgen', ['MusicgenForConditionalGeneration', MusicgenForConditionalGeneration]],
+    ['supertonic', ['SupertonicForConditionalGeneration', SupertonicForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
@@ -8488,7 +8551,9 @@ const MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_MASK_GENERATION_MAPPING_NAMES = new Map([
     ['sam', ['SamModel', SamModel]],
+    ['sam2', ['Sam2Model', Sam2Model]],
     ['edgetam', ['EdgeTamModel', EdgeTamModel]],
+    ['sam3_tracker', ['Sam3TrackerModel', Sam3TrackerModel]],
 ]);
 
 const MODEL_FOR_CTC_MAPPING_NAMES = new Map([
@@ -8630,6 +8695,7 @@ const CUSTOM_MAPPING = [
     ['SnacDecoderModel', SnacDecoderModel, MODEL_TYPES.EncoderOnly],
 
     ['Gemma3nForConditionalGeneration', Gemma3nForConditionalGeneration, MODEL_TYPES.ImageAudioTextToText],
+    ['SupertonicForConditionalGeneration', SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ChatterboxModel, MODEL_TYPES.Chatterbox],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
