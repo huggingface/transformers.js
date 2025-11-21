@@ -111,6 +111,7 @@ function getNormalizedConfig(config) {
         case 'llama':
         case 'llama4_text':
         case 'nanochat':
+        case 'apertus':
         case 'arcee':
         case 'lfm2':
         case 'smollm3':
