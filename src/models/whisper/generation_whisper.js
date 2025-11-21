@@ -1,7 +1,6 @@
-import { GenerationConfig } from "../../generation/configuration_utils.js";
+import { GenerationConfig } from '../../generation/configuration_utils.js';
 
 export class WhisperGenerationConfig extends GenerationConfig {
-
     /**
      * Whether to return the timestamps with the text. This enables the `WhisperTimestampsLogitsProcessor`.
      * @type {boolean}

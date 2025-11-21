@@ -1,8 +1,4 @@
-import { 
-    ImageProcessor,
-    post_process_semantic_segmentation,
-} from "../../base/image_processors_utils.js";
-
+import { ImageProcessor, post_process_semantic_segmentation } from '../../base/image_processors_utils.js';
 
 export class SegformerImageProcessor extends ImageProcessor {
     /** @type {typeof post_process_semantic_segmentation} */
@@ -10,4 +6,4 @@ export class SegformerImageProcessor extends ImageProcessor {
         return post_process_semantic_segmentation(...args);
     }
 }
-export class SegformerFeatureExtractor extends SegformerImageProcessor { }
+export class SegformerFeatureExtractor extends SegformerImageProcessor {}

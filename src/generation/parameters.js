@@ -1,10 +1,9 @@
-
 /**
  * @module generation/parameters
  */
 
 /**
- * @typedef {Object} GenerationFunctionParameters
+ * @typedef {Object} GenerationFunctionParametersBase
  * @property {import('../utils/tensor.js').Tensor} [inputs=null] (`Tensor` of varying shape depending on the modality, *optional*):
  * The sequence used as a prompt for the generation or as model inputs to the encoder. If `null` the
  * method initializes it with `bos_token_id` and a batch size of 1. For decoder-only models `inputs`
@@ -31,5 +30,8 @@
  * through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
  * @property {number[]} [decoder_input_ids=null] (`number[]`, *optional*):
  * If the model is an encoder-decoder model, this argument is used to pass the `decoder_input_ids`.
- * @param {any} [kwargs] (`Dict[str, any]`, *optional*):
+ */
+
+/**
+ * @typedef {GenerationFunctionParametersBase & Partial<import('./configuration_utils.js').GenerationConfig> & Record<string, any>} GenerationFunctionParameters
  */

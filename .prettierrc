@@ -1,10 +1,19 @@
 {
-    "overrides": [
-        {
-            "files": ["tests/**/*.js"],
-            "options": {
-              "printWidth": 10000000
-            }
-        }
-    ]
+  "overrides": [
+    {
+      "files": ["src/**/*.{js,mjs,cjs}"],
+      "options": {
+        "singleQuote": true,
+        "tabWidth": 4,
+        "printWidth": 120
+      }
+    },
+    {
+      "files": ["tests/**/*.{js,mjs,cjs}"],
+      "options": {
+        "tabWidth": 2,
+        "printWidth": 10000000
+      }
+    }
+  ]
 }

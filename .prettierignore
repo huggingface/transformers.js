@@ -2,7 +2,6 @@
 .github
 dist
 docs
-examples
 scripts
 types
 *.md
