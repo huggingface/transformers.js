@@ -147,6 +147,7 @@ function getNormalizedConfig(config) {
         case 'helium':
         case 'ernie4_5':
         case 'ministral':
+        case 'ministral3':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'head_dim';
