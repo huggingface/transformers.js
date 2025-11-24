@@ -75,6 +75,7 @@ function getNormalizedConfig(config) {
         case 'voxtral':
         case 'smolvlm':
         case 'gemma3n':
+        case 'mistral3':
             // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;
@@ -145,6 +146,7 @@ function getNormalizedConfig(config) {
         case 'glm':
         case 'helium':
         case 'ernie4_5':
+        case 'ministral':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'head_dim';

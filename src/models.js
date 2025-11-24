@@ -3866,6 +3866,8 @@ export class LlavaQwen2ForCausalLM extends LlavaPreTrainedModel {
     }
 }
 
+export class Mistral3ForConditionalGeneration extends LlavaQwen2ForCausalLM { }
+
 export class Gemma3nPreTrainedModel extends PreTrainedModel {
     forward_params = [
         'input_ids',
@@ -8228,6 +8230,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['paligemma', ['PaliGemmaForConditionalGeneration', PaliGemmaForConditionalGeneration]],
     ['llava_qwen2', ['LlavaQwen2ForCausalLM', LlavaQwen2ForCausalLM]],
     ['gemma3n', ['Gemma3nForConditionalGeneration', Gemma3nForConditionalGeneration]],
+    ['mistral3', ['Mistral3ForConditionalGeneration', Mistral3ForConditionalGeneration]],
 ]);
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
