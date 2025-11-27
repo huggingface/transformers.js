@@ -1,9 +1,5 @@
-
-
-import {
-    ImageProcessor,
-} from "../../base/image_processors_utils.js";
-import { cat, full, interpolate_4d, slice, stack } from "../../utils/tensor.js";
+import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { cat, full, interpolate_4d, slice, stack } from '../../utils/tensor.js';
 
 export class Idefics3ImageProcessor extends ImageProcessor {
     constructor(config) {
@@ -41,23 +37,19 @@ export class Idefics3ImageProcessor extends ImageProcessor {
     }
 
     /** @param {RawImage|RawImage[]|RawImage[][]} images */
-    async _call(images, {
-        do_image_splitting = null,
-        return_row_col_info = false,
-    } = {}) {
-
+    async _call(images, { do_image_splitting = null, return_row_col_info = false } = {}) {
         /** @type {RawImage[][]} */
         let batched_2d_images;
         if (!Array.isArray(images)) {
             batched_2d_images = [[images]];
         } else {
             if (images.length === 0 || !images[0]) {
-                throw new Error("No images provided.");
+                throw new Error('No images provided.');
             }
             if (!Array.isArray(images[0])) {
-                batched_2d_images = [/** @type {RawImage[]} */(images)];
+                batched_2d_images = [/** @type {RawImage[]} */ (images)];
             } else {
-                batched_2d_images = /** @type {RawImage[][]} */(images);
+                batched_2d_images = /** @type {RawImage[][]} */ (images);
             }
         }
 
@@ -69,17 +61,16 @@ export class Idefics3ImageProcessor extends ImageProcessor {
         const original_sizes = [];
         const reshaped_input_sizes = [];
         for (const image_batch of batched_2d_images) {
-
-            let images_list = await Promise.all(image_batch.map(x => this.preprocess(x)));
+            let images_list = await Promise.all(image_batch.map((x) => this.preprocess(x)));
 
             // Original sizes of images
-            original_sizes.push(...images_list.map(x => x.original_size));
+            original_sizes.push(...images_list.map((x) => x.original_size));
 
             // Reshaped sizes of images, before padding or cropping
-            reshaped_input_sizes.push(...images_list.map(x => x.reshaped_input_size));
+            reshaped_input_sizes.push(...images_list.map((x) => x.reshaped_input_size));
 
             // Convert images to 4D tensors for easier processing
-            images_list.forEach(x => x.pixel_values.unsqueeze_(0));
+            images_list.forEach((x) => x.pixel_values.unsqueeze_(0));
 
             const { longest_edge } = this.max_image_size;
 
@@ -90,28 +81,30 @@ export class Idefics3ImageProcessor extends ImageProcessor {
                 let image_cols = new Array(images_list.length);
 
                 // We first resize both height and width of each image to the nearest max_image_size multiple, disregarding the aspect ratio
-                images_tensor = await Promise.all(images_list.map(async (x, i) => {
-                    const new_size = this.get_resize_for_vision_encoder(x.pixel_values, longest_edge);
+                images_tensor = await Promise.all(
+                    images_list.map(async (x, i) => {
+                        const new_size = this.get_resize_for_vision_encoder(x.pixel_values, longest_edge);
 
-                    const resized = await interpolate_4d(x.pixel_values, {
-                        size: [new_size.height, new_size.width],
-                    });
+                        const resized = await interpolate_4d(x.pixel_values, {
+                            size: [new_size.height, new_size.width],
+                        });
 
-                    const { frames, num_splits_h, num_splits_w } = await this.split_image(resized, this.max_image_size);
-                    image_rows[i] = num_splits_h;
-                    image_cols[i] = num_splits_w;
-                    return cat(frames, 0);
-                }));
+                        const { frames, num_splits_h, num_splits_w } = await this.split_image(
+                            resized,
+                            this.max_image_size,
+                        );
+                        image_rows[i] = num_splits_h;
+                        image_cols[i] = num_splits_w;
+                        return cat(frames, 0);
+                    }),
+                );
 
                 images_list_rows.push(image_rows);
                 images_list_cols.push(image_cols);
-
             } else {
                 /** @type {[number, number]} */
                 const size = [longest_edge, longest_edge];
-                images_tensor = await Promise.all(
-                    images_list.map(x => interpolate_4d(x.pixel_values, { size }))
-                );
+                images_tensor = await Promise.all(images_list.map((x) => interpolate_4d(x.pixel_values, { size })));
 
                 images_list_rows.push(new Array(images_list.length).fill(0));
                 images_list_cols.push(new Array(images_list.length).fill(0));
@@ -131,7 +124,7 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             pixel_attention_mask = full([batch_size, n, h, w], true);
         } else {
             // Add padding (if necessary) to images with less patches than the maximum number of patches
-            const max_num_patches = Math.max(...all_pixel_values.map(x => x.dims.at(0)));
+            const max_num_patches = Math.max(...all_pixel_values.map((x) => x.dims.at(0)));
 
             pixel_attention_mask = full([batch_size, max_num_patches, h, w], true);
             const pixel_attention_mask_data = pixel_attention_mask.data;
@@ -139,10 +132,10 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             for (let i = 0; i < batch_size; ++i) {
                 const num_patches = all_pixel_values[i].dims[0];
                 if (num_patches < max_num_patches) {
-                    all_pixel_values[i] = cat([
-                        all_pixel_values[i],
-                        full([max_num_patches - num_patches, c, h, w], 0),
-                    ], 0);
+                    all_pixel_values[i] = cat(
+                        [all_pixel_values[i], full([max_num_patches - num_patches, c, h, w], 0)],
+                        0,
+                    );
 
                     const start_offset = i * pixel_attention_mask_stride + num_patches * h * w;
                     const end_offset = (i + 1) * pixel_attention_mask_stride;
@@ -160,12 +153,8 @@ export class Idefics3ImageProcessor extends ImageProcessor {
 
             original_sizes,
             reshaped_input_sizes,
-            ...(
-                return_row_col_info
-                    ? { rows: images_list_rows, cols: images_list_cols }
-                    : {}
-            ),
-        }
+            ...(return_row_col_info ? { rows: images_list_rows, cols: images_list_cols } : {}),
+        };
     }
 
     async split_image(pixel_values, { longest_edge }) {
@@ -176,7 +165,8 @@ export class Idefics3ImageProcessor extends ImageProcessor {
 
         const [height, width] = pixel_values.dims.slice(-2);
 
-        let num_splits_h = 0, num_splits_w = 0;
+        let num_splits_h = 0,
+            num_splits_w = 0;
 
         if (height > max_height || width > max_width) {
             // Calculate the number of splits
@@ -191,14 +181,16 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             for (let r = 0; r < num_splits_h; ++r) {
                 for (let c = 0; c < num_splits_w; ++c) {
                     let start_x, start_y, end_x, end_y;
-                    if (r === num_splits_h - 1) { // At bottom
+                    if (r === num_splits_h - 1) {
+                        // At bottom
                         start_y = height - optimal_height;
                         end_y = height;
                     } else {
                         start_y = r * optimal_height;
                         end_y = (r + 1) * optimal_height;
                     }
-                    if (c === num_splits_w - 1) { // At right
+                    if (c === num_splits_w - 1) {
+                        // At right
                         start_x = width - optimal_width;
                         end_x = width;
                     } else {
@@ -221,7 +213,7 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             if (height !== global_image_height || width !== global_image_width) {
                 pixel_values = await interpolate_4d(pixel_values, {
                     size: [global_image_height, global_image_width],
-                })
+                });
             }
         }
 

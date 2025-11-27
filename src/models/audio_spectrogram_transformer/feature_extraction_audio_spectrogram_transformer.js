@@ -2,9 +2,7 @@ import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extr
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
 
-
 export class ASTFeatureExtractor extends FeatureExtractor {
-
     constructor(config) {
         super(config);
 
@@ -16,14 +14,14 @@ export class ASTFeatureExtractor extends FeatureExtractor {
             Math.floor(sampling_rate / 2), // max_frequency
             sampling_rate, // sampling_rate
             null, // norm
-            "kaldi", // mel_scale
+            'kaldi', // mel_scale
             true, // triangularize_in_mel_space
         );
         this.mel_filters = mel_filters;
 
         this.window = window_function(400, 'hann', {
             periodic: false,
-        })
+        });
 
         this.mean = this.config.mean;
         this.std = this.config.std;
@@ -49,16 +47,15 @@ export class ASTFeatureExtractor extends FeatureExtractor {
                 preemphasis: 0.97,
                 mel_filters: this.mel_filters,
                 log_mel: 'log',
-                mel_floor: 1.192092955078125e-07,
+                mel_floor: 1.192092955078125e-7,
                 remove_dc_offset: true,
 
                 // Custom
                 max_num_frames: max_length,
                 transpose: true,
-            }
-        )
+            },
+        );
     }
-
 
     /**
      * Asynchronously extracts features from a given audio using the provided configuration.
@@ -79,7 +76,7 @@ export class ASTFeatureExtractor extends FeatureExtractor {
         }
 
         return {
-            input_values: features.unsqueeze_(0)
+            input_values: features.unsqueeze_(0),
         };
     }
 }

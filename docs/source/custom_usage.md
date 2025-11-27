@@ -2,6 +2,6 @@
 
 <include>
 {
-    "path": "../snippets/4_custom-usage.snippet"
+    "path": "../snippets/3_custom-usage.snippet"
 }
 </include>

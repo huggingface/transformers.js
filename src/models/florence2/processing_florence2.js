@@ -1,10 +1,10 @@
-import { Processor } from "../../base/processing_utils.js";
-import { AutoImageProcessor } from "../auto/image_processing_auto.js";
-import { AutoTokenizer } from "../../tokenizers.js";
+import { Processor } from '../../base/processing_utils.js';
+import { AutoImageProcessor } from '../auto/image_processing_auto.js';
+import { AutoTokenizer } from '../../tokenizers.js';
 
 export class Florence2Processor extends Processor {
-    static tokenizer_class = AutoTokenizer
-    static image_processor_class = AutoImageProcessor
+    static tokenizer_class = AutoTokenizer;
+    static image_processor_class = AutoImageProcessor;
 
     constructor(config, components, chat_template) {
         super(config, components, chat_template);
@@ -28,9 +28,10 @@ export class Florence2Processor extends Processor {
         this.task_prompts_with_input = new Map(Object.entries(task_prompts_with_input ?? {}));
 
         this.regexes = {
-            quad_boxes: /(.+?)<loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/gm,
+            quad_boxes:
+                /(.+?)<loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/gm,
             bboxes: /([^<]+)?<loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/gm,
-        }
+        };
         this.size_per_bin = 1000;
     }
 
@@ -50,7 +51,7 @@ export class Florence2Processor extends Processor {
             if (this.task_prompts_without_inputs.has(t)) {
                 prompts.push(this.task_prompts_without_inputs.get(t));
             }
-            // 2. task prompts with additional inputs 
+            // 2. task prompts with additional inputs
             else {
                 for (const [task, prompt] of this.task_prompts_with_input) {
                     if (t.includes(task)) {
@@ -96,10 +97,13 @@ export class Florence2Processor extends Processor {
                 const items = [];
                 for (const [_, label, ...locations] of matches) {
                     // Push new label, or duplicate the last label
-                    labels.push(label ? label.trim() : labels.at(-1) ?? '');
-                    items.push(locations.map((x, i) =>
-                        // NOTE: Add 0.5 to use the center position of the bin as the coordinate.
-                        (Number(x) + 0.5) / this.size_per_bin * image_size[i % 2])
+                    labels.push(label ? label.trim() : (labels.at(-1) ?? ''));
+                    items.push(
+                        locations.map(
+                            (x, i) =>
+                                // NOTE: Add 0.5 to use the center position of the bin as the coordinate.
+                                ((Number(x) + 0.5) / this.size_per_bin) * image_size[i % 2],
+                        ),
                     );
                 }
                 final_answer = { labels, [key]: items };
@@ -109,14 +113,13 @@ export class Florence2Processor extends Processor {
                 throw new Error(`Task "${task}" (of type "${task_answer_post_processing_type}") not yet implemented.`);
         }
 
-        return { [task]: final_answer }
+        return { [task]: final_answer };
     }
 
     // NOTE: images and text are switched from the python version
     // `images` is required, `text` is optional
-    async _call(images, text=null, kwargs = {}) {
-
-        if (!images && !text){
+    async _call(images, text = null, kwargs = {}) {
+        if (!images && !text) {
             throw new Error('Either text or images must be provided');
         }
 
@@ -126,6 +129,6 @@ export class Florence2Processor extends Processor {
         return {
             ...image_inputs,
             ...text_inputs,
-        }
+        };
     }
 }

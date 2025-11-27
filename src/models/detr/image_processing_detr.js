@@ -1,12 +1,11 @@
-import { 
+import {
     ImageProcessor,
     post_process_object_detection,
     post_process_panoptic_segmentation,
     post_process_instance_segmentation,
-} from "../../base/image_processors_utils.js";
+} from '../../base/image_processors_utils.js';
 
 import { full } from '../../utils/tensor.js';
-
 
 /**
  * @typedef {object} DetrFeatureExtractorResultProps
@@ -49,4 +48,4 @@ export class DetrImageProcessor extends ImageProcessor {
     }
 }
 
-export class DetrFeatureExtractor extends DetrImageProcessor { } // NOTE: extends DetrImageProcessor  
+export class DetrFeatureExtractor extends DetrImageProcessor {} // NOTE: extends DetrImageProcessor

@@ -3,13 +3,10 @@ import { full, Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
 
 export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
-
     constructor(config) {
         super(config);
 
-        const {
-            fft_length, feature_size, min_frequency, max_frequency, sampling_rate, frame_length
-        } = this.config;
+        const { fft_length, feature_size, min_frequency, max_frequency, sampling_rate, frame_length } = this.config;
 
         const mel_filters = mel_filter_bank(
             Math.floor(1 + fft_length / 2), // num_frequency_bins
@@ -18,12 +15,12 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
             max_frequency, // max_frequency
             sampling_rate, // sampling_rate
             null, // norm
-            "htk", // mel_scale
+            'htk', // mel_scale
             false, // triangularize_in_mel_space
         );
         this.mel_filters = mel_filters;
 
-        this.window = window_function(frame_length, 'hann')
+        this.window = window_function(frame_length, 'hann');
     }
 
     /**
@@ -52,8 +49,8 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
 
                 // Custom
                 transpose: true,
-            }
-        )
+            },
+        );
     }
 
     /**
@@ -67,12 +64,7 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
      * @param {number} [options.pad_to_multiple_of=128] The number to pad the sequence to a multiple of.
      * @returns {Promise<{ input_features: Tensor, input_features_mask: Tensor }>} A Promise resolving to an object containing the extracted input features and attention masks as Tensors.
      */
-    async _call(audio, {
-        max_length = 480_000,
-        truncation=true,
-        padding = true,
-        pad_to_multiple_of = 128,
-    } = {}) {
+    async _call(audio, { max_length = 480_000, truncation = true, padding = true, pad_to_multiple_of = 128 } = {}) {
         validate_audio_inputs(audio, 'Gemma3nAudioFeatureExtractor');
         if (truncation && audio.length > max_length) {
             audio = audio.slice(0, max_length);
@@ -92,6 +84,6 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
         return {
             input_features: features.unsqueeze_(0),
             input_features_mask: padded_attention_mask,
-        }
+        };
     }
 }

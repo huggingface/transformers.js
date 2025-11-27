@@ -1,4 +1,3 @@
-
 /**
  * @file Core utility functions/classes for Transformers.js.
  *
@@ -102,14 +101,13 @@ export function isTypedArray(val) {
     return val?.prototype?.__proto__?.constructor?.name === 'TypedArray';
 }
 
-
 /**
  * Check if a value is an integer.
  * @param {*} x The value to check.
  * @returns {boolean} True if the value is a string, false otherwise.
  */
 export function isIntegralNumber(x) {
-    return Number.isInteger(x) || typeof x === 'bigint'
+    return Number.isInteger(x) || typeof x === 'bigint';
 }
 
 /**
@@ -152,7 +150,7 @@ export function pop(obj, key, defaultValue = undefined) {
         return value;
     }
     if (defaultValue === undefined) {
-        throw Error(`Key ${key} does not exist in object.`)
+        throw Error(`Key ${key} does not exist in object.`);
     }
     return defaultValue;
 }
@@ -160,8 +158,8 @@ export function pop(obj, key, defaultValue = undefined) {
 /**
  * Efficiently merge arrays, creating a new copy.
  * Adapted from https://stackoverflow.com/a/6768642/13989043
- * @param  {Array[]} arrs Arrays to merge.
- * @returns {Array} The merged array.
+ * @param  {any[]} arrs Arrays to merge.
+ * @returns {any[]} The merged array.
  */
 export function mergeArrays(...arrs) {
     return Array.prototype.concat.apply([], arrs);
@@ -169,14 +167,14 @@ export function mergeArrays(...arrs) {
 
 /**
  * Compute the Cartesian product of given arrays
- * @param {...Array} a Arrays to compute the product
- * @returns {Array} Returns the computed Cartesian product as an array
+ * @param {...any[]} a Arrays to compute the product
+ * @returns {any[]} Returns the computed Cartesian product as an array
  * @private
  */
 export function product(...a) {
     // Cartesian product of items
     // Adapted from https://stackoverflow.com/a/43053803
-    return a.reduce((a, b) => a.flatMap(d => b.map(e => [d, e])));
+    return a.reduce((a, b) => a.flatMap((d) => b.map((e) => [d, e])));
 }
 
 /**
@@ -186,33 +184,7 @@ export function product(...a) {
  * @returns {number} The index offset.
  */
 export function calculateReflectOffset(i, w) {
-    return Math.abs((i + w) % (2 * w) - w);
-}
-
-/**
- * Save blob file on the web.
- * @param {string} path The path to save the blob to
- * @param {Blob} blob The blob to save
- */
-export function saveBlob(path, blob){
-    // Convert the canvas content to a data URL
-    const dataURL = URL.createObjectURL(blob);
-
-    // Create an anchor element with the data URL as the href attribute
-    const downloadLink = document.createElement('a');
-    downloadLink.href = dataURL;
-
-    // Set the download attribute to specify the desired filename for the downloaded image
-    downloadLink.download = path;
-
-    // Trigger the download
-    downloadLink.click();
-
-    // Clean up: remove the anchor element from the DOM
-    downloadLink.remove();
-
-    // Revoke the Object URL to free up memory
-    URL.revokeObjectURL(dataURL);
+    return Math.abs(((i + w) % (2 * w)) - w);
 }
 
 /**
@@ -228,7 +200,7 @@ export function pick(o, props) {
             if (o[prop] !== undefined) {
                 return { [prop]: o[prop] };
             }
-        })
+        }),
     );
 }
 

@@ -1,10 +1,9 @@
-
 /**
- * @file Helper module for mathematical processing. 
- * 
- * These functions and classes are only used internally, 
+ * @file Helper module for mathematical processing.
+ *
+ * These functions and classes are only used internally,
  * meaning an end-user shouldn't need to access anything here.
- * 
+ *
  * @module utils/maths
  */
 
@@ -17,7 +16,13 @@
 /**
  * @param {TypedArray} input
  */
-export function interpolate_data(input, [in_channels, in_height, in_width], [out_height, out_width], mode = 'bilinear', align_corners = false) {
+export function interpolate_data(
+    input,
+    [in_channels, in_height, in_width],
+    [out_height, out_width],
+    mode = 'bilinear',
+    align_corners = false,
+) {
     // TODO use mode and align_corners
 
     // Output image dimensions
@@ -50,7 +55,6 @@ export function interpolate_data(input, [in_channels, in_height, in_width], [out
 
             x1 = Math.max(x1, 0);
             y1 = Math.max(y1, 0);
-
 
             // Calculate the fractional distances between the input pixel and the four nearest pixels
             const s = x - x1;
@@ -86,13 +90,12 @@ export function interpolate_data(input, [in_channels, in_height, in_width], [out
     return out_img;
 }
 
-
 /**
  * Helper method to permute a `AnyTypedArray` directly
- * @template {AnyTypedArray} T 
- * @param {T} array 
- * @param {number[]} dims 
- * @param {number[]} axes 
+ * @template {AnyTypedArray} T
+ * @param {T} array
+ * @param {number[]} dims
+ * @param {number[]} axes
  * @returns {[T, number[]]} The permuted array and the new shape.
  */
 export function permute_data(array, dims, axes) {
@@ -127,7 +130,6 @@ export function permute_data(array, dims, axes) {
     return [permutedData, shape];
 }
 
-
 /**
  * Compute the softmax of an array of numbers.
  * @template {TypedArray|number[]} T
@@ -139,16 +141,16 @@ export function softmax(arr) {
     const maxVal = max(arr)[0];
 
     // Compute the exponentials of the array values
-    const exps = arr.map(x => Math.exp(x - maxVal));
+    const exps = arr.map((x) => Math.exp(x - maxVal));
 
     // Compute the sum of the exponentials
     // @ts-ignore
     const sumExps = exps.reduce((acc, val) => acc + val, 0);
 
     // Compute the softmax values
-    const softmaxArr = exps.map(x => x / sumExps);
+    const softmaxArr = exps.map((x) => x / sumExps);
 
-    return /** @type {T} */(softmaxArr);
+    return /** @type {T} */ (softmaxArr);
 }
 
 /**
@@ -163,7 +165,7 @@ export function log_softmax(arr) {
 
     // Compute the sum of the exponentials
     let sumExps = 0;
-    for(let i = 0; i < arr.length; ++i) {
+    for (let i = 0; i < arr.length; ++i) {
         sumExps += Math.exp(arr[i] - maxVal);
     }
 
@@ -171,9 +173,9 @@ export function log_softmax(arr) {
     const logSum = Math.log(sumExps);
 
     // Compute the softmax values
-    const logSoftmaxArr = arr.map(x => x - maxVal - logSum);
+    const logSoftmaxArr = arr.map((x) => x - maxVal - logSum);
 
-    return /** @type {T} */(logSoftmaxArr);
+    return /** @type {T} */ (logSoftmaxArr);
 }
 
 /**
@@ -222,7 +224,6 @@ export function magnitude(arr) {
     return Math.sqrt(arr.reduce((acc, val) => acc + val * val, 0));
 }
 
-
 /**
  * Returns the value and index of the minimum element in an array.
  * @template {number[]|bigint[]|AnyTypedArray} T
@@ -240,9 +241,8 @@ export function min(arr) {
             indexOfMin = i;
         }
     }
-    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([min, indexOfMin]);
+    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */ ([min, indexOfMin]);
 }
-
 
 /**
  * Returns the value and index of the maximum element in an array.
@@ -261,17 +261,17 @@ export function max(arr) {
             indexOfMax = i;
         }
     }
-    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */([max, indexOfMax]);
+    return /** @type {T extends bigint[]|BigTypedArray ? [bigint, number] : [number, number]} */ ([max, indexOfMax]);
 }
 
 function isPowerOfTwo(number) {
     // Check if the number is greater than 0 and has only one bit set to 1
-    return (number > 0) && ((number & (number - 1)) === 0);
+    return number > 0 && (number & (number - 1)) === 0;
 }
 
 /**
  * Implementation of Radix-4 FFT.
- * 
+ *
  * P2FFT class provides functionality for performing Fast Fourier Transform on arrays
  * which are a power of two in length.
  * Code adapted from https://www.npmjs.com/package/fft.js
@@ -290,15 +290,14 @@ class P2FFT {
 
         this.table = new Float64Array(this.size * 2);
         for (let i = 0; i < this.table.length; i += 2) {
-            const angle = Math.PI * i / this.size;
+            const angle = (Math.PI * i) / this.size;
             this.table[i] = Math.cos(angle);
             this.table[i + 1] = -Math.sin(angle);
         }
 
         // Find size's power of two
         let power = 0;
-        for (let t = 1; this.size > t; t <<= 1)
-            ++power;
+        for (let t = 1; this.size > t; t <<= 1) ++power;
 
         // Calculate initial step's width:
         //   * If we are full radix-4, it is 2x smaller to give inital len=8
@@ -327,15 +326,14 @@ class P2FFT {
 
     /**
      * Converts a complex number representation stored in a Float64Array to an array of real numbers.
-     * 
+     *
      * @param {Float64Array} complex The complex number representation to be converted.
      * @param {number[]} [storage] An optional array to store the result in.
      * @returns {number[]} An array of real numbers representing the input complex number representation.
      */
     fromComplexArray(complex, storage) {
         const res = storage || new Array(complex.length >>> 1);
-        for (let i = 0; i < complex.length; i += 2)
-            res[i >>> 1] = complex[i];
+        for (let i = 0; i < complex.length; i += 2) res[i >>> 1] = complex[i];
         return res;
     }
 
@@ -356,17 +354,16 @@ class P2FFT {
 
     /**
      * Performs a Fast Fourier Transform (FFT) on the given input data and stores the result in the output buffer.
-     * 
+     *
      * @param {Float64Array} out The output buffer to store the result.
      * @param {Float64Array} data The input data to transform.
-     * 
+     *
      * @throws {Error} Input and output buffers must be different.
-     * 
+     *
      * @returns {void}
      */
     transform(out, data) {
-        if (out === data)
-            throw new Error('Input and output buffers must be different');
+        if (out === data) throw new Error('Input and output buffers must be different');
 
         this._transform4(out, data, 1 /* DONE */);
     }
@@ -382,8 +379,7 @@ class P2FFT {
      * @throws {Error} If the input and output buffers are the same.
      */
     realTransform(out, data) {
-        if (out === data)
-            throw new Error('Input and output buffers must be different');
+        if (out === data) throw new Error('Input and output buffers must be different');
 
         this._realTransform4(out, data, 1 /* DONE */);
     }
@@ -392,19 +388,17 @@ class P2FFT {
      * Performs an inverse FFT transformation on the given `data` array, and stores the result in `out`.
      * The `out` array must be a different buffer than the `data` array. The `out` array will contain the
      * result of the transformation. The `data` array will not be modified.
-     * 
+     *
      * @param {Float64Array} out The output buffer for the transformed data.
      * @param {Float64Array} data The input data to transform.
      * @throws {Error} If `out` and `data` refer to the same buffer.
      * @returns {void}
      */
     inverseTransform(out, data) {
-        if (out === data)
-            throw new Error('Input and output buffers must be different');
+        if (out === data) throw new Error('Input and output buffers must be different');
 
         this._transform4(out, data, -1 /* DONE */);
-        for (let i = 0; i < out.length; ++i)
-            out[i] /= this.size;
+        for (let i = 0; i < out.length; ++i) out[i] /= this.size;
     }
 
     /**
@@ -540,7 +534,7 @@ class P2FFT {
      * @param {number} off Index of input array to start reading from
      * @param {number} step Step size between elements in input array
      * @param {number} inv Scaling factor for inverse transform
-     * 
+     *
      * @returns {void}
      */
     _singleTransform4(data, out, outOff, off, step, inv) {
@@ -680,8 +674,7 @@ class P2FFT {
                     }
 
                     // Do not overwrite ourselves
-                    if (i === hquarterLen)
-                        continue;
+                    if (i === hquarterLen) continue;
 
                     const SA = outOff + quarterLen - i;
                     const SB = outOff + halfLen - i;
@@ -704,13 +697,13 @@ class P2FFT {
 
     /**
      * Performs a single real input radix-2 transformation on the provided data
-     * 
+     *
      * @param {Float64Array} data The input data array
      * @param {Float64Array} out The output data array
      * @param {number} outOff The output offset
      * @param {number} off The input offset
      * @param {number} step The step
-     * 
+     *
      * @returns {void}
      */
     _singleRealTransform2(data, out, outOff, off, step) {
@@ -770,11 +763,10 @@ class P2FFT {
 /**
  * NP2FFT class provides functionality for performing Fast Fourier Transform on arrays
  * which are not a power of two in length. In such cases, the chirp-z transform is used.
- * 
+ *
  * For more information, see: https://math.stackexchange.com/questions/77118/non-power-of-2-ffts/77156#77156
  */
 class NP2FFT {
-
     /**
      * Constructs a new NP2FFT object.
      * @param {number} fft_length The length of the FFT
@@ -783,7 +775,7 @@ class NP2FFT {
         // Helper variables
         const a = 2 * (fft_length - 1);
         const b = 2 * (2 * fft_length - 1);
-        const nextP2 = 2 ** (Math.ceil(Math.log2(b)))
+        const nextP2 = 2 ** Math.ceil(Math.log2(b));
         this.bufferSize = nextP2;
         this._a = a;
 
@@ -798,7 +790,7 @@ class NP2FFT {
         this._outBuffer2 = new Float64Array(nextP2);
 
         // Compute complex exponentiation
-        const theta = -2 * Math.PI / fft_length;
+        const theta = (-2 * Math.PI) / fft_length;
         const baseR = Math.cos(theta);
         const baseI = Math.sin(theta);
 
@@ -819,7 +811,7 @@ class NP2FFT {
 
             // conjugate
             ichirp[i2] = chirp[i2];
-            ichirp[i2 + 1] = - chirp[i2 + 1];
+            ichirp[i2 + 1] = -chirp[i2 + 1];
         }
         this._slicedChirpBuffer = chirp.subarray(a, b);
 
@@ -841,7 +833,7 @@ class NP2FFT {
         if (real) {
             // Real multiplication
             for (let j = 0; j < sb.length; j += 2) {
-                const j2 = j + 1
+                const j2 = j + 1;
                 const j3 = j >> 1;
 
                 const a_real = input[j3];
@@ -851,7 +843,7 @@ class NP2FFT {
         } else {
             // Complex multiplication
             for (let j = 0; j < sb.length; j += 2) {
-                const j2 = j + 1
+                const j2 = j + 1;
                 ib1[j] = input[j] * sb[j] - input[j2] * sb[j2];
                 ib1[j2] = input[j] * sb[j2] + input[j2] * sb[j];
             }
@@ -908,14 +900,12 @@ export class FFT {
     }
 }
 
-
 /**
  * Performs median filter on the provided data. Padding is done by mirroring the data.
  * @param {AnyTypedArray} data The input array
  * @param {number} windowSize The window size
  */
 export function medianFilter(data, windowSize) {
-
     if (windowSize % 2 === 0 || windowSize <= 0) {
         throw new Error('Window size must be a positive odd number');
     }
@@ -964,7 +954,7 @@ export function round(num, decimals) {
  * Helper function to round a number to the nearest integer, with ties rounded to the nearest even number.
  * Also known as "bankers' rounding". This is the default rounding mode in python. For example:
  * 1.5 rounds to 2 and 2.5 rounds to 2.
- * 
+ *
  * @param {number} x The number to round
  * @returns {number} The rounded number
  */
@@ -974,11 +964,10 @@ export function bankers_round(x) {
     return br;
 }
 
-
 /**
  * Measures similarity between two temporal sequences (e.g., input audio and output tokens
  * to generate token-level timestamps).
- * @param {number[][]} matrix 
+ * @param {number[][]} matrix
  * @returns {number[][]}
  */
 export function dynamic_time_warping(matrix) {
@@ -987,16 +976,10 @@ export function dynamic_time_warping(matrix) {
 
     const outputShape = [output_length + 1, input_length + 1];
 
-    const cost = Array.from(
-        { length: outputShape[0] },
-        () => Array(outputShape[1]).fill(Infinity)
-    );
+    const cost = Array.from({ length: outputShape[0] }, () => Array(outputShape[1]).fill(Infinity));
     cost[0][0] = 0;
 
-    const trace = Array.from(
-        { length: outputShape[0] },
-        () => Array(outputShape[1]).fill(-1)
-    );
+    const trace = Array.from({ length: outputShape[0] }, () => Array(outputShape[1]).fill(-1));
 
     for (let j = 1; j < outputShape[1]; ++j) {
         for (let i = 1; i < outputShape[0]; ++i) {
@@ -1020,10 +1003,12 @@ export function dynamic_time_warping(matrix) {
         }
     }
 
-    for (let i = 0; i < outputShape[1]; ++i) { // trace[0, :] = 2
+    for (let i = 0; i < outputShape[1]; ++i) {
+        // trace[0, :] = 2
         trace[0][i] = 2;
     }
-    for (let i = 0; i < outputShape[0]; ++i) { // trace[:, 0] = 1
+    for (let i = 0; i < outputShape[0]; ++i) {
+        // trace[:, 0] = 1
         trace[i][0] = 1;
     }
 
@@ -1038,7 +1023,8 @@ export function dynamic_time_warping(matrix) {
 
         switch (trace[i][j]) {
             case 0:
-                --i; --j;
+                --i;
+                --j;
                 break;
             case 1:
                 --i;
@@ -1048,8 +1034,8 @@ export function dynamic_time_warping(matrix) {
                 break;
             default:
                 throw new Error(
-                    `Internal error in dynamic time warping. Unexpected trace[${i}, ${j}]. Please file a bug report.`
-                )
+                    `Internal error in dynamic time warping. Unexpected trace[${i}, ${j}]. Please file a bug report.`,
+                );
         }
     }
 
@@ -1057,5 +1043,4 @@ export function dynamic_time_warping(matrix) {
     time_indices.reverse();
 
     return [text_indices, time_indices];
-
 }
