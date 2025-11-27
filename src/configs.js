@@ -292,7 +292,6 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-
     } else if (config.model_type === 'granitemoehybrid') {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
@@ -301,10 +300,21 @@ export function getCacheShapes(config, options) {
         const cache_values = {};
 
         // @ts-expect-error TS2339
-        const { layer_types, num_attention_heads, num_key_value_heads, hidden_size, mamba_d_conv, mamba_n_heads, mamba_d_head, mamba_d_state, mamba_n_groups, mamba_expand } = config;
+        const {
+            layer_types,
+            num_attention_heads,
+            num_key_value_heads,
+            hidden_size,
+            mamba_d_conv,
+            mamba_n_heads,
+            mamba_d_head,
+            mamba_d_state,
+            mamba_n_groups,
+            mamba_expand,
+        } = config;
         const head_dim = hidden_size / num_attention_heads;
         const batch_size = options?.batch_size ?? 1;
-        const conv_d_inner = (mamba_expand * hidden_size) + (2 * mamba_n_groups * mamba_d_state)
+        const conv_d_inner = mamba_expand * hidden_size + 2 * mamba_n_groups * mamba_d_state;
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'attention') {
                 for (const kv of ['key', 'value']) {

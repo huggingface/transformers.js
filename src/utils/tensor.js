@@ -1531,10 +1531,10 @@ export function randn(size) {
     }
 
     return new Tensor(
-        "float32",
+        'float32',
         Float32Array.from({ length }, () => boxMullerRandom()),
         size,
-    )
+    );
 }
 
 /**

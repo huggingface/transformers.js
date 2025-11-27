@@ -193,11 +193,9 @@ if (ONNX_ENV?.wasm) {
     // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
     if (
         // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
-        (
-            !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
-            ONNX_ENV.versions?.web &&
-            !ONNX_ENV.wasm.wasmPaths
-        )
+        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
+        ONNX_ENV.versions?.web &&
+        !ONNX_ENV.wasm.wasmPaths
     ) {
         const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
 

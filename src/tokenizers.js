@@ -2267,7 +2267,6 @@ class MetaspacePreTokenizer extends PreTokenizer {
             // We add a prefix space if:
             //  (1) The normalized token does not already start with the replacement character.
             !normalized.startsWith(this.replacement) &&
-
             // and (2) either:
             //  (a) prepend_scheme is 'always'
             //  (b) prepend_scheme is 'first' and this is the first section
@@ -3379,7 +3378,7 @@ export class LlamaTokenizer extends PreTrainedTokenizer {
             this.normalizer = null;
             this.pre_tokenizer = new MetaspacePreTokenizer({
                 replacement: SPIECE_UNDERLINE,
-                prepend_scheme: "first",
+                prepend_scheme: 'first',
             });
         }
     }

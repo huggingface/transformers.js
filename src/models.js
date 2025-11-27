@@ -1398,13 +1398,18 @@ export class PreTrainedModel extends Callable {
             ]);
         } else if (modelType === MODEL_TYPES.Supertonic) {
             info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, {
-                    text_encoder: 'text_encoder',
-                    latent_denoiser: 'latent_denoiser',
-                    voice_decoder: 'voice_decoder',
-                }, options),
+                constructSessions(
+                    pretrained_model_name_or_path,
+                    {
+                        text_encoder: 'text_encoder',
+                        latent_denoiser: 'latent_denoiser',
+                        voice_decoder: 'voice_decoder',
+                    },
+                    options,
+                ),
             ]);
-        } else { // should be MODEL_TYPES.EncoderOnly
+        } else {
+            // should be MODEL_TYPES.EncoderOnly
             if (modelType !== MODEL_TYPES.EncoderOnly) {
                 const type = modelName ?? config?.model_type;
                 if (type !== 'custom') {
@@ -6148,8 +6153,8 @@ export class SamModel extends SamPreTrainedModel {
             // Compute the image embeddings if they are missing
             model_inputs = {
                 ...model_inputs,
-                ...(await this.get_image_embeddings(model_inputs))
-            }
+                ...(await this.get_image_embeddings(model_inputs)),
+            };
         } else {
             model_inputs = { ...model_inputs };
         }
@@ -6220,9 +6225,8 @@ export class Sam2ImageSegmentationOutput extends ModelOutput {
     }
 }
 
-export class Sam2PreTrainedModel extends PreTrainedModel { }
+export class Sam2PreTrainedModel extends PreTrainedModel {}
 export class Sam2Model extends Sam2PreTrainedModel {
-
     /**
      * Compute image embeddings and positional image embeddings, given the pixel values of an image.
      * @param {Object} model_inputs Object containing the model inputs.
@@ -6232,7 +6236,7 @@ export class Sam2Model extends Sam2PreTrainedModel {
     async get_image_embeddings({ pixel_values }) {
         // in:
         //  - pixel_values: tensor.float32[batch_size,3,1024,1024]
-        // 
+        //
         // out:
         //  - image_embeddings.0: tensor.float32[batch_size,32,256,256]
         //  - image_embeddings.1: tensor.float32[batch_size,64,128,128]
@@ -6245,29 +6249,30 @@ export class Sam2Model extends Sam2PreTrainedModel {
         const { num_feature_levels } = this.config.vision_config;
         const image_embeddings_name = Array.from({ length: num_feature_levels }, (_, i) => `image_embeddings.${i}`);
 
-        if (image_embeddings_name.some(name => !model_inputs[name])) {
+        if (image_embeddings_name.some((name) => !model_inputs[name])) {
             // Compute the image embeddings if they are missing
             model_inputs = {
                 ...model_inputs,
-                ...(await this.get_image_embeddings(model_inputs))
-            }
+                ...(await this.get_image_embeddings(model_inputs)),
+            };
         } else {
             model_inputs = { ...model_inputs };
         }
 
         if (model_inputs.input_points) {
             if (model_inputs.input_boxes && model_inputs.input_boxes.dims[1] !== 1) {
-                throw new Error('When both `input_points` and `input_boxes` are provided, the number of boxes per image must be 1.');
+                throw new Error(
+                    'When both `input_points` and `input_boxes` are provided, the number of boxes per image must be 1.',
+                );
             }
             const shape = model_inputs.input_points.dims;
             model_inputs.input_labels ??= ones(shape.slice(0, -1));
             model_inputs.input_boxes ??= full([shape[0], 0, 4], 0.0);
-
-        } else if (model_inputs.input_boxes) { // only boxes
+        } else if (model_inputs.input_boxes) {
+            // only boxes
             const shape = model_inputs.input_boxes.dims;
             model_inputs.input_labels = full([shape[0], shape[1], 0], -1n);
             model_inputs.input_points = full([shape[0], 1, 0, 2], 0.0);
-
         } else {
             throw new Error('At least one of `input_points` or `input_boxes` must be provided.');
         }
@@ -6291,10 +6296,9 @@ export class Sam2Model extends Sam2PreTrainedModel {
         return new Sam2ImageSegmentationOutput(await super._call(model_inputs));
     }
 }
-export class EdgeTamModel extends Sam2Model { } // NOTE: extends Sam2Model
-export class Sam3TrackerModel extends Sam2Model { } // NOTE: extends Sam2Model
+export class EdgeTamModel extends Sam2Model {} // NOTE: extends Sam2Model
+export class Sam3TrackerModel extends Sam2Model {} // NOTE: extends Sam2Model
 //////////////////////////////////////////////////
-
 
 //////////////////////////////////////////////////
 // MarianMT models
@@ -6992,9 +6996,8 @@ export class SpeechT5HifiGan extends PreTrainedModel {
 }
 //////////////////////////////////////////////////
 
-export class SupertonicPreTrainedModel extends PreTrainedModel { }
+export class SupertonicPreTrainedModel extends PreTrainedModel {}
 export class SupertonicForConditionalGeneration extends SupertonicPreTrainedModel {
-
     async generate_speech({
         // Required inputs
         input_ids,
@@ -7010,7 +7013,9 @@ export class SupertonicForConditionalGeneration extends SupertonicPreTrainedMode
 
         // 1. Text Encoder
         const { last_hidden_state, durations } = await sessionRun(this.sessions['text_encoder'], {
-            input_ids, attention_mask, style,
+            input_ids,
+            attention_mask,
+            style,
         });
         durations.div_(speed); // Apply speed factor to duration
 
@@ -7043,10 +7048,9 @@ export class SupertonicForConditionalGeneration extends SupertonicPreTrainedMode
         return {
             waveform,
             durations,
-        }
+        };
     }
 }
-
 
 //////////////////////////////////////////////////
 // TrOCR models
