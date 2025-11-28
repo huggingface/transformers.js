@@ -1,9 +1,9 @@
-import { 
+import {
     ImageProcessor,
 } from "../../base/image_processors_utils.js";
 
 export class PixtralImageProcessor extends ImageProcessor {
-    
+
     /** @type {ImageProcessor['get_resize_output_image_size']} */
     get_resize_output_image_size(image, size) {
         const { longest_edge } = size;
@@ -24,7 +24,10 @@ export class PixtralImageProcessor extends ImageProcessor {
 
         // @ts-expect-error TS2339
         const { patch_size, spatial_merge_size } = this.config;
-        const real_patch_size = patch_size * (spatial_merge_size ?? 1);
+        if (!spatial_merge_size) {
+            throw new Error("config must contain 'spatial_merge_size'");
+        }
+        const real_patch_size = patch_size * spatial_merge_size;
 
         // Calculate number of tokens
         const num_width_tokens = Math.floor((newWidth - 1) / real_patch_size) + 1;
