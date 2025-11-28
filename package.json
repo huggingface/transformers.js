@@ -25,8 +25,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typegen": "tsc --build",
-    "dev": "webpack serve --no-client-overlay",
-    "build": "webpack && npm run typegen",
+    "dev": "node scripts/esbuild/dev.mjs",
+    "build": "node scripts/esbuild/build.mjs && npm run typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
@@ -56,8 +56,10 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.5.1",
+    "esbuild": "^0.27.0",
     "onnxruntime-node": "1.24.0-dev.20251104-75d35474d5",
     "onnxruntime-web": "1.24.0-dev.20251104-75d35474d5",
+    "rimraf": "^6.1.2",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
@@ -69,10 +71,7 @@
     "jsdoc-to-markdown": "^9.1.1",
     "prettier": "3.4.2",
     "typescript": "^5.8.3",
-    "wavefile": "11.0.0",
-    "webpack": "^5.99.9",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.2"
+    "wavefile": "11.0.0"
   },
   "files": [
     "src",
