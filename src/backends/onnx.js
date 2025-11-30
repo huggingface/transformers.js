@@ -151,7 +151,13 @@ let webInitChain = Promise.resolve();
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     // Temporarily suppress console.error from WASM module warnings
     const originalConsoleError = console.error;
-    console.error = () => {};
+    console.error = (...e) => {
+        const errorMessage = e[0];
+        if(errorMessage.includes('LogEarlyWarning') || errorMessage.includes('VerifyEachNodeIsAssignedToAnEp')){
+            return;
+        }
+        originalConsoleError(...e);
+    };
 
     try {
         const load = () => InferenceSession.create(buffer_or_path, session_options);
