@@ -149,10 +149,19 @@ let webInitChain = Promise.resolve();
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
-    const load = () => InferenceSession.create(buffer_or_path, session_options);
-    const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
-    session.config = session_config;
-    return session;
+    // Temporarily suppress console.error from WASM module warnings
+    const originalConsoleError = console.error;
+    console.error = () => {};
+
+    try {
+        const load = () => InferenceSession.create(buffer_or_path, session_options);
+        const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+        session.config = session_config;
+        return session;
+    } finally {
+        // Restore console.error
+        console.error = originalConsoleError;
+    }
 }
 
 /**
