@@ -150,17 +150,17 @@ let webInitChain = Promise.resolve();
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
 
-  /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
-  const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
-  /** @type 0|1|2|3|4 */
-  const logSeverityLevel= (typeof session_options.logSeverityLevel !== 'number' || session_options.logSeverityLevel < 0 || session_options.logSeverityLevel > 4) ? 4 : session_options.logSeverityLevel;
+    /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
+    const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
+    /** @type 0|1|2|3|4 */
+    const logSeverityLevel= (typeof session_options.logSeverityLevel !== 'number' || session_options.logSeverityLevel < 0 || session_options.logSeverityLevel > 4) ? 4 : session_options.logSeverityLevel;
 
-  ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
+    ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
 
-  const load = () => InferenceSession.create(buffer_or_path, { ...session_options, logSeverityLevel });
-  const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
-  session.config = session_config;
-  return session;
+    const load = () => InferenceSession.create(buffer_or_path, { ...session_options, logSeverityLevel });
+    const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    session.config = session_config;
+    return session;
 }
 
 /**
