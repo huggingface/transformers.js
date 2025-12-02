@@ -9,5 +9,5 @@ export const NODE_EXTERNAL_MODULES = [
   "node:url",
 ];
 
-export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
+export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "stream", "stream/promises"];
 export const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];

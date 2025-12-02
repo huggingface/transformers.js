@@ -17,7 +17,17 @@ export const ignoreModulesPlugin = (modules = []) => ({
       return { path: args.path, namespace: "ignore-modules" };
     });
     build.onLoad({ filter: /.*/, namespace: "ignore-modules" }, () => {
-      return { contents: "export default {}" };
+      return {
+        contents: `
+          const noop = () => {};
+          const emptyObj = {};
+          export default emptyObj;
+          export const Readable = { fromWeb: noop };
+          export const pipeline = noop;
+          export const createWriteStream = noop;
+          export const createReadStream = noop;
+        `
+      };
     });
   },
 });
