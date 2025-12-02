@@ -157,7 +157,9 @@ export async function createInferenceSession(buffer_or_path, session_options, se
 
     ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
 
-    const load = () => InferenceSession.create(buffer_or_path, { ...session_options, logSeverityLevel });
+    session_options = { ...session_options, logSeverityLevel };
+
+    const load = () => InferenceSession.create(buffer_or_path, session_options);
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
     return session;
