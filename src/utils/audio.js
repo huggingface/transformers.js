@@ -9,10 +9,10 @@
 
 import { getFile } from './hub.js';
 import { FFT, max } from './maths.js';
-import { calculateReflectOffset, saveBlob } from './core.js';
+import { calculateReflectOffset } from './core.js';
+import { saveBlob } from './io.js';
 import { apis } from '../env.js';
 import { Tensor, matmul } from './tensor.js';
-import fs from 'node:fs';
 
 /**
  * Helper function to read audio from a path/URL.
@@ -733,23 +733,24 @@ export function window_function(window_length, name, { periodic = true, frame_le
 }
 
 /**
- * Encode audio data to a WAV file.
+ * Efficiently encode audio data to a WAV file.
  * WAV file specs : https://en.wikipedia.org/wiki/WAV#WAV_File_header
  *
  * Adapted from https://www.npmjs.com/package/audiobuffer-to-wav
- * @param {Float32Array} samples The audio samples.
+ * @param {Float32Array[]} chunks The audio samples.
  * @param {number} rate The sample rate.
- * @returns {ArrayBuffer} The WAV audio buffer.
+ * @returns {Blob} The WAV file as a Blob.
  */
-function encodeWAV(samples, rate) {
-    let offset = 44;
-    const buffer = new ArrayBuffer(offset + samples.length * 4);
+function encodeWAV(chunks, rate) {
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+
+    const buffer = new ArrayBuffer(44);
     const view = new DataView(buffer);
 
     /* RIFF identifier */
     writeString(view, 0, 'RIFF');
     /* RIFF chunk length */
-    view.setUint32(4, 36 + samples.length * 4, true);
+    view.setUint32(4, 36 + totalLength * 4, true);
     /* RIFF type */
     writeString(view, 8, 'WAVE');
     /* format chunk identifier */
@@ -771,13 +772,10 @@ function encodeWAV(samples, rate) {
     /* data chunk identifier */
     writeString(view, 36, 'data');
     /* data chunk length */
-    view.setUint32(40, samples.length * 4, true);
+    view.setUint32(40, totalLength * 4, true);
 
-    for (let i = 0; i < samples.length; ++i, offset += 4) {
-        view.setFloat32(offset, samples[i], true);
-    }
-
-    return buffer;
+    // @ts-expect-error TS2322
+    return new Blob([buffer, ...chunks], { type: "audio/wav" });
 }
 
 function writeString(view, offset, string) {
@@ -789,7 +787,7 @@ function writeString(view, offset, string) {
 export class RawAudio {
     /**
      * Create a new `RawAudio` object.
-     * @param {Float32Array} audio Audio data
+     * @param {Float32Array|Float32Array[]} audio Audio data, either as a single `Float32Array` chunk or multiple `Float32Array` chunks.
      * @param {number} sampling_rate Sampling rate of the audio data
      */
     constructor(audio, sampling_rate) {
@@ -798,11 +796,29 @@ export class RawAudio {
     }
 
     /**
-     * Convert the audio to a wav file buffer.
-     * @returns {ArrayBuffer} The WAV file.
+     * Get the audio data, accumulating all chunks if necessary.
+     * @returns {Float32Array} The audio data.
      */
-    toWav() {
-        return encodeWAV(this.audio, this.sampling_rate);
+    get data() {
+        if (Array.isArray(this.audio)) {
+            if (this.audio.length === 0) {
+                return new Float32Array(0);
+            }
+            if (this.audio.length === 1) {
+                return this.audio[0];
+            }
+            // Concatenate all chunks into a single Float32Array
+            const totalLength = this.audio.reduce((acc, chunk) => acc + chunk.length, 0);
+            const result = new Float32Array(totalLength);
+            let offset = 0;
+            for (const chunk of this.audio) {
+                result.set(chunk, offset);
+                offset += chunk.length;
+            }
+            return result;
+        } else {
+            return this.audio;
+        }
     }
 
     /**
@@ -810,32 +826,19 @@ export class RawAudio {
      * @returns {Blob}
      */
     toBlob() {
-        const wav = this.toWav();
-        const blob = new Blob([wav], { type: 'audio/wav' });
-        return blob;
+        let audio = this.audio;
+        if (audio instanceof Float32Array) {
+            audio = [audio]; // Ensure audio is an array of chunks
+        }
+        return encodeWAV(audio, this.sampling_rate);
     }
 
     /**
      * Save the audio to a wav file.
      * @param {string} path
+     * @returns {Promise<void>}
      */
     async save(path) {
-        let fn;
-
-        if (apis.IS_BROWSER_ENV) {
-            if (apis.IS_WEBWORKER_ENV) {
-                throw new Error('Unable to save a file from a Web Worker.');
-            }
-            fn = saveBlob;
-        } else if (apis.IS_FS_AVAILABLE) {
-            fn = async (/** @type {string} */ path, /** @type {Blob} */ blob) => {
-                let buffer = await blob.arrayBuffer();
-                fs.writeFileSync(path, Buffer.from(buffer));
-            };
-        } else {
-            throw new Error('Unable to save because filesystem is disabled in this environment.');
-        }
-
-        await fn(path, this.toBlob());
+        return saveBlob(path, this.toBlob());
     }
 }

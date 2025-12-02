@@ -4767,6 +4767,13 @@ export class NanoChatForCausalLM extends NanoChatPreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+// Apertus models
+export class ApertusPreTrainedModel extends PreTrainedModel {}
+export class ApertusModel extends ApertusPreTrainedModel {}
+export class ApertusForCausalLM extends ApertusPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
 // Arcee models
 export class ArceePreTrainedModel extends PreTrainedModel {}
 export class ArceeModel extends ArceePreTrainedModel {}
@@ -8259,6 +8266,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['gpt_neox', ['GPTNeoXModel', GPTNeoXModel]],
     ['codegen', ['CodeGenModel', CodeGenModel]],
     ['llama', ['LlamaModel', LlamaModel]],
+    ['apertus', ['ApertusModel', ApertusModel]],
     ['nanochat', ['NanoChatModel', NanoChatModel]],
     ['arcee', ['ArceeModel', ArceeModel]],
     ['lfm2', ['Lfm2Model', Lfm2Model]],
@@ -8372,6 +8380,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['codegen', ['CodeGenForCausalLM', CodeGenForCausalLM]],
     ['llama', ['LlamaForCausalLM', LlamaForCausalLM]],
     ['nanochat', ['NanoChatForCausalLM', NanoChatForCausalLM]],
+    ['apertus', ['ApertusForCausalLM', ApertusForCausalLM]],
     ['llama4_text', ['Llama4ForCausalLM', Llama4ForCausalLM]],
     ['arcee', ['ArceeForCausalLM', ArceeForCausalLM]],
     ['lfm2', ['Lfm2ForCausalLM', Lfm2ForCausalLM]],

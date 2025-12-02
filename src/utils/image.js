@@ -7,10 +7,11 @@
  * @module utils/image
  */
 
-import { isNullishDimension, saveBlob } from './core.js';
+import { isNullishDimension } from './core.js';
 import { getFile } from './hub.js';
 import { apis } from '../env.js';
 import { Tensor } from './tensor.js';
+import { saveBlob } from './io.js';
 
 // Will be empty (or not used) if running in browser or web-worker
 import sharp from 'sharp';
@@ -769,6 +770,7 @@ export class RawImage {
     /**
      * Save the image to the given path.
      * @param {string} path The path to save the image to.
+     * @returns {Promise<void>}
      */
     async save(path) {
         if (IS_BROWSER_OR_WEBWORKER) {
@@ -782,15 +784,19 @@ export class RawImage {
             // Convert image to Blob
             const blob = await this.toBlob(mime);
 
-            saveBlob(path, blob);
-        } else if (!apis.IS_FS_AVAILABLE) {
-            throw new Error('Unable to save the image because filesystem is disabled in this environment.');
-        } else {
+            return saveBlob(path, blob);
+        } else if (apis.IS_FS_AVAILABLE) {
             const img = this.toSharp();
-            return await img.toFile(path);
+            await img.toFile(path);
+        } else {
+            throw new Error('Unable to save the image because filesystem is disabled in this environment.');
         }
     }
 
+    /**
+     * Convert the image to a Sharp instance.
+     * @returns {import('sharp').Sharp} The Sharp instance.
+     */
     toSharp() {
         if (IS_BROWSER_OR_WEBWORKER) {
             throw new Error('toSharp() is only supported in server-side environments.');
