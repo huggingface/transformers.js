@@ -149,25 +149,18 @@ let webInitChain = Promise.resolve();
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
-    // Temporarily suppress console.error from WASM module warnings
-    const originalConsoleError = console.error;
-    console.error = (...e) => {
-        const errorMessage = e[0];
-        if(errorMessage.includes('LogEarlyWarning') || errorMessage.includes('VerifyEachNodeIsAssignedToAnEp')){
-            return;
-        }
-        originalConsoleError(...e);
-    };
 
-    try {
-        const load = () => InferenceSession.create(buffer_or_path, session_options);
-        const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
-        session.config = session_config;
-        return session;
-    } finally {
-        // Restore console.error
-        console.error = originalConsoleError;
-    }
+  /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
+  const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
+  /** @type 0|1|2|3|4 */
+  const logSeverityLevel= (typeof session_options.logSeverityLevel !== 'number' || session_options.logSeverityLevel < 0 || session_options.logSeverityLevel > 4) ? 4 : session_options.logSeverityLevel;
+
+  ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
+
+  const load = () => InferenceSession.create(buffer_or_path, { ...session_options, logSeverityLevel });
+  const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+  session.config = session_config;
+  return session;
 }
 
 /**

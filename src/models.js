@@ -241,6 +241,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // Overwrite `executionProviders` if not specified
     session_options.executionProviders ??= executionProviders;
+    // Set `logSeverityLevel` to 4 (fatal) if not specified
+    session_options.logSeverityLevel ??= 4;
 
     // Overwrite `freeDimensionOverrides` if specified in config and not set in session options
     const free_dimension_overrides = custom_config.free_dimension_overrides;
