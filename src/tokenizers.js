@@ -4352,8 +4352,6 @@ export class CohereTokenizer extends PreTrainedTokenizer { }
 
 export class MgpstrTokenizer extends PreTrainedTokenizer { }
 
-export class Ernie4_5_Tokenizer extends PreTrainedTokenizer { }
-
 /**
  * Helper class which is used to instantiate pretrained tokenizers with the `from_pretrained` function.
  * The chosen tokenizer class is determined by the type specified in the tokenizer config.
@@ -4408,7 +4406,6 @@ export class AutoTokenizer {
         Grok1Tokenizer,
         CohereTokenizer,
         MgpstrTokenizer,
-        Ernie4_5_Tokenizer,
 
         // Base case:
         PreTrainedTokenizer,

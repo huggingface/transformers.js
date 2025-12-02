@@ -6950,11 +6950,11 @@ export class MistralForCausalLM extends MistralPreTrainedModel { }
 
 //////////////////////////////////////////////////
 // ERNIE-4.5 models
-export class Ernie4_5_PretrainedModel extends PreTrainedModel { }
+export class Ernie4_5PreTrainedModel extends PreTrainedModel { }
 
-export class Ernie4_5_Model extends Ernie4_5_PretrainedModel { }
+export class Ernie4_5Model extends Ernie4_5PreTrainedModel { }
 
-export class Ernie4_5_ForCausalLM extends Ernie4_5_PretrainedModel { }
+export class Ernie4_5ForCausalLM extends Ernie4_5PreTrainedModel { }
 //////////////////////////////////////////////////
 
 
@@ -8041,7 +8041,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['mpt', ['MptModel', MptModel]],
     ['opt', ['OPTModel', OPTModel]],
     ['mistral', ['MistralModel', MistralModel]],
-    ['ernie4_5', ['Ernie4_5_Model', Ernie4_5_Model]],
+    ['ernie4_5', ['Ernie4_5Model', Ernie4_5Model]],
     ['starcoder2', ['Starcoder2Model', Starcoder2Model]],
     ['falcon', ['FalconModel', FalconModel]],
     ['stablelm', ['StableLmModel', StableLmModel]],
@@ -8155,7 +8155,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['opt', ['OPTForCausalLM', OPTForCausalLM]],
     ['mbart', ['MBartForCausalLM', MBartForCausalLM]],
     ['mistral', ['MistralForCausalLM', MistralForCausalLM]],
-    ['ernie4_5', ['Ernie4_5_ForCausalLM', Ernie4_5_ForCausalLM]],
+    ['ernie4_5', ['Ernie4_5ForCausalLM', Ernie4_5ForCausalLM]],
     ['starcoder2', ['Starcoder2ForCausalLM', Starcoder2ForCausalLM]],
     ['falcon', ['FalconForCausalLM', FalconForCausalLM]],
     ['trocr', ['TrOCRForCausalLM', TrOCRForCausalLM]],
