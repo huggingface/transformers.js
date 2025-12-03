@@ -152,7 +152,7 @@ export async function createInferenceSession(buffer_or_path, session_options, se
 
     /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
     const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
-    /** @type 0|1|2|3|4 */
+    /** @type {0|1|2|3|4} */
     const logSeverityLevel =
         typeof session_options.logSeverityLevel !== 'number' ||
         session_options.logSeverityLevel < 0 ||
