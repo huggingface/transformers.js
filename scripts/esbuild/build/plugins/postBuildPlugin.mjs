@@ -15,8 +15,8 @@ export const postBuildPlugin = (distDir, rootDir) => {
         if (completed) return;
         completed = true;
 
-        const ORT_JSEP_FILE = 'ort-wasm-simd-threaded.jsep.mjs';
-        const ORT_BUNDLE_FILE = 'ort.bundle.min.mjs';
+        const ORT_JSEP_FILE = "ort-wasm-simd-threaded.jsep.mjs";
+        const ORT_BUNDLE_FILE = "ort.bundle.min.mjs";
 
         // 1. Remove unnecessary files
         const file = path.join(distDir, ORT_BUNDLE_FILE);
@@ -24,10 +24,7 @@ export const postBuildPlugin = (distDir, rootDir) => {
 
         // 2. Copy unbundled JSEP file
         try {
-          const ORT_SOURCE_DIR = path.join(
-            rootDir,
-            "node_modules/onnxruntime-web/dist",
-          );
+          const ORT_SOURCE_DIR = path.join(rootDir, "node_modules/onnxruntime-web/dist");
           const src = path.join(ORT_SOURCE_DIR, ORT_JSEP_FILE);
           const dest = path.join(distDir, ORT_JSEP_FILE);
           copyFileSync(src, dest);

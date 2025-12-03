@@ -1,18 +1,23 @@
 import { build as esbuild } from "esbuild";
-import { execSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { stripNodePrefixPlugin } from "./build/plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./build/plugins/ignoreModulesPlugin.mjs";
 import { postBuildPlugin } from "./build/plugins/postBuildPlugin.mjs";
-import { DIST_FOLDER, NODE_IGNORE_MODULES, NODE_EXTERNAL_MODULES, WEB_IGNORE_MODULES, WEB_EXTERNAL_MODULES } from "./build/constants.mjs";
+import { externalNodeBuiltinsPlugin } from "./build/plugins/externalNodeBuiltinsPlugin.mjs";
+import {
+  NODE_IGNORE_MODULES,
+  NODE_EXTERNAL_MODULES,
+  WEB_IGNORE_MODULES,
+  WEB_EXTERNAL_MODULES,
+  OUT_DIR,
+  ROOT_DIR,
+  getEsbuildProdConfig,
+} from "./build/constants.mjs";
 import { reportSize } from "./build/reportSize.mjs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.join(__dirname, "../..");
+import prepareOutDir from "./build/prepareOutDir.mjs";
 
 /**
+ *
  * Helper function to create build configurations.
  * Equivalent to webpack's buildConfig function.
  */
@@ -25,11 +30,6 @@ async function buildTarget({
   usePostBuild = false,
 }) {
   const platform = format === "cjs" ? "node" : "neutral";
-  const outdir = path.join(rootDir, DIST_FOLDER);
-
-  if (!existsSync(outdir)) {
-    mkdirSync(outdir, { recursive: true });
-  }
 
   const regularFile = `transformers${name}${suffix}`;
   const minFile = `transformers${name}.min${suffix}`;
@@ -40,49 +40,34 @@ async function buildTarget({
     plugins.push(ignoreModulesPlugin(ignoreModules));
   }
   plugins.push(stripNodePrefixPlugin());
+  plugins.push(externalNodeBuiltinsPlugin());
   if (usePostBuild) {
-    plugins.push(postBuildPlugin(outdir, rootDir));
+    plugins.push(postBuildPlugin(OUT_DIR, ROOT_DIR));
   }
 
   console.log(`\nBuilding ${regularFile}...`);
   await esbuild({
-    bundle: true,
-    treeShaking: true,
-    logLevel: "warning",
-    entryPoints: [path.join(rootDir, "src/transformers.js")],
+    ...getEsbuildProdConfig(ROOT_DIR),
     platform,
     format,
-    outfile: path.join(outdir, regularFile),
-    sourcemap: true,
+    outfile: path.join(OUT_DIR, regularFile),
     external: externalModules,
     plugins,
-    logOverride: {
-      // Suppress import.meta warning for CJS builds - it's handled gracefully in the code
-      "empty-import-meta": "silent",
-    },
   });
-  reportSize(path.join(outdir, regularFile));
+  reportSize(path.join(OUT_DIR, regularFile));
 
   console.log(`\nBuilding ${minFile}...`);
   await esbuild({
-    bundle: true,
-    treeShaking: true,
-    logLevel: "warning",
-    entryPoints: [path.join(rootDir, "src/transformers.js")],
+    ...getEsbuildProdConfig(ROOT_DIR),
     platform,
     format,
-    outfile: path.join(outdir, minFile),
-    sourcemap: true,
+    outfile: path.join(OUT_DIR, minFile),
     minify: true,
     external: externalModules,
     plugins,
     legalComments: "none",
-    logOverride: {
-      // Suppress import.meta warning for CJS builds - it's handled gracefully in the code
-      "empty-import-meta": "silent",
-    },
   });
-  reportSize(path.join(outdir, minFile));
+  reportSize(path.join(OUT_DIR, minFile));
 }
 
 console.log("\nBuilding transformers.js with esbuild...\n");
@@ -90,8 +75,7 @@ console.log("\nBuilding transformers.js with esbuild...\n");
 const startTime = performance.now();
 
 try {
-  console.log("=== CLEAN ===");
-  execSync(`rimraf ${DIST_FOLDER}`, { stdio: "inherit" });
+  prepareOutDir(OUT_DIR);
 
   // Bundle build - bundles everything except ignored modules
   console.log("\n=== Bundle Build (ESM) ===");

@@ -56,16 +56,15 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
     "@huggingface/jinja": "^0.5.1",
-    "esbuild": "^0.27.0",
     "onnxruntime-node": "1.24.0-dev.20251104-75d35474d5",
     "onnxruntime-web": "1.24.0-dev.20251104-75d35474d5",
-    "rimraf": "^6.1.2",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.11",
     "@webgpu/types": "^0.1.64",
+    "esbuild": "^0.27.0",
     "jest": "^30.0.4",
     "jest-environment-node": "^30.0.4",
     "jsdoc-to-markdown": "^9.1.1",

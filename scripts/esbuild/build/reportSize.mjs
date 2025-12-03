@@ -12,7 +12,5 @@ export const reportSize = (outfile) => {
   const size = content.length;
   const gzipSize = gzipSync(content).length;
 
-  console.log(
-    `\n${outfile}\n${formatSize(size)} (gzip: ${formatSize(gzipSize)})`,
-  );
+  console.log(`\n${outfile}\n${formatSize(size)} (gzip: ${formatSize(gzipSize)})`);
 };

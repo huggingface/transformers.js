@@ -6,11 +6,11 @@ export const ignoreModulesPlugin = (modules = []) => ({
   name: "ignore-modules",
   setup(build) {
     // Escape special regex characters in module names
-    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const escapedModules = modules.map(escapeRegex);
 
     // Match both "module" and "node:module" patterns
-    const patterns = escapedModules.flatMap(mod => [mod, `node:${mod}`]);
+    const patterns = escapedModules.flatMap((mod) => [mod, `node:${mod}`]);
     const filter = new RegExp(`^(${patterns.join("|")})$`);
 
     build.onResolve({ filter }, (args) => {
@@ -26,7 +26,7 @@ export const ignoreModulesPlugin = (modules = []) => ({
           export const pipeline = noop;
           export const createWriteStream = noop;
           export const createReadStream = noop;
-        `
+        `,
       };
     });
   },
