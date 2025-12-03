@@ -46,6 +46,9 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
+/** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
+const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
+
 /**
  * The list of supported devices, sorted by priority/performance.
  * @type {import("../utils/devices.js").DeviceType[]}
@@ -150,8 +153,6 @@ let webInitChain = Promise.resolve();
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
 
-    /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
-    const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
     /** @type {0|1|2|3|4} */
     const logSeverityLevel =
         typeof session_options.logSeverityLevel !== 'number' ||
