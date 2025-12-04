@@ -4,18 +4,22 @@
  * @module utils/hub
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-
 import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
+import FileResponse from './hub/FileResponse.js';
+import FileCache from './hub/FileCache.js';
+import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
+import { getCache, tryCache } from './cache.js';
+
+export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
 /**
- * @typedef {boolean|number} ExternalData Whether to load the model using the external data format (used for models >= 2GB in size).
- * If `true`, the model will be loaded using the external data format.
- * If a number, this many chunks will be loaded using the external data format (of the form: "model.onnx_data[_{chunk_number}]").
+ * @typedef {boolean|number} ExternalData
+ * Specifies whether to load the model using the external data format.
+ * - `false`: Do not use external data format
+ * - `true`: Use external data format with 1 chunk
+ * - `number`: Use external data format with the specified number of chunks
  */
-export const MAX_EXTERNAL_DATA_CHUNKS = 100;
 
 /**
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.
@@ -44,165 +48,6 @@ export const MAX_EXTERNAL_DATA_CHUNKS = 100;
 /**
  * @typedef {PretrainedOptions & ModelSpecificPretrainedOptions} PretrainedModelOptions Options for loading a pretrained model.
  */
-
-/**
- * Mapping from file extensions to MIME types.
- */
-const CONTENT_TYPE_MAP = {
-    txt: 'text/plain',
-    html: 'text/html',
-    css: 'text/css',
-    js: 'text/javascript',
-    json: 'application/json',
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    gif: 'image/gif',
-};
-class FileResponse {
-    /**
-     * Creates a new `FileResponse` object.
-     * @param {string} filePath
-     */
-    constructor(filePath) {
-        this.filePath = filePath;
-        this.headers = new Headers();
-
-        this.exists = fs.existsSync(filePath);
-        if (this.exists) {
-            this.status = 200;
-            this.statusText = 'OK';
-
-            let stats = fs.statSync(filePath);
-            this.headers.set('content-length', stats.size.toString());
-
-            this.updateContentType();
-
-            const stream = fs.createReadStream(filePath);
-            this.body = new ReadableStream({
-                start(controller) {
-                    stream.on('data', (chunk) => controller.enqueue(chunk));
-                    stream.on('end', () => controller.close());
-                    stream.on('error', (err) => controller.error(err));
-                },
-                cancel() {
-                    stream.destroy();
-                },
-            });
-        } else {
-            this.status = 404;
-            this.statusText = 'Not Found';
-            this.body = null;
-        }
-    }
-
-    /**
-     * Updates the 'content-type' header property of the response based on the extension of
-     * the file specified by the filePath property of the current object.
-     * @returns {void}
-     */
-    updateContentType() {
-        // Set content-type header based on file extension
-        const extension = this.filePath.toString().split('.').pop().toLowerCase();
-        this.headers.set('content-type', CONTENT_TYPE_MAP[extension] ?? 'application/octet-stream');
-    }
-
-    /**
-     * Clone the current FileResponse object.
-     * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
-     */
-    clone() {
-        let response = new FileResponse(this.filePath);
-        response.exists = this.exists;
-        response.status = this.status;
-        response.statusText = this.statusText;
-        response.headers = new Headers(this.headers);
-        return response;
-    }
-
-    /**
-     * Reads the contents of the file specified by the filePath property and returns a Promise that
-     * resolves with an ArrayBuffer containing the file's contents.
-     * @returns {Promise<ArrayBuffer>} A Promise that resolves with an ArrayBuffer containing the file's contents.
-     * @throws {Error} If the file cannot be read.
-     */
-    async arrayBuffer() {
-        const data = await fs.promises.readFile(this.filePath);
-        return /** @type {ArrayBuffer} */ (data.buffer);
-    }
-
-    /**
-     * Reads the contents of the file specified by the filePath property and returns a Promise that
-     * resolves with a Blob containing the file's contents.
-     * @returns {Promise<Blob>} A Promise that resolves with a Blob containing the file's contents.
-     * @throws {Error} If the file cannot be read.
-     */
-    async blob() {
-        const data = await fs.promises.readFile(this.filePath);
-        return new Blob([/** @type {any} */ (data)], { type: this.headers.get('content-type') });
-    }
-
-    /**
-     * Reads the contents of the file specified by the filePath property and returns a Promise that
-     * resolves with a string containing the file's contents.
-     * @returns {Promise<string>} A Promise that resolves with a string containing the file's contents.
-     * @throws {Error} If the file cannot be read.
-     */
-    async text() {
-        const data = await fs.promises.readFile(this.filePath, 'utf8');
-        return data;
-    }
-
-    /**
-     * Reads the contents of the file specified by the filePath property and returns a Promise that
-     * resolves with a parsed JavaScript object containing the file's contents.
-     *
-     * @returns {Promise<Object>} A Promise that resolves with a parsed JavaScript object containing the file's contents.
-     * @throws {Error} If the file cannot be read.
-     */
-    async json() {
-        return JSON.parse(await this.text());
-    }
-}
-
-/**
- * Determines whether the given string is a valid URL.
- * @param {string|URL} string The string to test for validity as an URL.
- * @param {string[]} [protocols=null] A list of valid protocols. If specified, the protocol must be in this list.
- * @param {string[]} [validHosts=null] A list of valid hostnames. If specified, the URL's hostname must be in this list.
- * @returns {boolean} True if the string is a valid URL, false otherwise.
- */
-function isValidUrl(string, protocols = null, validHosts = null) {
-    let url;
-    try {
-        url = new URL(string);
-    } catch (_) {
-        return false;
-    }
-    if (protocols && !protocols.includes(url.protocol)) {
-        return false;
-    }
-    if (validHosts && !validHosts.includes(url.hostname)) {
-        return false;
-    }
-    return true;
-}
-
-const REPO_ID_REGEX = /^(\b[\w\-.]+\b\/)?\b[\w\-.]{1,96}\b$/;
-
-/**
- * Tests whether a string is a valid Hugging Face model ID or not.
- * Adapted from https://github.com/huggingface/huggingface_hub/blob/6378820ebb03f071988a96c7f3268f5bdf8f9449/src/huggingface_hub/utils/_validators.py#L119-L170
- *
- * @param {string} string The string to test
- * @returns {boolean} True if the string is a valid model ID, false otherwise.
- */
-function isValidHfModelId(string) {
-    if (!REPO_ID_REGEX.test(string)) return false;
-    if (string.includes('..') || string.includes('--')) return false;
-    if (string.endsWith('.git') || string.endsWith('.ipynb')) return false;
-    return true;
-}
 
 /**
  * Helper function to get a file, using either the Fetch API or FileSystem API.
@@ -246,142 +91,6 @@ export async function getFile(urlOrPath) {
     }
 }
 
-const ERROR_MAPPING = {
-    // 4xx errors (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses)
-    400: 'Bad request error occurred while trying to load file',
-    401: 'Unauthorized access to file',
-    403: 'Forbidden access to file',
-    404: 'Could not locate file',
-    408: 'Request timeout error occurred while trying to load file',
-
-    // 5xx errors (https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses)
-    500: 'Internal server error error occurred while trying to load file',
-    502: 'Bad gateway error occurred while trying to load file',
-    503: 'Service unavailable error occurred while trying to load file',
-    504: 'Gateway timeout error occurred while trying to load file',
-};
-/**
- * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
- * @param {number} status The HTTP status code of the error.
- * @param {string} remoteURL The URL of the file that could not be loaded.
- * @param {boolean} fatal Whether to raise an error if the file could not be loaded.
- * @returns {null} Returns `null` if `fatal = true`.
- * @throws {Error} If `fatal = false`.
- */
-function handleError(status, remoteURL, fatal) {
-    if (!fatal) {
-        // File was not loaded correctly, but it is optional.
-        // TODO in future, cache the response?
-        return null;
-    }
-
-    const message = ERROR_MAPPING[status] ?? `Error (${status}) occurred while trying to load file`;
-    throw Error(`${message}: "${remoteURL}".`);
-}
-
-class FileCache {
-    /**
-     * Instantiate a `FileCache` object.
-     * @param {string} path
-     */
-    constructor(path) {
-        this.path = path;
-    }
-
-    /**
-     * Checks whether the given request is in the cache.
-     * @param {string} request
-     * @returns {Promise<FileResponse | undefined>}
-     */
-    async match(request) {
-        let filePath = path.join(this.path, request);
-        let file = new FileResponse(filePath);
-
-        if (file.exists) {
-            return file;
-        } else {
-            return undefined;
-        }
-    }
-
-    /**
-     * Adds the given response to the cache.
-     * @param {string} request
-     * @param {Response} response
-     * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
-     * The function to call with progress updates
-     * @returns {Promise<void>}
-     */
-    async put(request, response, progress_callback = undefined) {
-        let filePath = path.join(this.path, request);
-
-        try {
-            const contentLength = response.headers.get('Content-Length');
-            const total = parseInt(contentLength ?? '0');
-            let loaded = 0;
-
-            await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-            const fileStream = fs.createWriteStream(filePath);
-            const reader = response.body.getReader();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    break;
-                }
-
-                await new Promise((resolve, reject) => {
-                    fileStream.write(value, (err) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        resolve();
-                    });
-                });
-
-                loaded += value.length;
-                const progress = total ? (loaded / total) * 100 : 0;
-
-                progress_callback?.({ progress, loaded, total });
-            }
-
-            fileStream.close();
-        } catch (error) {
-            // Clean up the file if an error occurred during download
-            try {
-                await fs.promises.unlink(filePath);
-            } catch {}
-            throw error;
-        }
-    }
-
-    // TODO add the rest?
-    // addAll(requests: RequestInfo[]): Promise<void>;
-    // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
-    // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
-    // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
-    // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
-}
-
-/**
- *
- * @param {FileCache|Cache} cache The cache to search
- * @param {string[]} names The names of the item to search for
- * @returns {Promise<FileResponse|Response|undefined>} The item from the cache, or undefined if not found.
- */
-async function tryCache(cache, ...names) {
-    for (let name of names) {
-        try {
-            let result = await cache.match(name);
-            if (result) return result;
-        } catch (e) {
-            continue;
-        }
-    }
-    return undefined;
-}
-
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
  * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
@@ -419,49 +128,8 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename,
     });
 
-    // First, check if the a caching backend is available
-    // If no caching mechanism available, will download the file every time
-    let cache;
-    if (!cache && env.useCustomCache) {
-        // Allow the user to specify a custom cache system.
-        if (!env.customCache) {
-            throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.');
-        }
-
-        // Check that the required methods are defined:
-        if (!env.customCache.match || !env.customCache.put) {
-            throw new Error(
-                '`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. ' +
-                    'For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache',
-            );
-        }
-        cache = env.customCache;
-    }
-
-    if (!cache && env.useBrowserCache) {
-        if (typeof caches === 'undefined') {
-            throw Error('Browser cache is not available in this environment.');
-        }
-        try {
-            // In some cases, the browser cache may be visible, but not accessible due to security restrictions.
-            // For example, when running an application in an iframe, if a user attempts to load the page in
-            // incognito mode, the following error is thrown: `DOMException: Failed to execute 'open' on 'CacheStorage':
-            // An attempt was made to break through the security policy of the user agent.`
-            // So, instead of crashing, we just ignore the error and continue without using the cache.
-            cache = await caches.open(env.cacheKey);
-        } catch (e) {
-            console.warn('An error occurred while opening the browser cache:', e);
-        }
-    }
-
-    if (!cache && env.useFSCache) {
-        if (!apis.IS_FS_AVAILABLE) {
-            throw Error('File System Cache is not available in this environment.');
-        }
-
-        // If `cache_dir` is not specified, use the default cache directory
-        cache = new FileCache(options.cache_dir ?? env.cacheDir);
-    }
+    /** @type {import('./cache.js').CacheInterface | null} */
+    const cache = await getCache(options?.cache_dir);
 
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
@@ -491,7 +159,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|FileResponse|undefined} */
+    /** @type {Response|import('./hub/FileResponse.js').default|undefined} */
     let response;
 
     if (cache) {
@@ -503,7 +171,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     }
 
     const cacheHit = response !== undefined;
-    if (response === undefined) {
+    if (!cacheHit) {
         // Caching not available, or file is not cached, so we perform the request
 
         if (env.allowLocalModels) {
@@ -725,74 +393,4 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
     }
 
     return JSON.parse(text);
-}
-/**
- * Read and track progress when reading a Response object
- *
- * @param {Response|FileResponse} response The Response object to read
- * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
- * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
- */
-async function readResponse(response, progress_callback) {
-    const contentLength = response.headers.get('Content-Length');
-    if (contentLength === null) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
-    }
-    let total = parseInt(contentLength ?? '0');
-    let buffer = new Uint8Array(total);
-    let loaded = 0;
-
-    const reader = response.body.getReader();
-    async function read() {
-        const { done, value } = await reader.read();
-        if (done) return;
-
-        const newLoaded = loaded + value.length;
-        if (newLoaded > total) {
-            total = newLoaded;
-
-            // Adding the new data will overflow buffer.
-            // In this case, we extend the buffer
-            const newBuffer = new Uint8Array(total);
-
-            // copy contents
-            newBuffer.set(buffer);
-
-            buffer = newBuffer;
-        }
-        buffer.set(value, loaded);
-        loaded = newLoaded;
-
-        const progress = (loaded / total) * 100;
-
-        // Call your function here
-        progress_callback({ progress, loaded, total });
-
-        return read();
-    }
-
-    // Actually read
-    await read();
-
-    return buffer;
-}
-
-/**
- * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
- *
- * @param {...string} parts Multiple parts of a path.
- * @returns {string} A string representing the joined path.
- */
-function pathJoin(...parts) {
-    // https://stackoverflow.com/a/55142565
-    parts = parts.map((part, index) => {
-        if (index) {
-            part = part.replace(new RegExp('^/'), '');
-        }
-        if (index !== parts.length - 1) {
-            part = part.replace(new RegExp('/$'), '');
-        }
-        return part;
-    });
-    return parts.join('/');
 }
