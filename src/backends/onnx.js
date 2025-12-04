@@ -153,12 +153,6 @@ let wasmLoadPromise = null;
  * Ensures the WASM binary is loaded and cached before creating an inference session.
  * Only runs once, even if called multiple times.
  *
- * Note: This caches the WASM binary via the wasmBinary option, which allows it to work offline.
- * However, the MJS loader file still needs to be fetched from the network (or bundled).
- * For full offline support including the MJS file, you need to either:
- * 1. Use a Service Worker to cache all network requests
- * 2. Bundle onnxruntime-web with your application
- *
  * @returns {Promise<void>}
  */
 async function ensureWasmLoaded() {
