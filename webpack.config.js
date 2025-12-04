@@ -171,12 +171,14 @@ const NODE_EXTERNAL_MODULES = [
   "node:fs",
   "node:path",
   "node:url",
+  "node:stream",
+  "node:stream/promises",
 ];
 
 // Do not bundle node-only packages when bundling for the web.
 // NOTE: We can exclude the "node:" prefix for built-in modules here,
 // since we apply the `StripNodePrefixPlugin` to strip it.
-const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url"];
+const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "stream", "stream/promises"];
 
 // Do not bundle the following modules with webpack (mark as external)
 const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];

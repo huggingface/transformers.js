@@ -18,7 +18,7 @@ import { AutoModel } from '../models.js';
 
 /**
  * @typedef {Object} TextToAudioOutput
- * @property {Float32Array} audio The generated audio waveform.
+ * @property {Float32Array|Float32Array[]} audio The generated audio waveform.
  * @property {number} sampling_rate The sampling rate of the generated audio waveform.
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
