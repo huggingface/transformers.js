@@ -22,6 +22,7 @@ import { env, apis } from '../env.js';
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
+import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 
 export { Tensor } from 'onnxruntime-common';
 
@@ -142,6 +143,79 @@ const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
 let webInitChain = Promise.resolve();
 
 /**
+ * Promise that resolves when WASM binary has been loaded (if caching is enabled).
+ * This ensures we only attempt to load the WASM binary once.
+ * @type {Promise<void>|null}
+ */
+let wasmLoadPromise = null;
+
+/**
+ * Ensures the WASM binary is loaded and cached before creating an inference session.
+ * Only runs once, even if called multiple times.
+ *
+ * @returns {Promise<void>}
+ */
+async function ensureWasmLoaded() {
+    // If already loading or loaded, return the existing promise
+    if (wasmLoadPromise) {
+        return wasmLoadPromise;
+    }
+
+    const shouldUseWasmCache =
+        env.useWasmCache &&
+        typeof ONNX_ENV?.wasm?.wasmPaths === 'object' &&
+        ONNX_ENV?.wasm?.wasmPaths?.wasm &&
+        ONNX_ENV?.wasm?.wasmPaths?.mjs;
+
+    // Check if we should load the WASM binary
+    if (!shouldUseWasmCache) {
+        wasmLoadPromise = Promise.resolve();
+        return wasmLoadPromise;
+    }
+
+    // Start loading the WASM binary
+    wasmLoadPromise = (async () => {
+        // At this point, we know wasmPaths is an object (not a string) because
+        // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
+        const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
+
+        // Load and cache both the WASM binary and factory
+        await Promise.all([
+            // Load and cache the WASM binary
+            urls.wasm
+                ? (async () => {
+                      try {
+                          const wasmBinary = await loadWasmBinary(urls.wasm);
+                          if (wasmBinary) {
+                              ONNX_ENV.wasm.wasmBinary = wasmBinary;
+                          }
+                      } catch (err) {
+                          console.warn('Failed to pre-load WASM binary:', err);
+                      }
+                  })()
+                : Promise.resolve(),
+
+            // Load and cache the WASM factory
+            urls.mjs
+                ? (async () => {
+                      try {
+                          const wasmFactoryBlob = await loadWasmFactory(urls.mjs);
+                          if (wasmFactoryBlob) {
+                              // @ts-ignore
+                              ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
+                          }
+                      } catch (err) {
+                          console.warn('Failed to pre-load WASM factory:', err);
+                      }
+                  })()
+                : Promise.resolve(),
+        ]);
+    })();
+
+    return wasmLoadPromise;
+}
+
+/**
  * Create an ONNX inference session.
  * @param {Uint8Array|string} buffer_or_path The ONNX model buffer or path.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
@@ -149,6 +223,8 @@ let webInitChain = Promise.resolve();
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
+    await ensureWasmLoaded();
+
     const load = () => InferenceSession.create(buffer_or_path, session_options);
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
@@ -201,14 +277,14 @@ if (ONNX_ENV?.wasm) {
 
         ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI
             ? {
-                  mjs: `${wasmPathPrefix}/ort-wasm-simd-threaded.mjs`,
-                  wasm: `${wasmPathPrefix}/ort-wasm-simd-threaded.wasm`,
+                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.mjs`,
+                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.wasm`,
               }
-            : wasmPathPrefix;
+            : {
+                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.mjs`,
+                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.wasm`,
+              };
     }
-
-    // TODO: Add support for loading WASM files from cached buffer when we upgrade to onnxruntime-web@1.19.0
-    // https://github.com/microsoft/onnxruntime/pull/21534
 
     // Users may wish to proxy the WASM backend to prevent the UI from freezing,
     // However, this is not necessary when using WebGPU, so we default to false.
