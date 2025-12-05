@@ -3,7 +3,7 @@ import FileCache from './hub/FileCache.js';
 
 /**
  * @typedef {Object} CacheInterface
- * @property {(request: string) => Promise<Response|import('./hub/FileResponse.js').default|undefined>} match
+ * @property {(request: string) => Promise<Response|import('./hub/FileResponse.js').default|undefined|string>} match
  * Checks if a request is in the cache and returns the cached response if found.
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
@@ -67,7 +67,7 @@ export async function getCache(file_cache_dir = null) {
  * Searches the cache for any of the provided names and returns the first match found.
  * @param {CacheInterface} cache The cache to search
  * @param {...string} names The names of the items to search for
- * @returns {Promise<import('./hub/FileResponse.js').default|Response|undefined>} The item from the cache, or undefined if not found.
+ * @returns {Promise<import('./hub/FileResponse.js').default|Response|undefined|string>} The item from the cache, or undefined if not found.
  */
 export async function tryCache(cache, ...names) {
     for (let name of names) {

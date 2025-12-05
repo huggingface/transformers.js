@@ -3,7 +3,7 @@ import { getCache } from '../../utils/cache.js';
 /**
  * Loads and caches a file from the given URL.
  * @param {string} url The URL of the file to load.
- * @returns {Promise<Response|import('../../utils/hub/FileResponse.js').default|null>} The response object, or null if loading failed.
+ * @returns {Promise<Response|import('../../utils/hub/FileResponse.js').default|null|string>} The response object, or null if loading failed.
  */
 async function loadAndCacheFile(url) {
     const fileName = url.split('/').pop();
@@ -50,7 +50,7 @@ async function loadAndCacheFile(url) {
 
 export async function loadWasmBinary(wasmURL) {
     const response = await loadAndCacheFile(wasmURL);
-    if (!response) return null;
+    if (!response || typeof response === 'string') return null;
 
     try {
         return await response.arrayBuffer();
@@ -67,7 +67,7 @@ export async function loadWasmBinary(wasmURL) {
  */
 export async function loadWasmFactory(libURL) {
     const response = await loadAndCacheFile(libURL);
-    if (!response) return null;
+    if (!response || typeof response === 'string') return null;
 
     try {
         let code = await response.text();

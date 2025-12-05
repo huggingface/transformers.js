@@ -159,7 +159,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|import('./hub/FileResponse.js').default|undefined} */
+    /** @type {Response|import('./hub/FileResponse.js').default|undefined|string} */
     let response;
 
     if (cache) {
@@ -196,7 +196,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             }
         }
 
-        if (response === undefined || response.status === 404) {
+        if (response === undefined || (typeof response !== 'string' && response.status === 404)) {
             // File not found locally. This means either:
             // - The user has disabled local file access (`env.allowLocalModels=false`)
             // - the path is a valid HTTP url (`response === undefined`)
@@ -253,14 +253,15 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         /** @type {Uint8Array} */
         let buffer;
 
-        if (!options.progress_callback) {
+        if (!options.progress_callback && typeof response !== 'string') {
             // If no progress callback is specified, we can use the `.arrayBuffer()`
             // method to read the response.
             buffer = new Uint8Array(await response.arrayBuffer());
         } else if (
             cacheHit && // The item is being read from the cache
             typeof navigator !== 'undefined' &&
-            /firefox/i.test(navigator.userAgent) // We are in Firefox
+            /firefox/i.test(navigator.userAgent) && // We are in Firefox
+            typeof response !== 'string'
         ) {
             // Due to bug in Firefox, we cannot display progress when loading from cache.
             // Fortunately, since this should be instantaneous, this should not impact users too much.
@@ -275,7 +276,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 loaded: buffer.length,
                 total: buffer.length,
             });
-        } else {
+        } else if (typeof response !== 'string') {
             buffer = await readResponse(response, (data) => {
                 dispatchCallback(options.progress_callback, {
                     status: 'progress',
@@ -309,7 +310,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                       })
                 : undefined;
             await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
-        } else {
+        } else if (typeof response !== 'string') {
             // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
             await cache
                 .put(
