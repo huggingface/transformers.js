@@ -1,7 +1,4 @@
-transformers[torch]==4.49.0
-onnxruntime==1.20.1
-optimum@git+https://github.com/huggingface/optimum.git@b04feaea78cda58d79b8da67dca3fd0c4ab33435
-onnx==1.17.0
-tqdm==4.67.1
-onnxslim==0.1.48
-numpy==2.2.6
+optimum-onnx==0.0.3
+onnxruntime==1.23.2
+onnxslim==0.1.78
+accelerate==1.12.0
