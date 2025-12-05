@@ -220,6 +220,12 @@ def quantize_fp16(
         disable_shape_infer=disable_shape_infer,
         op_block_list=blocked_ops,
     )
+    try:
+        # Check the model
+        onnx.checker.check_model(model_fp16, full_check=True)
+    except Exception as e:
+        import onnxslim
+        model_fp16 = onnxslim.slim(model_fp16)
     check_and_save_model(model_fp16, save_path)
 
 
