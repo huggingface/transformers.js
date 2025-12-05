@@ -124,6 +124,9 @@ const localModelPath = RUNNING_LOCALLY
  * @property {Object} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
  * If you wish, you may also return a `Promise<string>` from the `match` function if you'd like to use a file path instead of `Promise<Response>`.
+ * @property {string|null} [DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN=null] Access token used when making requests to the Hugging Face Hub.
+ * This value is visible to every user of your application. Only set it when the user is explicitly providing
+ * their own token (e.g., via an input field). Do not use it for any other purpose and use at your own risk.
  */
 
 /** @type {TransformersEnvironment} */
@@ -155,6 +158,8 @@ export const env = {
     useCustomCache: false,
     customCache: null,
     //////////////////////////////////////////////////////
+
+    DANGEROUSLY_AVAILABLE_TO_EVERY_USER_HF_TOKEN: null,
 }
 
 
