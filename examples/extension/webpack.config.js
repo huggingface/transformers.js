@@ -22,6 +22,26 @@ const config = {
         path: path.resolve(__dirname, 'build'),
         filename: '[name].js',
     },
+    resolve: {
+        fallback: {
+            "fs": false,
+            "path": false,
+            "url": false,
+        }
+    },
+    module: {
+        parser: {
+            javascript: {
+                importMeta: false,
+            },
+        },
+    },
+    ignoreWarnings: [
+        {
+            module: /node_modules\/@huggingface\/transformers/,
+            message: /Critical dependency: Accessing import\.meta directly is unsupported/,
+        },
+    ],
     plugins: [
         new HtmlWebpackPlugin({
             template: './src/popup.html',
