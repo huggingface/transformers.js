@@ -253,38 +253,39 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         /** @type {Uint8Array} */
         let buffer;
 
-        if (!options.progress_callback && typeof response !== 'string') {
-            // If no progress callback is specified, we can use the `.arrayBuffer()`
-            // method to read the response.
-            buffer = new Uint8Array(await response.arrayBuffer());
-        } else if (
-            cacheHit && // The item is being read from the cache
-            typeof navigator !== 'undefined' &&
-            /firefox/i.test(navigator.userAgent) && // We are in Firefox
-            typeof response !== 'string'
-        ) {
-            // Due to bug in Firefox, we cannot display progress when loading from cache.
-            // Fortunately, since this should be instantaneous, this should not impact users too much.
-            buffer = new Uint8Array(await response.arrayBuffer());
+        if (typeof response !== 'string') {
+            if (!options.progress_callback) {
+                // If no progress callback is specified, we can use the `.arrayBuffer()`
+                // method to read the response.
+                buffer = new Uint8Array(await response.arrayBuffer());
+            } else if (
+                cacheHit && // The item is being read from the cache
+                typeof navigator !== 'undefined' &&
+                /firefox/i.test(navigator.userAgent) // We are in Firefox
+            ) {
+                // Due to bug in Firefox, we cannot display progress when loading from cache.
+                // Fortunately, since this should be instantaneous, this should not impact users too much.
+                buffer = new Uint8Array(await response.arrayBuffer());
 
-            // For completeness, we still fire the final progress callback
-            dispatchCallback(options.progress_callback, {
-                status: 'progress',
-                name: path_or_repo_id,
-                file: filename,
-                progress: 100,
-                loaded: buffer.length,
-                total: buffer.length,
-            });
-        } else if (typeof response !== 'string') {
-            buffer = await readResponse(response, (data) => {
+                // For completeness, we still fire the final progress callback
                 dispatchCallback(options.progress_callback, {
                     status: 'progress',
                     name: path_or_repo_id,
                     file: filename,
-                    ...data,
+                    progress: 100,
+                    loaded: buffer.length,
+                    total: buffer.length,
                 });
-            });
+            } else {
+                buffer = await readResponse(response, (data) => {
+                    dispatchCallback(options.progress_callback, {
+                        status: 'progress',
+                        name: path_or_repo_id,
+                        file: filename,
+                        ...data,
+                    });
+                });
+            }
         }
         result = buffer;
     }
