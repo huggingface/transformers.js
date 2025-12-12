@@ -435,7 +435,19 @@ async function sessionRun(session, inputs) {
     const checkedInputs = validateInputs(session, inputs);
     try {
         // pass the original ort tensor
-        const ortFeed = Object.fromEntries(Object.entries(checkedInputs).map(([k, v]) => [k, v.ort_tensor]));
+        const ortFeed = Object.fromEntries(Object.entries(checkedInputs).map(([k, v]) => {
+            const tensor = /** @type {any} */(v.ort_tensor);
+            if (apis.IS_NODE_ENV) {
+                // In recent versions of Node.js, which support Float16Array, we need to convert
+                // the Float16Array to Uint16Array for ONNX Runtime to accept it.
+                // NOTE: This will be removed in Transformers.js v4.0.
+                if (typeof Float16Array !== "undefined" && tensor.cpuData instanceof Float16Array) {
+                    tensor.cpuData = new Uint16Array(tensor.cpuData.buffer); // reinterpret as Uint16Array
+                }
+            }
+            return [k, tensor];
+        }));
+
         const output = await runInferenceSession(session, ortFeed);
         return replaceTensors(output);
     } catch (e) {
