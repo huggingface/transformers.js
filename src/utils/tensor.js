@@ -22,9 +22,10 @@ import { TensorOpRegistry } from '../ops/registry.js';
 
 export const DataTypeMap = Object.freeze({
     float32: Float32Array,
-    // @ts-ignore ts(2552) Limited availability of Float16Array across browsers:
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Float16Array
-    float16: typeof Float16Array !== "undefined" ? Float16Array: Uint16Array,
+    // NOTE: onnxruntime-node's native binding expects Uint16Array for float16 tensors.
+    // Float16Array is not yet supported by onnxruntime-node (see microsoft/onnxruntime#26742).
+    // Once onnxruntime adds Float16Array support, this can be updated.
+    float16: Uint16Array,
     float64: Float64Array,
     string: Array, // string[]
     int8: Int8Array,
