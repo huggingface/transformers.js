@@ -3032,6 +3032,57 @@ export class T5ForConditionalGeneration extends T5PreTrainedModel { }
 
 
 //////////////////////////////////////////////////
+// Chronos2 models
+/**
+ * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
+ */
+export class Chronos2PreTrainedModel extends PreTrainedModel {
+    forward_params = [
+        'context',
+        'group_ids',
+        'attention_mask',
+    ];
+};
+
+/**
+ * The Chronos-2 Model for time series forecasting.
+ *
+ * Chronos-2 is a family of pretrained time series forecasting models based on T5.
+ * It uses a patching mechanism to convert time series into tokens and predicts
+ * multiple quantiles for probabilistic forecasting.
+ *
+ * **Example:** Load and run a Chronos-2 model for forecasting.
+ *
+ * ```javascript
+ * import { Chronos2ForForecasting } from '@huggingface/transformers';
+ *
+ * const model = await Chronos2ForForecasting.from_pretrained('amazon/chronos-2-small');
+ *
+ * // Prepare time series input
+ * const context = new Float32Array([1.0, 2.0, 3.0, 4.0, ...]); // Your historical data
+ * const inputs = {
+ *     context: context,
+ *     group_ids: new BigInt64Array([0]),  // Group ID for cross-learning
+ *     attention_mask: new Float32Array(context.length).fill(1.0),
+ * };
+ *
+ * // Generate forecasts
+ * const { quantile_preds } = await model(inputs);
+ * // Returns quantile predictions: [batch_size, num_quantiles, prediction_length]
+ * ```
+ */
+export class Chronos2Model extends Chronos2PreTrainedModel { }
+
+/**
+ * Chronos2 Model with a forecasting head for time series prediction.
+ *
+ * This model outputs quantile predictions for probabilistic forecasting.
+ */
+export class Chronos2ForForecasting extends Chronos2PreTrainedModel { }
+//////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////
 // LONGT5 models
 /**
  * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
@@ -8017,6 +8068,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
     ['t5', ['T5Model', T5Model]],
+    ['chronos2', ['Chronos2Model', Chronos2Model]],
     ['longt5', ['LongT5Model', LongT5Model]],
     ['mt5', ['MT5Model', MT5Model]],
     ['bart', ['BartModel', BartModel]],
@@ -8138,6 +8190,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['t5', ['T5ForConditionalGeneration', T5ForConditionalGeneration]],
+    ['chronos2', ['Chronos2ForForecasting', Chronos2ForForecasting]],
     ['longt5', ['LongT5ForConditionalGeneration', LongT5ForConditionalGeneration]],
     ['mt5', ['MT5ForConditionalGeneration', MT5ForConditionalGeneration]],
     ['bart', ['BartForConditionalGeneration', BartForConditionalGeneration]],
@@ -8413,6 +8466,10 @@ const MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES = new Map([
     ['jina_clip', ['JinaCLIPVisionModel', JinaCLIPVisionModel]],
 ])
 
+const MODEL_FOR_FORECASTING_MAPPING_NAMES = new Map([
+    ['chronos2', ['Chronos2ForForecasting', Chronos2ForForecasting]],
+])
+
 const MODEL_CLASS_TYPE_MAPPING = [
     // MODEL_MAPPING_NAMES:
     [MODEL_MAPPING_NAMES_ENCODER_ONLY, MODEL_TYPES.EncoderOnly],
@@ -8450,6 +8507,7 @@ const MODEL_CLASS_TYPE_MAPPING = [
     [MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
     [MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
+    [MODEL_FOR_FORECASTING_MAPPING_NAMES, MODEL_TYPES.Seq2Seq],
 
     // Custom:
     [MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
@@ -8751,6 +8809,30 @@ export class AutoModelForImageTextToText extends PretrainedMixin {
 
 export class AutoModelForAudioTextToText extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
+}
+
+/**
+ * Helper class which is used to instantiate time series forecasting models with the `from_pretrained` function.
+ *
+ * @example
+ * const model = await AutoModelForForecasting.from_pretrained('amazon/chronos-2-small');
+ */
+export class AutoModelForForecasting extends PretrainedMixin {
+    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_FORECASTING_MAPPING_NAMES];
+
+    /** @type {typeof PreTrainedModel.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        // First, load the config to check if it has chronos_config
+        const config = options.config || await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
+
+        // If model has chronos_config, route to Chronos2ForForecasting regardless of model_type
+        if (config.chronos_config) {
+            return await Chronos2ForForecasting.from_pretrained(pretrained_model_name_or_path, { ...options, config });
+        }
+
+        // Otherwise, use the standard mapping-based routing
+        return await super.from_pretrained(pretrained_model_name_or_path, { ...options, config });
+    }
 }
 
 //////////////////////////////////////////////////
