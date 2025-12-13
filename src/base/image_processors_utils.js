@@ -969,7 +969,7 @@ export class ImageProcessor extends Callable {
             image = await this.thumbnail(image, this.size, this.resample);
         }
 
-        if (this.do_center_crop) {
+        if (this.do_center_crop && this.crop_size) {
 
             let crop_width;
             let crop_height;
