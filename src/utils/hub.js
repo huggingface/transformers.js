@@ -10,6 +10,7 @@ import path from 'node:path';
 
 import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
+import CrossOriginStorage from './CrossOriginStorage.js'
 
 /**
  * @typedef {boolean|number} ExternalData Whether to load the model using the external data format (used for models >= 2GB in size).
@@ -478,6 +479,10 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             .replaceAll('{revision}', encodeURIComponent(revision)),
         filename
     );
+
+    if(CrossOriginStorage.isAvailable()){
+      cache = new CrossOriginStorage();
+    }
 
     /** @type {string} */
     let cacheKey;
