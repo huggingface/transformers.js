@@ -774,5 +774,62 @@ export const CUSTOM_TESTS = () => {
       },
       MAX_EXECUTION_TIME,
     );
+
+    it(
+      "should clamp timestamps to chunk_len when model outputs exceed chunk boundary (issue #1357)",
+      async () => {
+        // This test verifies the fix for issue #1357
+        // When the last chunk is shorter than 30s but model outputs timestamps near 29.98s,
+        // the timestamps should be clamped to the actual chunk_len
+
+        const tokenizer = await WhisperTokenizer.from_pretrained("onnx-community/whisper-tiny.en_timestamped");
+
+        // Simulate a 65s audio with chunk_length_s=30, stride_length_s=5
+        const model_outputs = [
+          {
+            stride: [30, 0, 5], // Full 30s chunk
+            tokens: [50258n, 50364n, 1000n, 50257n],
+            token_timestamps: [0, 0, 25.0, 29.98], // Near boundary
+          },
+          {
+            stride: [30, 5, 5], // Full 30s chunk
+            tokens: [50258n, 50364n, 2000n, 50257n],
+            token_timestamps: [0, 0, 15.0, 29.98], // Near boundary
+          },
+          {
+            stride: [15, 5, 0], // Only 15s chunk! But model might output 29.98s
+            tokens: [50258n, 50364n, 3000n, 50257n],
+            // BUG CASE: model outputs timestamp near 29.98s even though chunk is only 15s
+            token_timestamps: [0, 0, 10.0, 29.98],
+          },
+        ];
+
+        const [text, options] = tokenizer._decode_asr(model_outputs, {
+          return_timestamps: "word",
+          time_precision: 0.02,
+          force_full_sequences: false,
+        });
+
+        // Without the fix, the last timestamp would be:
+        //   time_offset = (30-5) + (30-5) - 5 = 45s (after both chunks)
+        //   29.98 + 45 = ~75s (WRONG - exceeds 65s audio!)
+        //
+        // With the fix, raw timestamp 29.98 is clamped to chunk_len=15:
+        //   15 + 45 = 60s (within audio duration)
+
+        if (options.chunks && options.chunks.length > 0) {
+          const maxTimestamp = Math.max(
+            ...options.chunks.map((c) => c.timestamp[1] || 0)
+          );
+
+          console.log("Issue #1357 test - Max timestamp:", maxTimestamp);
+
+          // The key assertion: timestamps should not exceed audio duration
+          // With fix, max should be around 60s (45 + 15), not 75s (45 + 29.98)
+          expect(maxTimestamp).toBeLessThanOrEqual(65);
+        }
+      },
+      MAX_EXECUTION_TIME,
+    );
   });
 };

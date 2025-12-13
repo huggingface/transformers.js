@@ -3690,8 +3690,14 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
             let last_timestamp = null;
             let first_timestamp = timestamp_begin;
 
+            // Track chunk length for clamping token timestamps (issue #1357)
+            // This prevents timestamps from exceeding the actual audio duration
+            // when the model outputs timestamps near the 30s boundary
+            let current_chunk_len = null;
+
             if ("stride" in output) {
                 const [chunk_len, stride_left, stride_right] = output.stride;
+                current_chunk_len = chunk_len;
 
                 // Offset the timings to account for the other `model_outputs`.
                 time_offset -= stride_left;
@@ -3821,11 +3827,21 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                     current_tokens.push(token)
 
                     if (returnWordTimestamps) {
-                        let start_time = round(token_timestamps[i] + time_offset, 2);
+                        // Clamp token timestamps to chunk length to prevent exceeding audio duration (issue #1357)
+                        let raw_start = token_timestamps[i];
+                        let raw_end = (i + 1 < token_timestamps.length) ? token_timestamps[i + 1] : null;
+                        if (current_chunk_len !== null) {
+                            raw_start = Math.min(raw_start, current_chunk_len);
+                            if (raw_end !== null) {
+                                raw_end = Math.min(raw_end, current_chunk_len);
+                            }
+                        }
+
+                        let start_time = round(raw_start + time_offset, 2);
 
                         let end_time;
-                        if (i + 1 < token_timestamps.length) {
-                            end_time = round(token_timestamps[i + 1] + time_offset, 2);
+                        if (raw_end !== null) {
+                            end_time = round(raw_end + time_offset, 2);
 
                             // Do not allow punctuation-only tokens to have a duration.
                             // This prevents long pauses from messing up the timestamps.
