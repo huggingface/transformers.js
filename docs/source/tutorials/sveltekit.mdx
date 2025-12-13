@@ -1,0 +1,403 @@
+# Building a SvelteKit application
+
+In this tutorial, we'll build a simple [SvelteKit](https://kit.svelte.dev/) application that performs sentiment analysis using Transformers.js!
+Since Transformers.js can run in the browser or in Node.js, you can choose whether you want to perform inference [client-side](#clientside-inference) or [server-side](#serverside-inference).
+The final product will look something like this:
+
+![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/svelte-transformersjs.gif)
+
+Useful links:
+
+- Demo site: [static-client-side](https://huggingface.co/spaces/radames/transformers-js-sveltekit-static-example-app) or [server-side](https://huggingface.co/spaces/radames/transformers-js-sveltekit-server-example-app)
+- Source code: [client-side](https://github.com/xenova/transformers.js/tree/main/examples/sveltekit-static) or [server-side](https://github.com/xenova/transformers.js/tree/main/examples/sveltekit-server)
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/en/) version 16.8+
+
+## Client-side inference
+
+### Step 1: Initialise the project
+
+Start by creating a new Seveltkit .js application using `npm create svelte@latest`:
+
+```bash
+npm create svelte@latest sveltekit-static
+```
+
+For this demo, we'll be selecting a simple project skeleton without TypeScript and additional packages
+for ESLint, Prettier and later adding Tailwind CSS following the [official guide](https://tailwindcss.com/docs/guides/sveltekit).
+
+### Step 2: Make skeleton project fully static
+
+We'll need to make a few changes to the default project skeleton to make our application fully static. You must install the [adapter-static](https://github.com/sveltejs/kit/tree/master/packages/adapter-static) to prerender your application as a collection of static files.
+See more on the [official guide](https://kit.svelte.dev/docs/adapter-static).
+
+```bash
+npm i -D @sveltejs/adapter-static
+```
+
+Update the `svelte.config.js` file to use the [`adapter-static`](https://github.com/sveltejs/kit/tree/master/packages/adapter-static):
+
+```js
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/kit/vite";
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+  kit: {
+    adapter: adapter({
+      // default options are shown. On some platforms
+      // these options are set automatically — see below
+      pages: "build",
+      assets: "build",
+      fallback: null,
+      precompress: false,
+      strict: true,
+    }),
+  },
+  preprocess: vitePreprocess(),
+};
+export default config;
+```
+
+Set `prerender` option to your root layout, `src/routes/+layout.js`:
+
+```js
+export const prerender = true;
+```
+
+### Step 3: Install and configure Transformers.js
+
+You can install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+
+```bash
+npm i @xenova/transformers
+```
+
+Next, we'll create a new [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) script where we'll place all ML-related code. This ensures that the main thread is not blocked while the model is loading and performing inference.
+For this application, we'll be using [`Xenova/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english),
+a ~67M parameter model finetuned on the [Stanford Sentiment Treebank](https://huggingface.co/datasets/sst) dataset. Add the following code to `./src/lib/worker.js`:
+
+```js
+import { pipeline, env } from "@xenova/transformers";
+
+// Skip local model check
+env.allowLocalModels = false;
+
+// Use the Singleton pattern to enable lazy construction of the pipeline.
+class PipelineSingleton {
+  static task = "text-classification";
+  static model = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      this.instance = pipeline(this.task, this.model, { progress_callback });
+    }
+    return this.instance;
+  }
+}
+
+// Listen for messages from the main thread
+self.addEventListener("message", async (event) => {
+  // Retrieve the classification pipeline. When called for the first time,
+  // this will load the pipeline and save it for future use.
+  let classifier = await PipelineSingleton.getInstance((x) => {
+    // We also add a progress callback to the pipeline so that we can
+    // track model loading.
+    self.postMessage(x);
+  });
+
+  // Actually perform the classification
+  let output = await classifier(event.data.text);
+
+  // Send the output back to the main thread
+  self.postMessage({
+    status: "complete",
+    output: output,
+  });
+});
+```
+
+### Step 4: Design the user interface
+
+We'll define our application's main interface and logic on the single page component `./src/routes/+page.svelte` that maps to `/`.
+Learn more about how SvelteKit handles routing [here](https://kit.svelte.dev/docs/routing).
+
+Let's start by loading the Web Worker once the page is mounted. In Svelte, the `onMount` function can run code when the component is mounted.
+To reference the worker code, we use the alias `$lib/worker.js?worker`. As Svelte is built with Vite.js, we can use the syntax `?worker` to specify that the file should be loaded as a Web Worker. Read more here [Vite.js Web Workers](https://vitejs.dev/guide/features.html#web-workers).
+
+```jsx
+<script>
+  import { onMount } from 'svelte';
+
+  // Create a global variable to store the worker.
+  let pipelineWorker;
+
+  // reactive variables to store the result and the ready state.
+  let result = null;
+  let ready = null;
+
+  onMount(async () => {
+    // onMount set up the worker as soon as the Svelte page component is mounted.
+    if (!pipelineWorker) {
+      // Create the worker if it does not yet exist.
+      const Worker = await import('$lib/worker.js?worker');
+      pipelineWorker = new Worker.default();
+
+      const onMessageReceived = (e) => {
+        switch (e.data.status) {
+          case 'initiate':
+            ready = false;
+            break;
+          case 'ready':
+            ready = true;
+            break;
+          case 'complete':
+            result = e.data.output[0];
+            break;
+        }
+      };
+
+      // Attach the callback function as an event listener.
+      pipelineWorker.addEventListener('message', onMessageReceived);
+    }
+  });
+
+  // main classify function that sends messages with the text to the worker.
+  function classify(text) {
+    if (pipelineWorker) {
+      pipelineWorker.postMessage({ text });
+    }
+  }
+</script>
+```
+
+Now we only need to design the UI with HTML, CSS, and attach the `classify` function to the input element.
+For every input change event, we call the `classify` function with the input text.
+
+```jsx
+<main class="flex min-h-screen flex-col items-center justify-center p-12">
+  <h1 class="text-5xl font-bold mb-2 text-center">Transformers.js</h1>
+  <h2 class="text-2xl mb-4 text-center">SvelteKit Static template (client-side)</h2>
+  <input
+    type="text"
+    class="w-full max-w-xs p-2 border border-gray-300 rounded mb-4 dark:text-black"
+    placeholder="Enter text here"
+    on:input={(e) => {
+      classify(e.target.value);
+    }}
+  />
+
+  {#if ready !== null}
+    <pre class="bg-gray-100 dark:bg-gray-800 p-2 rounded">{!ready || !result
+        ? 'Loading...'
+        : JSON.stringify(result, null, 2)}</pre>
+  {/if}
+</main>
+```
+
+You can run your application on development mode with the following command:
+
+```bash
+npm run dev
+```
+
+View the application at [http://localhost:5173/](http://localhost:5173/)
+
+### (Optional) Step 5: Build and deploy
+
+To build your application, simply run:
+
+```bash
+npm run build
+```
+
+The `./build` folder will contain all of the generated static files.
+
+You can now deploy your application as a static [Hugging Face Space](https://huggingface.co/docs/hub/spaces) or to any other static hosting service you choose.
+You can create a free Hugging Face account [here](https://huggingface.co/join) if you haven't already.
+
+1. Visit [https://huggingface.co/new-space](https://huggingface.co/new-space) and fill in the form. Remember to select "Static" as the space type.
+2. Click the "Create space" button at the bottom of the page.
+3. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from the `build` folder into the upload box and click "Upload".
+   After they have uploaded, scroll down to the button and click "Commit changes to main".
+
+**That's it!** Your application should now be live at `https://huggingface.co/spaces/<your-username>/<your-space-name>`!
+
+## Server-side inference
+
+We'll rely on [SvelteKit API routes](https://kit.svelte.dev/docs/routing#server) to handle requests for server-side inference.
+
+### Step 1: Initialise the project
+
+Start by creating a new Seveltkit .js application using `npm create svelte@latest`:
+
+```bash
+npm create svelte@latest sveltekit-static
+```
+
+For this demo, we'll be selecting a simple project skeleton without TypeScript and additional packages
+for ESLint, Prettier, and later adding Tailwind CSS following the [official guide](https://tailwindcss.com/docs/guides/sveltekit).
+
+### Step 2: Install SvelteKit Node Server Adapter
+
+In this step, we'll setup [@sveltejs/adapter-node](https://kit.svelte.dev/docs/adapter-node)
+to change the deployment target to Node.js, so we can build and deploy our application as a Node.js server.
+
+```bash
+npm i -D @sveltejs/adapter-node
+```
+
+Update the `svelte.config.js` file to use the [`adapter-node`](https://kit.svelte.dev/docs/adapter-node):
+
+```js
+import adapter from "@sveltejs/adapter-node";
+import { vitePreprocess } from "@sveltejs/kit/vite";
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+  kit: {
+    adapter: adapter({
+      // default options are shown
+      out: "build",
+      precompress: false,
+      envPrefix: "",
+      polyfill: true,
+    }),
+  },
+  preprocess: vitePreprocess(),
+};
+export default config;
+```
+
+### Step 3: Install and configure Transformers.js
+
+You can install Transformers.js from [NPM](https://www.npmjs.com/package/@xenova/transformers) with the following command:
+
+```bash
+npm i @xenova/transformers
+```
+
+`./src/lib/server/pipeline.js` - to handle the construction of our pipeline.
+
+```js
+import { pipeline } from "@xenova/transformers";
+
+class PipelineSingleton {
+  static task = "text-classification";
+  static model = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+  static instance = null;
+
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      this.instance = pipeline(this.task, this.model, { progress_callback });
+    }
+    return this.instance;
+  }
+}
+export default PipelineSingleton;
+```
+
+Our only API route will be a `GET` request to `/classify` that takes a `text` parameter and returns the classification result.
+This is defined in `./src/routes/classify/+server.js`.
+
+```jsx
+import { json } from "@sveltejs/kit";
+import PipelineSingleton from "$lib/server/pipeline.js";
+
+export async function GET({ url }) {
+  const text = url.searchParams.get("text");
+  if (!text) {
+    return json(
+      {
+        error: "Missing text parameter",
+      },
+      { status: 400 }
+    );
+  }
+  // Get the classification pipeline. When called for the first time,
+  // this will load the pipeline and cache it for future use.
+  const classifier = await PipelineSingleton.getInstance();
+
+  // Actually perform the classification
+  const result = await classifier(text);
+
+  return json(result);
+}
+```
+
+### Step 4: Design the user interface
+
+We'll define our application's main interface and logic on the single page component `./src/routes/+page.svelte` that maps to `/`.
+When using client-side inference, we will use the `fetch` API to send requests to our API route handler instead of relying on a Web Worker.
+
+```jsx
+<script>
+  let result = null;
+  let ready = null;
+
+  async function classify(text) {
+    if (!text) return;
+    if (ready === null) {
+      ready = false;
+    }
+    // Make a request to the /classify route on the server.
+    const response = await fetch(`/classify?text=${encodeURIComponent(text)}`);
+
+    // If this is the first time we've made a request, set the ready flag.
+    if (!ready) {
+      ready = true;
+    }
+    result = await response.json();
+  }
+</script>
+```
+
+You can now run your application using the following command:
+
+```bash
+npm run dev
+```
+
+Go to [http://localhost:5173/](http://localhost:5173/) to see your application in action!
+
+### (Optional) Step 5: Build and deploy
+
+To build your application, simply run:
+
+```bash
+npm run build
+```
+
+All your application files will be generated in the `./build` folder, including node server files and static files.
+
+You can test your application locally by running:
+
+```bash
+node ./build
+```
+
+Go to [http://localhost:3000/](http://localhost:3000/) to see your application in action!
+
+Deploying as a Docker container on [Hugging Face Spaces](https://huggingface.co/docs/hub/spaces).
+You can create a free Hugging Face account [here](https://huggingface.co/join) if you haven't already.
+
+1. Create a new `Dockerfile` in your project's root folder. You can use our [example Dockerfile](https://github.com/xenova/transformers.js/blob/main/examples/sveltekit-server/Dockerfile) as a template.
+2. Visit [https://huggingface.co/new-space](https://huggingface.co/new-space) and fill in the form. Remember to select "Docker" as the space type (you can choose the "Blank" Docker template).
+3. Click the "Create space" button at the bottom of the page.
+4. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from your project folder (excluding `node_modules` and `build`, if present) into the upload box and click "Upload".
+   After they have uploaded, scroll down to the button and click "Commit changes to main".
+5. Add the following lines to the top of your `README.md`:
+   ```
+   ---
+   title: SvelteKit Server Example App
+   emoji: 🔥
+   colorFrom: yellow
+   colorTo: red
+   sdk: docker
+   pinned: false
+   app_port: 3000
+   ---
+   ```
+
+**That's it!** Your application should now be live at `https://huggingface.co/spaces/<your-username>/<your-space-name>`!
