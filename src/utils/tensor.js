@@ -7,7 +7,7 @@
  * @module utils/tensor
  */
 
-import { interpolate_data, max, min, permute_data } from './maths.js';
+import { interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
 
 import { Tensor as ONNXTensor, isONNXTensor } from '../backends/onnx.js';
 
@@ -835,6 +835,9 @@ export class Tensor {
             } else {
                 map_fn = BigInt;
             }
+        } else if (this.type === 'float16' && type == 'float32' && this.data instanceof Uint16Array) {
+            // Certain runtimes do not support Float16Array, so the values are stored in Uint16Array
+            return new Tensor(type, uint16_to_float32(this.data), this.dims);
         }
 
         // @ts-ignore

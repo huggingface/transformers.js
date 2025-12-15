@@ -53,7 +53,7 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
  * //   data: Float32Array [0.09528215229511261, -0.024730168282985687, ...],
  * //   dims: [1, 384]
  * // }
- * 
+ *
  * // You can convert this Tensor to a nested JavaScript array using `.tolist()`:
  * console.log(output.tolist());
  * ```
@@ -67,7 +67,7 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
  * //   data: Int8Array [49, 108, 25, ...],
  * //   dims: [1, 48]
  * // }
- * 
+ *
  * // You can convert this Tensor to a nested JavaScript array using `.tolist()`:
  * console.log(output.tolist());
  * ```

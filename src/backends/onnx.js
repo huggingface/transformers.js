@@ -47,6 +47,9 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
+/** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
+const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
+
 /**
  * The list of supported devices, sorted by priority/performance.
  * @type {import("../utils/devices.js").DeviceType[]}
@@ -224,6 +227,18 @@ async function ensureWasmLoaded() {
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
+
+    /** @type {0|1|2|3|4} */
+    const logSeverityLevel =
+        typeof session_options.logSeverityLevel !== 'number' ||
+        session_options.logSeverityLevel < 0 ||
+        session_options.logSeverityLevel > 4
+            ? 4
+            : session_options.logSeverityLevel;
+
+    ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
+
+    session_options = { ...session_options, logSeverityLevel };
 
     const load = () => InferenceSession.create(buffer_or_path, session_options);
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());

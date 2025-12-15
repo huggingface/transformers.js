@@ -17,9 +17,7 @@ import { AutoModel } from '../models.js';
  */
 
 /**
- * @typedef {Object} TextToAudioOutput
- * @property {Float32Array} audio The generated audio waveform.
- * @property {number} sampling_rate The sampling rate of the generated audio waveform.
+ * @typedef {RawAudio} TextToAudioOutput
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
  * @property {Tensor|Float32Array|string|URL} [speaker_embeddings=null] The speaker embeddings (if the model requires it).
@@ -29,7 +27,7 @@ import { AutoModel } from '../models.js';
  *
  * @callback TextToAudioPipelineCallback Generates speech/audio from the inputs.
  * @param {string|string[]} texts The text(s) to generate.
- * @param {TextToAudioPipelineOptions} options Parameters passed to the model generation/forward method.
+ * @param {TextToAudioPipelineOptions} [options] Parameters passed to the model generation/forward method.
  * @returns {Promise<TextToAudioOutput>} An object containing the generated audio and sampling rate.
  *
  * @typedef {TextToAudioPipelineConstructorArgs & TextToAudioPipelineCallback & Disposable} TextToAudioPipelineType
@@ -50,7 +48,7 @@ import { AutoModel } from '../models.js';
  * //   audio: Float32Array(95232) [-0.000482565927086398, -0.0004853440332226455, ...],
  * //   sampling_rate: 44100
  * // }
- * 
+ *
  * // Optional: Save the audio to a .wav file or Blob
  * await output.save('output.wav'); // You can also use `output.toBlob()` to access the audio as a Blob
  * ```
@@ -87,37 +85,24 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(
-                await (await fetch(speaker_embeddings)).arrayBuffer()
-            );
+            speaker_embeddings = new Float32Array(await (await fetch(speaker_embeddings)).arrayBuffer());
         }
 
         if (speaker_embeddings instanceof Float32Array) {
-            speaker_embeddings = new Tensor(
-                'float32',
-                speaker_embeddings,
-                [speaker_embeddings.length]
-            )
+            speaker_embeddings = new Tensor('float32', speaker_embeddings, [speaker_embeddings.length]);
         } else if (!(speaker_embeddings instanceof Tensor)) {
-            throw new Error("Speaker embeddings must be a `Tensor`, `Float32Array`, `string`, or `URL`.")
+            throw new Error('Speaker embeddings must be a `Tensor`, `Float32Array`, `string`, or `URL`.');
         }
 
         return speaker_embeddings;
     }
 
     /** @type {TextToAudioPipelineCallback} */
-    async _call(text_inputs, {
-        speaker_embeddings = null,
-        num_inference_steps,
-        speed,
-    } = {}) {
-
+    async _call(text_inputs, { speaker_embeddings = null, num_inference_steps, speed } = {}) {
         // If this.processor is not set, we are using a `AutoModelForTextToWaveform` model
         if (this.processor) {
             return this._call_text_to_spectrogram(text_inputs, { speaker_embeddings });
-        } else if (
-            this.model.config.model_type === "supertonic"
-        ) {
+        } else if (this.model.config.model_type === 'supertonic') {
             return this._call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps, speed });
         } else {
             return this._call_text_to_waveform(text_inputs);
@@ -126,14 +111,14 @@ export class TextToAudioPipeline
 
     async _call_supertonic(text_inputs, { speaker_embeddings, num_inference_steps, speed }) {
         if (!speaker_embeddings) {
-            throw new Error("Speaker embeddings must be provided for Supertonic models.");
+            throw new Error('Speaker embeddings must be provided for Supertonic models.');
         }
         speaker_embeddings = await this._prepare_speaker_embeddings(speaker_embeddings);
 
         // @ts-expect-error TS2339
         const { sampling_rate, style_dim } = this.model.config;
 
-        speaker_embeddings = (/** @type {Tensor} */ (speaker_embeddings)).view(1, -1, style_dim);
+        speaker_embeddings = /** @type {Tensor} */ (speaker_embeddings).view(1, -1, style_dim);
         const inputs = this.tokenizer(text_inputs, {
             padding: true,
             truncation: true,
@@ -147,14 +132,10 @@ export class TextToAudioPipeline
             speed,
         });
 
-        return new RawAudio(
-            waveform.data,
-            sampling_rate,
-        )
+        return new RawAudio(waveform.data, sampling_rate);
     }
 
     async _call_text_to_waveform(text_inputs) {
-
         // Run tokenization
         const inputs = this.tokenizer(text_inputs, {
             padding: true,
@@ -166,14 +147,10 @@ export class TextToAudioPipeline
 
         // @ts-expect-error TS2339
         const sampling_rate = this.model.config.sampling_rate;
-        return new RawAudio(
-            waveform.data,
-            sampling_rate,
-        )
+        return new RawAudio(waveform.data, sampling_rate);
     }
 
     async _call_text_to_spectrogram(text_inputs, { speaker_embeddings }) {
-
         // Load vocoder, if not provided
         if (!this.vocoder) {
             console.log('No vocoder specified, using default HifiGan vocoder.');
@@ -193,9 +170,6 @@ export class TextToAudioPipeline
         const { waveform } = await this.model.generate_speech(input_ids, speaker_embeddings, { vocoder: this.vocoder });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        return new RawAudio(
-            waveform.data,
-            sampling_rate,
-        )
+        return new RawAudio(waveform.data, sampling_rate);
     }
 }

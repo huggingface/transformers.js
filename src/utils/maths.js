@@ -1044,3 +1044,61 @@ export function dynamic_time_warping(matrix) {
 
     return [text_indices, time_indices];
 }
+
+/**
+ * Efficiently converts a Uint16Array of float16 values to a Float32Array.
+ * This implementation uses a lazily initialized lookup table (LUT) for fast conversion.
+ */
+export const uint16_to_float32 = (function () {
+    let float16LUT = null; // The Lookup Table
+
+    return function (/** @type {Uint16Array} */ u16Array) {
+        if (!float16LUT) {
+            // Lazily initialize LUT
+            float16LUT = new Float32Array(65536);
+            const buffer = new ArrayBuffer(4);
+            const u32 = new Uint32Array(buffer);
+            const f32 = new Float32Array(buffer);
+
+            for (let i = 0; i < float16LUT.length; ++i) {
+                let outBits = 0;
+                const sign = (i & 0x8000) << 16;
+                const exp = (i & 0x7c00) >> 10;
+                let mantissa = i & 0x03ff;
+
+                if (exp === 0x1f) {
+                    // Infinity or NaN
+                    outBits = sign | 0x7f800000 | (mantissa << 13);
+                } else if (exp === 0) {
+                    // Zero or Subnormal
+                    if (mantissa === 0) {
+                        outBits = sign;
+                    } else {
+                        let renormExp = 113;
+                        while ((mantissa & 0x0400) === 0) {
+                            mantissa <<= 1;
+                            --renormExp;
+                        }
+                        mantissa &= ~0x0400;
+                        outBits = sign | (renormExp << 23) | (mantissa << 13);
+                    }
+                } else {
+                    // Normal
+                    outBits = sign | ((exp + 112) << 23) | (mantissa << 13);
+                }
+
+                u32[0] = outBits;
+                float16LUT[i] = f32[0];
+            }
+        }
+
+        const length = u16Array.length;
+        const lut = float16LUT;
+        const out = new Float32Array(length);
+        for (let i = 0; i < length; ++i) {
+            out[i] = lut[u16Array[i]];
+        }
+
+        return out;
+    };
+})();
