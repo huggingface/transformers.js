@@ -109,9 +109,8 @@ const SUPPORTED_TASKS = Object.freeze({
         pipeline: FillMaskPipeline,
         model: AutoModelForMaskedLM,
         default: {
-            // TODO: replace with original
-            // "model": "bert-base-uncased",
-            model: 'Xenova/bert-base-uncased',
+            model: 'onnx-community/ettin-encoder-32m-ONNX',
+            dtype: 'fp32',
         },
         type: 'text',
     },
@@ -210,9 +209,8 @@ const SUPPORTED_TASKS = Object.freeze({
         model: [AutoModelForTextToWaveform, AutoModelForTextToSpectrogram],
         processor: [AutoProcessor, /* Some don't use a processor */ null],
         default: {
-            // TODO: replace with original
-            // "model": "microsoft/speecht5_tts",
-            model: 'Xenova/speecht5_tts',
+            model: 'onnx-community/Supertonic-TTS-ONNX',
+            dtype: 'fp32',
         },
         type: 'text',
     },
@@ -446,9 +444,9 @@ export async function pipeline(
     if (!model) {
         model = pipelineInfo.default.model;
         console.log(`No model specified. Using default model: "${model}".`);
-    }
-    if (!dtype && pipelineInfo.default.dtype) {
-        dtype = pipelineInfo.default.dtype;
+        if (!dtype && pipelineInfo.default.dtype) {
+            dtype = pipelineInfo.default.dtype;
+        }
     }
 
     const pretrainedOptions = {

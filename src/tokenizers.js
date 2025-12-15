@@ -3284,6 +3284,8 @@ export class PreTrainedTokenizer extends Callable {
     }
 }
 
+export class TokenizersBackend extends PreTrainedTokenizer {}
+
 /**
  * BertTokenizer is a class used to tokenize text for BERT models.
  * @extends PreTrainedTokenizer
@@ -4341,6 +4343,9 @@ export class AutoTokenizer {
 
         // Base case:
         PreTrainedTokenizer,
+
+        // As of transformers v5.0.0
+        TokenizersBackend,
     };
 
     /**

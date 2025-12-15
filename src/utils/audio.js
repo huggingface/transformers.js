@@ -774,7 +774,6 @@ function encodeWAV(chunks, rate) {
     /* data chunk length */
     view.setUint32(40, totalLength * 4, true);
 
-    // @ts-expect-error TS2322
     return new Blob([buffer, ...chunks], { type: "audio/wav" });
 }
 

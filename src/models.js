@@ -241,6 +241,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // Overwrite `executionProviders` if not specified
     session_options.executionProviders ??= executionProviders;
+    // Set `logSeverityLevel` to 4 (fatal) if not specified
+    session_options.logSeverityLevel ??= 4;
 
     // Overwrite `freeDimensionOverrides` if specified in config and not set in session options
     const free_dimension_overrides = custom_config.free_dimension_overrides;
@@ -2051,7 +2053,10 @@ export class PreTrainedModel extends Callable {
             // In most cases, this will be [batch_size, 1, vocab_size]
             // So, we select the last token's logits:
             // (equivalent to `logits = outputs.logits[:, -1, :]`)
-            const logits = outputs.logits.slice(null, -1, null);
+            // The `.to('float32')` is necessary for models with float16 logits,
+            // and is a no-op for float32 logits.
+            // TODO: Support float16 sampling in the sampler directly
+            const logits = outputs.logits.slice(null, -1, null).to('float32');
 
             const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
 
@@ -4676,6 +4681,15 @@ export class GPT2LMHeadModel extends GPT2PreTrainedModel {}
 // }
 //////////////////////////////////////////////////
 
+
+//////////////////////////////////////////////////
+// GPT OSS models
+export class GptOssPreTrainedModel extends PreTrainedModel {}
+export class GptOssModel extends GptOssPreTrainedModel {}
+export class GptOssForCausalLM extends GptOssPreTrainedModel {}
+//////////////////////////////////////////////////
+
+
 //////////////////////////////////////////////////
 // JAIS models
 export class JAISPreTrainedModel extends PreTrainedModel {}
@@ -4823,17 +4837,24 @@ export class MobileLLMForCausalLM extends MobileLLMPreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
-// OLMo models
+// Olmo models
 export class OlmoPreTrainedModel extends PreTrainedModel {}
 export class OlmoModel extends OlmoPreTrainedModel {}
 export class OlmoForCausalLM extends OlmoPreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
-// OLMo2 models
+// Olmo2 models
 export class Olmo2PreTrainedModel extends PreTrainedModel {}
 export class Olmo2Model extends Olmo2PreTrainedModel {}
 export class Olmo2ForCausalLM extends Olmo2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Olmo3 models
+export class Olmo3PreTrainedModel extends PreTrainedModel {}
+export class Olmo3Model extends Olmo3PreTrainedModel {}
+export class Olmo3ForCausalLM extends Olmo3PreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -8260,6 +8281,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['bloom', ['BloomModel', BloomModel]],
     ['jais', ['JAISModel', JAISModel]],
     ['gpt2', ['GPT2Model', GPT2Model]],
+    ['gpt_oss', ['GptOssModel', GptOssModel]],
     ['gptj', ['GPTJModel', GPTJModel]],
     ['gpt_bigcode', ['GPTBigCodeModel', GPTBigCodeModel]],
     ['gpt_neo', ['GPTNeoModel', GPTNeoModel]],
@@ -8274,6 +8296,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['exaone', ['ExaoneModel', ExaoneModel]],
     ['olmo', ['OlmoModel', OlmoModel]],
     ['olmo2', ['Olmo2Model', Olmo2Model]],
+    ['olmo3', ['Olmo3Model', Olmo3Model]],
     ['mobilellm', ['MobileLLMModel', MobileLLMModel]],
     ['granite', ['GraniteModel', GraniteModel]],
     ['granitemoehybrid', ['GraniteMoeHybridModel', GraniteMoeHybridModel]],
@@ -8372,6 +8395,7 @@ const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
 const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['bloom', ['BloomForCausalLM', BloomForCausalLM]],
     ['gpt2', ['GPT2LMHeadModel', GPT2LMHeadModel]],
+    ['gpt_oss', ['GptOssForCausalLM', GptOssForCausalLM]],
     ['jais', ['JAISLMHeadModel', JAISLMHeadModel]],
     ['gptj', ['GPTJForCausalLM', GPTJForCausalLM]],
     ['gpt_bigcode', ['GPTBigCodeForCausalLM', GPTBigCodeForCausalLM]],
@@ -8388,6 +8412,7 @@ const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['exaone', ['ExaoneForCausalLM', ExaoneForCausalLM]],
     ['olmo', ['OlmoForCausalLM', OlmoForCausalLM]],
     ['olmo2', ['Olmo2ForCausalLM', Olmo2ForCausalLM]],
+    ['olmo3', ['Olmo3ForCausalLM', Olmo3ForCausalLM]],
     ['mobilellm', ['MobileLLMForCausalLM', MobileLLMForCausalLM]],
     ['granite', ['GraniteForCausalLM', GraniteForCausalLM]],
     ['granitemoehybrid', ['GraniteMoeHybridForCausalLM', GraniteMoeHybridForCausalLM]],
