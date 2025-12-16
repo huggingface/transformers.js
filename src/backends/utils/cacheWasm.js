@@ -13,7 +13,10 @@ async function loadAndCacheFile(url) {
         // Try to get from cache first
         if (cache) {
             try {
-                return await cache.match(url);
+                const result = await cache.match(url);
+                if (result) {
+                    return result;
+                }
             } catch (e) {
                 console.warn(`Error reading ${fileName} from cache:`, e);
             }
