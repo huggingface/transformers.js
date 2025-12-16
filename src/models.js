@@ -241,8 +241,6 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // Overwrite `executionProviders` if not specified
     session_options.executionProviders ??= executionProviders;
-    // Set `logSeverityLevel` to 4 (fatal) if not specified
-    session_options.logSeverityLevel ??= 4;
 
     // Overwrite `freeDimensionOverrides` if specified in config and not set in session options
     const free_dimension_overrides = custom_config.free_dimension_overrides;
@@ -1008,8 +1006,8 @@ function multimodality_prepare_inputs_for_generation(self, input_ids, model_inpu
 }
 
 function chatterbox_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
-    if (!model_inputs.position_ids) {
+    if (!model_inputs.position_ids && self.sessions['embed_tokens'].inputNames.includes('position_ids')) {
+        // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
         const START_SPEECH_TOKEN = 6561;
         if (model_inputs.input_ids.dims[1] === 1) {
             const position_ids = Array.from(
@@ -8000,29 +7998,33 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
     }) {
         let speech_encoder_outputs;
         if (!inputs_embeds) {
-            // Support the following types for exaggeration:
-            // 1. null/undefined (no exaggeration): use the default of 0.5
-            // 2. number: broadcast to (batch_size,)
-            // 3. number[]: convert to Tensor of shape (batch_size,)
-            // 4. Tensor of shape (batch_size, 1)
-            if (!(exaggeration instanceof Tensor)) {
-                const batch_size = input_ids.dims[0];
-                if (exaggeration == null) {
-                    exaggeration = full([batch_size], 0.5);
-                } else if (typeof exaggeration === 'number') {
-                    exaggeration = full([batch_size], exaggeration);
-                } else if (Array.isArray(exaggeration)) {
-                    exaggeration = new Tensor('float32', exaggeration, [batch_size]);
-                } else {
-                    throw new Error('Unsupported type for `exaggeration` input');
+            const expected_inputs = this.sessions['embed_tokens'].inputNames;
+            const embed_model_inputs = { input_ids };
+            if (expected_inputs.includes('exaggeration')) {
+                // Support the following types for exaggeration:
+                // 1. null/undefined (no exaggeration): use the default of 0.5
+                // 2. number: broadcast to (batch_size,)
+                // 3. number[]: convert to Tensor of shape (batch_size,)
+                // 4. Tensor of shape (batch_size, 1)
+                if (!(exaggeration instanceof Tensor)) {
+                    const batch_size = input_ids.dims[0];
+                    if (exaggeration == null) {
+                        exaggeration = full([batch_size], 0.5);
+                    } else if (typeof exaggeration === 'number') {
+                        exaggeration = full([batch_size], exaggeration);
+                    } else if (Array.isArray(exaggeration)) {
+                        exaggeration = new Tensor('float32', exaggeration, [batch_size]);
+                    } else {
+                        throw new Error('Unsupported type for `exaggeration` input');
+                    }
                 }
+                embed_model_inputs.exaggeration = exaggeration;
+            }
+            if (expected_inputs.includes('position_ids')) {
+                embed_model_inputs.position_ids = position_ids;
             }
 
-            ({ inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], {
-                input_ids,
-                position_ids,
-                exaggeration,
-            }));
+            ({ inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], embed_model_inputs));
 
             if (audio_features && audio_tokens && speaker_embeddings && speaker_features) {
                 // Use pre-computed speech encoder outputs
@@ -8076,7 +8078,10 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
             -1, // Exclude end of speech token
         ]);
 
-        const speech_tokens = cat([audio_tokens, new_tokens], 1);
+        const SILENCE_TOKEN = 4299n;
+        const silence_tokens = full([new_tokens.dims[0], 3], SILENCE_TOKEN); // Add 3 silence tokens
+        const speech_tokens = cat([audio_tokens, new_tokens, silence_tokens], 1);
+
         const { waveform } = await sessionRun(this.sessions['conditional_decoder'], {
             speech_tokens,
             speaker_features,

@@ -49,6 +49,7 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
 
 /** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
 const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
+const DEFAULT_LOG_LEVEL = 4; // 'fatal';
 
 /**
  * The list of supported devices, sorted by priority/performance.
@@ -227,20 +228,11 @@ async function ensureWasmLoaded() {
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
-
-    /** @type {0|1|2|3|4} */
-    const logSeverityLevel =
-        typeof session_options.logSeverityLevel !== 'number' ||
-        session_options.logSeverityLevel < 0 ||
-        session_options.logSeverityLevel > 4
-            ? 4
-            : session_options.logSeverityLevel;
-
-    ONNX_WEB.env.logLevel = LOG_LEVELS[logSeverityLevel];
-
-    session_options = { ...session_options, logSeverityLevel };
-
-    const load = () => InferenceSession.create(buffer_or_path, session_options);
+    const load = () => InferenceSession.create(buffer_or_path, {
+        // Set default log level, but allow overriding through session options
+        logSeverityLevel: DEFAULT_LOG_LEVEL,
+        ...session_options,
+    });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
     return session;
@@ -275,8 +267,8 @@ export function isONNXTensor(x) {
 }
 
 /** @type {import('onnxruntime-common').Env} */
-// @ts-ignore
 const ONNX_ENV = ONNX?.env;
+ONNX_ENV.logLevel = LOG_LEVELS[DEFAULT_LOG_LEVEL];
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
