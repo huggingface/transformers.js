@@ -7,42 +7,41 @@ import { getCache } from '../../utils/cache.js';
  */
 async function loadAndCacheFile(url) {
     const fileName = url.split('/').pop();
+
+    /** @type {import('../../utils/cache.js').CacheInterface|undefined} */
+    let cache;
     try {
-        const cache = await getCache();
+        cache = await getCache();
 
         // Try to get from cache first
         if (cache) {
-            try {
-                const result = await cache.match(url);
-                if (result) {
-                    return result;
-                }
-            } catch (e) {
-                console.warn(`Error reading ${fileName} from cache:`, e);
+            const result = await cache.match(url);
+            if (result) {
+                return result;
             }
         }
-
-        // If not in cache, fetch it
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
-        }
-
-        // Cache the response for future use
-        if (cache) {
-            try {
-                await cache.put(url, response.clone());
-            } catch (e) {
-                console.warn(`Failed to cache ${fileName}:`, e);
-            }
-        }
-
-        return response;
     } catch (error) {
-        console.warn(`Failed to load ${fileName}:`, error);
-        return null;
+        console.warn(`Failed to load ${fileName} from cache:`, error);
     }
+
+    // If not in cache, fetch it
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
+    }
+
+    // Cache the response for future use
+    if (cache) {
+        try {
+            await cache.put(url, response.clone());
+        } catch (e) {
+            console.warn(`Failed to cache ${fileName}:`, e);
+        }
+    }
+
+    return response;
+
 }
 
 /**
