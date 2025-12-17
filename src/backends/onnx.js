@@ -186,7 +186,7 @@ async function ensureWasmLoaded() {
         // Load and cache both the WASM binary and factory
         await Promise.all([
             // Load and cache the WASM binary
-            urls.wasm
+            urls.wasm && !urls.wasm.startsWith('blob:')
                 ? (async () => {
                       try {
                           const wasmBinary = await loadWasmBinary(urls.wasm);
@@ -200,7 +200,7 @@ async function ensureWasmLoaded() {
                 : Promise.resolve(),
 
             // Load and cache the WASM factory
-            urls.mjs
+            urls.mjs && !urls.mjs.startsWith('blob:')
                 ? (async () => {
                       try {
                           const wasmFactoryBlob = await loadWasmFactory(urls.mjs);
