@@ -2,6 +2,8 @@ __pycache__
 .vscode
 node_modules
 .cache
+/.idea
+.DS_Store
 
 # Do not track build artifacts/generated files
 /dist
