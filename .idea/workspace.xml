@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="99c086b0-c1ce-4951-967a-aae05e8ca0bc" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.3.6/bin/php" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
+  <component name="ProjectId" id="2x3ZJ2ayje7rk6ketj2PNpg50a0" />
+  <component name="ProjectViewState">
+    <option name="autoscrollFromSource" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Jest.tokenizers.test.js.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Node.js.postinstall.js.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "git-widget-placeholder": "v2-maintenance",
+    "javascript.preferred.runtime.type.id": "node",
+    "last_opened_file_path": "/Users/nico/Documents/Dev/transformers.js/scripts/esbuild",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs.jest.jest_package": "/Users/nico/Documents/Dev/transformers.js/node_modules/jest",
+    "nodejs_package_manager_path": "npm",
+    "prettierjs.PrettierConfiguration.Package": "/Users/nico/Documents/Dev/transformers.js/node_modules/prettier",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "/Users/nico/Documents/Dev/transformers.js/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/scripts/esbuild" />
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/scripts" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/.cache/onnx-community/granite-4.0-micro-ONNX-web" />
+      <recent name="$PROJECT_DIR$/scripts/build/esbuild" />
+      <recent name="$PROJECT_DIR$/scripts/esbuild" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Node.js.postinstall.js">
+    <configuration name="tokenizers.test.js" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$" />
+      <envs />
+      <scope-kind value="TEST_FILE" />
+      <test-file value="$PROJECT_DIR$/tests/tokenizers.test.js" />
+      <method v="2" />
+    </configuration>
+    <configuration name="postinstall.js" type="NodeJSConfigurationType" temporary="true" nameIsGenerated="true" path-to-js-file="$PROJECT_DIR$/scripts/postinstall.js" working-dir="$PROJECT_DIR$/scripts">
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Node.js.postinstall.js" />
+        <item itemvalue="Jest.tokenizers.test.js" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-c7e53b3be11b-JavaScript-PS-253.28294.345" />
+        <option value="bundled-php-predefined-a98d8de5180a-09080813851e-com.jetbrains.php.sharedIndexes-PS-253.28294.345" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="99c086b0-c1ce-4951-967a-aae05e8ca0bc" name="Changes" comment="" />
+      <created>1747168641333</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1747168641333</updated>
+      <workItem from="1747168642451" duration="13260000" />
+      <workItem from="1754987973358" duration="10646000" />
+      <workItem from="1755614621340" duration="625000" />
+      <workItem from="1759406753465" duration="19335000" />
+      <workItem from="1759734986243" duration="20357000" />
+      <workItem from="1759825269531" duration="10437000" />
+      <workItem from="1759874703216" duration="28327000" />
+      <workItem from="1760095081241" duration="13825000" />
+      <workItem from="1760470039507" duration="6043000" />
+      <workItem from="1760680621047" duration="938000" />
+      <workItem from="1760681789919" duration="33000" />
+      <workItem from="1760681830672" duration="9318000" />
+      <workItem from="1760948457406" duration="29127000" />
+      <workItem from="1761838723455" duration="5639000" />
+      <workItem from="1762163477928" duration="4579000" />
+      <workItem from="1762507842587" duration="5144000" />
+      <workItem from="1763371913192" duration="21087000" />
+      <workItem from="1763727076553" duration="17255000" />
+      <workItem from="1764165301821" duration="9993000" />
+      <workItem from="1764347898318" duration="71004000" />
+      <workItem from="1765176343884" duration="72000" />
+      <workItem from="1765176424403" duration="4505000" />
+      <workItem from="1765273687012" duration="4438000" />
+      <workItem from="1765369496433" duration="1450000" />
+      <workItem from="1765376640352" duration="3821000" />
+      <workItem from="1765576621865" duration="8230000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>
