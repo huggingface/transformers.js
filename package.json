@@ -6,27 +6,41 @@
   "types": "./types/transformers.d.ts",
   "type": "module",
   "exports": {
-    "node": {
-      "import": {
-        "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.mjs"
+    ".": {
+      "node": {
+        "import": {
+          "types": "./types/transformers.d.ts",
+          "default": "./dist/transformers.node.mjs"
+        },
+        "require": {
+          "types": "./types/transformers.d.ts",
+          "default": "./dist/transformers.node.cjs"
+        }
       },
-      "require": {
+      "default": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.cjs"
+        "default": "./dist/transformers.web.js"
       }
     },
-    "default": {
-      "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.web.js"
+    "./react": {
+      "types": "./types/react/index.d.ts",
+      "default": "./dist/react.js"
+    }
+  },
+  "peerDependencies": {
+    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
     }
   },
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typegen": "tsc --build",
-    "dev": "webpack serve --no-client-overlay",
-    "build": "webpack && npm run typegen",
+    "dev": "node scripts/esbuild/dev.mjs",
+    "build": "node scripts/esbuild/build.mjs && npm run typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
@@ -63,16 +77,15 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.11",
+    "@types/react": "^18.3.27",
     "@webgpu/types": "^0.1.64",
+    "esbuild": "^0.27.0",
     "jest": "^30.0.4",
     "jest-environment-node": "^30.0.4",
     "jsdoc-to-markdown": "^9.1.1",
     "prettier": "3.4.2",
     "typescript": "^5.8.3",
-    "wavefile": "11.0.0",
-    "webpack": "^5.99.9",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.2"
+    "wavefile": "11.0.0"
   },
   "files": [
     "src",

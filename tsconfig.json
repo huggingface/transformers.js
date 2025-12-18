@@ -14,7 +14,10 @@
     "declarationMap": true,
     "noEmit": false,
     "emitDeclarationOnly": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    // Allow importing .js files in TS (for cross-referencing core library)
+    "allowJs": true,
+    "resolveJsonModule": true
   },
   "typeAcquisition": {
     "include": ["jest"]
