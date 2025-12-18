@@ -104,17 +104,13 @@ export function isRemoteURL(url) {
 }
 
 /**
- * Converts a relative URL to an absolute URL if needed.
- * If the URL is already absolute (http://, https://, or blob:), returns it unchanged.
+ * Converts any URL to an absolute URL if needed.
+ * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
  * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
  * @param {string} url - The URL to convert (can be relative or absolute).
  * @returns {string} The absolute URL.
  */
 export function toAbsoluteURL(url) {
-    if (isBlobURL(url) || isRemoteURL(url)) {
-        return url;
-    }
-
     let baseURL;
 
     if (typeof location !== 'undefined' && location.href) {
