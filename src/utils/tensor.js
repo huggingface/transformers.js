@@ -212,7 +212,7 @@ export class Tensor {
      * @returns {Array}
      */
     tolist() {
-        return reshape(this.data, this.dims)
+        return reshape(this.data, this.dims);
     }
 
     /**
@@ -889,31 +889,54 @@ export class Tensor {
  */
 function reshape(data, dimensions) {
 
+    const ndim = dimensions.length;
+
+    if (ndim === 0) {
+        // Scalar
+        return data[0];
+    }
+
     const totalElements = data.length;
-    const dimensionSize = dimensions.reduce((a, b) => a * b);
+    const dimensionSize = dimensions.reduce((a, b) => a * b, 1);
 
     if (totalElements !== dimensionSize) {
         throw Error(`cannot reshape array of size ${totalElements} into shape (${dimensions})`);
     }
 
-    /** @type {any} */
-    let reshapedArray = data;
-
-    for (let i = dimensions.length - 1; i >= 0; i--) {
-        reshapedArray = reshapedArray.reduce((acc, val) => {
-            let lastArray = acc[acc.length - 1];
-
-            if (lastArray.length < dimensions[i]) {
-                lastArray.push(val);
-            } else {
-                acc.push([val]);
-            }
-
-            return acc;
-        }, [[]]);
+    if (ndim === 1) {
+        return Array.from(data);
     }
 
-    return reshapedArray[0];
+    // Pre-compute strides for each dimension
+    const strides = new Array(ndim);
+    strides[ndim - 1] = 1;
+    for (let i = ndim - 2; i >= 0; i--) {
+        strides[i] = strides[i + 1] * dimensions[i + 1];
+    }
+
+    /**
+     * Recursively construct the nested array.
+     * @param {number} offset - Current offset in `data`.
+     * @param {number} axis - Current axis being processed.
+     * @returns {Array}
+     */
+    function build(offset, axis) {
+        const size = dimensions[axis];
+        const result = new Array(size);
+        if (axis === ndim - 1) {
+            for (let i = 0; i < size; i++) {
+                result[i] = data[offset + i];
+            }
+        } else {
+            const step = strides[axis];
+            for (let i = 0; i < size; i++) {
+                result[i] = build(offset + i * step, axis + 1);
+            }
+        }
+        return result;
+    }
+
+    return build(0, 0);
 }
 
 /**
