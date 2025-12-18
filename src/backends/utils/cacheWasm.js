@@ -41,7 +41,6 @@ async function loadAndCacheFile(url) {
     }
 
     return response;
-
 }
 
 /**
@@ -82,4 +81,52 @@ export async function loadWasmFactory(libURL) {
         console.warn('Failed to read WASM binary:', error);
         return null;
     }
+}
+
+/**
+ * Checks if the given URL is a blob URL (created via URL.createObjectURL).
+ * Blob URLs should not be cached as they are temporary in-memory references.
+ * @param {string} url - The URL to check.
+ * @returns {boolean} True if the URL is a blob URL, false otherwise.
+ */
+export function isBlobURL(url) {
+    return url.startsWith('blob:');
+}
+
+/**
+ * Checks if the given URL is a remote HTTP/HTTPS URL.
+ * Remote URLs can be fetched and cached, unlike local file paths or blob URLs.
+ * @param {string} url - The URL to check.
+ * @returns {boolean} True if the URL is a remote HTTP/HTTPS URL, false otherwise.
+ */
+export function isRemoteURL(url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+}
+
+/**
+ * Converts a relative URL to an absolute URL if needed.
+ * If the URL is already absolute (http://, https://, or blob:), returns it unchanged.
+ * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
+ * @param {string} url - The URL to convert (can be relative or absolute).
+ * @returns {string} The absolute URL.
+ */
+export function toAbsoluteURL(url) {
+    if (isBlobURL(url) || isRemoteURL(url)) {
+        return url;
+    }
+
+    let baseURL;
+
+    if (typeof location !== 'undefined' && location.href) {
+        // Browser environment: use location.href
+        baseURL = location.href;
+    } else if (typeof import.meta !== 'undefined' && import.meta.url) {
+        // Node.js/Bun/Deno module environment: use import.meta.url
+        baseURL = import.meta.url;
+    } else {
+        // Fallback: if no base is available, return the URL unchanged
+        return url;
+    }
+
+    return new URL(url, baseURL).href;
 }
