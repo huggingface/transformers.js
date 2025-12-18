@@ -22,8 +22,7 @@ import { env, apis } from '../env.js';
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
-import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
-
+import { isBlobURL, isRemoteURL, loadWasmBinary, loadWasmFactory, toAbsoluteURL } from './utils/cacheWasm.js';
 export { Tensor } from 'onnxruntime-common';
 
 /**
@@ -186,10 +185,10 @@ async function ensureWasmLoaded() {
         // Load and cache both the WASM binary and factory
         await Promise.all([
             // Load and cache the WASM binary
-            urls.wasm && !urls.wasm.startsWith('blob:')
+            urls.wasm && !isBlobURL(urls.wasm)
                 ? (async () => {
                       try {
-                          const wasmBinary = await loadWasmBinary(urls.wasm);
+                          const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
                           if (wasmBinary) {
                               ONNX_ENV.wasm.wasmBinary = wasmBinary;
                           }
@@ -200,10 +199,10 @@ async function ensureWasmLoaded() {
                 : Promise.resolve(),
 
             // Load and cache the WASM factory
-            urls.mjs && !urls.mjs.startsWith('blob:')
+            urls.mjs && !isBlobURL(urls.mjs)
                 ? (async () => {
                       try {
-                          const wasmFactoryBlob = await loadWasmFactory(urls.mjs);
+                          const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
                           if (wasmFactoryBlob) {
                               // @ts-ignore
                               ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
@@ -228,11 +227,12 @@ async function ensureWasmLoaded() {
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
-    const load = () => InferenceSession.create(buffer_or_path, {
-        // Set default log level, but allow overriding through session options
-        logSeverityLevel: DEFAULT_LOG_LEVEL,
-        ...session_options,
-    });
+    const load = () =>
+        InferenceSession.create(buffer_or_path, {
+            // Set default log level, but allow overriding through session options
+            logSeverityLevel: DEFAULT_LOG_LEVEL,
+            ...session_options,
+        });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
     return session;
