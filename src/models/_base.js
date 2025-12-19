@@ -209,3 +209,60 @@ export class Sam2ImageSegmentationOutput extends ModelOutput {
         this.object_score_logits = object_score_logits;
     }
 }
+
+export class MgpstrModelOutput extends ModelOutput {
+    constructor({ char_logits, bpe_logits, wp_logits }) {
+        super();
+        this.char_logits = char_logits;
+        this.bpe_logits = bpe_logits;
+        this.wp_logits = wp_logits;
+    }
+
+    get logits() {
+        return [this.char_logits, this.bpe_logits, this.wp_logits];
+    }
+}
+
+export class MimiEncoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
+     */
+    constructor({ audio_codes }) {
+        super();
+        this.audio_codes = audio_codes;
+    }
+}
+
+export class MimiDecoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
+     */
+    constructor({ audio_values }) {
+        super();
+        this.audio_values = audio_values;
+    }
+}
+
+export class DacEncoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
+     */
+    constructor({ audio_codes }) {
+        super();
+        this.audio_codes = audio_codes;
+    }
+}
+
+export class DacDecoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
+     */
+    constructor({ audio_values }) {
+        super();
+        this.audio_values = audio_values;
+    }
+}
