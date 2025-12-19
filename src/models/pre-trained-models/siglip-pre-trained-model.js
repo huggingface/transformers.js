@@ -1,5 +1,5 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
-import { CLIPPreTrainedModel } from './CLIPPreTrainedModel.js';
+import { CLIPPreTrainedModel } from './clip-pre-trained-model.js';
 
 export class SiglipPreTrainedModel extends PreTrainedModel {}
 
