@@ -1,4 +1,5 @@
 import { getCache } from '../../utils/cache.js';
+import { isValidUrl } from '../../utils/hub/utils.js';
 
 /**
  * Loads and caches a file from the given URL.
@@ -90,17 +91,7 @@ export async function loadWasmFactory(libURL) {
  * @returns {boolean} True if the URL is a blob URL, false otherwise.
  */
 export function isBlobURL(url) {
-    return url.startsWith('blob:');
-}
-
-/**
- * Checks if the given URL is a remote HTTP/HTTPS URL.
- * Remote URLs can be fetched and cached, unlike local file paths or blob URLs.
- * @param {string} url - The URL to check.
- * @returns {boolean} True if the URL is a remote HTTP/HTTPS URL, false otherwise.
- */
-export function isRemoteURL(url) {
-    return url.startsWith('http://') || url.startsWith('https://');
+    return isValidUrl(url, ['blob:']);
 }
 
 /**
