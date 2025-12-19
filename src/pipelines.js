@@ -14,7 +14,7 @@
  */
 
 import { AutoTokenizer } from './tokenizers.js';
-import { AutoProcessor } from './models/auto/processing_auto.js';
+import { AutoProcessor } from './models/model-processors/auto/processing_auto.js';
 import {
     AutoModel,
     AutoModelForSequenceClassification,
