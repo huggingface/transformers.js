@@ -72,7 +72,7 @@ import {
     MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES,
     MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES,
     MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES,
-} from './models/PreTrainedModel.js';
+} from './models/pre-trained-model.js';
 import { PreTrainedModel } from '../types/models.d.ts';
 
 /**
