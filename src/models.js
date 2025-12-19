@@ -1340,22 +1340,1092 @@ export class PreTrainedModel extends Callable {
     }
 }
 
+//////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// NeoBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// ModernBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// ModernBERT Decoder models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// NomicBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// RoFormer models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// ConvBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Electra models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// CamemBERT models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// DeBERTa models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// DeBERTa-v2 models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// DistilBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// ESM models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MobileBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MPNet models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// SqueezeBert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Albert models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// T5 models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LONGT5 models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MT5 models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Bart models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MBart models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Blenderbot models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Blenderbot models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Roberta models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// XLM models
+/**
+ * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
+ */
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// XLMRoberta models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Audio Spectrogram Transformer (AST) models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Whisper models
+
+//////////////////////////////////////////////////
+// Moonshine models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LLaVa Models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Idefics3 Models
+
+//////////////////////////////////////////////////
+
+
+
+//////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// SigLIP models
+
+//////////////////////////////////////////////////
+// ChineseCLIP models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// JinaCLIP models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// CLIPSeg models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPT2 models
+
+
+
+// }
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPT OSS models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// JAIS models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPTNeo models
+
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPTNeoX models
+export class GPTNeoXPreTrainedModel extends PreTrainedModel {}
+export class GPTNeoXModel extends GPTNeoXPreTrainedModel {}
+
+export class GPTNeoXForCausalLM extends GPTNeoXPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPT-J models
+export class GPTJPreTrainedModel extends PreTrainedModel {}
+
+export class GPTJModel extends GPTJPreTrainedModel {}
+
+export class GPTJForCausalLM extends GPTJPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GPTBigCode models
+export class GPTBigCodePreTrainedModel extends PreTrainedModel {}
+
+export class GPTBigCodeModel extends GPTBigCodePreTrainedModel {}
+
+export class GPTBigCodeForCausalLM extends GPTBigCodePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// CodeGen models
+export class CodeGenPreTrainedModel extends PreTrainedModel {}
+/**
+ * CodeGenModel is a class representing a code generation model without a language model head.
+ */
+export class CodeGenModel extends CodeGenPreTrainedModel {}
+
+/**
+ * CodeGenForCausalLM is a class that represents a code generation model based on the GPT-2 architecture. It extends the `CodeGenPreTrainedModel` class.
+ */
+export class CodeGenForCausalLM extends CodeGenPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LLama models
+
+/**
+ * The bare LLama Model outputting raw hidden-states without any specific head on top.
+ */
+export class LlamaPreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare LLaMA Model outputting raw hidden-states without any specific head on top.
+ */
+export class LlamaModel extends LlamaPreTrainedModel {}
+
+export class LlamaForCausalLM extends LlamaPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class Llama4PreTrainedModel extends PreTrainedModel {}
+export class Llama4ForCausalLM extends Llama4PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// NanoChat models
+export class NanoChatPreTrainedModel extends PreTrainedModel {}
+export class NanoChatModel extends NanoChatPreTrainedModel {}
+export class NanoChatForCausalLM extends NanoChatPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Apertus models
+export class ApertusPreTrainedModel extends PreTrainedModel {}
+export class ApertusModel extends ApertusPreTrainedModel {}
+export class ApertusForCausalLM extends ApertusPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Arcee models
+export class ArceePreTrainedModel extends PreTrainedModel {}
+export class ArceeModel extends ArceePreTrainedModel {}
+export class ArceeForCausalLM extends ArceePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// LFM2 models
+export class Lfm2PreTrainedModel extends PreTrainedModel {}
+export class Lfm2Model extends Lfm2PreTrainedModel {}
+export class Lfm2ForCausalLM extends Lfm2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// SmolLM3 models
+export class SmolLM3PreTrainedModel extends PreTrainedModel {}
+export class SmolLM3Model extends SmolLM3PreTrainedModel {}
+export class SmolLM3ForCausalLM extends SmolLM3PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Helium models
+export class HeliumPreTrainedModel extends PreTrainedModel {}
+export class HeliumModel extends HeliumPreTrainedModel {}
+export class HeliumForCausalLM extends HeliumPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Glm models
+export class GlmPreTrainedModel extends PreTrainedModel {}
+export class GlmModel extends GlmPreTrainedModel {}
+export class GlmForCausalLM extends GlmPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// EXAONE models
+export class ExaonePreTrainedModel extends PreTrainedModel {}
+export class ExaoneModel extends ExaonePreTrainedModel {}
+export class ExaoneForCausalLM extends ExaonePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MobileLLM models
+export class MobileLLMPreTrainedModel extends PreTrainedModel {}
+export class MobileLLMModel extends MobileLLMPreTrainedModel {}
+export class MobileLLMForCausalLM extends MobileLLMPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Olmo models
+export class OlmoPreTrainedModel extends PreTrainedModel {}
+export class OlmoModel extends OlmoPreTrainedModel {}
+export class OlmoForCausalLM extends OlmoPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Olmo2 models
+export class Olmo2PreTrainedModel extends PreTrainedModel {}
+export class Olmo2Model extends Olmo2PreTrainedModel {}
+export class Olmo2ForCausalLM extends Olmo2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Olmo3 models
+export class Olmo3PreTrainedModel extends PreTrainedModel {}
+export class Olmo3Model extends Olmo3PreTrainedModel {}
+export class Olmo3ForCausalLM extends Olmo3PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Granite models
+export class GranitePreTrainedModel extends PreTrainedModel {}
+export class GraniteModel extends GranitePreTrainedModel {}
+export class GraniteForCausalLM extends GranitePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// GraniteMoeHybrid models
+export class GraniteMoeHybridPreTrainedModel extends PreTrainedModel {}
+export class GraniteMoeHybridModel extends GraniteMoeHybridPreTrainedModel {}
+export class GraniteMoeHybridForCausalLM extends GraniteMoeHybridPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Cohere models
+
+/**
+ * The bare Cohere Model outputting raw hidden-states without any specific head on top.
+ */
+export class CoherePreTrainedModel extends PreTrainedModel {}
+export class CohereModel extends CoherePreTrainedModel {}
+
+export class CohereForCausalLM extends CoherePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Gemma models
+
+/**
+ * The bare Gemma Model outputting raw hidden-states without any specific head on top.
+ */
+export class GemmaPreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Gemma Model outputting raw hidden-states without any specific head on top.
+ */
+export class GemmaModel extends GemmaPreTrainedModel {}
+
+export class GemmaForCausalLM extends GemmaPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Gemma2 models
+
+/**
+ * The bare Gemma2 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma2PreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Gemma2 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma2Model extends Gemma2PreTrainedModel {}
+
+export class Gemma2ForCausalLM extends Gemma2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// VaultGemma models
+export class VaultGemmaPreTrainedModel extends PreTrainedModel {}
+export class VaultGemmaModel extends VaultGemmaPreTrainedModel {}
+export class VaultGemmaForCausalLM extends VaultGemmaPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Gemma3 models
+
+/**
+ * The bare Gemma3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma3PreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Gemma3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Gemma3Model extends Gemma3PreTrainedModel {}
+
+export class Gemma3ForCausalLM extends Gemma3PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class OpenELMPreTrainedModel extends PreTrainedModel {}
+export class OpenELMModel extends OpenELMPreTrainedModel {}
+
+export class OpenELMForCausalLM extends OpenELMPreTrainedModel {}
+
+//////////////////////////////////////////////////
+// Qwen2 models
+
+/**
+ * The bare Qwen2 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen2PreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Qwen2 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen2Model extends Qwen2PreTrainedModel {}
+
+export class Qwen2ForCausalLM extends Qwen2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Qwen3 models
+
+/**
+ * The bare Qwen3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen3PreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Qwen3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Qwen3Model extends Qwen3PreTrainedModel {}
+
+export class Qwen3ForCausalLM extends Qwen3PreTrainedModel {}
+//////////////////////////////////////////////////
+
+export class Qwen2VLPreTrainedModel extends PreTrainedModel {
+    forward_params = [
+        // Text inputs
+        'input_ids',
+        'attention_mask',
+        'position_ids',
+        'past_key_values',
+
+        // Vision inputs
+        'pixel_values',
+        'image_grid_thw',
+    ];
+}
+export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
+    /**
+     * Calculate the 3D rope index based on image and video's temporal, height and width in LLM.
+     *
+     * Explanation:
+     *     Each embedding sequence contains vision embedding and text embedding or just contains text embedding.
+     *
+     *     For pure text embedding sequence, the rotary position embedding has no difference with mordern LLMs.
+     *     Examples:
+     *         input_ids: [T T T T T], here T is for text.
+     *         temporal position_ids: [0, 1, 2, 3, 4]
+     *         height position_ids: [0, 1, 2, 3, 4]
+     *         width position_ids: [0, 1, 2, 3, 4]
+     *
+     *     For vision and text embedding sequence, we calculate 3D rotary position embedding for vision part
+     *     and 1D rotary position embeddin for text part.
+     *     Examples:
+     *         Assume we have a video input with 3 temporal patches, 2 height patches and 2 width patches.
+     *         input_ids: [V V V V V V V V V V V V T T T T T], here V is for vision.
+     *         vision temporal position_ids: [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2]
+     *         vision height position_ids: [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1]
+     *         vision width position_ids: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+     *         text temporal position_ids: [3, 4, 5, 6, 7]
+     *         text height position_ids: [3, 4, 5, 6, 7]
+     *         text width position_ids: [3, 4, 5, 6, 7]
+     *         Here we calculate the text start position_ids as the max vision position_ids plus 1.
+     *
+     * @param {Tensor} input_ids Indices of input sequence tokens in the vocabulary. Tensor of shape `(batch_size, sequence_length)`.
+     * @param {Tensor} image_grid_thw (Optional) The temporal, height and width of feature shape of each image in LLM. Tensor of shape `(num_images, 3)`.
+     * @param {Tensor} video_grid_thw (Optional) The temporal, height and width of feature shape of each video in LLM. Tensor of shape `(num_videos, 3)`.
+     * @param {Tensor} attention_mask (Optional) Mask to avoid performing attention on padding token indices. Tensor of shape `(batch_size, sequence_length)`. Mask values selected in `[0, 1]`:
+     * - 1 for tokens that are **not masked**,
+     * - 0 for tokens that are **masked**.
+     * @returns {[Tensor, Tensor]} [position_ids, mrope_position_deltas] with:
+     * - position_ids: Tensor of shape `(3, batch_size, sequence_length)`.
+     * - mrope_position_deltas: Tensor of shape `(batch_size)`.
+     */
+    get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask) {
+        // @ts-ignore
+        const { vision_config, image_token_id, video_token_id, vision_start_token_id } = this.config;
+        const spatial_merge_size = vision_config.spatial_merge_size ?? 2;
+
+        const mrope_position_deltas = [];
+        if (image_grid_thw || video_grid_thw) {
+            let total_input_ids = input_ids.tolist();
+            if (!attention_mask) {
+                attention_mask = ones_like(input_ids);
+            }
+
+            const attention_mask_list = attention_mask.tolist();
+            const position_ids_list = Array.from({ length: 3 }, (_) =>
+                Array.from({ length: input_ids.dims[0] }, (_) => Array.from({ length: input_ids.dims[1] }, (_) => 1)),
+            );
+
+            const image_grid_thw_list = image_grid_thw ? image_grid_thw.tolist() : [];
+            const video_grid_thw_list = video_grid_thw ? video_grid_thw.tolist() : [];
+
+            let image_index = 0;
+            let video_index = 0;
+            for (let i = 0; i < total_input_ids.length; ++i) {
+                const ids = total_input_ids[i].filter((_, j) => attention_mask_list[i][j] == 1);
+
+                const vision_start_indices = ids.reduce((acc, x, idx) => {
+                    if (x == vision_start_token_id) acc.push(idx);
+                    return acc;
+                }, []);
+
+                const vision_tokens = vision_start_indices.map((x) => ids[x + 1]);
+                const image_nums = vision_tokens.filter((x) => x == image_token_id).length;
+                const video_nums = vision_tokens.filter((x) => x == video_token_id).length;
+
+                /** @type {number[][]} */
+                let llm_pos_ids_list = [];
+                let st = 0;
+                let remain_images = image_nums;
+                let remain_videos = video_nums;
+                for (let j = 0; j < vision_tokens.length; ++j) {
+                    const next_image_token = ids.findIndex((x, i) => i > st && x == image_token_id);
+                    const next_video_token = ids.findIndex((x, i) => i > st && x == video_token_id);
+
+                    const ed_image = remain_images > 0 && next_image_token !== -1 ? next_image_token : ids.length + 1;
+
+                    const ed_video = remain_videos > 0 && next_video_token !== -1 ? next_video_token : ids.length + 1;
+
+                    let ed;
+                    let t, h, w;
+                    if (ed_image < ed_video) {
+                        [t, h, w] = image_grid_thw_list[image_index];
+                        ++image_index;
+                        --remain_images;
+                        ed = ed_image;
+                    } else {
+                        [t, h, w] = video_grid_thw_list[video_index];
+                        ++video_index;
+                        --remain_videos;
+                        ed = ed_video;
+                    }
+
+                    const [llm_grid_t, llm_grid_h, llm_grid_w] = [
+                        Number(t),
+                        Math.floor(Number(h) / spatial_merge_size),
+                        Math.floor(Number(w) / spatial_merge_size),
+                    ];
+                    const text_len = ed - st;
+                    const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
+
+                    llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
+
+                    const offset = text_len + st_idx;
+                    const grid_size = llm_grid_t * llm_grid_h * llm_grid_w;
+                    const t_index = Array.from(
+                        { length: grid_size },
+                        (_, i) => offset + Math.floor(i / (llm_grid_h * llm_grid_w)),
+                    );
+                    const h_index = Array.from(
+                        { length: grid_size },
+                        (_, i) => offset + (Math.floor(i / llm_grid_w) % llm_grid_h),
+                    );
+                    const w_index = Array.from({ length: grid_size }, (_, i) => offset + (i % llm_grid_w));
+
+                    llm_pos_ids_list.push([t_index, h_index, w_index].flat());
+
+                    st = ed + grid_size;
+                }
+
+                if (st < ids.length) {
+                    const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
+                    const text_len = ids.length - st;
+
+                    llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
+                }
+
+                // NOTE: Each item in llm_pos_ids_list is an array of shape (3, text_len),
+                // meaning to perform concatenation along dim=1, we can do the following:
+                const num_items = llm_pos_ids_list.reduce((acc, x) => acc + x.length, 0);
+                /** @type {number[]} */
+                const llm_positions = new Array(num_items);
+                let index = 0;
+                for (let x = 0; x < 3; ++x) {
+                    for (let y = 0; y < llm_pos_ids_list.length; ++y) {
+                        const val = llm_pos_ids_list[y];
+                        const text_len = val.length / 3;
+                        for (let z = x * text_len; z < (x + 1) * text_len; ++z) {
+                            llm_positions[index++] = val[z];
+                        }
+                    }
+                }
+
+                let count = 0;
+                const attn_mask = attention_mask_list[i];
+                for (let y = 0; y < attn_mask.length; ++y) {
+                    if (attn_mask[y] == 1) {
+                        for (let x = 0; x < 3; ++x) {
+                            position_ids_list[x][i][y] = llm_positions[(x * num_items) / 3 + count];
+                        }
+                        ++count;
+                    }
+                }
+
+                const max_llm_positions = max(llm_positions)[0];
+                mrope_position_deltas.push(max_llm_positions + 1 - total_input_ids[i].length);
+            }
+
+            return [
+                new Tensor('int64', position_ids_list.flat(Infinity), [3, input_ids.dims[0], input_ids.dims[1]]),
+                new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
+            ];
+        } else {
+            // Text-only
+            if (attention_mask) {
+                const { data, dims } = cumsum_masked_fill(attention_mask);
+
+                const position_ids = BigInt64Array.from({ length: 3 * data.length }, (_, i) => data[i % data.length]);
+                /** @type {bigint[]} */
+                const mrope_position_deltas = Array.from(
+                    { length: dims[0] },
+                    (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n + BigInt(dims[1]),
+                );
+
+                return [
+                    new Tensor('int64', position_ids, [3, ...dims]),
+                    new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
+                ];
+            } else {
+                const [batch_size, seq_length] = input_ids.dims;
+                const position_ids = BigInt64Array.from({ length: 3 * batch_size * seq_length }, (_, i) =>
+                    BigInt(Math.floor((i % seq_length) / batch_size)),
+                );
+
+                return [new Tensor('int64', position_ids, [3, ...input_ids.dims]), zeros([batch_size, 1])];
+            }
+        }
+    }
+
+    async encode_image({ pixel_values, image_grid_thw }) {
+        const features = (await sessionRun(this.sessions['vision_encoder'], { pixel_values, grid_thw: image_grid_thw }))
+            .image_features;
+        return features;
+    }
+
+    _merge_input_ids_with_image_features(kwargs) {
+        return default_merge_input_ids_with_image_features({
+            // @ts-ignore
+            image_token_id: this.config.image_token_id,
+            ...kwargs,
+        });
+    }
+
+    prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        // Overwritten -- in specific circumstances we don't want to forward image inputs to the model
+        if (model_inputs.attention_mask && !model_inputs.position_ids) {
+            // Calculate position_ids and rope_deltas
+            if (!model_inputs.past_key_values) {
+                [model_inputs.position_ids, model_inputs.rope_deltas] = this.get_rope_index(
+                    model_inputs.input_ids,
+                    model_inputs.image_grid_thw,
+                    model_inputs.video_grid_thw,
+                    model_inputs.attention_mask,
+                );
+            } else {
+                model_inputs.pixel_values = null;
+                // model_inputs.pixel_values_videos = null;
+
+                const delta = BigInt(Object.values(model_inputs.past_key_values)[0].dims.at(-2));
+                const rope_deltas_list = model_inputs.rope_deltas.map((x) => delta + x);
+                model_inputs.position_ids = stack([rope_deltas_list, rope_deltas_list, rope_deltas_list], 0);
+            }
+        }
+
+        return model_inputs;
+    }
+}
 
 //////////////////////////////////////////////////
 // Phi models
+export class PhiPreTrainedModel extends PreTrainedModel {}
+/**
+ * The bare Phi Model outputting raw hidden-states without any specific head on top.
+ */
+export class PhiModel extends PhiPreTrainedModel {}
+
+export class PhiForCausalLM extends PhiPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Phi3 models
+export class Phi3PreTrainedModel extends PreTrainedModel {}
+
+/**
+ * The bare Phi3 Model outputting raw hidden-states without any specific head on top.
+ */
+export class Phi3Model extends Phi3PreTrainedModel {}
+
+export class Phi3ForCausalLM extends Phi3PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Bloom models
+/**
+ * The Bloom Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
+ */
+export class BloomPreTrainedModel extends PreTrainedModel {}
+
+/**
+ * The bare Bloom Model transformer outputting raw hidden-states without any specific head on top.
+ */
+export class BloomModel extends BloomPreTrainedModel {}
+
+/**
+ * The Bloom Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
+ */
+export class BloomForCausalLM extends BloomPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// MPT models
+export class MptPreTrainedModel extends PreTrainedModel {}
+
+/**
+ * The bare Mpt Model transformer outputting raw hidden-states without any specific head on top.
+ */
+export class MptModel extends MptPreTrainedModel {}
+
+/**
+ * The MPT Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
+ */
+export class MptForCausalLM extends MptPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// OPT models
+export class OPTPreTrainedModel extends PreTrainedModel {}
+
+/**
+ * The bare OPT Model outputting raw hidden-states without any specific head on top.
+ */
+export class OPTModel extends OPTPreTrainedModel {}
+
+/**
+ * The OPT Model transformer with a language modeling head on top (linear layer with weights tied to the input embeddings).
+ */
+export class OPTForCausalLM extends OPTPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class ViTPreTrainedModel extends PreTrainedModel {}
+export class ViTModel extends ViTPreTrainedModel {}
+export class ViTForImageClassification extends ViTPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class IJepaPreTrainedModel extends PreTrainedModel {}
+export class IJepaModel extends IJepaPreTrainedModel {}
+export class IJepaForImageClassification extends IJepaPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class VitPosePreTrainedModel extends PreTrainedModel {}
+
+/**
+ * The VitPose model with a pose estimation head on top.
+ */
+export class VitPoseForPoseEstimation extends VitPosePreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class PvtPreTrainedModel extends PreTrainedModel {}
+export class PvtModel extends PvtPreTrainedModel {}
+export class PvtForImageClassification extends PvtPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class ViTMAEPreTrainedModel extends PreTrainedModel {}
+export class ViTMAEModel extends ViTMAEPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class ViTMSNPreTrainedModel extends PreTrainedModel {}
+export class ViTMSNModel extends ViTMSNPreTrainedModel {}
+export class ViTMSNForImageClassification extends ViTMSNPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class GroupViTPreTrainedModel extends PreTrainedModel {}
+export class GroupViTModel extends GroupViTPreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class FastViTPreTrainedModel extends PreTrainedModel {}
+export class FastViTModel extends FastViTPreTrainedModel {}
+export class FastViTForImageClassification extends FastViTPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class VitMattePreTrainedModel extends PreTrainedModel {}
+
+/**
+ * ViTMatte framework leveraging any vision backbone e.g. for ADE20k, CityScapes.
+ *
+ * **Example:** Perform image matting with a `VitMatteForImageMatting` model.
+ * ```javascript
+ * import { AutoProcessor, VitMatteForImageMatting, RawImage } from '@huggingface/transformers';
+ *
+ * // Load processor and model
+ * const processor = await AutoProcessor.from_pretrained('Xenova/vitmatte-small-distinctions-646');
+ * const model = await VitMatteForImageMatting.from_pretrained('Xenova/vitmatte-small-distinctions-646');
+ *
+ * // Load image and trimap
+ * const image = await RawImage.fromURL('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/vitmatte_image.png');
+ * const trimap = await RawImage.fromURL('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/vitmatte_trimap.png');
+ *
+ * // Prepare image + trimap for the model
+ * const inputs = await processor(image, trimap);
+ *
+ * // Predict alpha matte
+ * const { alphas } = await model(inputs);
+ * // Tensor {
+ * //   dims: [ 1, 1, 640, 960 ],
+ * //   type: 'float32',
+ * //   size: 614400,
+ * //   data: Float32Array(614400) [ 0.9894027709960938, 0.9970508813858032, ... ]
+ * // }
+ * ```
+ *
+ * You can visualize the alpha matte as follows:
+ * ```javascript
+ * import { Tensor, cat } from '@huggingface/transformers';
+ *
+ * // Visualize predicted alpha matte
+ * const imageTensor = image.toTensor();
+ *
+ * // Convert float (0-1) alpha matte to uint8 (0-255)
+ * const alphaChannel = alphas
+ *   .squeeze(0)
+ *   .mul_(255)
+ *   .clamp_(0, 255)
+ *   .round_()
+ *   .to('uint8');
+ *
+ * // Concatenate original image with predicted alpha
+ * const imageData = cat([imageTensor, alphaChannel], 0);
+ *
+ * // Save output image
+ * const outputImage = RawImage.fromTensor(imageData);
+ * outputImage.save('output.png');
+ * ```
+ */
+export class VitMatteForImageMatting extends VitMattePreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new ImageMattingOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class MobileViTPreTrainedModel extends PreTrainedModel {}
+export class MobileViTModel extends MobileViTPreTrainedModel {}
+export class MobileViTForImageClassification extends MobileViTPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+// TODO: MobileViTForSemanticSegmentation
 
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+export class MobileViTV2PreTrainedModel extends PreTrainedModel {}
+export class MobileViTV2Model extends MobileViTV2PreTrainedModel {}
+export class MobileViTV2ForImageClassification extends MobileViTV2PreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+// TODO: MobileViTV2ForSemanticSegmentation
 
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
-
-
+export class OwlViTPreTrainedModel extends PreTrainedModel {}
+export class OwlViTModel extends OwlViTPreTrainedModel {}
+export class OwlViTForObjectDetection extends OwlViTPreTrainedModel {}
 //////////////////////////////////////////////////
 
+//////////////////////////////////////////////////
+export class Owlv2PreTrainedModel extends PreTrainedModel {}
+export class Owlv2Model extends Owlv2PreTrainedModel {}
+export class Owlv2ForObjectDetection extends Owlv2PreTrainedModel {}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+// Beit Models
+export class BeitPreTrainedModel extends PreTrainedModel {}
+export class BeitModel extends BeitPreTrainedModel {}
+export class BeitForImageClassification extends BeitPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class DetrPreTrainedModel extends PreTrainedModel {}
+export class DetrModel extends DetrPreTrainedModel {}
+export class DetrForObjectDetection extends DetrPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new DetrObjectDetectionOutput(await super._call(model_inputs));
+    }
+}
+
+export class DetrForSegmentation extends DetrPreTrainedModel {
+    /**
+     * Runs the model with the provided inputs
+     * @param {Object} model_inputs Model inputs
+     * @returns {Promise<DetrSegmentationOutput>} Object containing segmentation outputs
+     */
+    async _call(model_inputs) {
+        return new DetrSegmentationOutput(await super._call(model_inputs));
+    }
+}
+
+export class DetrObjectDetectionOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.logits Classification logits (including no-object) for all queries.
+     * @param {Tensor} output.pred_boxes Normalized boxes coordinates for all queries, represented as (center_x, center_y, width, height).
+     * These values are normalized in [0, 1], relative to the size of each individual image in the batch (disregarding possible padding).
+     */
+    constructor({ logits, pred_boxes }) {
+        super();
+        this.logits = logits;
+        this.pred_boxes = pred_boxes;
+    }
+}
+
+export class DetrSegmentationOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.logits The output logits of the model.
+     * @param {Tensor} output.pred_boxes Predicted boxes.
+     * @param {Tensor} output.pred_masks Predicted masks.
+     */
+    constructor({ logits, pred_boxes, pred_masks }) {
+        super();
+        this.logits = logits;
+        this.pred_boxes = pred_boxes;
+        this.pred_masks = pred_masks;
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class RTDetrPreTrainedModel extends PreTrainedModel {}
+export class RTDetrModel extends RTDetrPreTrainedModel {}
+export class RTDetrForObjectDetection extends RTDetrPreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new RTDetrObjectDetectionOutput(await super._call(model_inputs));
+    }
+}
+
+export class RTDetrObjectDetectionOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.logits Classification logits (including no-object) for all queries.
+     * @param {Tensor} output.pred_boxes Normalized boxes coordinates for all queries, represented as (center_x, center_y, width, height).
+     * These values are normalized in [0, 1], relative to the size of each individual image in the batch (disregarding possible padding).
+     */
+    constructor({ logits, pred_boxes }) {
+        super();
+        this.logits = logits;
+        this.pred_boxes = pred_boxes;
+    }
+}
+//////////////////////////////////////////////////
+
+//////////////////////////////////////////////////
+export class RTDetrV2PreTrainedModel extends PreTrainedModel {}
+export class RTDetrV2Model extends RTDetrV2PreTrainedModel {}
+export class RTDetrV2ForObjectDetection extends RTDetrV2PreTrainedModel {
+    /**
+     * @param {any} model_inputs
+     */
+    async _call(model_inputs) {
+        return new RTDetrV2ObjectDetectionOutput(await super._call(model_inputs));
+    }
+}
+
+export class RTDetrV2ObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
@@ -4758,4 +5828,49 @@ export class AutoModelForAudioTextToText extends PretrainedMixin {
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
+export class Seq2SeqLMOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.logits The output logits of the model.
+     * @param {Tensor} output.past_key_values An tensor of key/value pairs that represent the previous state of the model.
+     * @param {Tensor} output.encoder_outputs The output of the encoder in a sequence-to-sequence model.
+     * @param {Tensor} [output.decoder_attentions] Attentions weights of the decoder, after the attention softmax, used to compute the weighted average in the self-attention heads.
+     * @param {Tensor} [output.cross_attentions] Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the weighted average in the cross-attention heads.
+     */
+    constructor({ logits, past_key_values, encoder_outputs, decoder_attentions = null, cross_attentions = null }) {
+        super();
+        this.logits = logits;
+        this.past_key_values = past_key_values;
+        this.encoder_outputs = encoder_outputs;
+        this.decoder_attentions = decoder_attentions;
+        this.cross_attentions = cross_attentions;
+    }
+}
 
+export class ImageMattingOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.alphas Estimated alpha values, of shape `(batch_size, num_channels, height, width)`.
+     */
+    constructor({ alphas }) {
+        super();
+        this.alphas = alphas;
+    }
+}
+
+/**
+ * Describes the outputs for the VITS model.
+ */
+export class VitsModelOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.waveform The final audio waveform predicted by the model, of shape `(batch_size, sequence_length)`.
+     * @param {Tensor} output.spectrogram The log-mel spectrogram predicted at the output of the flow model.
+     * This spectrogram is passed to the Hi-Fi GAN decoder model to obtain the final audio waveform.
+     */
+    constructor({ waveform, spectrogram }) {
+        super();
+        this.waveform = waveform;
+        this.spectrogram = spectrogram;
+    }
+}
