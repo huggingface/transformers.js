@@ -1,6 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { CausalLMOutput, SequenceClassifierOutput } from '../output.js';
-import { Wav2Vec2PreTrainedModel } from './Wav2Vec2PreTrainedModel.js';
+import { Wav2Vec2PreTrainedModel } from './wav2-vec2-pre-trained-model.js';
 
 export class HubertPreTrainedModel extends PreTrainedModel {}
 
