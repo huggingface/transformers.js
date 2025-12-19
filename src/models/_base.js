@@ -194,3 +194,18 @@ export class VitsModelOutput extends ModelOutput {
         this.spectrogram = spectrogram;
     }
 }
+
+export class Sam2ImageSegmentationOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.iou_scores The output logits of the model.
+     * @param {Tensor} output.pred_masks Predicted boxes.
+     * @param {Tensor} output.object_score_logits Logits for the object score, indicating if an object is present.
+     */
+    constructor({ iou_scores, pred_masks, object_score_logits }) {
+        super();
+        this.iou_scores = iou_scores;
+        this.pred_masks = pred_masks;
+        this.object_score_logits = object_score_logits;
+    }
+}
