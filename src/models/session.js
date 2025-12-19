@@ -231,7 +231,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name = undefined) {
+export async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name = undefined) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {
