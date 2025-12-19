@@ -1358,505 +1358,146 @@ export class PreTrainedModel extends Callable {
 
 //////////////////////////////////////////////////
 
-//////////////////////////////////////////////////
-export class RFDetrPreTrainedModel extends PreTrainedModel {}
-export class RFDetrModel extends RFDetrPreTrainedModel {}
-export class RFDetrForObjectDetection extends RFDetrPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new RFDetrObjectDetectionOutput(await super._call(model_inputs));
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
+//
+// //////////////////////////////////////////////////
 
-export class RFDetrObjectDetectionOutput extends RTDetrObjectDetectionOutput {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DFinePreTrainedModel extends PreTrainedModel {}
-export class DFineModel extends DFinePreTrainedModel {}
-export class DFineForObjectDetection extends DFinePreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new RTDetrObjectDetectionOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class TableTransformerPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare Table Transformer Model (consisting of a backbone and encoder-decoder Transformer)
- * outputting raw hidden-states without any specific head on top.
- */
-export class TableTransformerModel extends TableTransformerPreTrainedModel {}
-
-/**
- * Table Transformer Model (consisting of a backbone and encoder-decoder Transformer)
- * with object detection heads on top, for tasks such as COCO detection.
- */
-export class TableTransformerForObjectDetection extends TableTransformerPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new TableTransformerObjectDetectionOutput(await super._call(model_inputs));
-    }
-}
-export class TableTransformerObjectDetectionOutput extends DetrObjectDetectionOutput {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DeiTPreTrainedModel extends PreTrainedModel {}
-export class DeiTModel extends DeiTPreTrainedModel {}
-export class DeiTForImageClassification extends DeiTPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class HieraPreTrainedModel extends PreTrainedModel {}
-export class HieraModel extends HieraPreTrainedModel {}
-export class HieraForImageClassification extends HieraPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-/**
- * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
- */
-export class ResNetPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare ResNet model outputting raw features without any specific head on top.
- */
-export class ResNetModel extends ResNetPreTrainedModel {}
-
-/**
- * ResNet Model with an image classification head on top (a linear layer on top of the pooled features), e.g. for ImageNet.
- */
-export class ResNetForImageClassification extends ResNetPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class SwinPreTrainedModel extends PreTrainedModel {}
-export class SwinModel extends SwinPreTrainedModel {}
-export class SwinForImageClassification extends SwinPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-export class SwinForSemanticSegmentation extends SwinPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class Swin2SRPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare Swin2SR Model transformer outputting raw hidden-states without any specific head on top.
- */
-export class Swin2SRModel extends Swin2SRPreTrainedModel {}
-
-/**
- * Swin2SR Model transformer with an upsampler head on top for image super resolution and restoration.
- *
- * **Example:** Super-resolution w/ `Xenova/swin2SR-classical-sr-x2-64`.
- *
- * ```javascript
- * import { AutoProcessor, Swin2SRForImageSuperResolution, RawImage } from '@huggingface/transformers';
- *
- * // Load processor and model
- * const model_id = 'Xenova/swin2SR-classical-sr-x2-64';
- * const processor = await AutoProcessor.from_pretrained(model_id);
- * const model = await Swin2SRForImageSuperResolution.from_pretrained(model_id);
- *
- * // Prepare model inputs
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/butterfly.jpg';
- * const image = await RawImage.fromURL(url);
- * const inputs = await processor(image);
- *
- * // Run model
- * const outputs = await model(inputs);
- *
- * // Convert Tensor to RawImage
- * const output = outputs.reconstruction.squeeze().clamp_(0, 1).mul_(255).round_().to('uint8');
- * const outputImage = RawImage.fromTensor(output);
- * // RawImage {
- * //   data: Uint8Array(786432) [ 41, 31, 24, ... ],
- * //   width: 512,
- * //   height: 512,
- * //   channels: 3
- * // }
- * ```
- */
-export class Swin2SRForImageSuperResolution extends Swin2SRPreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
-export class DPTPreTrainedModel extends PreTrainedModel {}
 
-/**
- * The bare DPT Model transformer outputting raw hidden-states without any specific head on top.
- */
-export class DPTModel extends DPTPreTrainedModel {}
-
-/**
- * DPT Model with a depth estimation head on top (consisting of 3 convolutional layers) e.g. for KITTI, NYUv2.
- *
- * **Example:** Depth estimation w/ `Xenova/dpt-hybrid-midas`.
- * ```javascript
- * import { DPTForDepthEstimation, AutoProcessor, RawImage, interpolate_4d } from '@huggingface/transformers';
- *
- * // Load model and processor
- * const model_id = 'Xenova/dpt-hybrid-midas';
- * const model = await DPTForDepthEstimation.from_pretrained(model_id);
- * const processor = await AutoProcessor.from_pretrained(model_id);
- *
- * // Load image from URL
- * const url = 'http://images.cocodataset.org/val2017/000000039769.jpg';
- * const image = await RawImage.read(url);
- *
- * // Prepare image for the model
- * const inputs = await processor(image);
- *
- * // Run model
- * const { predicted_depth } = await model(inputs);
- *
- * // Interpolate to original size
- * const prediction = (await interpolate_4d(predicted_depth.unsqueeze(1), {
- * size: image.size.reverse(),
- * mode: 'bilinear',
- * })).squeeze(1);
- *
- * // Visualize the prediction
- * const min = prediction.min().item();
- * const max = prediction.max().item();
- * const formatted = prediction.sub_(min).div_(max - min).mul_(255).to('uint8');
- * const depth = RawImage.fromTensor(formatted);
- * // RawImage {
- * //   data: Uint8Array(307200) [ 85, 85, 84, ... ],
- * //   width: 640,
- * //   height: 480,
- * //   channels: 1
- * // }
- * ```
- */
-export class DPTForDepthEstimation extends DPTPreTrainedModel {}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
-export class DepthAnythingPreTrainedModel extends PreTrainedModel {}
 
-/**
- * Depth Anything Model with a depth estimation head on top (consisting of 3 convolutional layers) e.g. for KITTI, NYUv2.
- */
-export class DepthAnythingForDepthEstimation extends DepthAnythingPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class SapiensPreTrainedModel extends PreTrainedModel {}
-export class SapiensForSemanticSegmentation extends SapiensPreTrainedModel {}
-export class SapiensForDepthEstimation extends SapiensPreTrainedModel {}
-export class SapiensForNormalEstimation extends SapiensPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DepthProPreTrainedModel extends PreTrainedModel {}
-export class DepthProForDepthEstimation extends DepthProPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class Metric3DPreTrainedModel extends PreTrainedModel {}
-export class Metric3DForDepthEstimation extends Metric3DPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class Metric3Dv2PreTrainedModel extends PreTrainedModel {}
-export class Metric3Dv2ForDepthEstimation extends Metric3Dv2PreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class MaskFormerPreTrainedModel extends PreTrainedModel {}
-export class MaskFormerModel extends MaskFormerPreTrainedModel {}
-export class MaskFormerForInstanceSegmentation extends MaskFormerPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class GLPNPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare GLPN encoder (Mix-Transformer) outputting raw hidden-states without any specific head on top.
- */
-export class GLPNModel extends GLPNPreTrainedModel {}
-
-/**
- * import { GLPNForDepthEstimation, AutoProcessor, RawImage, interpolate_4d } from '@huggingface/transformers';
- *
- * // Load model and processor
- * const model_id = 'Xenova/glpn-kitti';
- * const model = await GLPNForDepthEstimation.from_pretrained(model_id);
- * const processor = await AutoProcessor.from_pretrained(model_id);
- *
- * // Load image from URL
- * const url = 'http://images.cocodataset.org/val2017/000000039769.jpg';
- * const image = await RawImage.read(url);
- *
- * // Prepare image for the model
- * const inputs = await processor(image);
- *
- * // Run model
- * const { predicted_depth } = await model(inputs);
- *
- * // Interpolate to original size
- * const prediction = (await interpolate_4d(predicted_depth.unsqueeze(1), {
- * size: image.size.reverse(),
- * mode: 'bilinear',
- * })).squeeze(1);
- *
- * // Visualize the prediction
- * const min = prediction.min().item();
- * const max = prediction.max().item();
- * const formatted = prediction.sub_(min).div_(max - min).mul_(255).to('uint8');
- * const depth = RawImage.fromTensor(formatted);
- * // RawImage {
- * //   data: Uint8Array(307200) [ 85, 85, 84, ... ],
- * //   width: 640,
- * //   height: 480,
- * //   channels: 1
- * // }
- * ```
- */
-export class GLPNForDepthEstimation extends GLPNPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DonutSwinPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare Donut Swin Model transformer outputting raw hidden-states without any specific head on top.
- *
- * **Example:** Step-by-step Document Parsing.
- *
- * ```javascript
- * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, RawImage } from '@huggingface/transformers';
- *
- * // Choose model to use
- * const model_id = 'Xenova/donut-base-finetuned-cord-v2';
- *
- * // Prepare image inputs
- * const processor = await AutoProcessor.from_pretrained(model_id);
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/receipt.png';
- * const image = await RawImage.read(url);
- * const image_inputs = await processor(image);
- *
- * // Prepare decoder inputs
- * const tokenizer = await AutoTokenizer.from_pretrained(model_id);
- * const task_prompt = '<s_cord-v2>';
- * const decoder_input_ids = tokenizer(task_prompt, {
- *   add_special_tokens: false,
- * }).input_ids;
- *
- * // Create the model
- * const model = await AutoModelForVision2Seq.from_pretrained(model_id);
- *
- * // Run inference
- * const output = await model.generate(image_inputs.pixel_values, {
- *   decoder_input_ids,
- *   max_length: model.config.decoder.max_position_embeddings,
- * });
- *
- * // Decode output
- * const decoded = tokenizer.batch_decode(output)[0];
- * // <s_cord-v2><s_menu><s_nm> CINNAMON SUGAR</s_nm><s_unitprice> 17,000</s_unitprice><s_cnt> 1 x</s_cnt><s_price> 17,000</s_price></s_menu><s_sub_total><s_subtotal_price> 17,000</s_subtotal_price></s_sub_total><s_total><s_total_price> 17,000</s_total_price><s_cashprice> 20,000</s_cashprice><s_changeprice> 3,000</s_changeprice></s_total></s>
- * ```
- *
- * **Example:** Step-by-step Document Visual Question Answering (DocVQA)
- *
- * ```javascript
- * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, RawImage } from '@huggingface/transformers';
- *
- * // Choose model to use
- * const model_id = 'Xenova/donut-base-finetuned-docvqa';
- *
- * // Prepare image inputs
- * const processor = await AutoProcessor.from_pretrained(model_id);
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/invoice.png';
- * const image = await RawImage.read(url);
- * const image_inputs = await processor(image);
- *
- * // Prepare decoder inputs
- * const tokenizer = await AutoTokenizer.from_pretrained(model_id);
- * const question = 'What is the invoice number?';
- * const task_prompt = `<s_docvqa><s_question>${question}</s_question><s_answer>`;
- * const decoder_input_ids = tokenizer(task_prompt, {
- *   add_special_tokens: false,
- * }).input_ids;
- *
- * // Create the model
- * const model = await AutoModelForVision2Seq.from_pretrained(model_id);
- *
- * // Run inference
- * const output = await model.generate(image_inputs.pixel_values, {
- *   decoder_input_ids,
- *   max_length: model.config.decoder.max_position_embeddings,
- * });
- *
- * // Decode output
- * const decoded = tokenizer.batch_decode(output)[0];
- * // <s_docvqa><s_question> What is the invoice number?</s_question><s_answer> us-001</s_answer></s>
- * ```
- */
-export class DonutSwinModel extends DonutSwinPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class ConvNextPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare ConvNext model outputting raw features without any specific head on top.
- */
-export class ConvNextModel extends ConvNextPreTrainedModel {}
-
-/**
- * ConvNext Model with an image classification head on top (a linear layer on top of the pooled features), e.g. for ImageNet.
- */
-export class ConvNextForImageClassification extends ConvNextPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class ConvNextV2PreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare ConvNextV2 model outputting raw features without any specific head on top.
- */
-export class ConvNextV2Model extends ConvNextV2PreTrainedModel {}
-
-/**
- * ConvNextV2 Model with an image classification head on top (a linear layer on top of the pooled features), e.g. for ImageNet.
- */
-export class ConvNextV2ForImageClassification extends ConvNextV2PreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class Dinov2PreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare DINOv2 Model transformer outputting raw hidden-states without any specific head on top.
- */
-export class Dinov2Model extends Dinov2PreTrainedModel {}
-
-/**
- * Dinov2 Model transformer with an image classification head on top (a linear layer on top of the final hidden state of the [CLS] token) e.g. for ImageNet.
- */
-export class Dinov2ForImageClassification extends Dinov2PreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class Dinov2WithRegistersPreTrainedModel extends PreTrainedModel {}
-
-/**
- * The bare Dinov2WithRegisters Model transformer outputting raw hidden-states without any specific head on top.
- */
-export class Dinov2WithRegistersModel extends Dinov2WithRegistersPreTrainedModel {}
-
-/**
- * Dinov2WithRegisters Model transformer with an image classification head on top (a linear layer on top of the final hidden state of the [CLS] token) e.g. for ImageNet.
- */
-export class Dinov2WithRegistersForImageClassification extends Dinov2WithRegistersPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new SequenceClassifierOutput(await super._call(model_inputs));
-    }
-}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DINOv3ViTPreTrainedModel extends PreTrainedModel {}
-export class DINOv3ViTModel extends DINOv3ViTPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class DINOv3ConvNextPreTrainedModel extends PreTrainedModel {}
-export class DINOv3ConvNextModel extends DINOv3ConvNextPreTrainedModel {}
-//////////////////////////////////////////////////
-
-//////////////////////////////////////////////////
-export class GroundingDinoPreTrainedModel extends PreTrainedModel {}
-export class GroundingDinoForObjectDetection extends GroundingDinoPreTrainedModel {}
-
-//////////////////////////////////////////////////
-export class YolosPreTrainedModel extends PreTrainedModel {}
-export class YolosModel extends YolosPreTrainedModel {}
-export class YolosForObjectDetection extends YolosPreTrainedModel {
-    /**
-     * @param {any} model_inputs
-     */
-    async _call(model_inputs) {
-        return new YolosObjectDetectionOutput(await super._call(model_inputs));
-    }
-}
-
-export class YolosObjectDetectionOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.logits Classification logits (including no-object) for all queries.
-     * @param {Tensor} output.pred_boxes Normalized boxes coordinates for all queries, represented as (center_x, center_y, width, height).
-     * These values are normalized in [0, 1], relative to the size of each individual image in the batch (disregarding possible padding).
-     */
-    constructor({ logits, pred_boxes }) {
-        super();
-        this.logits = logits;
-        this.pred_boxes = pred_boxes;
-    }
-}
 //////////////////////////////////////////////////
 
 //////////////////////////////////////////////////
