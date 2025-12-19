@@ -5,7 +5,7 @@ import {
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
-import { getModelFile } from '../utils/hub.js';
+import { getModelFile, MAX_EXTERNAL_DATA_CHUNKS } from '../utils/hub.js';
 import {
     DATA_TYPES,
     DEFAULT_DEVICE_DTYPE_MAPPING,

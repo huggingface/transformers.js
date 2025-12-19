@@ -2,6 +2,8 @@
 import { pick } from '../utils/core.js';
 import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like } from '../utils/tensor.js';
 import { sessionRun } from './session.js';
+import { getModelJSON } from '../utils/hub.js';
+import { isONNXProxy } from '../backends/onnx.js';
 
 /**
  * Perform forward pass on the seq2seq model (both encoder and decoder).
@@ -547,4 +549,23 @@ export function default_merge_input_ids_with_audio_features({
         input_ids,
         attention_mask,
     });
+}
+
+/**
+ * Helper function to load multiple optional configuration files
+ * @param {string} pretrained_model_name_or_path The path to the directory containing the config file.
+ * @param {Record<string, string>} names The names of the config files to load.
+ * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the configs.
+ * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of configuration objects.
+ * @private
+ */
+export async function getOptionalConfigs(pretrained_model_name_or_path, names, options) {
+    return Object.fromEntries(
+        await Promise.all(
+            Object.keys(names).map(async (name) => {
+                const config = await getModelJSON(pretrained_model_name_or_path, names[name], false, options);
+                return [name, config];
+            }),
+        ),
+    );
 }
