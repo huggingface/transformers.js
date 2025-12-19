@@ -70,8 +70,9 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         const length = max_length ?? this.config.n_samples;
         if (audio.length > length) {
             if (audio.length > this.config.n_samples) {
+                const seconds = Math.floor(length / this.config.sampling_rate);
                 console.warn(
-                    "Attempting to extract features for audio longer than 30 seconds. " +
+                    `Attempting to extract features for audio longer than ${seconds} seconds. ` +
                     "If using a pipeline to extract transcript from a long audio clip, " +
                     "remember to specify `chunk_length_s` and/or `stride_length_s`."
                 );

@@ -1515,9 +1515,13 @@ export class AudioClassificationPipeline extends (/** @type {new (options: Audio
             const output = await this.model(inputs);
             const logits = output.logits[0];
 
+            const probabilities = logits.data.length > 1
+                ? softmax(logits.data)
+                : logits.sigmoid().data; // Only one label, so we assume it's a binary classification
+
             const scores = await topk(new Tensor(
                 'float32',
-                softmax(logits.data),
+                probabilities,
                 logits.dims,
             ), top_k);
 

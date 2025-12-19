@@ -3401,6 +3401,11 @@ export class WhisperPreTrainedModel extends PreTrainedModel {
  */
 export class WhisperModel extends WhisperPreTrainedModel { }
 
+/**
+ * Whisper Encoder Model with a sequence classification head on top
+ * (a linear layer over the pooled output) for tasks like SUPERB Keyword Spotting.
+ */
+export class WhisperForAudioClassification extends WhisperPreTrainedModel { }
 
 /**
  * WhisperForConditionalGeneration class for generating conditional outputs from Whisper models.
@@ -8361,6 +8366,7 @@ const MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['wavlm', ['WavLMForSequenceClassification', WavLMForSequenceClassification]],
     ['hubert', ['HubertForSequenceClassification', HubertForSequenceClassification]],
     ['audio-spectrogram-transformer', ['ASTForAudioClassification', ASTForAudioClassification]],
+    ['whisper', ['WhisperForAudioClassification', WhisperForAudioClassification]],
 ]);
 
 const MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES = new Map([
