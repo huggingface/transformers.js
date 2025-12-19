@@ -41,6 +41,28 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it(
+      "w/ input_boxes",
+      async () => {
+        const raw_image = await load_cached_image("corgi");
+        const input_boxes = [[[0, 341.3333, 682.6667, 682.6667]]];
+
+        const inputs = await processor(raw_image, { input_boxes });
+        const { pred_masks, iou_scores } = await model(inputs);
+
+        expect(pred_masks.dims).toEqual([1, 1, 3, 256, 256]);
+        expect(pred_masks.mean().item()).toBeCloseTo(-5.76981782913208, 5);
+        expect(iou_scores.dims).toEqual([1, 1, 3]);
+        expect(iou_scores.tolist()).toBeCloseToNested([[[0.8583833575248718, 0.9773167967796326, 0.8511142730712891]]]);
+
+        // Post-process masks
+        const masks = await processor.post_process_masks(pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
+        expect(masks).toHaveLength(1);
+        expect(masks[0].dims).toEqual([1, 3, 410, 614]);
+        expect(masks[0].type).toEqual("bool");
+      }
+    )
+
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
