@@ -52,6 +52,74 @@ export const MODEL_TYPES = {
     Chatterbox: 14,
 };
 
+const MODEL_TYPE_CONFIG = {
+    [MODEL_TYPES.DecoderOnly]: {
+        can_generate: true,
+        forward: decoderForward,
+        prepare_inputs: decoder_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.Seq2Seq]: {
+        can_generate: true,
+        forward: seq2seqForward,
+        prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.Vision2Seq]: {
+        can_generate: true,
+        forward: seq2seqForward,
+        prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.Musicgen]: {
+        can_generate: true,
+        forward: seq2seqForward,
+        prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.EncoderDecoder]: {
+        can_generate: false,
+        forward: seq2seqForward,
+        prepare_inputs: null,
+    },
+    [MODEL_TYPES.ImageTextToText]: {
+        can_generate: true,
+        forward: imageTextToTextForward,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.AudioTextToText]: {
+        can_generate: true,
+        forward: audioTextToTextForward,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.Phi3V]: {
+        can_generate: true,
+        forward: null,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.ImageAudioTextToText]: {
+        can_generate: true,
+        forward: null,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.MultiModality]: {
+        can_generate: true,
+        forward: null,
+        prepare_inputs: multimodality_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.AutoEncoder]: {
+        can_generate: false,
+        forward: autoEncoderForward,
+        prepare_inputs: null,
+    },
+    [MODEL_TYPES.Chatterbox]: {
+        can_generate: true,
+        forward: encoderForward,
+        prepare_inputs: chatterbox_prepare_inputs_for_generation,
+    },
+    default: {
+        can_generate: false,
+        forward: encoderForward,
+        prepare_inputs: null,
+    },
+};
+
 export const MODEL_TYPE_MAPPING = new Map();
 export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
 export const MODEL_CLASS_TO_NAME_MAPPING = new Map();
@@ -80,58 +148,12 @@ export class PreTrainedModel extends Callable {
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
         const modelType = MODEL_TYPE_MAPPING.get(modelName);
 
-        this.can_generate = false;
-        this._forward = null;
+        // Get configuration for this model type
+        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
 
-        this._prepare_inputs_for_generation = null;
-        switch (modelType) {
-            case MODEL_TYPES.DecoderOnly:
-                this.can_generate = true;
-                this._forward = decoderForward;
-                this._prepare_inputs_for_generation = decoder_prepare_inputs_for_generation;
-                break;
-            case MODEL_TYPES.Seq2Seq:
-            case MODEL_TYPES.Vision2Seq:
-            case MODEL_TYPES.Musicgen:
-                this.can_generate = true;
-
-                this._forward = seq2seqForward;
-                this._prepare_inputs_for_generation = encoder_decoder_prepare_inputs_for_generation;
-                break;
-
-            case MODEL_TYPES.EncoderDecoder:
-                this._forward = seq2seqForward;
-                break;
-            case MODEL_TYPES.ImageTextToText:
-                this.can_generate = true;
-                this._forward = imageTextToTextForward;
-                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
-                break;
-            case MODEL_TYPES.AudioTextToText:
-                this.can_generate = true;
-                this._forward = audioTextToTextForward;
-                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
-                break;
-            case MODEL_TYPES.Phi3V:
-            case MODEL_TYPES.ImageAudioTextToText:
-                this.can_generate = true;
-                this._prepare_inputs_for_generation = multimodal_text_to_text_prepare_inputs_for_generation;
-                break;
-            case MODEL_TYPES.MultiModality:
-                this.can_generate = true;
-                this._prepare_inputs_for_generation = multimodality_prepare_inputs_for_generation;
-                break;
-            case MODEL_TYPES.AutoEncoder:
-                this._forward = autoEncoderForward;
-                break;
-            case MODEL_TYPES.Chatterbox:
-                this.can_generate = true;
-                this._prepare_inputs_for_generation = chatterbox_prepare_inputs_for_generation;
-            default:
-                // should be MODEL_TYPES.EncoderOnly
-                this._forward = encoderForward;
-                break;
-        }
+        this.can_generate = typeConfig.can_generate;
+        this._forward = typeConfig.forward;
+        this._prepare_inputs_for_generation = typeConfig.prepare_inputs;
 
         if (this.can_generate) {
             this.forward_params.push('past_key_values');
