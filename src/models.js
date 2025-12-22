@@ -38,6 +38,10 @@
  */
 
 import { AutoConfig } from './configs.js';
+import { PreTrainedModel } from './models/pre-trained-model.js';
+
+// Re-export all model classes from registry
+export * from './models/registry.js';
 
 import {
     CUSTOM_ARCHITECTURES,
@@ -398,3 +402,6 @@ export class AutoModelForImageTextToText extends PretrainedMixin {
 export class AutoModelForAudioTextToText extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
 }
+
+// Re-export PreTrainedModel for backwards compatibility
+export { PreTrainedModel };
