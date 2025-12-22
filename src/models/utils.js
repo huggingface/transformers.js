@@ -1,6 +1,7 @@
 // JS doesn't support mixins, so we define some reused functions here, and allow "this" to be passed in
 import { pick } from '../utils/core.js';
-import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like } from '../utils/tensor.js';
+import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like, boolTensor } from '../utils/tensor.js';
+import { max } from '../utils/maths.js';
 import { sessionRun } from './session.js';
 import { getModelJSON } from '../utils/hub.js';
 import { isONNXProxy } from '../backends/onnx.js';

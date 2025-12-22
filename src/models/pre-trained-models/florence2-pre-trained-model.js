@@ -1,5 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { cat, ones } from '../../utils/tensor.js';
+import { encoderForward, decoderForward } from '../utils.js';
 
 export class Florence2PreTrainedModel extends PreTrainedModel {
     forward_params = [
