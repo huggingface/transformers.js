@@ -1,4 +1,3 @@
-// Import the Maps and MODEL_TYPES from pre-trained-model.js
 import {
     MODEL_TYPES,
     MODEL_TYPE_MAPPING,
@@ -7,383 +6,381 @@ import {
     PreTrainedModel,
 } from './pre-trained-model.js';
 
-// import all classes
-import { ASTModel, ASTForAudioClassification } from './pre-trained-models/ast-pre-trained-model.js';
 import {
+    ASTModel,
+    ASTForAudioClassification,
     AlbertModel,
     AlbertForSequenceClassification,
     AlbertForQuestionAnswering,
     AlbertForMaskedLM,
-} from './pre-trained-models/albert-pre-trained-model.js';
-import { ApertusModel, ApertusForCausalLM } from './pre-trained-models/apertus-pre-trained-model.js';
-import { ArceeModel, ArceeForCausalLM } from './pre-trained-models/arcee-pre-trained-model.js';
-import {
+    ApertusModel,
+    ApertusForCausalLM,
+    ArceeModel,
+    ArceeForCausalLM,
     BartModel,
     BartForConditionalGeneration,
     BartForSequenceClassification,
-} from './pre-trained-models/bart-pretrained-model.js';
-import { BeitModel, BeitForImageClassification } from './pre-trained-models/beit-pre-trained-model.js';
-import {
+    BeitModel,
+    BeitForImageClassification,
     BertModel,
     BertForMaskedLM,
     BertForSequenceClassification,
     BertForTokenClassification,
     BertForQuestionAnswering,
-} from './pre-trained-models/bert-pre-trained-model.js';
-import { BlenderbotModel, BlenderbotForConditionalGeneration } from './pre-trained-models/blenderbot-pre-trained-model.js';
-import {
+    BlenderbotModel,
+    BlenderbotForConditionalGeneration,
     BlenderbotSmallModel,
     BlenderbotSmallForConditionalGeneration,
-} from './pre-trained-models/blenderbot-small-pre-trained-model.js';
-import { BloomModel, BloomForCausalLM } from './pre-trained-models/bloom-pre-trained-model.js';
-import {
+    BloomModel,
+    BloomForCausalLM,
     CLIPModel,
     CLIPTextModelWithProjection,
     CLIPVisionModelWithProjection,
-} from './pre-trained-models/clip-pre-trained-model.js';
-import { CLIPSegModel, CLIPSegForImageSegmentation } from './pre-trained-models/clip-seg-pre-trained-model.js';
-import {
+    CLIPSegModel,
+    CLIPSegForImageSegmentation,
     CamembertModel,
     CamembertForMaskedLM,
     CamembertForSequenceClassification,
     CamembertForTokenClassification,
     CamembertForQuestionAnswering,
-} from './pre-trained-models/camembert-pre-trained-model.js';
-import { ChatterboxModel } from './pre-trained-models/chatterbox-pre-trained-model.js';
-import { ChineseCLIPModel } from './pre-trained-models/chinese-clip-pre-trained-model.js';
-import {
+    ChatterboxModel,
+    ChineseCLIPModel,
     ClapModel,
     ClapTextModelWithProjection,
     ClapAudioModelWithProjection,
-} from './pre-trained-models/clap-pre-trained-model.js';
-import { CodeGenModel, CodeGenForCausalLM } from './pre-trained-models/code-gen-pre-trained-model.js';
-import { CohereModel, CohereForCausalLM } from './pre-trained-models/cohere-pre-trained-model.js';
-import {
+    CodeGenModel,
+    CodeGenForCausalLM,
+    CohereModel,
+    CohereForCausalLM,
     ConvBertModel,
     ConvBertForMaskedLM,
     ConvBertForSequenceClassification,
     ConvBertForTokenClassification,
     ConvBertForQuestionAnswering,
-} from './pre-trained-models/conv-bert-pre-trained-model.js';
-import { ConvNextModel, ConvNextForImageClassification } from './pre-trained-models/conv-next-pre-trained-model.js';
-import { ConvNextV2Model, ConvNextV2ForImageClassification } from './pre-trained-models/conv-next-v2-pre-trained-model.js';
-import { DFineModel, DFineForObjectDetection } from './pre-trained-models/d-fine-pre-trained-model.js';
-import { DINOv3ConvNextModel } from './pre-trained-models/din-ov3-conv-next-pre-trained-model.js';
-import { DINOv3ViTModel } from './pre-trained-models/din-ov3-vi-t-pre-trained-model.js';
-import { DPTModel, DPTForDepthEstimation } from './pre-trained-models/dpt-pre-trained-model.js';
-import { DacModel, DacEncoderModel, DacDecoderModel } from './pre-trained-models/dac-pre-trained-model.js';
-import {
+    ConvNextModel,
+    ConvNextForImageClassification,
+    ConvNextV2Model,
+    ConvNextV2ForImageClassification,
+    DFineModel,
+    DFineForObjectDetection,
+    DINOv3ConvNextModel,
+    DINOv3ViTModel,
+    DPTModel,
+    DPTForDepthEstimation,
+    DacModel,
+    DacEncoderModel,
+    DacDecoderModel,
     DebertaModel,
     DebertaForMaskedLM,
     DebertaForSequenceClassification,
     DebertaForTokenClassification,
     DebertaForQuestionAnswering,
-} from './pre-trained-models/deberta-pre-trained-model.js';
-import {
     DebertaV2Model,
     DebertaV2ForMaskedLM,
     DebertaV2ForSequenceClassification,
     DebertaV2ForTokenClassification,
     DebertaV2ForQuestionAnswering,
-} from './pre-trained-models/deberta-v2-pre-trained-model.js';
-import { DecisionTransformerModel } from './pre-trained-models/decision-transformer-pre-trained-model.js';
-import { DeiTModel, DeiTForImageClassification } from './pre-trained-models/dei-t-pre-trained-model.js';
-import { DepthAnythingForDepthEstimation } from './pre-trained-models/depth-anything-pre-trained-model.js';
-import { DepthProForDepthEstimation } from './pre-trained-models/depth-pro-pre-trained-model.js';
-import { DetrModel, DetrForObjectDetection, DetrForSegmentation } from './pre-trained-models/detr-pre-trained-model.js';
-import { Dinov2Model, Dinov2ForImageClassification } from './pre-trained-models/dinov2-pre-trained-model.js';
-import {
+    DecisionTransformerModel,
+    DeiTModel,
+    DeiTForImageClassification,
+    DepthAnythingForDepthEstimation,
+    DepthProForDepthEstimation,
+    DetrModel,
+    DetrForObjectDetection,
+    DetrForSegmentation,
+    Dinov2Model,
+    Dinov2ForImageClassification,
     Dinov2WithRegistersModel,
     Dinov2WithRegistersForImageClassification,
-} from './pre-trained-models/dinov2-with-registers-pre-trained-model.js';
-import {
     DistilBertModel,
     DistilBertForSequenceClassification,
     DistilBertForTokenClassification,
     DistilBertForQuestionAnswering,
     DistilBertForMaskedLM,
-} from './pre-trained-models/distil-bert-pre-trained-model.js';
-import { DonutSwinModel } from './pre-trained-models/donut-swin-pre-trained-model.js';
-import {
+    DonutSwinModel,
     EfficientNetModel,
     EfficientNetForImageClassification,
-} from './pre-trained-models/efficient-net-pre-trained-model.js';
-import {
     ElectraModel,
     ElectraForMaskedLM,
     ElectraForSequenceClassification,
     ElectraForTokenClassification,
     ElectraForQuestionAnswering,
-} from './pre-trained-models/electra-pre-trained-model.js';
-import { Ernie4_5_Model, Ernie4_5_ForCausalLM } from './pre-trained-models/ernie4_5_pretrained-model.js';
-import {
+    Ernie4_5_Model,
+    Ernie4_5_ForCausalLM,
     EsmModel,
     EsmForMaskedLM,
     EsmForSequenceClassification,
     EsmForTokenClassification,
-} from './pre-trained-models/esm-pre-trained-model.js';
-import { ExaoneModel, ExaoneForCausalLM } from './pre-trained-models/exaone-pre-trained-model.js';
-import { FalconModel, FalconForCausalLM } from './pre-trained-models/falcon-pre-trained-model.js';
-import { FastViTModel, FastViTForImageClassification } from './pre-trained-models/fast-vi-t-pre-trained-model.js';
-import { Florence2ForConditionalGeneration } from './pre-trained-models/florence2-pre-trained-model.js';
-import { GLPNModel, GLPNForDepthEstimation } from './pre-trained-models/glpn-pre-trained-model.js';
-import { GPT2Model, GPT2LMHeadModel } from './pre-trained-models/gpt2-pre-trained-model.js';
-import { GPTBigCodeModel, GPTBigCodeForCausalLM } from './pre-trained-models/gpt-big-code-pre-trained-model.js';
-import { GPTJModel, GPTJForCausalLM } from './pre-trained-models/gptj-pre-trained-model.js';
-import { GPTNeoModel, GPTNeoForCausalLM } from './pre-trained-models/gpt-neo-pre-trained-model.js';
-import { GPTNeoXModel, GPTNeoXForCausalLM } from './pre-trained-models/gpt-neo-x-pre-trained-model.js';
-import { Gemma2Model, Gemma2ForCausalLM } from './pre-trained-models/gemma2-pre-trained-model.js';
-import { Gemma3Model, Gemma3ForCausalLM } from './pre-trained-models/gemma3-pre-trained-model.js';
-import { Gemma3nForConditionalGeneration } from './pre-trained-models/gemma3n-pre-trained-model.js';
-import { GemmaModel, GemmaForCausalLM } from './pre-trained-models/gemma-pre-trained-model.js';
-import { GlmModel, GlmForCausalLM } from './pre-trained-models/glm-pre-trained-model.js';
-import { GptOssModel, GptOssForCausalLM } from './pre-trained-models/gpt-oss-pre-trained-model.js';
-import {
+    ExaoneModel,
+    ExaoneForCausalLM,
+    FalconModel,
+    FalconForCausalLM,
+    FastViTModel,
+    FastViTForImageClassification,
+    Florence2ForConditionalGeneration,
+    GLPNModel,
+    GLPNForDepthEstimation,
+    GPT2Model,
+    GPT2LMHeadModel,
+    GPTBigCodeModel,
+    GPTBigCodeForCausalLM,
+    GPTJModel,
+    GPTJForCausalLM,
+    GPTNeoModel,
+    GPTNeoForCausalLM,
+    GPTNeoXModel,
+    GPTNeoXForCausalLM,
+    Gemma2Model,
+    Gemma2ForCausalLM,
+    Gemma3Model,
+    Gemma3ForCausalLM,
+    Gemma3nForConditionalGeneration,
+    GemmaModel,
+    GemmaForCausalLM,
+    GlmModel,
+    GlmForCausalLM,
+    GptOssModel,
+    GptOssForCausalLM,
     GraniteMoeHybridModel,
     GraniteMoeHybridForCausalLM,
-} from './pre-trained-models/granite-moe-hybrid-pre-trained-model.js';
-import { GraniteModel, GraniteForCausalLM } from './pre-trained-models/granite-pre-trained-model.js';
-import { GroundingDinoForObjectDetection } from './pre-trained-models/grounding-dino-pre-trained-model.js';
-import { GroupViTModel } from './pre-trained-models/group-vi-t-pre-trained-model.js';
-import { HeliumModel, HeliumForCausalLM } from './pre-trained-models/helium-pre-trained-model.js';
-import { HieraModel, HieraForImageClassification } from './pre-trained-models/hiera-pre-trained-model.js';
-import {
+    GraniteModel,
+    GraniteForCausalLM,
+    GroundingDinoForObjectDetection,
+    GroupViTModel,
+    HeliumModel,
+    HeliumForCausalLM,
+    HieraModel,
+    HieraForImageClassification,
     HubertModel,
     HubertForCTC,
     HubertForSequenceClassification,
-} from './pre-trained-models/hubert-pre-trained-model.js';
-import { IJepaModel, IJepaForImageClassification } from './pre-trained-models/i-jepa-pre-trained-model.js';
-import {
+    IJepaModel,
+    IJepaForImageClassification,
     Idefics3ForConditionalGeneration,
     SmolVLMForConditionalGeneration,
-} from './pre-trained-models/idefics3-pre-trained-model.js';
-import { JAISModel, JAISLMHeadModel } from './pre-trained-models/jais-pre-trained-model.js';
-import { JinaCLIPModel, JinaCLIPTextModel, JinaCLIPVisionModel } from './pre-trained-models/jina-clip-pre-trained-model.js';
-import { Lfm2Model, Lfm2ForCausalLM } from './pre-trained-models/lfm2-pre-trained-model.js';
-import { Llama4ForCausalLM } from './pre-trained-models/llama4-pre-trained-model.js';
-import { LlamaModel, LlamaForCausalLM } from './pre-trained-models/llama-pre-trained-model.js';
-import {
+    JAISModel,
+    JAISLMHeadModel,
+    JinaCLIPModel,
+    JinaCLIPTextModel,
+    JinaCLIPVisionModel,
+    Lfm2Model,
+    Lfm2ForCausalLM,
+    Llama4ForCausalLM,
+    LlamaModel,
+    LlamaForCausalLM,
     LlavaForConditionalGeneration,
     LlavaOnevisionForConditionalGeneration,
     Moondream1ForConditionalGeneration,
     LlavaQwen2ForCausalLM,
-} from './pre-trained-models/llava-pre-trained-model.js';
-import { LongT5Model, LongT5ForConditionalGeneration } from './pre-trained-models/long-t5-pre-trained-model.js';
-import { M2M100Model, M2M100ForConditionalGeneration } from './pre-trained-models/m2-m100-pre-trained-model.js';
-import {
+    LongT5Model,
+    LongT5ForConditionalGeneration,
+    M2M100Model,
+    M2M100ForConditionalGeneration,
     MBartModel,
     MBartForConditionalGeneration,
     MBartForSequenceClassification,
     MBartForCausalLM,
-} from './pre-trained-models/m-bart-pre-trained-model.js';
-import {
     MPNetModel,
     MPNetForMaskedLM,
     MPNetForSequenceClassification,
     MPNetForTokenClassification,
     MPNetForQuestionAnswering,
-} from './pre-trained-models/mp-net-pre-trained-model.js';
-import { MT5Model, MT5ForConditionalGeneration } from './pre-trained-models/mt5-pre-trained-model.js';
-import { MarianModel, MarianMTModel } from './pre-trained-models/marian-pre-trained-model.js';
-import { MaskFormerModel, MaskFormerForInstanceSegmentation } from './pre-trained-models/mask-former-pre-trained-model.js';
-import { Metric3DForDepthEstimation } from './pre-trained-models/metric3-d-pre-trained-model.js';
-import { Metric3Dv2ForDepthEstimation } from './pre-trained-models/metric3-dv2-pre-trained-model.js';
-import { MgpstrForSceneTextRecognition } from './pre-trained-models/mgpstr-pre-trained-model.js';
-import { MimiModel, MimiEncoderModel, MimiDecoderModel } from './pre-trained-models/mimi-pre-trained-model.js';
-import { MistralModel, MistralForCausalLM } from './pre-trained-models/mistral-pre-trained-model.js';
-import {
+    MT5Model,
+    MT5ForConditionalGeneration,
+    MarianModel,
+    MarianMTModel,
+    MaskFormerModel,
+    MaskFormerForInstanceSegmentation,
+    Metric3DForDepthEstimation,
+    Metric3Dv2ForDepthEstimation,
+    MgpstrForSceneTextRecognition,
+    MimiModel,
+    MimiEncoderModel,
+    MimiDecoderModel,
+    MistralModel,
+    MistralForCausalLM,
     MobileBertModel,
     MobileBertForMaskedLM,
     MobileBertForSequenceClassification,
     MobileBertForQuestionAnswering,
-} from './pre-trained-models/mobile-bert-pre-trained-model.js';
-import { MobileLLMModel, MobileLLMForCausalLM } from './pre-trained-models/mobile-llm-pre-trained-model.js';
-import {
+    MobileLLMModel,
+    MobileLLMForCausalLM,
     MobileNetV1Model,
     MobileNetV1ForImageClassification,
     MobileNetV1ForSemanticSegmentation,
-} from './pre-trained-models/mobile-net-v1-pre-trained-model.js';
-import {
     MobileNetV2Model,
     MobileNetV2ForImageClassification,
     MobileNetV2ForSemanticSegmentation,
-} from './pre-trained-models/mobile-net-v2-pre-trained-model.js';
-import {
     MobileNetV3Model,
     MobileNetV3ForImageClassification,
     MobileNetV3ForSemanticSegmentation,
-} from './pre-trained-models/mobile-net-v3-pre-trained-model.js';
-import {
     MobileNetV4Model,
     MobileNetV4ForImageClassification,
     MobileNetV4ForSemanticSegmentation,
-} from './pre-trained-models/mobile-net-v4-pre-trained-model.js';
-import { MobileViTModel, MobileViTForImageClassification } from './pre-trained-models/mobile-vi-t-pre-trained-model.js';
-import {
+    MobileViTModel,
+    MobileViTForImageClassification,
     MobileViTV2Model,
     MobileViTV2ForImageClassification,
-} from './pre-trained-models/mobile-vi-tv2-pre-trained-model.js';
-import {
     ModernBertDecoderModel,
     ModernBertDecoderForCausalLM,
-} from './pre-trained-models/modern-bert-decoder-pre-trained-model.js';
-import {
     ModernBertModel,
     ModernBertForMaskedLM,
     ModernBertForSequenceClassification,
     ModernBertForTokenClassification,
-} from './pre-trained-models/modern-bert-pre-trained-model.js';
-import { MoonshineForConditionalGeneration } from './pre-trained-models/moonshine-pre-trained-model.js';
-import { MptModel, MptForCausalLM } from './pre-trained-models/mpt-pre-trained-model.js';
-import { MultiModalityCausalLM } from './pre-trained-models/multi-modality-pre-trained-model.js';
-import { MusicgenForConditionalGeneration } from './pre-trained-models/musicgen-pre-trained-model.js';
-import { NanoChatModel, NanoChatForCausalLM } from './pre-trained-models/nano-chat-pre-trained-model.js';
-import {
+    MoonshineForConditionalGeneration,
+    MptModel,
+    MptForCausalLM,
+    MultiModalityCausalLM,
+    MusicgenForConditionalGeneration,
+    NanoChatModel,
+    NanoChatForCausalLM,
     NeoBertModel,
     NeoBertForMaskedLM,
     NeoBertForSequenceClassification,
     NeoBertForTokenClassification,
     NeoBertForQuestionAnswering,
-} from './pre-trained-models/neo-bert-pre-trained-model.js';
-import { NomicBertModel } from './pre-trained-models/nomic-bert-pre-trained-model.js';
-import { OPTModel, OPTForCausalLM } from './pre-trained-models/opt-pre-trained-model.js';
-import { Olmo2Model, Olmo2ForCausalLM } from './pre-trained-models/olmo2-pre-trained-model.js';
-import { Olmo3Model, Olmo3ForCausalLM } from './pre-trained-models/olmo3-pre-trained-model.js';
-import { OlmoModel, OlmoForCausalLM } from './pre-trained-models/olmo-pre-trained-model.js';
-import { OpenELMModel, OpenELMForCausalLM } from './pre-trained-models/open-elm-pre-trained-model.js';
-import { OwlViTModel, OwlViTForObjectDetection } from './pre-trained-models/owl-vi-t-pre-trained-model.js';
-import { Owlv2Model, Owlv2ForObjectDetection } from './pre-trained-models/owlv2-pre-trained-model.js';
-import { PaliGemmaForConditionalGeneration } from './pre-trained-models/pali-gemma-pre-trained-model.js';
-import { ParakeetForCTC } from './pre-trained-models/parakeet-pre-trained-model.js';
-import { PatchTSMixerModel, PatchTSMixerForPrediction } from './pre-trained-models/patch-ts-mixer-pre-trained-model.js';
-import { PatchTSTModel, PatchTSTForPrediction } from './pre-trained-models/patch-tst-pre-trained-model.js';
-import { Phi3Model, Phi3ForCausalLM } from './pre-trained-models/phi3-pre-trained-model.js';
-import { Phi3VForCausalLM } from './pre-trained-models/phi3-v-pre-trained-model.js';
-import { PhiModel, PhiForCausalLM } from './pre-trained-models/phi-pre-trained-model.js';
-import { PvtModel, PvtForImageClassification } from './pre-trained-models/pvt-pre-trained-model.js';
-import { PyAnnoteModel, PyAnnoteForAudioFrameClassification } from './pre-trained-models/py-annote-pre-trained-model.js';
-import { Qwen2Model, Qwen2ForCausalLM } from './pre-trained-models/qwen2-pre-trained-model.js';
-import { Qwen2VLForConditionalGeneration } from './pre-trained-models/qwen2-vl-pre-trained-model.js';
-import { Qwen3Model, Qwen3ForCausalLM } from './pre-trained-models/qwen3-pre-trained-model.js';
-import { RFDetrModel, RFDetrForObjectDetection } from './pre-trained-models/rf-detr-pre-trained-model.js';
-import { RTDetrModel, RTDetrForObjectDetection } from './pre-trained-models/rt-detr-pre-trained-model.js';
-import { RTDetrV2Model, RTDetrV2ForObjectDetection } from './pre-trained-models/rt-detr-v2-pre-trained-model.js';
-import { ResNetModel, ResNetForImageClassification } from './pre-trained-models/res-net-pre-trained-model.js';
-import {
+    NomicBertModel,
+    OPTModel,
+    OPTForCausalLM,
+    Olmo2Model,
+    Olmo2ForCausalLM,
+    Olmo3Model,
+    Olmo3ForCausalLM,
+    OlmoModel,
+    OlmoForCausalLM,
+    OpenELMModel,
+    OpenELMForCausalLM,
+    OwlViTModel,
+    OwlViTForObjectDetection,
+    Owlv2Model,
+    Owlv2ForObjectDetection,
+    PaliGemmaForConditionalGeneration,
+    ParakeetForCTC,
+    PatchTSMixerModel,
+    PatchTSMixerForPrediction,
+    PatchTSTModel,
+    PatchTSTForPrediction,
+    Phi3Model,
+    Phi3ForCausalLM,
+    Phi3VForCausalLM,
+    PhiModel,
+    PhiForCausalLM,
+    PvtModel,
+    PvtForImageClassification,
+    PyAnnoteModel,
+    PyAnnoteForAudioFrameClassification,
+    Qwen2Model,
+    Qwen2ForCausalLM,
+    Qwen2VLForConditionalGeneration,
+    Qwen3Model,
+    Qwen3ForCausalLM,
+    RFDetrModel,
+    RFDetrForObjectDetection,
+    RTDetrModel,
+    RTDetrForObjectDetection,
+    RTDetrV2Model,
+    RTDetrV2ForObjectDetection,
+    ResNetModel,
+    ResNetForImageClassification,
     RoFormerModel,
     RoFormerForMaskedLM,
     RoFormerForSequenceClassification,
     RoFormerForTokenClassification,
     RoFormerForQuestionAnswering,
-} from './pre-trained-models/ro-former-pre-trained-model.js';
-import {
     RobertaModel,
     RobertaForMaskedLM,
     RobertaForSequenceClassification,
     RobertaForTokenClassification,
     RobertaForQuestionAnswering,
-} from './pre-trained-models/roberta-pre-trained-model.js';
-import { Sam2Model, EdgeTamModel, Sam3TrackerModel } from './pre-trained-models/sam2-pre-trained-model.js';
-import { SamModel } from './pre-trained-models/sam-pre-trained-model.js';
-import {
+    Sam2Model,
+    EdgeTamModel,
+    Sam3TrackerModel,
+    SamModel,
     SapiensForSemanticSegmentation,
     SapiensForDepthEstimation,
     SapiensForNormalEstimation,
-} from './pre-trained-models/sapiens-pre-trained-model.js';
-import {
     SegformerForImageClassification,
     SegformerForSemanticSegmentation,
-} from './pre-trained-models/segformer-pre-trained-model.js';
-import { SiglipModel, SiglipTextModel, SiglipVisionModel } from './pre-trained-models/siglip-pre-trained-model.js';
-import { SmolLM3Model, SmolLM3ForCausalLM } from './pre-trained-models/smol-lm3-pre-trained-model.js';
-import { SnacModel, SnacEncoderModel, SnacDecoderModel } from './pre-trained-models/snac-pre-trained-model.js';
-import {
+    SiglipModel,
+    SiglipTextModel,
+    SiglipVisionModel,
+    SmolLM3Model,
+    SmolLM3ForCausalLM,
+    SnacModel,
+    SnacEncoderModel,
+    SnacDecoderModel,
     SpeechT5ForSpeechToText,
     SpeechT5ForTextToSpeech,
     SpeechT5HifiGan,
-} from './pre-trained-models/speech-t5-pre-trained-model.js';
-import {
     SqueezeBertModel,
     SqueezeBertForMaskedLM,
     SqueezeBertForSequenceClassification,
     SqueezeBertForQuestionAnswering,
-} from './pre-trained-models/squeeze-bert-pre-trained-model.js';
-import { StableLmModel, StableLmForCausalLM } from './pre-trained-models/stable-lm-pre-trained-model.js';
-import { Starcoder2Model, Starcoder2ForCausalLM } from './pre-trained-models/starcoder2-pre-trained-model.js';
-import { StyleTextToSpeech2Model } from './pre-trained-models/style-text-to-speech2-pre-trained-model.js';
-import { SupertonicForConditionalGeneration } from './pre-trained-models/supertonic-pre-trained-model.js';
-import { Swin2SRModel, Swin2SRForImageSuperResolution } from './pre-trained-models/swin2-sr-pre-trained-model.js';
-import {
+    StableLmModel,
+    StableLmForCausalLM,
+    Starcoder2Model,
+    Starcoder2ForCausalLM,
+    StyleTextToSpeech2Model,
+    SupertonicForConditionalGeneration,
+    Swin2SRModel,
+    Swin2SRForImageSuperResolution,
     SwinModel,
     SwinForImageClassification,
     SwinForSemanticSegmentation,
-} from './pre-trained-models/swin-pre-trained-model.js';
-import { T5Model, T5ForConditionalGeneration } from './pre-trained-models/t5-pre-trained-model.js';
-import {
+    T5Model,
+    T5ForConditionalGeneration,
     TableTransformerModel,
     TableTransformerForObjectDetection,
-} from './pre-trained-models/table-transformer-pre-trained-model.js';
-import { TrOCRForCausalLM } from './pre-trained-models/tr-ocr-pre-trained-model.js';
-import { UltravoxModel, VoxtralForConditionalGeneration } from './pre-trained-models/ultravox-pre-trained-model.js';
-import {
+    TrOCRForCausalLM,
+    UltravoxModel,
+    VoxtralForConditionalGeneration,
     UniSpeechModel,
     UniSpeechForCTC,
     UniSpeechForSequenceClassification,
-} from './pre-trained-models/uni-speech-pre-trained-model.js';
-import {
     UniSpeechSatModel,
     UniSpeechSatForCTC,
     UniSpeechSatForSequenceClassification,
     UniSpeechSatForAudioFrameClassification,
-} from './pre-trained-models/uni-speech-sat-pre-trained-model.js';
-import { VaultGemmaModel, VaultGemmaForCausalLM } from './pre-trained-models/vault-gemma-pre-trained-model.js';
-import { ViTMAEModel } from './pre-trained-models/vi-tmae-pre-trained-model.js';
-import { ViTMSNModel, ViTMSNForImageClassification } from './pre-trained-models/vi-tmsn-pre-trained-model.js';
-import { ViTModel, ViTForImageClassification } from './pre-trained-models/vi-t-pre-trained-model.js';
-import { VisionEncoderDecoderModel } from './pre-trained-models/vision-encoder-decoder-model.js';
-import { VitMatteForImageMatting } from './pre-trained-models/vit-matte-pre-trained-model.js';
-import { VitPoseForPoseEstimation } from './pre-trained-models/vit-pose-pre-trained-model.js';
-import { VitsModel } from './pre-trained-models/vits-pre-trained-model.js';
-import {
+    VaultGemmaModel,
+    VaultGemmaForCausalLM,
+    ViTMAEModel,
+    ViTMSNModel,
+    ViTMSNForImageClassification,
+    ViTModel,
+    ViTForImageClassification,
+    VisionEncoderDecoderModel,
+    VitMatteForImageMatting,
+    VitPoseForPoseEstimation,
+    VitsModel,
     Wav2Vec2BertModel,
     Wav2Vec2BertForCTC,
     Wav2Vec2BertForSequenceClassification,
-} from './pre-trained-models/wav2-vec2-bert-pre-trained-model.js';
-import {
     Wav2Vec2Model,
     Wav2Vec2ForCTC,
     Wav2Vec2ForSequenceClassification,
     Wav2Vec2ForAudioFrameClassification,
-} from './pre-trained-models/wav2-vec2-pre-trained-model.js';
-import {
     WavLMModel,
     WavLMForCTC,
     WavLMForSequenceClassification,
     WavLMForXVector,
     WavLMForAudioFrameClassification,
-} from './pre-trained-models/wav-lm-pre-trained-model.js';
-import { WeSpeakerResNetModel } from './pre-trained-models/we-speaker-res-net-pre-trained-model.js';
-import {
+    WeSpeakerResNetModel,
     WhisperModel,
     WhisperForConditionalGeneration,
     LiteWhisperForConditionalGeneration,
-} from './pre-trained-models/whisper-pre-trained-model.js';
-import {
     XLMModel,
     XLMWithLMHeadModel,
     XLMForSequenceClassification,
     XLMForTokenClassification,
     XLMForQuestionAnswering,
-} from './pre-trained-models/xlm-pre-trained-model.js';
-import {
     XLMRobertaModel,
     XLMRobertaForMaskedLM,
     XLMRobertaForSequenceClassification,
     XLMRobertaForTokenClassification,
     XLMRobertaForQuestionAnswering,
-} from './pre-trained-models/xlm-roberta-pre-trained-model.js';
-import { YolosModel, YolosForObjectDetection } from './pre-trained-models/yolos-pre-trained-model.js';
-
+    YolosModel,
+    YolosForObjectDetection,
+} from './pre-trained-models/index.js';
 
 const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['bert', ['BertModel', BertModel]],
@@ -997,167 +994,4 @@ export {
     MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES,
 };
 
-// Re-export all model classes
-export * from './pre-trained-models/albert-pre-trained-model.js';
-export * from './pre-trained-models/apertus-pre-trained-model.js';
-export * from './pre-trained-models/arcee-pre-trained-model.js';
-export * from './pre-trained-models/ast-pre-trained-model.js';
-export * from './pre-trained-models/bart-pretrained-model.js';
-export * from './pre-trained-models/beit-pre-trained-model.js';
-export * from './pre-trained-models/bert-pre-trained-model.js';
-export * from './pre-trained-models/blenderbot-pre-trained-model.js';
-export * from './pre-trained-models/blenderbot-small-pre-trained-model.js';
-export * from './pre-trained-models/bloom-pre-trained-model.js';
-export * from './pre-trained-models/camembert-pre-trained-model.js';
-export * from './pre-trained-models/chatterbox-pre-trained-model.js';
-export * from './pre-trained-models/chinese-clip-pre-trained-model.js';
-export * from './pre-trained-models/clap-pre-trained-model.js';
-export * from './pre-trained-models/clip-pre-trained-model.js';
-export * from './pre-trained-models/clip-seg-pre-trained-model.js';
-export * from './pre-trained-models/code-gen-pre-trained-model.js';
-export * from './pre-trained-models/cohere-pre-trained-model.js';
-export * from './pre-trained-models/conv-bert-pre-trained-model.js';
-export * from './pre-trained-models/conv-next-pre-trained-model.js';
-export * from './pre-trained-models/conv-next-v2-pre-trained-model.js';
-export * from './pre-trained-models/d-fine-pre-trained-model.js';
-export * from './pre-trained-models/dac-pre-trained-model.js';
-export * from './pre-trained-models/deberta-pre-trained-model.js';
-export * from './pre-trained-models/deberta-v2-pre-trained-model.js';
-export * from './pre-trained-models/decision-transformer-pre-trained-model.js';
-export * from './pre-trained-models/dei-t-pre-trained-model.js';
-export * from './pre-trained-models/depth-anything-pre-trained-model.js';
-export * from './pre-trained-models/depth-pro-pre-trained-model.js';
-export * from './pre-trained-models/detr-pre-trained-model.js';
-export * from './pre-trained-models/din-ov3-conv-next-pre-trained-model.js';
-export * from './pre-trained-models/din-ov3-vi-t-pre-trained-model.js';
-export * from './pre-trained-models/dinov2-pre-trained-model.js';
-export * from './pre-trained-models/dinov2-with-registers-pre-trained-model.js';
-export * from './pre-trained-models/distil-bert-pre-trained-model.js';
-export * from './pre-trained-models/donut-swin-pre-trained-model.js';
-export * from './pre-trained-models/dpt-pre-trained-model.js';
-export * from './pre-trained-models/efficient-net-pre-trained-model.js';
-export * from './pre-trained-models/electra-pre-trained-model.js';
-export * from './pre-trained-models/ernie4_5_pretrained-model.js';
-export * from './pre-trained-models/esm-pre-trained-model.js';
-export * from './pre-trained-models/exaone-pre-trained-model.js';
-export * from './pre-trained-models/falcon-pre-trained-model.js';
-export * from './pre-trained-models/fast-vi-t-pre-trained-model.js';
-export * from './pre-trained-models/florence2-pre-trained-model.js';
-export * from './pre-trained-models/gemma-pre-trained-model.js';
-export * from './pre-trained-models/gemma2-pre-trained-model.js';
-export * from './pre-trained-models/gemma3-pre-trained-model.js';
-export * from './pre-trained-models/gemma3n-pre-trained-model.js';
-export * from './pre-trained-models/glm-pre-trained-model.js';
-export * from './pre-trained-models/glpn-pre-trained-model.js';
-export * from './pre-trained-models/gpt-big-code-pre-trained-model.js';
-export * from './pre-trained-models/gpt-neo-pre-trained-model.js';
-export * from './pre-trained-models/gpt-neo-x-pre-trained-model.js';
-export * from './pre-trained-models/gpt-oss-pre-trained-model.js';
-export * from './pre-trained-models/gpt2-pre-trained-model.js';
-export * from './pre-trained-models/gptj-pre-trained-model.js';
-export * from './pre-trained-models/granite-pre-trained-model.js';
-export * from './pre-trained-models/granite-moe-hybrid-pre-trained-model.js';
-export * from './pre-trained-models/grounding-dino-pre-trained-model.js';
-export * from './pre-trained-models/group-vi-t-pre-trained-model.js';
-export * from './pre-trained-models/helium-pre-trained-model.js';
-export * from './pre-trained-models/hiera-pre-trained-model.js';
-export * from './pre-trained-models/hubert-pre-trained-model.js';
-export * from './pre-trained-models/i-jepa-pre-trained-model.js';
-export * from './pre-trained-models/idefics3-pre-trained-model.js';
-export * from './pre-trained-models/jais-pre-trained-model.js';
-export * from './pre-trained-models/jina-clip-pre-trained-model.js';
-export * from './pre-trained-models/lfm2-pre-trained-model.js';
-export * from './pre-trained-models/llama-pre-trained-model.js';
-export * from './pre-trained-models/llama4-pre-trained-model.js';
-export * from './pre-trained-models/llava-pre-trained-model.js';
-export * from './pre-trained-models/long-t5-pre-trained-model.js';
-export * from './pre-trained-models/m-bart-pre-trained-model.js';
-export * from './pre-trained-models/m2-m100-pre-trained-model.js';
-export * from './pre-trained-models/marian-pre-trained-model.js';
-export * from './pre-trained-models/mask-former-pre-trained-model.js';
-export * from './pre-trained-models/metric3-d-pre-trained-model.js';
-export * from './pre-trained-models/metric3-dv2-pre-trained-model.js';
-export * from './pre-trained-models/mgpstr-pre-trained-model.js';
-export * from './pre-trained-models/mimi-pre-trained-model.js';
-export * from './pre-trained-models/mistral-pre-trained-model.js';
-export * from './pre-trained-models/mobile-bert-pre-trained-model.js';
-export * from './pre-trained-models/mobile-llm-pre-trained-model.js';
-export * from './pre-trained-models/mobile-net-v1-pre-trained-model.js';
-export * from './pre-trained-models/mobile-net-v2-pre-trained-model.js';
-export * from './pre-trained-models/mobile-net-v3-pre-trained-model.js';
-export * from './pre-trained-models/mobile-net-v4-pre-trained-model.js';
-export * from './pre-trained-models/mobile-vi-t-pre-trained-model.js';
-export * from './pre-trained-models/mobile-vi-tv2-pre-trained-model.js';
-export * from './pre-trained-models/modern-bert-pre-trained-model.js';
-export * from './pre-trained-models/modern-bert-decoder-pre-trained-model.js';
-export * from './pre-trained-models/moonshine-pre-trained-model.js';
-export * from './pre-trained-models/mp-net-pre-trained-model.js';
-export * from './pre-trained-models/mpt-pre-trained-model.js';
-export * from './pre-trained-models/mt5-pre-trained-model.js';
-export * from './pre-trained-models/multi-modality-pre-trained-model.js';
-export * from './pre-trained-models/musicgen-pre-trained-model.js';
-export * from './pre-trained-models/nano-chat-pre-trained-model.js';
-export * from './pre-trained-models/neo-bert-pre-trained-model.js';
-export * from './pre-trained-models/nomic-bert-pre-trained-model.js';
-export * from './pre-trained-models/olmo-pre-trained-model.js';
-export * from './pre-trained-models/olmo2-pre-trained-model.js';
-export * from './pre-trained-models/olmo3-pre-trained-model.js';
-export * from './pre-trained-models/open-elm-pre-trained-model.js';
-export * from './pre-trained-models/opt-pre-trained-model.js';
-export * from './pre-trained-models/owl-vi-t-pre-trained-model.js';
-export * from './pre-trained-models/owlv2-pre-trained-model.js';
-export * from './pre-trained-models/pali-gemma-pre-trained-model.js';
-export * from './pre-trained-models/parakeet-pre-trained-model.js';
-export * from './pre-trained-models/patch-ts-mixer-pre-trained-model.js';
-export * from './pre-trained-models/patch-tst-pre-trained-model.js';
-export * from './pre-trained-models/phi-pre-trained-model.js';
-export * from './pre-trained-models/phi3-pre-trained-model.js';
-export * from './pre-trained-models/phi3-v-pre-trained-model.js';
-export * from './pre-trained-models/pvt-pre-trained-model.js';
-export * from './pre-trained-models/py-annote-pre-trained-model.js';
-export * from './pre-trained-models/qwen2-pre-trained-model.js';
-export * from './pre-trained-models/qwen2-vl-pre-trained-model.js';
-export * from './pre-trained-models/qwen3-pre-trained-model.js';
-export * from './pre-trained-models/res-net-pre-trained-model.js';
-export * from './pre-trained-models/rf-detr-pre-trained-model.js';
-export * from './pre-trained-models/ro-former-pre-trained-model.js';
-export * from './pre-trained-models/roberta-pre-trained-model.js';
-export * from './pre-trained-models/rt-detr-pre-trained-model.js';
-export * from './pre-trained-models/rt-detr-v2-pre-trained-model.js';
-export * from './pre-trained-models/sam-pre-trained-model.js';
-export * from './pre-trained-models/sam2-pre-trained-model.js';
-export * from './pre-trained-models/sapiens-pre-trained-model.js';
-export * from './pre-trained-models/segformer-pre-trained-model.js';
-export * from './pre-trained-models/siglip-pre-trained-model.js';
-export * from './pre-trained-models/smol-lm3-pre-trained-model.js';
-export * from './pre-trained-models/snac-pre-trained-model.js';
-export * from './pre-trained-models/speech-t5-pre-trained-model.js';
-export * from './pre-trained-models/squeeze-bert-pre-trained-model.js';
-export * from './pre-trained-models/stable-lm-pre-trained-model.js';
-export * from './pre-trained-models/starcoder2-pre-trained-model.js';
-export * from './pre-trained-models/style-text-to-speech2-pre-trained-model.js';
-export * from './pre-trained-models/supertonic-pre-trained-model.js';
-export * from './pre-trained-models/swin-pre-trained-model.js';
-export * from './pre-trained-models/swin2-sr-pre-trained-model.js';
-export * from './pre-trained-models/t5-pre-trained-model.js';
-export * from './pre-trained-models/table-transformer-pre-trained-model.js';
-export * from './pre-trained-models/tr-ocr-pre-trained-model.js';
-export * from './pre-trained-models/ultravox-pre-trained-model.js';
-export * from './pre-trained-models/uni-speech-pre-trained-model.js';
-export * from './pre-trained-models/uni-speech-sat-pre-trained-model.js';
-export * from './pre-trained-models/vault-gemma-pre-trained-model.js';
-export * from './pre-trained-models/vi-t-pre-trained-model.js';
-export * from './pre-trained-models/vi-tmae-pre-trained-model.js';
-export * from './pre-trained-models/vi-tmsn-pre-trained-model.js';
-export * from './pre-trained-models/vision-encoder-decoder-model.js';
-export * from './pre-trained-models/vit-matte-pre-trained-model.js';
-export * from './pre-trained-models/vit-pose-pre-trained-model.js';
-export * from './pre-trained-models/vits-pre-trained-model.js';
-export * from './pre-trained-models/wav-lm-pre-trained-model.js';
-export * from './pre-trained-models/wav2-vec2-pre-trained-model.js';
-export * from './pre-trained-models/wav2-vec2-bert-pre-trained-model.js';
-export * from './pre-trained-models/we-speaker-res-net-pre-trained-model.js';
-export * from './pre-trained-models/whisper-pre-trained-model.js';
-export * from './pre-trained-models/xlm-pre-trained-model.js';
-export * from './pre-trained-models/xlm-roberta-pre-trained-model.js';
-export * from './pre-trained-models/yolos-pre-trained-model.js';
+export * from './pre-trained-models/index.js';
