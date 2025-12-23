@@ -5,16 +5,16 @@ import {
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
-import { getModelFile, MAX_EXTERNAL_DATA_CHUNKS } from '../utils/hub.js';
 import {
     DATA_TYPES,
     DEFAULT_DEVICE_DTYPE_MAPPING,
     DEFAULT_DTYPE_SUFFIX_MAPPING,
     isWebGpuFp16Supported,
 } from '../utils/dtypes.js';
-import { apis, env } from '../env.js';
+import { apis } from '../env.js';
 import { replaceTensors } from '../utils/tensor.js';
 import { validateInputs } from './utils.js';
+import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 
 /**
  * Constructs an InferenceSession using a model file located at the specified path.
@@ -116,10 +116,8 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         device: selectedDevice,
     };
 
-    // Construct the model file name
+    // Construct the model file suffix
     const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype];
-    const baseName = `${fileName}${suffix}.onnx`;
-    const modelFileName = `${options.subfolder ?? ''}/${baseName}`;
 
     const session_options = { ...options.session_options };
 
@@ -137,68 +135,21 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         );
     }
 
-    const return_path = apis.IS_NODE_ENV && env.useFSCache;
-    const bufferOrPathPromise = getModelFile(pretrained_model_name_or_path, modelFileName, true, options, return_path);
+    const bufferOrPathPromise = getCoreModelFile(pretrained_model_name_or_path, fileName, options, suffix);
 
     // Handle onnx external data files
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
-    /** @type {Promise<string|{path: string, data: Uint8Array}>[]} */
-    let externalDataPromises = [];
-    if (use_external_data_format) {
-        let external_data_format;
-        if (typeof use_external_data_format === 'object') {
-            if (use_external_data_format.hasOwnProperty(baseName)) {
-                external_data_format = use_external_data_format[baseName];
-            } else if (use_external_data_format.hasOwnProperty(fileName)) {
-                external_data_format = use_external_data_format[fileName];
-            } else {
-                external_data_format = false;
-            }
-        } else {
-            external_data_format = use_external_data_format;
-        }
+    const externalData = await getModelDataFiles(
+        pretrained_model_name_or_path,
+        fileName,
+        suffix,
+        options,
+        use_external_data_format,
+        session_options,
+    );
 
-        const num_chunks = +external_data_format; // (false=0, true=1, number remains the same)
-        if (num_chunks > MAX_EXTERNAL_DATA_CHUNKS) {
-            throw new Error(
-                `The number of external data chunks (${num_chunks}) exceeds the maximum allowed value (${MAX_EXTERNAL_DATA_CHUNKS}).`,
-            );
-        }
-        for (let i = 0; i < num_chunks; ++i) {
-            const path = `${baseName}_data${i === 0 ? '' : '_' + i}`;
-            const fullPath = `${options.subfolder ?? ''}/${path}`;
-            externalDataPromises.push(
-                new Promise(async (resolve, reject) => {
-                    const data = await getModelFile(
-                        pretrained_model_name_or_path,
-                        fullPath,
-                        true,
-                        options,
-                        return_path,
-                    );
-                    resolve(data instanceof Uint8Array ? { path, data } : path);
-                }),
-            );
-        }
-    } else if (session_options.externalData !== undefined) {
-        externalDataPromises = session_options.externalData.map(async (ext) => {
-            // if the external data is a string, fetch the file and replace the string with its content
-            // @ts-expect-error TS2339
-            if (typeof ext.data === 'string') {
-                // @ts-expect-error TS2339
-                const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
-                // @ts-expect-error TS2698
-                return { ...ext, data: ext_buffer };
-            }
-            return ext;
-        });
-    }
-
-    if (externalDataPromises.length > 0) {
-        const externalData = await Promise.all(externalDataPromises);
-        if (!apis.IS_NODE_ENV) {
-            session_options.externalData = externalData;
-        }
+    if (externalData.length > 0 && !apis.IS_NODE_ENV) {
+        session_options.externalData = externalData;
     }
 
     if (is_decoder && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
