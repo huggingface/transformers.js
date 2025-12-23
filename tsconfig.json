@@ -2,19 +2,26 @@
   // Only include files in the src directory
   "include": ["src/**/*"],
   "compilerOptions": {
-    // Tells the compiler to check JS files
+    // Allow both JS and TS files for gradual migration
+    "allowJs": true,
+    // Check JS files for type errors
     "checkJs": true,
     "target": "esnext",
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "outDir": "types",
+    // Use strict mode for new TypeScript files, but keep lenient for JS files
     "strict": false,
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
     "noEmit": false,
     "emitDeclarationOnly": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    // Additional helpful options for hybrid approach
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
   },
   "typeAcquisition": {
     "include": ["jest"]

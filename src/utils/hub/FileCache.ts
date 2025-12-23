@@ -1,26 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import FileResponse from './FileResponse.js';
+import { ProgressCallback } from './types.js';
 
 /**
  * File system cache implementation that implements the CacheInterface.
  * Provides `match` and `put` methods compatible with the Web Cache API.
  */
 export default class FileCache {
+    path: string;
+
     /**
      * Instantiate a `FileCache` object.
-     * @param {string} path
+     * @param path The path to the cache directory.
      */
-    constructor(path) {
+    constructor(path: string) {
         this.path = path;
     }
 
     /**
      * Checks whether the given request is in the cache.
-     * @param {string} request
-     * @returns {Promise<FileResponse | undefined>}
+     * @param request The request to check.
      */
-    async match(request) {
+    async match(request: string): Promise<FileResponse> {
         let filePath = path.join(this.path, request);
         let file = new FileResponse(filePath);
 
@@ -35,11 +37,10 @@ export default class FileCache {
      * Adds the given response to the cache.
      * @param {string} request
      * @param {Response} response
-     * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
+     * @param [progress_callback] Optional.
      * The function to call with progress updates
-     * @returns {Promise<void>}
      */
-    async put(request, response, progress_callback = undefined) {
+    async put(request: string, response: Response, progress_callback: ProgressCallback = undefined): Promise<void> {
         let filePath = path.join(this.path, request);
 
         try {
@@ -57,7 +58,7 @@ export default class FileCache {
                     break;
                 }
 
-                await new Promise((resolve, reject) => {
+                await new Promise<void>((resolve, reject) => {
                     fileStream.write(value, (err) => {
                         if (err) {
                             reject(err);

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 /**
  * Mapping from file extensions to MIME types.
  */
-const CONTENT_TYPE_MAP = {
+const CONTENT_TYPE_MAP: Record<string, string> = {
     txt: 'text/plain',
     html: 'text/html',
     css: 'text/css',
@@ -16,11 +16,18 @@ const CONTENT_TYPE_MAP = {
 };
 
 export default class FileResponse {
+    filePath: string;
+    headers: Headers;
+    exists: boolean;
+    status: number;
+    statusText: string;
+    body: ReadableStream<Uint8Array> | null;
+
     /**
      * Creates a new `FileResponse` object.
-     * @param {string} filePath
+     * @param filePath - The path to the file
      */
-    constructor(filePath) {
+    constructor(filePath: string) {
         this.filePath = filePath;
         this.headers = new Headers();
 
@@ -37,7 +44,7 @@ export default class FileResponse {
             const stream = fs.createReadStream(filePath);
             this.body = new ReadableStream({
                 start(controller) {
-                    stream.on('data', (chunk) => controller.enqueue(chunk));
+                    stream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
                     stream.on('end', () => controller.close());
                     stream.on('error', (err) => controller.error(err));
                 },
@@ -55,19 +62,18 @@ export default class FileResponse {
     /**
      * Updates the 'content-type' header property of the response based on the extension of
      * the file specified by the filePath property of the current object.
-     * @returns {void}
      */
-    updateContentType() {
+    updateContentType(): void {
         // Set content-type header based on file extension
-        const extension = this.filePath.toString().split('.').pop().toLowerCase();
+        const extension = this.filePath.toString().split('.').pop()?.toLowerCase() ?? '';
         this.headers.set('content-type', CONTENT_TYPE_MAP[extension] ?? 'application/octet-stream');
     }
 
     /**
      * Clone the current FileResponse object.
-     * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
+     * @returns A new FileResponse object with the same properties as the current object.
      */
-    clone() {
+    clone(): FileResponse {
         let response = new FileResponse(this.filePath);
         response.exists = this.exists;
         response.status = this.status;
@@ -79,32 +85,32 @@ export default class FileResponse {
     /**
      * Reads the contents of the file specified by the filePath property and returns a Promise that
      * resolves with an ArrayBuffer containing the file's contents.
-     * @returns {Promise<ArrayBuffer>} A Promise that resolves with an ArrayBuffer containing the file's contents.
-     * @throws {Error} If the file cannot be read.
+     * @returns A Promise that resolves with an ArrayBuffer containing the file's contents.
+     * @throws If the file cannot be read.
      */
-    async arrayBuffer() {
+    async arrayBuffer(): Promise<ArrayBuffer> {
         const data = await fs.promises.readFile(this.filePath);
-        return /** @type {ArrayBuffer} */ (data.buffer);
+        return data.buffer as ArrayBuffer;
     }
 
     /**
      * Reads the contents of the file specified by the filePath property and returns a Promise that
      * resolves with a Blob containing the file's contents.
-     * @returns {Promise<Blob>} A Promise that resolves with a Blob containing the file's contents.
-     * @throws {Error} If the file cannot be read.
+     * @returns A Promise that resolves with a Blob containing the file's contents.
+     * @throws If the file cannot be read.
      */
-    async blob() {
+    async blob(): Promise<Blob> {
         const data = await fs.promises.readFile(this.filePath);
-        return new Blob([/** @type {any} */ (data)], { type: this.headers.get('content-type') });
+        return new Blob([data], { type: this.headers.get('content-type') ?? 'application/octet-stream' });
     }
 
     /**
      * Reads the contents of the file specified by the filePath property and returns a Promise that
      * resolves with a string containing the file's contents.
-     * @returns {Promise<string>} A Promise that resolves with a string containing the file's contents.
-     * @throws {Error} If the file cannot be read.
+     * @returns A Promise that resolves with a string containing the file's contents.
+     * @throws If the file cannot be read.
      */
-    async text() {
+    async text(): Promise<string> {
         return await fs.promises.readFile(this.filePath, 'utf8');
     }
 
@@ -112,10 +118,10 @@ export default class FileResponse {
      * Reads the contents of the file specified by the filePath property and returns a Promise that
      * resolves with a parsed JavaScript object containing the file's contents.
      *
-     * @returns {Promise<Object>} A Promise that resolves with a parsed JavaScript object containing the file's contents.
-     * @throws {Error} If the file cannot be read.
+     * @returns A Promise that resolves with a parsed JavaScript object containing the file's contents.
+     * @throws If the file cannot be read.
      */
-    async json() {
+    async json(): Promise<unknown> {
         return JSON.parse(await this.text());
     }
 }
