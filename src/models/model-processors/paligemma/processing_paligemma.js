@@ -14,7 +14,7 @@ export class PaliGemmaProcessor extends Processor {
     static uses_processor_config = false;
 
     /**
-     * @typedef {import('../../utils/image.js').RawImage} RawImage
+     * @typedef {import('../../../utils/image.js').RawImage} RawImage
      */
 
     // `images` is required, `text` is optional

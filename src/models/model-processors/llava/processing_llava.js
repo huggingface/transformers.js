@@ -8,7 +8,7 @@ export class LlavaProcessor extends Processor {
     static uses_processor_config = true;
 
     /**
-     * @typedef {import('../../utils/image.js').RawImage} RawImage
+     * @typedef {import('../../../utils/image.js').RawImage} RawImage
      */
 
     // `images` is required, `text` is optional

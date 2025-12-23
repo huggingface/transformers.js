@@ -9,15 +9,15 @@ import { full } from '../../../utils/tensor.js';
 
 /**
  * @typedef {object} DetrFeatureExtractorResultProps
- * @property {import('../../utils/tensor.js').Tensor} pixel_mask
- * @typedef {import('../../base/image_processors_utils.js').ImageProcessorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
+ * @property {import('../../../utils/tensor.js').Tensor} pixel_mask
+ * @typedef {import('../../../base/image_processors_utils.js').ImageProcessorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
  */
 
 export class DetrImageProcessor extends ImageProcessor {
     /**
      * Calls the feature extraction process on an array of images, preprocesses
      * each image, and concatenates the resulting features into a single Tensor.
-     * @param {import('../../utils/image.js').RawImage[]} images The image(s) to extract features from.
+     * @param {import('../../../utils/image.js').RawImage[]} images The image(s) to extract features from.
      * @returns {Promise<DetrFeatureExtractorResult>} An object containing the concatenated pixel values of the preprocessed images.
      */
     async _call(images) {

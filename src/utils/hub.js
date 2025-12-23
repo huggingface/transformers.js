@@ -372,7 +372,8 @@ export async function loadResourceFile(
         // Only cache web responses
         // i.e., do not cache FileResponses (prevents duplication)
         toCacheResponse &&
-        cacheKey
+        cacheKey &&
+        typeof response !== 'string'
     ) {
         // Store temporary context for progress callbacks in cache storage
         const extendedOptions = {

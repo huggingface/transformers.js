@@ -239,7 +239,7 @@ export class SuppressTokensAtBeginLogitsProcessor extends LogitsProcessor {
 export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
     /**
      * Constructs a new WhisperTimeStampLogitsProcessor.
-     * @param {import('../models/whisper/generation_whisper.js').WhisperGenerationConfig} generate_config The config object passed to the `generate()` method of a transformer model.
+     * @param {import('../models/model-processors/whisper/generation_whisper.js').WhisperGenerationConfig} generate_config The config object passed to the `generate()` method of a transformer model.
      * @param {number[]} init_tokens The initial tokens of the input sequence.
      */
     constructor(generate_config, init_tokens) {

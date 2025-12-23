@@ -1,4 +1,10 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
+import {
+    MaskedLMOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+} from '../output.js';
 
 export class NeoBertPreTrainedModel extends PreTrainedModel {}
 export class NeoBertModel extends NeoBertPreTrainedModel {}

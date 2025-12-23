@@ -1,6 +1,7 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { sessionRun } from '../session.js';
 import { Tensor } from '../../utils/tensor.js';
+import { ModelOutput } from '../output.js';
 
 export class MusicgenPreTrainedModel extends PreTrainedModel {}
 
@@ -119,7 +120,7 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
 
     /**
      * Generates sequences of token ids for models with a language modeling head.
-     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     * @param {import('../../generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
     async generate(options) {

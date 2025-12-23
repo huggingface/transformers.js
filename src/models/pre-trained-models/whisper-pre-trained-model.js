@@ -1,4 +1,4 @@
-import { cat, mean, Tensor } from '../../utils/tensor.js';
+import { cat, mean, Tensor, stack, std_mean } from '../../utils/tensor.js';
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { WhisperGenerationConfig } from '../model-processors/whisper/generation_whisper.js';
 import { whisper_language_to_code } from '../model-processors/whisper/common_whisper.js';
@@ -9,6 +9,7 @@ import {
 } from '../../generation/logits_process.js';
 import { medianFilter, dynamic_time_warping } from '../../utils/maths.js';
 import { mergeArrays } from '../../utils/core.js';
+import { ModelOutput } from '../output.js';
 
 export class WhisperPreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;
@@ -96,7 +97,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 
     /**
      * Transcribes or translates log-mel input features to a sequence of auto-regressively generated token ids.
-     * @param {import('./models/whisper/generation_whisper.js').WhisperGenerationFunctionParameters} options
+     * @param {import('../model-processors/whisper/generation_whisper.js').WhisperGenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
     async generate({

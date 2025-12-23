@@ -13,21 +13,21 @@ export class MgpstrProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
 
     /**
-     * @returns {import('../../tokenizers.js').MgpstrTokenizer} The character tokenizer.
+     * @returns {import('../../../tokenizers.js').MgpstrTokenizer} The character tokenizer.
      */
     get char_tokenizer() {
         return this.components.char_tokenizer;
     }
 
     /**
-     * @returns {import('../../tokenizers.js').GPT2Tokenizer} The BPE tokenizer.
+     * @returns {import('../../../tokenizers.js').GPT2Tokenizer} The BPE tokenizer.
      */
     get bpe_tokenizer() {
         return this.components.bpe_tokenizer;
     }
 
     /**
-     * @returns {import('../../tokenizers.js').BertTokenizer} The WordPiece tokenizer.
+     * @returns {import('../../../tokenizers.js').BertTokenizer} The WordPiece tokenizer.
      */
     get wp_tokenizer() {
         return this.components.wp_tokenizer;
@@ -35,7 +35,7 @@ export class MgpstrProcessor extends Processor {
 
     /**
      * Helper function to decode the model prediction logits.
-     * @param {import('../../utils/tensor.js').Tensor} pred_logits Model prediction logits.
+     * @param {import('../../../utils/tensor.js').Tensor} pred_logits Model prediction logits.
      * @param {string} format Type of model prediction. Must be one of ['char', 'bpe', 'wp'].
      * @returns {[string[], number[]]} The decoded sentences and their confidence scores.
      */
@@ -108,7 +108,7 @@ export class MgpstrProcessor extends Processor {
 
     /**
      * Convert a list of lists of token ids into a list of strings by calling decode.
-     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} sequences List of tokenized input ids.
+     * @param {[import('../../../utils/tensor.js').Tensor, import('../../../utils/tensor.js').Tensor, import('../../../utils/tensor.js').Tensor]} sequences List of tokenized input ids.
      * @returns {{generated_text: string[], scores: number[], char_preds: string[], bpe_preds: string[], wp_preds: string[]}}
      * Dictionary of all the outputs of the decoded results.
      * - generated_text: The final results after fusion of char, bpe, and wp.

@@ -5,8 +5,8 @@ import { center_to_corners_format } from '../../../base/image_processors_utils.j
 
 /**
  * Get token ids of phrases from posmaps and input_ids.
- * @param {import('../../utils/tensor.js').Tensor} posmaps A boolean tensor of unbatched text-thresholded logits related to the detected bounding boxes of shape `(hidden_size, )`.
- * @param {import('../../utils/tensor.js').Tensor} input_ids A tensor of token ids of shape `(sequence_length, )`.
+ * @param {import('../../../utils/tensor.js').Tensor} posmaps A boolean tensor of unbatched text-thresholded logits related to the detected bounding boxes of shape `(hidden_size, )`.
+ * @param {import('../../../utils/tensor.js').Tensor} input_ids A tensor of token ids of shape `(sequence_length, )`.
  */
 function get_phrases_from_posmap(posmaps, input_ids) {
     const left_idx = 0;
@@ -28,7 +28,7 @@ export class GroundingDinoProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
 
     /**
-     * @typedef {import('../../utils/image.js').RawImage} RawImage
+     * @typedef {import('../../../utils/image.js').RawImage} RawImage
      */
     /**
      *

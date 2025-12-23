@@ -4,6 +4,7 @@ import { sessionRun } from '../session.js';
 import { Sam2ImageSegmentationOutput } from '../output.js';
 import { ones, full } from '../../utils/tensor.js';
 import { pick } from '../../utils/core.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class Sam2PreTrainedModel extends PreTrainedModel {}
 export class Sam2Model extends Sam2PreTrainedModel {

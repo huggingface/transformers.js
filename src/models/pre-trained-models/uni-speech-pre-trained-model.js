@@ -1,5 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { CausalLMOutput, SequenceClassifierOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class UniSpeechPreTrainedModel extends PreTrainedModel {}
 

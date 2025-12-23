@@ -87,11 +87,8 @@ export async function getModelDataFiles(
     } else if (session_options.externalData !== undefined) {
         externalDataPromises = session_options.externalData.map(async (ext) => {
             // if the external data is a string, fetch the file and replace the string with its content
-            // @ts-expect-error TS2339
             if (typeof ext.data === 'string') {
-                // @ts-expect-error TS2339
                 const ext_buffer = await getModelFile(pretrained_model_name_or_path, ext.data, true, options);
-                // @ts-expect-error TS2698
                 return { ...ext, data: ext_buffer };
             }
             return ext;

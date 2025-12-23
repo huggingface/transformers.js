@@ -3,6 +3,7 @@ import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
 import { decoderForward } from '../utils.js';
 import { RawImage } from '../../utils/image.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class MultiModalityPreTrainedModel extends PreTrainedModel {}
 export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
@@ -71,7 +72,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     }
 
     /**
-     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     * @param {import('../../generation/parameters.js').GenerationFunctionParameters} options
      */
     async generate(options) {
         this._generation_mode = 'text';
@@ -79,7 +80,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     }
 
     /**
-     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     * @param {import('../../generation/parameters.js').GenerationFunctionParameters} options
      */
     async generate_images(options) {
         this._generation_mode = 'image';
