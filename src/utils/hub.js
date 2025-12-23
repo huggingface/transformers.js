@@ -92,45 +92,19 @@ export async function getFile(urlOrPath) {
 }
 
 /**
- * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
- * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
+ * Builds the resource paths and URLs for a model file.
+ * Can be used to get the resource URL or path without loading the file.
  *
  * @param {string} path_or_repo_id This can be either:
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
- * @param {string} filename The name of the file to locate in `path_or_repo`.
- * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
+ * @param {string} filename The name of the file to locate.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
- * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
- *
- * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use for determining cache keys.
+ * @returns {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }}
+ * An object containing all the paths and URLs for the resource.
  */
-export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
-    if (!env.allowLocalModels) {
-        // User has disabled local models, so we just make sure other settings are correct.
-
-        if (options.local_files_only) {
-            throw Error(
-                'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
-            );
-        } else if (!env.allowRemoteModels) {
-            throw Error(
-                'Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.',
-            );
-        }
-    }
-
-    // Initiate file retrieval
-    dispatchCallback(options.progress_callback, {
-        status: 'initiate',
-        name: path_or_repo_id,
-        file: filename,
-    });
-
-    /** @type {import('./cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir);
-
+export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -144,8 +118,6 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         filename,
     );
 
-    /** @type {string} */
-    let cacheKey;
     const proposedCacheKey =
         cache instanceof FileCache
             ? // Choose cache key for filesystem cache
@@ -156,19 +128,125 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 : pathJoin(path_or_repo_id, revision, filename)
             : remoteURL;
 
+    return {
+        requestURL,
+        localPath,
+        remoteURL,
+        proposedCacheKey,
+        validModelId,
+    };
+}
+
+/**
+ * Checks if a resource exists in cache.
+ *
+ * @param {import('./cache.js').CacheInterface | null} cache The cache instance to check.
+ * @param {string} localPath The local path to try first.
+ * @param {string} proposedCacheKey The proposed cache key to try second.
+ * @returns {Promise<Response|import('./hub/FileResponse.js').default|undefined|string>}
+ * The cached response if found, undefined otherwise.
+ */
+export async function checkCachedResource(cache, localPath, proposedCacheKey) {
+    if (!cache) {
+        return undefined;
+    }
+
+    // A caching system is available, so we try to get the file from it.
+    //  1. We first try to get from cache using the local path. In some environments (like deno),
+    //     non-URL cache keys are not allowed. In these cases, `response` will be undefined.
+    //  2. If no response is found, we try to get from cache using the remote URL or file system cache.
+    return await tryCache(cache, localPath, proposedCacheKey);
+}
+
+/**
+ * Stores a resource in the cache.
+ *
+ * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
+ * @param {string} cacheKey The cache key to use.
+ * @param {Response|import('./hub/FileResponse.js').default} response The response to cache.
+ * @param {Uint8Array} [result] The result buffer if already read.
+ * @param {PretrainedOptions & { _path_or_repo_id?: string, _filename?: string }} [options] Options containing progress callback and context for progress updates.
+ * @returns {Promise<void>}
+ */
+export async function storeCachedResource(cache, cacheKey, response, result, options = {}) {
+    // Check again whether request is in cache. If not, we add the response to the cache
+    if ((await cache.match(cacheKey)) !== undefined) {
+        return;
+    }
+
+    if (!result) {
+        // We haven't yet read the response body, so we need to do so now.
+        // Ensure progress updates include consistent metadata.
+        const wrapped_progress = options.progress_callback
+            ? (data) =>
+                  dispatchCallback(options.progress_callback, {
+                      status: 'progress',
+                      name: options._path_or_repo_id,
+                      file: options._filename,
+                      ...data,
+                  })
+            : undefined;
+        await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
+    } else if (typeof response !== 'string') {
+        // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
+        await cache
+            .put(
+                cacheKey,
+                new Response(/** @type {any} */ (result), {
+                    headers: response.headers,
+                }),
+            )
+            .catch((err) => {
+                // Do not crash if unable to add to cache (e.g., QuotaExceededError).
+                // Rather, log a warning and proceed with execution.
+                console.warn(`Unable to add response to browser cache: ${err}.`);
+            });
+    }
+}
+
+/**
+ * Loads a resource file from local or remote sources.
+ *
+ * @param {string} path_or_repo_id This can be either:
+ * - a string, the *model id* of a model repo on huggingface.co.
+ * - a path to a *directory* potentially containing the file.
+ * @param {string} filename The name of the file to locate.
+ * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
+ * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
+ * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
+ * @param {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }} [paths] Pre-built paths object.
+ *
+ * @throws Will throw an error if the file is not found and `fatal` is true.
+ * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ */
+export async function loadResourceFile(
+    path_or_repo_id,
+    filename,
+    fatal = true,
+    options = {},
+    return_path = false,
+    cache = null,
+    paths = null,
+) {
+    // Use pre-built paths or build them
+    if (!paths) {
+        paths = buildResourcePaths(path_or_repo_id, filename, options, cache);
+    }
+
+    const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = paths;
+
+    /** @type {string} */
+    let cacheKey;
+
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
     /** @type {Response|import('./hub/FileResponse.js').default|undefined|string} */
     let response;
 
-    if (cache) {
-        // A caching system is available, so we try to get the file from it.
-        //  1. We first try to get from cache using the local path. In some environments (like deno),
-        //     non-URL cache keys are not allowed. In these cases, `response` will be undefined.
-        //  2. If no response is found, we try to get from cache using the remote URL or file system cache.
-        response = await tryCache(cache, localPath, proposedCacheKey);
-    }
+    // Check cache
+    response = await checkCachedResource(cache, localPath, proposedCacheKey);
 
     const cacheHit = response !== undefined;
     if (!cacheHit) {
@@ -294,39 +372,17 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         // Only cache web responses
         // i.e., do not cache FileResponses (prevents duplication)
         toCacheResponse &&
-        cacheKey &&
-        // Check again whether request is in cache. If not, we add the response to the cache
-        (await cache.match(cacheKey)) === undefined
+        cacheKey
     ) {
-        if (!result) {
-            // We haven't yet read the response body, so we need to do so now.
-            // Ensure progress updates include consistent metadata.
-            const wrapped_progress = options.progress_callback
-                ? (data) =>
-                      dispatchCallback(options.progress_callback, {
-                          status: 'progress',
-                          name: path_or_repo_id,
-                          file: filename,
-                          ...data,
-                      })
-                : undefined;
-            await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
-        } else if (typeof response !== 'string') {
-            // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
-            await cache
-                .put(
-                    cacheKey,
-                    new Response(/** @type {any} */ (result), {
-                        headers: response.headers,
-                    }),
-                )
-                .catch((err) => {
-                    // Do not crash if unable to add to cache (e.g., QuotaExceededError).
-                    // Rather, log a warning and proceed with execution.
-                    console.warn(`Unable to add response to browser cache: ${err}.`);
-                });
-        }
+        // Store temporary context for progress callbacks in cache storage
+        const extendedOptions = {
+            ...options,
+            _path_or_repo_id: path_or_repo_id,
+            _filename: filename,
+        };
+        await storeCachedResource(cache, cacheKey, response, result, extendedOptions);
     }
+
     dispatchCallback(options.progress_callback, {
         status: 'done',
         name: path_or_repo_id,
@@ -355,6 +411,49 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     }
 
     throw new Error('Unable to get model file path or buffer.');
+}
+
+/**
+ * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
+ * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
+ *
+ * @param {string} path_or_repo_id This can be either:
+ * - a string, the *model id* of a model repo on huggingface.co.
+ * - a path to a *directory* potentially containing the file.
+ * @param {string} filename The name of the file to locate in `path_or_repo`.
+ * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
+ * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
+ *
+ * @throws Will throw an error if the file is not found and `fatal` is true.
+ * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ */
+export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
+    if (!env.allowLocalModels) {
+        // User has disabled local models, so we just make sure other settings are correct.
+
+        if (options.local_files_only) {
+            throw Error(
+                'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
+            );
+        } else if (!env.allowRemoteModels) {
+            throw Error(
+                'Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.',
+            );
+        }
+    }
+
+    dispatchCallback(options.progress_callback, {
+        status: 'initiate',
+        name: path_or_repo_id,
+        file: filename,
+    });
+
+    /** @type {import('./cache.js').CacheInterface | null} */
+    const cache = await getCache(options?.cache_dir);
+    const paths = buildResourcePaths(path_or_repo_id, filename, options, cache);
+
+    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache, paths);
 }
 
 /**
