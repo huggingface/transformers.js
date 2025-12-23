@@ -1,5 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { ModelOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class RTDetrPreTrainedModel extends PreTrainedModel {}
 export class RTDetrModel extends RTDetrPreTrainedModel {}

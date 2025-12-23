@@ -6,8 +6,8 @@ import { interpolate_4d, Tensor } from '../../../utils/tensor.js';
 /**
  * @typedef {object} SamImageProcessorResult
  * @property {Tensor} pixel_values
- * @property {import("../../base/image_processors_utils.js").HeightWidth[]} original_sizes
- * @property {import("../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
+ * @property {import("../../../base/image_processors_utils.js").HeightWidth[]} original_sizes
+ * @property {import("../../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
  * @property {Tensor} [input_points]
  * @property {Tensor} [input_labels]
  * @property {Tensor} [input_boxes]
@@ -17,8 +17,8 @@ export class SamImageProcessor extends ImageProcessor {
     /**
      *
      * @param {any} input_points
-     * @param {import("../../base/image_processors_utils.js").HeightWidth[]} original_sizes
-     * @param {import("../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
+     * @param {import("../../../base/image_processors_utils.js").HeightWidth[]} original_sizes
+     * @param {import("../../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
      * @returns {Tensor}
      */
     reshape_input_points(input_points, original_sizes, reshaped_input_sizes, is_bounding_box = false) {
@@ -204,7 +204,7 @@ export class SamImageProcessor extends ImageProcessor {
 
     /**
      * Generates a list of crop boxes of different sizes. Each layer has (2**i)**2 boxes for the ith layer.
-     * @param {import("../../utils/image.js").RawImage} image Input original image
+     * @param {import("../../../utils/image.js").RawImage} image Input original image
      * @param {number} target_size Target size of the resized image
      * @param {Object} options Options for generating crop boxes
      * @param {number} [options.crop_n_layers] If >0, mask prediction will be run again on crops of the image.

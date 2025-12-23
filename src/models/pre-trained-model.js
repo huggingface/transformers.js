@@ -3,6 +3,13 @@ import { constructSessions, sessionRun } from './session.js';
 import { AutoConfig, getCacheShapes } from '../configs.js';
 import { Tensor, DataTypeMap, full_like, cat, zeros_like, toI64Tensor, ones_like, ones } from '../utils/tensor.js';
 import {
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
+    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
+} from './registry.js';
+import { GITHUB_ISSUE_URL } from '../utils/constants.js';
+import {
     decoderForward,
     decoder_prepare_inputs_for_generation,
     seq2seqForward,
@@ -33,6 +40,7 @@ import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
 import { pick } from '../utils/core.js';
+import { ModelOutput } from './output.js';
 
 export const MODEL_TYPES = {
     EncoderOnly: 0,
@@ -134,7 +142,7 @@ export class PreTrainedModel extends Callable {
     _return_dict_in_generate_keys = null;
     /**
      * Creates a new instance of the `PreTrainedModel` class.
-     * @param {import('./configs.js').PretrainedConfig} config The model configuration.
+     * @param {import('../configs.js').PretrainedConfig} config The model configuration.
      * @param {Record<string, any>} sessions The inference sessions for the model.
      * @param {Record<string, Object>} configs Additional configuration files (e.g., generation_config.json).
      */
@@ -159,7 +167,7 @@ export class PreTrainedModel extends Callable {
             this.forward_params.push('past_key_values');
         }
 
-        /** @type {import('./configs.js').TransformersJSConfig} */
+        /** @type {import('../configs.js').TransformersJSConfig} */
         this.custom_config = this.config['transformers.js_config'] ?? {};
     }
 
@@ -187,7 +195,7 @@ export class PreTrainedModel extends Callable {
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
-     * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+     * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
      *
      * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
      */
@@ -937,7 +945,7 @@ export class PreTrainedModel extends Callable {
 
     /**
      * Generates sequences of token ids for models with a language modeling head.
-     * @param {import('./generation/parameters.js').GenerationFunctionParameters} options
+     * @param {import('../generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
     async generate({

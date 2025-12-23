@@ -1,5 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { CausalLMOutput, SequenceClassifierOutput, TokenClassifierOutput, XVectorOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 /**
  * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.

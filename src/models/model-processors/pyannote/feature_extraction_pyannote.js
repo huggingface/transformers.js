@@ -32,7 +32,7 @@ export class PyAnnoteFeatureExtractor extends FeatureExtractor {
 
     /**
      * Post-processes the speaker diarization logits output by the model.
-     * @param {import('../../utils/tensor.js').Tensor} logits The speaker diarization logits output by the model.
+     * @param {import('../../../utils/tensor.js').Tensor} logits The speaker diarization logits output by the model.
      * @param {number} num_samples Number of samples in the input audio.
      * @returns {Array<Array<{ id: number, start: number, end: number, confidence: number }>>} The post-processed speaker diarization results.
      */

@@ -3,6 +3,7 @@ import { ones } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { SamImageSegmentationOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class SamPreTrainedModel extends PreTrainedModel {}
 

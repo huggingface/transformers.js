@@ -20,7 +20,7 @@ import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
  * Constructs an InferenceSession using a model file located at the specified path.
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
- * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
  * @param {boolean} [is_decoder=false] Whether the model is a decoder model.
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
@@ -39,7 +39,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     }
 
     // If the device is not specified, we use the default (supported) execution providers.
-    const selectedDevice = /** @type {import("./utils/devices.js").DeviceType} */ (
+    const selectedDevice = /** @type {import("../utils/devices.js").DeviceType} */ (
         device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
     );
 
@@ -84,7 +84,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         }
     }
 
-    const selectedDtype = /** @type {import("./utils/dtypes.js").DataType} */ (dtype);
+    const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (dtype);
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
         throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);
@@ -177,7 +177,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
  *
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {Record<string, string>} names The names of the model files to load.
- * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
+ * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
  * @param {string} [decoder_name] The name of the decoder model, if any.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private

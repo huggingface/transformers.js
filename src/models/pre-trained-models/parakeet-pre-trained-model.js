@@ -1,5 +1,6 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { CausalLMOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class ParakeetPreTrainedModel extends PreTrainedModel {}
 export class ParakeetForCTC extends ParakeetPreTrainedModel {

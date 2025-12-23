@@ -1,6 +1,7 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
 import { sessionRun } from '../session.js';
 import { DacEncoderOutput, DacDecoderOutput } from '../output.js';
+import { Tensor } from '../../utils/tensor.js';
 
 export class DacPreTrainedModel extends PreTrainedModel {
     main_input_name = 'input_values';

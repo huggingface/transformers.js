@@ -7,7 +7,7 @@ import * as AllImageProcessors from '../../image-processors.js';
 import * as AllFeatureExtractors from '../../feature-extractors.js';
 
 /**
- * @typedef {import('../../base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
+ * @typedef {import('../../../base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
  */
 
 /**

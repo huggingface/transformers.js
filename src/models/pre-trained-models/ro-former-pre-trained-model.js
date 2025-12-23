@@ -1,5 +1,10 @@
 import { PreTrainedModel } from '../pre-trained-model.js';
-import { QuestionAnsweringModelOutput, SequenceClassifierOutput, TokenClassifierOutput } from '../output.js';
+import {
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    MaskedLMOutput,
+} from '../output.js';
 
 export class RoFormerPreTrainedModel extends PreTrainedModel {}
 

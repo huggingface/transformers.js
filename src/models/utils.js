@@ -1,10 +1,11 @@
 // JS doesn't support mixins, so we define some reused functions here, and allow "this" to be passed in
 import { pick } from '../utils/core.js';
-import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like, boolTensor } from '../utils/tensor.js';
+import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like, boolTensor, full } from '../utils/tensor.js';
 import { max } from '../utils/maths.js';
 import { sessionRun } from './session.js';
 import { getModelJSON } from '../utils/hub.js';
 import { isONNXProxy } from '../backends/onnx.js';
+import { Seq2SeqLMOutput } from './output.js';
 
 /**
  * Perform forward pass on the seq2seq model (both encoder and decoder).
@@ -556,7 +557,7 @@ export function default_merge_input_ids_with_audio_features({
  * Helper function to load multiple optional configuration files
  * @param {string} pretrained_model_name_or_path The path to the directory containing the config file.
  * @param {Record<string, string>} names The names of the config files to load.
- * @param {import('./utils/hub.js').PretrainedModelOptions} options Additional options for loading the configs.
+ * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the configs.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of configuration objects.
  * @private
  */

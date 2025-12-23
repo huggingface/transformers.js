@@ -1,3 +1,7 @@
+/**
+ * @typedef {import('../utils/tensor.js').Tensor} Tensor
+ */
+
 export class ModelOutput {}
 
 /**

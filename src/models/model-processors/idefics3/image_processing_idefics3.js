@@ -10,8 +10,8 @@ export class Idefics3ImageProcessor extends ImageProcessor {
     }
 
     /**
-     * @typedef {import('../../utils/image.js').RawImage} RawImage
-     * @typedef {import('../../utils/tensor.js').Tensor} Tensor
+     * @typedef {import('../../../utils/image.js').RawImage} RawImage
+     * @typedef {import('../../../utils/tensor.js').Tensor} Tensor
      */
 
     /**

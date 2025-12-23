@@ -535,7 +535,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['modernbert-decoder', ['ModernBertDecoderModel', ModernBertDecoderModel]],
 ]);
 
-const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
+export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['speecht5', ['SpeechT5ForSpeechToText', SpeechT5ForSpeechToText]],
     ['whisper', ['WhisperForConditionalGeneration', WhisperForConditionalGeneration]],
     ['lite-whisper', ['LiteWhisperForConditionalGeneration', LiteWhisperForConditionalGeneration]],
@@ -593,7 +593,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['xlm-roberta', ['XLMRobertaForTokenClassification', XLMRobertaForTokenClassification]],
 ]);
 
-const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
+export const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['t5', ['T5ForConditionalGeneration', T5ForConditionalGeneration]],
     ['longt5', ['LongT5ForConditionalGeneration', LongT5ForConditionalGeneration]],
     ['mt5', ['MT5ForConditionalGeneration', MT5ForConditionalGeneration]],
@@ -605,7 +605,7 @@ const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['blenderbot-small', ['BlenderbotSmallForConditionalGeneration', BlenderbotSmallForConditionalGeneration]],
 ]);
 
-const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
+export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['bloom', ['BloomForCausalLM', BloomForCausalLM]],
     ['gpt2', ['GPT2LMHeadModel', GPT2LMHeadModel]],
     ['gpt_oss', ['GptOssForCausalLM', GptOssForCausalLM]],
@@ -700,7 +700,7 @@ const MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
     ['squeezebert', ['SqueezeBertForQuestionAnswering', SqueezeBertForQuestionAnswering]],
 ]);
 
-const MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = new Map([
+export const MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = new Map([
     ['vision-encoder-decoder', ['VisionEncoderDecoderModel', VisionEncoderDecoderModel]],
     ['idefics3', ['Idefics3ForConditionalGeneration', Idefics3ForConditionalGeneration]],
     ['smolvlm', ['SmolVLMForConditionalGeneration', SmolVLMForConditionalGeneration]],
@@ -964,14 +964,10 @@ export {
     MODEL_CLASS_TYPE_MAPPING,
     MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
     MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
     MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES,
     MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES,
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
     MODEL_FOR_MASKED_LM_MAPPING_NAMES,
     MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES,
-    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
     MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
     MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES,
     MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES,

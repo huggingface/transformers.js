@@ -84,5 +84,5 @@ export class WhisperGenerationConfig extends GenerationConfig {
 }
 
 /**
- * @typedef {import('../../generation/parameters.js').GenerationFunctionParameters & {generation_config: WhisperGenerationConfig} & WhisperGenerationConfig} WhisperGenerationFunctionParameters
+ * @typedef {import('../../../generation/parameters.js').GenerationFunctionParameters & {generation_config: WhisperGenerationConfig} & WhisperGenerationConfig} WhisperGenerationFunctionParameters
  */
