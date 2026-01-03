@@ -1,4 +1,3 @@
-
 import json
 import os
 import shutil
@@ -14,10 +13,11 @@ from transformers import (
 
 import onnxslim
 from optimum.exporters.onnx import main_export, export_models
-from optimum.onnx.graph_transformations import check_and_save_model
 from optimum.exporters.tasks import TasksManager
-
-from .quantize import QuantizationArguments, quantize
+from optimum.onnxruntime import ORTQuantizer
+from optimum.onnxruntime.configuration import QuantizationConfig
+from quantize import QuantizationArguments, quantize
+from utils import check_and_save_model
 
 NO_PER_CHANNEL_REDUCE_RANGE_MODELS = {
     # Decoder-only models
@@ -260,21 +260,21 @@ def main():
 
     # Handle special cases
     if config.model_type == 'marian':
-        from .extra.marian import generate_tokenizer_json
+        from extra.marian import generate_tokenizer_json
         tokenizer_json = generate_tokenizer_json(model_id, tokenizer)
 
         with open(os.path.join(output_model_folder, 'tokenizer.json'), 'w', encoding='utf-8') as fp:
             json.dump(tokenizer_json, fp, indent=4)
 
     elif config.model_type == 'esm':
-        from .extra.esm import generate_fast_tokenizer
+        from extra.esm import generate_fast_tokenizer
         fast_tokenizer = generate_fast_tokenizer(tokenizer)
         fast_tokenizer.save(os.path.join(
             output_model_folder, 'tokenizer.json'))
 
     elif config.model_type == 'whisper':
         if conv_args.output_attentions:
-            from .extra.whisper import get_main_export_kwargs
+            from extra.whisper import get_main_export_kwargs
 
             export_kwargs.update(
                 **get_main_export_kwargs(config, "automatic-speech-recognition")
@@ -282,7 +282,7 @@ def main():
 
     elif config.model_type in ('wav2vec2', 'wav2vec2-bert', 'hubert', 'unispeech', 'unispeech-sat'):
         if tokenizer is not None:
-            from .extra.wav2vec2 import generate_tokenizer_json
+            from extra.wav2vec2 import generate_tokenizer_json
             tokenizer_json = generate_tokenizer_json(tokenizer)
 
             with open(os.path.join(output_model_folder, 'tokenizer.json'), 'w', encoding='utf-8') as fp:
@@ -290,7 +290,7 @@ def main():
 
     elif config.model_type == 'vits':
         if tokenizer is not None:
-            from .extra.vits import generate_tokenizer_json
+            from extra.vits import generate_tokenizer_json
             tokenizer_json = generate_tokenizer_json(tokenizer)
 
             with open(os.path.join(output_model_folder, 'tokenizer.json'), 'w', encoding='utf-8') as fp:
@@ -302,7 +302,7 @@ def main():
             "vocoder": "microsoft/speecht5_hifigan"}
 
         if tokenizer is not None:
-            from .extra.speecht5 import generate_tokenizer_json
+            from extra.speecht5 import generate_tokenizer_json
             tokenizer_json = generate_tokenizer_json(tokenizer)
 
             with open(os.path.join(output_model_folder, 'tokenizer.json'), 'w', encoding='utf-8') as fp:
@@ -314,7 +314,7 @@ def main():
         export_kwargs['batch_size'] = 1
 
     elif config.model_type == 'openelm':
-        from .extra.openelm import OpenElmOnnxConfig
+        from extra.openelm import OpenElmOnnxConfig
 
         config = AutoConfig.from_pretrained(
             model_id, trust_remote_code=conv_args.trust_remote_code)
@@ -347,7 +347,7 @@ def main():
 
         if config.model_type == 'clip':
             # Handle special case for exporting text and vision models separately
-            from .extra.clip import CLIPTextModelWithProjectionOnnxConfig, CLIPVisionModelWithProjectionOnnxConfig
+            from extra.clip import CLIPTextModelWithProjectionOnnxConfig, CLIPVisionModelWithProjectionOnnxConfig
             from transformers.models.clip import CLIPTextModelWithProjection, CLIPVisionModelWithProjection
 
             text_model = CLIPTextModelWithProjection.from_pretrained(
@@ -365,7 +365,7 @@ def main():
 
         elif config.model_type == 'siglip':
             # Handle special case for exporting text and vision models separately
-            from .extra.siglip import SiglipTextModelOnnxConfig, SiglipVisionModelOnnxConfig
+            from extra.siglip import SiglipTextModelOnnxConfig, SiglipVisionModelOnnxConfig
             from transformers.models.siglip import SiglipTextModel, SiglipVisionModel
 
             text_model = SiglipTextModel.from_pretrained(
@@ -384,7 +384,7 @@ def main():
         # TODO: Enable once https://github.com/huggingface/optimum/pull/1552 is merged
         # elif config.model_type == 'clap':
         #     # Handle special case for exporting text and audio models separately
-        #     from .extra.clap import ClapTextModelWithProjectionOnnxConfig, ClapAudioModelWithProjectionOnnxConfig
+        #     from extra.clap import ClapTextModelWithProjectionOnnxConfig, ClapAudioModelWithProjectionOnnxConfig
         #     from transformers.models.clap import ClapTextModelWithProjection, ClapAudioModelWithProjection
 
         #     text_model = ClapTextModelWithProjection.from_pretrained(model_id, **from_pretrained_kwargs)
@@ -442,7 +442,7 @@ def main():
     # Step 4. Update the generation config if necessary
     if config.model_type == 'whisper':
         from transformers import GenerationConfig
-        from .extra.whisper import get_alignment_heads
+        from extra.whisper import get_alignment_heads
 
         generation_config = GenerationConfig.from_pretrained(
             model_id, **from_pretrained_kwargs)
