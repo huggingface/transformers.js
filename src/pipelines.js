@@ -578,10 +578,63 @@ export class QuestionAnsweringPipeline extends (/** @type {new (options: TextPip
                     skip_special_tokens: true,
                 });
 
-                // TODO add start and end?
-                // NOTE: HF returns character index
+                // Derive the start and end character indexes of the answer (within the context) based on the start and end indexes of the tokens (from the model output).
+                /**
+                 * From Transformers(py) documentation (https://huggingface.co/docs/transformers/main/en/main_classes/pipelines#transformers.QuestionAnsweringPipeline.__call__:
+                 * start(int) — The character start index of the answer(in the tokenized version of the input).
+                 * end(int) — The character end index of the answer(in the tokenized version of the input).
+                 */
+
+                // Compare the tokenized text from the model output to the original text to derive the character indexes of the answer within the context.
+                const deriveCharIndex = ({ originalText, tokenIds, tokenStart, tokenEnd }) => {
+                    // Derive character count of text snippet, adding space characters present in original version of text
+                    let characterCount = 0
+                    if (tokenEnd - tokenStart > 0) {
+                        const PUNCTUATION_REGEX = '\\p{P}\\u0021-\\u002F\\u003A-\\u0040\\u005B-\\u0060\\u007B-\\u007E';
+
+                        // Decode tokenized text from model output, split into array of words and punctuation, and remove space strings (similar to tokenzier)
+                        const pattern_output = new RegExp(`[^\\s${PUNCTUATION_REGEX}]+|[${PUNCTUATION_REGEX}]`, 'gu');
+                        const decodedTokenizedText = this.tokenizer.decode(tokenIds.slice(tokenStart, tokenEnd))
+                        const splitDecodedTextArr = decodedTokenizedText.match(pattern_output)
+                        // Split original text into array of words and punctuation, but do not remove space strings
+                        const patternOriginal = new RegExp(`[^\\s${PUNCTUATION_REGEX}]+|[\\s${PUNCTUATION_REGEX}]`, 'gu');
+                        const splitOriginalTextArr = originalText.match(patternOriginal)     // 
+                        // Iterate through each element of the original text array, adding to the character count if space character is found
+                        const spacesRegEx = new RegExp(`[\\s]`)
+                        let originalIndex = 0
+                        let outputIndex = 0
+                        while (outputIndex < splitDecodedTextArr?.length) {
+                            if (splitOriginalTextArr[originalIndex]?.match(spacesRegEx)) {
+                                // If the original text array element is a space, add one to the character count. Increment only the original index.
+                                characterCount += 1
+                                originalIndex += 1
+                            } else {
+                                // Add text length to character count. Increment both original and output indexes.
+                                characterCount += splitDecodedTextArr[outputIndex]?.length ?? 0
+                                originalIndex += 1
+                                outputIndex += 1
+                            }
+                        }
+                    }
+                    return characterCount
+                }
+                // Extract start and end character indexes of the answer (within the context)
+                let startChar_context = null
+                let endChar_context = null
+                if (start > 0 && context) {
+                    if (start - (sepIndex + 1) > 0) {
+                        // Answer is not the first word in the context. 
+                        // Add one character to account for the space before the separator.
+                        startChar_context = deriveCharIndex({ originalText: context.trim(), tokenIds: [...ids], tokenStart: sepIndex + 1, tokenEnd: start }) + 1
+                    } else {
+                        // Answer is the first word in the context.
+                        startChar_context = 0
+                    }
+                    endChar_context = deriveCharIndex({ originalText: context.trim(), tokenIds: [...ids], tokenStart: sepIndex + 1, tokenEnd: end + 1 })
+                }
+
                 toReturn.push({
-                    answer, score
+                    answer, score, start: startChar_context, end: endChar_context
                 });
             }
         }
