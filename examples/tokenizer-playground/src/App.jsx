@@ -146,7 +146,7 @@ function App() {
         </div>
       </div>
 
-      <div ref={outputRef} className='font-mono text-lg p-2.5 w-full bg-gray-100 rounded-lg border border-gray-200 whitespace-pre-wrap text-left h-[200px] overflow-y-auto'>
+      <div ref={outputRef} className='font-mono text-black text-lg p-2.5 w-full bg-gray-100 rounded-lg border border-gray-200 whitespace-pre-wrap text-left h-[200px] overflow-y-auto'>
         {outputOption === 'text' ? (
           decodedTokens.map(
             (token, index) => <Token key={index} text={token} position={index} margin={margins[index]} />
