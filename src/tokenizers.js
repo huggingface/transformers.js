@@ -31,7 +31,7 @@ import { PriorityQueue, TokenLattice, CharTrie, DictionarySplitter, LRUCache } f
 
 import { Template } from '@huggingface/jinja';
 
-import { WHISPER_LANGUAGE_MAPPING } from './models/model-processors/whisper/common_whisper.js';
+import { WHISPER_LANGUAGE_MAPPING } from './models/whisper/common_whisper.js';
 
 /**
  * @typedef {Object} TokenizerProperties Additional tokenizer-specific properties.

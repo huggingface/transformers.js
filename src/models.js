@@ -38,7 +38,7 @@
  */
 
 import { AutoConfig } from './configs.js';
-import { PreTrainedModel } from './models/pre-trained-model.js';
+import { PreTrainedModel } from './models/_base/pre-trained-model.js';
 
 // Re-export all model classes from registry
 export * from './models/registry.js';

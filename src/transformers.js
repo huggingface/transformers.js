@@ -26,15 +26,15 @@ export * from './utils/maths.js';
 
 export { FeatureExtractor } from './base/feature_extraction_utils.js';
 export * from './models/feature-extractors.js';
-export * from './models/model-processors/auto/feature_extraction_auto.js';
+export * from './models/auto/feature_extraction_auto.js';
 
 export { ImageProcessor } from './base/image_processors_utils.js';
 export * from './models/image-processors.js';
-export * from './models/model-processors/auto/image_processing_auto.js';
+export * from './models/auto/image_processing_auto.js';
 
 export { Processor } from './base/processing_utils.js';
 export * from './models/processors.js';
-export * from './models/model-processors/auto/processing_auto.js';
+export * from './models/auto/processing_auto.js';
 
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
