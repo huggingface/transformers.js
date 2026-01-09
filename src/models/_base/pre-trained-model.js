@@ -7,7 +7,7 @@ import {
     MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
     MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
     MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
-} from '../registry.js';
+} from '../model-mapping-names.js';
 import { GITHUB_ISSUE_URL } from '../../utils/constants.js';
 import {
     decoderForward,
