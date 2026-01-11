@@ -65,6 +65,7 @@
     "@types/node": "^22.10.1",
     "@webgpu/types": "^0.1.51",
     "catharsis": "github:xenova/catharsis",
+    "fastest-levenshtein": "^1.0.16",
     "jest": "^30.0.0-alpha.6",
     "jest-environment-node": "^30.0.0-alpha.6",
     "jsdoc-to-markdown": "^9.1.1",

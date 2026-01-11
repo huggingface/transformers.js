@@ -574,6 +574,40 @@ export class NoBadWordsLogitsProcessor extends LogitsProcessor {
     }
 }
 
+export class OnlyGoodWordsLogitsProcessor extends LogitsProcessor {
+    /**
+     * Create a `OnlyGoodWordsLogitsProcessor`.
+     * @param {number[][]} good_words_ids List of list of token ids that are allowed to be generated.
+     * @param {number|number[]} eos_token_id The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens.
+     */
+    constructor(good_words_ids, eos_token_id) {
+        super();
+        this.good_words_ids = good_words_ids;
+        this.eos_token_id = Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id];
+    }
+
+    /**
+     * Apply logit processor.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Object} The processed logits.
+     */
+    _call(input_ids, logits) {
+        const good_ids = this.good_words_ids.flat();
+        // Iterate over batches of input IDs and logits
+        for (let i = 0; i < input_ids.length; ++i) {
+            const batch_logits_data = /** @type {Float32Array} */(logits[i].data);
+            // For every ID, set its logit score to -Infinity unless it's in our list of valid token IDs
+            for (let j = 0; j < batch_logits_data.length; ++j) {
+                if (!good_ids.includes(j)) {
+                    batch_logits_data[j] = -Infinity;
+                }
+            }
+        }
+        return logits
+    }
+}
+
 /**
  * [`LogitsProcessor`] for classifier free guidance (CFG). The scores are split over the batch dimension,
  * where the first half correspond to the conditional logits (predicted from the input prompt) and the second half
