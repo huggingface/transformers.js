@@ -10,6 +10,8 @@ deno.lock
 /dist
 /types
 /models
+packages/*/dist
+packages/*/types
 
 # Do not track coverage reports
 /coverage

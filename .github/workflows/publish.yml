@@ -1,9 +1,9 @@
-name: Publish Package to npmjs
+name: Publish Packages to npmjs
 on:
   release:
     types: [published]
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,8 +12,23 @@ jobs:
         with:
           node-version: '24.10.0'
           registry-url: 'https://registry.npmjs.org'
+
+      # Install all workspace dependencies
       - run: npm ci
-      - run: npm run build
-      - run: npm publish
+
+      # Build all packages
+      - run: npm run build --workspaces
+
+      # Publish core package
+      - name: Publish @huggingface/transformers
+        working-directory: ./packages/transformers
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Publish React package
+      - name: Publish @huggingface/transformers-react
+        working-directory: ./packages/transformers-react
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

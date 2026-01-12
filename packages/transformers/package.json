@@ -1,0 +1,87 @@
+{
+  "name": "@huggingface/transformers",
+  "version": "4.0.0-alpha.0",
+  "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
+  "main": "./src/transformers.js",
+  "types": "./types/transformers.d.ts",
+  "type": "module",
+  "exports": {
+    "node": {
+      "import": {
+        "types": "./types/transformers.d.ts",
+        "default": "./dist/transformers.node.mjs"
+      },
+      "require": {
+        "types": "./types/transformers.d.ts",
+        "default": "./dist/transformers.node.cjs"
+      }
+    },
+    "default": {
+      "types": "./types/transformers.d.ts",
+      "default": "./dist/transformers.web.js"
+    }
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typegen": "tsc --build",
+    "dev": "node scripts/esbuild/dev.mjs",
+    "build": "node scripts/esbuild/build.mjs && npm run typegen",
+    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
+    "readme": "python ./docs/scripts/build_readme.py",
+    "docs-api": "node ./docs/scripts/generate.js",
+    "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
+    "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huggingface/transformers.js.git"
+  },
+  "keywords": [
+    "transformers",
+    "transformers.js",
+    "huggingface",
+    "hugging face",
+    "machine learning",
+    "deep learning",
+    "artificial intelligence",
+    "AI",
+    "ML"
+  ],
+  "author": "Hugging Face",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/huggingface/transformers.js/issues"
+  },
+  "homepage": "https://github.com/huggingface/transformers.js#readme",
+  "dependencies": {
+    "@huggingface/jinja": "^0.5.1",
+    "onnxruntime-node": "1.24.0-dev.20251104-75d35474d5",
+    "onnxruntime-web": "1.24.0-dev.20251104-75d35474d5",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.11",
+    "@webgpu/types": "^0.1.64",
+    "esbuild": "^0.27.2",
+    "jest": "^30.0.4",
+    "jest-environment-node": "^30.0.4",
+    "jsdoc-to-markdown": "^9.1.1",
+    "prettier": "3.4.2",
+    "typescript": "^5.8.3",
+    "wavefile": "11.0.0"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "jsdelivr": "./dist/transformers.min.js",
+  "unpkg": "./dist/transformers.min.js"
+}

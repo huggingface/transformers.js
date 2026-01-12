@@ -51,6 +51,32 @@ Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN
 </script>
 ```
 
+### Framework Integrations
+
+We provide framework-specific packages for easier integration with popular frameworks:
+
+#### React
+
+```bash
+npm i @huggingface/transformers @huggingface/transformers-react
+```
+
+```tsx
+import { usePipeline } from '@huggingface/transformers-react';
+
+function App() {
+  const { pipeline, loading, error, run } = usePipeline({
+    task: 'sentiment-analysis'
+  });
+
+  if (loading) return <div>Loading model...</div>;
+
+  // Use the pipeline...
+}
+```
+
+See the [@huggingface/transformers-react](./packages/transformers-react/README.md) package for full documentation.
+
 
 ## Quick tour
 
