@@ -1,5 +1,5 @@
 import { PreTrainedModel } from '../modeling_utils.js';
-import { default_merge_input_ids_with_image_features } from '../utils.js';
+import { default_merge_input_ids_with_image_features } from '../modeling_utils.js';
 
 export class PaliGemmaPreTrainedModel extends PreTrainedModel {
     forward_params = [

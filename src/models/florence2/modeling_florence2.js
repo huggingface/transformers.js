@@ -1,6 +1,6 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { cat, ones } from '../../utils/tensor.js';
-import { encoderForward, decoderForward } from '../utils.js';
+import { encoder_forward, decoder_forward } from '../modeling_utils.js';
 
 export class Florence2PreTrainedModel extends PreTrainedModel {
     forward_params = [
@@ -92,7 +92,7 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
 
         if (!encoder_outputs) {
             // Must compute encoder outputs
-            let { last_hidden_state } = await encoderForward(this, { inputs_embeds, attention_mask });
+            let { last_hidden_state } = await encoder_forward(this, { inputs_embeds, attention_mask });
             encoder_outputs = last_hidden_state;
         }
 
@@ -110,6 +110,6 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
             encoder_hidden_states: encoder_outputs,
             past_key_values,
         };
-        return await decoderForward(this, decoderFeeds, true);
+        return await decoder_forward(this, decoderFeeds, true);
     }
 }

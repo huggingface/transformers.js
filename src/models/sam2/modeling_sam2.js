@@ -1,5 +1,5 @@
 import { PreTrainedModel } from '../modeling_utils.js';
-import { encoderForward } from '../utils.js';
+import { encoder_forward } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { Sam2ImageSegmentationOutput } from '../modeling_outputs.js';
 import { ones, full } from '../../utils/tensor.js';
@@ -22,7 +22,7 @@ export class Sam2Model extends Sam2PreTrainedModel {
         //  - image_embeddings.0: tensor.float32[batch_size,32,256,256]
         //  - image_embeddings.1: tensor.float32[batch_size,64,128,128]
         //  - image_embeddings.2: tensor.float32[batch_size,256,64,64]
-        return await encoderForward(this, { pixel_values });
+        return await encoder_forward(this, { pixel_values });
     }
 
     async forward(model_inputs) {

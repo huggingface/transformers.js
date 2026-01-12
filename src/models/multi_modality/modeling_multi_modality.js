@@ -1,7 +1,7 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
-import { decoderForward } from '../utils.js';
+import { decoder_forward } from '../modeling_utils.js';
 import { RawImage } from '../../utils/image.js';
 import { Tensor } from '../../utils/tensor.js';
 
@@ -55,7 +55,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         }
 
         const input_2 = { ...model_inputs, ...output_1 };
-        const output_2 = await decoderForward(this, input_2);
+        const output_2 = await decoder_forward(this, input_2);
 
         const head = this.sessions[mode === 'text' ? 'lm_head' : 'gen_head'];
         if (!head) {

@@ -1,5 +1,5 @@
 import { PreTrainedModel } from '../modeling_utils.js';
-import { default_merge_input_ids_with_features, default_merge_input_ids_with_image_features } from '../utils.js';
+import { default_merge_input_ids_with_features, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
 
 export class LlavaPreTrainedModel extends PreTrainedModel {
     forward_params = ['input_ids', 'attention_mask', 'pixel_values', 'position_ids', 'past_key_values'];

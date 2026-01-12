@@ -1,6 +1,6 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { decoderForward } from '../utils.js';
+import { decoder_forward } from '../modeling_utils.js';
 import { cat, ones, full, Tensor } from '../../utils/tensor.js';
 
 export class ChatterboxPreTrainedModel extends PreTrainedModel {
@@ -108,7 +108,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
             }
         }
 
-        const outputs = await decoderForward(
+        const outputs = await decoder_forward(
             this,
             {
                 inputs_embeds,

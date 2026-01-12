@@ -1,4 +1,4 @@
-import { encoderForward } from '../utils.js';
+import { encoder_forward } from '../modeling_utils.js';
 import { ones } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
 import { PreTrainedModel } from '../modeling_utils.js';
@@ -61,7 +61,7 @@ export class SamModel extends SamPreTrainedModel {
         // out:
         //  - image_embeddings: tensor.float32[batch_size,256,64,64]
         //  - image_positional_embeddings: tensor.float32[batch_size,256,64,64]
-        return await encoderForward(this, { pixel_values });
+        return await encoder_forward(this, { pixel_values });
     }
 
     /**

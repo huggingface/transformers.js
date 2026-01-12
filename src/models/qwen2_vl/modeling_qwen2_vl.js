@@ -2,7 +2,7 @@ import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
-import { cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../utils.js';
+import { cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
 
 export class Qwen2VLPreTrainedModel extends PreTrainedModel {
     forward_params = [

@@ -1,7 +1,7 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { Tensor, boolTensor, cat } from '../../utils/tensor.js';
-import { encoderForward } from '../utils.js';
+import { encoder_forward } from '../modeling_utils.js';
 
 /**
  * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
@@ -95,7 +95,7 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
             input_ids: input_values,
         };
 
-        const { encoder_outputs, encoder_attention_mask } = await encoderForward(this, model_inputs);
+        const { encoder_outputs, encoder_attention_mask } = await encoder_forward(this, model_inputs);
 
         // @ts-expect-error TS2339
         const r = encoder_outputs.dims[1] / this.config.reduction_factor;
