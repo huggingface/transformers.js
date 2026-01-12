@@ -13,12 +13,38 @@ import {
     boolTensor,
     full,
 } from '../utils/tensor.js';
-import {
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
-    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
-} from './model-mapping-names.js';
+// These will be populated by registry.js
+// They contain name-only mappings (no class references) used for model validation
+export let MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = null;
+export let MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = null;
+export let MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = null;
+export let MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = null;
+
+/**
+ * Helper to convert a mapping with class references to name-only mapping
+ * @param {Map<string, [string, Function]>} mapping - Full mapping with [name, ClassRef]
+ * @returns {Map<string, [string]>} - Name-only mapping with just [name]
+ */
+export function toNameOnlyMapping(mapping) {
+    const nameOnly = new Map();
+    for (const [key, value] of mapping) {
+        nameOnly.set(key, [value[0]]); // Keep only the name, drop the class reference
+    }
+    return nameOnly;
+}
+
+/**
+ * Register task mappings (called by registry.js after defining full mappings)
+ * @param {Object} mappings - Object with mapping names as keys
+ */
+export function registerTaskMappings(mappings) {
+    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = toNameOnlyMapping(mappings.MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES);
+    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = toNameOnlyMapping(
+        mappings.MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+    );
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = toNameOnlyMapping(mappings.MODEL_FOR_CAUSAL_LM_MAPPING_NAMES);
+    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = toNameOnlyMapping(mappings.MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES);
+}
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
 import { getModelJSON } from '../utils/hub.js';
 import { Seq2SeqLMOutput } from './modeling_outputs.js';
@@ -745,14 +771,14 @@ export class PreTrainedModel extends Callable {
                 MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
                 MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
                 MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
-            ];
+            ].filter(Boolean); // Filter out null mappings (in case registry hasn't loaded yet)
 
             const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
 
             const generate_compatible_classes = new Set();
             const modelType = this.config.model_type;
             for (const model_mapping of generate_compatible_mappings) {
-                const supported_models = model_mapping.get(modelType);
+                const supported_models = model_mapping?.get(modelType);
                 if (supported_models) {
                     generate_compatible_classes.add(supported_models[0]);
                 }

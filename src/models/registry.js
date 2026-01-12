@@ -4,6 +4,7 @@ import {
     MODEL_NAME_TO_CLASS_MAPPING,
     MODEL_CLASS_TO_NAME_MAPPING,
     PreTrainedModel,
+    registerTaskMappings,
 } from './modeling_utils.js';
 
 import {
@@ -989,5 +990,13 @@ export {
     MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES,
     MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES,
 };
+
+// Register name-only mappings for validation (derived from full mappings above)
+registerTaskMappings({
+    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
+    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
+});
 
 export * from './pre-trained-models/index.js';
