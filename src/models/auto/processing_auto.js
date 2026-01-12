@@ -3,8 +3,8 @@ import { getModelJSON } from '../../utils/hub.js';
 import { Processor } from '../../base/processing_utils.js';
 
 import * as AllProcessors from '../processors.js';
-import * as AllImageProcessors from '../image-processors.js';
-import * as AllFeatureExtractors from '../feature-extractors.js';
+import * as AllImageProcessors from '../image_processors.js';
+import * as AllFeatureExtractors from '../feature_extractors.js';
 
 /**
  * @typedef {import('../../base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions

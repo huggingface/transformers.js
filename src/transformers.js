@@ -25,11 +25,11 @@ export * from './utils/tensor.js';
 export * from './utils/maths.js';
 
 export { FeatureExtractor } from './base/feature_extraction_utils.js';
-export * from './models/feature-extractors.js';
+export * from './models/feature_extractors.js';
 export * from './models/auto/feature_extraction_auto.js';
 
 export { ImageProcessor } from './base/image_processors_utils.js';
-export * from './models/image-processors.js';
+export * from './models/image_processors.js';
 export * from './models/auto/image_processing_auto.js';
 
 export { Processor } from './base/processing_utils.js';
