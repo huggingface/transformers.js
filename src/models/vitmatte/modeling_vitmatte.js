@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { ImageMattingOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { ImageMattingOutput } from '../modeling_outputs.js';
 
 export class VitMattePreTrainedModel extends PreTrainedModel {}
 

@@ -5,7 +5,7 @@ import {
     default_merge_input_ids_with_audio_features,
 } from '../utils.js';
 import { sessionRun } from '../session.js';
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class Gemma3nPreTrainedModel extends PreTrainedModel {
     forward_params = [

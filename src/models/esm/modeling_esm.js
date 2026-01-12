@@ -1,9 +1,9 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import {
     MaskedLMOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-} from '../_base/output.js';
+} from '../modeling_outputs.js';
 
 export class EsmPreTrainedModel extends PreTrainedModel {}
 

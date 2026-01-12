@@ -1,6 +1,6 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { DacEncoderOutput, DacDecoderOutput } from '../_base/output.js';
+import { DacEncoderOutput, DacDecoderOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class DacPreTrainedModel extends PreTrainedModel {

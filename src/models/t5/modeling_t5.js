@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class T5PreTrainedModel extends PreTrainedModel {
     forward_params = [

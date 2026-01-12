@@ -1,8 +1,8 @@
 import { encoderForward } from '../utils.js';
 import { ones } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { SamImageSegmentationOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { SamImageSegmentationOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class SamPreTrainedModel extends PreTrainedModel {}

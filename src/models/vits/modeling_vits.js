@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { VitsModelOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { VitsModelOutput } from '../modeling_outputs.js';
 
 export class VitsPreTrainedModel extends PreTrainedModel {}
 

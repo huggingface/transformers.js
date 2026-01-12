@@ -1,7 +1,7 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { Tensor } from '../../utils/tensor.js';
-import { ModelOutput } from '../_base/output.js';
+import { ModelOutput } from '../modeling_outputs.js';
 
 export class MusicgenPreTrainedModel extends PreTrainedModel {}
 

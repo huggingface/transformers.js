@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 /**
  * The bare Qwen3 Model outputting raw hidden-states without any specific head on top.

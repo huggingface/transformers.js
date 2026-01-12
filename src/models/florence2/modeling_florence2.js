@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { cat, ones } from '../../utils/tensor.js';
 import { encoderForward, decoderForward } from '../utils.js';
 

@@ -1,7 +1,7 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { encoderForward } from '../utils.js';
 import { sessionRun } from '../session.js';
-import { Sam2ImageSegmentationOutput } from '../_base/output.js';
+import { Sam2ImageSegmentationOutput } from '../modeling_outputs.js';
 import { ones, full } from '../../utils/tensor.js';
 import { pick } from '../../utils/core.js';
 import { Tensor } from '../../utils/tensor.js';

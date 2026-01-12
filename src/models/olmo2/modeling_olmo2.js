@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class Olmo2PreTrainedModel extends PreTrainedModel {}
 export class Olmo2Model extends Olmo2PreTrainedModel {}

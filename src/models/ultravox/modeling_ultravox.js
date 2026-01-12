@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { default_merge_input_ids_with_audio_features } from '../utils.js';
 
 export class UltravoxPreTrainedModel extends PreTrainedModel {

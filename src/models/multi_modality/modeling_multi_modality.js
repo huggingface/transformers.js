@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
 import { decoderForward } from '../utils.js';

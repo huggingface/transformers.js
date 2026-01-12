@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 /**
  * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.
  */

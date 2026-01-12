@@ -4,7 +4,7 @@ import {
     MODEL_NAME_TO_CLASS_MAPPING,
     MODEL_CLASS_TO_NAME_MAPPING,
     PreTrainedModel,
-} from './_base/pre-trained-model.js';
+} from './modeling_utils.js';
 
 import {
     ASTModel,

@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { MaskedLMOutput, SequenceClassifierOutput, TokenClassifierOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { MaskedLMOutput, SequenceClassifierOutput, TokenClassifierOutput } from '../modeling_outputs.js';
 
 export class ModernBertPreTrainedModel extends PreTrainedModel {}
 export class ModernBertModel extends ModernBertPreTrainedModel {}

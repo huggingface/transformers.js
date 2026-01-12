@@ -7,7 +7,7 @@ import {
     MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
     MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
     MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
-} from './registry.js';
+} from './model-mapping-names.js';
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
 import {
     decoderForward,
@@ -40,7 +40,7 @@ import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
 import { pick } from '../utils/core.js';
-import { ModelOutput } from './output.js';
+import { ModelOutput } from './modeling_outputs.js';
 
 export const MODEL_TYPES = {
     EncoderOnly: 0,

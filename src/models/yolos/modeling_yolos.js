@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { ModelOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { ModelOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class YolosPreTrainedModel extends PreTrainedModel {}

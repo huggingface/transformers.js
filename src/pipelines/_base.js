@@ -1,5 +1,5 @@
 import { PreTrainedTokenizer } from '../tokenizers.js';
-import { PreTrainedModel } from '../models/pre-trained-model.js';
+import { PreTrainedModel } from '../models/modeling_utils.js';
 import { Processor } from '../base/processing_utils.js';
 
 import { Callable } from '../utils/generic.js';

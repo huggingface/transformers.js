@@ -1,5 +1,5 @@
 import { cat, mean, Tensor, stack, std_mean } from '../../utils/tensor.js';
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { WhisperGenerationConfig } from './generation_whisper.js';
 import { whisper_language_to_code } from './common_whisper.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../../generation/logits_process.js';
 import { medianFilter, dynamic_time_warping } from '../../utils/maths.js';
 import { mergeArrays } from '../../utils/core.js';
-import { ModelOutput } from '../_base/output.js';
+import { ModelOutput } from '../modeling_outputs.js';
 
 export class WhisperPreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;

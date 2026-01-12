@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { MgpstrModelOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { MgpstrModelOutput } from '../modeling_outputs.js';
 
 export class MgpstrPreTrainedModel extends PreTrainedModel {}
 

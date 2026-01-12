@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class SapiensPreTrainedModel extends PreTrainedModel {}
 export class SapiensForSemanticSegmentation extends SapiensPreTrainedModel {}

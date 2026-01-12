@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class GPTNeoXPreTrainedModel extends PreTrainedModel {}
 export class GPTNeoXModel extends GPTNeoXPreTrainedModel {}

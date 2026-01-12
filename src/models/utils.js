@@ -1,11 +1,10 @@
 // JS doesn't support mixins, so we define some reused functions here, and allow "this" to be passed in
 import { pick } from '../utils/core.js';
 import { cat, full_like, ones, Tensor, toI64Tensor, zeros_like, boolTensor, full } from '../utils/tensor.js';
-import { max } from '../utils/maths.js';
 import { sessionRun } from './session.js';
 import { getModelJSON } from '../utils/hub.js';
 import { isONNXProxy } from '../backends/onnx.js';
-import { Seq2SeqLMOutput } from './output.js';
+import { Seq2SeqLMOutput } from './modeling_outputs.js';
 
 /**
  * Perform forward pass on the seq2seq model (both encoder and decoder).

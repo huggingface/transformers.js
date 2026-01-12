@@ -1,5 +1,5 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
-import { SequenceClassifierOutput } from '../_base/output.js';
+import { PreTrainedModel } from '../modeling_utils.js';
+import { SequenceClassifierOutput } from '../modeling_outputs.js';
 
 export class PvtPreTrainedModel extends PreTrainedModel {}
 export class PvtModel extends PvtPreTrainedModel {}

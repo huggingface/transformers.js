@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class Owlv2PreTrainedModel extends PreTrainedModel {}
 export class Owlv2Model extends Owlv2PreTrainedModel {}

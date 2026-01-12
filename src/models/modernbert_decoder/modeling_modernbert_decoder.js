@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class ModernBertDecoderPreTrainedModel extends PreTrainedModel {}
 export class ModernBertDecoderModel extends ModernBertDecoderPreTrainedModel {}

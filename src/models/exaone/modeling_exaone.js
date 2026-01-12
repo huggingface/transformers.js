@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../_base/pre-trained-model.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class ExaonePreTrainedModel extends PreTrainedModel {}
 export class ExaoneModel extends ExaonePreTrainedModel {}
