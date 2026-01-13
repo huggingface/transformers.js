@@ -244,7 +244,7 @@ export class PreTrainedModel extends Callable {
             session_options = {},
         } = {},
     ) {
-        let options = {
+        const options = {
             progress_callback,
             config,
             cache_dir,
