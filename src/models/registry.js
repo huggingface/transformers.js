@@ -587,7 +587,10 @@ for (const [name, mapping] of CUSTOM_ARCHITECTURES.entries()) {
     MODEL_TYPE_MAPPING.set(name, MODEL_TYPES.EncoderOnly);
     MODEL_NAME_TO_CLASS_MAPPING.set(name, PreTrainedModel);
 }
-MODEL_CLASS_TO_NAME_MAPPING.set(PreTrainedModel, 'PreTrainedModel'); // Default mapping
+
+// Default mappings
+MODEL_TYPE_MAPPING.set('PreTrainedModel', MODEL_TYPES.EncoderOnly);
+MODEL_CLASS_TO_NAME_MAPPING.set(PreTrainedModel, 'PreTrainedModel');
 
 export {
     CUSTOM_ARCHITECTURES,
