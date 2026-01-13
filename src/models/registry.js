@@ -617,5 +617,3 @@ const MODEL_MAPPINGS = {
 registerTaskMappings(MODEL_MAPPINGS);
 
 export { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS };
-
-export * from './index.js';
