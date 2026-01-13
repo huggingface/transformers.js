@@ -20,22 +20,22 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("text-classification", models[0]);
-        let texts = ["This was a masterpiece. Not completely faithful to the books, but enthralling from beginning to end. Might be my favorite of the three.", "I hated the movie"];
+        const classifier = await pipeline("text-classification", models[0]);
+        const texts = ["This was a masterpiece. Not completely faithful to the books, but enthralling from beginning to end. Might be my favorite of the three.", "I hated the movie"];
 
         // single
         {
-          let outputs = await classifier("I hated the movie");
-          let expected = [{ label: "NEGATIVE", score: 0.9996212720870972 }];
+          const outputs = await classifier("I hated the movie");
+          const expected = [{ label: "NEGATIVE", score: 0.9996212720870972 }];
           compare(outputs, expected);
         }
 
         // single + topk
         {
-          let outputs = await classifier("I hated the movie", {
+          const outputs = await classifier("I hated the movie", {
             topk: 2,
           });
-          let expected = [
+          const expected = [
             { label: "NEGATIVE", score: 0.9996212720870972 },
             { label: "POSITIVE", score: 0.0003787268069572747 },
           ];
@@ -44,9 +44,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await classifier(texts);
+          const outputs = await classifier(texts);
 
-          let expected = [
+          const expected = [
             { label: "POSITIVE", score: 0.9993746876716614 },
             { label: "NEGATIVE", score: 0.9996694326400757 },
           ];
@@ -56,11 +56,11 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + topk
         {
-          let outputs = await classifier(texts, {
+          const outputs = await classifier(texts, {
             topk: 2,
           });
 
-          let expected = [
+          const expected = [
             [
               { label: "POSITIVE", score: 0.9993746876716614 },
               { label: "NEGATIVE", score: 0.0006253048195503652 },
@@ -83,16 +83,16 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let classifier = await pipeline("text-classification", models[1]);
-        let texts = [
+        const classifier = await pipeline("text-classification", models[1]);
+        const texts = [
           "I like you. I love you", // low scores
           "I hate you.", // high scores
         ];
 
         // single
         {
-          let outputs = await classifier(texts);
-          let expected = [
+          const outputs = await classifier(texts);
+          const expected = [
             { label: "toxic", score: 0.0007729064091108739 },
             { label: "toxic", score: 0.9475088119506836 },
           ];
@@ -110,14 +110,14 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("token-classification", models[0]);
-        let texts = ["The Golden State Warriors are an American professional basketball team based in San Francisco.", "My name is Sarah and I live in London."];
+        const classifier = await pipeline("token-classification", models[0]);
+        const texts = ["The Golden State Warriors are an American professional basketball team based in San Francisco.", "My name is Sarah and I live in London."];
 
         // single
         {
-          let outputs = await classifier(texts[0]);
+          const outputs = await classifier(texts[0]);
 
-          let expected = [
+          const expected = [
             { entity: "B-ORG", score: 0.9998535513877869, index: 2, word: "Golden", start: null, end: null },
             { entity: "I-ORG", score: 0.9998612999916077, index: 3, word: "State", start: null, end: null },
             { entity: "I-ORG", score: 0.999866247177124, index: 4, word: "Warriors", start: null, end: null },
@@ -130,9 +130,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await classifier(texts);
+          const outputs = await classifier(texts);
 
-          let expected = [
+          const expected = [
             [
               { entity: "B-ORG", score: 0.9998375773429871, index: 2, word: "Golden", start: null, end: null },
               { entity: "I-ORG", score: 0.9998642206192017, index: 3, word: "State", start: null, end: null },
@@ -162,15 +162,15 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("zero-shot-classification", models[0]);
+        const classifier = await pipeline("zero-shot-classification", models[0]);
 
-        let sequences_to_classify = ["one day I will see the world", "I love making pizza"];
-        let candidate_labels = ["travel", "cooking", "dancing"];
+        const sequences_to_classify = ["one day I will see the world", "I love making pizza"];
+        const candidate_labels = ["travel", "cooking", "dancing"];
 
         // single
         {
-          let outputs = await classifier(sequences_to_classify[0], candidate_labels);
-          let expected = {
+          const outputs = await classifier(sequences_to_classify[0], candidate_labels);
+          const expected = {
             sequence: "one day I will see the world",
             labels: ["travel", "dancing", "cooking"],
             scores: [0.4261703487477968, 0.2903585771517135, 0.28347107410048983],
@@ -181,8 +181,8 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await classifier(sequences_to_classify, candidate_labels);
-          let expected = [
+          const outputs = await classifier(sequences_to_classify, candidate_labels);
+          const expected = [
             {
               sequence: "one day I will see the world",
               labels: ["travel", "dancing", "cooking"],
@@ -200,10 +200,10 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + multilabel
         {
-          let outputs = await classifier(sequences_to_classify, candidate_labels, {
+          const outputs = await classifier(sequences_to_classify, candidate_labels, {
             multi_label: true,
           });
-          let expected = [
+          const expected = [
             {
               sequence: "one day I will see the world",
               labels: ["travel", "dancing", "cooking"],
@@ -232,13 +232,13 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let unmasker = await pipeline("fill-mask", models[0]);
-        let texts = ["Once upon a [MASK].", "[MASK] is the capital of England."];
+        const unmasker = await pipeline("fill-mask", models[0]);
+        const texts = ["Once upon a [MASK].", "[MASK] is the capital of England."];
 
         // single
         {
-          let outputs = await unmasker(texts[0]);
-          let expected = [
+          const outputs = await unmasker(texts[0]);
+          const expected = [
             {
               score: 0.9405396580696106,
               token: 2051,
@@ -275,9 +275,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await unmasker(texts);
+          const outputs = await unmasker(texts);
 
-          let expected = [
+          const expected = [
             [
               {
                 score: 0.9900539517402649,
@@ -354,8 +354,8 @@ xdescribe("Pipelines (ignored)", () => {
   });
 
   describe("Question answering", () => {
-    let question = "Who was Jim Henson?";
-    let context = "Jim Henson was a nice puppet.";
+    const question = "Who was Jim Henson?";
+    const context = "Jim Henson was a nice puppet.";
 
     // List all models which will be tested
     const models = ["Xenova/distilbert-base-uncased-distilled-squad"];
@@ -363,22 +363,22 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let answerer = await pipeline("question-answering", models[0]);
+        const answerer = await pipeline("question-answering", models[0]);
 
         // single
         {
-          let outputs = await answerer(question, context);
-          let expected = { answer: "a nice puppet", score: 0.5664517526948352 };
+          const outputs = await answerer(question, context);
+          const expected = { answer: "a nice puppet", score: 0.5664517526948352 };
 
           compare(outputs, expected, 0.2);
         }
 
         // single + topk
         {
-          let outputs = await answerer(question, context, {
+          const outputs = await answerer(question, context, {
             topk: 3,
           });
-          let expected = [
+          const expected = [
             { answer: "a nice puppet", score: 0.5664517526948352 },
             { answer: "nice puppet", score: 0.1698902336448853 },
             { answer: "puppet", score: 0.14046057793125577 },
@@ -396,16 +396,16 @@ xdescribe("Pipelines (ignored)", () => {
     // List all models which will be tested
     const models = ["Xenova/distilbart-cnn-6-6", "Xenova/bart-large-cnn"];
 
-    let texts = [`The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side. During its construction, the Eiffel Tower surpassed the Washington Monument to become the tallest man-made structure in the world, a title it held for 41 years until the Chrysler Building in New York City was finished in 1930. It was the first structure to reach a height of 300 metres. Due to the addition of a broadcasting aerial at the top of the tower in 1957, it is now taller than the Chrysler Building by 5.2 metres (17 ft). Excluding transmitters, the Eiffel Tower is the second tallest free-standing structure in France after the Millau Viaduct.`, `The Amazon rainforest (Portuguese: Floresta Amazônica or Amazônia; Spanish: Selva Amazónica, Amazonía or usually Amazonia; French: Forêt amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of which 5,500,000 square kilometres (2,100,000 sq mi) are covered by the rainforest. This region includes territory belonging to nine nations. The majority of the forest is contained within Brazil, with 60% of the rainforest, followed by Peru with 13%, Colombia with 10%, and with minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain "Amazonas" in their names. The Amazon represents over half of the planet's remaining rainforests, and comprises the largest and most biodiverse tract of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species.`];
+    const texts = [`The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side. During its construction, the Eiffel Tower surpassed the Washington Monument to become the tallest man-made structure in the world, a title it held for 41 years until the Chrysler Building in New York City was finished in 1930. It was the first structure to reach a height of 300 metres. Due to the addition of a broadcasting aerial at the top of the tower in 1957, it is now taller than the Chrysler Building by 5.2 metres (17 ft). Excluding transmitters, the Eiffel Tower is the second tallest free-standing structure in France after the Millau Viaduct.`, `The Amazon rainforest (Portuguese: Floresta Amazônica or Amazônia; Spanish: Selva Amazónica, Amazonía or usually Amazonia; French: Forêt amazonienne; Dutch: Amazoneregenwoud), also known in English as Amazonia or the Amazon Jungle, is a moist broadleaf forest that covers most of the Amazon basin of South America. This basin encompasses 7,000,000 square kilometres (2,700,000 sq mi), of which 5,500,000 square kilometres (2,100,000 sq mi) are covered by the rainforest. This region includes territory belonging to nine nations. The majority of the forest is contained within Brazil, with 60% of the rainforest, followed by Peru with 13%, Colombia with 10%, and with minor amounts in Venezuela, Ecuador, Bolivia, Guyana, Suriname and French Guiana. States or departments in four nations contain "Amazonas" in their names. The Amazon represents over half of the planet's remaining rainforests, and comprises the largest and most biodiverse tract of tropical rainforest in the world, with an estimated 390 billion individual trees divided into 16,000 species.`];
 
     it(
       models[0],
       async () => {
-        let summarizer = await pipeline("summarization", models[0]);
+        const summarizer = await pipeline("summarization", models[0]);
 
         // batched
         {
-          let summary = await summarizer(texts, {
+          const summary = await summarizer(texts, {
             top_k: 0,
             do_sample: false,
           });
@@ -421,11 +421,11 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let summarizer = await pipeline("summarization", models[1]);
+        const summarizer = await pipeline("summarization", models[1]);
 
         // batched + `forced_bos_token_id`
         {
-          let summary = await summarizer(texts[0], {
+          const summary = await summarizer(texts[0], {
             top_k: 0,
             do_sample: false,
           });
@@ -451,29 +451,29 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let translator = await pipeline("translation_en_to_de", models[0]);
-        let texts = ["Hello, how are you?", "My name is Maria."];
+        const translator = await pipeline("translation_en_to_de", models[0]);
+        const texts = ["Hello, how are you?", "My name is Maria."];
 
         // single
         {
-          let translation = await translator(texts[0], {
+          const translation = await translator(texts[0], {
             top_k: 0,
             do_sample: false,
           });
 
-          let expected = [{ translation_text: "Hallo, wie sind Sie?" }];
+          const expected = [{ translation_text: "Hallo, wie sind Sie?" }];
 
           compare(translation, expected);
         }
 
         // batched
         {
-          let output = await translator(texts, {
+          const output = await translator(texts, {
             top_k: 0,
             do_sample: false,
           });
 
-          let expected = [{ translation_text: "Hallo, wie sind Sie?" }, { translation_text: "Mein Name ist Maria." }];
+          const expected = [{ translation_text: "Hallo, wie sind Sie?" }, { translation_text: "Mein Name ist Maria." }];
 
           compare(output, expected);
         }
@@ -486,37 +486,37 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let translator = await pipeline("translation", models[1]);
-        let texts = ["Hello world!", "I like to walk my dog."];
+        const translator = await pipeline("translation", models[1]);
+        const texts = ["Hello world!", "I like to walk my dog."];
 
         // single
         {
-          let translation = await translator(texts[0], {
+          const translation = await translator(texts[0], {
             src_lang: "eng_Latn",
             tgt_lang: "arb_Arab",
           });
 
-          let expected = [{ translation_text: "مرحباً، يا عالم!" }];
+          const expected = [{ translation_text: "مرحباً، يا عالم!" }];
 
           compare(translation, expected);
         }
 
         // single + back-translation
         {
-          let translation1 = await translator(texts[1], {
+          const translation1 = await translator(texts[1], {
             // src_lang: 'eng_Latn',
             tgt_lang: "ell_Grek",
           });
-          let translation2 = await translator(translation1[0].translation_text, {
+          const translation2 = await translator(translation1[0].translation_text, {
             src_lang: "ell_Grek",
             tgt_lang: "eng_Latn",
           });
 
-          let expected = [{ translation_text: "Μου αρέσει να περπατάω το σκυλί μου." }];
+          const expected = [{ translation_text: "Μου αρέσει να περπατάω το σκυλί μου." }];
 
           compare(translation1, expected);
 
-          let expectedBack = [{ translation_text: texts[1] }];
+          const expectedBack = [{ translation_text: texts[1] }];
           compare(translation2, expectedBack);
         }
 
@@ -533,11 +533,11 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let generator = await pipeline("text2text-generation", models[0]);
-        let text = "Premise:  At my age you will probably have learnt one lesson. " + "Hypothesis:  It's not certain how many lessons you'll learn by your thirties. " + "Does the premise entail the hypothesis?";
+        const generator = await pipeline("text2text-generation", models[0]);
+        const text = "Premise:  At my age you will probably have learnt one lesson. " + "Hypothesis:  It's not certain how many lessons you'll learn by your thirties. " + "Does the premise entail the hypothesis?";
 
         {
-          let outputs = await generator(text, {
+          const outputs = await generator(text, {
             top_k: 0,
             do_sample: false,
           });
@@ -553,8 +553,8 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let generator = await pipeline("text2text-generation", models[1]);
-        let text = `
+        const generator = await pipeline("text2text-generation", models[1]);
+        const text = `
             Q: Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can
             has 3 tennis balls. How many tennis balls does he have now?
             A: Roger started with 5 balls. 2 cans of 3 tennis balls each is 6 tennis balls.
@@ -565,7 +565,7 @@ xdescribe("Pipelines (ignored)", () => {
 
         // single
         {
-          let outputs = await generator(text, {
+          const outputs = await generator(text, {
             top_k: 0,
             do_sample: false,
           });
@@ -585,12 +585,12 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let generator = await pipeline("text-generation", models[0]);
-        let texts = ["Once upon a time, there was a", "I enjoy walking with my cute dog"];
+        const generator = await pipeline("text-generation", models[0]);
+        const texts = ["Once upon a time, there was a", "I enjoy walking with my cute dog"];
 
         // single
         {
-          let output = await generator(texts[0], {
+          const output = await generator(texts[0], {
             max_new_tokens: 10,
             top_k: 0,
             do_sample: false,
@@ -601,7 +601,7 @@ xdescribe("Pipelines (ignored)", () => {
 
         // single + `num_beams` + `num_return_sequences`
         {
-          let output = await generator(texts[0], {
+          const output = await generator(texts[0], {
             max_new_tokens: 10,
             num_beams: 2,
             num_return_sequences: 2,
@@ -615,7 +615,7 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + `num_beams` + `num_return_sequences`
         {
-          let output = await generator(texts, {
+          const output = await generator(texts, {
             max_new_tokens: 10,
             num_beams: 2,
             num_return_sequences: 2,
@@ -639,12 +639,12 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let generator = await pipeline("text-generation", models[1]);
-        let code = "def fib(n):";
+        const generator = await pipeline("text-generation", models[1]);
+        const code = "def fib(n):";
 
         // single + `added_tokens`
         {
-          let output = await generator(code, {
+          const output = await generator(code, {
             max_new_tokens: 45,
             top_k: 0,
             do_sample: false,
@@ -665,32 +665,32 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let extractor = await pipeline("feature-extraction", models[0]);
+        const extractor = await pipeline("feature-extraction", models[0]);
 
         // Provide sentences
-        let sentences = ["This framework generates embeddings for each input sentence", "Sentences are passed as a list of string.", "The quick brown fox jumps over the lazy dog."];
+        const sentences = ["This framework generates embeddings for each input sentence", "Sentences are passed as a list of string.", "The quick brown fox jumps over the lazy dog."];
 
         // Without pooling or normalization
         {
-          let output = await extractor(sentences);
+          const output = await extractor(sentences);
           expect(output.dims).toHaveLength(3);
         }
 
         // With pooling and normalization + compare features
         {
-          let output = await extractor(sentences, { pooling: "mean", normalize: true });
+          const output = await extractor(sentences, { pooling: "mean", normalize: true });
           expect(output.dims).toHaveLength(2);
 
           // Convert Tensor to JS list
           output = output.tolist();
 
-          let pairwiseScores = [
+          const pairwiseScores = [
             [output[0], output[1]],
             [output[0], output[2]],
             [output[1], output[2]],
           ].map((x) => cos_sim(...x));
 
-          let expected = [0.502872309810269, 0.11088411026413121, 0.09602621986931259];
+          const expected = [0.502872309810269, 0.11088411026413121, 0.09602621986931259];
           compare(pairwiseScores, expected);
         }
         await extractor.dispose();
@@ -715,21 +715,21 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", models[0]);
+        const transcriber = await pipeline("automatic-speech-recognition", models[0]);
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Transcribe English
-          let output = await transcriber(audioData);
+          const output = await transcriber(audioData);
           expect(output.text.length).toBeGreaterThan(50);
           // { text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." }
         }
 
         {
           // Transcribe English w/ timestamps.
-          let output = await transcriber(audioData, { return_timestamps: true });
+          const output = await transcriber(audioData, { return_timestamps: true });
           expect(output.text.length).toBeGreaterThan(50);
           expect(output.chunks.length).toBeGreaterThan(0);
           // {
@@ -748,21 +748,21 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", models[1]);
+        const transcriber = await pipeline("automatic-speech-recognition", models[1]);
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/french-audio.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/french-audio.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Transcribe French
-          let output = await transcriber(audioData, { language: "french", task: "transcribe" });
+          const output = await transcriber(audioData, { language: "french", task: "transcribe" });
           expect(output.text.length).toBeGreaterThan(20);
           // { text: " J'adore, j'aime, je n'aime pas, je déteste." }
         }
 
         {
           // Translate French to English.
-          let output = await transcriber(audioData, { language: "french", task: "translate" });
+          const output = await transcriber(audioData, { language: "french", task: "translate" });
           expect(output.text.length).toBeGreaterThan(20);
           // { text: " I love, I like, I don't like, I hate." }
         }
@@ -774,17 +774,17 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[2].join(" + "),
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", m(models[2][0]), {
+        const transcriber = await pipeline("automatic-speech-recognition", m(models[2][0]), {
           revision: models[2][1],
           quantized: false,
         });
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Transcribe English w/ word-level timestamps.
-          let output = await transcriber(audioData, { return_timestamps: "word" });
+          const output = await transcriber(audioData, { return_timestamps: "word" });
           const target = {
             text: " And so my fellow Americans ask not what your country can do for you ask what you can do for your country.",
             chunks: [
@@ -824,16 +824,16 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[3].join(" + "),
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", m(models[3][0]), {
+        const transcriber = await pipeline("automatic-speech-recognition", m(models[3][0]), {
           revision: models[3][1],
         });
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/japanese-audio.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/japanese-audio.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Transcribe Japanese w/ word-level timestamps.
-          let output = await transcriber(audioData, { return_timestamps: "word", language: "japanese", task: "transcribe" });
+          const output = await transcriber(audioData, { return_timestamps: "word", language: "japanese", task: "transcribe" });
           const target = {
             text: "モリナガの美味しい牛乳は濃い青色に牛乳瓶を払ったゼザインのパック牛乳である。",
             chunks: [
@@ -883,14 +883,14 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[4],
       async () => {
-        let transcriber = await pipeline("automatic-speech-recognition", m(models[4]));
+        const transcriber = await pipeline("automatic-speech-recognition", m(models[4]));
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Transcribe
-          let output = await transcriber(audioData);
+          const output = await transcriber(audioData);
           expect(output.text.length).toBeGreaterThan(50);
           // { text: "and so my fellow america ask not what your country can do for you ask what you can do for your country" }
         }
@@ -908,17 +908,17 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let synthesizer = await pipeline("text-to-speech", models[0], {
+        const synthesizer = await pipeline("text-to-speech", models[0], {
           // NOTE: Although the quantized version produces incoherent results,
           // it it is okay to use for testing.
           // quantized: false,
         });
 
-        let speaker_embeddings = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin";
+        const speaker_embeddings = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin";
 
         {
           // Generate English speech
-          let output = await synthesizer("Hello, my dog is cute", { speaker_embeddings });
+          const output = await synthesizer("Hello, my dog is cute", { speaker_embeddings });
           expect(output.audio.length).toBeGreaterThan(0);
           expect(output.sampling_rate).toEqual(16000);
         }
@@ -931,11 +931,11 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let synthesizer = await pipeline("text-to-speech", models[1]);
+        const synthesizer = await pipeline("text-to-speech", models[1]);
 
         {
           // Generate French speech
-          let output = await synthesizer("Bonjour");
+          const output = await synthesizer("Bonjour");
           expect(output.audio.length).toBeGreaterThan(0);
           expect(output.sampling_rate).toEqual(16000);
         }
@@ -953,16 +953,16 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("audio-classification", models[0]);
+        const classifier = await pipeline("audio-classification", models[0]);
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
-        let audioData = await loadAudio(url);
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+        const audioData = await loadAudio(url);
 
         {
           // Classify audio
-          let outputs = await classifier(audioData);
+          const outputs = await classifier(audioData);
 
-          let expected = [
+          const expected = [
             { score: 0.997512936592102, label: "male" },
             { score: 0.0024870133493095636, label: "female" },
           ];
@@ -982,18 +982,18 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let captioner = await pipeline("image-to-text", models[0]);
+        const captioner = await pipeline("image-to-text", models[0]);
 
-        let url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg";
-        let urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/airport.jpg"];
+        const url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg";
+        const urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/airport.jpg"];
 
         // single
         {
-          let output = await captioner(url, {
+          const output = await captioner(url, {
             top_k: 0,
             do_sample: false,
           });
-          // let expected = [
+          // const expected = [
           //     { "generated_text": "a herd of giraffes and zebras grazing in a field" }
           // ]
 
@@ -1003,14 +1003,14 @@ xdescribe("Pipelines (ignored)", () => {
 
         // single + generation options
         {
-          let output = await captioner(url, {
+          const output = await captioner(url, {
             max_new_tokens: 20,
             num_beams: 2,
             num_return_sequences: 2,
             top_k: 0,
             do_sample: false,
           });
-          // let expected = [
+          // const expected = [
           //     { "generated_text": "a herd of giraffes and zebras grazing in a field" },
           //     { "generated_text": "a herd of giraffes and zebras in a grassy field" }
           // ]
@@ -1022,11 +1022,11 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let output = await captioner(urls, {
+          const output = await captioner(urls, {
             top_k: 0,
             do_sample: false,
           });
-          // let expected = [
+          // const expected = [
           //     [{ "generated_text": "two men are kicking a soccer ball in a soccer game" }],
           //     [{ "generated_text": "a plane on the tarmac with a passenger bus" }]
           // ]
@@ -1040,14 +1040,14 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + generation options
         {
-          let output = await captioner(urls, {
+          const output = await captioner(urls, {
             max_new_tokens: 20,
             num_beams: 2,
             num_return_sequences: 2,
             top_k: 0,
             do_sample: false,
           });
-          // let expected = [
+          // const expected = [
           //     [
           //         { "generated_text": "two men are kicking a soccer ball on a field" },
           //         { "generated_text": "two men are kicking a soccer ball in a soccer game" }
@@ -1078,27 +1078,27 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("image-classification", models[0]);
+        const classifier = await pipeline("image-classification", models[0]);
 
-        let url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/tiger.jpg";
-        let urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/palace.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/teapot.jpg"];
+        const url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/tiger.jpg";
+        const urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/palace.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/teapot.jpg"];
 
         // single
         {
-          let outputs = await classifier(url);
+          const outputs = await classifier(url);
 
-          let expected = [{ label: "tiger, Panthera tigris", score: 0.607988178730011 }];
+          const expected = [{ label: "tiger, Panthera tigris", score: 0.607988178730011 }];
 
           compare(outputs, expected, 0.2);
         }
 
         // single + topk
         {
-          let outputs = await classifier(url, {
+          const outputs = await classifier(url, {
             topk: 2,
           });
 
-          let expected = [
+          const expected = [
             { label: "tiger, Panthera tigris", score: 0.607988178730011 },
             { label: "tiger cat", score: 0.3877776563167572 },
           ];
@@ -1108,9 +1108,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await classifier(urls);
+          const outputs = await classifier(urls);
 
-          let expected = [
+          const expected = [
             { label: "palace", score: 0.9986862540245056 },
             { label: "teapot", score: 0.987880527973175 },
           ];
@@ -1120,11 +1120,11 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + topk
         {
-          let outputs = await classifier(urls, {
+          const outputs = await classifier(urls, {
             topk: 2,
           });
 
-          let expected = [
+          const expected = [
             [
               { label: "palace", score: 0.9986862540245056 },
               { label: "castle", score: 0.00037879671435803175 },
@@ -1151,17 +1151,17 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let segmenter = await pipeline("image-segmentation", models[0], {
+        const segmenter = await pipeline("image-segmentation", models[0], {
           // Quantized version of model produces incorrect results
           quantized: false,
         });
-        let img = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/coco_sample.png";
+        const img = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/coco_sample.png";
 
         // single
         {
-          let outputs = await segmenter(img);
+          const outputs = await segmenter(img);
 
-          let expected = [
+          const expected = [
             { score: 0.9916538596153259, label: "cat", mask: 58998 },
             { score: 0.9987397789955139, label: "remote", mask: 4164 },
             { score: 0.9994599223136902, label: "remote", mask: 2275 },
@@ -1169,8 +1169,8 @@ xdescribe("Pipelines (ignored)", () => {
             { score: 0.9993911385536194, label: "cat", mask: 52670 },
           ];
 
-          let outputLabels = outputs.map((x) => x.label);
-          let expectedLabels = expected.map((x) => x.label);
+          const outputLabels = outputs.map((x) => x.label);
+          const expectedLabels = expected.map((x) => x.label);
 
           expect(outputLabels).toHaveLength(expectedLabels.length);
           expect(outputLabels.sort()).toEqual(expectedLabels.sort());
@@ -1184,23 +1184,23 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[1],
       async () => {
-        let segmenter = await pipeline("image-segmentation", models[1]);
-        let img = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/young-man-standing-and-leaning-on-car.jpg";
+        const segmenter = await pipeline("image-segmentation", models[1]);
+        const img = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/young-man-standing-and-leaning-on-car.jpg";
 
         // single
         {
-          let outputs = await segmenter(img);
+          const outputs = await segmenter(img);
 
-          let expected = [{ label: "Background" }, { label: "Hair" }, { label: "Upper-clothes" }, { label: "Pants" }, { label: "Left-shoe" }, { label: "Right-shoe" }, { label: "Face" }, { label: "Left-leg" }, { label: "Right-leg" }, { label: "Left-arm" }, { label: "Right-arm" }];
+          const expected = [{ label: "Background" }, { label: "Hair" }, { label: "Upper-clothes" }, { label: "Pants" }, { label: "Left-shoe" }, { label: "Right-shoe" }, { label: "Face" }, { label: "Left-leg" }, { label: "Right-leg" }, { label: "Left-arm" }, { label: "Right-arm" }];
 
-          let outputLabels = outputs.map((x) => x.label);
-          let expectedLabels = expected.map((x) => x.label);
+          const outputLabels = outputs.map((x) => x.label);
+          const expectedLabels = expected.map((x) => x.label);
 
           expect(outputLabels).toHaveLength(expectedLabels.length);
           expect(outputLabels.sort()).toEqual(expectedLabels.sort());
 
           // check that all scores are null, and masks have correct dimensions
-          for (let output of outputs) {
+          for (const output of outputs) {
             expect(output.score).toBeNull();
             expect(output.mask.width).toEqual(970);
             expect(output.mask.height).toEqual(1455);
@@ -1221,18 +1221,18 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let classifier = await pipeline("zero-shot-image-classification", models[0]);
+        const classifier = await pipeline("zero-shot-image-classification", models[0]);
 
-        let url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg";
-        let urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/airport.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg"];
+        const url = "https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg";
+        const urls = ["https://huggingface.co/datasets/mishig/sample_images/resolve/main/football-match.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/airport.jpg", "https://huggingface.co/datasets/mishig/sample_images/resolve/main/savanna.jpg"];
 
-        let classes = ["football", "airport", "animals"];
+        const classes = ["football", "airport", "animals"];
 
         // single
         {
-          let output = await classifier(url, classes);
+          const output = await classifier(url, classes);
 
-          let expected = [
+          const expected = [
             { score: 0.9719080924987793, label: "football" },
             { score: 0.022564826533198357, label: "animals" },
             { score: 0.005527070723474026, label: "airport" },
@@ -1242,9 +1242,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let output = await classifier(urls, classes);
+          const output = await classifier(urls, classes);
 
-          let expected = [
+          const expected = [
             [
               { score: 0.9712504148483276, label: "football" },
               { score: 0.022469401359558105, label: "animals" },
@@ -1276,19 +1276,19 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let detector = await pipeline("object-detection", models[0]);
+        const detector = await pipeline("object-detection", models[0]);
 
         // TODO add batched test cases when supported
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg";
-        let urls = ["https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/savanna.jpg"];
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg";
+        const urls = ["https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/savanna.jpg"];
 
         // single + threshold
         {
-          let output = await detector(url, {
+          const output = await detector(url, {
             threshold: 0.9,
           });
 
-          // let expected = [
+          // const expected = [
           //     {
           //         "score": 0.9977124929428101,
           //         "label": "remote",
@@ -1317,10 +1317,10 @@ xdescribe("Pipelines (ignored)", () => {
           // ]
 
           expect(output.length).toBeGreaterThan(0);
-          for (let cls of output) {
+          for (const cls of output) {
             expect(typeof cls.score).toBe("number");
             expect(typeof cls.label).toBe("string");
-            for (let key of ["xmin", "ymin", "xmax", "ymax"]) {
+            for (const key of ["xmin", "ymin", "xmax", "ymax"]) {
               expect(typeof cls.box[key]).toBe("number");
             }
           }
@@ -1328,11 +1328,11 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched + threshold + percentage
         {
-          let output = await detector(urls, {
+          const output = await detector(urls, {
             threshold: 0.9,
             percentage: true,
           });
-          // let expected = [[
+          // const expected = [[
           //     {
           //         score: 0.9991137385368347,
           //         label: 'zebra',
@@ -1362,12 +1362,12 @@ xdescribe("Pipelines (ignored)", () => {
 
           expect(output).toHaveLength(urls.length); // Same number of inputs as outputs
 
-          for (let i = 0; i < output.length; ++i) {
+          for (const i = 0; i < output.length; ++i) {
             expect(output[i].length).toBeGreaterThan(0);
-            for (let cls of output[i]) {
+            for (const cls of output[i]) {
               expect(typeof cls.score).toBe("number");
               expect(typeof cls.label).toBe("string");
-              for (let key of ["xmin", "ymin", "xmax", "ymax"]) {
+              for (const key of ["xmin", "ymin", "xmax", "ymax"]) {
                 expect(typeof cls.box[key]).toBe("number");
               }
             }
@@ -1387,16 +1387,16 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let detector = await pipeline("zero-shot-object-detection", models[0]);
+        const detector = await pipeline("zero-shot-object-detection", models[0]);
 
         // single (default)
         {
-          let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/astronaut.png";
-          let candidate_labels = ["human face", "rocket", "helmet", "american flag"];
+          const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/astronaut.png";
+          const candidate_labels = ["human face", "rocket", "helmet", "american flag"];
 
-          let output = await detector(url, candidate_labels);
+          const output = await detector(url, candidate_labels);
 
-          // let expected = [
+          // const expected = [
           //     {
           //         score: 0.24392342567443848,
           //         label: 'human face',
@@ -1420,10 +1420,10 @@ xdescribe("Pipelines (ignored)", () => {
           // ]
 
           expect(output.length).toBeGreaterThan(0);
-          for (let cls of output) {
+          for (const cls of output) {
             expect(typeof cls.score).toBe("number");
             expect(typeof cls.label).toBe("string");
-            for (let key of ["xmin", "ymin", "xmax", "ymax"]) {
+            for (const key of ["xmin", "ymin", "xmax", "ymax"]) {
               expect(typeof cls.box[key]).toBe("number");
             }
           }
@@ -1431,16 +1431,16 @@ xdescribe("Pipelines (ignored)", () => {
 
         // topk + threshold + percentage
         {
-          let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/beach.png";
-          let candidate_labels = ["hat", "book", "sunglasses", "camera"];
+          const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/beach.png";
+          const candidate_labels = ["hat", "book", "sunglasses", "camera"];
 
-          let output = await detector(url, candidate_labels, {
+          const output = await detector(url, candidate_labels, {
             topk: 4,
             threshold: 0.05,
             percentage: true,
           });
 
-          // let expected = [
+          // const expected = [
           //     {
           //         score: 0.1606510728597641,
           //         label: 'sunglasses',
@@ -1464,10 +1464,10 @@ xdescribe("Pipelines (ignored)", () => {
           // ]
 
           expect(output.length).toBeGreaterThan(0);
-          for (let cls of output) {
+          for (const cls of output) {
             expect(typeof cls.score).toBe("number");
             expect(typeof cls.label).toBe("string");
-            for (let key of ["xmin", "ymin", "xmax", "ymax"]) {
+            for (const key of ["xmin", "ymin", "xmax", "ymax"]) {
               expect(typeof cls.box[key]).toBe("number");
             }
           }
@@ -1486,14 +1486,14 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let upscaler = await pipeline("image-to-image", models[0]);
+        const upscaler = await pipeline("image-to-image", models[0]);
 
         // Input is 3x3 => padded to 8x8 => upscaled to 16x16
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/pattern_3x3.png";
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/pattern_3x3.png";
 
         // single
         {
-          let outputs = await upscaler(url);
+          const outputs = await upscaler(url);
           expect(outputs.width).toEqual(16);
           expect(outputs.height).toEqual(16);
           expect(outputs.channels).toEqual(3);
@@ -1502,9 +1502,9 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await upscaler([url, url]);
+          const outputs = await upscaler([url, url]);
           expect(outputs).toHaveLength(2);
-          for (let output of outputs) {
+          for (const output of outputs) {
             expect(output.width).toEqual(16);
             expect(output.height).toEqual(16);
             expect(output.channels).toEqual(3);
@@ -1525,13 +1525,13 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let depth_estimator = await pipeline("depth-estimation", models[0]);
+        const depth_estimator = await pipeline("depth-estimation", models[0]);
 
-        let url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg";
+        const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg";
 
         // single
         {
-          let { predicted_depth, depth } = await depth_estimator(url);
+          const { predicted_depth, depth } = await depth_estimator(url);
           compare(predicted_depth.dims, [384, 384]);
           expect(depth.width).toEqual(640);
           expect(depth.height).toEqual(480);
@@ -1541,10 +1541,10 @@ xdescribe("Pipelines (ignored)", () => {
 
         // batched
         {
-          let outputs = await depth_estimator([url, url]);
+          const outputs = await depth_estimator([url, url]);
           expect(outputs).toHaveLength(2);
-          for (let output of outputs) {
-            let { predicted_depth, depth } = output;
+          for (const output of outputs) {
+            const { predicted_depth, depth } = output;
             compare(predicted_depth.dims, [384, 384]);
             expect(depth.width).toEqual(640);
             expect(depth.height).toEqual(480);
@@ -1568,12 +1568,12 @@ xdescribe("Pipelines (ignored)", () => {
     it(
       models[0],
       async () => {
-        let qa_pipeline = await pipeline("document-question-answering", models[0]);
+        const qa_pipeline = await pipeline("document-question-answering", models[0]);
 
         // basic
         {
-          let output = await qa_pipeline(image, question);
-          let expected = [{ answer: "us-001" }];
+          const output = await qa_pipeline(image, question);
+          const expected = [{ answer: "us-001" }];
           compare(output, expected);
         }
 

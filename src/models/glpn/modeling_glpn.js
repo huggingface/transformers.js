@@ -27,8 +27,8 @@ export class GLPNModel extends GLPNPreTrainedModel {}
  *
  * // Interpolate to original size
  * const prediction = (await interpolate_4d(predicted_depth.unsqueeze(1), {
- * size: image.size.reverse(),
- * mode: 'bilinear',
+ *   size: image.size.reverse(),
+ *   mode: 'bilinear',
  * })).squeeze(1);
  *
  * // Visualize the prediction

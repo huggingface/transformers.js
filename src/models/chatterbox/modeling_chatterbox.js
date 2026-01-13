@@ -1,7 +1,9 @@
-import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { decoder_forward } from '../modeling_utils.js';
+import { PreTrainedModel, decoder_forward, decoder_prepare_inputs_for_generation } from '../modeling_utils.js';
 import { cat, ones, full, Tensor } from '../../utils/tensor.js';
+
+const SILENCE_TOKEN = 4299n;
+const START_SPEECH_TOKEN = 6561n;
 
 export class ChatterboxPreTrainedModel extends PreTrainedModel {
     forward_params = [
@@ -125,6 +127,37 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         };
     }
 
+    prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        if (!model_inputs.position_ids && this.sessions['embed_tokens'].inputNames.includes('position_ids')) {
+            // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
+            if (model_inputs.input_ids.dims[1] === 1) {
+                const position_ids = Array.from(
+                    {
+                        length: input_ids.length,
+                    },
+                    (_, i) => input_ids[i].length - input_ids[i].findLastIndex((x) => x == START_SPEECH_TOKEN) - 1,
+                );
+                model_inputs.position_ids = new Tensor('int64', position_ids, [input_ids.length, 1]);
+            } else {
+                const batched_input_ids = model_inputs.input_ids.tolist();
+                const position_ids_list = batched_input_ids.map((ids) => {
+                    let position = 0;
+                    return ids.map((id) => (id >= START_SPEECH_TOKEN ? 0 : position++));
+                });
+                model_inputs.position_ids = new Tensor('int64', position_ids_list.flat(), model_inputs.input_ids.dims);
+            }
+        }
+        if (model_inputs.input_ids.dims[1] === 1) {
+            // We are in generation mode and no longer need the audio inputs
+            delete model_inputs.audio_values;
+            delete model_inputs.audio_features;
+            delete model_inputs.audio_tokens;
+            delete model_inputs.speaker_embeddings;
+            delete model_inputs.speaker_features;
+        }
+        return decoder_prepare_inputs_for_generation(this, input_ids, model_inputs, generation_config);
+    }
+
     /** @type {PreTrainedModel['generate']} */
     async generate(params) {
         const { sequences, audio_tokens, speaker_embeddings, speaker_features } = /** @type {any} */ (
@@ -139,7 +172,6 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
             -1, // Exclude end of speech token
         ]);
 
-        const SILENCE_TOKEN = 4299n;
         const silence_tokens = full([new_tokens.dims[0], 3], SILENCE_TOKEN); // Add 3 silence tokens
         const speech_tokens = cat([audio_tokens, new_tokens, silence_tokens], 1);
 

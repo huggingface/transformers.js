@@ -930,7 +930,7 @@ export function interpolate(input, [out_height, out_width], mode = 'bilinear', a
     const in_height = input.dims.at(-2);
     const in_width = input.dims.at(-1);
 
-    let output = interpolate_data(
+    const output = interpolate_data(
         /** @type {import('./maths.js').TypedArray}*/ (input.data),
         [in_channels, in_height, in_width],
         [out_height, out_width],

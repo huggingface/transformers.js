@@ -11,24 +11,17 @@ import {
     ones_like,
     ones,
     boolTensor,
-    full,
 } from '../utils/tensor.js';
+
 // These will be populated by registry.js
-// They contain name-only mappings (no class references) used for model validation
-export let MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = null;
-export let MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = null;
-export let MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = null;
-export let MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = null;
+export let MODEL_MAPPING_NAMES = null;
 
 /**
  * Register task mappings (called by registry.js after defining full mappings)
  * @param {Object} mappings - Object with mapping names as keys
  */
 export function registerTaskMappings(mappings) {
-    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = mappings.MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES;
-    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = mappings.MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES;
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = mappings.MODEL_FOR_CAUSAL_LM_MAPPING_NAMES;
-    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES = mappings.MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES;
+    MODEL_MAPPING_NAMES = mappings;
 }
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
 import { getModelJSON } from '../utils/hub.js';
@@ -89,12 +82,10 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.Musicgen]: {
         can_generate: true,
         forward: seq2seq_forward,
-        prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
     },
     [MODEL_TYPES.EncoderDecoder]: {
         can_generate: false,
         forward: seq2seq_forward,
-        prepare_inputs: null,
     },
     [MODEL_TYPES.ImageTextToText]: {
         can_generate: true,
@@ -108,33 +99,26 @@ const MODEL_TYPE_CONFIG = {
     },
     [MODEL_TYPES.Phi3V]: {
         can_generate: true,
-        forward: null,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
-        forward: null,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
     },
     [MODEL_TYPES.MultiModality]: {
         can_generate: true,
-        forward: null,
-        prepare_inputs: multimodality_prepare_inputs_for_generation,
     },
     [MODEL_TYPES.AutoEncoder]: {
         can_generate: false,
         forward: auto_encoder_forward,
-        prepare_inputs: null,
     },
     [MODEL_TYPES.Chatterbox]: {
         can_generate: true,
         forward: encoder_forward,
-        prepare_inputs: chatterbox_prepare_inputs_for_generation,
     },
     default: {
         can_generate: false,
         forward: encoder_forward,
-        prepare_inputs: null,
     },
 };
 
@@ -751,11 +735,11 @@ export class PreTrainedModel extends Callable {
     _validate_model_class() {
         if (!this.can_generate) {
             const generate_compatible_mappings = [
-                MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
-                // MODEL_FOR_CAUSAL_IMAGE_MODELING_MAPPING, // TODO
-                MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
-                MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
-                MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
+                MODEL_MAPPING_NAMES.MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+                // MODEL_MAPPING_NAMES.MODEL_FOR_CAUSAL_IMAGE_MODELING_MAPPING, // TODO
+                MODEL_MAPPING_NAMES.MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
+                MODEL_MAPPING_NAMES.MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+                MODEL_MAPPING_NAMES.MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
             ].filter(Boolean); // Filter out null mappings (in case registry hasn't loaded yet)
 
             const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
@@ -778,6 +762,9 @@ export class PreTrainedModel extends Callable {
     }
 
     prepare_inputs_for_generation(...args) {
+        if (!this._prepare_inputs_for_generation) {
+            throw new Error('prepare_inputs_for_generation is not implemented for this model.');
+        }
         return this._prepare_inputs_for_generation(this, ...args);
     }
 
@@ -1286,38 +1273,6 @@ export class PreTrainedModel extends Callable {
     }
 }
 
-export function chatterbox_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    if (!model_inputs.position_ids && self.sessions['embed_tokens'].inputNames.includes('position_ids')) {
-        // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
-        const START_SPEECH_TOKEN = 6561;
-        if (model_inputs.input_ids.dims[1] === 1) {
-            const position_ids = Array.from(
-                {
-                    length: input_ids.length,
-                },
-                (_, i) => input_ids[i].length - input_ids[i].findLastIndex((x) => x == START_SPEECH_TOKEN) - 1,
-            );
-            model_inputs.position_ids = new Tensor('int64', position_ids, [input_ids.length, 1]);
-        } else {
-            const batched_input_ids = model_inputs.input_ids.tolist();
-            const position_ids_list = batched_input_ids.map((ids) => {
-                let position = 0;
-                return ids.map((id) => (id >= START_SPEECH_TOKEN ? 0 : position++));
-            });
-            model_inputs.position_ids = new Tensor('int64', position_ids_list.flat(), model_inputs.input_ids.dims);
-        }
-    }
-    if (model_inputs.input_ids.dims[1] === 1) {
-        // We are in generation mode and no longer need the audio inputs
-        delete model_inputs.audio_values;
-        delete model_inputs.audio_features;
-        delete model_inputs.audio_tokens;
-        delete model_inputs.speaker_embeddings;
-        delete model_inputs.speaker_features;
-    }
-    return decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config);
-}
-
 /**
  * Perform forward pass on the seq2seq model (both encoder and decoder).
  * @param {Object} self The seq2seq model object.
@@ -1675,49 +1630,6 @@ export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...a
     } else {
         return decoder_prepare_inputs_for_generation(self, ...args);
     }
-}
-
-export function multimodality_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    const has_past_key_values = !!model_inputs.past_key_values;
-
-    if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
-        if (has_past_key_values) {
-            model_inputs.input_ids = cat([model_inputs.input_ids, model_inputs.input_ids], 0);
-            // NOTE: attention_mask handled in generation
-        } else {
-            model_inputs.input_ids = cat(
-                [model_inputs.input_ids, full_like(model_inputs.input_ids, BigInt(generation_config.pad_token_id))],
-                0,
-            );
-            model_inputs.attention_mask = cat(
-                [model_inputs.attention_mask, full_like(model_inputs.attention_mask, 0n)],
-                0,
-            );
-        }
-    }
-
-    if (has_past_key_values || !model_inputs.pixel_values) {
-        model_inputs.pixel_values = full([0, 0, 3, 384, 384], 1.0);
-    }
-
-    if (has_past_key_values) {
-        const num_img_tokens = 0;
-        const num_text_tokens = 1;
-        const has_image = num_img_tokens > 0 ? 1 : 0;
-
-        const batch_size = 1;
-        model_inputs.images_seq_mask = new Tensor(
-            'bool',
-            new Array(num_img_tokens + num_text_tokens).fill(true).fill(false, 0, num_text_tokens),
-            [batch_size, num_img_tokens + num_text_tokens],
-        );
-        model_inputs.images_emb_mask = new Tensor('bool', new Array(num_img_tokens).fill(!!has_image), [
-            batch_size,
-            1,
-            num_img_tokens,
-        ]);
-    }
-    return model_inputs;
 }
 
 export function default_merge_input_ids_with_features({

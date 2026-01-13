@@ -91,7 +91,7 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
  * **Example:** Compute vision embeddings with `SiglipVisionModel`.
  *
  * ```javascript
- * import { AutoProcessor, SiglipVisionModel, RawImage} from '@huggingface/transformers';
+ * import { AutoProcessor, SiglipVisionModel, RawImage } from '@huggingface/transformers';
  *
  * // Load processor and vision model
  * const processor = await AutoProcessor.from_pretrained('Xenova/siglip-base-patch16-224');

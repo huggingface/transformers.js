@@ -6,11 +6,11 @@
  * ```javascript
  * import { AutoModel, AutoTokenizer } from '@huggingface/transformers';
  *
- * let tokenizer = await AutoTokenizer.from_pretrained('Xenova/bert-base-uncased');
- * let model = await AutoModel.from_pretrained('Xenova/bert-base-uncased');
+ * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/bert-base-uncased');
+ * const model = await AutoModel.from_pretrained('Xenova/bert-base-uncased');
  *
- * let inputs = await tokenizer('I love transformers!');
- * let { logits } = await model(inputs);
+ * const inputs = await tokenizer('I love transformers!');
+ * const { logits } = await model(inputs);
  * // Tensor {
  * //     data: Float32Array(183132) [-7.117443084716797, -7.107812881469727, -7.092104911804199, ...]
  * //     dims: (3) [1, 6, 30522],
@@ -25,12 +25,12 @@
  * ```javascript
  * import { AutoModelForSeq2SeqLM, AutoTokenizer } from '@huggingface/transformers';
  *
- * let tokenizer = await AutoTokenizer.from_pretrained('Xenova/t5-small');
- * let model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
+ * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/t5-small');
+ * const model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
  *
- * let { input_ids } = await tokenizer('translate English to German: I love transformers!');
- * let outputs = await model.generate(input_ids);
- * let decoded = tokenizer.decode(outputs[0], { skip_special_tokens: true });
+ * const { input_ids } = await tokenizer('translate English to German: I love transformers!');
+ * const outputs = await model.generate(input_ids);
+ * const decoded = tokenizer.decode(outputs[0], { skip_special_tokens: true });
  * // 'Ich liebe Transformatoren!'
  * ```
  *
@@ -43,40 +43,7 @@ import { PreTrainedModel } from './models/modeling_utils.js';
 // Re-export all model classes from registry
 export * from './models/registry.js';
 
-import {
-    CUSTOM_ARCHITECTURES,
-    MODEL_CLASS_TYPE_MAPPING,
-    MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES,
-    MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES,
-    MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES,
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_MASKED_LM_MAPPING_NAMES,
-    MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES,
-    MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES,
-    MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES,
-    MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES,
-    MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES,
-    MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES,
-    MODEL_FOR_MASK_GENERATION_MAPPING_NAMES,
-    MODEL_FOR_CTC_MAPPING_NAMES,
-    MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES,
-    MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES,
-    MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES,
-    MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES,
-    MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES,
-    MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES,
-    MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES,
-    MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES,
-} from './models/registry.js';
+import { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS } from './models/registry.js';
 
 import * as ALL_MODEL_FILES from './models/index.js';
 
@@ -164,7 +131,7 @@ export class PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModel.from_pretrained('Xenova/bert-base-uncased');
+ * const model = await AutoModel.from_pretrained('Xenova/bert-base-uncased');
  */
 export class AutoModel extends PretrainedMixin {
     /** @type {Map<string, Object>[]} */
@@ -178,10 +145,10 @@ export class AutoModel extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForSequenceClassification.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+ * const model = await AutoModelForSequenceClassification.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
  */
 export class AutoModelForSequenceClassification extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES];
 }
 
 /**
@@ -189,10 +156,10 @@ export class AutoModelForSequenceClassification extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForTokenClassification.from_pretrained('Xenova/distilbert-base-multilingual-cased-ner-hrl');
+ * const model = await AutoModelForTokenClassification.from_pretrained('Xenova/distilbert-base-multilingual-cased-ner-hrl');
  */
 export class AutoModelForTokenClassification extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES];
 }
 
 /**
@@ -200,10 +167,10 @@ export class AutoModelForTokenClassification extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
+ * const model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
  */
 export class AutoModelForSeq2SeqLM extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES];
 }
 
 /**
@@ -211,10 +178,10 @@ export class AutoModelForSeq2SeqLM extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForSpeechSeq2Seq.from_pretrained('openai/whisper-tiny.en');
+ * const model = await AutoModelForSpeechSeq2Seq.from_pretrained('openai/whisper-tiny.en');
  */
 export class AutoModelForSpeechSeq2Seq extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES];
 }
 
 /**
@@ -222,10 +189,10 @@ export class AutoModelForSpeechSeq2Seq extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForTextToSpectrogram.from_pretrained('microsoft/speecht5_tts');
+ * const model = await AutoModelForTextToSpectrogram.from_pretrained('microsoft/speecht5_tts');
  */
 export class AutoModelForTextToSpectrogram extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES];
 }
 
 /**
@@ -233,10 +200,10 @@ export class AutoModelForTextToSpectrogram extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForTextToSpectrogram.from_pretrained('facebook/mms-tts-eng');
+ * const model = await AutoModelForTextToSpectrogram.from_pretrained('facebook/mms-tts-eng');
  */
 export class AutoModelForTextToWaveform extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES];
 }
 
 /**
@@ -244,10 +211,10 @@ export class AutoModelForTextToWaveform extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForCausalLM.from_pretrained('Xenova/gpt2');
+ * const model = await AutoModelForCausalLM.from_pretrained('Xenova/gpt2');
  */
 export class AutoModelForCausalLM extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_CAUSAL_LM_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_CAUSAL_LM_MAPPING_NAMES];
 }
 
 /**
@@ -255,10 +222,10 @@ export class AutoModelForCausalLM extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForMaskedLM.from_pretrained('Xenova/bert-base-uncased');
+ * const model = await AutoModelForMaskedLM.from_pretrained('Xenova/bert-base-uncased');
  */
 export class AutoModelForMaskedLM extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_MASKED_LM_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_MASKED_LM_MAPPING_NAMES];
 }
 
 /**
@@ -266,10 +233,10 @@ export class AutoModelForMaskedLM extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForQuestionAnswering.from_pretrained('Xenova/distilbert-base-cased-distilled-squad');
+ * const model = await AutoModelForQuestionAnswering.from_pretrained('Xenova/distilbert-base-cased-distilled-squad');
  */
 export class AutoModelForQuestionAnswering extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES];
 }
 
 /**
@@ -277,10 +244,10 @@ export class AutoModelForQuestionAnswering extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForVision2Seq.from_pretrained('Xenova/vit-gpt2-image-captioning');
+ * const model = await AutoModelForVision2Seq.from_pretrained('Xenova/vit-gpt2-image-captioning');
  */
 export class AutoModelForVision2Seq extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES];
 }
 
 /**
@@ -288,10 +255,10 @@ export class AutoModelForVision2Seq extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForImageClassification.from_pretrained('Xenova/vit-base-patch16-224');
+ * const model = await AutoModelForImageClassification.from_pretrained('Xenova/vit-base-patch16-224');
  */
 export class AutoModelForImageClassification extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES];
 }
 
 /**
@@ -299,10 +266,10 @@ export class AutoModelForImageClassification extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForImageSegmentation.from_pretrained('Xenova/detr-resnet-50-panoptic');
+ * const model = await AutoModelForImageSegmentation.from_pretrained('Xenova/detr-resnet-50-panoptic');
  */
 export class AutoModelForImageSegmentation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES];
 }
 
 /**
@@ -310,10 +277,10 @@ export class AutoModelForImageSegmentation extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForSemanticSegmentation.from_pretrained('nvidia/segformer-b3-finetuned-cityscapes-1024-1024');
+ * const model = await AutoModelForSemanticSegmentation.from_pretrained('nvidia/segformer-b3-finetuned-cityscapes-1024-1024');
  */
 export class AutoModelForSemanticSegmentation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES];
 }
 
 /**
@@ -321,10 +288,10 @@ export class AutoModelForSemanticSegmentation extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForUniversalSegmentation.from_pretrained('hf-internal-testing/tiny-random-MaskFormerForInstanceSegmentation');
+ * const model = await AutoModelForUniversalSegmentation.from_pretrained('hf-internal-testing/tiny-random-MaskFormerForInstanceSegmentation');
  */
 export class AutoModelForUniversalSegmentation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES];
 }
 
 /**
@@ -332,14 +299,14 @@ export class AutoModelForUniversalSegmentation extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForObjectDetection.from_pretrained('Xenova/detr-resnet-50');
+ * const model = await AutoModelForObjectDetection.from_pretrained('Xenova/detr-resnet-50');
  */
 export class AutoModelForObjectDetection extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES];
 }
 
 export class AutoModelForZeroShotObjectDetection extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES];
 }
 
 /**
@@ -347,62 +314,62 @@ export class AutoModelForZeroShotObjectDetection extends PretrainedMixin {
  * The chosen model class is determined by the type specified in the model config.
  *
  * @example
- * let model = await AutoModelForMaskGeneration.from_pretrained('Xenova/sam-vit-base');
+ * const model = await AutoModelForMaskGeneration.from_pretrained('Xenova/sam-vit-base');
  */
 export class AutoModelForMaskGeneration extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_MASK_GENERATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_MASK_GENERATION_MAPPING_NAMES];
 }
 
 export class AutoModelForCTC extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_CTC_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_CTC_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioClassification extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES];
 }
 
 export class AutoModelForXVector extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioFrameClassification extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES];
 }
 
 export class AutoModelForDocumentQuestionAnswering extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES];
 }
 
 export class AutoModelForImageMatting extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES];
 }
 
 export class AutoModelForImageToImage extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES];
 }
 
 export class AutoModelForDepthEstimation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForNormalEstimation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForPoseEstimation extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForImageFeatureExtraction extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES];
 }
 
 export class AutoModelForImageTextToText extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioTextToText extends PretrainedMixin {
-    static MODEL_CLASS_MAPPINGS = [MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
+    static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
 }
 
 // Re-export PreTrainedModel for backwards compatibility

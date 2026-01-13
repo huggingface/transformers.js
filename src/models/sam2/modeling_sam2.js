@@ -1,5 +1,4 @@
-import { PreTrainedModel } from '../modeling_utils.js';
-import { encoder_forward } from '../modeling_utils.js';
+import { PreTrainedModel, encoder_forward } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { ModelOutput } from '../modeling_outputs.js';
 import { ones, full } from '../../utils/tensor.js';

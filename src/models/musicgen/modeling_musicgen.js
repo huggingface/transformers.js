@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../modeling_utils.js';
+import { PreTrainedModel, encoder_decoder_prepare_inputs_for_generation } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { Tensor } from '../../utils/tensor.js';
 import { ModelOutput } from '../modeling_outputs.js';
@@ -21,7 +21,7 @@ export class MusicgenForCausalLM extends MusicgenPreTrainedModel {}
  *
  * **Example:** Generate music from text with `Xenova/musicgen-small`.
  * ```javascript
- * import { AutoTokenizer, MusicgenForConditionalGeneration } from '@huggingface/transformers';
+ * import { AutoTokenizer, MusicgenForConditionalGeneration, RawAudio } from '@huggingface/transformers';
  *
  * // Load tokenizer and model
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/musicgen-small');
@@ -41,13 +41,12 @@ export class MusicgenForCausalLM extends MusicgenPreTrainedModel {}
  *   guidance_scale: 3,
  * });
  *
- * // (Optional) Write the output to a WAV file
- * import wavefile from 'wavefile';
- * import fs from 'fs';
- *
- * const wav = new wavefile.WaveFile();
- * wav.fromScratch(1, model.config.audio_encoder.sampling_rate, '32f', audio_values.data);
- * fs.writeFileSync('musicgen_out.wav', wav.toBuffer());
+ * // (Optional) Save the output to a WAV file
+ * const audio = new RawAudio(
+ *   audio_values.data,
+ *   model.config.audio_encoder.sampling_rate,
+ * );
+ * audio.save('musicgen_out.wav');
  * ```
  */
 export class MusicgenForConditionalGeneration extends PreTrainedModel {
@@ -76,7 +75,7 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
         let newDataSize = 0;
         for (let i = 0; i < outputs.size; ++i) {
             // @ts-expect-error TS2339
-            if (outputs.data[i] === this.config.decoder.pad_token_id) {
+            if (outputs.data[i] == this.config.decoder.pad_token_id) {
                 continue;
             }
 
@@ -96,14 +95,16 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
     }
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        // @ts-expect-error TS2339
+        const pad_token_id = BigInt(this.config.decoder.pad_token_id);
+
         // apply the delay pattern mask
         let clonedInputIds = structuredClone(input_ids);
         for (let i = 0; i < clonedInputIds.length; ++i) {
             for (let j = 0; j < clonedInputIds[i].length; ++j) {
                 // @ts-expect-error TS2339
                 if (i % this.config.decoder.num_codebooks >= j) {
-                    // @ts-expect-error TS2339
-                    clonedInputIds[i][j] = BigInt(this.config.decoder.pad_token_id);
+                    clonedInputIds[i][j] = pad_token_id;
                 }
             }
         }
@@ -114,8 +115,7 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
             clonedInputIds = clonedInputIds.concat(clonedInputIds);
         }
 
-        const prepped = super.prepare_inputs_for_generation(clonedInputIds, model_inputs, generation_config);
-        return prepped;
+        return encoder_decoder_prepare_inputs_for_generation(this, clonedInputIds, model_inputs, generation_config);
     }
 
     /**

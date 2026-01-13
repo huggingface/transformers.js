@@ -1,9 +1,8 @@
-import { PreTrainedModel } from '../modeling_utils.js';
+import { PreTrainedModel, decoder_forward } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
-import { decoder_forward } from '../modeling_utils.js';
 import { RawImage } from '../../utils/image.js';
-import { Tensor } from '../../utils/tensor.js';
+import { Tensor, cat, full, full_like } from '../../utils/tensor.js';
 
 export class MultiModalityPreTrainedModel extends PreTrainedModel {}
 export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
@@ -69,6 +68,49 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
             ...output_2,
             ...output_3,
         };
+    }
+
+    prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        const has_past_key_values = !!model_inputs.past_key_values;
+
+        if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
+            if (has_past_key_values) {
+                model_inputs.input_ids = cat([model_inputs.input_ids, model_inputs.input_ids], 0);
+                // NOTE: attention_mask handled in generation
+            } else {
+                model_inputs.input_ids = cat(
+                    [model_inputs.input_ids, full_like(model_inputs.input_ids, BigInt(generation_config.pad_token_id))],
+                    0,
+                );
+                model_inputs.attention_mask = cat(
+                    [model_inputs.attention_mask, full_like(model_inputs.attention_mask, 0n)],
+                    0,
+                );
+            }
+        }
+
+        if (has_past_key_values || !model_inputs.pixel_values) {
+            model_inputs.pixel_values = full([0, 0, 3, 384, 384], 1.0);
+        }
+
+        if (has_past_key_values) {
+            const num_img_tokens = 0;
+            const num_text_tokens = 1;
+            const has_image = num_img_tokens > 0 ? 1 : 0;
+
+            const batch_size = 1;
+            model_inputs.images_seq_mask = new Tensor(
+                'bool',
+                new Array(num_img_tokens + num_text_tokens).fill(true).fill(false, 0, num_text_tokens),
+                [batch_size, num_img_tokens + num_text_tokens],
+            );
+            model_inputs.images_emb_mask = new Tensor('bool', new Array(num_img_tokens).fill(!!has_image), [
+                batch_size,
+                1,
+                num_img_tokens,
+            ]);
+        }
+        return model_inputs;
     }
 
     /**
