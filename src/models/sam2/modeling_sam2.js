@@ -1,10 +1,25 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { encoder_forward } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { Sam2ImageSegmentationOutput } from '../modeling_outputs.js';
+import { ModelOutput } from '../modeling_outputs.js';
 import { ones, full } from '../../utils/tensor.js';
 import { pick } from '../../utils/core.js';
 import { Tensor } from '../../utils/tensor.js';
+
+export class Sam2ImageSegmentationOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.iou_scores The output logits of the model.
+     * @param {Tensor} output.pred_masks Predicted boxes.
+     * @param {Tensor} output.object_score_logits Logits for the object score, indicating if an object is present.
+     */
+    constructor({ iou_scores, pred_masks, object_score_logits }) {
+        super();
+        this.iou_scores = iou_scores;
+        this.pred_masks = pred_masks;
+        this.object_score_logits = object_score_logits;
+    }
+}
 
 export class Sam2PreTrainedModel extends PreTrainedModel {}
 export class Sam2Model extends Sam2PreTrainedModel {

@@ -1,7 +1,29 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { MimiEncoderOutput, MimiDecoderOutput } from '../modeling_outputs.js';
+import { ModelOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
+
+export class MimiEncoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
+     */
+    constructor({ audio_codes }) {
+        super();
+        this.audio_codes = audio_codes;
+    }
+}
+
+export class MimiDecoderOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
+     */
+    constructor({ audio_values }) {
+        super();
+        this.audio_values = audio_values;
+    }
+}
 
 export class MimiPreTrainedModel extends PreTrainedModel {
     main_input_name = 'input_values';

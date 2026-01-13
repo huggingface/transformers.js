@@ -1,5 +1,18 @@
 import { PreTrainedModel } from '../modeling_utils.js';
-import { MgpstrModelOutput } from '../modeling_outputs.js';
+import { ModelOutput } from '../modeling_outputs.js';
+
+export class MgpstrModelOutput extends ModelOutput {
+    constructor({ char_logits, bpe_logits, wp_logits }) {
+        super();
+        this.char_logits = char_logits;
+        this.bpe_logits = bpe_logits;
+        this.wp_logits = wp_logits;
+    }
+
+    get logits() {
+        return [this.char_logits, this.bpe_logits, this.wp_logits];
+    }
+}
 
 export class MgpstrPreTrainedModel extends PreTrainedModel {}
 

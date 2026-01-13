@@ -1,6 +1,22 @@
 import { PreTrainedModel } from '../modeling_utils.js';
-import { CausalLMOutput, SequenceClassifierOutput, TokenClassifierOutput, XVectorOutput } from '../modeling_outputs.js';
+import { CausalLMOutput, SequenceClassifierOutput, TokenClassifierOutput, ModelOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
+
+/**
+ * Base class for outputs of XVector models.
+ */
+export class XVectorOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.logits Classification hidden states before AMSoftmax, of shape `(batch_size, config.xvector_output_dim)`.
+     * @param {Tensor} output.embeddings Utterance embeddings used for vector similarity-based retrieval, of shape `(batch_size, config.xvector_output_dim)`.
+     */
+    constructor({ logits, embeddings }) {
+        super();
+        this.logits = logits;
+        this.embeddings = embeddings;
+    }
+}
 
 /**
  * An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained models.

@@ -23,22 +23,6 @@ export class BaseModelOutput extends ModelOutput {
 }
 
 /**
- * Base class for Segment-Anything model's output.
- */
-export class SamImageSegmentationOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.iou_scores The output logits of the model.
-     * @param {Tensor} output.pred_masks Predicted boxes.
-     */
-    constructor({ iou_scores, pred_masks }) {
-        super();
-        this.iou_scores = iou_scores;
-        this.pred_masks = pred_masks;
-    }
-}
-
-/**
  * Base class for outputs of sentence classification models.
  */
 export class SequenceClassifierOutput extends ModelOutput {
@@ -56,22 +40,6 @@ export class SequenceClassifierOutput extends ModelOutput {
             // Only set attentions if they are not empty
             this.attentions = attentions_list;
         }
-    }
-}
-
-/**
- * Base class for outputs of XVector models.
- */
-export class XVectorOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.logits Classification hidden states before AMSoftmax, of shape `(batch_size, config.xvector_output_dim)`.
-     * @param {Tensor} output.embeddings Utterance embeddings used for vector similarity-based retrieval, of shape `(batch_size, config.xvector_output_dim)`.
-     */
-    constructor({ logits, embeddings }) {
-        super();
-        this.logits = logits;
-        this.embeddings = embeddings;
     }
 }
 
@@ -177,94 +145,5 @@ export class ImageMattingOutput extends ModelOutput {
     constructor({ alphas }) {
         super();
         this.alphas = alphas;
-    }
-}
-
-/**
- * Describes the outputs for the VITS model.
- */
-export class VitsModelOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.waveform The final audio waveform predicted by the model, of shape `(batch_size, sequence_length)`.
-     * @param {Tensor} output.spectrogram The log-mel spectrogram predicted at the output of the flow model.
-     * This spectrogram is passed to the Hi-Fi GAN decoder model to obtain the final audio waveform.
-     */
-    constructor({ waveform, spectrogram }) {
-        super();
-        this.waveform = waveform;
-        this.spectrogram = spectrogram;
-    }
-}
-
-export class Sam2ImageSegmentationOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.iou_scores The output logits of the model.
-     * @param {Tensor} output.pred_masks Predicted boxes.
-     * @param {Tensor} output.object_score_logits Logits for the object score, indicating if an object is present.
-     */
-    constructor({ iou_scores, pred_masks, object_score_logits }) {
-        super();
-        this.iou_scores = iou_scores;
-        this.pred_masks = pred_masks;
-        this.object_score_logits = object_score_logits;
-    }
-}
-
-export class MgpstrModelOutput extends ModelOutput {
-    constructor({ char_logits, bpe_logits, wp_logits }) {
-        super();
-        this.char_logits = char_logits;
-        this.bpe_logits = bpe_logits;
-        this.wp_logits = wp_logits;
-    }
-
-    get logits() {
-        return [this.char_logits, this.bpe_logits, this.wp_logits];
-    }
-}
-
-export class MimiEncoderOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
-     */
-    constructor({ audio_codes }) {
-        super();
-        this.audio_codes = audio_codes;
-    }
-}
-
-export class MimiDecoderOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
-     */
-    constructor({ audio_values }) {
-        super();
-        this.audio_values = audio_values;
-    }
-}
-
-export class DacEncoderOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.audio_codes Discrete code embeddings, of shape `(batch_size, num_quantizers, codes_length)`.
-     */
-    constructor({ audio_codes }) {
-        super();
-        this.audio_codes = audio_codes;
-    }
-}
-
-export class DacDecoderOutput extends ModelOutput {
-    /**
-     * @param {Object} output The output of the model.
-     * @param {Tensor} output.audio_values Decoded audio values, of shape `(batch_size, num_channels, sequence_length)`.
-     */
-    constructor({ audio_values }) {
-        super();
-        this.audio_values = audio_values;
     }
 }

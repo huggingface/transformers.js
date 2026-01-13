@@ -2,8 +2,24 @@ import { encoder_forward } from '../modeling_utils.js';
 import { ones } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
 import { PreTrainedModel } from '../modeling_utils.js';
-import { SamImageSegmentationOutput } from '../modeling_outputs.js';
+import { ModelOutput } from '../modeling_outputs.js';
 import { Tensor } from '../../utils/tensor.js';
+
+/**
+ * Base class for Segment-Anything model's output.
+ */
+export class SamImageSegmentationOutput extends ModelOutput {
+    /**
+     * @param {Object} output The output of the model.
+     * @param {Tensor} output.iou_scores The output logits of the model.
+     * @param {Tensor} output.pred_masks Predicted boxes.
+     */
+    constructor({ iou_scores, pred_masks }) {
+        super();
+        this.iou_scores = iou_scores;
+        this.pred_masks = pred_masks;
+    }
+}
 
 export class SamPreTrainedModel extends PreTrainedModel {}
 
