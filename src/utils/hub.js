@@ -104,7 +104,7 @@ export async function getFile(urlOrPath) {
  * @returns {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }}
  * An object containing all the paths and URLs for the resource.
  */
-export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -215,7 +215,6 @@ export async function storeCachedResource(cache, cacheKey, response, result, opt
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
  * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
- * @param {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }} [paths] Pre-built paths object.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
  * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
@@ -227,14 +226,13 @@ export async function loadResourceFile(
     options = {},
     return_path = false,
     cache = null,
-    paths = null,
 ) {
-    // Use pre-built paths or build them
-    if (!paths) {
-        paths = buildResourcePaths(path_or_repo_id, filename, options, cache);
-    }
-
-    const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = paths;
+    const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
+        path_or_repo_id,
+        filename,
+        options,
+        cache,
+    );
 
     /** @type {string} */
     let cacheKey;
@@ -452,9 +450,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
 
     /** @type {import('./cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
-    const paths = buildResourcePaths(path_or_repo_id, filename, options, cache);
-
-    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache, paths);
+    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
 }
 
 /**
