@@ -161,14 +161,16 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
 /**
  * Stores a resource in the cache.
  *
+ * @param {string} path_or_repo_id The path or repo ID of the model.
+ * @param {string} filename The name of the file to cache.
  * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
  * @param {string} cacheKey The cache key to use.
  * @param {Response|import('./hub/FileResponse.js').default} response The response to cache.
  * @param {Uint8Array} [result] The result buffer if already read.
- * @param {PretrainedOptions & { _path_or_repo_id?: string, _filename?: string }} [options] Options containing progress callback and context for progress updates.
+ * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
  */
-export async function storeCachedResource(cache, cacheKey, response, result, options = {}) {
+export async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options = {}) {
     // Check again whether request is in cache. If not, we add the response to the cache
     if ((await cache.match(cacheKey)) !== undefined) {
         return;
@@ -181,8 +183,8 @@ export async function storeCachedResource(cache, cacheKey, response, result, opt
             ? (data) =>
                   dispatchCallback(options.progress_callback, {
                       status: 'progress',
-                      name: options._path_or_repo_id,
-                      file: options._filename,
+                      name: path_or_repo_id,
+                      file: filename,
                       ...data,
                   })
             : undefined;
@@ -373,13 +375,7 @@ export async function loadResourceFile(
         cacheKey &&
         typeof response !== 'string'
     ) {
-        // Store temporary context for progress callbacks in cache storage
-        const extendedOptions = {
-            ...options,
-            _path_or_repo_id: path_or_repo_id,
-            _filename: filename,
-        };
-        await storeCachedResource(cache, cacheKey, response, result, extendedOptions);
+        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
     }
 
     dispatchCallback(options.progress_callback, {
