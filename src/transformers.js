@@ -16,13 +16,13 @@ export { env } from './env.js';
 export * from './pipelines.js';
 export * from './models.js';
 export * from './tokenizers.js';
-export * from './configs.js';
+export { PretrainedConfig, AutoConfig } from './configs.js';
 
-export * from './utils/audio.js';
-export * from './utils/image.js';
-export * from './utils/video.js';
+export { read_audio, RawAudio } from './utils/audio.js';
+export { load_image, RawImage } from './utils/image.js';
+export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
-export * from './utils/maths.js';
+export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 
 export { FeatureExtractor } from './base/feature_extraction_utils.js';
 export * from './models/feature_extractors.js';

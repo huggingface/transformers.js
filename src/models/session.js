@@ -2,6 +2,7 @@ import {
     createInferenceSession,
     deviceToExecutionProviders,
     isONNXProxy,
+    isONNXTensor,
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
@@ -12,7 +13,6 @@ import {
     isWebGpuFp16Supported,
 } from '../utils/dtypes.js';
 import { apis } from '../env.js';
-import { replaceTensors } from '../utils/tensor.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 import { Tensor } from '../utils/tensor.js';
 
@@ -195,6 +195,23 @@ export async function constructSessions(pretrained_model_name_or_path, names, op
             }),
         ),
     );
+}
+
+/**
+ * Replaces ONNX Tensor objects with custom Tensor objects to support additional functions.
+ * @param {Object} obj The object to replace tensor objects in.
+ * @returns {Object} The object with tensor objects replaced by custom Tensor objects.
+ * @private
+ */
+function replaceTensors(obj) {
+    for (let prop in obj) {
+        if (isONNXTensor(obj[prop])) {
+            obj[prop] = new Tensor(obj[prop]);
+        } else if (typeof obj[prop] === 'object') {
+            replaceTensors(obj[prop]);
+        }
+    }
+    return obj;
 }
 
 /**

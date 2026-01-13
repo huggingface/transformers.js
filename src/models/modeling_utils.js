@@ -1,17 +1,8 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
 import { AutoConfig, getCacheShapes } from '../configs.js';
-import {
-    Tensor,
-    DataTypeMap,
-    full_like,
-    cat,
-    zeros_like,
-    toI64Tensor,
-    ones_like,
-    ones,
-    boolTensor,
-} from '../utils/tensor.js';
+import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
+import { DataTypeMap } from '../utils/dtypes.js';
 
 // These will be populated by registry.js
 export let MODEL_MAPPING_NAMES = null;
@@ -44,6 +35,50 @@ import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../ge
 import { LogitsSampler } from '../generation/logits_sampler.js';
 import { pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
+
+/**
+ * Converts an array or Tensor of integers to an int64 Tensor.
+ * @param {any[]|Tensor} items The input integers to be converted.
+ * @returns {Tensor} The int64 Tensor with the converted values.
+ * @throws {Error} If the input array is empty or the input is a batched Tensor and not all sequences have the same length.
+ * @private
+ */
+function toI64Tensor(items) {
+    if (items instanceof Tensor) {
+        return items;
+    }
+    // items is an array
+    if (items.length === 0) {
+        throw Error('items must be non-empty');
+    }
+
+    if (Array.isArray(items[0])) {
+        // batched
+        if (items.some((x) => x.length !== items[0].length)) {
+            throw Error(
+                "Unable to create tensor, you should probably activate truncation and/or padding with 'padding=True' and/or 'truncation=True' to have batched tensors with the same length.",
+            );
+        }
+
+        return new Tensor('int64', BigInt64Array.from(items.flat().map((x) => BigInt(x))), [
+            items.length,
+            items[0].length,
+        ]);
+    } else {
+        //flat
+        return new Tensor('int64', BigInt64Array.from(items.map((x) => BigInt(x))), [1, items.length]);
+    }
+}
+
+/**
+ * Creates a boolean tensor with a single value.
+ * @param {boolean} value The value of the tensor.
+ * @returns {Tensor} The boolean tensor.
+ * @private
+ */
+export function boolTensor(value) {
+    return new Tensor('bool', [value], [1]);
+}
 
 export const MODEL_TYPES = {
     EncoderOnly: 0,

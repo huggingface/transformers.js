@@ -220,7 +220,7 @@ export function cos_sim(arr1, arr2) {
  * @param {number[]} arr The array to calculate the magnitude of.
  * @returns {number} The magnitude of the array.
  */
-export function magnitude(arr) {
+function magnitude(arr) {
     return Math.sqrt(arr.reduce((acc, val) => acc + val * val, 0));
 }
 

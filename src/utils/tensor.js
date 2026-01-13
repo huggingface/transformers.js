@@ -13,25 +13,7 @@ import { Tensor as ONNXTensor, isONNXTensor } from '../backends/onnx.js';
 
 import { TensorOpRegistry } from '../ops/registry.js';
 
-export const DataTypeMap = Object.freeze({
-    float32: Float32Array,
-    // @ts-ignore ts(2552) Limited availability of Float16Array across browsers:
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Float16Array
-    float16: typeof Float16Array !== 'undefined' ? Float16Array : Uint16Array,
-    float64: Float64Array,
-    string: Array, // string[]
-    int8: Int8Array,
-    uint8: Uint8Array,
-    int16: Int16Array,
-    uint16: Uint16Array,
-    int32: Int32Array,
-    uint32: Uint32Array,
-    int64: BigInt64Array,
-    uint64: BigUint64Array,
-    bool: Uint8Array,
-    uint4: Uint8Array,
-    int4: Int8Array,
-});
+import { DataTypeMap } from './dtypes.js';
 
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
@@ -1582,65 +1564,4 @@ export function quantize_embeddings(tensor, precision) {
     }
 
     return new Tensor(dtype, outputData, [tensor.dims[0], tensor.dims[1] / 8]);
-}
-
-/**
- * Replaces ONNX Tensor objects with custom Tensor objects to support additional functions.
- * @param {Object} obj The object to replace tensor objects in.
- * @returns {Object} The object with tensor objects replaced by custom Tensor objects.
- * @private
- */
-export function replaceTensors(obj) {
-    for (let prop in obj) {
-        if (isONNXTensor(obj[prop])) {
-            obj[prop] = new Tensor(obj[prop]);
-        } else if (typeof obj[prop] === 'object') {
-            replaceTensors(obj[prop]);
-        }
-    }
-    return obj;
-}
-
-/**
- * Converts an array or Tensor of integers to an int64 Tensor.
- * @param {any[]|Tensor} items The input integers to be converted.
- * @returns {Tensor} The int64 Tensor with the converted values.
- * @throws {Error} If the input array is empty or the input is a batched Tensor and not all sequences have the same length.
- * @private
- */
-export function toI64Tensor(items) {
-    if (items instanceof Tensor) {
-        return items;
-    }
-    // items is an array
-    if (items.length === 0) {
-        throw Error('items must be non-empty');
-    }
-
-    if (Array.isArray(items[0])) {
-        // batched
-        if (items.some((x) => x.length !== items[0].length)) {
-            throw Error(
-                "Unable to create tensor, you should probably activate truncation and/or padding with 'padding=True' and/or 'truncation=True' to have batched tensors with the same length.",
-            );
-        }
-
-        return new Tensor('int64', BigInt64Array.from(items.flat().map((x) => BigInt(x))), [
-            items.length,
-            items[0].length,
-        ]);
-    } else {
-        //flat
-        return new Tensor('int64', BigInt64Array.from(items.map((x) => BigInt(x))), [1, items.length]);
-    }
-}
-
-/**
- * Creates a boolean tensor with a single value.
- * @param {boolean} value The value of the tensor.
- * @returns {Tensor} The boolean tensor.
- * @private
- */
-export function boolTensor(value) {
-    return new Tensor('bool', [value], [1]);
 }
