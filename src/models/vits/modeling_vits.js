@@ -5,7 +5,6 @@ import { ModelOutput } from '../modeling_outputs.js';
  * Describes the outputs for the VITS model.
  */
 export class VitsModelOutput extends ModelOutput {
-
     /**
      * @typedef {import('../../utils/tensor.js').Tensor} Tensor
      */

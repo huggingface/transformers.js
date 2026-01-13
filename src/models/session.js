@@ -110,12 +110,6 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         throw new Error(`Invalid kv_cache_dtype: ${kv_cache_dtype}. Should be one of: float32, float16`);
     }
 
-    const session_config = {
-        dtype: selectedDtype,
-        kv_cache_dtype,
-        device: selectedDevice,
-    };
-
     // Construct the model file suffix
     const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype];
 
@@ -168,7 +162,11 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     }
 
     const buffer_or_path = await bufferOrPathPromise;
-
+    const session_config = {
+        dtype: selectedDtype,
+        kv_cache_dtype,
+        device: selectedDevice,
+    };
     return { buffer_or_path, session_options, session_config };
 }
 
