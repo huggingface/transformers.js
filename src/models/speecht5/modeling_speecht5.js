@@ -30,12 +30,12 @@ export class SpeechT5Model extends SpeechT5PreTrainedModel {}
  *
  * // Load speaker embeddings from URL
  * const speaker_embeddings_data = new Float32Array(
- *     await (await fetch('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin')).arrayBuffer()
+ *   await (await fetch('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin')).arrayBuffer()
  * );
  * const speaker_embeddings = new Tensor(
- *     'float32',
- *     speaker_embeddings_data,
- *     [1, speaker_embeddings_data.length]
+ *   'float32',
+ *   speaker_embeddings_data,
+ *   [1, speaker_embeddings_data.length]
  * )
  *
  * // Run tokenization
