@@ -169,9 +169,7 @@ export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['moonshine', 'MoonshineForConditionalGeneration'],
 ]);
 
-const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([
-    ['speecht5', 'SpeechT5ForTextToSpeech'],
-]);
+const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([['speecht5', 'SpeechT5ForTextToSpeech']]);
 
 const MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES = new Map([
     ['vits', 'VitsModel'],
@@ -283,9 +281,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['phi3_v', 'Phi3VForCausalLM'],
 ]);
 
-const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([
-    ['multi_modality', 'MultiModalityCausalLM'],
-]);
+const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([['multi_modality', 'MultiModalityCausalLM']]);
 
 const MODEL_FOR_MASKED_LM_MAPPING_NAMES = new Map([
     ['bert', 'BertForMaskedLM'],
@@ -445,9 +441,7 @@ const MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['audio-spectrogram-transformer', 'ASTForAudioClassification'],
 ]);
 
-const MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES = new Map([
-    ['wavlm', 'WavLMForXVector'],
-]);
+const MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES = new Map([['wavlm', 'WavLMForXVector']]);
 
 const MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['unispeech-sat', 'UniSpeechSatForAudioFrameClassification'],
@@ -456,18 +450,14 @@ const MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['pyannote', 'PyAnnoteForAudioFrameClassification'],
 ]);
 
-const MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES = new Map([
-    ['vitmatte', 'VitMatteForImageMatting'],
-]);
+const MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES = new Map([['vitmatte', 'VitMatteForImageMatting']]);
 
 const MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING_NAMES = new Map([
     ['patchtst', 'PatchTSTForPrediction'],
     ['patchtsmixer', 'PatchTSMixerForPrediction'],
 ]);
 
-const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([
-    ['swin2sr', 'Swin2SRForImageSuperResolution'],
-]);
+const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([['swin2sr', 'Swin2SRForImageSuperResolution']]);
 
 const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
     ['dpt', 'DPTForDepthEstimation'],
@@ -479,13 +469,9 @@ const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
     ['metric3dv2', 'Metric3Dv2ForDepthEstimation'],
 ]);
 
-const MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES = new Map([
-    ['sapiens', 'SapiensForNormalEstimation'],
-]);
+const MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES = new Map([['sapiens', 'SapiensForNormalEstimation']]);
 
-const MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES = new Map([
-    ['vitpose', 'VitPoseForPoseEstimation'],
-]);
+const MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES = new Map([['vitpose', 'VitPoseForPoseEstimation']]);
 
 // NOTE: This is custom to Transformers.js, and is necessary because certain models
 // (e.g., CLIP) are split into vision and text components
@@ -566,7 +552,11 @@ const CUSTOM_MAPPING = [
     ['SnacEncoderModel', ALL_MODEL_FILES.SnacEncoderModel, MODEL_TYPES.EncoderOnly],
     ['SnacDecoderModel', ALL_MODEL_FILES.SnacDecoderModel, MODEL_TYPES.EncoderOnly],
 
-    ['Gemma3nForConditionalGeneration', ALL_MODEL_FILES.Gemma3nForConditionalGeneration, MODEL_TYPES.ImageAudioTextToText],
+    [
+        'Gemma3nForConditionalGeneration',
+        ALL_MODEL_FILES.Gemma3nForConditionalGeneration,
+        MODEL_TYPES.ImageAudioTextToText,
+    ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
 ];

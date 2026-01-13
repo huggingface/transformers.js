@@ -40,14 +40,12 @@ export class SamImageProcessor extends ImageProcessor {
         }
 
         // Reshape input points
-        for (let i = 0; i < input_points.length; ++i) { // batch_size
+        for (let i = 0; i < input_points.length; ++i) {
+            // batch_size
             const [originalHeight, originalWidth] = original_sizes[i];
             const [reshapedHeight, reshapedWidth] = reshaped_input_sizes[i];
 
-            const resizeFactors = [
-                reshapedWidth / originalWidth,
-                reshapedHeight / originalHeight,
-            ]
+            const resizeFactors = [reshapedWidth / originalWidth, reshapedHeight / originalHeight];
 
             for (let j = 0; j < input_points[i].length; ++j) {
                 // point_batch_size
