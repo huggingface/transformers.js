@@ -312,7 +312,7 @@ export function getCacheShapes(config, options) {
             mamba_d_state,
             mamba_n_groups,
             mamba_expand,
-        } = /** @type {any} */(config);
+        } = /** @type {any} */ (config);
         const head_dim = hidden_size / num_attention_heads;
         const batch_size = options?.batch_size ?? 1;
         const conv_d_inner = mamba_expand * hidden_size + 2 * mamba_n_groups * mamba_d_state;

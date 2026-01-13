@@ -185,14 +185,13 @@ export class TextGenerationPipeline
                 // Trim the decoded text to only include the generated part
                 decoded[i] = decoded[i].slice(promptLengths[textIndex]);
             }
-            toReturn[textIndex].push(/** @type {TextGenerationSingle} */({
-                generated_text: isChatInput
-                    ? [
-                        ...((/** @type {Chat[]} */(texts)[textIndex])),
-                        { role: 'assistant', content: decoded[i] },
-                    ]
-                    : decoded[i]
-            }));
+            toReturn[textIndex].push(
+                /** @type {TextGenerationSingle} */ ({
+                    generated_text: isChatInput
+                        ? [.../** @type {Chat[]} */ (texts)[textIndex], { role: 'assistant', content: decoded[i] }]
+                        : decoded[i],
+                }),
+            );
         }
         return !isBatched && toReturn.length === 1 ? toReturn[0] : toReturn;
     }

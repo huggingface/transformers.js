@@ -14,13 +14,7 @@ export async function getCoreModelFile(pretrained_model_name_or_path, fileName, 
     const baseName = `${fileName}${suffix}.onnx`;
     const fullPath = `${options.subfolder ?? ''}/${baseName}`;
 
-    return await getModelFile(
-        pretrained_model_name_or_path,
-        fullPath,
-        true,
-        options,
-        apis.IS_NODE_ENV,
-    );
+    return await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
 }
 
 /**

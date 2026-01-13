@@ -1,9 +1,8 @@
-
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline as pipe } from 'node:stream/promises';
 
-import { apis } from "../env.js";
+import { apis } from '../env.js';
 
 /**
  * Save blob file.
@@ -18,23 +17,22 @@ export async function saveBlob(path, blob) {
         }
         // Convert the canvas content to a data URL
         const dataURL = URL.createObjectURL(blob);
-        
+
         // Create an anchor element with the data URL as the href attribute
         const downloadLink = document.createElement('a');
         downloadLink.href = dataURL;
-        
+
         // Set the download attribute to specify the desired filename for the downloaded image
         downloadLink.download = path;
-        
+
         // Trigger the download
         downloadLink.click();
-        
+
         // Clean up: remove the anchor element from the DOM
         downloadLink.remove();
-        
+
         // Revoke the Object URL to free up memory
         URL.revokeObjectURL(dataURL);
-
     } else if (apis.IS_FS_AVAILABLE) {
         // Convert Blob to a Node.js Readable Stream
         const webStream = blob.stream();
@@ -45,7 +43,6 @@ export async function saveBlob(path, blob) {
 
         // Pipe the readable stream to the file write stream
         await pipe(nodeStream, fileStream);
-
     } else {
         throw new Error('Unable to save because filesystem is disabled in this environment.');
     }

@@ -774,7 +774,7 @@ function encodeWAV(chunks, rate) {
     /* data chunk length */
     view.setUint32(40, totalLength * 4, true);
 
-    return new Blob([buffer, ...chunks], { type: "audio/wav" });
+    return new Blob([buffer, ...chunks], { type: 'audio/wav' });
 }
 
 function writeString(view, offset, string) {
