@@ -78,6 +78,8 @@ import {
     MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES,
 } from './models/registry.js';
 
+import * as ALL_MODEL_FILES from './models/index.js';
+
 /**
  * Base class of all AutoModels. Contains the `from_pretrained` function
  * which is used to instantiate pretrained models.
@@ -143,7 +145,7 @@ export class PretrainedMixin {
                 }
                 if (!modelInfo) continue; // Item not found in this mapping
             }
-            return await modelInfo[1].from_pretrained(pretrained_model_name_or_path, options);
+            return await ALL_MODEL_FILES[modelInfo].from_pretrained(pretrained_model_name_or_path, options);
         }
 
         if (this.BASE_IF_FAIL) {
