@@ -22,8 +22,6 @@ export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
     }
 }
 
-export class LlavaOnevisionForConditionalGeneration extends LlavaForConditionalGeneration {} // NOTE: extends LlavaForConditionalGeneration
-
 export class Moondream1ForConditionalGeneration extends LlavaForConditionalGeneration {} // NOTE: extends LlavaForConditionalGeneration
 
 export class LlavaQwen2ForCausalLM extends LlavaForConditionalGeneration { } // NOTE: extends LlavaForConditionalGeneration
