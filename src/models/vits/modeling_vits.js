@@ -2,13 +2,14 @@ import { PreTrainedModel } from '../modeling_utils.js';
 import { ModelOutput } from '../modeling_outputs.js';
 
 /**
- * @typedef {import('../../utils/tensor.js').Tensor} Tensor
- */
-
-/**
  * Describes the outputs for the VITS model.
  */
 export class VitsModelOutput extends ModelOutput {
+
+    /**
+     * @typedef {import('../../utils/tensor.js').Tensor} Tensor
+     */
+
     /**
      * @param {Object} output The output of the model.
      * @param {Tensor} output.waveform The final audio waveform predicted by the model, of shape `(batch_size, sequence_length)`.
