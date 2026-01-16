@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "node scripts/dev.mjs",
     "typegen": "tsc",
     "clean": "rm -rf dist"
   },

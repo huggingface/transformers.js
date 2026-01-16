@@ -6,6 +6,7 @@ const MIME_TYPES = {
   ".html": "text/html",
   ".js": "text/javascript",
   ".mjs": "text/javascript",
+  ".ts": "text/plain",
   ".css": "text/css",
   ".json": "application/json",
   ".wasm": "application/wasm",

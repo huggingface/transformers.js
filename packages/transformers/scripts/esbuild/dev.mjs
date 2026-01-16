@@ -12,7 +12,7 @@ import {
   ROOT_DIR,
   WEB_IGNORE_MODULES,
 } from "./build/constants.mjs";
-import { startServer } from "./build/httpServer.mjs";
+import { startServer } from "../../../../scripts/httpServer.mjs";
 import prepareOutDir from "./build/prepareOutDir.mjs";
 import { colors, log } from "../../../../scripts/logger.mjs";
 

@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "dev": "node scripts/dev.mjs",
     "test": "npm run test --workspaces --if-present",
     "typegen": "npm run typegen --workspaces --if-present",
     "format": "prettier --write .",
