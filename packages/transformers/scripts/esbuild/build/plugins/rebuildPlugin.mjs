@@ -1,14 +1,20 @@
+import { colors, log } from "../../../../../../scripts/logger.mjs";
+
 /**
  * Plugin to log rebuild events with timing
  */
 export const rebuildPlugin = (name) => {
   let startTime = 0;
+  let isFirstBuild = true;
 
   return {
     name: "rebuild-logger",
     setup(build) {
       build.onStart(() => {
         startTime = performance.now();
+        if (!isFirstBuild) {
+          log.build(`${colors.gray}Rebuilding ${name}...${colors.reset}`);
+        }
       });
 
       build.onEnd((result) => {
@@ -16,10 +22,41 @@ export const rebuildPlugin = (name) => {
         const duration = (endTime - startTime).toFixed(2);
 
         if (result.errors.length > 0) {
-          console.log(`\n${name} - Build failed with ${result.errors.length} error(s) in ${duration}ms`);
+          log.error(
+            `${colors.bright}${name}${colors.reset} - Build failed with ${result.errors.length} error(s) in ${duration}ms`,
+          );
+        } else if (!isFirstBuild) {
+          log.done(
+            `${colors.bright}${name}${colors.reset} - Rebuilt in ${colors.gray}${duration}ms${colors.reset}`,
+          );
         } else {
-          console.log(`\n${name} - Rebuilt in ${duration}ms`);
+          log.done(
+            `${colors.bright}${name}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`,
+          );
         }
+
+        isFirstBuild = false;
+      });
+
+      build.onEnd((result) => {
+        const endTime = performance.now();
+        const duration = (endTime - startTime).toFixed(2);
+
+        if (result.errors.length > 0) {
+          console.log(
+            `${colors.red}[fail]${colors.reset} ${colors.bright}${name}${colors.reset} - Build failed with ${result.errors.length} error(s) in ${duration}ms`,
+          );
+        } else if (!isFirstBuild) {
+          console.log(
+            `${colors.green}[done]${colors.reset} ${colors.bright}${name}${colors.reset} - Rebuilt in ${colors.gray}${duration}ms${colors.reset}`,
+          );
+        } else {
+          console.log(
+            `${colors.green}[done]${colors.reset} ${colors.bright}${name}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`,
+          );
+        }
+
+        isFirstBuild = false;
       });
     },
   };

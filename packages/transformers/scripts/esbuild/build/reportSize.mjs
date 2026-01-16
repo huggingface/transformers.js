@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
+import path from "node:path";
+import { colors, log } from "../../../../../scripts/logger.mjs";
 
 export const formatSize = (bytes) => {
   if (bytes < 1024) return `${bytes}b`;
@@ -11,6 +13,9 @@ export const reportSize = (outfile) => {
   const content = readFileSync(outfile);
   const size = content.length;
   const gzipSize = gzipSync(content).length;
+  const filename = path.basename(outfile);
 
-  console.log(`\n${outfile}\n${formatSize(size)} (gzip: ${formatSize(gzipSize)})`);
+  log.done(
+    `${colors.bright}${filename}${colors.reset} ${colors.gray}${formatSize(size)}${colors.reset} ${colors.dim}(gzip: ${formatSize(gzipSize)})${colors.reset}`,
+  );
 };

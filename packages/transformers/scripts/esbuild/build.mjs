@@ -15,6 +15,7 @@ import {
 } from "./build/constants.mjs";
 import { reportSize } from "./build/reportSize.mjs";
 import prepareOutDir from "./build/prepareOutDir.mjs";
+import { colors, log } from "../../../../scripts/logger.mjs";
 
 /**
  *
@@ -45,7 +46,7 @@ async function buildTarget({
     plugins.push(postBuildPlugin(OUT_DIR, ROOT_DIR));
   }
 
-  console.log(`\nBuilding ${regularFile}...`);
+  log.build(`Building ${colors.bright}${regularFile}${colors.reset}...`);
   await esbuild({
     ...getEsbuildProdConfig(ROOT_DIR),
     platform,
@@ -56,7 +57,7 @@ async function buildTarget({
   });
   reportSize(path.join(OUT_DIR, regularFile));
 
-  console.log(`\nBuilding ${minFile}...`);
+  log.build(`Building ${colors.bright}${minFile}${colors.reset}...`);
   await esbuild({
     ...getEsbuildProdConfig(ROOT_DIR),
     platform,
@@ -70,7 +71,8 @@ async function buildTarget({
   reportSize(path.join(OUT_DIR, minFile));
 }
 
-console.log("\nBuilding transformers.js with esbuild...\n");
+log.section("BUILD");
+log.info("Building transformers.js with esbuild...\n");
 
 const startTime = performance.now();
 
@@ -78,7 +80,7 @@ try {
   prepareOutDir(OUT_DIR);
 
   // Bundle build - bundles everything except ignored modules
-  console.log("\n=== Bundle Build (ESM) ===");
+  log.section("Bundle Build (ESM)");
   await buildTarget({
     name: "",
     suffix: ".js",
@@ -89,7 +91,7 @@ try {
   });
 
   // Web build - external onnxruntime libs
-  console.log("\n=== Web Build (ESM) ===");
+  log.section("Web Build (ESM)");
   await buildTarget({
     name: ".web",
     suffix: ".js",
@@ -100,7 +102,7 @@ try {
   });
 
   // Node ESM build
-  console.log("\n=== Node Build (ESM) ===");
+  log.section("Node Build (ESM)");
   await buildTarget({
     name: ".node",
     suffix: ".mjs",
@@ -111,7 +113,7 @@ try {
   });
 
   // Node CJS build
-  console.log("\n=== Node Build (CJS) ===");
+  log.section("Node Build (CJS)");
   await buildTarget({
     name: ".node",
     suffix: ".cjs",
@@ -123,8 +125,11 @@ try {
 
   const endTime = performance.now();
   const duration = (endTime - startTime).toFixed(2);
-  console.log(`\nAll builds completed successfully in ${duration}ms!\n`);
+  log.success(
+    `All builds completed in ${colors.bright}${duration}ms${colors.reset}\n`,
+  );
 } catch (error) {
-  console.error("\nBuild failed:", error);
+  log.error(`Build failed: ${error.message}`);
+  console.error(error);
   process.exit(1);
 }

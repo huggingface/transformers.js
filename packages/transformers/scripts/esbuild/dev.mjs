@@ -1,20 +1,27 @@
 import { context } from "esbuild";
 import path from "node:path";
+import { readdirSync } from "node:fs";
 import { postBuildPlugin } from "./build/plugins/postBuildPlugin.mjs";
 import { stripNodePrefixPlugin } from "./build/plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./build/plugins/ignoreModulesPlugin.mjs";
 import { rebuildPlugin } from "./build/plugins/rebuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./build/plugins/externalNodeBuiltinsPlugin.mjs";
-import { getEsbuildDevConfig, OUT_DIR, ROOT_DIR, WEB_IGNORE_MODULES } from "./build/constants.mjs";
+import {
+  getEsbuildDevConfig,
+  OUT_DIR,
+  ROOT_DIR,
+  WEB_IGNORE_MODULES,
+} from "./build/constants.mjs";
 import { startServer } from "./build/httpServer.mjs";
 import prepareOutDir from "./build/prepareOutDir.mjs";
+import { colors, log } from "../../../../scripts/logger.mjs";
 
 const startTime = performance.now();
 
 prepareOutDir(OUT_DIR);
 
-console.log("\n=== BUILD ===");
-console.log("Building transformers.js with esbuild in watch mode...");
+log.section("BUILD");
+log.info("Building transformers.js with esbuild in watch mode...");
 
 // Create build contexts for watch mode
 const bundleContext = await context({
@@ -41,29 +48,54 @@ const webContext = await context({
   ],
 });
 
-console.log("\nInitial build starting...");
+log.dim("Starting initial build...\n");
 
+// Wait for the initial builds to complete before starting the server
+await Promise.all([bundleContext.rebuild(), webContext.rebuild()]);
+
+// Now start watching
 await Promise.all([bundleContext.watch(), webContext.watch()]);
 
 const endTime = performance.now();
 const duration = (endTime - startTime).toFixed(2);
-console.log(`\nAll builds completed successfully in ${duration}ms!`);
+log.success(
+  `All builds completed in ${colors.bright}${duration}ms${colors.reset}`,
+);
 
 const PORT = 8080;
 
-console.log("\n=== SERVE ===");
+log.section("SERVER");
 const server = await startServer(OUT_DIR, PORT);
 
-console.log(`\nServer running at http://localhost:${PORT}/`);
-console.log(`Serving files from: ${OUT_DIR}`);
+log.success(
+  `Server running at ${colors.bright}http://localhost:${PORT}/${colors.reset}`,
+);
+log.dim(`Serving from: ${OUT_DIR}\n`);
 
-console.log(`\nWatching for changes...\n`);
+// List all files in OUT_DIR (excluding .map files)
+const files = readdirSync(OUT_DIR)
+  .filter((file) => !file.endsWith(".map"))
+  .sort();
+
+if (files.length > 0) {
+  console.log(`${colors.bright}Available files:${colors.reset}`);
+  files.forEach((file) => {
+    log.url(`http://localhost:${PORT}/${file}`);
+  });
+}
+
+console.log(
+  `\n${colors.yellow}[watch]${colors.reset} Watching for changes...\n`,
+);
 
 // Keep process alive and cleanup
 process.on("SIGINT", async () => {
-  console.log("\n\nStopping watch mode and server...");
+  console.log(
+    `\n\n${colors.yellow}[stop]${colors.reset} Stopping watch mode and server...`,
+  );
   server.close();
   await bundleContext.dispose();
   await webContext.dispose();
+  log.dim("Goodbye!");
   process.exit(0);
 });
