@@ -9,12 +9,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./browser.min": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/browser.min.js"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
-    "typegen": "tsc",
+    "typegen": "tsc --declaration --emitDeclarationOnly",
     "clean": "rm -rf dist"
   },
   "peerDependencies": {

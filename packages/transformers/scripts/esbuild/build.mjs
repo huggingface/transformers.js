@@ -13,9 +13,11 @@ import {
   ROOT_DIR,
   getEsbuildProdConfig,
 } from "./build/constants.mjs";
-import { reportSize } from "./build/reportSize.mjs";
-import prepareOutDir from "./build/prepareOutDir.mjs";
-import { colors, log } from "../../../../scripts/logger.mjs";
+import { reportSize } from "../../../../scripts/reportSize.mjs";
+import prepareOutDir from "../../../../scripts/prepareOutDir.mjs";
+import { colors, createLogger } from "../../../../scripts/logger.mjs";
+
+const log = createLogger("transformers");
 
 /**
  *
@@ -55,7 +57,7 @@ async function buildTarget({
     external: externalModules,
     plugins,
   });
-  reportSize(path.join(OUT_DIR, regularFile));
+  reportSize(path.join(OUT_DIR, regularFile), log);
 
   log.build(`Building ${colors.bright}${minFile}${colors.reset}...`);
   await esbuild({
@@ -68,7 +70,7 @@ async function buildTarget({
     plugins,
     legalComments: "none",
   });
-  reportSize(path.join(OUT_DIR, minFile));
+  reportSize(path.join(OUT_DIR, minFile), log);
 }
 
 log.section("BUILD");

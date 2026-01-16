@@ -32,10 +32,14 @@ const transformers = spawn("npm", ["run", "dev", "--workspace=packages/transform
 });
 processes.push(transformers);
 
-// Start transformers-react dev server
+// Start transformers-react dev server with transform flag
 const transformersReact = spawn("npm", ["run", "dev", "--workspace=packages/transformers-react"], {
   stdio: "inherit",
   shell: true,
+  env: {
+    ...process.env,
+    TRANSFORM_IMPORTS: "true", // Enable import transformation
+  },
 });
 processes.push(transformersReact);
 

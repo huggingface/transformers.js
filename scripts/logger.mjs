@@ -16,15 +16,28 @@ export const colors = {
   gray: "\x1b[90m",
 };
 
-export const log = {
-  section: (text) => console.log(`\n${colors.bright}${colors.cyan}=== ${text} ===${colors.reset}`),
-  info: (text) => console.log(`${colors.blue}[info]${colors.reset} ${text}`),
-  success: (text) => console.log(`${colors.green}✓${colors.reset} ${text}`),
-  warning: (text) => console.log(`${colors.yellow}[warn]${colors.reset} ${text}`),
-  error: (text) => console.log(`${colors.red}[error]${colors.reset} ${text}`),
-  dim: (text) => console.log(`${colors.dim}${text}${colors.reset}`),
-  url: (text) => console.log(`  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`),
-  file: (text) => console.log(`  ${colors.gray}-${colors.reset} ${text}`),
-  build: (text) => console.log(`${colors.cyan}[build]${colors.reset} ${text}`),
-  done: (text) => console.log(`${colors.green}[done]${colors.reset} ${text}`),
-};
+/**
+ * Creates a logger with optional package prefix
+ * @param {string} [prefix] - Optional prefix to prepend to all logs (e.g., "transformers", "react")
+ * @returns {Object} Logger object with various log methods
+ */
+export function createLogger(prefix = "") {
+  const formatPrefix = prefix ? `${colors.magenta}[${prefix}]${colors.reset} ` : "";
+
+  return {
+    section: (text) => console.log(`\n${formatPrefix}${colors.bright}${colors.cyan}=== ${text} ===${colors.reset}`),
+    info: (text) => console.log(`${formatPrefix}${colors.blue}[info]${colors.reset} ${text}`),
+    success: (text) => console.log(`${formatPrefix}${colors.green}✓${colors.reset} ${text}`),
+    warning: (text) => console.log(`${formatPrefix}${colors.yellow}[warn]${colors.reset} ${text}`),
+    error: (text) => console.log(`${formatPrefix}${colors.red}[error]${colors.reset} ${text}`),
+    dim: (text) => console.log(`${formatPrefix}${colors.dim}${text}${colors.reset}`),
+    url: (text) =>
+      console.log(`${formatPrefix}  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`),
+    file: (text) => console.log(`${formatPrefix}  ${colors.gray}-${colors.reset} ${text}`),
+    build: (text) => console.log(`${formatPrefix}${colors.cyan}[build]${colors.reset} ${text}`),
+    done: (text) => console.log(`${formatPrefix}${colors.green}[done]${colors.reset} ${text}`),
+  };
+}
+
+// Default logger without prefix for backward compatibility
+export const log = createLogger();

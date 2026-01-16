@@ -13,9 +13,10 @@ import {
   WEB_IGNORE_MODULES,
 } from "./build/constants.mjs";
 import { startServer } from "../../../../scripts/httpServer.mjs";
-import prepareOutDir from "./build/prepareOutDir.mjs";
-import { colors, log } from "../../../../scripts/logger.mjs";
+import prepareOutDir from "../../../../scripts/prepareOutDir.mjs";
+import { colors, createLogger } from "../../../../scripts/logger.mjs";
 
+const log = createLogger("transformers");
 const startTime = performance.now();
 
 prepareOutDir(OUT_DIR);
@@ -78,21 +79,17 @@ const files = readdirSync(OUT_DIR)
   .sort();
 
 if (files.length > 0) {
-  console.log(`${colors.bright}Available files:${colors.reset}`);
+  log.info(`${colors.bright}Available files:${colors.reset}`);
   files.forEach((file) => {
     log.url(`http://localhost:${PORT}/${file}`);
   });
 }
 
-console.log(
-  `\n${colors.yellow}[watch]${colors.reset} Watching for changes...\n`,
-);
+log.dim(`\nWatching for changes...\n`);
 
 // Keep process alive and cleanup
 process.on("SIGINT", async () => {
-  console.log(
-    `\n\n${colors.yellow}[stop]${colors.reset} Stopping watch mode and server...`,
-  );
+  log.warning(`\nStopping watch mode and server...`);
   server.close();
   await bundleContext.dispose();
   await webContext.dispose();

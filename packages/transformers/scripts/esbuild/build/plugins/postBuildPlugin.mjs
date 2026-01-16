@@ -1,6 +1,8 @@
 import path from "node:path";
 import { copyFileSync, unlinkSync, existsSync } from "node:fs";
-import { colors, log } from "../../../../../../scripts/logger.mjs";
+import { colors, createLogger } from "../../../../../../scripts/logger.mjs";
+
+const log = createLogger("transformers");
 
 /**
  * Plugin to post-process build files.

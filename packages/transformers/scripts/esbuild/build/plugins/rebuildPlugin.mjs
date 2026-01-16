@@ -1,4 +1,6 @@
-import { colors, log } from "../../../../../../scripts/logger.mjs";
+import { colors, createLogger } from "../../../../../../scripts/logger.mjs";
+
+const log = createLogger("transformers");
 
 /**
  * Plugin to log rebuild events with timing
@@ -32,27 +34,6 @@ export const rebuildPlugin = (name) => {
         } else {
           log.done(
             `${colors.bright}${name}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`,
-          );
-        }
-
-        isFirstBuild = false;
-      });
-
-      build.onEnd((result) => {
-        const endTime = performance.now();
-        const duration = (endTime - startTime).toFixed(2);
-
-        if (result.errors.length > 0) {
-          console.log(
-            `${colors.red}[fail]${colors.reset} ${colors.bright}${name}${colors.reset} - Build failed with ${result.errors.length} error(s) in ${duration}ms`,
-          );
-        } else if (!isFirstBuild) {
-          console.log(
-            `${colors.green}[done]${colors.reset} ${colors.bright}${name}${colors.reset} - Rebuilt in ${colors.gray}${duration}ms${colors.reset}`,
-          );
-        } else {
-          console.log(
-            `${colors.green}[done]${colors.reset} ${colors.bright}${name}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`,
           );
         }
 
