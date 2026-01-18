@@ -535,8 +535,8 @@
         </div>
         <div class="mb-3">
           <h5 class="mb-2">Installation</h5>
-          To install via <a href="https://www.npmjs.com/package/@xenova/transformers">NPM</a>, run:
-          <pre><code class="language-bash">npm i @xenova/transformers</code></pre>
+          To install via <a href="https://www.npmjs.com/package/@huggingface/transformers">NPM</a>, run:
+          <pre><code class="language-bash">npm i @huggingface/transformers</code></pre>
 
           Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN
           or static hosting. For example, using
@@ -544,7 +544,7 @@
           you can import the library with:
 
           <pre><code class="language-html">&lt;script type=&quot;module&quot;&gt;
-    import { pipeline } from &#39;https://cdn.jsdelivr.net/npm/@xenova/transformers&#39;;
+    import { pipeline } from &#39;https://cdn.jsdelivr.net/npm/@huggingface/transformers&#39;;
 &lt;/script&gt;</code></pre>
         </div>
 
@@ -564,7 +564,7 @@ out = pipe('I love transformers!')
 
             </div>
             <div class="col-lg-6 mb-4 mb-lg-0">
-              <pre><code class="language-js">import { pipeline } from '@xenova/transformers';
+              <pre><code class="language-js">import { pipeline } from '@huggingface/transformers';
 
 // Allocate a pipeline for sentiment-analysis
 let pipe = await pipeline('sentiment-analysis');

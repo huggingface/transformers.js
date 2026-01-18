@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "vite": "^4.3.2"
+    "vite": "latest"
   },
   "dependencies": {
-    "@xenova/transformers": "^2.0.0-alpha.3",
-    "chart.js": "^4.3.0",
-    "prismjs": "^1.29.0"
+    "@huggingface/transformers": "../..",
+    "chart.js": "latest",
+    "prismjs": "latest"
   }
 }
