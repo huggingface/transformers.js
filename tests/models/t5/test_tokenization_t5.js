@@ -248,7 +248,6 @@ export const CUSTOM_TESTS = () => {
   // This is necessary since there are sometimes bugs in the transformers library.
   describe("hard-coded", () => {
     const TESTS = {
-      // legacy=false
       "Xenova/t5-tokenizer-new": [
         {
           data: {
@@ -257,7 +256,6 @@ export const CUSTOM_TESTS = () => {
             "Hey </s>. how are you": [9459, 3, 1, 5, 149, 33, 25],
           },
           reversible: true,
-          legacy: null,
         },
         {
           data: {
@@ -265,7 +263,6 @@ export const CUSTOM_TESTS = () => {
             "A\n'll": [71, 3, 31, 195],
           },
           reversible: false,
-          legacy: null,
         },
       ],
     };
@@ -274,8 +271,8 @@ export const CUSTOM_TESTS = () => {
       it(
         tokenizerName,
         async () => {
-          for (const { data, reversible, legacy } of test_data) {
-            const tokenizer = await T5Tokenizer.from_pretrained(tokenizerName, { legacy });
+          for (const { data, reversible } of test_data) {
+            const tokenizer = await T5Tokenizer.from_pretrained(tokenizerName);
 
             for (const [text, expected] of Object.entries(data)) {
               const token_ids = tokenizer.encode(text, { add_special_tokens: false });
