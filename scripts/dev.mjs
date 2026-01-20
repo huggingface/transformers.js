@@ -36,10 +36,6 @@ processes.push(transformers);
 const transformersReact = spawn("npm", ["run", "dev", "--workspace=packages/transformers-react"], {
   stdio: "inherit",
   shell: true,
-  env: {
-    ...process.env,
-    TRANSFORM_IMPORTS: "true", // Enable import transformation
-  },
 });
 processes.push(transformersReact);
 
