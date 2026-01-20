@@ -12,10 +12,7 @@ export default () => {
     let images = {};
 
     beforeAll(async () => {
-      processor = await AutoProcessor.from_pretrained(model_id, {
-        // Use legacy to match python version
-        legacy: true,
-      });
+      processor = await AutoProcessor.from_pretrained(model_id);
       images = {
         white_image: await load_cached_image("white_image"),
       };
