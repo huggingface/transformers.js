@@ -4,8 +4,20 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "jsx": "react",
-    "types": ["react"]
+    "types": ["react"],
+    "composite": true,
+    "baseUrl": ".",
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@huggingface/transformers": ["../transformers/types/src/transformers"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../transformers" }
+  ]
 }
