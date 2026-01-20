@@ -25,7 +25,7 @@ import { getModelJSON, getModelText } from '../utils/hub.js';
 /**
  * @typedef {Object} ProcessorProperties Additional processor-specific properties.
  * @typedef {import('../utils/hub.js').PretrainedOptions & ProcessorProperties} PretrainedProcessorOptions
- * @typedef {import('../tokenizers.js').PreTrainedTokenizer} PreTrainedTokenizer
+ * @typedef {import('./tokenization_utils.js').PreTrainedTokenizer} PreTrainedTokenizer
  */
 
 /**
