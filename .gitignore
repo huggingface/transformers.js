@@ -16,3 +16,4 @@ packages/*/types
 
 # Do not track coverage reports
 /coverage
+packages/*/coverage
