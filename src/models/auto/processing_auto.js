@@ -1,13 +1,13 @@
 import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { getModelJSON } from '../../utils/hub.js';
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 
 import * as AllProcessors from '../processors.js';
 import * as AllImageProcessors from '../image_processors.js';
 import * as AllFeatureExtractors from '../feature_extractors.js';
 
 /**
- * @typedef {import('../../base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
+ * @typedef {import('../../processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
  */
 
 /**

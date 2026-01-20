@@ -1,4 +1,4 @@
-import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extraction_utils.js';
+import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class EncodecFeatureExtractor extends FeatureExtractor {

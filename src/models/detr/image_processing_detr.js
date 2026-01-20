@@ -3,14 +3,14 @@ import {
     post_process_object_detection,
     post_process_panoptic_segmentation,
     post_process_instance_segmentation,
-} from '../../base/image_processors_utils.js';
+} from '../../image_processors_utils.js';
 
 import { full } from '../../utils/tensor.js';
 
 /**
  * @typedef {object} DetrFeatureExtractorResultProps
  * @property {import('../../utils/tensor.js').Tensor} pixel_mask
- * @typedef {import('../../base/image_processors_utils.js').ImageProcessorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
+ * @typedef {import('../../image_processors_utils.js').ImageProcessorResult & DetrFeatureExtractorResultProps} DetrFeatureExtractorResult
  */
 
 export class DetrImageProcessor extends ImageProcessor {

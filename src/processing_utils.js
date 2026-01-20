@@ -18,13 +18,13 @@
  *
  * @module processors
  */
-import { PROCESSOR_NAME, CHAT_TEMPLATE_NAME } from '../utils/constants.js';
-import { Callable } from '../utils/generic.js';
-import { getModelJSON, getModelText } from '../utils/hub.js';
+import { PROCESSOR_NAME, CHAT_TEMPLATE_NAME } from './utils/constants.js';
+import { Callable } from './utils/generic.js';
+import { getModelJSON, getModelText } from './utils/hub.js';
 
 /**
  * @typedef {Object} ProcessorProperties Additional processor-specific properties.
- * @typedef {import('../utils/hub.js').PretrainedOptions & ProcessorProperties} PretrainedProcessorOptions
+ * @typedef {import('./utils/hub.js').PretrainedOptions & ProcessorProperties} PretrainedProcessorOptions
  * @typedef {import('./tokenization_utils.js').PreTrainedTokenizer} PreTrainedTokenizer
  */
 

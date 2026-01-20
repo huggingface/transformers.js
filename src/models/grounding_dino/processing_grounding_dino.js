@@ -1,7 +1,7 @@
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
-import { center_to_corners_format } from '../../base/image_processors_utils.js';
+import { center_to_corners_format } from '../../image_processors_utils.js';
 
 /**
  * Get token ids of phrases from posmaps and input_ids.

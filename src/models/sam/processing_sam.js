@@ -1,4 +1,4 @@
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 
 export class SamProcessor extends Processor {

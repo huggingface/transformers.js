@@ -1,4 +1,4 @@
-import { PreTrainedTokenizer, _build_translation_inputs } from '../../base/tokenization_utils.js';
+import { PreTrainedTokenizer, _build_translation_inputs } from '../../tokenization_utils.js';
 
 /**
  * The M2M100Tokenizer class is used to tokenize text for M2M100 ("Many-to-Many") models.

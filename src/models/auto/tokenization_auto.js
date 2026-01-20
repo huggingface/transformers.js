@@ -1,4 +1,4 @@
-import { PreTrainedTokenizer, loadTokenizer } from '../../base/tokenization_utils.js';
+import { PreTrainedTokenizer, loadTokenizer } from '../../tokenization_utils.js';
 import * as AllTokenizers from '../tokenizers.js';
 
 /**
@@ -33,7 +33,7 @@ export class AutoTokenizer {
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing tokenizer files, e.g., `./my_model_directory/`.
-     * @param {import('../../base/tokenization_utils.js').PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
+     * @param {import('../../tokenization_utils.js').PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
      *
      * @returns {Promise<PreTrainedTokenizer>} A new instance of the PreTrainedTokenizer class.
      */

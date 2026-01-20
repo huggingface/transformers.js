@@ -1,4 +1,4 @@
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 import { PyAnnoteFeatureExtractor } from './feature_extraction_pyannote.js';
 
 export class PyAnnoteProcessor extends Processor {

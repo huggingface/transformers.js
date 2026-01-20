@@ -1,4 +1,4 @@
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { mergeArrays } from '../../utils/core.js';
@@ -22,7 +22,7 @@ export class VLChatProcessor extends Processor {
     /**
      * @typedef {Object} MultimodalMessageProperties Additional properties for multimodal messages.
      * @property {(RawImage | string | URL)[]} [images] The images in the message.
-     * @typedef {(import('../../base/tokenization_utils.js').Message & MultimodalMessageProperties)[]} MultimodalConversation The conversation possibly containing multimodal inputs.
+     * @typedef {(import('../../tokenization_utils.js').Message & MultimodalMessageProperties)[]} MultimodalConversation The conversation possibly containing multimodal inputs.
      */
 
     /**
@@ -38,7 +38,7 @@ export class VLChatProcessor extends Processor {
      * @param {Object} options Additional options for processing.
      * @param {RawImage|RawImage[]} [options.images] The images to process, if not set in the conversation.
      * @param {string} [options.chat_template="default"] The chat template to use.
-     * @returns {Promise<VLCChatProcessorResult | VLCChatProcessorResult & import('../../base/image_processors_utils.js').ImageProcessorResult>} The processed input.
+     * @returns {Promise<VLCChatProcessorResult | VLCChatProcessorResult & import('../../image_processors_utils.js').ImageProcessorResult>} The processed input.
      */
     async _call(conversation, { images = null, chat_template = 'default' } = {}) {
         if (!images) {

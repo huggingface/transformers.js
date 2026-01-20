@@ -1,6 +1,6 @@
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
-import { Processor } from '../../base/processing_utils.js';
+import { Processor } from '../../processing_utils.js';
 
 export class Wav2Vec2ProcessorWithLM extends Processor {
     static tokenizer_class = AutoTokenizer;

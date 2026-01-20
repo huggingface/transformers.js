@@ -1,14 +1,14 @@
 import { Tokenizer } from '@huggingface/tokenizers';
 import { Template } from '@huggingface/jinja';
-import { Callable } from '../utils/generic.js';
+import { Callable } from './utils/generic.js';
 
-import { isIntegralNumber, mergeArrays } from '../utils/core.js';
-import { getModelJSON } from '../utils/hub.js';
-import { max } from '../utils/maths.js';
-import { Tensor } from '../utils/tensor.js';
+import { isIntegralNumber, mergeArrays } from './utils/core.js';
+import { getModelJSON } from './utils/hub.js';
+import { max } from './utils/maths.js';
+import { Tensor } from './utils/tensor.js';
 
 /**
- * @typedef {import('../utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
+ * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
  */
 
 /**

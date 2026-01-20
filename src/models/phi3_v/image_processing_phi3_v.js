@@ -1,4 +1,4 @@
-import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { ImageProcessor } from '../../image_processors_utils.js';
 import { cat, interpolate_4d, slice, stack, Tensor } from '../../utils/tensor.js';
 
 const IMAGE_SIZE = 336;

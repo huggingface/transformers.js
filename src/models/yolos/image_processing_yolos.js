@@ -1,4 +1,4 @@
-import { ImageProcessor, post_process_object_detection } from '../../base/image_processors_utils.js';
+import { ImageProcessor, post_process_object_detection } from '../../image_processors_utils.js';
 
 export class YolosImageProcessor extends ImageProcessor {
     /** @type {typeof post_process_object_detection} */

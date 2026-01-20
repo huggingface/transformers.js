@@ -50,8 +50,8 @@ export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
- * @typedef {import('./base/processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
- * @typedef {import('./base/tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
+ * @typedef {import('./processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
+ * @typedef {import('./tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
  */

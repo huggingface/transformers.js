@@ -14,4 +14,4 @@ export * from './wav2vec2/feature_extraction_wav2vec2.js';
 export * from './wespeaker/feature_extraction_wespeaker.js';
 export * from './whisper/feature_extraction_whisper.js';
 
-export { FeatureExtractor } from '../base/feature_extraction_utils.js';
+export { FeatureExtractor } from '../feature_extraction_utils.js';

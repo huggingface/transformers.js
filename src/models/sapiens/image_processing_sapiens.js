@@ -1,4 +1,4 @@
-import { ImageProcessor, post_process_semantic_segmentation } from '../../base/image_processors_utils.js';
+import { ImageProcessor, post_process_semantic_segmentation } from '../../image_processors_utils.js';
 
 export class SapiensImageProcessor extends ImageProcessor {
     /** @type {typeof post_process_semantic_segmentation} */

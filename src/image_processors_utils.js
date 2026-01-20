@@ -1,10 +1,10 @@
-import { Callable } from '../utils/generic.js';
-import { Tensor, interpolate, stack } from '../utils/tensor.js';
-import { bankers_round, max, min, softmax } from '../utils/maths.js';
-import { RawImage } from '../utils/image.js';
-import { calculateReflectOffset } from '../utils/core.js';
-import { getModelJSON } from '../utils/hub.js';
-import { IMAGE_PROCESSOR_NAME } from '../utils/constants.js';
+import { Callable } from './utils/generic.js';
+import { Tensor, interpolate, stack } from './utils/tensor.js';
+import { bankers_round, max, min, softmax } from './utils/maths.js';
+import { RawImage } from './utils/image.js';
+import { calculateReflectOffset } from './utils/core.js';
+import { getModelJSON } from './utils/hub.js';
+import { IMAGE_PROCESSOR_NAME } from './utils/constants.js';
 
 /**
  * Named tuple to indicate the order we are using is (height x width),
@@ -1069,7 +1069,7 @@ export class ImageProcessor extends Callable {
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
-     * @param {import('../utils/hub.js').PretrainedOptions} options Additional options for loading the processor.
+     * @param {import('./utils/hub.js').PretrainedOptions} options Additional options for loading the processor.
      *
      * @returns {Promise<ImageProcessor>} A new instance of the Processor class.
      */

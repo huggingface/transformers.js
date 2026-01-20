@@ -1,4 +1,4 @@
-import { PreTrainedTokenizer, _build_translation_inputs } from '../../base/tokenization_utils.js';
+import { PreTrainedTokenizer, _build_translation_inputs } from '../../tokenization_utils.js';
 
 /**
  * The NllbTokenizer class is used to tokenize text for NLLB ("No Language Left Behind") models.

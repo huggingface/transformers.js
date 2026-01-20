@@ -1,4 +1,4 @@
-import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { ImageProcessor } from '../../image_processors_utils.js';
 import { calculateDimensions } from '../../utils/core.js';
 
 import { interpolate_4d, Tensor } from '../../utils/tensor.js';
@@ -6,8 +6,8 @@ import { interpolate_4d, Tensor } from '../../utils/tensor.js';
 /**
  * @typedef {object} SamImageProcessorResult
  * @property {Tensor} pixel_values
- * @property {import("../../base/image_processors_utils.js").HeightWidth[]} original_sizes
- * @property {import("../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
+ * @property {import("../../image_processors_utils.js").HeightWidth[]} original_sizes
+ * @property {import("../../image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
  * @property {Tensor} [input_points]
  * @property {Tensor} [input_labels]
  * @property {Tensor} [input_boxes]
@@ -17,8 +17,8 @@ export class SamImageProcessor extends ImageProcessor {
     /**
      *
      * @param {any} input_points
-     * @param {import("../../base/image_processors_utils.js").HeightWidth[]} original_sizes
-     * @param {import("../../base/image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
+     * @param {import("../../image_processors_utils.js").HeightWidth[]} original_sizes
+     * @param {import("../../image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
      * @returns {Tensor}
      */
     reshape_input_points(input_points, original_sizes, reshaped_input_sizes, is_bounding_box = false) {

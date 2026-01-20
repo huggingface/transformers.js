@@ -1,4 +1,4 @@
-import { PreTrainedTokenizer, _build_translation_inputs } from '../../base/tokenization_utils.js';
+import { PreTrainedTokenizer, _build_translation_inputs } from '../../tokenization_utils.js';
 
 export class MBartTokenizer extends PreTrainedTokenizer {
     constructor(tokenizerJSON, tokenizerConfig) {

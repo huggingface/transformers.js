@@ -1,4 +1,4 @@
-import { PreTrainedTokenizer, prepareTensorForDecode } from '../../base/tokenization_utils.js';
+import { PreTrainedTokenizer, prepareTensorForDecode } from '../../tokenization_utils.js';
 import { WHISPER_LANGUAGE_MAPPING } from './common_whisper.js';
 
 import { round } from '../../utils/maths.js';

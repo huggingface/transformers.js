@@ -1,3 +1,3 @@
-import { FeatureExtractor } from '../../base/feature_extraction_utils.js';
+import { FeatureExtractor } from '../../feature_extraction_utils.js';
 
 export class SpeechT5FeatureExtractor extends FeatureExtractor {}

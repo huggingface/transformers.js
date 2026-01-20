@@ -1,4 +1,4 @@
-import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { ImageProcessor } from '../../image_processors_utils.js';
 import { cat, Tensor } from '../../utils/tensor.js';
 
 export class Qwen2VLImageProcessor extends ImageProcessor {

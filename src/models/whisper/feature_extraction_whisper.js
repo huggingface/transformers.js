@@ -1,4 +1,4 @@
-import { FeatureExtractor, validate_audio_inputs } from '../../base/feature_extraction_utils.js';
+import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
 import { max } from '../../utils/maths.js';

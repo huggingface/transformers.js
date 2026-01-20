@@ -1,10 +1,10 @@
-import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { ImageProcessor } from '../../image_processors_utils.js';
 import { ones } from '../../utils/tensor.js';
 
 /**
  * @typedef {object} GroundingDinoFeatureExtractorResultProps
  * @property {import('../../utils/tensor.js').Tensor} pixel_mask
- * @typedef {import('../../base/image_processors_utils.js').ImageProcessorResult & GroundingDinoFeatureExtractorResultProps} GroundingDinoFeatureExtractorResult
+ * @typedef {import('../../image_processors_utils.js').ImageProcessorResult & GroundingDinoFeatureExtractorResultProps} GroundingDinoFeatureExtractorResult
  */
 
 export class GroundingDinoImageProcessor extends ImageProcessor {

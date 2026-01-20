@@ -1,4 +1,4 @@
-import { ImageProcessor } from '../../base/image_processors_utils.js';
+import { ImageProcessor } from '../../image_processors_utils.js';
 import { cat, full, interpolate_4d, slice, stack } from '../../utils/tensor.js';
 
 export class Idefics3ImageProcessor extends ImageProcessor {

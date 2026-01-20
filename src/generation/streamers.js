@@ -40,7 +40,7 @@ const stdout_write = apis.IS_PROCESS_AVAILABLE ? (x) => process.stdout.write(x) 
 export class TextStreamer extends BaseStreamer {
     /**
      *
-     * @param {import('../base/tokenization_utils.js').PreTrainedTokenizer} tokenizer
+     * @param {import('../tokenization_utils.js').PreTrainedTokenizer} tokenizer
      * @param {Object} options
      * @param {boolean} [options.skip_prompt=false] Whether to skip the prompt tokens
      * @param {boolean} [options.skip_special_tokens=true] Whether to skip special tokens when decoding
