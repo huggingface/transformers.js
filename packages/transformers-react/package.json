@@ -23,7 +23,8 @@
     "build": "node scripts/build.mjs && npm run typegen",
     "dev": "node scripts/dev.mjs",
     "typegen": "tsc --build",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "jest"
   },
   "peerDependencies": {
     "@huggingface/transformers": "^4.0.0",
@@ -31,8 +32,15 @@
   },
   "devDependencies": {
     "@huggingface/transformers": "*",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/react-hooks": "^8.0.1",
+    "@types/jest": "^29.5.0",
     "@types/react": "^18.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "ts-jest": "^29.1.0",
     "typescript": "^5.8.3"
   },
   "files": [

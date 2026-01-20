@@ -1,0 +1,211 @@
+import { renderHook, waitFor } from "@testing-library/react";
+import { usePipeline, UsePipelineStatus } from "../usePipeline";
+import { pipeline } from "@huggingface/transformers";
+
+// Mock the transformers pipeline
+jest.mock("@huggingface/transformers", () => ({
+  pipeline: jest.fn(),
+}));
+
+const mockPipeline = pipeline as jest.MockedFunction<typeof pipeline>;
+
+describe("usePipeline", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should automatically load pipeline on mount", async () => {
+    const mockPipelineFn = jest.fn().mockResolvedValue({ label: "positive" });
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result } = renderHook(() =>
+      usePipeline("text-classification", "test-model"),
+    );
+
+    expect(result.current.status).toBe(UsePipelineStatus.Preload);
+    expect(result.current.pipe).toBeNull();
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(result.current.pipe).toBe(mockPipelineFn);
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "text-classification",
+      "test-model",
+      undefined,
+    );
+  });
+
+  it("should pass options to pipeline", async () => {
+    const mockPipelineFn = jest.fn();
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result } = renderHook(() =>
+      usePipeline("text-classification", "test-model", { device: "cpu" } as any),
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "text-classification",
+      "test-model",
+      { device: "cpu" },
+    );
+  });
+
+  it("should reload when task changes", async () => {
+    const mockPipelineFn = jest.fn();
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result, rerender } = renderHook(
+      ({ task, model }: { task: any; model: string }) => usePipeline(task, model),
+      {
+        initialProps: { task: "text-classification", model: "model1" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(mockPipeline).toHaveBeenCalledTimes(1);
+
+    // Change task
+    rerender({ task: "summarization", model: "model1" });
+
+    await waitFor(() => {
+      expect(mockPipeline).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockPipeline).toHaveBeenLastCalledWith("summarization", "model1", undefined);
+  });
+
+  it("should reload when model changes", async () => {
+    const mockPipelineFn = jest.fn();
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result, rerender } = renderHook(
+      ({ model }) => usePipeline("text-classification", model),
+      {
+        initialProps: { model: "model1" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(mockPipeline).toHaveBeenCalledTimes(1);
+
+    // Change model
+    rerender({ model: "model2" });
+
+    await waitFor(() => {
+      expect(mockPipeline).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockPipeline).toHaveBeenLastCalledWith(
+      "text-classification",
+      "model2",
+      undefined,
+    );
+  });
+
+  it("should reload when options change", async () => {
+    const mockPipelineFn = jest.fn();
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result, rerender } = renderHook(
+      ({ options }: { options: any }) => usePipeline("text-classification", "model", options),
+      {
+        initialProps: { options: { device: "cpu" } },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(mockPipeline).toHaveBeenCalledTimes(1);
+
+    // Change options
+    rerender({ options: { device: "gpu" } });
+
+    await waitFor(() => {
+      expect(mockPipeline).toHaveBeenCalledTimes(2);
+    });
+
+    expect(mockPipeline).toHaveBeenLastCalledWith(
+      "text-classification",
+      "model",
+      { device: "gpu" },
+    );
+  });
+
+  it("should handle loading errors", async () => {
+    const error = new Error("Failed to load");
+    mockPipeline.mockRejectedValue(error);
+
+    const { result } = renderHook(() =>
+      usePipeline("text-classification", "test-model"),
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Preload);
+    });
+
+    expect(result.current.pipe).toBeNull();
+  });
+
+  it("should set loading status while loading", async () => {
+    let resolveLoad: (value: any) => void;
+    const loadPromise = new Promise<any>((resolve) => {
+      resolveLoad = resolve;
+    });
+    mockPipeline.mockReturnValue(loadPromise as any);
+
+    const { result } = renderHook(() =>
+      usePipeline("text-classification", "test-model"),
+    );
+
+    // Should start as Preload
+    expect(result.current.status).toBe(UsePipelineStatus.Preload);
+
+    // After a tick, should be Loading
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Loading);
+    });
+
+    // Resolve the promise
+    const mockPipelineFn = jest.fn();
+    resolveLoad!(mockPipelineFn);
+
+    // Should become Ready
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    expect(result.current.pipe).toBe(mockPipelineFn);
+  });
+
+  it("should cleanup on unmount", async () => {
+    const mockPipelineFn = jest.fn();
+    mockPipeline.mockResolvedValue(mockPipelineFn as any);
+
+    const { result, unmount } = renderHook(() =>
+      usePipeline("text-classification", "test-model"),
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe(UsePipelineStatus.Ready);
+    });
+
+    unmount();
+
+    // Should not throw or cause any issues
+    expect(result.current.pipe).toBe(mockPipelineFn);
+  });
+});

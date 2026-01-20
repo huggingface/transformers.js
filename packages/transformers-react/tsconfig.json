@@ -4,7 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "jsx": "react",
-    "types": ["react"],
+    "types": ["react", "jest"],
     "composite": true,
     "baseUrl": ".",
     "moduleResolution": "node",
@@ -17,7 +17,5 @@
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [
-    { "path": "../transformers" }
-  ]
+  "references": [{ "path": "../transformers" }]
 }
