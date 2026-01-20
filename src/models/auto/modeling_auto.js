@@ -37,12 +37,12 @@
  * @module models
  */
 
-import { AutoConfig } from './configs.js';
-import { PreTrainedModel } from './models/modeling_utils.js';
+import { AutoConfig } from '../../configs.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 
-import { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS } from './models/registry.js';
+import { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS } from '../registry.js';
 
-import * as ALL_MODEL_FILES from './models/models.js';
+import * as ALL_MODEL_FILES from '../models.js';
 
 /**
  * Base class of all AutoModels. Contains the `from_pretrained` function
@@ -368,5 +368,3 @@ export class AutoModelForImageTextToText extends PretrainedMixin {
 export class AutoModelForAudioTextToText extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
 }
-
-export * from './models/models.js';

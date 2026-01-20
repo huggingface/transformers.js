@@ -41,3 +41,6 @@ export * from './vit/image_processing_vit.js';
 export * from './vitmatte/image_processing_vitmatte.js';
 export * from './vitpose/image_processing_vitpose.js';
 export * from './yolos/image_processing_yolos.js';
+
+// For legacy support, ImageFeatureExtractor is an alias for ImageProcessor
+export { ImageProcessor, ImageProcessor as ImageFeatureExtractor } from '../base/image_processors_utils.js';

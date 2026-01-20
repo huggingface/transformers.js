@@ -22,3 +22,5 @@ export * from './voxtral/processing_voxtral.js';
 export * from './wav2vec2/processing_wav2vec2.js';
 export * from './wav2vec2_with_lm/processing_wav2vec2_with_lm.js';
 export * from './whisper/processing_whisper.js';
+
+export { Processor } from '../base/processing_utils.js';
