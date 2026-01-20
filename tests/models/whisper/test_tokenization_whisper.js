@@ -1,4 +1,4 @@
-import { WhisperTokenizer } from "../../../src/tokenizers.js";
+import { WhisperTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, WHISPER_TEST_STRINGS } from "../test_strings.js";
 import { compare } from "../../test_utils.js";
 

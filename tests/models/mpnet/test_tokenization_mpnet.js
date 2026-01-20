@@ -1,4 +1,4 @@
-import { MPNetTokenizer } from "../../../src/tokenizers.js";
+import { MPNetTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = MPNetTokenizer;

@@ -1,4 +1,4 @@
-import { M2M100Tokenizer } from "../../../src/tokenizers.js";
+import { M2M100Tokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, M2M_100_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = M2M100Tokenizer;

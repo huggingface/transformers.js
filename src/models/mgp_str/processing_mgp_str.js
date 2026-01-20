@@ -1,6 +1,6 @@
 import { Processor } from '../../base/processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { max, softmax } from '../../utils/maths.js';
 
 const DECODE_TYPE_MAPPING = {
@@ -13,21 +13,21 @@ export class MgpstrProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
 
     /**
-     * @returns {import('../../tokenizers.js').MgpstrTokenizer} The character tokenizer.
+     * @returns {import('./tokenization_mgp_str.js').MgpstrTokenizer} The character tokenizer.
      */
     get char_tokenizer() {
         return this.components.char_tokenizer;
     }
 
     /**
-     * @returns {import('../../tokenizers.js').GPT2Tokenizer} The BPE tokenizer.
+     * @returns {import('../gpt2/tokenization_gpt2.js').GPT2Tokenizer} The BPE tokenizer.
      */
     get bpe_tokenizer() {
         return this.components.bpe_tokenizer;
     }
 
     /**
-     * @returns {import('../../tokenizers.js').BertTokenizer} The WordPiece tokenizer.
+     * @returns {import('../bert/tokenization_bert.js').BertTokenizer} The WordPiece tokenizer.
      */
     get wp_tokenizer() {
         return this.components.wp_tokenizer;

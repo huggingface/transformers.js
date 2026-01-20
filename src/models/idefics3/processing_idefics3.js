@@ -1,6 +1,6 @@
 import { Processor } from '../../base/processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { RawImage } from '../../utils/image.js';
 import { count } from '../../utils/core.js';
 

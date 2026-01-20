@@ -1,4 +1,4 @@
-import { BlenderbotSmallTokenizer } from "../../../src/tokenizers.js";
+import { BlenderbotSmallTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, BLENDERBOT_SMALL_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = BlenderbotSmallTokenizer;

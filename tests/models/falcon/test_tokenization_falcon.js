@@ -1,4 +1,4 @@
-import { FalconTokenizer } from "../../../src/tokenizers.js";
+import { FalconTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, FALCON_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = FalconTokenizer;

@@ -1,4 +1,4 @@
-import { DebertaV2Tokenizer } from "../../../src/tokenizers.js";
+import { DebertaV2Tokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, BERT_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = DebertaV2Tokenizer;

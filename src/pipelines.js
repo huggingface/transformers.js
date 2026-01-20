@@ -13,7 +13,7 @@
  * @module pipelines
  */
 
-import { AutoTokenizer } from './tokenizers.js';
+import { AutoTokenizer } from './models/auto/tokenization_auto.js';
 import { AutoProcessor } from './models/auto/processing_auto.js';
 import {
     AutoModel,

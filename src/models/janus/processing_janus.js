@@ -1,6 +1,6 @@
 import { Processor } from '../../base/processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { mergeArrays } from '../../utils/core.js';
 import { Tensor } from '../../utils/tensor.js';
 import { RawImage } from '../../utils/image.js';
@@ -22,7 +22,7 @@ export class VLChatProcessor extends Processor {
     /**
      * @typedef {Object} MultimodalMessageProperties Additional properties for multimodal messages.
      * @property {(RawImage | string | URL)[]} [images] The images in the message.
-     * @typedef {(import('../../tokenizers.js').Message & MultimodalMessageProperties)[]} MultimodalConversation The conversation possibly containing multimodal inputs.
+     * @typedef {(import('../../base/tokenization_utils.js').Message & MultimodalMessageProperties)[]} MultimodalConversation The conversation possibly containing multimodal inputs.
      */
 
     /**
@@ -68,7 +68,7 @@ export class VLChatProcessor extends Processor {
             );
         }
 
-        const [image_placeholder_tag_id, image_start_tag_id, image_end_tag_id] = tokenizer.model.convert_tokens_to_ids([
+        const [image_placeholder_tag_id, image_start_tag_id, image_end_tag_id] = tokenizer.convert_tokens_to_ids([
             this.image_tag,
             this.image_start_tag,
             this.image_end_tag,

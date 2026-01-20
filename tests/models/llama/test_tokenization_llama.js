@@ -1,4 +1,4 @@
-import { LlamaTokenizer } from "../../../src/tokenizers.js";
+import { LlamaTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, LLAMA_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = LlamaTokenizer;

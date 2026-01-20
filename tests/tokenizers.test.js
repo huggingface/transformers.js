@@ -1,4 +1,4 @@
-import { AutoTokenizer } from "../src/tokenizers.js";
+import { AutoTokenizer } from "../src/models/auto/tokenization_auto.js";
 import { MAX_TOKENIZER_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "./init.js";
 import { compare, collect_tests } from "./test_utils.js";
 

@@ -156,7 +156,7 @@ export class TextStreamer extends BaseStreamer {
  */
 export class WhisperTextStreamer extends TextStreamer {
     /**
-     * @param {import('../tokenizers.js').WhisperTokenizer} tokenizer
+     * @param {import('../models/whisper/tokenization_whisper.js').WhisperTokenizer} tokenizer
      * @param {Object} options
      * @param {boolean} [options.skip_prompt=false] Whether to skip the prompt tokens
      * @param {function(string): void} [options.callback_function=null] Function to call when a piece of text is ready to display

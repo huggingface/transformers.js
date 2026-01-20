@@ -1,4 +1,4 @@
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
 import { Processor } from '../../base/processing_utils.js';
 

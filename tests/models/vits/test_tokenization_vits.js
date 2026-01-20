@@ -1,4 +1,4 @@
-import { VitsTokenizer } from "../../../src/tokenizers.js";
+import { VitsTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, VITS_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = VitsTokenizer;

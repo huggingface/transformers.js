@@ -1,5 +1,5 @@
 import { Processor } from '../../base/processing_utils.js';
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
 
 export class SpeechT5Processor extends Processor {

@@ -1,6 +1,6 @@
 import { Processor } from '../../base/processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
-import { AutoTokenizer } from '../../tokenizers.js';
+import { AutoTokenizer } from '../auto/tokenization_auto.js';
 
 export class JinaCLIPProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;

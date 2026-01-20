@@ -7,7 +7,7 @@ import {
     registerTaskMappings,
 } from './modeling_utils.js';
 
-import * as ALL_MODEL_FILES from './index.js';
+import * as ALL_MODEL_FILES from './models.js';
 
 const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['bert', 'BertModel'],

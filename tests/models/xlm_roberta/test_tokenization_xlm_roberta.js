@@ -1,4 +1,4 @@
-import { XLMRobertaTokenizer } from "../../../src/tokenizers.js";
+import { XLMRobertaTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = XLMRobertaTokenizer;

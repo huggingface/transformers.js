@@ -1,4 +1,4 @@
-import { GPT2Tokenizer } from "../../../src/tokenizers.js";
+import { GPT2Tokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, SENTENCEPIECE_TEST_STRINGS } from "../test_strings.js";
 
 export const TOKENIZER_CLASS = GPT2Tokenizer;

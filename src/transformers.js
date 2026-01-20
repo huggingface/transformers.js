@@ -15,7 +15,6 @@ export { env } from './env.js';
 
 export * from './pipelines.js';
 export * from './models.js';
-export * from './tokenizers.js';
 export { PretrainedConfig, AutoConfig } from './configs.js';
 
 export { read_audio, RawAudio } from './utils/audio.js';
@@ -23,6 +22,10 @@ export { load_image, RawImage } from './utils/image.js';
 export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
+
+export { PreTrainedTokenizer } from './base/tokenization_utils.js';
+export * from './models/tokenizers.js';
+export * from './models/auto/tokenization_auto.js';
 
 export { FeatureExtractor } from './base/feature_extraction_utils.js';
 export * from './models/feature_extractors.js';
