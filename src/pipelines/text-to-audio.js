@@ -3,7 +3,7 @@ import { Pipeline } from './_base.js';
 import { Tensor } from '../utils/tensor.js';
 import { RawAudio } from '../utils/audio.js';
 
-import { AutoModel } from '../models.js';
+import { AutoModel } from '../models/auto/modeling_auto.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -12,7 +12,7 @@ import { AutoModel } from '../models.js';
 
 /**
  * @typedef {Object} VocoderOptions
- * @property {import('../models.js').PreTrainedModel} [vocoder] The vocoder used by the pipeline (if the model uses one). If not provided, use the default HifiGan vocoder.
+ * @property {import('../models/modeling_utils.js').PreTrainedModel} [vocoder] The vocoder used by the pipeline (if the model uses one). If not provided, use the default HifiGan vocoder.
  * @typedef {TextAudioPipelineConstructorArgs & VocoderOptions} TextToAudioPipelineConstructorArgs
  */
 

@@ -39,7 +39,7 @@ import {
     AutoModelForImageToImage,
     AutoModelForDepthEstimation,
     AutoModelForImageFeatureExtraction,
-} from './models.js';
+} from './models/auto/modeling_auto.js';
 
 import { dispatchCallback } from './utils/core.js';
 
