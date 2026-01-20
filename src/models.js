@@ -48,7 +48,7 @@ import * as ALL_MODEL_FILES from './models/models.js';
  * Base class of all AutoModels. Contains the `from_pretrained` function
  * which is used to instantiate pretrained models.
  */
-export class PretrainedMixin {
+class PretrainedMixin {
     /**
      * Mapping from model type to model class.
      * @type {Map<string, Object>[]}
