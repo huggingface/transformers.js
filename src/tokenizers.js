@@ -18,17 +18,14 @@
  *
  * @module tokenizers
  */
-import { Tokenizer, Decoder, MetaspacePreTokenizer } from '@huggingface/tokenizers';
+import { Tokenizer, Decoder } from '@huggingface/tokenizers';
+import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
 
-import { isIntegralNumber, mergeArrays, pick } from './utils/core.js';
-
+import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
-
 import { max, round } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
-
-import { Template } from '@huggingface/jinja';
 
 import { WHISPER_LANGUAGE_MAPPING } from './models/whisper/common_whisper.js';
 
