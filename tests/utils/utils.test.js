@@ -1,4 +1,5 @@
-import { AutoProcessor, hamming, hanning, mel_filter_bank } from "../../src/transformers.js";
+import { AutoProcessor } from "../../src/transformers.js";
+import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
 import { RawImage } from "../../src/utils/image.js";
 
