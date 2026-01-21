@@ -6,7 +6,7 @@ import { softmax } from '../utils/maths.js';
 /**
  * @typedef {import('./_base.js').AudioPipelineConstructorArgs} AudioPipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('./_base.js').AudioPipelineInputs} AudioPipelineInputs
+ * @typedef {import('./_base.js').AudioInput} AudioInput
  */
 
 /**
@@ -20,14 +20,21 @@ import { softmax } from '../utils/maths.js';
  * If the provided number is `null` or higher than the number of labels available in the model configuration,
  * it will default to the number of labels.
  *
- * @callback AudioClassificationPipelineCallback Classify the sequence(s) given as inputs.
- * @param {AudioPipelineInputs} audio The input audio file(s) to be classified. The input is either:
+ * @callback AudioClassificationPipelineCallbackSingle Classify a single audio input.
+ * @param {AudioInput} audio The input audio file(s) to be classified. The input is either:
  * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
  * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
  * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
  * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
  * @param {AudioClassificationPipelineOptions} [options] The options to use for audio classification.
- * @returns {Promise<AudioClassificationOutput|AudioClassificationOutput[]>} An array or object containing the predicted labels and scores.
+ * @returns {Promise<AudioClassificationOutput>} An array containing the predicted labels and scores.
+ *
+ * @callback AudioClassificationPipelineCallbackBatch Classify multiple audio inputs.
+ * @param {AudioInput[]} audio The audio inputs to be classified.
+ * @param {AudioClassificationPipelineOptions} [options] The options to use for audio classification.
+ * @returns {Promise<AudioClassificationOutput[]>} An array of prediction arrays corresponding to each input.
+ *
+ * @typedef {AudioClassificationPipelineCallbackSingle & AudioClassificationPipelineCallbackBatch} AudioClassificationPipelineCallback
  *
  * @typedef {AudioPipelineConstructorArgs & AudioClassificationPipelineCallback & Disposable} AudioClassificationPipelineType
  */
@@ -38,9 +45,11 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Perform audio classification with `Xenova/wav2vec2-large-xlsr-53-gender-recognition-librispeech`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('audio-classification', 'Xenova/wav2vec2-large-xlsr-53-gender-recognition-librispeech');
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
- * const output = await classifier(url);
+ * const audio = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
+ * const output = await classifier(audio);
  * // [
  * //   { label: 'male', score: 0.9981542229652405 },
  * //   { label: 'female', score: 0.001845747814513743 }
@@ -49,9 +58,11 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Perform audio classification with `Xenova/ast-finetuned-audioset-10-10-0.4593` and return top 4 results.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('audio-classification', 'Xenova/ast-finetuned-audioset-10-10-0.4593');
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cat_meow.wav';
- * const output = await classifier(url, { top_k: 4 });
+ * const audio = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cat_meow.wav';
+ * const output = await classifier(audio, { top_k: 4 });
  * // [
  * //   { label: 'Meow', score: 0.5617874264717102 },
  * //   { label: 'Cat', score: 0.22365376353263855 },
@@ -63,15 +74,6 @@ import { softmax } from '../utils/maths.js';
 export class AudioClassificationPipeline
     extends /** @type {new (options: AudioPipelineConstructorArgs) => AudioClassificationPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new AudioClassificationPipeline.
-     * @param {AudioPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {AudioClassificationPipelineCallback} */
     async _call(audio, { top_k = 5 } = {}) {
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
         const preparedAudios = await prepareAudios(audio, sampling_rate);
