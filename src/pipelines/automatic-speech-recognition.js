@@ -6,7 +6,6 @@ import { max, round } from '../utils/maths.js';
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('./_base.js').AudioPipelineInputs} AudioPipelineInputs
  * @typedef {import('./_base.js').AudioInput} AudioInput
  */
 
@@ -32,14 +31,25 @@ import { max, round } from '../utils/maths.js';
  * @property {number} [num_frames] The number of frames in the input audio.
  * @typedef {import('../generation/configuration_utils.js').GenerationConfig & AutomaticSpeechRecognitionSpecificParams} AutomaticSpeechRecognitionConfig
  *
- * @callback AutomaticSpeechRecognitionPipelineCallback Transcribe the audio sequence(s) given as inputs to text.
- * @param {AudioPipelineInputs} audio The input audio file(s) to be transcribed. The input is either:
+ * @callback AutomaticSpeechRecognitionPipelineCallbackSingle Transcribe the audio sequence given as inputs to text.
+ * @param {AudioInput} audio The input audio file(s) to be transcribed. The input is either:
  * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
  * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
  * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
  * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
  * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<AutomaticSpeechRecognitionOutput|AutomaticSpeechRecognitionOutput[]>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
+ * @returns {Promise<AutomaticSpeechRecognitionOutput>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
+ *
+ * @callback AutomaticSpeechRecognitionPipelineCallbackBatch Transcribe the audio sequences given as inputs to text.
+ * @param {AudioInput[]} audio The input audio file(s) to be transcribed. Each entry is either:
+ * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
+ * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
+ * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
+ * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
+ * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @returns {Promise<AutomaticSpeechRecognitionOutput[]>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
+ *
+ * @typedef {AutomaticSpeechRecognitionPipelineCallbackSingle & AutomaticSpeechRecognitionPipelineCallbackBatch} AutomaticSpeechRecognitionPipelineCallback
  *
  * @typedef {TextAudioPipelineConstructorArgs & AutomaticSpeechRecognitionPipelineCallback & Disposable} AutomaticSpeechRecognitionPipelineType
  */
@@ -49,6 +59,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Transcribe English.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
  * const output = await transcriber(url);
@@ -57,6 +69,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Transcribe English w/ timestamps.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
  * const output = await transcriber(url, { return_timestamps: true });
@@ -71,6 +85,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Transcribe English w/ word-level timestamps.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
  * const output = await transcriber(url, { return_timestamps: 'word' });
@@ -90,6 +106,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Transcribe French.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/french-audio.mp3';
  * const output = await transcriber(url, { language: 'french', task: 'transcribe' });
@@ -98,6 +116,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Translate French to English.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/french-audio.mp3';
  * const output = await transcriber(url, { language: 'french', task: 'translate' });
@@ -106,6 +126,8 @@ import { max, round } from '../utils/maths.js';
  *
  * **Example:** Transcribe/translate audio longer than 30 seconds.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/ted_60.wav';
  * const output = await transcriber(url, { chunk_length_s: 30, stride_length_s: 5 });
@@ -117,15 +139,6 @@ export class AutomaticSpeechRecognitionPipeline
         Pipeline
     )
 {
-    /**
-     * Create a new AutomaticSpeechRecognitionPipeline.
-     * @param {TextAudioPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {AutomaticSpeechRecognitionPipelineCallback} */
     async _call(audio, kwargs = {}) {
         switch (this.model.config.model_type) {
             case 'whisper':
@@ -147,10 +160,6 @@ export class AutomaticSpeechRecognitionPipeline
         }
     }
 
-    /**
-     * @type {AutomaticSpeechRecognitionPipelineCallback}
-     * @private
-     */
     async _call_wav2vec2(audio, kwargs) {
         // TODO use kwargs
 
@@ -162,12 +171,10 @@ export class AutomaticSpeechRecognitionPipeline
         }
 
         const single = !Array.isArray(audio);
-        if (single) {
-            audio = [/** @type {AudioInput} */ (audio)];
-        }
+        const batchedAudio = single ? [audio] : audio;
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
 
         const toReturn = [];
         for (const aud of preparedAudios) {
@@ -185,10 +192,6 @@ export class AutomaticSpeechRecognitionPipeline
         return single ? toReturn[0] : toReturn;
     }
 
-    /**
-     * @type {AutomaticSpeechRecognitionPipelineCallback}
-     * @private
-     */
     async _call_whisper(audio, kwargs) {
         const return_timestamps = kwargs.return_timestamps ?? false;
         const chunk_length_s = kwargs.chunk_length_s ?? 0;
@@ -203,9 +206,7 @@ export class AutomaticSpeechRecognitionPipeline
         }
 
         const single = !Array.isArray(audio);
-        if (single) {
-            audio = [/** @type {AudioInput} */ (audio)];
-        }
+        const batchedAudio = single ? [audio] : audio;
         const feature_extractor_config = this.processor.feature_extractor.config;
 
         // @ts-expect-error TS2339
@@ -213,7 +214,7 @@ export class AutomaticSpeechRecognitionPipeline
         const hop_length = feature_extractor_config.hop_length;
 
         const sampling_rate = feature_extractor_config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
 
         const toReturn = [];
         for (const aud of preparedAudios) {
@@ -298,17 +299,11 @@ export class AutomaticSpeechRecognitionPipeline
         return single ? toReturn[0] : toReturn;
     }
 
-    /**
-     * @type {AutomaticSpeechRecognitionPipelineCallback}
-     * @private
-     */
     async _call_moonshine(audio, kwargs) {
         const single = !Array.isArray(audio);
-        if (single) {
-            audio = [/** @type {AudioInput} */ (audio)];
-        }
+        const batchedAudio = single ? [audio] : audio;
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
         const toReturn = [];
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);
