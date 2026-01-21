@@ -84,8 +84,8 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['efficientnet', 'EfficientNetModel'],
 
     ['decision_transformer', 'DecisionTransformerModel'],
-    ['patchtst', 'PatchTSTForPrediction'],
-    ['patchtsmixer', 'PatchTSMixerForPrediction'],
+    ['patchtst', 'PatchTSTModel'],
+    ['patchtsmixer', 'PatchTSMixerModel'],
 
     ['mobilenet_v1', 'MobileNetV1Model'],
     ['mobilenet_v2', 'MobileNetV2Model'],
