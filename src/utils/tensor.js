@@ -1584,20 +1584,26 @@ export function rand(size) {
  */
 export function randn(size) {
     const length = size.reduce((a, b) => a * b, 1);
+    const data = new Float32Array(length);
 
-    // Box-Muller transform
-    function boxMullerRandom() {
-        // NOTE: 1 - Math.random() is used to avoid log(0)
-        const u = 1 - Math.random();
-        const v = 1 - Math.random();
-        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    for (let i = 0; i < length; i += 2) {
+        // Box-Muller transform
+        const u = 1 - Math.random(); // Avoids log(0)
+        const v = Math.random();
+
+        const mag = Math.sqrt(-2.0 * Math.log(u));
+        const angle = 2.0 * Math.PI * v;
+
+        // Assign the first value
+        data[i] = mag * Math.cos(angle);
+
+        // Assign the second value (if valid index)
+        if (i + 1 < length) {
+            data[i + 1] = mag * Math.sin(angle);
+        }
     }
 
-    return new Tensor(
-        'float32',
-        Float32Array.from({ length }, () => boxMullerRandom()),
-        size,
-    );
+    return new Tensor('float32', data, size);
 }
 
 /**
