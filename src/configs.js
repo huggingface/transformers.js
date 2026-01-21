@@ -147,6 +147,7 @@ function getNormalizedConfig(config) {
         case 'helium':
         case 'ernie4_5':
         case 'hunyuan_v1_dense':
+        case 'falcon_h1':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'head_dim';
@@ -295,7 +296,7 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-    } else if (config.model_type === 'granitemoehybrid') {
+    } else if (['granitemoehybrid', 'falcon_h1'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
 
@@ -304,6 +305,7 @@ export function getCacheShapes(config, options) {
 
         const {
             layer_types,
+            num_hidden_layers,
             num_attention_heads,
             num_key_value_heads,
             hidden_size,
@@ -313,20 +315,21 @@ export function getCacheShapes(config, options) {
             mamba_d_state,
             mamba_n_groups,
             mamba_expand,
+            mamba_d_ssm,
         } = /** @type {any} */ (config);
         const head_dim = hidden_size / num_attention_heads;
         const batch_size = options?.batch_size ?? 1;
-        const conv_d_inner = mamba_expand * hidden_size + 2 * mamba_n_groups * mamba_d_state;
-        for (let i = 0; i < layer_types.length; ++i) {
-            if (layer_types[i] === 'attention') {
+
+        const conv_d_inner = (mamba_d_ssm ?? mamba_expand * hidden_size) + 2 * mamba_n_groups * mamba_d_state;
+        for (let i = 0; i < num_hidden_layers; ++i) {
+            if (!layer_types || layer_types[i] === 'mamba') {
+                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, mamba_d_conv];
+                cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_n_heads, mamba_d_head, mamba_d_state];
+            }
+            if (!layer_types || layer_types[i] === 'attention') {
                 for (const kv of ['key', 'value']) {
                     cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, head_dim];
                 }
-            } else if (layer_types[i] === 'mamba') {
-                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, mamba_d_conv];
-                cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_n_heads, mamba_d_head, mamba_d_state];
-            } else {
-                throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
         }
         return cache_values;

@@ -41,6 +41,7 @@ export * from './ernie4_5/modeling_ernie4_5.js';
 export * from './esm/modeling_esm.js';
 export * from './exaone/modeling_exaone.js';
 export * from './falcon/modeling_falcon.js';
+export * from './falcon_h1/modeling_falcon_h1.js';
 export * from './fastvit/modeling_fastvit.js';
 export * from './florence2/modeling_florence2.js';
 export * from './gemma/modeling_gemma.js';
