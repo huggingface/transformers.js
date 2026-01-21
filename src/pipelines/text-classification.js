@@ -15,13 +15,29 @@ import { softmax } from '../utils/maths.js';
  * @typedef {TextClassificationSingle[]} TextClassificationOutput
  *
  * @typedef {Object} TextClassificationPipelineOptions Parameters specific to text classification pipelines.
- * @property {number} [top_k=1] The number of top predictions to be returned.
+ * @property {number|null} [top_k=1] The number of top predictions to be returned. If set to `null`, all predictions are returned.
  *
- * @callback TextClassificationPipelineCallback Classify the text(s) given as inputs.
- * @param {string|string[]} texts The input text(s) to be classified.
+ * @callback TextClassificationPipelineCallbackSingle Classify a single text.
+ * @param {string} texts The input text to be classified.
  * @param {TextClassificationPipelineOptions} [options] The options to use for text classification.
- * @returns {Promise<TextClassificationOutput|TextClassificationOutput[]>} An array or object containing the predicted labels and scores.
+ * @returns {Promise<TextClassificationOutput>} An object containing the predicted labels and scores.
  *
+ * @callback TextClassificationPipelineCallbackBatchTopK Classify a batch of texts and return top-k results for each.
+ * @param {string[]} texts The input texts to be classified.
+ * @param {{top_k: number|null}} [options] The options to use for text classification.
+ * @returns {Promise<TextClassificationOutput[]>} An array of objects containing the predicted labels and scores.
+ *
+ * @callback TextClassificationPipelineCallbackBatchTop1 Classify a batch of texts and return the top-1 result for each.
+ * @param {string[]} texts The input texts to be classified.
+ * @param {{top_k: 1} | {} | undefined} [options] The options to use for text classification (where `top_k` is 1 or omitted).
+ * @returns {Promise<TextClassificationOutput>} An object containing the predicted labels and scores.
+ */
+
+/**
+ * @typedef {TextClassificationPipelineCallbackSingle & TextClassificationPipelineCallbackBatchTop1 & TextClassificationPipelineCallbackBatchTopK} TextClassificationPipelineCallback
+ */
+
+/**
  * @typedef {TextPipelineConstructorArgs & TextClassificationPipelineCallback & Disposable} TextClassificationPipelineType
  */
 
@@ -30,6 +46,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Sentiment-analysis w/ `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
  * const output = await classifier('I love transformers!');
  * // [{ label: 'POSITIVE', score: 0.999788761138916 }]
@@ -37,6 +55,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Multilingual sentiment-analysis w/ `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
  * const output = await classifier('Le meilleur film de tous les temps.', { top_k: 5 });
  * // [
@@ -65,15 +85,6 @@ import { softmax } from '../utils/maths.js';
 export class TextClassificationPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => TextClassificationPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new TextClassificationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {TextClassificationPipelineCallback} */
     async _call(texts, { top_k = 1 } = {}) {
         // Run tokenization
         const model_inputs = this.tokenizer(texts, {
@@ -84,22 +95,19 @@ export class TextClassificationPipeline
         // Run model
         const outputs = await this.model(model_inputs);
 
+        // @ts-expect-error TS2339
+        const { problem_type, id2label } = this.model.config;
+
         // TODO: Use softmax tensor function
         const function_to_apply =
-            // @ts-expect-error TS2339
-            this.model.config.problem_type === 'multi_label_classification'
+            problem_type === 'multi_label_classification'
                 ? (batch) => batch.sigmoid()
                 : (batch) => new Tensor('float32', softmax(batch.data), batch.dims); // single_label_classification (default)
-
-        // @ts-expect-error TS2339
-        const id2label = this.model.config.id2label;
 
         const toReturn = [];
         for (const batch of outputs.logits) {
             const output = function_to_apply(batch);
-
             const scores = await topk(output, top_k);
-
             const values = scores[0].tolist();
             const indices = scores[1].tolist();
             const vals = indices.map((x, i) => ({
@@ -112,9 +120,6 @@ export class TextClassificationPipeline
                 toReturn.push(vals);
             }
         }
-
-        return Array.isArray(texts) || top_k === 1
-            ? /** @type {TextClassificationOutput} */ (toReturn)
-            : /** @type {TextClassificationOutput[]} */ (toReturn)[0];
+        return Array.isArray(texts) || top_k === 1 ? toReturn : toReturn[0];
     }
 }
