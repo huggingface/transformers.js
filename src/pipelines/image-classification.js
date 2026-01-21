@@ -6,7 +6,7 @@ import { softmax } from '../utils/maths.js';
 /**
  * @typedef {import('./_base.js').ImagePipelineConstructorArgs} ImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('./_base.js').ImagePipelineInputs} ImagePipelineInputs
+ * @typedef {import('./_base.js').ImageInput} ImageInput
  */
 
 /**
@@ -18,10 +18,17 @@ import { softmax } from '../utils/maths.js';
  * @typedef {Object} ImageClassificationPipelineOptions Parameters specific to image classification pipelines.
  * @property {number} [top_k=1] The number of top labels that will be returned by the pipeline.
  *
- * @callback ImageClassificationPipelineCallback Assign labels to the image(s) passed as inputs.
- * @param {ImagePipelineInputs} images The input images(s) to be classified.
+ * @callback ImageClassificationPipelineCallbackSingle Assign labels to the image passed as input.
+ * @param {ImageInput} images The input image to be classified.
  * @param {ImageClassificationPipelineOptions} [options] The options to use for image classification.
- * @returns {Promise<ImageClassificationOutput|ImageClassificationOutput[]>} An array or object containing the predicted labels and scores.
+ * @returns {Promise<ImageClassificationOutput>} An array containing the predicted labels and scores.
+ *
+ * @callback ImageClassificationPipelineCallbackBatch Assign labels to the images passed as inputs.
+ * @param {ImageInput[]} images The input images to be classified.
+ * @param {ImageClassificationPipelineOptions} [options] The options to use for image classification.
+ * @returns {Promise<ImageClassificationOutput[]>} An array where each entry contains the predictions for the corresponding input image.
+ *
+ * @typedef {ImageClassificationPipelineCallbackSingle & ImageClassificationPipelineCallbackBatch} ImageClassificationPipelineCallback
  *
  * @typedef {ImagePipelineConstructorArgs & ImageClassificationPipelineCallback & Disposable} ImageClassificationPipelineType
  */
@@ -32,6 +39,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Classify an image.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('image-classification', 'Xenova/vit-base-patch16-224');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
  * const output = await classifier(url);
@@ -42,6 +51,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Classify an image and return top `n` classes.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('image-classification', 'Xenova/vit-base-patch16-224');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
  * const output = await classifier(url, { top_k: 3 });
@@ -54,6 +65,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Classify an image and return all classes.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('image-classification', 'Xenova/vit-base-patch16-224');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
  * const output = await classifier(url, { top_k: 0 });
@@ -69,15 +82,6 @@ import { softmax } from '../utils/maths.js';
 export class ImageClassificationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => ImageClassificationPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new ImageClassificationPipeline.
-     * @param {ImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {ImageClassificationPipelineCallback} */
     async _call(images, { top_k = 5 } = {}) {
         const preparedImages = await prepareImages(images);
 
@@ -85,7 +89,7 @@ export class ImageClassificationPipeline
         const output = await this.model({ pixel_values });
 
         // @ts-expect-error TS2339
-        const id2label = this.model.config.id2label;
+        const { id2label } = this.model.config;
 
         /** @type {ImageClassificationOutput[]} */
         const toReturn = [];
