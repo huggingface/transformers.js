@@ -790,6 +790,84 @@ export class Tensor {
     }
 
     /**
+     * Repeats this tensor along the specified dimensions.
+     * @param  {...number} repeats The number of times to repeat this tensor along each dimension.
+     * @returns {Tensor} The repeated tensor.
+     * @throws {Error} If the number of repeats is less than the number of dimensions.
+     */
+    repeat(...repeats) {
+        if (repeats.length < this.dims.length) {
+            throw new Error(
+                `Number of dimensions of repeat dims (${repeats.length}) cannot be smaller than number of dimensions of tensor (${this.dims.length})`,
+            );
+        }
+
+        // Optimization: if all repeats are 1, just clone with potentially expanded dims
+        if (repeats.every((r) => r === 1)) {
+            if (repeats.length === this.dims.length) {
+                return this.clone();
+            }
+            // Need to expand dimensions by prepending 1s
+            const numPrependedDims = repeats.length - this.dims.length;
+            const newDims = Array(numPrependedDims).fill(1).concat(this.dims);
+            return new Tensor(this.type, this.data.slice(), newDims);
+        }
+
+        // If repeats has more dimensions than the tensor, prepend 1s to tensor dims
+        const numPrependedDims = repeats.length - this.dims.length;
+        const expandedDims = Array(numPrependedDims).fill(1).concat(this.dims);
+
+        // Calculate the output dimensions
+        const outputDims = expandedDims.map((dim, i) => dim * repeats[i]);
+
+        // Calculate total output size
+        const outputSize = outputDims.reduce((a, b) => a * b, 1);
+
+        // Allocate output data
+        const this_data = this.data;
+        // @ts-ignore
+        const data = new this_data.constructor(outputSize);
+
+        // Calculate strides for the expanded input tensor
+        const inputStrides = dimsToStride(expandedDims);
+        const outputStrides = dimsToStride(outputDims);
+
+        // Fill the output tensor
+        for (let i = 0; i < outputSize; ++i) {
+            // Convert flat index to multi-dimensional indices in output
+            let remaining = i;
+            let inputIndex = 0;
+
+            for (let d = 0; d < outputDims.length; ++d) {
+                const outputCoord = Math.floor(remaining / outputStrides[d]);
+                remaining = remaining % outputStrides[d];
+
+                // Map output coordinate to input coordinate using modulo
+                const inputCoord = outputCoord % expandedDims[d];
+                inputIndex += inputCoord * inputStrides[d];
+            }
+
+            data[i] = this_data[inputIndex];
+        }
+
+        return new Tensor(this.type, data, outputDims);
+    }
+
+    /**
+     * Constructs a tensor by repeating the elements of input. The dims argument specifies the number of repetitions in each dimension.
+     * @param  {...number} dims The number of repetitions per dimension.
+     * @returns {Tensor} The tiled tensor.
+     */
+    tile(...dims) {
+        // If fewer repeats than dims, prepend 1s to repeats
+        if (dims.length < this.dims.length) {
+            const numPrependedRepeats = this.dims.length - dims.length;
+            dims = Array(numPrependedRepeats).fill(1).concat(dims);
+        }
+        return this.repeat(...dims);
+    }
+
+    /**
      * Performs Tensor dtype conversion.
      * @param {DataType} type The desired data type.
      * @returns {Tensor} The converted tensor.
