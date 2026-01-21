@@ -1,4 +1,4 @@
-import { AutoModel, PreTrainedModel } from "../../src/models/models.js";
+import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
