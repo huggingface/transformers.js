@@ -5,7 +5,7 @@ import { Tensor } from '../utils/tensor.js';
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('../tokenizers.js').Message[]} Chat
+ * @typedef {import('../tokenization_utils.js').Message[]} Chat
  */
 
 function isChat(x) {
