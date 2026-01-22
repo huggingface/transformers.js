@@ -6,23 +6,34 @@ import { softmax } from '../utils/maths.js';
  * @typedef {import('./_base.js').TextImagePipelineConstructorArgs} TextImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
  * @typedef {import('./_base.js').ImagePipelineInputs} ImagePipelineInputs
+ * @typedef {import('./_base.js').ImageInput} ImageInput
  */
 
 /**
- * @typedef {Object} ZeroShotImageClassificationOutput
+ * @typedef {Object} ZeroShotImageClassificationOutputSingle
  * @property {string} label The label identified by the model. It is one of the suggested `candidate_label`.
  * @property {number} score The score attributed by the model for that label (between 0 and 1).
+ *
+ * @typedef {ZeroShotImageClassificationOutputSingle[]} ZeroShotImageClassificationOutput
  *
  * @typedef {Object} ZeroShotImageClassificationPipelineOptions Parameters specific to zero-shot image classification pipelines.
  * @property {string} [hypothesis_template="This is a photo of {}"] The sentence used in conjunction with `candidate_labels`
  * to attempt the image classification by replacing the placeholder with the candidate_labels.
  * Then likelihood is estimated by using `logits_per_image`.
  *
- * @callback ZeroShotImageClassificationPipelineCallback Assign labels to the image(s) passed as inputs.
- * @param {ImagePipelineInputs} images The input images.
+ * @callback ZeroShotImageClassificationPipelineCallbackSingle Assign labels to the image(s) passed as inputs.
+ * @param {ImageInput} images The input images.
  * @param {string[]} candidate_labels The candidate labels for this image.
  * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
- * @returns {Promise<ZeroShotImageClassificationOutput[]|ZeroShotImageClassificationOutput[][]>} An array of objects containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotImageClassificationOutputSingle[]>} An array of objects containing the predicted labels and scores.
+ *
+ * @callback ZeroShotImageClassificationPipelineCallbackBatch Assign labels to the image(s) passed as inputs.
+ * @param {ImageInput[]} images The input images.
+ * @param {string[]} candidate_labels The candidate labels for this image.
+ * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
+ * @returns {Promise<ZeroShotImageClassificationOutputSingle[][]>} An array of objects containing the predicted labels and scores.
+ *
+ * @typedef {ZeroShotImageClassificationPipelineCallbackSingle & ZeroShotImageClassificationPipelineCallbackBatch} ZeroShotImageClassificationPipelineCallback
  *
  * @typedef {TextImagePipelineConstructorArgs & ZeroShotImageClassificationPipelineCallback & Disposable} ZeroShotImageClassificationPipelineType
  */
@@ -33,6 +44,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Zero shot image classification w/ `Xenova/clip-vit-base-patch32`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('zero-shot-image-classification', 'Xenova/clip-vit-base-patch32');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
  * const output = await classifier(url, ['tiger', 'horse', 'dog']);
@@ -48,15 +61,6 @@ export class ZeroShotImageClassificationPipeline
         Pipeline
     )
 {
-    /**
-     * Create a new ZeroShotImageClassificationPipeline.
-     * @param {TextImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {ZeroShotImageClassificationPipelineCallback} */
     async _call(images, candidate_labels, { hypothesis_template = 'This is a photo of {}' } = {}) {
         const isBatched = Array.isArray(images);
         const preparedImages = await prepareImages(images);

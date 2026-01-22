@@ -3,15 +3,17 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
 /**
  * @typedef {import('./_base.js').TextImagePipelineConstructorArgs} TextImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('./_base.js').ImagePipelineInputs} ImagePipelineInputs
+ * @typedef {import('./_base.js').ImageInput} ImageInput
  * @typedef {import('./_base.js').BoundingBox} BoundingBox
  */
 
 /**
- * @typedef {Object} ZeroShotObjectDetectionOutput
+ * @typedef {Object} ZeroShotObjectDetectionOutputSingle
  * @property {string} label Text query corresponding to the found object.
  * @property {number} score Score corresponding to the object (between 0 and 1).
  * @property {BoundingBox} box Bounding box of the detected object in image's original size, or as a percentage if `percentage` is set to true.
+ *
+ * @typedef {ZeroShotObjectDetectionOutputSingle[]} ZeroShotObjectDetectionOutput
  *
  * @typedef {Object} ZeroShotObjectDetectionPipelineOptions Parameters specific to zero-shot object detection pipelines.
  * @property {number} [threshold=0.1] The probability necessary to make a prediction.
@@ -20,11 +22,19 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * to the number of predictions.
  * @property {boolean} [percentage=false] Whether to return the boxes coordinates in percentage (true) or in pixels (false).
  *
- * @callback ZeroShotObjectDetectionPipelineCallback Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
- * @param {ImagePipelineInputs} images The input images.
+ * @callback ZeroShotObjectDetectionPipelineCallbackSingle Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
+ * @param {ImageInput} images The input images.
  * @param {string[]} candidate_labels What the model should recognize in the image.
  * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
- * @returns {Promise<ZeroShotObjectDetectionOutput[]|ZeroShotObjectDetectionOutput[][]>} An array of objects containing the predicted labels, scores, and bounding boxes.
+ * @returns {Promise<ZeroShotObjectDetectionOutputSingle[]>} An array of objects containing the predicted labels, scores, and bounding boxes.
+ *
+ * @callback ZeroShotObjectDetectionPipelineCallbackBatch Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
+ * @param {ImageInput[]} images The input images.
+ * @param {string[]} candidate_labels What the model should recognize in the image.
+ * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
+ * @returns {Promise<ZeroShotObjectDetectionOutputSingle[][]>} An array of objects containing the predicted labels, scores, and bounding boxes.
+ *
+ * @typedef {ZeroShotObjectDetectionPipelineCallbackSingle & ZeroShotObjectDetectionPipelineCallbackBatch} ZeroShotObjectDetectionPipelineCallback
  *
  * @typedef {TextImagePipelineConstructorArgs & ZeroShotObjectDetectionPipelineCallback & Disposable} ZeroShotObjectDetectionPipelineType
  */
@@ -35,6 +45,8 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  *
  * **Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const detector = await pipeline('zero-shot-object-detection', 'Xenova/owlvit-base-patch32');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/astronaut.png';
  * const candidate_labels = ['human face', 'rocket', 'helmet', 'american flag'];
@@ -65,6 +77,8 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  *
  * **Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const detector = await pipeline('zero-shot-object-detection', 'Xenova/owlvit-base-patch32');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/beach.png';
  * const candidate_labels = ['hat', 'book', 'sunglasses', 'camera'];
@@ -98,15 +112,6 @@ export class ZeroShotObjectDetectionPipeline
         Pipeline
     )
 {
-    /**
-     * Create a new ZeroShotObjectDetectionPipeline.
-     * @param {TextImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {ZeroShotObjectDetectionPipelineCallback} */
     async _call(images, candidate_labels, { threshold = 0.1, top_k = null, percentage = false } = {}) {
         const isBatched = Array.isArray(images);
         const preparedImages = await prepareImages(images);
