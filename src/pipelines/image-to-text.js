@@ -5,7 +5,7 @@ import { Tensor } from '../utils/tensor.js';
 /**
  * @typedef {import('./_base.js').TextImagePipelineConstructorArgs} TextImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
- * @typedef {import('./_base.js').ImagePipelineInputs} ImagePipelineInputs
+ * @typedef {import('./_base.js').ImageInput} ImageInput
  */
 
 /**
@@ -13,10 +13,17 @@ import { Tensor } from '../utils/tensor.js';
  * @property {string} generated_text The generated text.
  * @typedef {ImageToTextSingle[]} ImageToTextOutput
  *
- * @callback ImageToTextPipelineCallback Assign labels to the image(s) passed as inputs.
- * @param {ImagePipelineInputs} texts The images to be captioned.
+ * @callback ImageToTextPipelineCallbackSingle Assign labels to the image passed as input.
+ * @param {ImageInput} texts The image to be captioned.
  * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<ImageToTextOutput|ImageToTextOutput[]>} An object (or array of objects) containing the generated text(s).
+ * @returns {Promise<ImageToTextOutput>} An object containing the generated text(s).
+ *
+ * @callback ImageToTextPipelineCallbackBatch Assign labels to the images passed as inputs.
+ * @param {ImageInput[]} texts The images to be captioned.
+ * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @returns {Promise<ImageToTextOutput[]>} An array containing the generated text(s) for each image.
+ *
+ * @typedef {ImageToTextPipelineCallbackSingle & ImageToTextPipelineCallbackBatch} ImageToTextPipelineCallback
  *
  * @typedef {TextImagePipelineConstructorArgs & ImageToTextPipelineCallback & Disposable} ImageToTextPipelineType
  */
@@ -26,6 +33,8 @@ import { Tensor } from '../utils/tensor.js';
  *
  * **Example:** Generate a caption for an image w/ `Xenova/vit-gpt2-image-captioning`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const captioner = await pipeline('image-to-text', 'Xenova/vit-gpt2-image-captioning');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg';
  * const output = await captioner(url);
@@ -34,6 +43,8 @@ import { Tensor } from '../utils/tensor.js';
  *
  * **Example:** Optical Character Recognition (OCR) w/ `Xenova/trocr-small-handwritten`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const captioner = await pipeline('image-to-text', 'Xenova/trocr-small-handwritten');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/handwriting.jpg';
  * const output = await captioner(url);
@@ -43,15 +54,6 @@ import { Tensor } from '../utils/tensor.js';
 export class ImageToTextPipeline
     extends /** @type {new (options: TextImagePipelineConstructorArgs) => ImageToTextPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new ImageToTextPipeline.
-     * @param {TextImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {ImageToTextPipelineCallback} */
     async _call(images, generate_kwargs = {}) {
         const isBatched = Array.isArray(images);
         const preparedImages = await prepareImages(images);
