@@ -76,12 +76,4 @@ export class TranslationPipeline
 {
     /** @type {'translation_text'} */
     _key = 'translation_text';
-
-    /**
-     * Create a new TranslationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
 }

@@ -75,14 +75,6 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
 export class FeatureExtractionPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => FeatureExtractionPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new FeatureExtractionPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
     /** @type {FeatureExtractionPipelineCallback} */
     async _call(
         texts,
