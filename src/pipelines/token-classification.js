@@ -20,10 +20,17 @@ import { max, softmax } from '../utils/maths.js';
  * @typedef {Object} TokenClassificationPipelineOptions Parameters specific to token classification pipelines.
  * @property {string[]} [ignore_labels] A list of labels to ignore.
  *
- * @callback TokenClassificationPipelineCallback Classify each token of the text(s) given as inputs.
- * @param {string|string[]} texts One or several texts (or one list of texts) for token classification.
+ * @callback TokenClassificationPipelineCallbackSingle Classify each token of a single text.
+ * @param {string} texts The text to classify.
  * @param {TokenClassificationPipelineOptions} [options] The options to use for token classification.
- * @returns {Promise<TokenClassificationOutput|TokenClassificationOutput[]>} The result.
+ * @returns {Promise<TokenClassificationOutput>} The result.
+ *
+ * @callback TokenClassificationPipelineCallbackBatch Classify each token of multiple texts.
+ * @param {string[]} texts The texts to classify.
+ * @param {TokenClassificationPipelineOptions} [options] The options to use for token classification.
+ * @returns {Promise<TokenClassificationOutput[]>} The result.
+ *
+ * @typedef {TokenClassificationPipelineCallbackSingle & TokenClassificationPipelineCallbackBatch} TokenClassificationPipelineCallback
  *
  * @typedef {TextPipelineConstructorArgs & TokenClassificationPipelineCallback & Disposable} TokenClassificationPipelineType
  */
@@ -33,6 +40,8 @@ import { max, softmax } from '../utils/maths.js';
  *
  * **Example:** Perform named entity recognition with `Xenova/bert-base-NER`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('token-classification', 'Xenova/bert-base-NER');
  * const output = await classifier('My name is Sarah and I live in London');
  * // [
@@ -43,6 +52,8 @@ import { max, softmax } from '../utils/maths.js';
  *
  * **Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all labels).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('token-classification', 'Xenova/bert-base-NER');
  * const output = await classifier('Sarah lives in the United States of America', { ignore_labels: [] });
  * // [
@@ -60,15 +71,6 @@ import { max, softmax } from '../utils/maths.js';
 export class TokenClassificationPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => TokenClassificationPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new TokenClassificationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {TokenClassificationPipelineCallback} */
     async _call(texts, { ignore_labels = ['O'] } = {}) {
         const isBatched = Array.isArray(texts);
 
