@@ -4,6 +4,7 @@
   "private": true,
   "description": "Monorepo for Hugging Face Transformers.js and framework integrations",
   "type": "module",
+  "packageManager": "pnpm@10.28.1",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",

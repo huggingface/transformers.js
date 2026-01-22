@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+
+/**
+ * This scripts looks at all packages and starts their dev command in parallel, if they have one.
+ */
+
 import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
