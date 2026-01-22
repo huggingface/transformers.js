@@ -65,7 +65,7 @@ if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
 } else if (apis.IS_NODE_ENV) {
-    ONNX = ONNX_NODE.default ?? ONNX_NODE;
+    ONNX = ONNX_NODE;
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
