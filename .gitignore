@@ -10,6 +10,10 @@ deno.lock
 /dist
 /types
 /models
+packages/*/dist
+packages/*/types
+*.tsbuildinfo
 
 # Do not track coverage reports
 /coverage
+packages/*/coverage
