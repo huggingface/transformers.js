@@ -1,7 +1,6 @@
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
-import { max, softmax } from '../utils/maths.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -16,7 +15,7 @@ import { max, softmax } from '../utils/maths.js';
  * @callback Text2TextGenerationPipelineCallback Generate the output text(s) using text(s) given as inputs.
  * @param {string|string[]} texts Input text for the encoder.
  * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<Text2TextGenerationOutput|Text2TextGenerationOutput[]>}
+ * @returns {Promise<Text2TextGenerationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & Text2TextGenerationPipelineCallback & Disposable} Text2TextGenerationPipelineType
  */
@@ -26,6 +25,8 @@ import { max, softmax } from '../utils/maths.js';
  *
  * **Example:** Text-to-text generation w/ `Xenova/LaMini-Flan-T5-783M`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const generator = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-783M');
  * const output = await generator('how can I become more healthy?', {
  *   max_new_tokens: 100,
@@ -38,14 +39,6 @@ export class Text2TextGenerationPipeline
 {
     /** @type {'generated_text'} */
     _key = 'generated_text';
-
-    /**
-     * Create a new Text2TextGenerationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
 
     /** @type {Text2TextGenerationPipelineCallback} */
     async _call(texts, generate_kwargs = {}) {
