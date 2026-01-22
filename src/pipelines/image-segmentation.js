@@ -8,11 +8,20 @@ import { RawImage } from '../utils/image.js';
  * @typedef {import('./_base.js').ImagePipelineInputs} ImagePipelineInputs
  */
 
+const SUBTASKS_MAPPING = {
+    // Mapping of subtasks to their corresponding post-processing function names.
+    panoptic: 'post_process_panoptic_segmentation',
+    instance: 'post_process_instance_segmentation',
+    semantic: 'post_process_semantic_segmentation',
+};
+
 /**
- * @typedef {Object} ImageSegmentationOutput
+ * @typedef {Object} ImageSegmentationOutputSingle
  * @property {string|null} label The label of the segment.
  * @property {number|null} score The score of the segment.
  * @property {RawImage} mask The mask of the segment.
+ *
+ * @typedef {ImageSegmentationOutputSingle[]} ImageSegmentationOutput
  *
  * @typedef {Object} ImageSegmentationPipelineOptions Parameters specific to image segmentation pipelines.
  * @property {number} [threshold=0.5] Probability threshold to filter out predicted masks.
@@ -26,7 +35,7 @@ import { RawImage } from '../utils/image.js';
  * @callback ImageSegmentationPipelineCallback Segment the input images.
  * @param {ImagePipelineInputs} images The input images.
  * @param {ImageSegmentationPipelineOptions} [options] The options to use for image segmentation.
- * @returns {Promise<ImageSegmentationOutput[]>} The annotated segments.
+ * @returns {Promise<ImageSegmentationOutput>} The annotated segments.
  *
  * @typedef {ImagePipelineConstructorArgs & ImageSegmentationPipelineCallback & Disposable} ImageSegmentationPipelineType
  */
@@ -51,21 +60,6 @@ import { RawImage } from '../utils/image.js';
 export class ImageSegmentationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => ImageSegmentationPipelineType} */ (Pipeline)
 {
-    /**
-     * Create a new ImageSegmentationPipeline.
-     * @param {ImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-
-        this.subtasks_mapping = {
-            // Mapping of subtasks to their corresponding post-processing function names.
-            panoptic: 'post_process_panoptic_segmentation',
-            instance: 'post_process_instance_segmentation',
-            semantic: 'post_process_semantic_segmentation',
-        };
-    }
-
     /** @type {ImageSegmentationPipelineCallback} */
     async _call(
         images,
@@ -108,9 +102,9 @@ export class ImageSegmentationPipeline
 
         let fn = null;
         if (subtask !== null) {
-            fn = this.subtasks_mapping[subtask];
+            fn = SUBTASKS_MAPPING[subtask];
         } else if (this.processor.image_processor) {
-            for (const [task, func] of Object.entries(this.subtasks_mapping)) {
+            for (const [task, func] of Object.entries(SUBTASKS_MAPPING)) {
                 if (func in this.processor.image_processor) {
                     fn = this.processor.image_processor[func].bind(this.processor.image_processor);
                     subtask = task;
@@ -122,7 +116,7 @@ export class ImageSegmentationPipeline
         // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;
 
-        /** @type {ImageSegmentationOutput[]} */
+        /** @type {ImageSegmentationOutputSingle[]} */
         const annotation = [];
         if (!subtask) {
             // We define an epsilon to safeguard against numerical/precision issues when detecting
