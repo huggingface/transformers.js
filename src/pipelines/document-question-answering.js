@@ -6,7 +6,6 @@ import { Tensor } from '../utils/tensor.js';
  * @typedef {import('./_base.js').TextImagePipelineConstructorArgs} TextImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
  * @typedef {import('./_base.js').ImageInput} ImageInput
- * @typedef {import('./_base.js').BoundingBox} BoundingBox
  */
 
 /**
