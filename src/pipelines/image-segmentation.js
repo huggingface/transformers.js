@@ -1,5 +1,4 @@
-import { Pipeline } from './_base.js';
-import { prepareImages } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { RawImage } from '../utils/image.js';
 
@@ -10,7 +9,7 @@ import { RawImage } from '../utils/image.js';
  */
 
 /**
- * @typedef {Object} ImageSegmentationPipelineOutput
+ * @typedef {Object} ImageSegmentationOutput
  * @property {string|null} label The label of the segment.
  * @property {number|null} score The score of the segment.
  * @property {RawImage} mask The mask of the segment.
@@ -27,7 +26,7 @@ import { RawImage } from '../utils/image.js';
  * @callback ImageSegmentationPipelineCallback Segment the input images.
  * @param {ImagePipelineInputs} images The input images.
  * @param {ImageSegmentationPipelineOptions} [options] The options to use for image segmentation.
- * @returns {Promise<ImageSegmentationPipelineOutput[]>} The annotated segments.
+ * @returns {Promise<ImageSegmentationOutput[]>} The annotated segments.
  *
  * @typedef {ImagePipelineConstructorArgs & ImageSegmentationPipelineCallback & Disposable} ImageSegmentationPipelineType
  */
@@ -38,6 +37,8 @@ import { RawImage } from '../utils/image.js';
  *
  * **Example:** Perform image segmentation with `Xenova/detr-resnet-50-panoptic`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const segmenter = await pipeline('image-segmentation', 'Xenova/detr-resnet-50-panoptic');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg';
  * const output = await segmenter(url);
@@ -121,7 +122,7 @@ export class ImageSegmentationPipeline
         // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;
 
-        /** @type {ImageSegmentationPipelineOutput[]} */
+        /** @type {ImageSegmentationOutput[]} */
         const annotation = [];
         if (!subtask) {
             // We define an epsilon to safeguard against numerical/precision issues when detecting
