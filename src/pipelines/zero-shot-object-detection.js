@@ -26,13 +26,13 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * @param {ImageInput} images The input images.
  * @param {string[]} candidate_labels What the model should recognize in the image.
  * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
- * @returns {Promise<ZeroShotObjectDetectionOutputSingle[]>} An array of objects containing the predicted labels, scores, and bounding boxes.
+ * @returns {Promise<ZeroShotObjectDetectionOutput>} An array of objects containing the predicted labels, scores, and bounding boxes.
  *
  * @callback ZeroShotObjectDetectionPipelineCallbackBatch Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
  * @param {ImageInput[]} images The input images.
  * @param {string[]} candidate_labels What the model should recognize in the image.
  * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
- * @returns {Promise<ZeroShotObjectDetectionOutputSingle[][]>} An array of objects containing the predicted labels, scores, and bounding boxes.
+ * @returns {Promise<ZeroShotObjectDetectionOutput[]>} An array of objects containing the predicted labels, scores, and bounding boxes.
  *
  * @typedef {ZeroShotObjectDetectionPipelineCallbackSingle & ZeroShotObjectDetectionPipelineCallbackBatch} ZeroShotObjectDetectionPipelineCallback
  *

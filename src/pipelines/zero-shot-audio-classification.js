@@ -13,7 +13,7 @@ import { softmax } from '../utils/maths.js';
  * @property {string} label The label identified by the model. It is one of the suggested `candidate_label`.
  * @property {number} score The score attributed by the model for that label (between 0 and 1).
  *
- * @typedef {ZeroShotAudioClassificationOutputSingle[]} ZeroShotAudioClassificationOutput
+ * @typedef {ZeroShotAudioClassificationOutput} ZeroShotAudioClassificationOutput
  *
  * @typedef {Object} ZeroShotAudioClassificationPipelineOptions Parameters specific to zero-shot audio classification pipelines.
  * @property {string} [hypothesis_template="This is a sound of {}."] The sentence used in conjunction with `candidate_labels`
@@ -28,7 +28,7 @@ import { softmax } from '../utils/maths.js';
  * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
  * @param {string[]} candidate_labels The candidate labels for this audio.
  * @param {ZeroShotAudioClassificationPipelineOptions} [options] The options to use for zero-shot audio classification.
- * @returns {Promise<ZeroShotAudioClassificationOutputSingle[]>} An array of objects containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotAudioClassificationOutput>} An array of objects containing the predicted labels and scores.
  *
  * @callback ZeroShotAudioClassificationPipelineCallbackBatch Classify the sequence(s) given as inputs.
  * @param {AudioInput[]} audio The input audio file(s) to be classified. The input is either:
@@ -38,7 +38,7 @@ import { softmax } from '../utils/maths.js';
  * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
  * @param {string[]} candidate_labels The candidate labels for this audio.
  * @param {ZeroShotAudioClassificationPipelineOptions} [options] The options to use for zero-shot audio classification.
- * @returns {Promise<ZeroShotAudioClassificationOutputSingle[][]>} An array of objects containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotAudioClassificationOutput[]>} An array of objects containing the predicted labels and scores.
  *
  * @typedef {ZeroShotAudioClassificationPipelineCallbackSingle & ZeroShotAudioClassificationPipelineCallbackBatch} ZeroShotAudioClassificationPipelineCallback
  *

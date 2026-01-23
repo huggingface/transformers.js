@@ -25,13 +25,13 @@ import { softmax } from '../utils/maths.js';
  * @param {ImageInput} images The input images.
  * @param {string[]} candidate_labels The candidate labels for this image.
  * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
- * @returns {Promise<ZeroShotImageClassificationOutputSingle[]>} An array of objects containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotImageClassificationOutput>} An array of objects containing the predicted labels and scores.
  *
  * @callback ZeroShotImageClassificationPipelineCallbackBatch Assign labels to the image(s) passed as inputs.
  * @param {ImageInput[]} images The input images.
  * @param {string[]} candidate_labels The candidate labels for this image.
  * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
- * @returns {Promise<ZeroShotImageClassificationOutputSingle[][]>} An array of objects containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotImageClassificationOutput[]>} An array of objects containing the predicted labels and scores.
  *
  * @typedef {ZeroShotImageClassificationPipelineCallbackSingle & ZeroShotImageClassificationPipelineCallbackBatch} ZeroShotImageClassificationPipelineCallback
  *

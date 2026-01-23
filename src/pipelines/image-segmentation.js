@@ -116,7 +116,7 @@ export class ImageSegmentationPipeline
         // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;
 
-        /** @type {ImageSegmentationOutputSingle[]} */
+        /** @type {ImageSegmentationOutput} */
         const annotation = [];
         if (!subtask) {
             // We define an epsilon to safeguard against numerical/precision issues when detecting
