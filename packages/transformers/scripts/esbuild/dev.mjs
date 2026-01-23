@@ -30,9 +30,7 @@ const contexts = await buildAllWithWatch(log);
 
 const endTime = performance.now();
 const duration = (endTime - startTime).toFixed(2);
-log.success(
-  `All builds completed in ${colors.bright}${duration}ms${colors.reset}`,
-);
+log.success(`All builds completed in ${colors.bright}${duration}ms${colors.reset}`);
 
 // Generate initial TypeScript declarations, then start watch mode
 log.section("TYPES");
@@ -86,7 +84,7 @@ tscWatch.stdout.on("data", (data) => {
         line.includes("error") ||
         line.includes("File change detected") ||
         line.includes("Found 0 errors") ||
-        line.includes("Found") && line.includes("error")
+        (line.includes("Found") && line.includes("error"))
       ) {
         log.dim(line);
       }

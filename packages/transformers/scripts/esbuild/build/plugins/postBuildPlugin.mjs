@@ -40,9 +40,7 @@ export const postBuildPlugin = (distDir, rootDir) => {
             if (existsSync(src)) {
               const dest = path.join(distDir, ORT_JSEP_FILE);
               copyFileSync(src, dest);
-              log.success(
-                `${colors.gray}Copied ${ORT_JSEP_FILE}${colors.reset}`,
-              );
+              log.success(`${colors.gray}Copied ${ORT_JSEP_FILE}${colors.reset}`);
               copied = true;
               break;
             }

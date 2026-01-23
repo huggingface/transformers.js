@@ -17,9 +17,7 @@ try {
 
   const endTime = performance.now();
   const duration = (endTime - startTime).toFixed(2);
-  log.success(
-    `All builds completed in ${colors.bright}${duration}ms${colors.reset}\n`,
-  );
+  log.success(`All builds completed in ${colors.bright}${duration}ms${colors.reset}\n`);
 } catch (error) {
   log.error(`Build failed: ${error.message}`);
   console.error(error);

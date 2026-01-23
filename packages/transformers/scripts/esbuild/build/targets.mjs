@@ -1,9 +1,4 @@
-import {
-  NODE_IGNORE_MODULES,
-  NODE_EXTERNAL_MODULES,
-  WEB_IGNORE_MODULES,
-  WEB_EXTERNAL_MODULES,
-} from "./constants.mjs";
+import { NODE_IGNORE_MODULES, NODE_EXTERNAL_MODULES, WEB_IGNORE_MODULES, WEB_EXTERNAL_MODULES } from "./constants.mjs";
 
 /**
  * Build target configuration

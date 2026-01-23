@@ -1,7 +1,7 @@
 {
   "overrides": [
     {
-      "files": ["src/**/*.{js,mjs,cjs}"],
+      "files": ["./packages/**/src/**/*.{js,mjs,cjs}"],
       "options": {
         "singleQuote": true,
         "tabWidth": 4,
@@ -9,14 +9,14 @@
       }
     },
     {
-      "files": ["tests/**/*.{js,mjs,cjs}"],
+      "files": ["./packages/**/tests/**/*.{js,mjs,cjs}"],
       "options": {
         "tabWidth": 2,
         "printWidth": 10000000
       }
     },
     {
-      "files": ["scripts/**/*.{js,mjs,cjs}"],
+      "files": ["./packages/**/scripts/**/*.{js,mjs,cjs}"],
       "options": {
         "tabWidth": 2,
         "printWidth": 120

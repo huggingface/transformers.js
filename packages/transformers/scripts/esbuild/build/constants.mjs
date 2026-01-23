@@ -10,15 +10,7 @@ export const NODE_EXTERNAL_MODULES = [
   // node:* modules are handled by externalNodeBuiltinsPlugin
 ];
 
-export const WEB_IGNORE_MODULES = [
-  "onnxruntime-node",
-  "sharp",
-  "fs",
-  "path",
-  "url",
-  "stream",
-  "stream/promises",
-];
+export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "stream", "stream/promises"];
 export const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

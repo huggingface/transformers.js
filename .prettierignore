@@ -2,6 +2,6 @@
 .github
 dist
 docs
-scripts/**/*.py
+*.py
 types
 *.md

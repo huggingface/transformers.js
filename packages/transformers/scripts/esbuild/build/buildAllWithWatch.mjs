@@ -12,8 +12,7 @@ import { BUILD_TARGETS } from "./targets.mjs";
  * Create an esbuild context for a single build target
  */
 async function createBuildContext(targetName, targetConfig, log) {
-  const { name, suffix, format, ignoreModules, externalModules, usePostBuild } =
-    targetConfig;
+  const { name, suffix, format, ignoreModules, externalModules, usePostBuild } = targetConfig;
   const platform = format === "cjs" ? "node" : "neutral";
   const outputFile = `transformers${name}${suffix}`;
 
@@ -48,9 +47,7 @@ export async function buildAllWithWatch(log) {
 
   // Create contexts for all targets
   const contexts = await Promise.all(
-    BUILD_TARGETS.map((target) =>
-      createBuildContext(target.name, target.config, log),
-    ),
+    BUILD_TARGETS.map((target) => createBuildContext(target.name, target.config, log)),
   );
 
   log.dim("Starting initial build...\n");
