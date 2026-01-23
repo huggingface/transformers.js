@@ -71,7 +71,7 @@ export class Tensor {
       // Create new tensor
       this.ort_tensor = new ONNXTensor(
         /** @type {DataType} */ (args[0]),
-        // @ts-ignore - ts(2769): Type 'number' is not assignable to type 'bigint' but works at runtime
+        // @ts-expect-error ts(2769) Type 'number' is not assignable to type 'bigint'.
         /** @type {Exclude<import('./maths.js').AnyTypedArray, Uint8ClampedArray>} */ (
           args[1]
         ),
@@ -833,6 +833,84 @@ export class Tensor {
     }
     const index = max(this.data)[1];
     return new Tensor("int64", [BigInt(index)], []);
+  }
+
+  /**
+   * Repeats this tensor along the specified dimensions.
+   * @param  {...number} repeats The number of times to repeat this tensor along each dimension.
+   * @returns {Tensor} The repeated tensor.
+   * @throws {Error} If the number of repeats is less than the number of dimensions.
+   */
+  repeat(...repeats) {
+    if (repeats.length < this.dims.length) {
+      throw new Error(
+        `Number of dimensions of repeat dims (${repeats.length}) cannot be smaller than number of dimensions of tensor (${this.dims.length})`,
+      );
+    }
+
+    // Optimization: if all repeats are 1, just clone with potentially expanded dims
+    if (repeats.every((r) => r === 1)) {
+      if (repeats.length === this.dims.length) {
+        return this.clone();
+      }
+      // Need to expand dimensions by prepending 1s
+      const numPrependedDims = repeats.length - this.dims.length;
+      const newDims = Array(numPrependedDims).fill(1).concat(this.dims);
+      return new Tensor(this.type, this.data.slice(), newDims);
+    }
+
+    // If repeats has more dimensions than the tensor, prepend 1s to tensor dims
+    const numPrependedDims = repeats.length - this.dims.length;
+    const expandedDims = Array(numPrependedDims).fill(1).concat(this.dims);
+
+    // Calculate the output dimensions
+    const outputDims = expandedDims.map((dim, i) => dim * repeats[i]);
+
+    // Calculate total output size
+    const outputSize = outputDims.reduce((a, b) => a * b, 1);
+
+    // Allocate output data
+    const this_data = this.data;
+    // @ts-ignore
+    const data = new this_data.constructor(outputSize);
+
+    // Calculate strides for the expanded input tensor
+    const inputStrides = dimsToStride(expandedDims);
+    const outputStrides = dimsToStride(outputDims);
+
+    // Fill the output tensor
+    for (let i = 0; i < outputSize; ++i) {
+      // Convert flat index to multi-dimensional indices in output
+      let remaining = i;
+      let inputIndex = 0;
+
+      for (let d = 0; d < outputDims.length; ++d) {
+        const outputCoord = Math.floor(remaining / outputStrides[d]);
+        remaining = remaining % outputStrides[d];
+
+        // Map output coordinate to input coordinate using modulo
+        const inputCoord = outputCoord % expandedDims[d];
+        inputIndex += inputCoord * inputStrides[d];
+      }
+
+      data[i] = this_data[inputIndex];
+    }
+
+    return new Tensor(this.type, data, outputDims);
+  }
+
+  /**
+   * Constructs a tensor by repeating the elements of input. The dims argument specifies the number of repetitions in each dimension.
+   * @param  {...number} dims The number of repetitions per dimension.
+   * @returns {Tensor} The tiled tensor.
+   */
+  tile(...dims) {
+    // If fewer repeats than dims, prepend 1s to repeats
+    if (dims.length < this.dims.length) {
+      const numPrependedRepeats = this.dims.length - dims.length;
+      dims = Array(numPrependedRepeats).fill(1).concat(dims);
+    }
+    return this.repeat(...dims);
   }
 
   /**
@@ -1605,20 +1683,26 @@ export function rand(size) {
  */
 export function randn(size) {
   const length = size.reduce((a, b) => a * b, 1);
+  const data = new Float32Array(length);
 
-  // Box-Muller transform
-  function boxMullerRandom() {
-    // NOTE: 1 - Math.random() is used to avoid log(0)
-    const u = 1 - Math.random();
-    const v = 1 - Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  for (let i = 0; i < length; i += 2) {
+    // Box-Muller transform
+    const u = 1 - Math.random(); // Avoids log(0)
+    const v = Math.random();
+
+    const mag = Math.sqrt(-2.0 * Math.log(u));
+    const angle = 2.0 * Math.PI * v;
+
+    // Assign the first value
+    data[i] = mag * Math.cos(angle);
+
+    // Assign the second value (if valid index)
+    if (i + 1 < length) {
+      data[i + 1] = mag * Math.sin(angle);
+    }
   }
 
-  return new Tensor(
-    "float32",
-    Float32Array.from({ length }, () => boxMullerRandom()),
-    size,
-  );
+  return new Tensor("float32", data, size);
 }
 
 /**
