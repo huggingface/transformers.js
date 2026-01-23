@@ -5,8 +5,8 @@
     // Tells the compiler to check JS files
     "checkJs": true,
     "target": "esnext",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "outDir": "types",
     "strict": false,
     "skipLibCheck": true,

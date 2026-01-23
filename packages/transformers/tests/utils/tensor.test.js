@@ -627,4 +627,124 @@ describe("Tensor operations", () => {
       compare(t2, target);
     });
   });
+
+  describe("repeat", () => {
+    it("should repeat a 1D tensor", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [3]);
+      const t2 = t1.repeat(2);
+      const target = new Tensor("float32", [1, 2, 3, 1, 2, 3], [6]);
+      compare(t2, target);
+    });
+
+    it("should repeat a 2D tensor along both dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = t1.repeat(2, 3);
+      // Shape becomes [4, 6]
+      // [[1, 2], [3, 4]] repeated 2x along dim0 and 3x along dim1
+      const target = new Tensor("float32", [1, 2, 1, 2, 1, 2, 3, 4, 3, 4, 3, 4, 1, 2, 1, 2, 1, 2, 3, 4, 3, 4, 3, 4], [4, 6]);
+      compare(t2, target);
+    });
+
+    it("should repeat with more dimensions than tensor has (prepend 1s)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = t1.repeat(2, 1, 1);
+      // Tensor is treated as [1, 2, 2], repeated [2, 1, 1] -> [2, 2, 2]
+      const target = new Tensor("float32", [1, 2, 3, 4, 1, 2, 3, 4], [2, 2, 2]);
+      compare(t2, target);
+    });
+
+    it("should repeat a 3D tensor", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      const t2 = t1.repeat(2, 1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4, 1, 2, 3, 4], [2, 2, 2]);
+      compare(t2, target);
+    });
+
+    it("should repeat with ones (no actual repetition)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const t2 = t1.repeat(1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      compare(t2, target);
+    });
+
+    it("should repeat a scalar tensor", () => {
+      const t1 = new Tensor("float32", [5], [1]);
+      const t2 = t1.repeat(4);
+      const target = new Tensor("float32", [5, 5, 5, 5], [4]);
+      compare(t2, target);
+    });
+
+    it("should handle int64 tensor type", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      const t2 = t1.repeat(2);
+      const target = new Tensor("int64", [1n, 2n, 3n, 1n, 2n, 3n], [6]);
+      compare(t2, target);
+    });
+
+    it("should throw error when repeats has fewer dimensions than tensor", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.repeat(2)).toThrow();
+    });
+
+    it("should optimize when all repeats are ones (same dims)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const t2 = t1.repeat(1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      compare(t2, target);
+      // Verify it's a copy, not the same reference
+      expect(t2.data).not.toBe(t1.data);
+    });
+
+    it("should optimize when all repeats are ones (expanded dims)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = t1.repeat(1, 1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      compare(t2, target);
+    });
+  });
+
+  describe("tile", () => {
+    it("should tile a 1D tensor", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [3]);
+      const t2 = t1.tile(2);
+      const target = new Tensor("float32", [1, 2, 3, 1, 2, 3], [6]);
+      compare(t2, target);
+    });
+
+    it("should tile a 2D tensor along both dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = t1.tile(2, 3);
+      const target = new Tensor("float32", [1, 2, 1, 2, 1, 2, 3, 4, 3, 4, 3, 4, 1, 2, 1, 2, 1, 2, 3, 4, 3, 4, 3, 4], [4, 6]);
+      compare(t2, target);
+    });
+
+    it("should tile with fewer repeats than tensor dims (prepend 1s to repeats)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      // Only tile along the last dimension
+      const t2 = t1.tile(2);
+      const target = new Tensor("float32", [1, 2, 3, 1, 2, 3, 4, 5, 6, 4, 5, 6], [2, 6]);
+      compare(t2, target);
+    });
+
+    it("should tile with more repeats than tensor dims (prepend 1s to dims)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = t1.tile(2, 1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4, 1, 2, 3, 4], [2, 2, 2]);
+      compare(t2, target);
+    });
+
+    it("should tile with ones (no actual tiling)", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const t2 = t1.tile(1, 1);
+      const target = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      compare(t2, target);
+    });
+
+    it("should handle int64 tensor type", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      const t2 = t1.tile(2);
+      const target = new Tensor("int64", [1n, 2n, 3n, 1n, 2n, 3n], [6]);
+      compare(t2, target);
+    });
+  });
 });

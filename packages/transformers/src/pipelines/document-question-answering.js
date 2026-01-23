@@ -6,7 +6,6 @@ import { Tensor } from '../utils/tensor.js';
  * @typedef {import('./_base.js').TextImagePipelineConstructorArgs} TextImagePipelineConstructorArgs
  * @typedef {import('./_base.js').Disposable} Disposable
  * @typedef {import('./_base.js').ImageInput} ImageInput
- * @typedef {import('./_base.js').BoundingBox} BoundingBox
  */
 
 /**
@@ -15,10 +14,10 @@ import { Tensor } from '../utils/tensor.js';
  * @typedef {DocumentQuestionAnsweringSingle[]} DocumentQuestionAnsweringOutput
  *
  * @callback DocumentQuestionAnsweringPipelineCallback Answer the question given as input by using the document.
- * @param {ImageInput} image The image of the document to use.
+ * @param {ImageInput|ImageInput[]} image The image of the document to use.
  * @param {string} question A question to ask of the document.
  * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<DocumentQuestionAnsweringOutput|DocumentQuestionAnsweringOutput[]>} An object (or array of objects) containing the answer(s).
+ * @returns {Promise<DocumentQuestionAnsweringOutput>} An object (or array of objects) containing the answer(s).
  *
  * @typedef {TextImagePipelineConstructorArgs & DocumentQuestionAnsweringPipelineCallback & Disposable} DocumentQuestionAnsweringPipelineType
  */
@@ -30,6 +29,8 @@ import { Tensor } from '../utils/tensor.js';
  *
  * **Example:** Answer questions about a document with `Xenova/donut-base-finetuned-docvqa`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const qa_pipeline = await pipeline('document-question-answering', 'Xenova/donut-base-finetuned-docvqa');
  * const image = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/invoice.png';
  * const question = 'What is the invoice number?';
@@ -42,17 +43,13 @@ export class DocumentQuestionAnsweringPipeline
         Pipeline
     )
 {
-    /**
-     * Create a new DocumentQuestionAnsweringPipeline.
-     * @param {TextImagePipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
-
-    /** @type {DocumentQuestionAnsweringPipelineCallback} */
     async _call(image, question, generate_kwargs = {}) {
-        // NOTE: For now, we only support a batch size of 1
+        if (Array.isArray(image)) {
+            if (image.length !== 1) {
+                throw Error('Document Question Answering pipeline currently only supports a batch size of 1.');
+            }
+            image = image[0];
+        }
 
         // Preprocess image
         const preparedImage = (await prepareImages(image))[0];
@@ -69,7 +66,7 @@ export class DocumentQuestionAnsweringPipeline
         // Run model
         const output = await this.model.generate({
             inputs: pixel_values,
-            // @ts-expect-error TS2339
+            // @ts-expect-error Ts2339
             max_length: this.model.config.decoder.max_position_embeddings,
             decoder_input_ids,
             ...generate_kwargs,

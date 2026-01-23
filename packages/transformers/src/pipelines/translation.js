@@ -13,7 +13,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * @callback TranslationPipelineCallback Translate the text(s) given as inputs.
  * @param {string|string[]} texts Texts to be translated.
  * @param {import('./generation/configuration_utils.js').GenerationConfig} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TranslationOutput|TranslationOutput[]>}
+ * @returns {Promise<TranslationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & TranslationPipelineCallback & Disposable} TranslationPipelineType
  */
@@ -27,6 +27,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * for the full list of languages and their corresponding codes.
  *
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
  * const output = await translator('जीवन एक चॉकलेट बॉक्स की तरह है।', {
  *   src_lang: 'hin_Deva', // Hindi
@@ -41,6 +43,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * for the full list of languages and their corresponding codes.
  *
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const translator = await pipeline('translation', 'Xenova/m2m100_418M');
  * const output = await translator('生活就像一盒巧克力。', {
  *   src_lang: 'zh', // Chinese
@@ -55,6 +59,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * for the full list of languages and their corresponding codes.
  *
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const translator = await pipeline('translation', 'Xenova/mbart-large-50-many-to-many-mmt');
  * const output = await translator('संयुक्त राष्ट्र के प्रमुख का कहना है कि सीरिया में कोई सैन्य समाधान नहीं है', {
  *   src_lang: 'hi_IN', // Hindi
@@ -70,12 +76,4 @@ export class TranslationPipeline
 {
     /** @type {'translation_text'} */
     _key = 'translation_text';
-
-    /**
-     * Create a new TranslationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
 }

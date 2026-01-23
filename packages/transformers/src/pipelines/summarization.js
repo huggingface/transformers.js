@@ -13,7 +13,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * @callback SummarizationPipelineCallback Summarize the text(s) given as inputs.
  * @param {string|string[]} texts One or several articles (or one list of articles) to summarize.
  * @param {import('./generation/configuration_utils.js').GenerationConfig} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<SummarizationOutput|SummarizationOutput[]>}
+ * @returns {Promise<SummarizationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & SummarizationPipelineCallback & Disposable} SummarizationPipelineType
  */
@@ -23,7 +23,9 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * **Example:** Summarization w/ `Xenova/distilbart-cnn-6-6`.
  * ```javascript
- * const generator = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6');
+ * import { pipeline } from '@huggingface/transformers';
+ *
+ * const summarizer = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6');
  * const text = 'The tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey building, ' +
  *   'and the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side. ' +
  *   'During its construction, the Eiffel Tower surpassed the Washington Monument to become the tallest ' +
@@ -32,7 +34,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *   'the addition of a broadcasting aerial at the top of the tower in 1957, it is now taller than the ' +
  *   'Chrysler Building by 5.2 metres (17 ft). Excluding transmitters, the Eiffel Tower is the second ' +
  *   'tallest free-standing structure in France after the Millau Viaduct.';
- * const output = await generator(text, {
+ * const output = await summarizer(text, {
  *   max_new_tokens: 100,
  * });
  * // [{ summary_text: ' The Eiffel Tower is about the same height as an 81-storey building and the tallest structure in Paris. It is the second tallest free-standing structure in France after the Millau Viaduct.' }]
@@ -45,12 +47,4 @@ export class SummarizationPipeline
 {
     /** @type {'summary_text'} */
     _key = 'summary_text';
-
-    /**
-     * Create a new SummarizationPipeline.
-     * @param {TextPipelineConstructorArgs} options An object used to instantiate the pipeline.
-     */
-    constructor(options) {
-        super(options);
-    }
 }

@@ -21,12 +21,21 @@ import { softmax } from '../utils/maths.js';
  * is 1. If `true`, the labels are considered independent and probabilities are normalized for each
  * candidate by doing a softmax of the entailment score vs. the contradiction score.
  *
- * @callback ZeroShotClassificationPipelineCallback Classify the sequence(s) given as inputs.
- * @param {string|string[]} texts The sequence(s) to classify, will be truncated if the model input is too large.
+ * @callback ZeroShotClassificationPipelineCallbackSingle Classify the sequence(s) given as inputs.
+ * @param {string} texts The sequence(s) to classify, will be truncated if the model input is too large.
  * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
  * Can be a single label, a string of comma-separated labels, or a list of labels.
  * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
- * @returns {Promise<ZeroShotClassificationOutput|ZeroShotClassificationOutput[]>} An array or object containing the predicted labels and scores.
+ * @returns {Promise<ZeroShotClassificationOutput>} An array or object containing the predicted labels and scores.
+ *
+ * @callback ZeroShotClassificationPipelineCallbackBatch Classify the sequence(s) given as inputs.
+ * @param {string[]} texts The sequence(s) to classify, will be truncated if the model input is too large.
+ * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
+ * Can be a single label, a string of comma-separated labels, or a list of labels.
+ * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
+ * @returns {Promise<ZeroShotClassificationOutput[]>} An array or object containing the predicted labels and scores.
+ *
+ * @typedef {ZeroShotClassificationPipelineCallbackSingle & ZeroShotClassificationPipelineCallbackBatch} ZeroShotClassificationPipelineCallback
  *
  * @typedef {TextPipelineConstructorArgs & ZeroShotClassificationPipelineCallback & Disposable} ZeroShotClassificationPipelineType
  */
@@ -39,6 +48,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Zero shot classification with `Xenova/mobilebert-uncased-mnli`.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('zero-shot-classification', 'Xenova/mobilebert-uncased-mnli');
  * const text = 'Last week I upgraded my iOS version and ever since then my phone has been overheating whenever I use your app.';
  * const labels = [ 'mobile', 'billing', 'website', 'account access' ];
@@ -52,6 +63,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Zero shot classification with `Xenova/nli-deberta-v3-xsmall` (multi-label).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('zero-shot-classification', 'Xenova/nli-deberta-v3-xsmall');
  * const text = 'I have a problem with my iphone that needs to be resolved asap!';
  * const labels = [ 'urgent', 'not urgent', 'phone', 'tablet', 'computer' ];
@@ -91,7 +104,6 @@ export class ZeroShotClassificationPipeline
         }
     }
 
-    /** @type {ZeroShotClassificationPipelineCallback} */
     async _call(texts, candidate_labels, { hypothesis_template = 'This example is {}.', multi_label = false } = {}) {
         const isBatched = Array.isArray(texts);
         if (!isBatched) {
