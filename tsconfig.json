@@ -1,6 +1,6 @@
 {
   // Only include files in the src directory
-  "include": ["src/**/*"],
+  "include": ["./packages/**/src/**/*"],
   "compilerOptions": {
     // Tells the compiler to check JS files
     "checkJs": true,
