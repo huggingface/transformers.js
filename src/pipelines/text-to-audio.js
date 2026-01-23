@@ -102,8 +102,14 @@ export class TextToAudioPipeline
         }
 
         if (batch_size > 1) {
-            // Repeat speaker embeddings for batch size
-            speaker_embeddings = speaker_embeddings.repeat(batch_size, 1);
+            if (speaker_embeddings.dims[0] === 1) {
+                // Repeat speaker embeddings for batch size
+                speaker_embeddings = speaker_embeddings.repeat(batch_size, 1);
+            } else if (speaker_embeddings.dims[0] !== batch_size) {
+                throw new Error(
+                    `Expected speaker embeddings batch size to be 1 or ${batch_size}, but got ${speaker_embeddings.dims[0]}.`,
+                );
+            }
         }
 
         return speaker_embeddings;
