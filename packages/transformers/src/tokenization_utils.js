@@ -12,6 +12,14 @@ import { Tensor } from './utils/tensor.js';
  */
 
 /**
+ * Returns the list of files that will be loaded for a tokenizer.
+ * @returns {string[]} An array of file names that will be loaded.
+ */
+export function getTokenizerFiles() {
+    return ['tokenizer.json', 'tokenizer_config.json'];
+}
+
+/**
  * Loads a tokenizer from the specified path.
  * @param {string} pretrained_model_name_or_path The path to the tokenizer directory.
  * @param {PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
