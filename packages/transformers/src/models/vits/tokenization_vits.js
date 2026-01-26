@@ -1,20 +1,9 @@
-// @ts-ignore - Decoder is exported at runtime but not in type definitions
 import { Decoder } from '@huggingface/tokenizers';
 
 import { PreTrainedTokenizer } from '../../tokenization_utils.js';
 
 class VitsDecoder extends Decoder {
-    /**
-     * @param {any} config
-     */
-    constructor(config) {
-        super(config);
-    }
-
-    /**
-     * @param {string[]} tokens
-     * @returns {string[]}
-     */
+    /** @type {Decoder['decode_chain']} */
     decode_chain(tokens) {
         let decoded = '';
         for (let i = 1; i < tokens.length; i += 2) {
