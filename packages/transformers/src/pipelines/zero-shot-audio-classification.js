@@ -13,7 +13,7 @@ import { softmax } from '../utils/maths.js';
  * @property {string} label The label identified by the model. It is one of the suggested `candidate_label`.
  * @property {number} score The score attributed by the model for that label (between 0 and 1).
  *
- * @typedef {ZeroShotAudioClassificationOutput} ZeroShotAudioClassificationOutput
+ * @typedef {ZeroShotAudioClassificationOutputSingle[]} ZeroShotAudioClassificationOutput
  *
  * @typedef {Object} ZeroShotAudioClassificationPipelineOptions Parameters specific to zero-shot audio classification pipelines.
  * @property {string} [hypothesis_template="This is a sound of {}."] The sentence used in conjunction with `candidate_labels`
