@@ -74,7 +74,7 @@ export const DEFAULT_MODEL_OPTIONS = Object.freeze({
 expect.extend({
   toBeCloseToNested(received, expected, numDigits = 2) {
     const compare = (received, expected, path = "") => {
-      if (typeof received === "number" && typeof expected === "number" && !Number.isInteger(received) && !Number.isInteger(expected)) {
+      if (typeof received === "number" && typeof expected === "number" && (!Number.isInteger(received) || !Number.isInteger(expected))) {
         const pass = Math.abs(received - expected) < Math.pow(10, -numDigits);
         return {
           pass,

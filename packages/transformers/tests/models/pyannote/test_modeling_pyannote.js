@@ -1,7 +1,6 @@
 import { AutoProcessor, AutoModelForAudioFrameClassification } from "../../../src/transformers.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
-import { compare } from "../../test_utils.js";
 
 export default () => {
   const models_to_test = ["onnx-community/pyannote-segmentation-3.0"];
@@ -30,8 +29,8 @@ export default () => {
 
       // Run model with inputs
       const { logits } = await model(inputs);
-      compare(logits.dims, [1, 767, 7]);
-      compare(logits.mean().item(), -4.822614669799805, 6);
+      expect(logits.dims).toEqual([1, 767, 7]);
+      expect(logits.mean().item()).toBeCloseTo(-4.822614669799805, 6);
 
       const result = processor.post_process_speaker_diarization(logits, audio.length);
       const target = [
@@ -47,7 +46,7 @@ export default () => {
           { id: 0, start: 12.598087048934833, end: 13.005023911888312, confidence: 0.37838892004965197 },
         ],
       ];
-      compare(result, target);
+      expect(result).toBeCloseToNested(target);
 
       await model.dispose();
     },

@@ -1,6 +1,5 @@
 import { WhisperTokenizer } from "../../../src/models/tokenizers.js";
 import { BASE_TEST_STRINGS, WHISPER_TEST_STRINGS } from "../test_strings.js";
-import { compare } from "../../test_utils.js";
 
 export const TOKENIZER_CLASS = WhisperTokenizer;
 export const TEST_CONFIG = {
@@ -631,16 +630,12 @@ export const CUSTOM_TESTS = () => {
             ],
           },
         ];
-
-        compare(
-          tokenizer._decode_asr(model_outputs, {
-            return_timestamps: "word",
-            time_precision: 0.02,
-            force_full_sequences: false,
-          }),
-          target,
-          1e-2,
-        );
+        const decoded = tokenizer._decode_asr(model_outputs, {
+          return_timestamps: "word",
+          time_precision: 0.02,
+          force_full_sequences: false,
+        });
+        expect(decoded).toBeCloseToNested(target, 2);
       },
       MAX_EXECUTION_TIME,
     );
@@ -762,15 +757,12 @@ export const CUSTOM_TESTS = () => {
           },
         ];
 
-        compare(
-          tokenizer._decode_asr(model_outputs, {
-            return_timestamps: "word",
-            time_precision: 0.02,
-            force_full_sequences: false,
-          }),
-          target,
-          1e-2,
-        );
+        const decoded = tokenizer._decode_asr(model_outputs, {
+          return_timestamps: "word",
+          time_precision: 0.02,
+          force_full_sequences: false,
+        });
+        expect(decoded).toEqual(target);
       },
       MAX_EXECUTION_TIME,
     );

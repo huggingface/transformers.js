@@ -1,5 +1,8 @@
 import { FFT, medianFilter, bankers_round, log_softmax } from "../../src/utils/maths.js";
-import { compare } from "../test_utils.js";
+import { init } from "../init.js";
+
+// Initialise the testing environment
+init();
 
 const fft = (arr, complex = false) => {
   let output;
@@ -84,7 +87,7 @@ describe("Mathematical operations", () => {
       const target = new Float32Array([12, 5, 6, 3, 6, 9, 9, 4, 4, 8, 8, 11]);
 
       const output = medianFilter(t1, window);
-      compare(output, target, 1e-3);
+      expect(output).toBeCloseToNested(target, 5);
     });
 
     // TODO add tests for errors
@@ -96,14 +99,14 @@ describe("Mathematical operations", () => {
       const input = [0, 1, 2, 3];
       const expected = [-3.4401896985611953, -2.4401896985611953, -1.4401896985611953, -0.44018969856119533];
       const output = log_softmax(input);
-      compare(output, expected, 1e-13);
+      expect(output).toBeCloseToNested(expected, 10);
     });
 
     it("should compute log softmax correctly for values with large differences", () => {
       const input = [1000, 1];
       const expected = [0, -999];
       const output = log_softmax(input);
-      compare(output, expected, 1e-13);
+      expect(output).toBeCloseToNested(expected, 10);
     });
   });
 
@@ -117,7 +120,7 @@ describe("Mathematical operations", () => {
         const target = new Float32Array([10, 0, -2, 2, -2, 0, -2, -2]);
 
         const output = fft(input);
-        compare(output, target, 1e-3);
+        expect(output).toBeCloseToNested(target, 5);
       }
 
       {
@@ -133,7 +136,7 @@ describe("Mathematical operations", () => {
         const target = new Float32Array([136.0, 0.0, -8.0, 40.218715937006785, -8.0, 19.31370849898476, -8.0, 11.972846101323912, -8.0, 8.0, -8.0, 5.345429103354389, -8.0, 3.313708498984761, -8.0, 1.5912989390372658, -8.0, 0.0, -8.0, -1.5912989390372658, -8.0, -3.313708498984761, -8.0, -5.345429103354389, -8.0, -8.0, -8.0, -11.972846101323912, -8.0, -19.31370849898476, -8.0, -40.218715937006785]);
 
         const output = fft(input);
-        compare(output, target, 1e-3);
+        expect(output).toBeCloseToNested(target, 5);
       }
     });
 
@@ -145,7 +148,7 @@ describe("Mathematical operations", () => {
         const target = new Float32Array([6, 0, -1.5, 0.8660254, -1.5, -0.8660254]);
 
         const output = fft(input);
-        compare(output, target, 1e-3);
+        expect(output).toBeCloseToNested(target, 5);
       }
     });
 
@@ -157,7 +160,7 @@ describe("Mathematical operations", () => {
         const target = new Float32Array([6, 2, -4.09807621, 4.3660254, 1.09807621, 2.6339746]);
 
         const output = fft(input, true);
-        compare(output, target, 1e-3);
+        expect(output).toBeCloseToNested(target, 5);
       }
     });
 
@@ -169,7 +172,7 @@ describe("Mathematical operations", () => {
         const target = new Float32Array([10, 2, -4, 4, -2, 10, 0, 0]);
 
         const output = fft(input, true);
-        compare(output, target, 1e-3);
+        expect(output).toBeCloseToNested(target, 5);
       }
     });
   });
@@ -185,7 +188,7 @@ describe("Mathematical operations", () => {
           console.log("output", output);
           console.log("target", test.output);
         }
-        compare(output, test.output, 1e-4);
+        expect(output).toBeCloseToNested(test.output, 4);
       });
     }
   });

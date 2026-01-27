@@ -1,6 +1,6 @@
 import { AutoTokenizer } from "../src/models/auto/tokenization_auto.js";
 import { MAX_TOKENIZER_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "./init.js";
-import { compare, collect_tests } from "./test_utils.js";
+import { collect_tests } from "./test_utils.js";
 
 const TOKENIZER_TESTS = await collect_tests("tokenization");
 describe("Tokenizers (model-specific)", () => {
@@ -75,7 +75,7 @@ describe("Tokenizer padding/truncation", () => {
           [0, 0, 0, 0],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("truncation output without special tokens when return_tensor is false", () => {
@@ -89,7 +89,7 @@ describe("Tokenizer padding/truncation", () => {
         attention_mask: [[1], [1, 1]],
         token_type_ids: [[0], [0, 0]],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("no padding with max_length defined and truncation unset", () => {
@@ -104,7 +104,7 @@ describe("Tokenizer padding/truncation", () => {
         attention_mask: [[1], [1]],
         token_type_ids: [[0], [0]],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("No padding, max_length=3 (implicit truncation strategy)", () => {
@@ -119,7 +119,7 @@ describe("Tokenizer padding/truncation", () => {
         token_type_ids: [[0], [0, 0, 0]],
         attention_mask: [[1], [1, 1, 1]],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("Padding true, max_length=3 (implicit truncation strategy)", () => {
@@ -143,7 +143,7 @@ describe("Tokenizer padding/truncation", () => {
           [1, 1, 1, 1, 1],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("No padding with explicit truncation, max_length=3", () => {
@@ -159,7 +159,7 @@ describe("Tokenizer padding/truncation", () => {
         token_type_ids: [[0], [0, 0, 0]],
         attention_mask: [[1], [1, 1, 1]],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("Padding true with explicit truncation, max_length=3", () => {
@@ -184,7 +184,7 @@ describe("Tokenizer padding/truncation", () => {
           [1, 1, 1],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("Padding 'max_length' without truncation, max_length=3", () => {
@@ -209,7 +209,7 @@ describe("Tokenizer padding/truncation", () => {
           [1, 1, 1, 1, 1],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("Padding 'max_length' with truncation, max_length=3", () => {
@@ -234,7 +234,7 @@ describe("Tokenizer padding/truncation", () => {
           [1, 1, 1],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
 
     test("Padding 'max_length' without truncation and max_length=null", () => {
@@ -259,7 +259,7 @@ describe("Tokenizer padding/truncation", () => {
           [1, 1, 1, 1, 1, ...Array(507).fill(0)],
         ],
       };
-      compare(output, expected);
+      expect(output).toEqual(expected);
     });
   });
 
@@ -414,7 +414,7 @@ describe("Token type ids", () => {
         ],
       };
 
-      compare(model_inputs, expected);
+      expect(model_inputs).toEqual(expected);
     },
     MAX_TEST_EXECUTION_TIME,
   );
@@ -435,7 +435,7 @@ describe("Token type ids", () => {
           attention_mask: [1, 1],
           token_type_ids: [0, 0],
         };
-        compare(model_inputs, expected);
+        expect(model_inputs).toEqual(expected);
       }
 
       {
@@ -450,7 +450,7 @@ describe("Token type ids", () => {
           attention_mask: [1, 1, 1, 1],
           token_type_ids: [0, 0, 1, 1],
         };
-        compare(model_inputs, expected);
+        expect(model_inputs).toEqual(expected);
       }
     },
     MAX_TEST_EXECUTION_TIME,
@@ -461,45 +461,45 @@ describe("Edge cases", () => {
   it(
     "should not crash when encoding a very long string",
     async () => {
-      let tokenizer = await AutoTokenizer.from_pretrained("Xenova/t5-small");
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/t5-small");
 
-      let text = String.prototype.repeat.call("Hello world! ", 50000);
-      let encoded = tokenizer(text);
+      const text = String.prototype.repeat.call("Hello world! ", 50000);
+      const encoded = tokenizer(text);
       expect(encoded.input_ids.data.length).toBeGreaterThan(100000);
     },
     MAX_TEST_EXECUTION_TIME,
   );
 
   it("should not take too long", async () => {
-    let tokenizer = await AutoTokenizer.from_pretrained("Xenova/all-MiniLM-L6-v2");
+    const tokenizer = await AutoTokenizer.from_pretrained("Xenova/all-MiniLM-L6-v2");
 
-    let text = String.prototype.repeat.call("a", 50000);
-    let token_ids = tokenizer.encode(text);
-    compare(token_ids, [101, 100, 102]);
+    const text = String.prototype.repeat.call("a", 50000);
+    const token_ids = tokenizer.encode(text);
+    expect(token_ids).toEqual([101, 100, 102]);
   }, 5000); // NOTE: 5 seconds
 
   it(
     "Special/added tokens with earlier partial matches",
     async () => {
-      let tokenizer = await AutoTokenizer.from_pretrained("Xenova/gemini-nano");
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gemini-nano");
       {
-        let token_ids = tokenizer.encode("\n", { add_special_tokens: false });
-        compare(token_ids, [108]);
+        const token_ids = tokenizer.encode("\n", { add_special_tokens: false });
+        expect(token_ids).toEqual([108]);
       }
       {
-        let token_ids = tokenizer.encode("\n\n", { add_special_tokens: false });
-        compare(token_ids, [109]); // Should not be [108, 108]
+        const token_ids = tokenizer.encode("\n\n", { add_special_tokens: false });
+        expect(token_ids).toEqual([109]); // Should not be [108, 108]
       }
     },
     MAX_TEST_EXECUTION_TIME,
   );
 
   it("many added tokens", async () => {
-    let tokenizer = await AutoTokenizer.from_pretrained("onnx-community/orpheus-3b-0.1-ft-ONNX");
+    const tokenizer = await AutoTokenizer.from_pretrained("onnx-community/orpheus-3b-0.1-ft-ONNX");
 
-    let text = "hello world!";
-    let token_ids = tokenizer.encode(text);
-    compare(token_ids, [128000, 15339, 1917, 0]);
+    const text = "hello world!";
+    const token_ids = tokenizer.encode(text);
+    expect(token_ids).toEqual([128000, 15339, 1917, 0]);
   }, 5000); // NOTE: 5 seconds
 });
 
@@ -527,22 +527,22 @@ describe("Extra decoding tests", () => {
   it(
     "should be able to decode the output of encode",
     async () => {
-      let tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
 
-      let text = "hello world!";
+      const text = "hello world!";
 
       // Ensure all the following outputs are the same:
       // 1. Tensor of ids: allow decoding of 1D or 2D tensors.
-      let encodedTensor = tokenizer(text);
-      let decoded1 = tokenizer.decode(encodedTensor.input_ids, { skip_special_tokens: true });
-      let decoded2 = tokenizer.batch_decode(encodedTensor.input_ids, { skip_special_tokens: true })[0];
+      const encodedTensor = tokenizer(text);
+      const decoded1 = tokenizer.decode(encodedTensor.input_ids, { skip_special_tokens: true });
+      const decoded2 = tokenizer.batch_decode(encodedTensor.input_ids, { skip_special_tokens: true })[0];
       expect(decoded1).toEqual(text);
       expect(decoded2).toEqual(text);
 
       // 2. List of ids
-      let encodedList = tokenizer(text, { return_tensor: false });
-      let decoded3 = tokenizer.decode(encodedList.input_ids, { skip_special_tokens: true });
-      let decoded4 = tokenizer.batch_decode([encodedList.input_ids], { skip_special_tokens: true })[0];
+      const encodedList = tokenizer(text, { return_tensor: false });
+      const decoded3 = tokenizer.decode(encodedList.input_ids, { skip_special_tokens: true });
+      const decoded4 = tokenizer.batch_decode([encodedList.input_ids], { skip_special_tokens: true })[0];
       expect(decoded3).toEqual(text);
       expect(decoded4).toEqual(text);
     },
@@ -565,7 +565,7 @@ describe("Chat templates", () => {
     expect(text).toEqual("<s>[INST] Hello, how are you? [/INST]I'm doing great. How can I help you today?</s> [INST] I'd like to show off how chat templating works! [/INST]");
 
     const input_ids = tokenizer.apply_chat_template(chat, { tokenize: true, return_tensor: false, return_dict: false });
-    compare(input_ids, [1, 733, 16289, 28793, 22557, 28725, 910, 460, 368, 28804, 733, 28748, 16289, 28793, 28737, 28742, 28719, 2548, 1598, 28723, 1602, 541, 315, 1316, 368, 3154, 28804, 2, 28705, 733, 16289, 28793, 315, 28742, 28715, 737, 298, 1347, 805, 910, 10706, 5752, 1077, 3791, 28808, 733, 28748, 16289, 28793]);
+    expect(input_ids).toEqual([1, 733, 16289, 28793, 22557, 28725, 910, 460, 368, 28804, 733, 28748, 16289, 28793, 28737, 28742, 28719, 2548, 1598, 28723, 1602, 541, 315, 1316, 368, 3154, 28804, 2, 28705, 733, 16289, 28793, 315, 28742, 28715, 737, 298, 1347, 805, 910, 10706, 5752, 1077, 3791, 28808, 733, 28748, 16289, 28793]);
   });
 
   it("should support multiple chat templates", async () => {
@@ -713,7 +713,7 @@ describe("Chat templates", () => {
       expect(text).toEqual("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 26 Jul 2024\n\nYou are a bot that responds to weather queries.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHey, what's the temperature in Paris right now?<|eot_id|>");
 
       const input_ids = tokenizer.apply_chat_template(chat, { tokenize: true, return_tensor: false, return_dict: false });
-      compare(input_ids, [128000, 128006, 9125, 128007, 271, 38766, 1303, 33025, 2696, 25, 6790, 220, 2366, 18, 198, 15724, 2696, 25, 220, 1627, 10263, 220, 2366, 19, 271, 2675, 527, 264, 11164, 430, 31680, 311, 9282, 20126, 13, 128009, 128006, 882, 128007, 271, 19182, 11, 1148, 596, 279, 9499, 304, 12366, 1314, 1457, 30, 128009]);
+      expect(input_ids).toEqual([128000, 128006, 9125, 128007, 271, 38766, 1303, 33025, 2696, 25, 6790, 220, 2366, 18, 198, 15724, 2696, 25, 220, 1627, 10263, 220, 2366, 19, 271, 2675, 527, 264, 11164, 430, 31680, 311, 9282, 20126, 13, 128009, 128006, 882, 128007, 271, 19182, 11, 1148, 596, 279, 9499, 304, 12366, 1314, 1457, 30, 128009]);
     }
 
     {
@@ -722,7 +722,7 @@ describe("Chat templates", () => {
       expect(text).toEqual('<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nEnvironment: ipython\nCutting Knowledge Date: December 2023\nToday Date: 26 Jul 2024\n\nYou are a bot that responds to weather queries.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nGiven the following functions, please respond with a JSON for a function call with its proper arguments that best answers the given prompt.\n\nRespond in the format {"name": function name, "parameters": dictionary of argument name and its value}.Do not use variables.\n\n{\n    "type": "function",\n    "function": {\n        "name": "get_current_temperature",\n        "description": "Get the current temperature at a location.",\n        "parameters": {\n            "type": "object",\n            "properties": {\n                "location": {\n                    "type": "string",\n                    "description": "The location to get the temperature for, in the format \\"City, Country\\""\n                }\n            },\n            "required": [\n                "location"\n            ]\n        },\n        "return": {\n            "type": "number",\n            "description": "The current temperature at the specified location in the specified units, as a float."\n        }\n    }\n}\n\nHey, what\'s the temperature in Paris right now?<|eot_id|>');
 
       const input_ids = tokenizer.apply_chat_template(chat, { tools, tokenize: true, return_tensor: false, return_dict: false });
-      compare(input_ids, [128000, 128006, 9125, 128007, 271, 13013, 25, 6125, 27993, 198, 38766, 1303, 33025, 2696, 25, 6790, 220, 2366, 18, 198, 15724, 2696, 25, 220, 1627, 10263, 220, 2366, 19, 271, 2675, 527, 264, 11164, 430, 31680, 311, 9282, 20126, 13, 128009, 128006, 882, 128007, 271, 22818, 279, 2768, 5865, 11, 4587, 6013, 449, 264, 4823, 369, 264, 734, 1650, 449, 1202, 6300, 6105, 430, 1888, 11503, 279, 2728, 10137, 382, 66454, 304, 279, 3645, 5324, 609, 794, 734, 836, 11, 330, 14105, 794, 11240, 315, 5811, 836, 323, 1202, 907, 7966, 5519, 539, 1005, 7482, 382, 517, 262, 330, 1337, 794, 330, 1723, 761, 262, 330, 1723, 794, 341, 286, 330, 609, 794, 330, 456, 11327, 54625, 761, 286, 330, 4789, 794, 330, 1991, 279, 1510, 9499, 520, 264, 3813, 10560, 286, 330, 14105, 794, 341, 310, 330, 1337, 794, 330, 1735, 761, 310, 330, 13495, 794, 341, 394, 330, 2588, 794, 341, 504, 330, 1337, 794, 330, 928, 761, 504, 330, 4789, 794, 330, 791, 3813, 311, 636, 279, 9499, 369, 11, 304, 279, 3645, 7393, 13020, 11, 14438, 2153, 702, 394, 457, 310, 1173, 310, 330, 6413, 794, 2330, 394, 330, 2588, 702, 310, 5243, 286, 1173, 286, 330, 693, 794, 341, 310, 330, 1337, 794, 330, 4174, 761, 310, 330, 4789, 794, 330, 791, 1510, 9499, 520, 279, 5300, 3813, 304, 279, 5300, 8316, 11, 439, 264, 2273, 10246, 286, 457, 262, 457, 633, 19182, 11, 1148, 596, 279, 9499, 304, 12366, 1314, 1457, 30, 128009]);
+      expect(input_ids).toEqual([128000, 128006, 9125, 128007, 271, 13013, 25, 6125, 27993, 198, 38766, 1303, 33025, 2696, 25, 6790, 220, 2366, 18, 198, 15724, 2696, 25, 220, 1627, 10263, 220, 2366, 19, 271, 2675, 527, 264, 11164, 430, 31680, 311, 9282, 20126, 13, 128009, 128006, 882, 128007, 271, 22818, 279, 2768, 5865, 11, 4587, 6013, 449, 264, 4823, 369, 264, 734, 1650, 449, 1202, 6300, 6105, 430, 1888, 11503, 279, 2728, 10137, 382, 66454, 304, 279, 3645, 5324, 609, 794, 734, 836, 11, 330, 14105, 794, 11240, 315, 5811, 836, 323, 1202, 907, 7966, 5519, 539, 1005, 7482, 382, 517, 262, 330, 1337, 794, 330, 1723, 761, 262, 330, 1723, 794, 341, 286, 330, 609, 794, 330, 456, 11327, 54625, 761, 286, 330, 4789, 794, 330, 1991, 279, 1510, 9499, 520, 264, 3813, 10560, 286, 330, 14105, 794, 341, 310, 330, 1337, 794, 330, 1735, 761, 310, 330, 13495, 794, 341, 394, 330, 2588, 794, 341, 504, 330, 1337, 794, 330, 928, 761, 504, 330, 4789, 794, 330, 791, 3813, 311, 636, 279, 9499, 369, 11, 304, 279, 3645, 7393, 13020, 11, 14438, 2153, 702, 394, 457, 310, 1173, 310, 330, 6413, 794, 2330, 394, 330, 2588, 702, 310, 5243, 286, 1173, 286, 330, 693, 794, 341, 310, 330, 1337, 794, 330, 4174, 761, 310, 330, 4789, 794, 330, 791, 1510, 9499, 520, 279, 5300, 3813, 304, 279, 5300, 8316, 11, 439, 264, 2273, 10246, 286, 457, 262, 457, 633, 19182, 11, 1148, 596, 279, 9499, 304, 12366, 1314, 1457, 30, 128009]);
     }
   });
 });
