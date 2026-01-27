@@ -13,10 +13,26 @@ import { Tensor } from './utils/tensor.js';
 
 /**
  * Returns the list of files that will be loaded for a tokenizer.
- * @returns {string[]} An array of file names that will be loaded.
+ * Automatically detects whether the model has tokenizer files.
+ *
+ * @param {string} modelId The model id to check for tokenizer files
+ * @returns {Promise<string[]>} An array of file names that will be loaded
  */
-export function getTokenizerFiles() {
-    return ['tokenizer.json', 'tokenizer_config.json'];
+export async function getTokenizerFiles(modelId) {
+    if (!modelId) {
+        throw new Error('modelId is required for getTokenizerFiles');
+    }
+
+    // Auto-detect: check if tokenizer_config.json exists
+    const { getModelJSON } = await import('./utils/hub.js');
+    const tokenizerConfig = await getModelJSON(modelId, 'tokenizer_config.json', false, {});
+
+    // If file exists, it will have properties; if not, it returns {}
+    if (Object.keys(tokenizerConfig).length > 0) {
+        return ['tokenizer.json', 'tokenizer_config.json'];
+    }
+
+    return [];
 }
 
 /**
@@ -26,11 +42,11 @@ export function getTokenizerFiles() {
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
-    const info = await Promise.all([
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer.json', true, options),
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer_config.json', true, options),
-    ]);
-    return info;
+    const { getModelJSON } = await import('./utils/hub.js');
+    const tokenizerFiles = await getTokenizerFiles(pretrained_model_name_or_path);
+    return await Promise.all(
+        tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
+    );
 }
 
 /**

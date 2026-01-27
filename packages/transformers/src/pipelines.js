@@ -68,6 +68,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
+import { getFiles } from './configs.js';
 
 const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -430,6 +431,13 @@ export async function pipeline(
 ) {
     // Helper method to construct pipeline
 
+    const expectedFiles = await getFiles(model, {
+        device,
+        dtype,
+    });
+    console.log('Expected files: ', expectedFiles);
+    const loadedFiles = new Set();
+
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -450,7 +458,10 @@ export async function pipeline(
     }
 
     const pretrainedOptions = {
-        progress_callback,
+        progress_callback: (info) => {
+            if (progress_callback) progress_callback(info);
+            if (info.file) loadedFiles.add(info.file);
+        },
         config,
         cache_dir,
         local_files_only,
@@ -478,6 +489,26 @@ export async function pipeline(
         task: task,
         model: model,
     });
+
+    const areSameFiles =
+        JSON.stringify([...expectedFiles].sort()) === JSON.stringify([...Array.from(loadedFiles)].sort());
+    console.log('loadedFiles', Array.from(loadedFiles));
+    console.log('areSameFiles', areSameFiles);
+    if (!areSameFiles) {
+        console.log(`expected files and loaded files for task "${task}" and model "${model}" are not the same: 
+const pipe = await pipeline(
+  "${task}",
+  "${model}",
+  {
+    device: "${device}",
+    dtype: "${dtype}",
+  }
+);
+
+expected: ${expectedFiles.join(', ')}
+loaded: ${Array.from(loadedFiles).join(', ')}
+`);
+    }
 
     const pipelineClass = pipelineInfo.pipeline;
     return new pipelineClass(results);

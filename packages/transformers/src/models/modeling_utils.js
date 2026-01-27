@@ -7,6 +7,7 @@ import {
     DATA_TYPES,
     DEFAULT_DEVICE_DTYPE_MAPPING,
     DEFAULT_DTYPE_SUFFIX_MAPPING,
+    DEFAULT_DEVICE_DTYPE,
 } from '../utils/dtypes.js';
 import { MAX_EXTERNAL_DATA_CHUNKS } from '../utils/hub.js';
 import { apis } from '../env.js';
@@ -1757,84 +1758,98 @@ export async function get_optional_configs(pretrained_model_name_or_path, names,
 }
 
 /**
- * Returns the list of files that will be loaded for a model given the configuration.
+ * Returns the list of files that will be loaded for a model based on its configuration.
+ *
+ * This function reads configuration from the model's config.json on the hub.
+ * If dtype/device are not specified in the config, you can provide them to match
+ * what the pipeline will actually use.
  *
  * @param {string} modelId The model id (e.g., "Xenova/llama-2-7b")
- * @param {Object} options Options for determining which files will be loaded
- * @param {import('../utils/dtypes.js').DataType|Record<string, import('../utils/dtypes.js').DataType>} [options.dtype=null] The data type to use for the model
- * @param {string} [options.device=null] The device type
- * @param {import('../utils/hub.js').ExternalData|Record<string, import('../utils/hub.js').ExternalData>} [options.use_external_data_format=null] Whether to use external data format
- * @param {import('../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config
- * @param {string} [options.subfolder='onnx'] The subfolder where model files are located
- * @param {string} [options.model_file_name=null] Specific model file name to use
+ * @param {Object} [options] Optional parameters
+ * @param {import('../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
+ * @param {import('../utils/dtypes.js').DataType} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
+ * @param {string} [options.device=null] Override device (use this if passing device to pipeline)
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function getModelFiles(
     modelId,
-    {
-        dtype = null,
-        device = null,
-        use_external_data_format = null,
-        config = null,
-        subfolder = 'onnx',
-        model_file_name = null,
-    } = {},
+    { config = null, dtype: overrideDtype = null, device: overrideDevice = null } = {},
 ) {
-    // Load config if not provided
     if (!config) {
         config = await AutoConfig.from_pretrained(modelId);
     }
 
     const files = [];
 
+    const custom_config = config['transformers.js_config'] ?? {};
+    const use_external_data_format = custom_config.use_external_data_format;
+    const subfolder = 'onnx'; // Always 'onnx' as per the default in from_pretrained
+
+    let device = overrideDevice ?? custom_config.device;
+    let dtype = overrideDtype ?? custom_config.dtype;
+
     // Infer model type from config
-    // We check is_encoder_decoder first as it's the most reliable indicator
+    // We use MODEL_TYPE_MAPPING (the authoritative source used by from_pretrained) when possible,
+    // and fall back to heuristic detection for unknown architectures
     let modelType;
-    if (config.is_encoder_decoder) {
-        // Check for specific model types
-        const modelName = config.model_type;
-        if (['whisper', 'vision-encoder-decoder'].includes(modelName)) {
-            modelType = MODEL_TYPES.Vision2Seq;
-        } else if (modelName === 'musicgen') {
-            modelType = MODEL_TYPES.Musicgen;
-        } else {
-            // Default encoder-decoder models (T5, BART, etc.)
-            modelType = MODEL_TYPES.Seq2Seq;
+
+    // @ts-ignore - architectures is set via Object.assign in PretrainedConfig constructor
+    const architectures = /** @type {string[]} */ (config.architectures || []);
+
+    // Try to find a known architecture in MODEL_TYPE_MAPPING
+    // This ensures we use the same logic as from_pretrained()
+    let foundInMapping = false;
+    for (const arch of architectures) {
+        const mappedType = MODEL_TYPE_MAPPING.get(arch);
+        if (mappedType !== undefined) {
+            modelType = mappedType;
+            foundInMapping = true;
+            break;
         }
-    } else {
-        // Decoder-only or encoder-only
-        // @ts-ignore - architectures is set via Object.assign in PretrainedConfig constructor
-        const architectures = /** @type {string[]} */ (config.architectures || []);
-        if (architectures.some((arch) => arch.includes('CausalLM') || arch.includes('LMHead'))) {
-            modelType = MODEL_TYPES.DecoderOnly;
+    }
+
+    // Fall back to manual detection if not found in mapping
+    if (!foundInMapping) {
+        if (config.is_encoder_decoder) {
+            // Check for specific model types
+            const modelName = config.model_type;
+            if (['whisper', 'vision-encoder-decoder'].includes(modelName)) {
+                modelType = MODEL_TYPES.Vision2Seq;
+            } else if (modelName === 'musicgen') {
+                modelType = MODEL_TYPES.Musicgen;
+            } else {
+                // Default encoder-decoder models (T5, BART, etc.)
+                modelType = MODEL_TYPES.Seq2Seq;
+            }
         } else {
-            modelType = MODEL_TYPES.EncoderOnly;
+            // Decoder-only or encoder-only (heuristic detection)
+            if (architectures.some((arch) => arch.includes('CausalLM') || arch.includes('LMHead'))) {
+                modelType = MODEL_TYPES.DecoderOnly;
+            } else {
+                modelType = MODEL_TYPES.EncoderOnly;
+            }
         }
     }
 
     // Helper function to determine dtype for a given file
+    // This reads from config only, matching the actual loading behavior
     const getDtype = (fileName) => {
-        if (dtype === null) {
-            const custom_config = config['transformers.js_config'] ?? {};
-            let config_dtype = custom_config.dtype;
-            if (typeof config_dtype !== 'string') {
-                config_dtype = config_dtype?.[fileName];
+        // First check if there's a file-specific dtype in config
+        if (dtype && typeof dtype === 'object') {
+            const fileDtype = dtype[fileName];
+            if (fileDtype && fileDtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(fileDtype)) {
+                return fileDtype;
             }
-            if (config_dtype && config_dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(config_dtype)) {
-                return config_dtype;
-            }
-            const selectedDevice = /** @type {string} */ (device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm'));
-            return DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-        } else if (typeof dtype === 'string') {
-            const selectedDevice = /** @type {string} */ (device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm'));
-            return dtype === DATA_TYPES.auto
-                ? (DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32)
-                : dtype;
-        } else {
-            // dtype is an object
-            const selectedDevice = /** @type {string} */ (device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm'));
-            return dtype[fileName] ?? DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
         }
+
+        // Check if there's a global dtype in config
+        if (dtype && typeof dtype === 'string' && dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(dtype)) {
+            return dtype;
+        }
+
+        // Fall back to device-specific defaults
+        const selectedDevice = /** @type {string} */ (device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm'));
+        return DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DEFAULT_DEVICE_DTYPE;
     };
 
     // Helper function to add model file and its external data files
@@ -1862,11 +1877,14 @@ export async function getModelFiles(
 
     // Add model files based on model type
     if (modelType === MODEL_TYPES.DecoderOnly) {
-        addModelFile('model', model_file_name ?? 'model');
+        addModelFile('model', 'model');
         files.push('generation_config.json');
     } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
         addModelFile('model', 'encoder_model');
         addModelFile('decoder_model_merged');
+        // Note: generation_config.json is only loaded for generation models (e.g., T5ForConditionalGeneration)
+        // not for base models (e.g., T5Model). Since we can't determine the specific class here,
+        // we include it as it's loaded for most use cases.
         files.push('generation_config.json');
     } else if (modelType === MODEL_TYPES.MaskGeneration) {
         addModelFile('model', 'vision_encoder');
@@ -1926,7 +1944,7 @@ export async function getModelFiles(
         addModelFile('voice_decoder');
     } else {
         // MODEL_TYPES.EncoderOnly or unknown
-        addModelFile('model', model_file_name ?? 'model');
+        addModelFile('model', 'model');
     }
 
     // Add config.json (always loaded)

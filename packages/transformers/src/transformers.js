@@ -14,7 +14,7 @@
 export { env } from './env.js';
 
 export * from './pipelines.js';
-export { PretrainedConfig, AutoConfig } from './configs.js';
+export { PretrainedConfig, AutoConfig, getFiles } from './configs.js';
 
 // Models
 export * from './models/models.js';

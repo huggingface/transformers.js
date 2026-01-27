@@ -165,4 +165,4 @@ export * from './xlm/modeling_xlm.js';
 export * from './xlm_roberta/modeling_xlm_roberta.js';
 export * from './yolos/modeling_yolos.js';
 
-export { PreTrainedModel } from './modeling_utils.js';
+export { PreTrainedModel, getModelFiles } from './modeling_utils.js';

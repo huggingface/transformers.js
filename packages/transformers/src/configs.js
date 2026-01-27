@@ -28,6 +28,9 @@
 
 import { pick } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
+import { getTokenizerFiles } from './models/tokenizers.js';
+import { getModelFiles } from './models/models.js';
+import { IMAGE_PROCESSOR_NAME } from './utils/constants.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
@@ -501,3 +504,50 @@ export class AutoConfig {
  * Device-specific configuration options.
  * @typedef {Omit<TransformersJSConfig, "device" | "device_config">} DeviceConfig
  */
+
+/**
+ * Returns the list of processor files that will be loaded for a model.
+ * Auto-detects if the model has a processor by checking if preprocessor_config.json exists.
+ *
+ * @param {string} modelId The model id (e.g., "Xenova/detr-resnet-50")
+ * @returns {Promise<string[]>} Array of processor file names (empty if no processor)
+ */
+export async function getProcessorFiles(modelId) {
+    if (!modelId) {
+        throw new Error('modelId is required');
+    }
+
+    // Try to fetch preprocessor_config.json to see if it exists
+    const processorConfig = await getModelJSON(modelId, IMAGE_PROCESSOR_NAME, false, {});
+
+    // If file exists, it will have properties; if not, it returns {}
+    return Object.keys(processorConfig).length > 0 ? [IMAGE_PROCESSOR_NAME] : [];
+}
+
+/**
+ * Returns the list of files that will be loaded for a model based on its configuration.
+ * Automatically detects which files are needed (tokenizer, processor, model files).
+ *
+ * @param {string} modelId The model id (e.g., "Xenova/llama-2-7b")
+ * @param {Object} [options] Optional parameters
+ * @param {PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
+ * @param {import('./utils/dtypes.js').DataType} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
+ * @param {string} [options.device=null] Override device (use this if passing device to pipeline)
+ * @returns {Promise<string[]>} Array of file paths that will be loaded
+ */
+export async function getFiles(modelId, { config = null, dtype = null, device = null } = {}) {
+    const files = [];
+
+    // Get tokenizer files (auto-detects if model has tokenizer)
+    const tokenizerFiles = await getTokenizerFiles(modelId);
+    files.push(...tokenizerFiles);
+
+    // Add model files
+    files.push(...(await getModelFiles(modelId, { config, dtype, device })));
+
+    // Get processor files (auto-detects if model has processor)
+    const processorFiles = await getProcessorFiles(modelId);
+    files.push(...processorFiles);
+
+    return files;
+}

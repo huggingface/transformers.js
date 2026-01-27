@@ -45,8 +45,9 @@ export const DATA_TYPES = Object.freeze({
 });
 /** @typedef {keyof typeof DATA_TYPES} DataType */
 
+export const DEFAULT_DEVICE_DTYPE = DATA_TYPES.fp32;
 export const DEFAULT_DEVICE_DTYPE_MAPPING = Object.freeze({
-    // NOTE: If not specified, will default to fp32
+    // NOTE: If not specified, will default to DEFAULT_DEVICE_DTYPE
     [DEVICE_TYPES.wasm]: DATA_TYPES.q8,
 });
 
