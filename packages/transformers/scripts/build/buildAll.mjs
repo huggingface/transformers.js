@@ -5,8 +5,8 @@ import { ignoreModulesPlugin } from "./plugins/ignoreModulesPlugin.mjs";
 import { postBuildPlugin } from "./plugins/postBuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./plugins/externalNodeBuiltinsPlugin.mjs";
 import { OUT_DIR, ROOT_DIR, getEsbuildProdConfig } from "./constants.mjs";
-import { reportSize } from "../../../../../scripts/reportSize.mjs";
-import { colors } from "../../../../../scripts/logger.mjs";
+import { reportSize } from "../../../../scripts/reportSize.mjs";
+import { colors } from "../../../../scripts/logger.mjs";
 import { BUILD_TARGETS } from "./targets.mjs";
 
 /**

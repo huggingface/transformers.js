@@ -4,7 +4,7 @@ import { stripNodePrefixPlugin } from "./plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./plugins/ignoreModulesPlugin.mjs";
 import { postBuildPlugin } from "./plugins/postBuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./plugins/externalNodeBuiltinsPlugin.mjs";
-import { rebuildPlugin } from "../../../../../scripts/rebuildPlugin.mjs";
+import { rebuildPlugin } from "../../../../scripts/rebuildPlugin.mjs";
 import { OUT_DIR, ROOT_DIR, getEsbuildDevConfig } from "./constants.mjs";
 import { BUILD_TARGETS } from "./targets.mjs";
 
