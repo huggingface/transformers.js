@@ -791,7 +791,7 @@ export class Tensor {
 
     /**
      * Repeats this tensor along the specified dimensions.
-     * @param  {...number} repeats The number of times to repeat this tensor along each dimension.
+     * @param {...number} repeats The number of times to repeat this tensor along each dimension.
      * @returns {Tensor} The repeated tensor.
      * @throws {Error} If the number of repeats is less than the number of dimensions.
      */

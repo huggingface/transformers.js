@@ -25,11 +25,10 @@ export default () => {
           const image = await load_cached_image("portrait_of_woman");
 
           const output = await pipe(image);
-          expect(output).toHaveLength(1);
-          expect(output[0]).toBeInstanceOf(RawImage);
-          expect(output[0].width).toEqual(image.width);
-          expect(output[0].height).toEqual(image.height);
-          expect(output[0].channels).toEqual(4); // With alpha channel
+          expect(output).toBeInstanceOf(RawImage);
+          expect(output.width).toEqual(image.width);
+          expect(output.height).toEqual(image.height);
+          expect(output.channels).toEqual(4); // With alpha channel
         },
         MAX_TEST_EXECUTION_TIME,
       );
@@ -53,11 +52,10 @@ export default () => {
           const image = await load_cached_image("portrait_of_woman");
 
           const output = await pipe(image);
-          expect(output).toHaveLength(1);
-          expect(output[0]).toBeInstanceOf(RawImage);
-          expect(output[0].width).toEqual(image.width);
-          expect(output[0].height).toEqual(image.height);
-          expect(output[0].channels).toEqual(4); // With alpha channel
+          expect(output).toBeInstanceOf(RawImage);
+          expect(output.width).toEqual(image.width);
+          expect(output.height).toEqual(image.height);
+          expect(output.channels).toEqual(4); // With alpha channel
         },
         MAX_TEST_EXECUTION_TIME,
       );
