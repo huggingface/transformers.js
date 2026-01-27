@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers-monorepo",
-  "version": "4.0.0-alpha.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Monorepo for Hugging Face Transformers.js and framework integrations",
   "type": "module",

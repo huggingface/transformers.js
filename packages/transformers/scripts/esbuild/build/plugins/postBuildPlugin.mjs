@@ -27,29 +27,14 @@ export const postBuildPlugin = (distDir, rootDir) => {
         if (existsSync(file)) unlinkSync(file);
 
         // 2. Copy unbundled JSEP file
-        // In a workspace setup, node_modules might be at the monorepo root
-        const possiblePaths = [
-          path.join(rootDir, "node_modules/onnxruntime-web/dist"),
-          path.join(rootDir, "../../node_modules/onnxruntime-web/dist"),
-        ];
+        const ORT_SOURCE_DIR = path.join(rootDir, "node_modules/onnxruntime-web/dist");
+        const src = path.join(ORT_SOURCE_DIR, ORT_JSEP_FILE);
 
-        let copied = false;
-        for (const ORT_SOURCE_DIR of possiblePaths) {
-          try {
-            const src = path.join(ORT_SOURCE_DIR, ORT_JSEP_FILE);
-            if (existsSync(src)) {
-              const dest = path.join(distDir, ORT_JSEP_FILE);
-              copyFileSync(src, dest);
-              log.success(`${colors.gray}Copied ${ORT_JSEP_FILE}${colors.reset}`);
-              copied = true;
-              break;
-            }
-          } catch (error) {
-            // Try next path
-          }
-        }
-
-        if (!copied) {
+        if (existsSync(src)) {
+          const dest = path.join(distDir, ORT_JSEP_FILE);
+          copyFileSync(src, dest);
+          log.success(`${colors.gray}Copied ${ORT_JSEP_FILE}${colors.reset}`);
+        } else {
           log.warning(`Could not find ${ORT_JSEP_FILE} in node_modules`);
         }
       });
