@@ -97,7 +97,7 @@ export class RawImage {
     /**
      * Helper method for reading an image from a variety of input types.
      * @param {RawImage|string|URL|Blob|HTMLCanvasElement|OffscreenCanvas} input
-     * @returns The image object.
+     * @returns {Promise<RawImage>} The image object.
      *
      * **Example:** Read image from a URL.
      * ```javascript
