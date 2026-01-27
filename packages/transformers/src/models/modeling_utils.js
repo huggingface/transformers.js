@@ -1,6 +1,6 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
-import { AutoConfig, getCacheShapes, getFiles } from '../configs.js';
+import { AutoConfig, getCacheShapes, get_files } from '../configs.js';
 import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
 import {
     DataTypeMap,

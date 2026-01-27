@@ -68,7 +68,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
-import { getFiles } from './configs.js';
+import { get_files } from './configs.js';
 
 const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -431,7 +431,7 @@ export async function pipeline(
 ) {
     // Helper method to construct pipeline
 
-    const expectedFiles = await getFiles(model, {
+    const expectedFiles = await get_files(model, {
         device,
         dtype,
     });
