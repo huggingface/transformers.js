@@ -2,34 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export async function loadAudio(url) {
-  // NOTE: Since the Web Audio API is not available in Node.js, we will need to use the `wavefile` library to obtain the raw audio data.
-  // For more information, see: https://huggingface.co/docs/transformers.js/guides/node-audio-processing
-  let wavefile = (await import("wavefile")).default;
-
-  // Load audio data
-  let buffer = Buffer.from(await fetch(url).then((x) => x.arrayBuffer()));
-
-  // Read .wav file and convert it to required format
-  let wav = new wavefile.WaveFile(buffer);
-  wav.toBitDepth("32f"); // Pipeline expects input as a Float32Array
-  wav.toSampleRate(16000); // Whisper expects audio with a sampling rate of 16000
-  let audioData = wav.getSamples();
-  if (Array.isArray(audioData)) {
-    if (audioData.length > 1) {
-      const SCALING_FACTOR = Math.sqrt(2);
-
-      // Merge channels (into first channel to save memory)
-      for (let i = 0; i < audioData[0].length; ++i) {
-        audioData[0][i] = (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
-      }
-    }
-
-    // Select first channel
-    audioData = audioData[0];
-  }
-  return audioData;
-}
 /**
  * Deep equality test (for arrays and objects) with tolerance for floating point numbers
  * @param {any} val1 The first item
