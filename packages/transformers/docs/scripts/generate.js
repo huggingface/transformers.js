@@ -57,8 +57,9 @@ for (const moduleName of moduleNames) {
 
   output = output.replaceAll("new exports.", "new ");
 
-  let outputPath = path.resolve(outputDir, `${moduleName}.md`);
+  const outputPath = path.resolve(outputDir, `${moduleName}.md`);
 
+  console.log(`Writing to ${outputPath}`);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, output);
 }
