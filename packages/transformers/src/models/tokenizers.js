@@ -44,4 +44,8 @@ export * from './whisper/tokenization_whisper.js';
 export * from './xlm_roberta/tokenization_xlm_roberta.js';
 export * from './xlm/tokenization_xlm.js';
 
-export { PreTrainedTokenizer, PreTrainedTokenizer as TokenizersBackend, getTokenizerFiles } from '../tokenization_utils.js';
+export {
+    PreTrainedTokenizer,
+    PreTrainedTokenizer as TokenizersBackend,
+    get_tokenizer_files,
+} from '../tokenization_utils.js';

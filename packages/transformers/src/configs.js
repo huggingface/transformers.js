@@ -28,8 +28,8 @@
 
 import { pick } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
-import { getTokenizerFiles } from './models/tokenizers.js';
-import { getModelFiles } from './models/models.js';
+import { get_tokenizer_files } from './models/tokenizers.js';
+import { get_model_files } from './models/models.js';
 import { IMAGE_PROCESSOR_NAME } from './utils/constants.js';
 
 /**
@@ -512,7 +512,7 @@ export class AutoConfig {
  * @param {string} modelId The model id (e.g., "Xenova/detr-resnet-50")
  * @returns {Promise<string[]>} Array of processor file names (empty if no processor)
  */
-export async function getProcessorFiles(modelId) {
+export async function get_processor_files(modelId) {
     if (!modelId) {
         throw new Error('modelId is required');
     }
@@ -535,18 +535,16 @@ export async function getProcessorFiles(modelId) {
  * @param {import('./utils/devices.js').DeviceType|Record<string, import('./utils/devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
-export async function getFiles(modelId, { config = null, dtype = null, device = null } = {}) {
+export async function get_files(modelId, { config = null, dtype = null, device = null } = {}) {
     const files = [];
 
-    // Get tokenizer files (auto-detects if model has tokenizer)
-    const tokenizerFiles = await getTokenizerFiles(modelId);
+    const tokenizerFiles = await get_tokenizer_files(modelId);
     files.push(...tokenizerFiles);
 
-    // Add model files
-    files.push(...(await getModelFiles(modelId, { config, dtype, device })));
+    files.push(...(await get_model_files(modelId, { config, dtype, device })));
 
     // Get processor files (auto-detects if model has processor)
-    const processorFiles = await getProcessorFiles(modelId);
+    const processorFiles = await get_processor_files(modelId);
     files.push(...processorFiles);
 
     return files;

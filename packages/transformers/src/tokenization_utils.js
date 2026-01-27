@@ -18,16 +18,12 @@ import { Tensor } from './utils/tensor.js';
  * @param {string} modelId The model id to check for tokenizer files
  * @returns {Promise<string[]>} An array of file names that will be loaded
  */
-export async function getTokenizerFiles(modelId) {
+export async function get_tokenizer_files(modelId) {
     if (!modelId) {
-        throw new Error('modelId is required for getTokenizerFiles');
+        throw new Error('modelId is required for get_tokenizer_files');
     }
 
-    // Auto-detect: check if tokenizer_config.json exists
-    const { getModelJSON } = await import('./utils/hub.js');
     const tokenizerConfig = await getModelJSON(modelId, 'tokenizer_config.json', false, {});
-
-    // If file exists, it will have properties; if not, it returns {}
     if (Object.keys(tokenizerConfig).length > 0) {
         return ['tokenizer.json', 'tokenizer_config.json'];
     }
@@ -43,7 +39,7 @@ export async function getTokenizerFiles(modelId) {
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
     const { getModelJSON } = await import('./utils/hub.js');
-    const tokenizerFiles = await getTokenizerFiles(pretrained_model_name_or_path);
+    const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
     return await Promise.all(
         tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
     );
