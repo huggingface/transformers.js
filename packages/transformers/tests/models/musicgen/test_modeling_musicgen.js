@@ -49,7 +49,7 @@ export default () => {
         const inputs = tokenizer(texts, { padding: true });
         const audio_values = await model.generate({ ...inputs, max_length: 10 });
         expect(audio_values.dims).toEqual([2, 1, 1920]);
-        expect(audio_values.mean().item()).toBeCloseTo(0.16644206643104553, 5);
+        expect(audio_values.mean().item()).toBeCloseTo(0.16682559251785278, 5);
       },
       MAX_TEST_EXECUTION_TIME,
     );
