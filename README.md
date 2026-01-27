@@ -155,40 +155,14 @@ For a full list of available settings, check out the [API Reference](https://hug
 
 ### Convert your models to ONNX
 
-We recommend using our [conversion script](https://github.com/huggingface/transformers.js/blob/main/scripts/convert.py) to convert your PyTorch, TensorFlow, or JAX models to ONNX in a single command. Behind the scenes, it uses [🤗 Optimum](https://huggingface.co/docs/optimum) to perform conversion and quantization of your model.
-
-```bash
-python -m scripts.convert --quantize --model_id <model_name_or_path>
-```
-
-For example, convert and quantize [bert-base-uncased](https://huggingface.co/bert-base-uncased) using:
-```bash
-python -m scripts.convert --quantize --model_id bert-base-uncased
-```
-
-This will save the following files to `./models/`:
-
-```
-bert-base-uncased/
-├── config.json
-├── tokenizer.json
-├── tokenizer_config.json
-└── onnx/
-    ├── model.onnx
-    └── model_quantized.onnx
-```
-
-For the full list of supported architectures, see the [Optimum documentation](https://huggingface.co/docs/optimum/main/en/exporters/onnx/overview).
+We recommend using [Optimum](https://github.com/huggingface/optimum-onnx) to convert your PyTorch models to ONNX in a single command. For the full list of supported architectures, check out the [Optimum documentation](https://huggingface.co/docs/optimum-onnx/onnx/overview).
 
 
 ## Supported tasks/models
 
-Here is the list of all tasks and architectures currently supported by Transformers.js.
-If you don't see your task/model listed here or it is not yet supported, feel free
-to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
+Here is the list of all tasks and architectures currently supported by Transformers.js. If you don't see your task/model listed here or it is not yet supported, feel free to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
 
-To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)).
-You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
+To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)). You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
 
 
 ### Tasks
