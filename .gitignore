@@ -7,7 +7,6 @@ deno.lock
 .idea
 
 # Do not track build artifacts/generated files
-/dist
 /types
 /models
 packages/*/dist

@@ -20,7 +20,7 @@ export const OUT_DIR = path.join(ROOT_DIR, DIST_FOLDER);
 export const getEsbuildDevConfig = (rootDir) => ({
   bundle: true,
   treeShaking: true,
-  logLevel: "silent",
+  logLevel: "info",
   entryPoints: [path.join(rootDir, "src/transformers.js")],
   platform: "neutral",
   format: "esm",
