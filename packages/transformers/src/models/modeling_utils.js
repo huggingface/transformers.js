@@ -1767,8 +1767,8 @@ export async function get_optional_configs(pretrained_model_name_or_path, names,
  * @param {string} modelId The model id (e.g., "Xenova/llama-2-7b")
  * @param {Object} [options] Optional parameters
  * @param {import('../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
- * @param {import('../utils/dtypes.js').DataType} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
- * @param {string} [options.device=null] Override device (use this if passing device to pipeline)
+ * @param {import('../utils/dtypes.js').DataType|Record<string, import('../utils/dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
+ * @param {import('../utils/devices.js').DeviceType|Record<string, import('../utils/devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function getModelFiles(
