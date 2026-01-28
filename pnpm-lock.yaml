@@ -36,32 +36,29 @@ importers:
         specifier: ^30.0.0
         version: 30.0.0
       "@types/node":
-        specifier: ^24.0.11
+        specifier: ^24.1.0
         version: 24.10.9
       "@webgpu/types":
-        specifier: ^0.1.64
+        specifier: ^0.1.69
         version: 0.1.69
       esbuild:
         specifier: ^0.27.2
         version: 0.27.2
       jest:
-        specifier: ^30.0.4
+        specifier: ^30.2.0
         version: 30.2.0(@types/node@24.10.9)
       jest-environment-node:
-        specifier: ^30.0.4
+        specifier: ^30.2.0
         version: 30.2.0
       jsdoc-to-markdown:
-        specifier: ^9.1.1
+        specifier: ^9.1.3
         version: 9.1.3
       prettier:
-        specifier: 3.4.2
-        version: 3.4.2
+        specifier: 3.8.1
+        version: 3.8.1
       typescript:
-        specifier: ^5.8.3
+        specifier: 5.9.3
         version: 5.9.3
-      wavefile:
-        specifier: 11.0.0
-        version: 11.0.0
 
 packages:
   "@babel/code-frame@7.28.6":
@@ -2941,6 +2938,14 @@ packages:
     engines: { node: ">=14" }
     hasBin: true
 
+  prettier@3.8.1:
+    resolution:
+      {
+        integrity: sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==,
+      }
+    engines: { node: ">=14" }
+    hasBin: true
+
   pretty-format@30.2.0:
     resolution:
       {
@@ -3353,14 +3358,6 @@ packages:
       {
         integrity: sha512-ts/8E8l5b7kY0vlWLewOkDXMmPdLcVV4GmOQLyxuSswIJsweeFZtAsMF7k1Nszz+TYBQrlYRmzOnr398y1JemQ==,
       }
-
-  wavefile@11.0.0:
-    resolution:
-      {
-        integrity: sha512-/OBiAALgWU24IG7sC84cDO/KfFuvajWc5Uec0oV2zrpOOZZDgGdOwHwgEzOrwh8jkubBk7PtZfQBIcI1OaE5Ng==,
-      }
-    engines: { node: ">=8" }
-    hasBin: true
 
   which@2.0.2:
     resolution:
@@ -5293,6 +5290,8 @@ snapshots:
 
   prettier@3.4.2: {}
 
+  prettier@3.8.1: {}
+
   pretty-format@30.2.0:
     dependencies:
       "@jest/schemas": 30.0.5
@@ -5547,8 +5546,6 @@ snapshots:
   walker@1.0.8:
     dependencies:
       makeerror: 1.0.12
-
-  wavefile@11.0.0: {}
 
   which@2.0.2:
     dependencies:
