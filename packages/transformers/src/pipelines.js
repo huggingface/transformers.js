@@ -68,7 +68,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
-import { get_files } from './configs.js';
+import { get_files } from './utils/hub.js';
 
 const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -435,8 +435,7 @@ export async function pipeline(
         device,
         dtype,
     });
-    console.log('Expected files: ', expectedFiles);
-    const loadedFiles = new Set();
+    const loadedFiles = {};
 
     // Apply aliases
     // @ts-ignore
@@ -459,8 +458,33 @@ export async function pipeline(
 
     const pretrainedOptions = {
         progress_callback: (info) => {
-            if (progress_callback) progress_callback(info);
-            if (info.file) loadedFiles.add(info.file);
+            if (progress_callback) {
+                let enhancedInfo = info;
+                if (info.status === 'progress' || info.status === 'done') {
+                    if (info.status === 'progress') {
+                        loadedFiles[info.file] = {
+                            loaded: info.loaded,
+                            total: info.total,
+                        };
+                    }
+
+                    const total_loaded = Object.values(loadedFiles).reduce((acc, curr) => acc + curr.loaded, 0);
+                    const total_bytes = Object.values(loadedFiles).reduce((acc, curr) => acc + curr.total, 0);
+                    const total_progress =
+                        Object.keys(loadedFiles).length === expectedFiles.length
+                            ? (total_loaded / total_bytes) * 100
+                            : 0;
+
+                    enhancedInfo = {
+                        ...info,
+                        total_loaded,
+                        total_bytes,
+                        total_progress,
+                    };
+                }
+
+                progress_callback(enhancedInfo);
+            }
         },
         config,
         cache_dir,
@@ -489,26 +513,6 @@ export async function pipeline(
         task: task,
         model: model,
     });
-
-    const areSameFiles =
-        JSON.stringify([...expectedFiles].sort()) === JSON.stringify([...Array.from(loadedFiles)].sort());
-    console.log('loadedFiles', Array.from(loadedFiles));
-    console.log('areSameFiles', areSameFiles);
-    if (!areSameFiles) {
-        console.log(`expected files and loaded files for task "${task}" and model "${model}" are not the same: 
-const pipe = await pipeline(
-  "${task}",
-  "${model}",
-  {
-    device: "${device}",
-    dtype: "${dtype}",
-  }
-);
-
-expected: ${expectedFiles.join(', ')}
-loaded: ${Array.from(loadedFiles).join(', ')}
-`);
-    }
 
     const pipelineClass = pipelineInfo.pipeline;
     return new pipelineClass(results);

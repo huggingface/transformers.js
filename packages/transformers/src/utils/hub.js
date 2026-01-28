@@ -10,7 +10,6 @@ import FileResponse from './hub/FileResponse.js';
 import FileCache from './hub/FileCache.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
-import { get_files } from '../configs.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
@@ -105,7 +104,7 @@ export async function getFile(urlOrPath) {
  * @returns {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }}
  * An object containing all the paths and URLs for the resource.
  */
-function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -490,48 +489,8 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
     return JSON.parse(text);
 }
 
-/**
- * Checks if all files for a given model are already cached.
- * Automatically determines which files are needed using get_files().
- *
- * @param {string} modelId The model id (e.g., "Xenova/gpt2")
- * @param {PretrainedOptions} [options] Optional parameters
- * @param {string} [options.cache_dir] Custom cache directory
- * @param {string} [options.revision] Model revision (default: 'main')
- * @param {import('../configs.js').PretrainedConfig} [options.config] Pre-loaded config
- * @param {import('../utils/dtypes.js').DataType} [options.dtype] Override dtype
- * @param {string} [options.device] Override device
- * @returns {Promise<boolean>} True if all files are cached, false otherwise
- *
- * @example
- * import { is_cached } from '@huggingface/transformers';
- *
- * const cached = await is_cached('Xenova/gpt2');
- * console.log(cached ? 'All files cached!' : 'Some files need downloading');
- *
- * // With options
- * const cached2 = await is_cached('Xenova/gpt2', { dtype: 'fp16', device: 'webgpu' });
- */
-export async function is_cached(modelId, options = {}) {
-    if (!modelId) {
-        throw new Error('modelId is required');
-    }
-
-    const cache = await getCache(options?.cache_dir);
-    if (!cache) {
-        return false;
-    }
-
-    const files = await get_files(modelId, options);
-
-    for (const filename of files) {
-        const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
-        const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
-
-        if (!cached) {
-            return false;
-        }
-    }
-
-    return true;
-}
+export { is_cached } from './hub/is_cached.js';
+export { get_files } from './hub/get_files.js';
+export { get_tokenizer_files } from './hub/get_tokenizer_files.js';
+export { get_model_files } from './hub/get_model_files.js';
+export { get_processor_files } from './hub/get_processor_files.js';

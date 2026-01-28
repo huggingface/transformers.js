@@ -14,7 +14,7 @@
 export { env } from './env.js';
 
 export * from './pipelines.js';
-export { PretrainedConfig, AutoConfig, get_files } from './configs.js';
+export { PretrainedConfig, AutoConfig } from './configs.js';
 
 // Models
 export * from './models/models.js';
@@ -40,7 +40,7 @@ export * from './models/auto/processing_auto.js';
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
-export { is_cached } from './utils/hub.js';
+export { is_cached, get_files, get_tokenizer_files, get_model_files, get_processor_files } from './utils/hub.js';
 
 export { read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';

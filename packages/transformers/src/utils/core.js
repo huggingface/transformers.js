@@ -26,9 +26,12 @@
  * @property {'progress'} status
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
- * @property {number} progress A number between 0 and 100.
- * @property {number} loaded The number of bytes loaded.
- * @property {number} total The total number of bytes to be loaded.
+ * @property {number} progress A number between 0 and 100 for the current file.
+ * @property {number} loaded The number of bytes loaded for the current file.
+ * @property {number} total The total number of bytes to be loaded for the current file.
+ * @property {number} [total_loaded] The total number of bytes loaded across all files.
+ * @property {number} [total_bytes] The total number of bytes to be loaded across all files.
+ * @property {number} [total_progress] A number between 0 and 100 for overall progress.
  */
 
 /**
@@ -36,6 +39,9 @@
  * @property {'done'} status
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
+ * @property {number} [total_loaded] The total number of bytes loaded across all files.
+ * @property {number} [total_bytes] The total number of bytes to be loaded across all files.
+ * @property {number} [total_progress] A number between 0 and 100 for overall progress.
  */
 
 /**

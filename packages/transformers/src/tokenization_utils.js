@@ -3,7 +3,7 @@ import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
 
 import { isIntegralNumber, mergeArrays } from './utils/core.js';
-import { getModelJSON } from './utils/hub.js';
+import { getModelJSON, get_tokenizer_files } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 
@@ -12,33 +12,12 @@ import { Tensor } from './utils/tensor.js';
  */
 
 /**
- * Returns the list of files that will be loaded for a tokenizer.
- * Automatically detects whether the model has tokenizer files.
- *
- * @param {string} modelId The model id to check for tokenizer files
- * @returns {Promise<string[]>} An array of file names that will be loaded
- */
-export async function get_tokenizer_files(modelId) {
-    if (!modelId) {
-        throw new Error('modelId is required for get_tokenizer_files');
-    }
-
-    const tokenizerConfig = await getModelJSON(modelId, 'tokenizer_config.json', false, {});
-    if (Object.keys(tokenizerConfig).length > 0) {
-        return ['tokenizer.json', 'tokenizer_config.json'];
-    }
-
-    return [];
-}
-
-/**
  * Loads a tokenizer from the specified path.
  * @param {string} pretrained_model_name_or_path The path to the tokenizer directory.
  * @param {PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
-    const { getModelJSON } = await import('./utils/hub.js');
     const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
     return await Promise.all(
         tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
