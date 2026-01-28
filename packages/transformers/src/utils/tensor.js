@@ -23,7 +23,7 @@ import { DataTypeMap } from './dtypes.js';
 export class Tensor {
     /**
      * Dimensions of the tensor.
-     * @type {number[]} 
+     * @type {number[]}
      */
     get dims() {
         // @ts-ignore
