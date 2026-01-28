@@ -1,3 +1,6 @@
+/**
+ * @module transformers/utils/hub/FileCache
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import FileResponse from './FileResponse.js';
