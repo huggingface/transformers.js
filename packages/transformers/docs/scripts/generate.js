@@ -1,8 +1,8 @@
 // Based on [this tutorial](https://github.com/jsdoc2md/jsdoc-to-markdown/wiki/How-to-create-one-output-file-per-class).
 
-import fs from "fs";
-import path from "path";
-import url from "url";
+import fs from "node:fs";
+import path from "node:path";
+import url from "node:url";
 
 import jsdoc2md from "jsdoc-to-markdown";
 
