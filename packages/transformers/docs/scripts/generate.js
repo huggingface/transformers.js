@@ -20,6 +20,7 @@ const outputDir = path.join(root, "/docs/source/api/");
 const templateData = await jsdoc2md.getTemplateData({
   files: inputFile,
   configure: conf,
+  "no-cache": true,
 });
 
 // reduce templateData to an array of module names
@@ -29,6 +30,16 @@ const moduleNames = templateData.reduce((moduleNames, identifier) => {
   }
   return moduleNames;
 }, []);
+
+// Clear all existing .md files from output directory (recursively)
+if (fs.existsSync(outputDir)) {
+  const existingFiles = fs.readdirSync(outputDir, { recursive: true });
+  for (const file of existingFiles) {
+    if (file.endsWith(".md")) {
+      fs.unlinkSync(path.join(outputDir, file));
+    }
+  }
+}
 
 // create a documentation file for each module
 for (const moduleName of moduleNames) {
