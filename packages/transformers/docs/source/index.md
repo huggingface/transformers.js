@@ -23,14 +23,6 @@ The documentation is organized into 4 sections:
 3. **DEVELOPER GUIDES** show you how to use the library to achieve a specific goal.
 4. **API REFERENCE** describes all classes and functions, as well as their available parameters and types.
 
-## Examples
-
-<include>
-{
-    "path": "../snippets/3_examples.snippet"
-}
-</include>
-
 ## Supported tasks/models
 
 Here is the list of all tasks and architectures currently supported by Transformers.js.
