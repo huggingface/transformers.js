@@ -223,7 +223,7 @@ async function ensureWasmLoaded() {
  * @param {Uint8Array|string} buffer_or_path The ONNX model buffer or path.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
- * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object}>} The ONNX inference session.
+ * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object }>} The ONNX inference session.
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
