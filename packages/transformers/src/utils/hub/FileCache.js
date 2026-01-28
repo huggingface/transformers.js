@@ -1,5 +1,5 @@
 /**
- * @module transformers/utils/hub/FileCache
+ * @module utils/hub/FileCache
  */
 import fs from 'node:fs';
 import path from 'node:path';
