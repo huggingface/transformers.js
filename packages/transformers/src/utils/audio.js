@@ -11,7 +11,6 @@ import { getFile } from './hub.js';
 import { FFT, max } from './maths.js';
 import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
-import { apis } from '../env.js';
 import { Tensor, matmul } from './tensor.js';
 
 /**
