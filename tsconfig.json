@@ -7,6 +7,7 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM"],
     "outDir": "types",
     "strict": false,
     "skipLibCheck": true,
@@ -14,7 +15,10 @@
     "declarationMap": true,
     "noEmit": false,
     "emitDeclarationOnly": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
   },
   "typeAcquisition": {
     "include": ["jest"]

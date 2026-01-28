@@ -1,6 +1,6 @@
 name: "🙋 Question"
 description: Ask a question about the library
-labels: [ "question" ]
+labels: ["question"]
 
 body:
   - type: textarea

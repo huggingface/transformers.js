@@ -96,7 +96,8 @@ const processor = await AutoProcessor.from_pretrained(model_id);
 const tokenizer = await AutoTokenizer.from_pretrained(model_id);
 
 // Load image and prepare vision inputs
-const url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg";
+const url =
+  "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg";
 const image = await RawImage.fromURL(url);
 const vision_inputs = await processor(image);
 

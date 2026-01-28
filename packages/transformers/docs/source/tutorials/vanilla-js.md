@@ -12,7 +12,7 @@ Useful links:
 - [Interactive code walk-through (scrim)](https://scrimba.com/scrim/cKm9bDAg)
 - [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/vanilla-js)
 
-## Step 1:  HTML and CSS setup
+## Step 1: HTML and CSS setup
 
 Before we start building with Transformers.js, we first need to lay the groundwork with some markup and styling. Create an `index.html` file with a basic HTML skeleton, and add the following `<main>` tag to the `<body>`:
 
@@ -20,7 +20,10 @@ Before we start building with Transformers.js, we first need to lay the groundwo
 <main class="container">
   <label class="custom-file-upload">
     <input id="file-upload" type="file" accept="image/*" />
-    <img class="upload-icon" src="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/upload-icon.png" />
+    <img
+      class="upload-icon"
+      src="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/upload-icon.png"
+    />
     Upload image
   </label>
   <div id="image-container"></div>
@@ -43,43 +46,43 @@ Next, add the following CSS rules in a `style.css` file and link it to the HTML:
 ```css
 html,
 body {
-    font-family: Arial, Helvetica, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .container {
-    margin: 40px auto;
-    width: max(50vw, 400px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  margin: 40px auto;
+  width: max(50vw, 400px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .custom-file-upload {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border: 2px solid black;
-    padding: 8px 16px;
-    cursor: pointer;
-    border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid black;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 6px;
 }
 
 #file-upload {
-    display: none;
+  display: none;
 }
 
 .upload-icon {
-    width: 30px;
+  width: 30px;
 }
 
 #image-container {
-    width: 100%;
-    margin-top: 20px;
-    position: relative;
+  width: 100%;
+  margin-top: 20px;
+  position: relative;
 }
 
-#image-container>img {
-    width: 100%;
+#image-container > img {
+  width: 100%;
 }
 ```
 
@@ -89,7 +92,7 @@ Here's how the UI looks at this point:
 
 ## Step 2: JavaScript setup
 
-With the *boring* part out of the way, let's start writing some JavaScript code! Create a file called `index.js` and link to it in `index.html` by adding the following to the end of the `<body>`:
+With the _boring_ part out of the way, let's start writing some JavaScript code! Create a file called `index.js` and link to it in `index.html` by adding the following to the end of the `<body>`:
 
 ```html
 <script src="./index.js" type="module"></script>
@@ -104,7 +107,10 @@ The `type="module"` attribute is important, as it turns our file into a [JavaScr
 Moving into `index.js`, let's import Transformers.js by adding the following line to the top of the file:
 
 ```js
-import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+import {
+  pipeline,
+  env,
+} from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
 ```
 
 Since we will be downloading the model from the Hugging Face Hub, we can skip the local model check by setting:
@@ -136,7 +142,6 @@ status.textContent = "Loading model...";
 To keep this tutorial simple, we'll be loading and running the model in the main (UI) thread. This is not recommended for production applications, since the UI will freeze when we're performing these actions. This is because JavaScript is a single-threaded language. To overcome this, you can use a [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) to download and run the model in the background. However, we’re not going to do cover that in this tutorial...
 
 </Tip>
-
 
 We can now call the `pipeline()` function that we imported at the top of our file, to create our object detection pipeline:
 
@@ -210,11 +215,12 @@ NOTE: The `detect` function needs to be asynchronous, since we’ll `await` the 
 
 </Tip>
 
-Once we’ve updated the `status` to "Analysing", we’re ready to perform *inference*, which simply means to run the model with some data. This is done via the `detector()` function that was returned from `pipeline()`. The first argument we’re passing is the image data (`img.src`).
+Once we’ve updated the `status` to "Analysing", we’re ready to perform _inference_, which simply means to run the model with some data. This is done via the `detector()` function that was returned from `pipeline()`. The first argument we’re passing is the image data (`img.src`).
 
 The second argument is an options object:
- - We set the `threshold` property to `0.5`. This means that we want the model to be at least 50% confident before claiming it has detected an object in the image. The lower the threshold, the more objects it'll detect (but may misidentify objects); the higher the threshold, the fewer objects it'll detect (but may miss objects in the scene).
- - We also specify `percentage: true`, which means that we want the bounding box for the objects to be returned as percentages (instead of pixels).
+
+- We set the `threshold` property to `0.5`. This means that we want the model to be at least 50% confident before claiming it has detected an object in the image. The lower the threshold, the more objects it'll detect (but may misidentify objects); the higher the threshold, the fewer objects it'll detect (but may miss objects in the scene).
+- We also specify `percentage: true`, which means that we want the bounding box for the objects to be returned as percentages (instead of pixels).
 
 If you now try to run the app and upload an image, you should see the following output logged to the console:
 
@@ -240,7 +246,11 @@ function renderBox({ box, label }) {
   const { xmax, xmin, ymax, ymin } = box;
 
   // Generate a random color for the box
-  const color = "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, 0);
+  const color =
+    "#" +
+    Math.floor(Math.random() * 0xffffff)
+      .toString(16)
+      .padStart(6, 0);
 
   // Draw the box
   const boxElement = document.createElement("div");
@@ -268,19 +278,19 @@ The bounding box and label span also need some styling, so add the following to 
 
 ```css
 .bounding-box {
-    position: absolute;
-    box-sizing: border-box;
-    border-width: 2px;
-    border-style: solid;
+  position: absolute;
+  box-sizing: border-box;
+  border-width: 2px;
+  border-style: solid;
 }
 
 .bounding-box-label {
-    color: white;
-    position: absolute;
-    font-size: 12px;
-    margin-top: -16px;
-    margin-left: -2px;
-    padding: 1px;
+  color: white;
+  position: absolute;
+  font-size: 12px;
+  margin-top: -16px;
+  margin-left: -2px;
+  padding: 1px;
 }
 ```
 
