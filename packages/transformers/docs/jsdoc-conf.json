@@ -1,5 +1,6 @@
 {
-    "source": {
-        "excludePattern": ""
-    }
+  "source": {
+    "excludePattern": ""
+  },
+  "plugins": ["./plugins/preprocess.js"]
 }

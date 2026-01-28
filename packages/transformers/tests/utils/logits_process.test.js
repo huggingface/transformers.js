@@ -5,7 +5,6 @@ import {
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
-import { compare } from "../test_utils.js";
 init();
 
 const MAX_MODEL_LOAD_TIME = 10_000; // 10 seconds
@@ -48,7 +47,7 @@ describe("Logits Processors", () => {
               [18824, 16621],
             ],
           });
-          compare(output, text_target);
+          expect(output).toEqual(text_target);
         },
         MAX_TEST_EXECUTION_TIME,
       );
@@ -75,7 +74,7 @@ describe("Logits Processors", () => {
 
           // block #3: [1n, 22172n, 18547n, 8143n, 7587n, 6831n, 30999n]
           const output = await pipe(text_input, { max_new_tokens: 5, bad_words_ids });
-          compare(output, text_target);
+          expect(output).toEqual(text_target);
         },
         MAX_TEST_EXECUTION_TIME,
       );
@@ -100,7 +99,7 @@ describe("Logits Processors", () => {
               // result: [1n, 445n, 338n, 263n, 1243n, 3931n, 14756n, 13319n, 19437n, 21948n]
             ],
           });
-          compare(output, text_target);
+          expect(output).toEqual(text_target);
         },
         MAX_TEST_EXECUTION_TIME,
       );

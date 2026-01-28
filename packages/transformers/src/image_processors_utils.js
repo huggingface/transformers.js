@@ -195,7 +195,10 @@ export function post_process_semantic_segmentation(outputs, target_sizes = null)
             const index = segmentation_data[j];
             hasLabel[index] = index;
         }
-        /** @type {number[]} The unique list of labels that were detected */
+        /**
+         * The unique list of labels that were detected
+         * @type {number[]}
+         */
         const labels = hasLabel.filter((x) => x !== undefined);
 
         toReturn.push({ segmentation, labels });

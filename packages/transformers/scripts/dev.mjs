@@ -3,15 +3,15 @@ import { unlinkSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { OUT_DIR } from "./build/constants.mjs";
-import prepareOutDir from "../../../../scripts/prepareOutDir.mjs";
-import { colors, createLogger } from "../../../../scripts/logger.mjs";
+import prepareOutDir from "../../../scripts/prepareOutDir.mjs";
+import { colors, createLogger } from "../../../scripts/logger.mjs";
 import { buildAllWithWatch } from "./build/buildAllWithWatch.mjs";
 
 const log = createLogger("transformers");
 const startTime = performance.now();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = path.join(__dirname, "../..");
+const ROOT_DIR = path.join(__dirname, "..");
 
 prepareOutDir(OUT_DIR);
 

@@ -1,7 +1,4 @@
 # Ignore artifacts:
 .github
-dist
-docs
 *.py
-types
 *.md

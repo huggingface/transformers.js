@@ -6,8 +6,7 @@
 
 import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
-import FileResponse from './hub/FileResponse.js';
-import FileCache from './hub/FileCache.js';
+import { FileResponse, FileCache } from './hub/files.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 
@@ -143,7 +142,7 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
  * @param {import('./cache.js').CacheInterface | null} cache The cache instance to check.
  * @param {string} localPath The local path to try first.
  * @param {string} proposedCacheKey The proposed cache key to try second.
- * @returns {Promise<Response|import('./hub/FileResponse.js').default|undefined|string>}
+ * @returns {Promise<Response|import('./hub/files.js').FileResponse|undefined|string>}
  * The cached response if found, undefined otherwise.
  */
 export async function checkCachedResource(cache, localPath, proposedCacheKey) {
@@ -165,7 +164,7 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
  * @param {string} filename The name of the file to cache.
  * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
  * @param {string} cacheKey The cache key to use.
- * @param {Response|import('./hub/FileResponse.js').default} response The response to cache.
+ * @param {Response|import('./hub/files.js').FileResponse} response The response to cache.
  * @param {Uint8Array} [result] The result buffer if already read.
  * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
@@ -242,7 +241,7 @@ export async function loadResourceFile(
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|import('./hub/FileResponse.js').default|undefined|string} */
+    /** @type {Response|import('./hub/files.js').FileResponse|undefined|string} */
     let response;
 
     // Check cache

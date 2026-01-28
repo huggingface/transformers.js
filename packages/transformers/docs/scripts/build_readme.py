@@ -36,12 +36,9 @@ README_TEMPLATE = """
 
 ## Supported tasks/models
 
-Here is the list of all tasks and architectures currently supported by Transformers.js.
-If you don't see your task/model listed here or it is not yet supported, feel free
-to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
+Here is the list of all tasks and architectures currently supported by Transformers.js. If you don't see your task/model listed here or it is not yet supported, feel free to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
 
-To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)).
-You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
+To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)). You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
 
 {tasks}
 

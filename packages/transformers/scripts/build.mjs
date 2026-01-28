@@ -1,6 +1,6 @@
 import { OUT_DIR } from "./build/constants.mjs";
-import prepareOutDir from "../../../../scripts/prepareOutDir.mjs";
-import { colors, createLogger } from "../../../../scripts/logger.mjs";
+import prepareOutDir from "../../../scripts/prepareOutDir.mjs";
+import { colors, createLogger } from "../../../scripts/logger.mjs";
 import { buildAll } from "./build/buildAll.mjs";
 
 const log = createLogger("transformers");

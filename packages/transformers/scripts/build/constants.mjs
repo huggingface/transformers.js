@@ -14,7 +14,7 @@ export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "u
 export const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const ROOT_DIR = path.join(__dirname, "../../..");
+export const ROOT_DIR = path.join(__dirname, "../..");
 export const OUT_DIR = path.join(ROOT_DIR, DIST_FOLDER);
 
 export const getEsbuildDevConfig = (rootDir) => ({

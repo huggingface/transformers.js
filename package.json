@@ -25,5 +25,37 @@
   "devDependencies": {
     "prettier": "3.4.2",
     "typescript": "^5.8.3"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": [
+          "./packages/**/src/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "singleQuote": true,
+          "tabWidth": 4,
+          "printWidth": 120
+        }
+      },
+      {
+        "files": [
+          "./packages/**/tests/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "tabWidth": 2,
+          "printWidth": 10000000
+        }
+      },
+      {
+        "files": [
+          "./packages/**/scripts/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "tabWidth": 2,
+          "printWidth": 120
+        }
+      }
+    ]
   }
 }

@@ -1,4 +1,3 @@
-
 # Building a Next.js application
 
 In this tutorial, we'll build a simple Next.js application that performs sentiment analysis using Transformers.js!
@@ -8,6 +7,7 @@ The final product will look something like this:
 ![Demo](https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/next-demo.gif)
 
 Useful links:
+
 - Demo site: [client-side](https://huggingface.co/spaces/Xenova/next-example-app) or [server-side](https://huggingface.co/spaces/Xenova/next-server-example-app)
 - Source code: [client-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-client) or [server-side](https://github.com/huggingface/transformers.js/tree/main/examples/next-server)
 
@@ -17,7 +17,6 @@ Useful links:
 - [npm](https://www.npmjs.com/) version 9+
 
 ## Client-side inference
-
 
 ### Step 1: Initialise the project
 
@@ -38,12 +37,9 @@ On installation, you'll see various prompts. For this demo, we'll be selecting t
 √ Would you like to customize the default import alias? ... <b>No</b> / Yes
 </pre>
 
-
-
 ### Step 2: Install and configure Transformers.js
 
 You can install Transformers.js from [NPM](https://www.npmjs.com/package/@huggingface/transformers) with the following command:
-
 
 ```bash
 npm i @huggingface/transformers
@@ -54,23 +50,23 @@ We also need to update the `next.config.js` file to ignore node-specific modules
 ```js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // (Optional) Export as a static site
-    // See https://nextjs.org/docs/pages/building-your-application/deploying/static-exports#configuration
-    output: 'export', // Feel free to modify/remove this option
+  // (Optional) Export as a static site
+  // See https://nextjs.org/docs/pages/building-your-application/deploying/static-exports#configuration
+  output: "export", // Feel free to modify/remove this option
 
-    // Override the default webpack configuration
-    webpack: (config) => {
-        // See https://webpack.js.org/configuration/resolve/#resolvealias
-        config.resolve.alias = {
-            ...config.resolve.alias,
-            "sharp$": false,
-            "onnxruntime-node$": false,
-        }
-        return config;
-    },
-}
+  // Override the default webpack configuration
+  webpack: (config) => {
+    // See https://webpack.js.org/configuration/resolve/#resolvealias
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      sharp$: false,
+      "onnxruntime-node$": false,
+    };
+    return config;
+  },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
 ```
 
 Next, we'll create a new [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) script where we'll place all ML-related code. This is to ensure that the main thread is not blocked while the model is loading and performing inference. For this application, we'll be using [`Xenova/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english), a ~67M parameter model finetuned on the [Stanford Sentiment Treebank](https://huggingface.co/datasets/sst) dataset. Add the following code to `./src/app/worker.js`:
@@ -83,38 +79,37 @@ env.allowLocalModels = false;
 
 // Use the Singleton pattern to enable lazy construction of the pipeline.
 class PipelineSingleton {
-    static task = 'text-classification';
-    static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
-    static instance = null;
+  static task = "text-classification";
+  static model = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+  static instance = null;
 
-    static async getInstance(progress_callback = null) {
-        if (this.instance === null) {
-            this.instance = pipeline(this.task, this.model, { progress_callback });
-        }
-        return this.instance;
+  static async getInstance(progress_callback = null) {
+    if (this.instance === null) {
+      this.instance = pipeline(this.task, this.model, { progress_callback });
     }
+    return this.instance;
+  }
 }
 
 // Listen for messages from the main thread
-self.addEventListener('message', async (event) => {
-    // Retrieve the classification pipeline. When called for the first time,
-    // this will load the pipeline and save it for future use.
-    let classifier = await PipelineSingleton.getInstance(x => {
-        // We also add a progress callback to the pipeline so that we can
-        // track model loading.
-        self.postMessage(x);
-    });
+self.addEventListener("message", async (event) => {
+  // Retrieve the classification pipeline. When called for the first time,
+  // this will load the pipeline and save it for future use.
+  let classifier = await PipelineSingleton.getInstance((x) => {
+    // We also add a progress callback to the pipeline so that we can
+    // track model loading.
+    self.postMessage(x);
+  });
 
-    // Actually perform the classification
-    let output = await classifier(event.data.text);
+  // Actually perform the classification
+  let output = await classifier(event.data.text);
 
-    // Send the output back to the main thread
-    self.postMessage({
-        status: 'complete',
-        output: output,
-    });
+  // Send the output back to the main thread
+  self.postMessage({
+    status: "complete",
+    output: output,
+  });
 });
-
 ```
 
 ### Step 3: Design the user interface
@@ -162,6 +157,7 @@ export default function Home() {
 ```
 
 Initialise the following state variables at the beginning of the `Home` component:
+
 ```jsx
 // Keep track of the classification result and the model loading status.
 const [result, setResult] = useState(null);
@@ -173,20 +169,21 @@ and fill in the `onMessageReceived` function to update these variables when the 
 ```js
 const onMessageReceived = (e) => {
   switch (e.data.status) {
-    case 'initiate':
+    case "initiate":
       setReady(false);
       break;
-    case 'ready':
+    case "ready":
       setReady(true);
       break;
-    case 'complete':
-      setResult(e.data.output[0])
+    case "complete":
+      setResult(e.data.output[0]);
       break;
   }
 };
 ```
 
 Finally, we can add a simple UI to the `Home` component, consisting of an input textbox and a preformatted text element to display the classification result:
+
 ```jsx
 <main className="flex min-h-screen flex-col items-center justify-center p-12">
   <h1 className="text-5xl font-bold mb-2 text-center">Transformers.js</h1>
@@ -196,14 +193,14 @@ Finally, we can add a simple UI to the `Home` component, consisting of an input 
     className="w-full max-w-xs p-2 border border-gray-300 rounded mb-4"
     type="text"
     placeholder="Enter text here"
-    onInput={e => {
-        classify(e.target.value);
+    onInput={(e) => {
+      classify(e.target.value);
     }}
   />
 
   {ready !== null && (
     <pre className="bg-gray-100 p-2 rounded">
-      { (!ready || !result) ? 'Loading...' : JSON.stringify(result, null, 2) }
+      {!ready || !result ? "Loading..." : JSON.stringify(result, null, 2)}
     </pre>
   )}
 </main>
@@ -235,11 +232,9 @@ For this demo, we will deploy our application as a static [Hugging Face Space](h
 
 **That's it!** Your application should now be live at `https://huggingface.co/spaces/<your-username>/<your-space-name>`!
 
-
 ## Server-side inference
 
 While there are many different ways to perform server-side inference, the simplest (which we will discuss in this tutorial) is using the new [Route Handlers](https://nextjs.org/docs/app/building-your-application/routing/router-handlers) feature.
-
 
 ### Step 1: Initialise the project
 
@@ -260,12 +255,9 @@ On installation, you'll see various prompts. For this demo, we'll be selecting t
 √ Would you like to customize the default import alias? ... <b>No</b> / Yes
 </pre>
 
-
-
 ### Step 2: Install and configure Transformers.js
 
 You can install Transformers.js from [NPM](https://www.npmjs.com/package/@huggingface/transformers) with the following command:
-
 
 ```bash
 npm i @huggingface/transformers
@@ -276,90 +268,96 @@ We also need to update the `next.config.js` file to prevent Webpack from bundlin
 ```js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // (Optional) Export as a standalone site
-    // See https://nextjs.org/docs/pages/api-reference/next-config-js/output#automatically-copying-traced-files
-    output: 'standalone', // Feel free to modify/remove this option
-    
-    // Indicate that these packages should not be bundled by webpack
-    experimental: {
-        serverComponentsExternalPackages: ['sharp', 'onnxruntime-node'],
-    },
+  // (Optional) Export as a standalone site
+  // See https://nextjs.org/docs/pages/api-reference/next-config-js/output#automatically-copying-traced-files
+  output: "standalone", // Feel free to modify/remove this option
+
+  // Indicate that these packages should not be bundled by webpack
+  experimental: {
+    serverComponentsExternalPackages: ["sharp", "onnxruntime-node"],
+  },
 };
 
-module.exports = nextConfig
+module.exports = nextConfig;
 ```
 
 Next, let's set up our Route Handler. We can do this by creating two files in a new `./src/app/classify/` directory:
 
 1. `pipeline.js` - to handle the construction of our pipeline.
 
-    ```js
-    import { pipeline } from "@huggingface/transformers";
+   ```js
+   import { pipeline } from "@huggingface/transformers";
 
-    // Use the Singleton pattern to enable lazy construction of the pipeline.
-    // NOTE: We wrap the class in a function to prevent code duplication (see below).
-    const P = () => class PipelineSingleton {
-        static task = 'text-classification';
-        static model = 'Xenova/distilbert-base-uncased-finetuned-sst-2-english';
-        static instance = null;
+   // Use the Singleton pattern to enable lazy construction of the pipeline.
+   // NOTE: We wrap the class in a function to prevent code duplication (see below).
+   const P = () =>
+     class PipelineSingleton {
+       static task = "text-classification";
+       static model = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+       static instance = null;
 
-        static async getInstance(progress_callback = null) {
-            if (this.instance === null) {
-                this.instance = pipeline(this.task, this.model, { progress_callback });
-            }
-            return this.instance;
-        }
-    }
+       static async getInstance(progress_callback = null) {
+         if (this.instance === null) {
+           this.instance = pipeline(this.task, this.model, {
+             progress_callback,
+           });
+         }
+         return this.instance;
+       }
+     };
 
-    let PipelineSingleton;
-    if (process.env.NODE_ENV !== 'production') {
-        // When running in development mode, attach the pipeline to the
-        // global object so that it's preserved between hot reloads.
-        // For more information, see https://vercel.com/guides/nextjs-prisma-postgres
-        if (!global.PipelineSingleton) {
-            global.PipelineSingleton = P();
-        }
-        PipelineSingleton = global.PipelineSingleton;
-    } else {
-        PipelineSingleton = P();
-    }
-    export default PipelineSingleton;
-    ```
+   let PipelineSingleton;
+   if (process.env.NODE_ENV !== "production") {
+     // When running in development mode, attach the pipeline to the
+     // global object so that it's preserved between hot reloads.
+     // For more information, see https://vercel.com/guides/nextjs-prisma-postgres
+     if (!global.PipelineSingleton) {
+       global.PipelineSingleton = P();
+     }
+     PipelineSingleton = global.PipelineSingleton;
+   } else {
+     PipelineSingleton = P();
+   }
+   export default PipelineSingleton;
+   ```
 
 2. `route.js` - to process requests made to the `/classify` route.
-    ```js
-    import { NextResponse } from 'next/server'
-    import PipelineSingleton from './pipeline.js';
 
-    export async function GET(request) {
-        const text = request.nextUrl.searchParams.get('text');
-        if (!text) {
-            return NextResponse.json({
-                error: 'Missing text parameter',
-            }, { status: 400 });
-        }
-        // Get the classification pipeline. When called for the first time,
-        // this will load the pipeline and cache it for future use.
-        const classifier = await PipelineSingleton.getInstance();
+   ```js
+   import { NextResponse } from "next/server";
+   import PipelineSingleton from "./pipeline.js";
 
-        // Actually perform the classification
-        const result = await classifier(text);
+   export async function GET(request) {
+     const text = request.nextUrl.searchParams.get("text");
+     if (!text) {
+       return NextResponse.json(
+         {
+           error: "Missing text parameter",
+         },
+         { status: 400 },
+       );
+     }
+     // Get the classification pipeline. When called for the first time,
+     // this will load the pipeline and cache it for future use.
+     const classifier = await PipelineSingleton.getInstance();
 
-        return NextResponse.json(result);
-    }
-    ```
+     // Actually perform the classification
+     const result = await classifier(text);
+
+     return NextResponse.json(result);
+   }
+   ```
 
 ### Step 3: Design the user interface
 
 We'll now modify the default `./src/app/page.js` file to make requests to our newly-created Route Handler.
 
 ```jsx
-'use client'
+"use client";
 
-import { useState } from 'react'
+import { useState } from "react";
 
 export default function Home() {
-
   // Keep track of the classification result and the model loading status.
   const [result, setResult] = useState(null);
   const [ready, setReady] = useState(null);
@@ -380,24 +378,25 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-12">
       <h1 className="text-5xl font-bold mb-2 text-center">Transformers.js</h1>
-      <h2 className="text-2xl mb-4 text-center">Next.js template (server-side)</h2>
+      <h2 className="text-2xl mb-4 text-center">
+        Next.js template (server-side)
+      </h2>
       <input
         type="text"
         className="w-full max-w-xs p-2 border border-gray-300 rounded mb-4"
         placeholder="Enter text here"
-        onInput={e => {
+        onInput={(e) => {
           classify(e.target.value);
         }}
       />
 
       {ready !== null && (
         <pre className="bg-gray-100 p-2 rounded">
-          {
-            (!ready || !result) ? 'Loading...' : JSON.stringify(result, null, 2)}
+          {!ready || !result ? "Loading..." : JSON.stringify(result, null, 2)}
         </pre>
       )}
     </main>
-  )
+  );
 }
 ```
 
@@ -418,16 +417,16 @@ For this demo, we will build and deploy our application to [Hugging Face Spaces]
 3. Click the "Create space" button at the bottom of the page.
 4. Go to "Files" &rarr; "Add file" &rarr; "Upload files". Drag the files from your project folder (excluding `node_modules` and `.next`, if present) into the upload box and click "Upload". After they have uploaded, scroll down to the button and click "Commit changes to main".
 5. Add the following lines to the top of your `README.md`:
-    ```
-    ---
-    title: Next Server Example App
-    emoji: 🔥
-    colorFrom: yellow
-    colorTo: red
-    sdk: docker
-    pinned: false
-    app_port: 3000
-    ---
-    ```
+   ```
+   ---
+   title: Next Server Example App
+   emoji: 🔥
+   colorFrom: yellow
+   colorTo: red
+   sdk: docker
+   pinned: false
+   app_port: 3000
+   ---
+   ```
 
 **That's it!** Your application should now be live at `https://huggingface.co/spaces/<your-username>/<your-space-name>`!

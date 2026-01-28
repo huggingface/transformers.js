@@ -4,7 +4,6 @@ import { getFile } from "../../src/utils/hub.js";
 import { RawImage } from "../../src/utils/image.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../init.js";
-import { compare } from "../test_utils.js";
 
 describe("Utilities", () => {
   describe("Audio utilities", () => {
@@ -46,8 +45,8 @@ describe("Utilities", () => {
     it(
       "should calculate window",
       async () => {
-        compare(hanning(10), new Float64Array([0.0, 0.11697777844051105, 0.41317591116653485, 0.75, 0.9698463103929542, 0.9698463103929542, 0.75, 0.41317591116653485, 0.11697777844051105, 0.0]));
-        compare(hamming(10), new Float64Array([0.08000000000000002, 0.1876195561652702, 0.46012183827321207, 0.7700000000000001, 0.9722586055615179, 0.9722586055615179, 0.7700000000000001, 0.46012183827321207, 0.1876195561652702, 0.08000000000000002]));
+        expect(hanning(10)).toBeCloseToNested(new Float64Array([0.0, 0.11697777844051105, 0.41317591116653485, 0.75, 0.9698463103929542, 0.9698463103929542, 0.75, 0.41317591116653485, 0.11697777844051105, 0.0]));
+        expect(hamming(10)).toBeCloseToNested(new Float64Array([0.08000000000000002, 0.1876195561652702, 0.46012183827321207, 0.7700000000000001, 0.9722586055615179, 0.9722586055615179, 0.7700000000000001, 0.46012183827321207, 0.1876195561652702, 0.08000000000000002]));
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -81,7 +80,7 @@ describe("Utilities", () => {
         new Uint8Array([2, 0, 3, 1]), // Blues
       ];
 
-      compare(image_data, target);
+      expect(image_data).toEqual(target);
     });
 
     it("Can splits channels for grayscale", async () => {
@@ -89,9 +88,9 @@ describe("Utilities", () => {
         .grayscale()
         .split()
         .map((x) => x.data);
-      const target = [new Uint8Array([1, 3, 2, 1])];
+      const target = [new Uint8ClampedArray([1, 3, 2, 1])];
 
-      compare(image_data, target);
+      expect(image_data).toEqual(target);
     });
 
     it("Read image from URL", async () => {

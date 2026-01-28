@@ -1,6 +1,6 @@
 name: "🌟 New model addition"
 description: Submit a proposal/request to implement a new model
-labels: [ "new model" ]
+labels: ["new model"]
 
 body:
   - type: textarea
@@ -17,7 +17,7 @@ body:
     attributes:
       label: Prerequisites
       description: |
-          Please note that Transformers.js relies on the model first being supported in [🤗 Transformers](https://github.com/huggingface/transformers) and [🤗 Optimum](https://github.com/huggingface/optimum). If the model you are requesting is not yet supported by either of them, feel free to open up a model request there too.
+        Please note that Transformers.js relies on the model first being supported in [🤗 Transformers](https://github.com/huggingface/transformers) and [🤗 Optimum](https://github.com/huggingface/optimum). If the model you are requesting is not yet supported by either of them, feel free to open up a model request there too.
       options:
         - label: "The model is supported in Transformers (i.e., listed [here](https://huggingface.co/docs/transformers/index#supported-models-and-frameworks))"
         - label: "The model can be exported to ONNX with Optimum (i.e., listed [here](https://huggingface.co/docs/optimum/main/en/exporters/onnx/overview))"

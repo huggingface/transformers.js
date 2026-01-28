@@ -21,7 +21,10 @@ import { DataTypeMap } from './dtypes.js';
  */
 
 export class Tensor {
-    /** @type {number[]} Dimensions of the tensor. */
+    /**
+     * Dimensions of the tensor.
+     * @type {number[]}
+     */
     get dims() {
         // @ts-ignore
         return this.ort_tensor.dims;
@@ -32,22 +35,34 @@ export class Tensor {
         this.ort_tensor.dims = value;
     }
 
-    /** @type {DataType} Type of the tensor. */
+    /**
+     * Type of the tensor.
+     * @type {DataType}
+     */
     get type() {
         return this.ort_tensor.type;
     }
 
-    /** @type {DataArray} The data stored in the tensor. */
+    /**
+     * The data stored in the tensor.
+     * @type {DataArray}
+     */
     get data() {
         return this.ort_tensor.data;
     }
 
-    /** @type {number} The number of elements in the tensor. */
+    /**
+     * The number of elements in the tensor.
+     * @type {number}
+     */
     get size() {
         return this.ort_tensor.size;
     }
 
-    /** @type {string} The location of the tensor data. */
+    /**
+     * The location of the tensor data.
+     * @type {string}
+     */
     get location() {
         return this.ort_tensor.location;
     }

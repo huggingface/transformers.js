@@ -35,10 +35,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      
+
       # Setup the testing environment
       - run: git lfs install && GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/hf-internal-testing/tiny-random-T5ForConditionalGeneration ./packages/transformers/models/hf-internal-testing/tiny-random-T5ForConditionalGeneration
 

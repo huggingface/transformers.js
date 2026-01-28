@@ -50,7 +50,8 @@ const transcriber = await pipeline(
 );
 
 // Transcribe audio from a URL
-const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
+const url =
+  "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav";
 const output = await transcriber(url);
 console.log(output);
 // { text: ' And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.' }
@@ -69,7 +70,8 @@ const classifier = await pipeline(
 );
 
 // Classify an image from a URL
-const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg";
+const url =
+  "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg";
 const output = await classifier(url);
 console.log(output);
 // [
@@ -84,4 +86,3 @@ console.log(output);
 ## Reporting bugs and providing feedback
 
 Due to the experimental nature of WebGPU, especially in non-Chromium browsers, you may experience issues when trying to run a model (even it it can run in WASM). If you do, please open [an issue on GitHub](https://github.com/huggingface/transformers.js/issues/new?title=[WebGPU]%20Error%20running%20MODEL_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml) and we'll do our best to address it. Thanks!
-
