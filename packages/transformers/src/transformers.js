@@ -1,12 +1,6 @@
 /**
- * @file Entry point for the Transformers.js library. Only the exports from this file
- * are available to the end user, and are grouped as follows:
- *
- * 1. [Pipelines](./pipelines)
- * 2. [Environment variables](./env)
- * 3. [Models](./models)
- * 4. [Tokenizers](./tokenizers)
- * 5. [Processors](./processors)
+ * @file Entry point for the Transformers.js library.
+ * Only the exports from this file are available to the end user.
  *
  * @module transformers
  */

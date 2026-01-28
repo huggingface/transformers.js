@@ -1,3 +1,9 @@
+/**
+ * @file Tokenization utilities
+ *
+ * @module tokenizers
+ */
+
 import { Tokenizer } from '@huggingface/tokenizers';
 import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
