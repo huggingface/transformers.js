@@ -23,14 +23,14 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "devDependencies": {
-    "prettier": "3.4.2",
-    "typescript": "^5.8.3"
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
   },
   "prettier": {
     "overrides": [
       {
         "files": [
-          "./packages/**/src/**/*.{js,mjs,cjs,ts}"
+          "./packages/*/src/**/*.{js,mjs,cjs,ts}"
         ],
         "options": {
           "singleQuote": true,
@@ -40,7 +40,7 @@
       },
       {
         "files": [
-          "./packages/**/tests/**/*.{js,mjs,cjs,ts}"
+          "./packages/*/tests/**/*.{js,mjs,cjs,ts}"
         ],
         "options": {
           "tabWidth": 2,
@@ -49,11 +49,13 @@
       },
       {
         "files": [
-          "./packages/**/scripts/**/*.{js,mjs,cjs,ts}"
+          "./scripts/**/*.{js,mjs,cjs,ts}",
+          "./packages/*/scripts/**/*.{js,mjs,cjs,ts}",
+          "./packages/*/docs/**/*.{js,mjs,cjs,ts}"
         ],
         "options": {
           "tabWidth": 2,
-          "printWidth": 120
+          "printWidth": 160
         }
       }
     ]

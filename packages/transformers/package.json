@@ -22,8 +22,8 @@
     }
   },
   "scripts": {
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
     "typegen": "tsc --build",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
@@ -69,7 +69,6 @@
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
     "jsdoc-to-markdown": "^9.1.3",
-    "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
   "files": [
