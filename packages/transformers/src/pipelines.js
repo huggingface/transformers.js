@@ -68,6 +68,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
+import { get_files } from './utils/hub/get_files.js';
 
 const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -449,8 +450,37 @@ export async function pipeline(
         }
     }
 
+    const expected_files = progress_callback ? await get_files(model, { device, dtype }) : [];
+    const loaded_files = {};
+
     const pretrainedOptions = {
-        progress_callback,
+        /** @param {import('./utils/core.js').ProgressInfo} info */
+        progress_callback: (info) => {
+            if (!progress_callback) return;
+            if (info.status === 'progress') {
+                loaded_files[info.file] = {
+                    loaded: info.loaded,
+                    total: info.total,
+                };
+
+                const files_loaded = Object.keys(loaded_files);
+                const all_files_started = Object.keys(loaded_files).length === loaded_files.length;
+                const loaded = Object.values(loaded_files).reduce((acc, curr) => acc + curr.loaded, 0);
+                const total = Object.values(loaded_files).reduce((acc, curr) => acc + curr.total, 0);
+                const progress = all_files_started ? (loaded / total) * 100 : 0;
+
+                progress_callback({
+                    status: 'progress_total',
+                    name: info.name,
+                    progress,
+                    loaded,
+                    total,
+                    files_started_loading: files_loaded,
+                    files_expected: expected_files,
+                });
+            }
+            progress_callback(info);
+        },
         config,
         cache_dir,
         local_files_only,

@@ -32,6 +32,17 @@
  */
 
 /**
+ * @typedef {Object} ProgressTotalStatusInfo
+ * @property {'progress_total'} status
+ * @property {string} name The model id or directory path.
+ * @property {number} progress A number between 0 and 100.
+ * @property {number} loaded The number of bytes loaded.
+ * @property {number} total The total number of bytes to be loaded.
+ * @property {string[]} files_started_loading An array of files that have started loading.
+ * @property {string[]} files_expected An array of files that are expected to be loaded.
+ */
+
+/**
  * @typedef {Object} DoneProgressInfo
  * @property {'done'} status
  * @property {string} name The model id or directory path.
@@ -46,7 +57,7 @@
  */
 
 /**
- * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo} ProgressInfo
+ * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo | ProgressTotalStatusInfo} ProgressInfo
  */
 
 /**
