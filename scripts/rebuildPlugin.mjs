@@ -28,17 +28,11 @@ export function rebuildPlugin(targetName, log, options = {}) {
         const duration = (endTime - startTime).toFixed(2);
 
         if (result.errors.length > 0) {
-          log.error(
-            `${colors.bright}${targetName}${colors.reset} - Build failed with ${result.errors.length} error(s) in ${duration}ms`,
-          );
+          log.error(`${colors.bright}${targetName}${colors.reset} - Build failed with ${result.errors.length} error(s) in ${duration}ms`);
         } else if (!isFirstBuild) {
-          log.done(
-            `${colors.bright}${targetName}${colors.reset} - Rebuilt in ${colors.gray}${duration}ms${colors.reset}`,
-          );
+          log.done(`${colors.bright}${targetName}${colors.reset} - Rebuilt in ${colors.gray}${duration}ms${colors.reset}`);
         } else if (logFirstBuild) {
-          log.done(
-            `${colors.bright}${targetName}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`,
-          );
+          log.done(`${colors.bright}${targetName}${colors.reset} - Built in ${colors.gray}${duration}ms${colors.reset}`);
         }
 
         isFirstBuild = false;

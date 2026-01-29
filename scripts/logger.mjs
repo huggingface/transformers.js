@@ -31,8 +31,7 @@ export function createLogger(prefix = "") {
     warning: (text) => console.log(`${formatPrefix}${colors.yellow}[warn]${colors.reset} ${text}`),
     error: (text) => console.log(`${formatPrefix}${colors.red}[error]${colors.reset} ${text}`),
     dim: (text) => console.log(`${formatPrefix}${colors.dim}${text}${colors.reset}`),
-    url: (text) =>
-      console.log(`${formatPrefix}  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`),
+    url: (text) => console.log(`${formatPrefix}  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`),
     file: (text) => console.log(`${formatPrefix}  ${colors.gray}-${colors.reset} ${text}`),
     build: (text) => console.log(`${formatPrefix}${colors.cyan}[build]${colors.reset} ${text}`),
     done: (text) => console.log(`${formatPrefix}${colors.green}[done]${colors.reset} ${text}`),

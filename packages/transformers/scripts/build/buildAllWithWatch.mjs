@@ -46,9 +46,7 @@ export async function buildAllWithWatch(log) {
   log.dim("Creating build contexts...\n");
 
   // Create contexts for all targets
-  const contexts = await Promise.all(
-    BUILD_TARGETS.map((target) => createBuildContext(target.name, target.config, log)),
-  );
+  const contexts = await Promise.all(BUILD_TARGETS.map((target) => createBuildContext(target.name, target.config, log)));
 
   log.dim("Starting initial build...\n");
 

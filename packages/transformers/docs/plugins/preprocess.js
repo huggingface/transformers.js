@@ -11,9 +11,7 @@ function extractBalancedBraces(text, start) {
     else if (text[i] === "}") depth--;
     i++;
   }
-  return depth === 0
-    ? { content: text.slice(start + 1, i - 1), endIndex: i }
-    : null;
+  return depth === 0 ? { content: text.slice(start + 1, i - 1), endIndex: i } : null;
 }
 
 function transformType(expr) {
