@@ -1,14 +1,22 @@
 /**
- * @file Entry point for the Transformers.js library.
- * Only the exports from this file are available to the end user.
+ * @file Entry point for the Transformers.js library. Only the exports from this file
+ * are available to the end user, and are grouped as follows:
+ *
+ * 1. [Environment variables](./env)
+ * 2. [Pipelines](./pipelines)
+ * 3. [Models](./models)
+ * 4. [Tokenizers](./tokenizers)
+ * 5. [Processors](./processors)
+ * 6. [Configs](./configs)
  *
  * @module transformers
  */
 
+// Environment variables
 export { env } from './env.js';
 
+// Pipelines
 export * from './pipelines.js';
-export { PretrainedConfig, AutoConfig } from './configs.js';
 
 // Models
 export * from './models/models.js';
@@ -29,6 +37,9 @@ export * from './models/auto/image_processing_auto.js';
 // Processors
 export * from './models/processors.js';
 export * from './models/auto/processing_auto.js';
+
+// Configs
+export { PretrainedConfig, AutoConfig } from './configs.js';
 
 // Additional exports
 export * from './generation/streamers.js';
