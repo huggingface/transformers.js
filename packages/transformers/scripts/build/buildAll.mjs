@@ -11,7 +11,6 @@ import { BUILD_TARGETS } from "./targets.mjs";
 
 /**
  * Helper function to create build configurations.
- * Equivalent to webpack's buildConfig function.
  */
 async function buildTarget(
   {
