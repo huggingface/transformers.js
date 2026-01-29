@@ -59,6 +59,9 @@ for (const moduleName of moduleNames) {
   // Post-processing
   output = output.replace(/(^#+\s.+)/gm, "$1\n"); // Add new line after each header
 
+  // Remove <code> tags from headers
+  output = output.replace(/^#+\s.+$/gm, (match) => match.replace(/<\/?code>/g, ""));
+
   // Replace all generated marker names with ids (for linking), and add group class
   output = output.replace(/<a name="(\S+)"><\/a>/g, '<a id="$1" class="group"></a>');
 
