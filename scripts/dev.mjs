@@ -13,9 +13,7 @@ const processes = [];
 
 // Cleanup function
 const cleanup = () => {
-  console.log(
-    `\n\n${colors.yellow}[stop]${colors.reset} Stopping all dev servers...`,
-  );
+  console.log(`\n\n${colors.yellow}[stop]${colors.reset} Stopping all dev servers...`);
   processes.forEach((proc) => {
     try {
       proc.kill("SIGINT");

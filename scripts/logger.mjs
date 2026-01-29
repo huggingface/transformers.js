@@ -22,41 +22,20 @@ export const colors = {
  * @returns {Object} Logger object with various log methods
  */
 export function createLogger(prefix = "") {
-  const formatPrefix = prefix
-    ? `${colors.magenta}[${prefix}]${colors.reset} `
-    : "";
+  const formatPrefix = prefix ? `${colors.magenta}[${prefix}]${colors.reset} ` : "";
 
   return {
-    section: (text) =>
-      console.log(
-        `\n${formatPrefix}${colors.bright}${colors.cyan}=== ${text} ===${colors.reset}`,
-      ),
-    info: (text) =>
-      console.log(`${formatPrefix}${colors.blue}[info]${colors.reset} ${text}`),
-    success: (text) =>
-      console.log(`${formatPrefix}${colors.green}✓${colors.reset} ${text}`),
-    warning: (text) =>
-      console.log(
-        `${formatPrefix}${colors.yellow}[warn]${colors.reset} ${text}`,
-      ),
-    error: (text) =>
-      console.log(`${formatPrefix}${colors.red}[error]${colors.reset} ${text}`),
-    dim: (text) =>
-      console.log(`${formatPrefix}${colors.dim}${text}${colors.reset}`),
+    section: (text) => console.log(`\n${formatPrefix}${colors.bright}${colors.cyan}=== ${text} ===${colors.reset}`),
+    info: (text) => console.log(`${formatPrefix}${colors.blue}[info]${colors.reset} ${text}`),
+    success: (text) => console.log(`${formatPrefix}${colors.green}✓${colors.reset} ${text}`),
+    warning: (text) => console.log(`${formatPrefix}${colors.yellow}[warn]${colors.reset} ${text}`),
+    error: (text) => console.log(`${formatPrefix}${colors.red}[error]${colors.reset} ${text}`),
+    dim: (text) => console.log(`${formatPrefix}${colors.dim}${text}${colors.reset}`),
     url: (text) =>
-      console.log(
-        `${formatPrefix}  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`,
-      ),
-    file: (text) =>
-      console.log(`${formatPrefix}  ${colors.gray}-${colors.reset} ${text}`),
-    build: (text) =>
-      console.log(
-        `${formatPrefix}${colors.cyan}[build]${colors.reset} ${text}`,
-      ),
-    done: (text) =>
-      console.log(
-        `${formatPrefix}${colors.green}[done]${colors.reset} ${text}`,
-      ),
+      console.log(`${formatPrefix}  ${colors.cyan}→${colors.reset} ${colors.bright}${text}${colors.reset}`),
+    file: (text) => console.log(`${formatPrefix}  ${colors.gray}-${colors.reset} ${text}`),
+    build: (text) => console.log(`${formatPrefix}${colors.cyan}[build]${colors.reset} ${text}`),
+    done: (text) => console.log(`${formatPrefix}${colors.green}[done]${colors.reset} ${text}`),
   };
 }
 
