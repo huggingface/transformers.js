@@ -1,4 +1,4 @@
-import { getModelJSON } from '../hub.js';
+import { get_file_metadata } from '../hub.js';
 import { IMAGE_PROCESSOR_NAME } from '../constants.js';
 
 /**
@@ -13,9 +13,8 @@ export async function get_processor_files(modelId) {
         throw new Error('modelId is required');
     }
 
-    // Try to fetch preprocessor_config.json to see if it exists
-    const processorConfig = await getModelJSON(modelId, IMAGE_PROCESSOR_NAME, false, {});
+    // Check if preprocessor_config.json exists
+    const metadata = await get_file_metadata(modelId, IMAGE_PROCESSOR_NAME, {});
 
-    // If file exists, it will have properties; if not, it returns {}
-    return Object.keys(processorConfig).length > 0 ? [IMAGE_PROCESSOR_NAME] : [];
+    return metadata.exists ? [IMAGE_PROCESSOR_NAME] : [];
 }

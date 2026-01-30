@@ -206,6 +206,134 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
 }
 
 /**
+ * Gets file metadata (size, content-type, etc.) without downloading the full content.
+ * Uses HEAD requests for remote files to be efficient.
+ * Can also be used as a lightweight file existence check by checking the `.exists` property.
+ *
+ * @param {string} path_or_repo_id This can be either:
+ * - a string, the *model id* of a model repo on huggingface.co.
+ * - a path to a *directory* potentially containing the file.
+ * @param {string} filename The name of the file to check.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
+ * @returns {Promise<{exists: boolean, size?: number, contentType?: string}>} A Promise that resolves to file metadata.
+ */
+export async function get_file_metadata(path_or_repo_id, filename, options = {}) {
+    /** @type {import('./cache.js').CacheInterface | null} */
+    const cache = await getCache(options?.cache_dir);
+    const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
+        path_or_repo_id,
+        filename,
+        options,
+        cache,
+    );
+
+    // Check cache first - if cached, we can get metadata from the cached response
+    const cachedResponse = await checkCachedResource(cache, localPath, proposedCacheKey);
+    if (cachedResponse !== undefined && typeof cachedResponse !== 'string') {
+        const size = cachedResponse.headers.get('content-length');
+        const contentType = cachedResponse.headers.get('content-type');
+        return {
+            exists: true,
+            size: size ? parseInt(size, 10) : undefined,
+            contentType: contentType || undefined,
+        };
+    }
+
+    // Check local file system
+    if (env.allowLocalModels) {
+        const isURL = isValidUrl(localPath, ['http:', 'https:']);
+        if (!isURL) {
+            try {
+                const response = await getFile(localPath);
+                if (typeof response !== 'string' && response.status !== 404) {
+                    const size = response.headers.get('content-length');
+                    const contentType = response.headers.get('content-type');
+                    return {
+                        exists: true,
+                        size: size ? parseInt(size, 10) : undefined,
+                        contentType: contentType || undefined,
+                    };
+                }
+            } catch (e) {
+                // File doesn't exist locally, continue to remote check
+            }
+        }
+    }
+
+    // Check remote if allowed - use HEAD request for efficiency
+    if (env.allowRemoteModels && !options.local_files_only && validModelId) {
+        try {
+            // Make a HEAD request to get metadata without downloading content
+            const headResponse = await fetch_file_head(remoteURL);
+            if (headResponse && headResponse.status >= 200 && headResponse.status < 300) {
+                const size = headResponse.headers.get('content-length');
+                const contentType = headResponse.headers.get('content-type');
+                return {
+                    exists: true,
+                    size: size ? parseInt(size, 10) : undefined,
+                    contentType: contentType || undefined,
+                };
+            }
+        } catch (e) {
+            // HEAD request failed, fall back to regular GET
+            try {
+                const response = await getFile(remoteURL);
+                if (typeof response !== 'string' && response.status >= 200 && response.status < 300) {
+                    const size = response.headers.get('content-length');
+                    const contentType = response.headers.get('content-type');
+                    return {
+                        exists: true,
+                        size: size ? parseInt(size, 10) : undefined,
+                        contentType: contentType || undefined,
+                    };
+                }
+            } catch (e2) {
+                // Ignore
+            }
+        }
+    }
+
+    return { exists: false };
+}
+
+/**
+ * Makes a HEAD request to get file metadata without downloading content.
+ * Similar to getFile but uses HEAD method.
+ *
+ * @param {URL|string} urlOrPath The URL/path of the file.
+ * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if HEAD is not supported.
+ */
+async function fetch_file_head(urlOrPath) {
+    // HEAD requests only make sense for HTTP URLs
+    if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
+        return null;
+    }
+
+    if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+        const IS_CI = !!process.env?.TESTING_REMOTELY;
+        const version = env.version;
+
+        const headers = new Headers();
+        headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
+
+        // Check whether we are making a request to the Hugging Face Hub.
+        const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
+        if (isHFURL) {
+            // If an access token is present in the environment variables,
+            // we add it to the request headers.
+            const token = process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN;
+            if (token) {
+                headers.set('Authorization', `Bearer ${token}`);
+            }
+        }
+        return fetch(urlOrPath, { method: 'HEAD', headers });
+    } else {
+        // Running in a browser-environment
+        return fetch(urlOrPath, { method: 'HEAD' });
+    }
+}
+
+/**
  * Loads a resource file from local or remote sources.
  *
  * @param {string} path_or_repo_id This can be either:

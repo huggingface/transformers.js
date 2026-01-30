@@ -1,4 +1,4 @@
-import { getModelJSON } from '../hub.js';
+import { get_file_metadata } from '../hub.js';
 
 /**
  * Returns the list of files that will be loaded for a tokenizer.
@@ -12,8 +12,8 @@ export async function get_tokenizer_files(modelId) {
         throw new Error('modelId is required for get_tokenizer_files');
     }
 
-    const tokenizerConfig = await getModelJSON(modelId, 'tokenizer_config.json', false, {});
-    if (Object.keys(tokenizerConfig).length > 0) {
+    const metadata = await get_file_metadata(modelId, 'tokenizer_config.json', {});
+    if (metadata.exists) {
         return ['tokenizer.json', 'tokenizer_config.json'];
     }
 

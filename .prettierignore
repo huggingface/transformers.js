@@ -14,3 +14,7 @@
 
 # Lock files
 pnpm-lock.yaml
+
+# YAML files (temporary workaround for VS Code extension issue)
+*.yml
+*.yaml

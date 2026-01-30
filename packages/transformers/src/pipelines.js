@@ -69,6 +69,7 @@ import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
 import { get_files } from './utils/hub/get_files.js';
+import { get_file_metadata } from './utils/hub.js';
 
 const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -450,37 +451,54 @@ export async function pipeline(
         }
     }
 
-    const expected_files = progress_callback ? await get_files(model, { device, dtype }) : [];
-    const loaded_files = {};
+    const started_expected_files = performance.now();
+    const expected_files = Boolean(progress_callback) ? await get_files(model, { device, dtype }) : [];
+    console.log('=====', 'FILES EXPECTED DONE', performance.now() - started_expected_files);
+
+    const started_files_loading = performance.now();
+
+    /** @type {import('./utils/core.js').FilesLoadingMap} */
+    let files_loading = {};
+    if (Boolean(progress_callback)) {
+        /** @type {Array<{exists: boolean, size?: number, contentType?: string}>} */
+        const metadata = await Promise.all(expected_files.map((file) => get_file_metadata(model, file)));
+        metadata.map((m, i) => {
+            if (m.exists) {
+                files_loading[expected_files[i]] = {
+                    loaded: 0,
+                    total: m.size ?? 0,
+                };
+            }
+        });
+    }
+    console.log('=====', 'FILES LOADING DONE', performance.now() - started_files_loading);
 
     const pretrainedOptions = {
-        /** @param {import('./utils/core.js').ProgressInfo} info */
-        progress_callback: (info) => {
-            if (!progress_callback) return;
-            if (info.status === 'progress') {
-                loaded_files[info.file] = {
-                    loaded: info.loaded,
-                    total: info.total,
-                };
+        progress_callback: progress_callback
+            ? /** @param {import('./utils/core.js').ProgressInfo} info */
+              (info) => {
+                  if (info.status === 'progress') {
+                      files_loading[info.file] = {
+                          loaded: info.loaded,
+                          total: info.total,
+                      };
 
-                const files_loaded = Object.keys(loaded_files);
-                const all_files_started = Object.keys(loaded_files).length === loaded_files.length;
-                const loaded = Object.values(loaded_files).reduce((acc, curr) => acc + curr.loaded, 0);
-                const total = Object.values(loaded_files).reduce((acc, curr) => acc + curr.total, 0);
-                const progress = all_files_started ? (loaded / total) * 100 : 0;
+                      const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+                      const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
+                      const progress = (loaded / total) * 100;
 
-                progress_callback({
-                    status: 'progress_total',
-                    name: info.name,
-                    progress,
-                    loaded,
-                    total,
-                    files_started_loading: files_loaded,
-                    files_expected: expected_files,
-                });
-            }
-            progress_callback(info);
-        },
+                      progress_callback({
+                          status: 'progress_total',
+                          name: info.name,
+                          progress,
+                          loaded,
+                          total,
+                          files: structuredClone(files_loading),
+                      });
+                  }
+                  progress_callback(info);
+              }
+            : undefined,
         config,
         cache_dir,
         local_files_only,
