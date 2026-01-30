@@ -245,7 +245,7 @@ export async function getFile(urlOrPath) {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
+        return fetch(urlOrPath, { referrerPolicy: 'no-referrer' });
     }
 }
 
