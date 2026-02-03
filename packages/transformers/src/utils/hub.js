@@ -207,7 +207,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
 
 /**
  * Gets file metadata (size, content-type, etc.) without downloading the full content.
- * Uses HEAD requests for remote files to be efficient.
+ * Uses Range requests for remote files to be efficient.
  * Can also be used as a lightweight file existence check by checking the `.exists` property.
  *
  * @param {string} path_or_repo_id This can be either:
@@ -215,7 +215,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to check.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
- * @returns {Promise<{exists: boolean, size?: number, contentType?: string}>} A Promise that resolves to file metadata.
+ * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
 export async function get_file_metadata(path_or_repo_id, filename, options = {}) {
     /** @type {import('./cache.js').CacheInterface | null} */
@@ -236,6 +236,7 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
             exists: true,
             size: size ? parseInt(size, 10) : undefined,
             contentType: contentType || undefined,
+            fromCache: true,
         };
     }
 
@@ -252,6 +253,7 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
                         exists: true,
                         size: size ? parseInt(size, 10) : undefined,
                         contentType: contentType || undefined,
+                        fromCache: false,
                     };
                 }
             } catch (e) {
@@ -260,22 +262,53 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
         }
     }
 
-    // Check remote if allowed - use HEAD request for efficiency
+    // Check remote if allowed - use Range request for efficiency
     if (env.allowRemoteModels && !options.local_files_only && validModelId) {
         try {
-            // Make a HEAD request to get metadata without downloading content
-            const headResponse = await fetch_file_head(remoteURL);
-            if (headResponse && headResponse.status >= 200 && headResponse.status < 300) {
-                const size = headResponse.headers.get('content-length');
-                const contentType = headResponse.headers.get('content-type');
+            // Make a Range request to get metadata without downloading full content
+            const rangeResponse = await fetch_file_head(remoteURL);
+
+            if (rangeResponse && rangeResponse.status >= 200 && rangeResponse.status < 300) {
+                let size;
+                const contentType = rangeResponse.headers.get('content-type');
+
+                // If server supports Range requests, we get a 206 Partial Content response
+                // with a content-range header showing the total uncompressed file size
+                if (rangeResponse.status === 206) {
+                    const contentRange = rangeResponse.headers.get('content-range');
+                    if (contentRange) {
+                        // Format: "bytes 0-0/12345" where 12345 is the total uncompressed size
+                        const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
+                        if (match) {
+                            size = parseInt(match[1], 10);
+                        }
+                    }
+                } else if (rangeResponse.status === 200) {
+                    // Server doesn't support Range requests and returned the full file (200 OK)
+                    // Cancel the response body immediately to avoid downloading the entire file
+                    try {
+                        await rangeResponse.body?.cancel();
+                    } catch (cancelError) {
+                        // Ignore cancellation errors - body might already be consumed or not cancellable
+                    }
+                }
+
+                // Fallback to content-length if content-range is not available (200 OK response)
+                // This can happen if server doesn't support Range requests
+                if (size === undefined) {
+                    const contentLength = rangeResponse.headers.get('content-length');
+                    size = contentLength ? parseInt(contentLength, 10) : undefined;
+                }
+
                 return {
                     exists: true,
-                    size: size ? parseInt(size, 10) : undefined,
+                    size,
                     contentType: contentType || undefined,
+                    fromCache: false,
                 };
             }
         } catch (e) {
-            // HEAD request failed, fall back to regular GET
+            // Range request failed, fall back to regular GET
             try {
                 const response = await getFile(remoteURL);
                 if (typeof response !== 'string' && response.status >= 200 && response.status < 300) {
@@ -285,6 +318,7 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
                         exists: true,
                         size: size ? parseInt(size, 10) : undefined,
                         contentType: contentType || undefined,
+                        fromCache: false,
                     };
                 }
             } catch (e2) {
@@ -293,18 +327,24 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
         }
     }
 
-    return { exists: false };
+    return { exists: false, fromCache: false };
 }
 
 /**
- * Makes a HEAD request to get file metadata without downloading content.
- * Similar to getFile but uses HEAD method.
+ * Makes a Range request to get file metadata without downloading full content.
+ *
+ * We use a Range request (first byte only) instead of HEAD because:
+ * 1. Ensures we get the uncompressed file size, which is critical for accurate progress tracking
+ * 2. When compression is used, HEAD request content-length reflects compressed size
+ * 3. But during actual download, fetch API decompresses transparently and reports uncompressed bytes
+ * 4. This mismatch causes progress bar inconsistencies when tracking multiple files
+ * 5. Range requests typically aren't compressed, and content-range header shows true uncompressed size
  *
  * @param {URL|string} urlOrPath The URL/path of the file.
- * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if HEAD is not supported.
+ * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if not supported.
  */
 async function fetch_file_head(urlOrPath) {
-    // HEAD requests only make sense for HTTP URLs
+    // Range requests only make sense for HTTP URLs
     if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
         return null;
     }
@@ -315,6 +355,8 @@ async function fetch_file_head(urlOrPath) {
 
         const headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
+        // Request only the first byte to get metadata without downloading the full file
+        headers.set('Range', 'bytes=0-0');
 
         // Check whether we are making a request to the Hugging Face Hub.
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
@@ -326,10 +368,13 @@ async function fetch_file_head(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { method: 'HEAD', headers });
+        return fetch(urlOrPath, { method: 'GET', headers });
     } else {
         // Running in a browser-environment
-        return fetch(urlOrPath, { method: 'HEAD' });
+        const headers = new Headers();
+        // Request only the first byte to get metadata without downloading the full file
+        headers.set('Range', 'bytes=0-0');
+        return fetch(urlOrPath, { method: 'GET', headers });
     }
 }
 
@@ -482,14 +527,36 @@ export async function loadResourceFile(
                     total: buffer.length,
                 });
             } else {
-                buffer = await readResponse(response, (data) => {
-                    dispatchCallback(options.progress_callback, {
-                        status: 'progress',
-                        name: path_or_repo_id,
-                        file: filename,
-                        ...data,
-                    });
-                });
+                // Get expected file size from response headers or metadata
+                // This helps with progress tracking when content-length is missing
+                let expectedSize;
+                const contentLength = response.headers.get('content-length');
+                if (contentLength) {
+                    expectedSize = parseInt(contentLength, 10);
+                } else {
+                    // Try to get size from metadata (useful when content-length is missing during download)
+                    try {
+                        const metadata = await get_file_metadata(path_or_repo_id, filename, options);
+                        if (metadata.size) {
+                            expectedSize = metadata.size;
+                        }
+                    } catch (e) {
+                        // Ignore metadata fetch errors
+                    }
+                }
+
+                buffer = await readResponse(
+                    response,
+                    (data) => {
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            ...data,
+                        });
+                    },
+                    expectedSize,
+                );
             }
         }
         result = buffer;

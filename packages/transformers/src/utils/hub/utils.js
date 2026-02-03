@@ -81,14 +81,19 @@ export function handleError(status, remoteURL, fatal) {
  *
  * @param {Response|import('./files.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
+ * @param {number} [expectedSize] The expected size of the file (used when content-length header is missing)
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
-export async function readResponse(response, progress_callback) {
+export async function readResponse(response, progress_callback, expectedSize) {
     const contentLength = response.headers.get('Content-Length');
-    if (contentLength === null) {
+
+    // Use content-length if available, otherwise fall back to expectedSize (from metadata)
+    let total = contentLength ? parseInt(contentLength, 10) : (expectedSize ?? 0);
+
+    if (contentLength === null && !expectedSize) {
         console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
-    let total = parseInt(contentLength ?? '0');
+
     let buffer = new Uint8Array(total);
     let loaded = 0;
 
