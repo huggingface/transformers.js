@@ -6,6 +6,7 @@ import {
     DEFAULT_DEVICE_DTYPE,
 } from '../dtypes.js';
 import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
+import { AutoConfig } from '../../configs.js';
 
 /**
  * Returns the list of files that will be loaded for a model based on its configuration.
@@ -26,8 +27,6 @@ export async function get_model_files(
     { config = null, dtype: overrideDtype = null, device: overrideDevice = null } = {},
 ) {
     if (!config) {
-        // Use dynamic import to avoid circular dependency
-        const { AutoConfig } = await import('../../configs.js');
         config = await AutoConfig.from_pretrained(modelId);
     }
 
