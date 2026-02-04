@@ -84,4 +84,13 @@
           title: Data Structures
       title: Utilities
       isExpanded: false
+    - sections:
+        - local: api/worker/constants
+          title: Constants
+        - local: api/worker/worker_pipeline
+          title: Worker Pipeline
+        - local: api/worker/worker_pipeline_handler
+          title: Worker Pipeline Handler
+      title: Web Workers
+      isExpanded: false
   title: API Reference
