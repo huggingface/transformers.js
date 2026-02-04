@@ -10,6 +10,7 @@
  */
 
 import { get_files } from './get_files.js';
+import { get_pipeline_files } from './get_pipeline_files.js';
 import { get_model_files } from './get_model_files.js';
 import { get_tokenizer_files } from './get_tokenizer_files.js';
 import { get_processor_files } from './get_processor_files.js';
@@ -25,10 +26,28 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {boolean} [options.include_tokenizer=true] - Whether to check for tokenizer files
+     * @param {boolean} [options.include_processor=true] - Whether to check for processor files
      * @returns {Promise<string[]>} Array of file paths
      */
     static async get_files(modelId, options = {}) {
         return get_files(modelId, options);
+    }
+
+    /**
+     * Get all files needed for a specific pipeline task.
+     * Automatically determines which components are needed based on the task.
+     *
+     * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
+     * @param {string} modelId - The model id (e.g., "Xenova/bert-base-uncased")
+     * @param {Object} [options] - Optional parameters
+     * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @returns {Promise<string[]>} Array of file paths
+     */
+    static async get_pipeline_files(task, modelId, options = {}) {
+        return get_pipeline_files(task, modelId, options);
     }
 
     /**

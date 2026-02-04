@@ -11,19 +11,29 @@ import { get_processor_files } from './get_processor_files.js';
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
+ * @param {boolean} [options.include_tokenizer=true] Whether to check for tokenizer files (set to false for vision-only models)
+ * @param {boolean} [options.include_processor=true] Whether to check for processor files
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
-export async function get_files(modelId, { config = null, dtype = null, device = null } = {}) {
+export async function get_files(
+    modelId,
+    { config = null, dtype = null, device = null, include_tokenizer = true, include_processor = true } = {},
+) {
     const files = [];
 
-    const tokenizerFiles = await get_tokenizer_files(modelId);
-    files.push(...tokenizerFiles);
+    // Only check for tokenizer if explicitly requested
+    if (include_tokenizer) {
+        const tokenizerFiles = await get_tokenizer_files(modelId);
+        files.push(...tokenizerFiles);
+    }
 
     files.push(...(await get_model_files(modelId, { config, dtype, device })));
 
-    // Get processor files (auto-detects if model has processor)
-    const processorFiles = await get_processor_files(modelId);
-    files.push(...processorFiles);
+    // Only check for processor if explicitly requested
+    if (include_processor) {
+        const processorFiles = await get_processor_files(modelId);
+        files.push(...processorFiles);
+    }
 
     return files;
 }
