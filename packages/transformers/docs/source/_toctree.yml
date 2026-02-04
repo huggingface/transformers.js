@@ -85,8 +85,8 @@
       title: Utilities
       isExpanded: false
     - sections:
-        - local: api/worker/constants
-          title: Constants
+        - local: api/worker
+          title: Overview
         - local: api/worker/worker_pipeline
           title: Worker Pipeline
         - local: api/worker/worker_pipeline_handler
