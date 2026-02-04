@@ -17,6 +17,10 @@ import { get_processor_files } from './get_processor_files.js';
 import { is_cached, is_pipeline_cached } from './is_cached.js';
 import { get_file_metadata } from './get_file_metadata.js';
 
+/**
+ * Static class for cache and file management operations.
+ * @hideconstructor
+ */
 export class ModelRegistry {
     /**
      * Get all files (model, tokenizer, processor) needed for a model.

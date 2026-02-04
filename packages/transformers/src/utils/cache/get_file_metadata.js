@@ -1,7 +1,5 @@
 /**
  * @file File metadata utilities for cache-aware operations
- *
- * @module utils/cache
  */
 
 import { env } from '../../env.js';
