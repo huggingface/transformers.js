@@ -14,7 +14,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 import { get_model_files } from './get_model_files.js';
 import { get_tokenizer_files } from './get_tokenizer_files.js';
 import { get_processor_files } from './get_processor_files.js';
-import { is_cached } from './is_cached.js';
+import { is_cached, is_pipeline_cached } from './is_cached.js';
 import { get_file_metadata } from './get_file_metadata.js';
 
 export class ModelRegistry {
@@ -91,10 +91,54 @@ export class ModelRegistry {
      * @param {Object} [options] - Optional parameters
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @returns {Promise<boolean>} True if all files are cached
+     * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
+     *
+     * @example
+     * // Check cache status
+     * const status = await ModelRegistry.is_cached('Xenova/gpt2');
+     * console.log(status.allCached ? 'All files cached!' : 'Some files need downloading');
+     * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
+     *
+     * @example
+     * // With options
+     * const status = await ModelRegistry.is_cached('Xenova/gpt2', { dtype: 'fp16', device: 'webgpu' });
+     * status.files.forEach(f => {
+     *     console.log(`${f.file}: ${f.cached ? '✓' : '✗'}`);
+     * });
      */
     static async is_cached(modelId, options = {}) {
         return is_cached(modelId, options);
+    }
+
+    /**
+     * Check if all files for a specific pipeline task are cached.
+     * Automatically determines which components are needed based on the task.
+     *
+     * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
+     * @param {string} modelId - The model id
+     * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
+     *
+     * @example
+     * // Check cache status
+     * const status = await ModelRegistry.is_pipeline_cached('text-generation', 'Xenova/gpt2');
+     * console.log(status.allCached ? 'Ready to use!' : 'Will download files');
+     * status.files.forEach(f => {
+     *     console.log(`${f.file}: ${f.cached ? '✓' : '✗'}`);
+     * });
+     *
+     * @example
+     * // Background removal (only needs model, no tokenizer/processor)
+     * const status = await ModelRegistry.is_pipeline_cached('background-removal', 'Xenova/modnet');
+     * console.log(`Files needed: ${status.files.length}`); // Should be fewer than full model
+     */
+    static async is_pipeline_cached(task, modelId, options = {}) {
+        return is_pipeline_cached(task, modelId, options);
     }
 
     /**
