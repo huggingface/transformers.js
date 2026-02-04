@@ -53,7 +53,6 @@ export const worker_pipeline_handler = () => {
          */
         onmessage: async (event) => {
             if (!event?.data || event.data?.type !== REQUEST_MESSAGE_TYPE) return;
-            console.log(event);
 
             const { id, data, task, model_id, options, pipe_options = {} } = event.data;
 
