@@ -38,7 +38,7 @@
  */
 
 /**
- * @typedef {Object.<string, FileLoadingProgress>} FilesLoadingMap
+ * @typedef {Record<string, FileLoadingProgress>} FilesLoadingMap
  * A mapping of file names to their loading progress. Each key is a file path and each value contains
  * the loaded and total bytes for that file.
  */
