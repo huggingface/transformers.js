@@ -41,6 +41,10 @@ export * from './models/auto/processing_auto.js';
 // Configs
 export { PretrainedConfig, AutoConfig } from './configs.js';
 
+// Worker
+export { worker_pipeline } from './worker/worker_pipeline.js';
+export { worker_pipeline_handler } from './worker/worker_pipeline_handler.js';
+
 // Additional exports
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
