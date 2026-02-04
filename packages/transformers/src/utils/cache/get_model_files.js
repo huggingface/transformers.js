@@ -59,8 +59,25 @@ export async function get_model_files(
         }
     }
 
-    // Fall back to manual detection if not found in mapping
+    // If not found by architecture, try model_type (handles custom models with no architectures)
+    if (!foundInMapping && config.model_type) {
+        const mappedType = MODEL_TYPE_MAPPING.get(config.model_type);
+        if (mappedType !== undefined) {
+            modelType = mappedType;
+            foundInMapping = true;
+        }
+    }
+
+    // Fall back to heuristic detection if not found in mapping
     if (!foundInMapping) {
+        // Log warning for models not in MODEL_TYPE_MAPPING so they can be added
+        const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
+        console.warn(
+            `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
+                `for model type '${config.model_type}'. Using heuristic detection. ` +
+                `Consider adding to packages/transformers/src/models/registry.js`,
+        );
+
         if (config.is_encoder_decoder) {
             const modelName = config.model_type;
             if (['whisper', 'vision-encoder-decoder'].includes(modelName)) {
@@ -119,6 +136,8 @@ export async function get_model_files(
             files.push(dataFilePath);
         }
     };
+
+    files.push('generation_config-test.json');
 
     // Add model files based on model type
     if (modelType === MODEL_TYPES.DecoderOnly) {

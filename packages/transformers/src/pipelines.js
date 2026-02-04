@@ -144,6 +144,7 @@ export async function pipeline(
             }
         });
     }
+
     const pretrainedOptions = {
         progress_callback: progress_callback
             ? /** @param {import('./utils/core.js').ProgressInfo} info */
