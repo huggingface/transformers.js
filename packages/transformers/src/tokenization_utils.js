@@ -12,7 +12,7 @@ import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
-import { get_tokenizer_files } from './utils/hub/get_tokenizer_files.js';
+import { get_tokenizer_files } from './utils/cache/get_tokenizer_files.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions

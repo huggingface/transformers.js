@@ -52,13 +52,8 @@ export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 
-// Hub utilities for cache and file management
-export { get_file_metadata } from './utils/hub.js';
-export { get_files } from './utils/hub/get_files.js';
-export { get_model_files } from './utils/hub/get_model_files.js';
-export { get_tokenizer_files } from './utils/hub/get_tokenizer_files.js';
-export { get_processor_files } from './utils/hub/get_processor_files.js';
-export { is_cached } from './utils/hub/is_cached.js';
+// Cache and file management
+export { ModelRegistry } from './utils/cache/ModelRegistry.js';
 
 // Expose common types used across the library for developers to access
 /**

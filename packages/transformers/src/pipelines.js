@@ -68,7 +68,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
-import { get_files } from './utils/hub/get_files.js';
+import { get_files } from './utils/cache/get_files.js';
 import { get_file_metadata } from './utils/hub.js';
 
 const SUPPORTED_TASKS = Object.freeze({
