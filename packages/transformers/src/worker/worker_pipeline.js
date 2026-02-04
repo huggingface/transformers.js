@@ -15,13 +15,11 @@ import {
 
 /**
  * Creates a pipeline that runs in a Web Worker.
- * @template PayloadType
- * @template ResultType
  * @param {Worker} worker - The Web Worker instance to use for pipeline execution
  * @param {PipelineType} task - The pipeline task type
  * @param {string} model_id - The model identifier to load
  * @param {Record<string, any>} [options={}] - Options for pipeline initialization
- * @returns {Promise<(data: PayloadType, pipe_options: Record<string, any>) => Promise<ResultType>>} A function that executes the pipeline
+ * @returns {Promise<Function>} A function that executes the pipeline and returns a Promise with the result
  */
 export const worker_pipeline = (worker, task, model_id, options = {}) =>
     new Promise((resolve, reject) => {
