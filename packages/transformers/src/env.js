@@ -191,7 +191,7 @@ export const env = {
     },
 
     /////////////////// Logging settings ///////////////////
-    logLevel: LogLevel.WARNING,
+    logLevel: LogLevel.ERROR,
 
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,

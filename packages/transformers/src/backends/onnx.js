@@ -47,9 +47,31 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
-/** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
-const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
-const DEFAULT_LOG_LEVEL = 4; // 'fatal';
+/**
+ * Maps LogLevel from env.js to ONNX Runtime env log levels (strings).
+ * ONNX Runtime env log levels: 'verbose' (most detailed) to 'fatal' (least detailed)
+ * @type {Record<number, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
+ */
+const LOG_LEVEL_MAP = {
+    0: 'fatal', // LogLevel.NONE -> minimal logging
+    1: 'error', // LogLevel.ERROR -> errors only
+    2: 'warning', // LogLevel.WARNING -> warnings and errors
+    3: 'info', // LogLevel.INFO -> info, warnings, and errors
+    4: 'verbose', // LogLevel.DEBUG -> all messages
+};
+
+/**
+ * Maps LogLevel from env.js to ONNX Runtime session logSeverityLevel (numbers).
+ * ONNX Runtime severity: 0=VERBOSE, 1=INFO, 2=WARNING, 3=ERROR, 4=FATAL
+ * @type {Record<number, 0 | 1 | 2 | 3 | 4>}
+ */
+const LOG_SEVERITY_LEVEL_MAP = {
+    0: 4, // LogLevel.NONE -> FATAL (minimal logging)
+    1: 3, // LogLevel.ERROR -> ERROR
+    2: 2, // LogLevel.WARNING -> WARNING
+    3: 1, // LogLevel.INFO -> INFO
+    4: 0, // LogLevel.DEBUG -> VERBOSE (all messages)
+};
 
 /**
  * The list of supported devices, sorted by priority/performance.
@@ -209,7 +231,7 @@ async function ensureWasmLoaded() {
                               ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM factory:', err);
+                          logger.warn('Failed to pre-load WASM factory:', err);
                       }
                   })()
                 : Promise.resolve(),
@@ -230,8 +252,8 @@ export async function createInferenceSession(buffer_or_path, session_options, se
     await ensureWasmLoaded();
     const load = () =>
         InferenceSession.create(buffer_or_path, {
-            // Set default log level, but allow overriding through session options
-            logSeverityLevel: DEFAULT_LOG_LEVEL,
+            // Set default log severity level, but allow overriding through session options
+            logSeverityLevel: LOG_SEVERITY_LEVEL_MAP[env.logLevel] ?? 2,
             ...session_options,
         });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
@@ -269,7 +291,7 @@ export function isONNXTensor(x) {
 
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = LOG_LEVELS[DEFAULT_LOG_LEVEL];
+ONNX_ENV.logLevel = LOG_LEVEL_MAP[env.logLevel] ?? 'warning';
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
