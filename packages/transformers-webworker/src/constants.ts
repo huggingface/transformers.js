@@ -1,4 +1,7 @@
-export const REQUEST_MESSAGE_TYPE = 'transformersjs_worker_pipeline';
-export const RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK = 'transformersjs_worker_invokeCallback';
-export const RESPONSE_MESSAGE_TYPE_READY = 'transformersjs_worker_ready';
-export const RESPONSE_MESSAGE_TYPE_RESULT = 'transformersjs_worker_result';
+// Main thread -> Worker
+export const REQUEST = 'transformersjs_worker_pipeline';
+
+// Worker -> Main thread
+export const RESPONSE_READY = 'transformersjs_worker_ready';
+export const RESPONSE_RESULT = 'transformersjs_worker_result';
+export const RESPONSE_CALLBACK_INVOCATION = 'callback_bridge:invoke';

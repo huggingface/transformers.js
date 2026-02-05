@@ -8,11 +8,3 @@
 // Web Worker utilities
 export { default as webWorkerPipeline } from './webWorkerPipeline.js';
 export { default as webWorkerPipelineHandler } from './webWorkerPipelineHandler.js';
-
-// Constants
-export {
-    REQUEST_MESSAGE_TYPE,
-    RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-    RESPONSE_MESSAGE_TYPE_READY,
-    RESPONSE_MESSAGE_TYPE_RESULT,
-} from './constants.js';

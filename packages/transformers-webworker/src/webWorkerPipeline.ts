@@ -1,9 +1,6 @@
 import { PipelineType } from '@huggingface/transformers';
-import {
-    REQUEST_MESSAGE_TYPE,
-    RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-    RESPONSE_MESSAGE_TYPE_RESULT,
-} from './constants.js';
+import { REQUEST, RESPONSE_RESULT } from './constants.js';
+import { CallbackBridgeClient } from './utils/callback-bridge';
 
 const webWorkerPipeline = <PayloadType = any, ResultType = any>(
     worker: Worker,
@@ -12,35 +9,15 @@ const webWorkerPipeline = <PayloadType = any, ResultType = any>(
     options: Record<string, any> = {},
 ) =>
     new Promise((resolve, reject) => {
-        const callbackMap = new Map<string, Function>();
+        const callbackBridge = new CallbackBridgeClient(worker);
 
         const messagesResolversMap = new Map<number | 'init', { resolve: Function; reject: Function }>();
         let messageIdCounter = 0;
 
-        const serializeOptions = (options: Record<string, any>) => {
-            const out: Record<string, any> = {};
-            Object.entries(options ?? {}).forEach(([key, value]) => {
-                if (typeof value === 'function') {
-                    const functionId = `cb_${key}`;
-                    callbackMap.set(functionId, value);
-                    out[key] = { __fn: true, functionId };
-                } else {
-                    out[key] = value;
-                }
-            });
-            return out;
-        };
-
+        const originalOnMessage = worker.onmessage;
         worker.onmessage = (e) => {
             const msg = e.data;
-            if (msg?.type === RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK) {
-                const { functionId, args } = msg;
-                const fn = callbackMap.get(functionId);
-                if (fn) {
-                    fn(...args);
-                }
-            }
-            if (msg?.type === RESPONSE_MESSAGE_TYPE_RESULT) {
+            if (msg?.type === RESPONSE_RESULT) {
                 if (msg?.id === 'init') {
                     resolve((data: PayloadType, pipeOptions: Record<string, any>) => {
                         return new Promise<any>((resolve, reject) => {
@@ -48,11 +25,11 @@ const webWorkerPipeline = <PayloadType = any, ResultType = any>(
                             messagesResolversMap.set(id, { resolve, reject });
                             worker.postMessage({
                                 id,
-                                type: REQUEST_MESSAGE_TYPE,
+                                type: REQUEST,
                                 data,
                                 task,
                                 model_id,
-                                options: options ? serializeOptions(options) : {},
+                                options: options ? callbackBridge.serialize(options) : {},
                                 pipeOptions,
                             });
                         });
@@ -71,11 +48,11 @@ const webWorkerPipeline = <PayloadType = any, ResultType = any>(
         messagesResolversMap.set('init', { resolve, reject });
         worker.postMessage({
             id: 'init',
-            type: REQUEST_MESSAGE_TYPE,
+            type: REQUEST,
             data: null,
             task: task ?? '',
             model_id: model_id ?? '',
-            options: options ? serializeOptions(options) : {},
+            options: options ? callbackBridge.serialize(options) : {},
         });
     });
 export default webWorkerPipeline;

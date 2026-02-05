@@ -1,44 +1,25 @@
 import { pipeline } from '@huggingface/transformers';
-import {
-    REQUEST_MESSAGE_TYPE,
-    RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-    RESPONSE_MESSAGE_TYPE_READY,
-    RESPONSE_MESSAGE_TYPE_RESULT,
-} from './constants.js';
+import { REQUEST, RESPONSE_READY, RESPONSE_RESULT } from './constants.js';
+import { CallbackBridgeHost } from './utils/callback-bridge';
 
 const pipelines = new Map();
 
 const webWorkerPipelineHandler = () => {
-    const unserializeOptions = (options: Record<string, any>) => {
-        const out: Record<string, any> = {};
-        Object.entries(options ?? {}).forEach(([key, value]) => {
-            if (typeof value === 'object' && value && '__fn' in value && value.__fn) {
-                out[key] = (...args: Array<any>) =>
-                    self.postMessage({
-                        type: RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-                        functionId: 'functionId' in value ? value.functionId : null,
-                        args,
-                    });
-            } else {
-                out[key] = value;
-            }
-        });
-        return out;
-    };
+    const callbackBridge = new CallbackBridgeHost();
 
     return {
         onmessage: async (event: MessageEvent) => {
-            if (!event?.data || event.data?.type !== REQUEST_MESSAGE_TYPE) return;
+            if (!event?.data || event.data?.type !== REQUEST) return;
             const { id, data, task, model_id, options, pipeOptions = {} } = event.data;
             const key = JSON.stringify({ task, model_id, options });
             let pipe = pipelines.get(key);
             if (!pipe) {
-                pipe = await pipeline(task, model_id, unserializeOptions(options));
+                pipe = await pipeline(task, model_id, callbackBridge.deserialize(options));
                 pipelines.set(key, pipe);
             }
-            self.postMessage({ id, type: RESPONSE_MESSAGE_TYPE_READY });
+            self.postMessage({ id, type: RESPONSE_READY });
             const result = data ? await pipe(data, pipeOptions) : null;
-            self.postMessage({ id, type: RESPONSE_MESSAGE_TYPE_RESULT, result });
+            self.postMessage({ id, type: RESPONSE_RESULT, result });
         },
     };
 };

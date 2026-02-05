@@ -1,7 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import type { PipelineType } from "@huggingface/transformers";
 
-// Import constants to match the implementation
 const REQUEST_MESSAGE_TYPE = "transformersjs_worker_pipeline";
 const RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK = "transformersjs_worker_invokeCallback";
 const RESPONSE_MESSAGE_TYPE_RESULT = "transformersjs_worker_result";
