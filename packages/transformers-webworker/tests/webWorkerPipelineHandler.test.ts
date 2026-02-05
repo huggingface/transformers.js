@@ -4,10 +4,20 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 const REQUEST_MESSAGE_TYPE = "transformersjs_worker_pipeline";
 const RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK = "transformersjs_worker_invokeCallback";
 
+interface WebWorkerPipelineHandler {
+  (): {
+    onmessage: (event: MessageEvent) => Promise<void>;
+  };
+}
+
+interface MockSelf {
+  postMessage: jest.Mock;
+}
+
 describe("webWorkerPipelineHandler", () => {
-  let webWorkerPipelineHandler;
-  let handler;
-  let mockSelf;
+  let webWorkerPipelineHandler: WebWorkerPipelineHandler;
+  let handler: ReturnType<WebWorkerPipelineHandler>;
+  let mockSelf: MockSelf;
 
   beforeEach(async () => {
     // Clear all mocks
@@ -17,7 +27,7 @@ describe("webWorkerPipelineHandler", () => {
     mockSelf = {
       postMessage: jest.fn(),
     };
-    global.self = mockSelf;
+    (global as any).self = mockSelf;
 
     // Import the built module
     const module = await import("../dist/index.js");
@@ -31,17 +41,17 @@ describe("webWorkerPipelineHandler", () => {
   });
 
   it("should ignore messages without correct type", async () => {
-    await handler.onmessage({ data: { type: "other" } });
+    await handler.onmessage({ data: { type: "other" } } as MessageEvent);
     expect(mockSelf.postMessage).not.toHaveBeenCalled();
   });
 
   it("should ignore messages without data", async () => {
-    await handler.onmessage({});
+    await handler.onmessage({} as MessageEvent);
     expect(mockSelf.postMessage).not.toHaveBeenCalled();
   });
 
   it("should return a promise when handling messages", () => {
-    const messageEvent = {
+    const messageEvent: MessageEvent = {
       data: {
         id: 1,
         type: REQUEST_MESSAGE_TYPE,
@@ -50,7 +60,7 @@ describe("webWorkerPipelineHandler", () => {
         options: {},
         data: null,
       },
-    };
+    } as MessageEvent;
 
     // The handler returns a promise (don't await to avoid loading real models)
     const result = handler.onmessage(messageEvent);
@@ -75,7 +85,7 @@ describe("webWorkerPipelineHandler", () => {
 
   it("should handle callback invocation structure", () => {
     // Simulate what would happen when a callback is invoked
-    const callbackFn = (...args) =>
+    const callbackFn = (...args: any[]) =>
       mockSelf.postMessage({
         type: RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
         functionId: "test_callback_id",
@@ -94,7 +104,7 @@ describe("webWorkerPipelineHandler", () => {
   });
 
   it("should handle empty pipeOptions parameter", () => {
-    const messageWithoutPipeOptions = {
+    const messageWithoutPipeOptions: MessageEvent = {
       data: {
         id: 1,
         type: REQUEST_MESSAGE_TYPE,
@@ -104,7 +114,7 @@ describe("webWorkerPipelineHandler", () => {
         data: "test input",
         // pipeOptions omitted
       },
-    };
+    } as MessageEvent;
 
     // Should not throw synchronously when pipeOptions is undefined
     expect(() => {
