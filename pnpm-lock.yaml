@@ -63,6 +63,9 @@ importers:
       '@huggingface/transformers':
         specifier: workspace:*
         version: link:../transformers
+      '@jest/globals':
+        specifier: ^30.2.0
+        version: 30.2.0
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
