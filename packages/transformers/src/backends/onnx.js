@@ -23,6 +23,7 @@ import { env, apis } from '../env.js';
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { isBlobURL, loadWasmBinary, loadWasmFactory, toAbsoluteURL } from './utils/cacheWasm.js';
+import { logger } from '../utils/logger.js';
 export { Tensor } from 'onnxruntime-common';
 
 /**
@@ -193,7 +194,7 @@ async function ensureWasmLoaded() {
                               ONNX_ENV.wasm.wasmBinary = wasmBinary;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM binary:', err);
+                          logger.warn('Failed to pre-load WASM binary:', err);
                       }
                   })()
                 : Promise.resolve(),
