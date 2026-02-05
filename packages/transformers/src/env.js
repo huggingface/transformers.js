@@ -136,19 +136,40 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
 
 /**
  * Log levels for controlling output verbosity.
+ *
+ * Each level is represented by a number, where higher numbers include all lower level messages.
+ * Use these values to set `env.logLevel`.
+ *
+ * @example
+ * import { env, LogLevel } from '@huggingface/transformers';
+ *
+ * // Set log level to show only errors
+ * env.logLevel = LogLevel.ERROR;
+ *
+ * // Set log level to show errors, warnings, and info
+ * env.logLevel = LogLevel.INFO;
+ *
+ * // Disable all logging
+ * env.logLevel = LogLevel.NONE;
+ *
  * @readonly
  * @enum {number}
+ * @property {0} NONE - No logging output
+ * @property {1} ERROR - Only error messages (value: 1)
+ * @property {2} WARNING - Errors and warnings (value: 2)
+ * @property {3} INFO - Errors, warnings, and info messages (value: 3)
+ * @property {4} DEBUG - All messages including debug output (value: 4)
  */
 export const LogLevel = Object.freeze({
-    /** No logging output */
+    /** No logging output (value: 0) */
     NONE: 0,
-    /** Only error messages */
+    /** Only error messages (value: 1) */
     ERROR: 1,
-    /** Errors and warnings */
+    /** Errors and warnings (value: 2) */
     WARNING: 2,
-    /** Errors, warnings, and info messages */
+    /** Errors, warnings, and info messages (value: 3) */
     INFO: 3,
-    /** All messages including debug output */
+    /** All messages including debug output (value: 4) */
     DEBUG: 4,
 });
 

@@ -1,0 +1,2 @@
+[console_scripts]
+doc-builder = doc_builder.commands.doc_builder_cli:main
