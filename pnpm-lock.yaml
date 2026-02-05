@@ -58,6 +58,27 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/transformers-webworker:
+    devDependencies:
+      '@huggingface/transformers':
+        specifier: workspace:*
+        version: link:../transformers
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
+      jest:
+        specifier: ^30.2.0
+        version: 30.2.0(@types/node@24.10.9)
+      jest-environment-node:
+        specifier: ^30.2.0
+        version: 30.2.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
 packages:
 
   '@babel/code-frame@7.28.6':
