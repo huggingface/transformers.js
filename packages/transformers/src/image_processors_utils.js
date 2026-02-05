@@ -5,6 +5,7 @@ import { RawImage } from './utils/image.js';
 import { calculateReflectOffset } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { IMAGE_PROCESSOR_NAME } from './utils/constants.js';
+import { logger } from './utils/logger.js';
 
 /**
  * Named tuple to indicate the order we are using is (height x width),
@@ -450,7 +451,7 @@ export function post_process_panoptic_segmentation(
     target_sizes = null,
 ) {
     if (label_ids_to_fuse === null) {
-        console.warn('`label_ids_to_fuse` unset. No instance will be fused.');
+        logger.warn('`label_ids_to_fuse` unset. No instance will be fused.');
         label_ids_to_fuse = new Set();
     }
 
