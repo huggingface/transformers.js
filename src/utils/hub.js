@@ -10,6 +10,9 @@ import path from 'node:path';
 
 import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
+import { getLogger } from './logging.js';
+
+const logger = getLogger('transformers.js');
 
 /**
  * @typedef {boolean|number} ExternalData Whether to load the model using the external data format (used for models >= 2GB in size).
@@ -451,7 +454,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             // So, instead of crashing, we just ignore the error and continue without using the cache.
             cache = await caches.open('transformers-cache');
         } catch (e) {
-            console.warn('An error occurred while opening the browser cache:', e);
+            logger.warn('An error occurred while opening the browser cache:', e);
         }
     }
 
@@ -517,7 +520,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
                     // NOTE: error handling is done in the next step (since `response` will be undefined)
-                    console.warn(`Unable to load from local path "${localPath}": "${e}"`);
+                    logger.warn(`Unable to load from local path "${localPath}": "${e}"`);
                 }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
@@ -643,7 +646,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
                 .catch(err => {
                     // Do not crash if unable to add to cache (e.g., QuotaExceededError).
                     // Rather, log a warning and proceed with execution.
-                    console.warn(`Unable to add response to browser cache: ${err}.`);
+                    logger.warn(`Unable to add response to browser cache: ${err}.`);
                 });
         }
     }
@@ -727,7 +730,7 @@ async function readResponse(response, progress_callback) {
 
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.')
+        logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.')
     }
     let total = parseInt(contentLength ?? '0');
     let buffer = new Uint8Array(total);

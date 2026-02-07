@@ -16,7 +16,10 @@ import {
 } from './core.js';
 import { apis } from '../env.js';
 import { Tensor, matmul } from './tensor.js';
+import { getLogger } from './logging.js';
 import fs from 'node:fs';
+
+const logger = getLogger('transformers.js');
 
 /**
  * Helper function to read audio from a path/URL.
@@ -37,7 +40,7 @@ export async function read_audio(url, sampling_rate) {
     const response = await (await getFile(url)).arrayBuffer();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
     if (typeof sampling_rate === 'undefined') {
-        console.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`)
+        logger.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`)
     }
     const decoded = await audioCTX.decodeAudioData(response);
 

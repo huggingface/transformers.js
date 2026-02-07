@@ -76,6 +76,9 @@ import {
     GITHUB_ISSUE_URL,
 } from './utils/constants.js';
 
+import { getLogger } from './utils/logging.js';
+const logger = getLogger('transformers.js');
+
 import {
     LogitsProcessorList,
     ForcedBOSTokenLogitsProcessor,
@@ -167,7 +170,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
         if (device.hasOwnProperty(fileName)) {
             device = device[fileName];
         } else {
-            console.warn(`device not specified for "${fileName}". Using the default device.`);
+            logger.warn(`device not specified for "${fileName}". Using the default device.`);
             device = null;
         }
     }
@@ -196,7 +199,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
             dtype = dtype[fileName];
         } else {
             dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-            console.warn(`dtype not specified for "${fileName}". Using the default dtype (${dtype}) for this device (${selectedDevice}).`);
+            logger.warn(`dtype not specified for "${fileName}". Using the default dtype (${dtype}) for this device (${selectedDevice}).`);
         }
     }
 
@@ -257,7 +260,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options) {
     if (free_dimension_overrides) {
         session_options.freeDimensionOverrides ??= free_dimension_overrides;
     } else if (selectedDevice.startsWith('webnn') && !session_options.freeDimensionOverrides) {
-        console.warn(
+        logger.warn(
             `WebNN does not currently support dynamic shapes and requires 'free_dimension_overrides' to be set in config.json, preferably as a field within config["transformers.js_config"]["device_config"]["${selectedDevice}"]. ` +
             `When 'free_dimension_overrides' is not set, you may experience significant performance degradation.`
         );
@@ -414,7 +417,7 @@ function validateInputs(session, inputs) {
         // No missing inputs, but too many inputs were provided.
         // Warn the user and ignore the extra inputs.
         let ignored = Object.keys(inputs).filter(inputName => !session.inputNames.includes(inputName));
-        console.warn(`WARNING: Too many inputs were provided (${numInputsProvided} > ${numInputsNeeded}). The following inputs will be ignored: "${ignored.join(', ')}".`);
+        logger.warn(`WARNING: Too many inputs were provided (${numInputsProvided} > ${numInputsNeeded}). The following inputs will be ignored: "${ignored.join(', ')}".`);
     }
 
     return checkedInputs;
@@ -469,8 +472,8 @@ async function sessionRun(session, inputs) {
             }));
 
         // This usually occurs when the inputs are of the wrong type.
-        console.error(`An error occurred during model execution: "${e}".`);
-        console.error('Inputs given to model:', formatted);
+        logger.error(`An error occurred during model execution: "${e}".`);
+        logger.error('Inputs given to model:', formatted);
         throw e;
     }
 }
@@ -1288,7 +1291,7 @@ export class PreTrainedModel extends Callable {
             if (modelType !== MODEL_TYPES.EncoderOnly) {
                 const type = modelName ?? config?.model_type;
                 if (type !== 'custom') {
-                    console.warn(`Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`)
+                    logger.warn(`Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`)
                 }
             }
             info = await Promise.all([
@@ -1451,7 +1454,7 @@ export class PreTrainedModel extends Callable {
 
 
         if (generation_config.temperature === 0 && generation_config.do_sample) {
-          console.warn('`do_sample` changed to false because `temperature: 0` implies greedy sampling (always selecting the most likely token), which is incompatible with `do_sample: true`.');
+          logger.warn('`do_sample` changed to false because `temperature: 0` implies greedy sampling (always selecting the most likely token), which is incompatible with `do_sample: true`.');
           generation_config.do_sample = false;
         }
 
@@ -3429,7 +3432,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         if (generation_config.is_multilingual) {
             if (!language) {
                 // TODO: Implement language detection
-                console.warn('No language specified - defaulting to English (en).');
+                logger.warn('No language specified - defaulting to English (en).');
                 language = 'en';
             }
 
@@ -3460,7 +3463,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             &&
             init_tokens.at(-1) === generation_config.no_timestamps_token_id
         ) {
-            console.warn("<|notimestamps|> prompt token is removed from generation_config since `return_timestamps` is set to `true`.");
+            logger.warn("<|notimestamps|> prompt token is removed from generation_config since `return_timestamps` is set to `true`.");
             init_tokens.pop();
         }
 
@@ -3513,7 +3516,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
 
             if (generation_config.task === 'translate') {
-                console.warn("Token-level timestamps may not be reliable for task 'translate'.")
+                logger.warn("Token-level timestamps may not be reliable for task 'translate'.")
             }
 
             generation_config.output_attentions = true;
@@ -3560,7 +3563,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             )
         }
         if (num_frames == null) {
-            console.warn(
+            logger.warn(
                 "`num_frames` has not been set, meaning the entire audio will be analyzed. " +
                 "This may lead to inaccurate token-level timestamps for short audios (< 30 seconds)."
             );
@@ -3569,7 +3572,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         // @ts-expect-error TS2339
         let median_filter_width = this.config.median_filter_width;
         if (median_filter_width === undefined) {
-            console.warn("Model config has no `median_filter_width`, using default value of 7.")
+            logger.warn("Model config has no `median_filter_width`, using default value of 7.")
             median_filter_width = 7;
         }
 
@@ -7917,7 +7920,7 @@ export class PretrainedMixin {
 
         if (this.BASE_IF_FAIL) {
             if (!(CUSTOM_ARCHITECTURES.has(model_type))) {
-                console.warn(`Unknown model class "${model_type}", attempting to construct from base class.`);
+                logger.warn(`Unknown model class "${model_type}", attempting to construct from base class.`);
             }
             return await PreTrainedModel.from_pretrained(pretrained_model_name_or_path, options);
         } else {

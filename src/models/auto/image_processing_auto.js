@@ -3,6 +3,9 @@ import { GITHUB_ISSUE_URL, IMAGE_PROCESSOR_NAME } from '../../utils/constants.js
 import { getModelJSON } from '../../utils/hub.js';
 import { ImageProcessor } from '../../base/image_processors_utils.js';
 import * as AllImageProcessors from '../image_processors.js';
+import { getLogger } from '../../utils/logging.js';
+
+const logger = getLogger('transformers.js');
 
 export class AutoImageProcessor {
 
@@ -18,7 +21,7 @@ export class AutoImageProcessor {
         if (!image_processor_class) {
             if (key !== undefined) {
                 // Only log a warning if the class is not found and the key is set.
-                console.warn(`Image processor type '${key}' not found, assuming base ImageProcessor. Please report this at ${GITHUB_ISSUE_URL}.`)
+                logger.warn(`Image processor type '${key}' not found, assuming base ImageProcessor. Please report this at ${GITHUB_ISSUE_URL}.`)
             }
             image_processor_class = ImageProcessor;
         }

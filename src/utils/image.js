@@ -12,6 +12,9 @@ import { isNullishDimension, saveBlob } from './core.js';
 import { getFile } from './hub.js';
 import { apis } from '../env.js';
 import { Tensor } from './tensor.js';
+import { getLogger } from './logging.js';
+
+const logger = getLogger('transformers.js');
 
 // Will be empty (or not used) if running in browser or web-worker
 import sharp from 'sharp';
@@ -414,7 +417,7 @@ export class RawImage {
                 case 'box':
                 case 'hamming':
                     if (resampleMethod === 'box' || resampleMethod === 'hamming') {
-                        console.warn(`Resampling method ${resampleMethod} is not yet supported. Using bilinear instead.`);
+                        logger.warn(`Resampling method ${resampleMethod} is not yet supported. Using bilinear instead.`);
                         resampleMethod = 'bilinear';
                     }
 

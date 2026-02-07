@@ -12,6 +12,7 @@
  */
 
 export { env } from './env.js';
+export { logging } from './utils/logging.js';
 
 export * from './pipelines.js';
 export * from './models.js';

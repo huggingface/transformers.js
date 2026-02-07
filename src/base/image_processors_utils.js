@@ -1,4 +1,7 @@
 import { Callable } from "../utils/generic.js";
+import { getLogger } from "../utils/logging.js";
+
+const logger = getLogger('transformers.js');
 import { Tensor, interpolate, stack } from "../utils/tensor.js";
 import { bankers_round, max, min, softmax } from "../utils/maths.js";
 import { RawImage } from "../utils/image.js";
@@ -482,7 +485,7 @@ export function post_process_panoptic_segmentation(
     target_sizes = null,
 ) {
     if (label_ids_to_fuse === null) {
-        console.warn("`label_ids_to_fuse` unset. No instance will be fused.")
+        logger.warn("`label_ids_to_fuse` unset. No instance will be fused.")
         label_ids_to_fuse = new Set();
     }
 

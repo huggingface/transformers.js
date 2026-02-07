@@ -75,6 +75,9 @@ import {
     topk,
 } from './utils/tensor.js';
 import { RawImage } from './utils/image.js';
+import { getLogger } from './utils/logging.js';
+
+const logger = getLogger('transformers.js');
 
 
 /**
@@ -1152,13 +1155,13 @@ export class ZeroShotClassificationPipeline extends (/** @type {new (options: Te
 
         this.entailment_id = this.label2id['entailment'];
         if (this.entailment_id === undefined) {
-            console.warn("Could not find 'entailment' in label2id mapping. Using 2 as entailment_id.");
+            logger.warn("Could not find 'entailment' in label2id mapping. Using 2 as entailment_id.");
             this.entailment_id = 2;
         }
 
         this.contradiction_id = this.label2id['contradiction'] ?? this.label2id['not_entailment'];
         if (this.contradiction_id === undefined) {
-            console.warn("Could not find 'contradiction' in label2id mapping. Using 0 as contradiction_id.");
+            logger.warn("Could not find 'contradiction' in label2id mapping. Using 0 as contradiction_id.");
             this.contradiction_id = 0;
         }
     }
@@ -1767,10 +1770,10 @@ export class AutomaticSpeechRecognitionPipeline extends (/** @type {new (options
         // TODO use kwargs
 
         if (kwargs.language) {
-            console.warn('`language` parameter is not yet supported for `wav2vec2` models, defaulting to "English".');
+            logger.warn('`language` parameter is not yet supported for `wav2vec2` models, defaulting to "English".');
         }
         if (kwargs.task) {
-            console.warn('`task` parameter is not yet supported for `wav2vec2` models, defaulting to "transcribe".');
+            logger.warn('`task` parameter is not yet supported for `wav2vec2` models, defaulting to "transcribe".');
         }
 
         const single = !Array.isArray(audio);
@@ -2939,7 +2942,7 @@ export class TextToAudioPipeline extends (/** @type {new (options: TextToAudioPi
 
         // Load vocoder, if not provided
         if (!this.vocoder) {
-            console.log('No vocoder specified, using default HifiGan vocoder.');
+            logger.info('No vocoder specified, using default HifiGan vocoder.');
             this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
         }
 
@@ -3475,7 +3478,7 @@ export async function pipeline(
     // Use model if specified, otherwise, use default
     if (!model) {
         model = pipelineInfo.default.model
-        console.log(`No model specified. Using default model: "${model}".`);
+        logger.info(`No model specified. Using default model: "${model}".`);
     }
 
     const pretrainedOptions = {

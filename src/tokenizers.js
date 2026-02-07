@@ -48,6 +48,9 @@ import {
 
 import { Template } from '@huggingface/jinja';
 
+import { getLogger } from './utils/logging.js';
+const logger = getLogger('transformers.js');
+
 import {
     WHISPER_LANGUAGE_MAPPING
 } from './models/whisper/common_whisper.js';
@@ -136,7 +139,7 @@ function createPattern(pattern, invert = true) {
         return new RegExp(invert ? escaped : `(${escaped})`, 'gu');
 
     } else {
-        console.warn('Unknown pattern type:', pattern)
+        logger.warn('Unknown pattern type:', pattern)
         return null;
     }
 }
@@ -2846,13 +2849,13 @@ export class PreTrainedTokenizer extends Callable {
             max_length = this.model_max_length;
         } else if (truncation === null) {
             if (padding === true) {
-                console.warn(
+                logger.warn(
                     "`max_length` is ignored when `padding: true` and there is no truncation strategy. " +
                     "To pad to max length, use `padding: 'max_length'`."
                 )
                 max_length = this.model_max_length;
             } else if (padding === false) {
-                console.warn("Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation: true` to explicitly truncate examples to max length.");
+                logger.warn("Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation: true` to explicitly truncate examples to max length.");
                 truncation = true;
             }
         }
@@ -3396,7 +3399,7 @@ export class XLMTokenizer extends PreTrainedTokenizer {
 
     constructor(tokenizerJSON, tokenizerConfig) {
         super(tokenizerJSON, tokenizerConfig);
-        console.warn('WARNING: `XLMTokenizer` is not yet supported by Hugging Face\'s "fast" tokenizers library. Therefore, you may experience slightly inaccurate results.')
+        logger.warn('WARNING: `XLMTokenizer` is not yet supported by Hugging Face\'s "fast" tokenizers library. Therefore, you may experience slightly inaccurate results.')
     }
 }
 export class ElectraTokenizer extends PreTrainedTokenizer {
@@ -4295,7 +4298,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
             x => this.languageRegex.test(x)
         );
 
-        console.warn('WARNING: `MarianTokenizer` is not yet supported by Hugging Face\'s "fast" tokenizers library. Therefore, you may experience slightly inaccurate results.')
+        logger.warn('WARNING: `MarianTokenizer` is not yet supported by Hugging Face\'s "fast" tokenizers library. Therefore, you may experience slightly inaccurate results.')
     }
 
     /**
@@ -4321,7 +4324,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
             const [language, text] = remainder;
 
             if (!this.supported_language_codes.includes(language)) {
-                console.warn(`Unsupported language code "${language}" detected, which may lead to unexpected behavior. Should be one of: ${JSON.stringify(this.supported_language_codes)}`)
+                logger.warn(`Unsupported language code "${language}" detected, which may lead to unexpected behavior. Should be one of: ${JSON.stringify(this.supported_language_codes)}`)
             }
             return mergeArrays([language], super._encode_text(text));
         }
@@ -4450,7 +4453,7 @@ export class AutoTokenizer {
 
         let cls = this.TOKENIZER_CLASS_MAPPING[tokenizerName];
         if (!cls) {
-            console.warn(`Unknown tokenizer class "${tokenizerName}", attempting to construct from base class.`);
+            logger.warn(`Unknown tokenizer class "${tokenizerName}", attempting to construct from base class.`);
             cls = PreTrainedTokenizer;
         }
         return new cls(tokenizerJSON, tokenizerConfig);
