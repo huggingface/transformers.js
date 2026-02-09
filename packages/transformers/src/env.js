@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.0.0-next.1';
+const VERSION = '4.0.0-next.2';
 
 const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
 const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
