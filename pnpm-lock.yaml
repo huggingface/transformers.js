@@ -24,8 +24,8 @@ importers:
         specifier: ^0.1.1
         version: 0.1.1
       onnxruntime-node:
-        specifier: 1.25.0-dev.20260209-a3749f1353
-        version: 1.25.0-dev.20260209-a3749f1353
+        specifier: 1.24.1
+        version: 1.24.1
       onnxruntime-web:
         specifier: 1.25.0-dev.20260209-a3749f1353
         version: 1.25.0-dev.20260209-a3749f1353
@@ -1688,8 +1688,11 @@ packages:
   onnxruntime-common@1.24.0-dev.20251116-b39e144322:
     resolution: {integrity: sha512-BOoomdHYmNRL5r4iQ4bMvsl2t0/hzVQ3OM3PHD0gxeXu1PmggqBv3puZicEUVOA3AtHHYmqZtjMj9FOfGrATTw==}
 
-  onnxruntime-node@1.25.0-dev.20260209-a3749f1353:
-    resolution: {integrity: sha512-KnzuIG1sYTNwK7+3S7CBtO9GiFSqFma8H9d1pqwiWdKWfxVSwy5gqjF8v+dSVEjvpkW2YERtZD6z3wVWGVgViw==}
+  onnxruntime-common@1.24.1:
+    resolution: {integrity: sha512-UnV15u4p4XxoIV+jFP4hXPsW93s3QrwLSpi20HUDYHoTfI4z4sjzex3L4XDOxGGZJ/M/catrwAG2go958UQq0w==}
+
+  onnxruntime-node@1.24.1:
+    resolution: {integrity: sha512-Ex/oUXKdhDoxvlNxBT3oYtW0MH88yYpPlXQeVQUXpcJQmN24usd/8RCoPLN5kCHwDsiZ+nqsnjciyFRl423dQw==}
     os: [win32, darwin, linux]
 
   onnxruntime-web@1.25.0-dev.20260209-a3749f1353:
@@ -3822,11 +3825,13 @@ snapshots:
 
   onnxruntime-common@1.24.0-dev.20251116-b39e144322: {}
 
-  onnxruntime-node@1.25.0-dev.20260209-a3749f1353:
+  onnxruntime-common@1.24.1: {}
+
+  onnxruntime-node@1.24.1:
     dependencies:
       adm-zip: 0.5.16
       global-agent: 3.0.0
-      onnxruntime-common: 1.24.0-dev.20251116-b39e144322
+      onnxruntime-common: 1.24.1
 
   onnxruntime-web@1.25.0-dev.20260209-a3749f1353:
     dependencies:

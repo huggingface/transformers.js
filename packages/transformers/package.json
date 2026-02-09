@@ -57,7 +57,7 @@
   "dependencies": {
     "@huggingface/jinja": "^0.5.5",
     "@huggingface/tokenizers": "^0.1.1",
-    "onnxruntime-node": "1.25.0-dev.20260209-a3749f1353",
+    "onnxruntime-node": "1.24.1",
     "onnxruntime-web": "1.25.0-dev.20260209-a3749f1353",
     "sharp": "^0.34.5"
   },
