@@ -746,7 +746,7 @@ export class PreTrainedModel extends Callable {
     /**
      *
      * @param {GenerationConfig} generation_config
-     * @param {StoppingCriteriaList} [stopping_criteria=null]
+     * @param {import('../generation/stopping_criteria.js').StoppingCriteria|import('../generation/stopping_criteria.js').StoppingCriteria[]|StoppingCriteriaList} [stopping_criteria=null]
      */
     _get_stopping_criteria(generation_config, stopping_criteria = null) {
         const criteria = new StoppingCriteriaList();
