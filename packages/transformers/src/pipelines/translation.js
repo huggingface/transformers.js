@@ -12,7 +12,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * @callback TranslationPipelineCallback Translate the text(s) given as inputs.
  * @param {string|string[]} texts Texts to be translated.
- * @param {import('../generation/configuration_utils.js').GenerationConfig} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {import('../generation/parameters.js').GenerationFunctionParameters} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<TranslationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & TranslationPipelineCallback & Disposable} TranslationPipelineType

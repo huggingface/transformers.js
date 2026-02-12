@@ -15,12 +15,12 @@ import { Tensor } from '../utils/tensor.js';
  *
  * @callback ImageToTextPipelineCallbackSingle Assign labels to the image passed as input.
  * @param {ImageInput} texts The image to be captioned.
- * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {Partial<import('../generation/parameters.js').GenerationFunctionParameters>} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<ImageToTextOutput>} An object containing the generated text(s).
  *
  * @callback ImageToTextPipelineCallbackBatch Assign labels to the images passed as inputs.
  * @param {ImageInput[]} texts The images to be captioned.
- * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {Partial<import('../generation/parameters.js').GenerationFunctionParameters>} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<ImageToTextOutput[]>} An array containing the generated text(s) for each image.
  *
  * @typedef {ImageToTextPipelineCallbackSingle & ImageToTextPipelineCallbackBatch} ImageToTextPipelineCallback

@@ -8,7 +8,7 @@
  *
  * Note: These tests are not meant to be executed, but rather to be type-checked by TypeScript.
  */
-import { pipeline } from "../../src/transformers.js";
+import { pipeline, InterruptableStoppingCriteria } from "../../src/transformers.js";
 
 import type { RawImage } from "../../src/utils/image.js";
 import type { RawAudio } from "../../src/utils/audio.js";
@@ -486,6 +486,18 @@ const FLOAT32 = new Float32Array(16000);
     output[0][0].generated_text as Chat;
     output[0][0].generated_text.at(-1)!.role as string;
     output[0][0].generated_text.at(-1)!.content as string;
+  }
+
+  // (e) Chat input with generation parameters -> TextGenerationChatOutput
+  {
+    const output = await generator(MESSAGES, {
+      max_new_tokens: 50,
+      stopping_criteria: [new InterruptableStoppingCriteria()],
+    });
+    output as TextGenerationChatOutput;
+    output[0].generated_text as Chat;
+    output[0].generated_text.at(-1)!.role as string;
+    output[0].generated_text.at(-1)!.content as string;
   }
 }
 

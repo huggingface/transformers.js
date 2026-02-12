@@ -29,7 +29,7 @@ function isChat(x) {
  * @property {boolean} [return_full_text=true] If set to `false` only added text is returned, otherwise the full text is returned.
  * @property {Object} [tokenizer_encode_kwargs] Additional keyword arguments to pass along to the encoding step of the tokenizer.
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
- * @typedef {import('../generation/configuration_utils.js').GenerationConfig & TextGenerationSpecificParams} TextGenerationConfig
+ * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
  *
  * @callback TextGenerationPipelineCallbackString
  * @param {string} texts One prompt to complete.
