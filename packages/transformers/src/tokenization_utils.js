@@ -67,7 +67,7 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
 /**
  * @typedef {Object} Message
  * @property {string} role The role of the message (e.g., "user" or "assistant" or "system").
- * @property {string} content The content of the message.
+ * @property {string | { type: string, text?: string }[]} content The content of the message.
  */
 
 /**
