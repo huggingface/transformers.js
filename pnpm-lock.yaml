@@ -27,8 +27,8 @@ importers:
         specifier: 1.24.1
         version: 1.24.1
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260209-a3749f1353
-        version: 1.25.0-dev.20260209-a3749f1353
+        specifier: 1.25.0-dev.20260212-1a71a5f46e
+        version: 1.25.0-dev.20260212-1a71a5f46e
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -1695,8 +1695,8 @@ packages:
     resolution: {integrity: sha512-Ex/oUXKdhDoxvlNxBT3oYtW0MH88yYpPlXQeVQUXpcJQmN24usd/8RCoPLN5kCHwDsiZ+nqsnjciyFRl423dQw==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260209-a3749f1353:
-    resolution: {integrity: sha512-V8FUnACkzpJ5vzji6GkHOfzg2XmTvGZWBnWoY6NF1D6a14dNDbqrbvqb3m3mF3sX0HCJuBMLhdFXLLspc1q1Qw==}
+  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
+    resolution: {integrity: sha512-ZsQZ+6Suesn98Afjvn/i7ttKEA98DrDQ98tqGjyAIGsmmf6iXg7SzvR1HTGnI14TPG/fzwW5x6r/VPa1YJqclw==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -3833,7 +3833,7 @@ snapshots:
       global-agent: 3.0.0
       onnxruntime-common: 1.24.1
 
-  onnxruntime-web@1.25.0-dev.20260209-a3749f1353:
+  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
