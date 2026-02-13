@@ -19,7 +19,7 @@ const webWorkerPipeline = <PayloadType = any, ResultType = any>(
             const msg = e.data;
             if (msg?.type === RESPONSE_RESULT) {
                 if (msg?.id === 'init') {
-                    resolve((data: PayloadType, pipeOptions: Record<string, any>) => {
+                    resolve((data: PayloadType, pipeOptions: Record<string, any> = {}) => {
                         return new Promise<any>((resolve, reject) => {
                             const id = messageIdCounter++;
                             messagesResolversMap.set(id, { resolve, reject });
