@@ -17,8 +17,8 @@ describe("webWorkerPipeline", () => {
   let mockWorker: MockWorker;
 
   beforeEach(async () => {
-    // Import the built module
-    const module = await import("../dist/index.js");
+    // Import the source module (avoid relying on built dist/)
+    const module = await import("../src/index");
     webWorkerPipeline = module.webWorkerPipeline;
 
     // Create a mock Worker
