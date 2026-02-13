@@ -17,14 +17,14 @@ export class CallbackBridgeClient {
     }
 
     /**
-     * Serialize options by replacing functions with callback references
-     * @throws {Error} If options contain non-serializable values like GPU devices or typed arrays
+     * Serialize options by replacing functions with callback references.
+     * Non-serializable values (e.g. certain GPU devices or typed arrays in `session_options`)
+     * are detected and logged as warnings but do not cause this method to throw.
      */
     serialize(options: SerializableOptions): SerializedOptions {
         const out: SerializedOptions = {};
 
         Object.entries(options ?? {}).forEach(([key, value]) => {
-            if (typeof value === 'function') {
                 const functionId = `cb_${key}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
                 this.callbackMap.set(functionId, value);
                 out[key] = { __fn: true, functionId };
