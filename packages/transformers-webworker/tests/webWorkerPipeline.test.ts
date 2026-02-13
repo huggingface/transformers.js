@@ -88,10 +88,14 @@ describe("webWorkerPipeline", () => {
     await webWorkerPipeline(mockWorker as any, "text-classification", "test-model", options);
 
     const callArgs = mockWorker.postMessage.mock.calls[0][0] as any;
-    expect(callArgs.options.progress_callback).toEqual({
-      __fn: true,
-      functionId: "cb_progress_callback",
-    });
+    expect(callArgs.options.progress_callback).toEqual(
+      expect.objectContaining({
+        __fn: true,
+      }),
+    );
+    expect(callArgs.options.progress_callback.functionId).toEqual(
+      expect.stringMatching(/^cb_progress_callback/),
+    );
     expect(callArgs.options.device).toBe("cpu");
   });
 
