@@ -100,6 +100,10 @@ function isChat(x) {
 export class TextGenerationPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => TextGenerationPipelineType} */ (Pipeline)
 {
+    /**
+     * @param {string | string[] | import('../tokenization_utils.js').Message[] | import('../tokenization_utils.js').Message[][]} texts
+     * @param {Partial<TextGenerationConfig>} generate_kwargs
+     */
     async _call(texts, generate_kwargs = {}) {
         let isBatched = false;
         let isChatInput = false;

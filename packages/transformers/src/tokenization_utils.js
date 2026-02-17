@@ -65,9 +65,29 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
 ];
 
 /**
+ * @typedef {Object} TextContent
+ * @property {'text'} type The type of content (must be 'text').
+ * @property {string} text The text content.
+ */
+
+/**
+ * @typedef {Object} ImageContent
+ * @property {'image'} type The type of content (must be 'image').
+ * @property {string | import('./utils/image.js').RawImage} image Optional URL of the image.
+ *
+ * Note: This works for SmolVLM. Qwen2VL and Idefics3 have different implementations. TODO: We should have a standardised way to handle images
+ */
+
+/**
+ * @typedef {TextContent | ImageContent} MessageContent
+ * Base type for message content. This is a discriminated union that can be extended with additional content types.
+ * Example: `@typedef {TextContent | ImageContent | AudioContent} MessageContent`
+ */
+
+/**
  * @typedef {Object} Message
  * @property {string} role The role of the message (e.g., "user" or "assistant" or "system").
- * @property {string | { type: string, text?: string }[]} content The content of the message.
+ * @property {string | MessageContent[]} content The content of the message. Can be a simple string or an array of content objects.
  */
 
 /**
