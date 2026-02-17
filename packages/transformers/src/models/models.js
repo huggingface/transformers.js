@@ -16,6 +16,7 @@ export * from './clip/modeling_clip.js';
 export * from './clipseg/modeling_clipseg.js';
 export * from './codegen/modeling_codegen.js';
 export * from './cohere/modeling_cohere.js';
+export * from './cohere2/modeling_cohere2.js';
 export * from './convbert/modeling_convbert.js';
 export * from './convnext/modeling_convnext.js';
 export * from './convnextv2/modeling_convnextv2.js';

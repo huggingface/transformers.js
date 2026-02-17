@@ -125,6 +125,7 @@ function getNormalizedConfig(config) {
         case 'granite':
         case 'granitemoehybrid':
         case 'cohere':
+        case 'cohere2':
         case 'mistral':
         case 'starcoder2':
         case 'qwen2':
