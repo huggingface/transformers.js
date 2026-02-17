@@ -71,6 +71,14 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  */
 
 /**
+ * @typedef {Object} TextContentTranslation
+ * @property {'text'} type The type of content (must be 'text').
+ * @property {string} text The text content.
+ * @property {string} source_lang_code The source language code.
+ * @property {string} target_lang_code The target language code.
+ */
+
+/**
  * @typedef {Object} ImageContent
  * @property {'image'} type The type of content (must be 'image').
  * @property {string | import('./utils/image.js').RawImage} image Optional URL of the image.
