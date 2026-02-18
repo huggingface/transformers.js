@@ -16,6 +16,7 @@ import { get_tokenizer_files } from './get_tokenizer_files.js';
 import { get_processor_files } from './get_processor_files.js';
 import { is_cached, is_pipeline_cached } from './is_cached.js';
 import { get_file_metadata } from './get_file_metadata.js';
+import { clear_cache, clear_pipeline_cache } from './clear_cache.js';
 
 /**
  * Static class for cache and file management operations.
@@ -155,5 +156,64 @@ export class ModelRegistry {
      */
     static async get_file_metadata(path_or_repo_id, filename, options = {}) {
         return get_file_metadata(path_or_repo_id, filename, options);
+    }
+
+    /**
+     * Clears all cached files for a given model.
+     * Automatically determines which files are needed and removes them from the cache.
+     *
+     * @param {string} modelId - The model id (e.g., "Xenova/gpt2")
+     * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
+     * @param {boolean} [options.include_tokenizer=true] - Whether to clear tokenizer files
+     * @param {boolean} [options.include_processor=true] - Whether to clear processor files
+     * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
+     *
+     * @example
+     * // Clear all cached files for a model
+     * const result = await ModelRegistry.clear_cache('Xenova/gpt2');
+     * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
+     *
+     * @example
+     * // Clear only specific dtype/device variant
+     * const result = await ModelRegistry.clear_cache('Xenova/gpt2', { dtype: 'fp16', device: 'webgpu' });
+     * result.files.forEach(f => {
+     *     console.log(`${f.file}: ${f.deleted ? '✓ deleted' : f.wasCached ? '✗ failed' : 'not cached'}`);
+     * });
+     */
+    static async clear_cache(modelId, options = {}) {
+        return clear_cache(modelId, options);
+    }
+
+    /**
+     * Clears all cached files for a specific pipeline task.
+     * Automatically determines which components are needed based on the task.
+     *
+     * @param {string} task - The pipeline task (e.g., "text-generation", "image-classification")
+     * @param {string} modelId - The model id (e.g., "Xenova/gpt2")
+     * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
+     * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
+     *
+     * @example
+     * // Clear cached files for a specific pipeline
+     * const result = await ModelRegistry.clear_pipeline_cache('text-generation', 'Xenova/gpt2');
+     * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
+     *
+     * @example
+     * // Background removal (only clears model files)
+     * const result = await ModelRegistry.clear_pipeline_cache('background-removal', 'Xenova/modnet');
+     * console.log(`Cleared ${result.filesDeleted} files`);
+     */
+    static async clear_pipeline_cache(task, modelId, options = {}) {
+        return clear_pipeline_cache(task, modelId, options);
     }
 }
