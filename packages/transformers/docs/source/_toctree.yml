@@ -1,0 +1,87 @@
+- local: index
+  title: 🤗 Transformers.js
+- sections:
+    - local: installation
+      title: Installation
+    - local: pipelines
+      title: The pipeline API
+    - local: custom_usage
+      title: Custom usage
+  title: Get started
+- sections:
+    - local: tutorials/vanilla-js
+      title: Building a Vanilla JS Application
+    - local: tutorials/react
+      title: Building a React Application
+    - local: tutorials/next
+      title: Building a Next.js Application
+    - local: tutorials/browser-extension
+      title: Building a Browser Extension
+    - local: tutorials/electron
+      title: Building an Electron Application
+    - local: tutorials/node
+      title: Server-side Inference in Node.js
+  title: Tutorials
+- sections:
+    - local: guides/webgpu
+      title: Running models on WebGPU
+    - local: guides/dtypes
+      title: Using quantized models (dtypes)
+    - local: guides/private
+      title: Accessing Private/Gated Models
+    - local: guides/node-audio-processing
+      title: Server-side Audio Processing
+  title: Developer Guides
+- sections:
+    - local: api/transformers
+      title: Index
+    - local: api/pipelines
+      title: Pipelines
+    - local: api/models
+      title: Models
+    - local: api/tokenizers
+      title: Tokenizers
+    - local: api/processors
+      title: Processors
+    - local: api/configs
+      title: Configs
+    - local: api/env
+      title: Environment variables
+    - sections:
+        - local: api/backends/onnx
+          title: ONNX
+      title: Backends
+      isExpanded: false
+    - sections:
+        - local: api/generation/parameters
+          title: Parameters
+        - local: api/generation/configuration_utils
+          title: Configuration
+        - local: api/generation/logits_process
+          title: Logits Processors
+        - local: api/generation/logits_sampler
+          title: Logits Samplers
+        - local: api/generation/stopping_criteria
+          title: Stopping Criteria
+        - local: api/generation/streamers
+          title: Streamers
+      title: Generation
+      isExpanded: false
+    - sections:
+        - local: api/utils/core
+          title: Core
+        - local: api/utils/hub
+          title: Hub
+        - local: api/utils/image
+          title: Image
+        - local: api/utils/audio
+          title: Audio
+        - local: api/utils/tensor
+          title: Tensor
+        - local: api/utils/maths
+          title: Maths
+        - local: api/utils/data-structures
+          title: Data Structures
+      title: Utilities
+      isExpanded: false
+  title: API Reference

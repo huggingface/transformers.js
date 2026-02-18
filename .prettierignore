@@ -1,8 +1,16 @@
-# Ignore artifacts:
+# Ignore artifacts and non-source files
 .github
-dist
-docs
-examples
-scripts
-types
+*.py
 *.md
+
+# Build outputs & caches
+**/dist
+**/types
+**/node_modules
+**/coverage
+**/.cache
+**/docs/build
+*.tsbuildinfo
+
+# Lock files
+pnpm-lock.yaml

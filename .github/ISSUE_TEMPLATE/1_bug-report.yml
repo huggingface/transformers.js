@@ -1,6 +1,6 @@
 name: "🐛 Bug Report"
 description: Submit a bug report to help us improve transformers.js
-labels: [ "bug" ]
+labels: ["bug"]
 body:
   - type: textarea
     id: system-info
@@ -47,4 +47,3 @@ body:
           1.
           2.
           3.
-          

@@ -1,90 +1,63 @@
 {
-  "name": "@huggingface/transformers",
-  "version": "3.8.1",
-  "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
-  "main": "./src/transformers.js",
-  "types": "./types/transformers.d.ts",
+  "name": "@huggingface/transformers-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Monorepo for Hugging Face Transformers.js and framework integrations",
   "type": "module",
-  "exports": {
-    "node": {
-      "import": {
-        "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.mjs"
-      },
-      "require": {
-        "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.cjs"
-      }
-    },
-    "default": {
-      "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.web.js"
-    }
-  },
+  "packageManager": "pnpm@10.28.1",
   "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typegen": "tsc --build",
-    "dev": "webpack serve --no-client-overlay",
-    "build": "webpack && npm run typegen",
-    "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose",
-    "readme": "python ./docs/scripts/build_readme.py",
-    "docs-api": "node ./docs/scripts/generate.js",
-    "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
-    "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/"
+    "dev": "node scripts/dev.mjs"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/huggingface/transformers.js.git"
   },
-  "keywords": [
-    "transformers",
-    "transformers.js",
-    "huggingface",
-    "hugging face",
-    "machine learning",
-    "deep learning",
-    "artificial intelligence",
-    "AI",
-    "ML"
-  ],
   "author": "Hugging Face",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/huggingface/transformers.js/issues"
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
-  "dependencies": {
-    "@huggingface/jinja": "^0.5.3",
-    "onnxruntime-node": "1.21.0",
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
-    "sharp": "^0.34.1"
-  },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.1",
-    "@webgpu/types": "^0.1.51",
-    "catharsis": "github:xenova/catharsis",
-    "jest": "^30.0.0-alpha.6",
-    "jest-environment-node": "^30.0.0-alpha.6",
-    "jsdoc-to-markdown": "^9.1.1",
-    "prettier": "3.4.2",
-    "typescript": "^5.8.2",
-    "wavefile": "11.0.0",
-    "webpack": "^5.97.1",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
   },
-  "files": [
-    "src",
-    "dist",
-    "types",
-    "README.md",
-    "LICENSE"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "jsdelivr": "./dist/transformers.min.js",
-  "unpkg": "./dist/transformers.min.js"
+  "prettier": {
+    "overrides": [
+      {
+        "files": [
+          "./packages/*/src/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "singleQuote": true,
+          "tabWidth": 4,
+          "printWidth": 120
+        }
+      },
+      {
+        "files": [
+          "./packages/*/tests/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "tabWidth": 2,
+          "printWidth": 10000000
+        }
+      },
+      {
+        "files": [
+          "./scripts/**/*.{js,mjs,cjs,ts}",
+          "./packages/*/scripts/**/*.{js,mjs,cjs,ts}",
+          "./packages/*/docs/**/*.{js,mjs,cjs,ts}"
+        ],
+        "options": {
+          "tabWidth": 2,
+          "printWidth": 160
+        }
+      }
+    ]
+  }
 }

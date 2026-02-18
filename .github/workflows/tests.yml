@@ -15,6 +15,7 @@ on:
 
 env:
   TESTING_REMOTELY: true
+  ONNXRUNTIME_NODE_INSTALL: skip
 
 jobs:
   build:
@@ -27,15 +28,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-      - run: npm ci
-      - run: npm run build
-      
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
       # Setup the testing environment
-      - run: git lfs install && GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/hf-internal-testing/tiny-random-T5ForConditionalGeneration ./models/hf-internal-testing/tiny-random-T5ForConditionalGeneration
+      - run: git lfs install && GIT_CLONE_PROTECTION_ACTIVE=false git clone https://huggingface.co/hf-internal-testing/tiny-random-T5ForConditionalGeneration ./packages/transformers/models/hf-internal-testing/tiny-random-T5ForConditionalGeneration
 
       # Actually run tests
-      - run: npm run test
+      - run: pnpm test
