@@ -14,7 +14,6 @@
 
 // Environment variables
 export { env, LogLevel } from './env.js';
-export { logger } from './utils/logger.js';
 
 // Pipelines
 export * from './pipelines.js';
