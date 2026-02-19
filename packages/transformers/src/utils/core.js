@@ -44,7 +44,7 @@
  */
 
 /**
- * @typedef {Object} ProgressTotalStatusInfo
+ * @typedef {Object} TotalProgressInfo
  * @property {'progress_total'} status
  * @property {string} name The model id or directory path.
  * @property {number} progress A number between 0 and 100.
@@ -68,7 +68,7 @@
  */
 
 /**
- * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo | ProgressTotalStatusInfo} ProgressInfo
+ * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo | TotalProgressInfo} ProgressInfo
  */
 
 /**
