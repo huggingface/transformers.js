@@ -3,7 +3,8 @@
  *
  * Defines which components (tokenizer, processor, model) each pipeline task needs.
  *
- * @module utils/pipeline-tasks
+ * @module pipelines
+ * @private
  */
 
 import { AutoTokenizer } from '../models/auto/tokenization_auto.js';
