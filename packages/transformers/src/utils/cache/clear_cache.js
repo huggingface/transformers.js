@@ -54,18 +54,14 @@ async function clear_files_from_cache(modelId, files, options = {}) {
         files.map(async (filename) => {
             const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
 
-            // Check if file is cached
             const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
             const wasCached = !!cached;
 
-            // Try to delete using both possible cache keys
             let deleted = false;
             if (wasCached) {
-                // Try deleting with proposedCacheKey first (most likely to work)
                 const deletedWithProposed = await cache.delete(proposedCacheKey);
-
-                // If that didn't work and keys are different, try localPath
-                const deletedWithLocal = proposedCacheKey !== localPath ? await cache.delete(localPath) : false;
+                const deletedWithLocal =
+                    !deletedWithProposed && proposedCacheKey !== localPath ? await cache.delete(localPath) : false;
 
                 deleted = deletedWithProposed || deletedWithLocal;
             }
