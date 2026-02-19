@@ -69,31 +69,19 @@ export async function get_model_files(
         }
     }
 
-    // Fall back to heuristic detection if not found in mapping
+    // Fall back to EncoderOnly if not found in mapping
     if (!foundInMapping) {
         const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
         console.warn(
             `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
-                `for model type '${config.model_type}'. Using heuristic detection. ` +
+                `for model type '${config.model_type}'. Falling back to EncoderOnly (single model.onnx file). ` +
                 `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
         );
 
-        if (config.is_encoder_decoder) {
-            const modelName = config.model_type;
-            if (['whisper', 'vision-encoder-decoder'].includes(modelName)) {
-                modelType = MODEL_TYPES.Vision2Seq;
-            } else if (modelName === 'musicgen') {
-                modelType = MODEL_TYPES.Musicgen;
-            } else {
-                modelType = MODEL_TYPES.Seq2Seq;
-            }
-        } else {
-            if (architectures.some((arch) => arch.includes('CausalLM') || arch.includes('LMHead'))) {
-                modelType = MODEL_TYPES.DecoderOnly;
-            } else {
-                modelType = MODEL_TYPES.EncoderOnly;
-            }
-        }
+        // Always fallback to EncoderOnly (single model.onnx file)
+        // Other model types (Vision2Seq, Musicgen, etc.) require specific file structures
+        // and should be properly registered in MODEL_TYPE_MAPPING if they are valid.
+        modelType = MODEL_TYPES.EncoderOnly;
     }
 
     // Helper function to determine dtype for a given file
