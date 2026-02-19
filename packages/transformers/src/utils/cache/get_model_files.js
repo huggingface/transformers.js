@@ -15,7 +15,7 @@ import { AutoConfig } from '../../configs.js';
  * If dtype/device are not specified in the config, you can provide them to match
  * what the pipeline will actually use.
  *
- * @param {string} modelId The model id (e.g., "Xenova/llama-2-7b")
+ * @param {string} modelId The model id (e.g., "onnx-community/granite-4.0-350m-ONNX-web")
  * @param {Object} [options] Optional parameters
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
