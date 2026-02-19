@@ -74,8 +74,6 @@
           title: Hub
         - local: api/utils/cache
           title: Cache & File Management
-        - local: api/utils/pipeline-tasks
-          title: Pipeline Tasks
         - local: api/utils/image
           title: Image
         - local: api/utils/audio
