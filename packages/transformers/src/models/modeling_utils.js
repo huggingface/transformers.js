@@ -87,21 +87,27 @@ export const MODEL_TYPES = {
     Seq2Seq: 2,
     Vision2Seq: 3,
     DecoderOnly: 4,
-    MaskGeneration: 5,
-    ImageTextToText: 6,
-    Musicgen: 7,
-    MultiModality: 8,
-    Phi3V: 9,
-    AudioTextToText: 10,
-    AutoEncoder: 11,
-    ImageAudioTextToText: 12,
-    Supertonic: 13,
-    Chatterbox: 14,
+    DecoderOnlyWithoutHead: 5,
+    MaskGeneration: 6,
+    ImageTextToText: 7,
+    Musicgen: 8,
+    MultiModality: 9,
+    Phi3V: 10,
+    AudioTextToText: 11,
+    AutoEncoder: 12,
+    ImageAudioTextToText: 13,
+    Supertonic: 14,
+    Chatterbox: 15,
 };
 
 const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
         can_generate: true,
+        forward: decoder_forward,
+        prepare_inputs: decoder_prepare_inputs_for_generation,
+    },
+    [MODEL_TYPES.DecoderOnlyWithoutHead]: {
+        can_generate: false,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
     },
@@ -485,8 +491,8 @@ export class PreTrainedModel extends Callable {
                 ),
             ]);
         } else {
-            // should be MODEL_TYPES.EncoderOnly
-            if (modelType !== MODEL_TYPES.EncoderOnly) {
+            // should be MODEL_TYPES.EncoderOnly or MODEL_TYPES.DecoderOnlyWithoutHead
+            if (modelType === undefined) {
                 const type = modelName ?? config?.model_type;
                 if (type !== 'custom') {
                     logger.warn(
@@ -741,7 +747,7 @@ export class PreTrainedModel extends Callable {
     /**
      *
      * @param {GenerationConfig} generation_config
-     * @param {StoppingCriteriaList} [stopping_criteria=null]
+     * @param {import('../generation/stopping_criteria.js').StoppingCriteria|import('../generation/stopping_criteria.js').StoppingCriteria[]|StoppingCriteriaList} [stopping_criteria=null]
      */
     _get_stopping_criteria(generation_config, stopping_criteria = null) {
         const criteria = new StoppingCriteriaList();

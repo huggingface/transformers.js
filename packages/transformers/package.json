@@ -1,8 +1,8 @@
 {
   "name": "@huggingface/transformers",
-  "version": "4.0.0-alpha.0",
+  "version": "4.0.0-next.4",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
-  "main": "./src/transformers.js",
+  "main": "./dist/transformers.node.cjs",
   "types": "./types/transformers.d.ts",
   "type": "module",
   "exports": {
@@ -55,10 +55,10 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
-    "@huggingface/jinja": "^0.5.4",
+    "@huggingface/jinja": "^0.5.5",
     "@huggingface/tokenizers": "^0.1.1",
-    "onnxruntime-node": "1.25.0-dev.20260125-727db0d3dc",
-    "onnxruntime-web": "1.25.0-dev.20260125-727db0d3dc",
+    "onnxruntime-node": "1.24.1",
+    "onnxruntime-web": "1.25.0-dev.20260212-1a71a5f46e",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
@@ -76,7 +76,8 @@
     "dist",
     "types",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "!**/*.tsbuildinfo"
   ],
   "publishConfig": {
     "access": "public"

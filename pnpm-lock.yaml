@@ -18,17 +18,17 @@ importers:
   packages/transformers:
     dependencies:
       '@huggingface/jinja':
-        specifier: ^0.5.4
-        version: 0.5.4
+        specifier: ^0.5.5
+        version: 0.5.5
       '@huggingface/tokenizers':
         specifier: ^0.1.1
         version: 0.1.1
       onnxruntime-node:
-        specifier: 1.25.0-dev.20260125-727db0d3dc
-        version: 1.25.0-dev.20260125-727db0d3dc
+        specifier: 1.24.1
+        version: 1.24.1
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260125-727db0d3dc
-        version: 1.25.0-dev.20260125-727db0d3dc
+        specifier: 1.25.0-dev.20260212-1a71a5f46e
+        version: 1.25.0-dev.20260212-1a71a5f46e
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -390,8 +390,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@huggingface/jinja@0.5.4':
-    resolution: {integrity: sha512-VoQJywjpjy2D88Oj0BTHRuS8JCbUgoOg5t1UGgbtGh2fRia9Dx/k6Wf8FqrEWIvWK9fAkfJeeLB9fcSpCNPCpw==}
+  '@huggingface/jinja@0.5.5':
+    resolution: {integrity: sha512-xRlzazC+QZwr6z4ixEqYHo9fgwhTZ3xNSdljlKfUFGZSdlvt166DljRELFUfFytlYOYvo3vTisA/AFOuOAzFQQ==}
     engines: {node: '>=18'}
 
   '@huggingface/tokenizers@0.1.1':
@@ -1688,12 +1688,15 @@ packages:
   onnxruntime-common@1.24.0-dev.20251116-b39e144322:
     resolution: {integrity: sha512-BOoomdHYmNRL5r4iQ4bMvsl2t0/hzVQ3OM3PHD0gxeXu1PmggqBv3puZicEUVOA3AtHHYmqZtjMj9FOfGrATTw==}
 
-  onnxruntime-node@1.25.0-dev.20260125-727db0d3dc:
-    resolution: {integrity: sha512-xgor91kp0ZwC4Tj9daTlFg005t5Rf6OiY0YRBcT0o/94q2n1HfbjRjqZPfJ/OzkykP/523z+HkQZIy0d5lLgvQ==}
+  onnxruntime-common@1.24.1:
+    resolution: {integrity: sha512-UnV15u4p4XxoIV+jFP4hXPsW93s3QrwLSpi20HUDYHoTfI4z4sjzex3L4XDOxGGZJ/M/catrwAG2go958UQq0w==}
+
+  onnxruntime-node@1.24.1:
+    resolution: {integrity: sha512-Ex/oUXKdhDoxvlNxBT3oYtW0MH88yYpPlXQeVQUXpcJQmN24usd/8RCoPLN5kCHwDsiZ+nqsnjciyFRl423dQw==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260125-727db0d3dc:
-    resolution: {integrity: sha512-020j8KmRppP6o9CMvcjxaBJMXTXd0Ix8y6/AQCwJojKq8Y4SROl8NtXUZk71FR4OMU6cYzIfQ2f2U5A3UshVzA==}
+  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
+    resolution: {integrity: sha512-ZsQZ+6Suesn98Afjvn/i7ttKEA98DrDQ98tqGjyAIGsmmf6iXg7SzvR1HTGnI14TPG/fzwW5x6r/VPa1YJqclw==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -2328,7 +2331,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.2':
     optional: true
 
-  '@huggingface/jinja@0.5.4': {}
+  '@huggingface/jinja@0.5.5': {}
 
   '@huggingface/tokenizers@0.1.1': {}
 
@@ -3822,13 +3825,15 @@ snapshots:
 
   onnxruntime-common@1.24.0-dev.20251116-b39e144322: {}
 
-  onnxruntime-node@1.25.0-dev.20260125-727db0d3dc:
+  onnxruntime-common@1.24.1: {}
+
+  onnxruntime-node@1.24.1:
     dependencies:
       adm-zip: 0.5.16
       global-agent: 3.0.0
-      onnxruntime-common: 1.24.0-dev.20251116-b39e144322
+      onnxruntime-common: 1.24.1
 
-  onnxruntime-web@1.25.0-dev.20260125-727db0d3dc:
+  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9

@@ -12,7 +12,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * @callback SummarizationPipelineCallback Summarize the text(s) given as inputs.
  * @param {string|string[]} texts One or several articles (or one list of articles) to summarize.
- * @param {import('./generation/configuration_utils.js').GenerationConfig} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {import('../generation/parameters.js').GenerationFunctionParameters} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<SummarizationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & SummarizationPipelineCallback & Disposable} SummarizationPipelineType

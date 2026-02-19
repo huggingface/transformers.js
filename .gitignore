@@ -5,6 +5,7 @@ __pycache__
 .idea
 node_modules
 deno.lock
+package-lock.json
 
 # Do not track build artifacts/generated files
 packages/**/dist
