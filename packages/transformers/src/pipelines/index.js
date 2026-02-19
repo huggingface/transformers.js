@@ -2,9 +2,6 @@
  * @file Pipeline task configurations and aliases
  *
  * Defines which components (tokenizer, processor, model) each pipeline task needs.
- *
- * @module pipelines
- * @private
  */
 
 import { AutoTokenizer } from '../models/auto/tokenization_auto.js';
