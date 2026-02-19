@@ -7,6 +7,7 @@ import {
 } from '../dtypes.js';
 import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
+import { GITHUB_ISSUE_URL } from '../constants.js';
 
 /**
  * Returns the list of files that will be loaded for a model based on its configuration.
@@ -70,12 +71,11 @@ export async function get_model_files(
 
     // Fall back to heuristic detection if not found in mapping
     if (!foundInMapping) {
-        // Log warning for models not in MODEL_TYPE_MAPPING so they can be added
         const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
         console.warn(
             `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
                 `for model type '${config.model_type}'. Using heuristic detection. ` +
-                `Consider adding to packages/transformers/src/models/registry.js`,
+                `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
         );
 
         if (config.is_encoder_decoder) {
