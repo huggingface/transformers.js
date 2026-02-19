@@ -143,6 +143,9 @@ export async function get_model_files(
     if (modelType === MODEL_TYPES.DecoderOnly) {
         add_model_file('model', 'model');
         files.push('generation_config.json');
+    } else if (modelType === MODEL_TYPES.DecoderOnlyWithoutHead) {
+        add_model_file('model', 'model');
+        // Do not load generation_config.json for models without generation head
     } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
         add_model_file('model', 'encoder_model');
         add_model_file('decoder_model_merged');
