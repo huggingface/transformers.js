@@ -52,7 +52,7 @@ export class DocumentQuestionAnsweringPipeline
         }
 
         // Preprocess image
-        const preparedImage = (await prepareImages(image))[0];
+        const preparedImage = (await prepareImages(image, { abort_signal: this.abort_signal }))[0];
         const { pixel_values } = await this.processor(preparedImage);
 
         // Run tokenization

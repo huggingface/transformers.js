@@ -56,7 +56,7 @@ export class ImageToTextPipeline
 {
     async _call(images, generate_kwargs = {}) {
         const isBatched = Array.isArray(images);
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         const { pixel_values } = await this.processor(preparedImages);
 

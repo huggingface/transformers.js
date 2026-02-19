@@ -92,7 +92,9 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(await (await fetch(speaker_embeddings)).arrayBuffer());
+            speaker_embeddings = new Float32Array(
+                await (await fetch(speaker_embeddings, { signal: this.abort_signal })).arrayBuffer(),
+            );
         }
 
         if (speaker_embeddings instanceof Float32Array) {
@@ -195,7 +197,10 @@ export class TextToAudioPipeline
         // Load vocoder, if not provided
         if (!this.vocoder) {
             console.log('No vocoder specified, using default HifiGan vocoder.');
-            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
+            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, {
+                dtype: 'fp32',
+                abort_signal: this.abort_signal,
+            });
         }
 
         // Run tokenization

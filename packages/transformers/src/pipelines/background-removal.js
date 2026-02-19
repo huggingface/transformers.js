@@ -46,7 +46,7 @@ export class BackgroundRemovalPipeline
     )
 {
     async _call(images, options = {}) {
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         // @ts-expect-error TS2339
         const masks = await super._call(images, options);

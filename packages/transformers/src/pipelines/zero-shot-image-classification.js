@@ -63,7 +63,7 @@ export class ZeroShotImageClassificationPipeline
 {
     async _call(images, candidate_labels, { hypothesis_template = 'This is a photo of {}' } = {}) {
         const isBatched = Array.isArray(images);
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         // Insert label into hypothesis template
         const texts = candidate_labels.map((x) => hypothesis_template.replace('{}', x));

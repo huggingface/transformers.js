@@ -83,7 +83,7 @@ export class ImageClassificationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => ImageClassificationPipelineType} */ (Pipeline)
 {
     async _call(images, { top_k = 5 } = {}) {
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         const { pixel_values } = await this.processor(preparedImages);
         const output = await this.model({ pixel_values });

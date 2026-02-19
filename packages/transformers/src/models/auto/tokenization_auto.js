@@ -39,7 +39,14 @@ export class AutoTokenizer {
      */
     static async from_pretrained(
         pretrained_model_name_or_path,
-        { progress_callback = null, config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+        {
+            progress_callback = null,
+            config = null,
+            cache_dir = null,
+            local_files_only = false,
+            revision = 'main',
+            abort_signal = null,
+        } = {},
     ) {
         const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {
             progress_callback,
@@ -47,6 +54,7 @@ export class AutoTokenizer {
             cache_dir,
             local_files_only,
             revision,
+            abort_signal,
         });
 
         // Some tokenizers are saved with the "Fast" suffix, so we remove that if present.

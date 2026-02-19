@@ -84,7 +84,7 @@ export class ZeroShotAudioClassificationPipeline
         });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate);
+        const preparedAudios = await prepareAudios(audio, sampling_rate, { abort_signal: this.abort_signal });
 
         const toReturn = [];
         for (const aud of preparedAudios) {

@@ -66,7 +66,7 @@ export class ObjectDetectionPipeline
         if (isBatched && images.length !== 1) {
             throw Error('Object detection pipeline currently only supports a batch size of 1.');
         }
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         const imageSizes = percentage ? null : preparedImages.map((x) => [x.height, x.width]);
 

@@ -57,7 +57,7 @@ export class DepthEstimationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => DepthEstimationPipelineType} */ (Pipeline)
 {
     async _call(images) {
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         const inputs = await this.processor(preparedImages);
         const { predicted_depth } = await this.model(inputs);

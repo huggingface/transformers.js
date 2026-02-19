@@ -425,6 +425,7 @@ export async function pipeline(
         subfolder = 'onnx',
         use_external_data_format = null,
         model_file_name = null,
+        abort_signal = null,
         session_options = {},
     } = {},
 ) {
@@ -460,6 +461,7 @@ export async function pipeline(
         subfolder,
         use_external_data_format,
         model_file_name,
+        abort_signal,
         session_options,
     };
 

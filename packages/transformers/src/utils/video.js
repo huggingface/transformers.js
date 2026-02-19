@@ -45,10 +45,11 @@ export class RawVideo {
  * @param {Object} [options] Optional parameters.
  * @param {number} [options.num_frames=null] The number of frames to sample uniformly.
  * @param {number} [options.fps=null] The number of frames to sample per second.
+ * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the video loading.
  *
  * @returns {Promise<RawVideo>} The loaded video.
  */
-export async function load_video(src, { num_frames = null, fps = null } = {}) {
+export async function load_video(src, { num_frames = null, fps = null, abort_signal = null } = {}) {
     if (!apis.IS_BROWSER_ENV) {
         throw new Error('`load_video` is currently only supported in browser environments.');
     }
@@ -79,7 +80,7 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
 
     if (video.seekable.start(0) === video.seekable.end(0)) {
         // Fallback: Download entire video if not seekable
-        const response = await fetch(video.src);
+        const response = await fetch(video.src, { signal: abort_signal });
         const blob = await response.blob();
         video.src = URL.createObjectURL(blob);
         await new Promise((resolve) => (video.onloadedmetadata = resolve));

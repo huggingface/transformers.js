@@ -114,7 +114,7 @@ export class ZeroShotObjectDetectionPipeline
 {
     async _call(images, candidate_labels, { threshold = 0.1, top_k = null, percentage = false } = {}) {
         const isBatched = Array.isArray(images);
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
 
         // Run tokenization
         const text_inputs = this.tokenizer(candidate_labels, {

@@ -4,9 +4,11 @@ import { isValidUrl } from '../../utils/hub/utils.js';
 /**
  * Loads and caches a file from the given URL.
  * @param {string} url The URL of the file to load.
+ * @param {Object} options Additional options for loading the file.
+ * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
  * @returns {Promise<Response|import('../../utils/hub/files.js').FileResponse|null|string>} The response object, or null if loading failed.
  */
-async function loadAndCacheFile(url) {
+async function loadAndCacheFile(url, { abort_signal = null } = {}) {
     const fileName = url.split('/').pop();
 
     /** @type {import('../../utils/cache.js').CacheInterface|undefined} */
@@ -26,7 +28,7 @@ async function loadAndCacheFile(url) {
     }
 
     // If not in cache, fetch it
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: abort_signal });
 
     if (!response.ok) {
         throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
@@ -35,7 +37,7 @@ async function loadAndCacheFile(url) {
     // Cache the response for future use
     if (cache) {
         try {
-            await cache.put(url, response.clone());
+            await cache.put(url, response.clone(), undefined, { abort_signal });
         } catch (e) {
             console.warn(`Failed to cache ${fileName}:`, e);
         }

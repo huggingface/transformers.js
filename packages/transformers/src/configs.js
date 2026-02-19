@@ -463,7 +463,14 @@ export class PretrainedConfig {
      */
     static async from_pretrained(
         pretrained_model_name_or_path,
-        { progress_callback = null, config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+        {
+            progress_callback = null,
+            config = null,
+            cache_dir = null,
+            local_files_only = false,
+            revision = 'main',
+            abort_signal = null,
+        } = {},
     ) {
         if (config && !(config instanceof PretrainedConfig)) {
             config = new PretrainedConfig(config);
@@ -477,6 +484,7 @@ export class PretrainedConfig {
                 cache_dir,
                 local_files_only,
                 revision,
+                abort_signal,
             }));
         return new this(data);
     }

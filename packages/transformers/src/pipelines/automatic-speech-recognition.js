@@ -174,7 +174,7 @@ export class AutomaticSpeechRecognitionPipeline
         const batchedAudio = single ? [audio] : audio;
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate, { abort_signal: this.abort_signal });
 
         const toReturn = [];
         for (const aud of preparedAudios) {
@@ -214,7 +214,7 @@ export class AutomaticSpeechRecognitionPipeline
         const hop_length = feature_extractor_config.hop_length;
 
         const sampling_rate = feature_extractor_config.sampling_rate;
-        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate, { abort_signal: this.abort_signal });
 
         const toReturn = [];
         for (const aud of preparedAudios) {
@@ -303,7 +303,7 @@ export class AutomaticSpeechRecognitionPipeline
         const single = !Array.isArray(audio);
         const batchedAudio = single ? [audio] : audio;
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate, { abort_signal: this.abort_signal });
         const toReturn = [];
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);

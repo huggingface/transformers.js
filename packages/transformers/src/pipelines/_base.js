@@ -15,15 +15,17 @@ import { RawImage } from '../utils/image.js';
 /**
  * Prepare images for further tasks.
  * @param {ImagePipelineInputs} images images to prepare.
+ * @param {Object} options Additional options for preparing the images.
+ * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
  * @returns {Promise<RawImage[]>} returns processed images.
  */
-export async function prepareImages(images) {
+export async function prepareImages(images, { abort_signal = null } = {}) {
     if (!Array.isArray(images)) {
         images = [images];
     }
 
     // Possibly convert any non-images to images
-    return await Promise.all(images.map((x) => RawImage.read(x)));
+    return await Promise.all(images.map((x) => RawImage.read(x, { abort_signal })));
 }
 
 /**
@@ -35,9 +37,11 @@ export async function prepareImages(images) {
  * Prepare audios for further tasks.
  * @param {AudioPipelineInputs} audios audios to prepare.
  * @param {number} sampling_rate sampling rate of the audios.
+ * @param {Object} options Additional options for preparing the audios.
+ * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
  * @returns {Promise<Float32Array[]>} The preprocessed audio data.
  */
-export async function prepareAudios(audios, sampling_rate) {
+export async function prepareAudios(audios, sampling_rate, { abort_signal = null } = {}) {
     if (!Array.isArray(audios)) {
         audios = [audios];
     }
@@ -45,7 +49,7 @@ export async function prepareAudios(audios, sampling_rate) {
     return await Promise.all(
         audios.map((x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                return read_audio(x, sampling_rate);
+                return read_audio(x, sampling_rate, { abort_signal });
             } else if (x instanceof Float64Array) {
                 return new Float32Array(x);
             }
@@ -98,13 +102,15 @@ export class Pipeline extends Callable {
      * @param {PreTrainedModel} [options.model] The model used by the pipeline.
      * @param {PreTrainedTokenizer} [options.tokenizer=null] The tokenizer used by the pipeline (if any).
      * @param {Processor} [options.processor=null] The processor used by the pipeline (if any).
+     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
      */
-    constructor({ task, model, tokenizer = null, processor = null }) {
+    constructor({ task, model, tokenizer = null, processor = null, abort_signal = null } = {}) {
         super();
         this.task = task;
         this.model = model;
         this.tokenizer = tokenizer;
         this.processor = processor;
+        this.abort_signal = abort_signal;
     }
 
     /** @type {DisposeType} */
@@ -118,6 +124,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
+ * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelTokenizerConstructorArgs} TextPipelineConstructorArgs An object used to instantiate a text-based pipeline.
  */
@@ -127,6 +134,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelProcessorConstructorArgs} AudioPipelineConstructorArgs An object used to instantiate an audio-based pipeline.
  * @typedef {ModelProcessorConstructorArgs} ImagePipelineConstructorArgs An object used to instantiate an image-based pipeline.
@@ -138,6 +146,7 @@ export class Pipeline extends Callable {
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextAudioPipelineConstructorArgs An object used to instantiate a text- and audio-based pipeline.
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextImagePipelineConstructorArgs An object used to instantiate a text- and image-based pipeline.

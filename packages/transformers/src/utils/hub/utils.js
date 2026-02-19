@@ -81,9 +81,11 @@ export function handleError(status, remoteURL, fatal) {
  *
  * @param {Response|import('./files.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
+ * @param {Object} options Additional options for reading the response.
+ * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
-export async function readResponse(response, progress_callback) {
+export async function readResponse(response, progress_callback, { abort_signal = null } = {}) {
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
         console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
@@ -93,6 +95,7 @@ export async function readResponse(response, progress_callback) {
     let loaded = 0;
 
     const reader = response.body.getReader();
+
     async function read() {
         const { done, value } = await reader.read();
         if (done) return;
@@ -121,8 +124,25 @@ export async function readResponse(response, progress_callback) {
         return read();
     }
 
-    // Actually read
-    await read();
+    // Set up abort listener to cancel the reader immediately
+    let abortHandler = null;
+    if (abort_signal) {
+        abortHandler = () => {
+            reader.cancel().catch(() => {
+                // Ignore errors from canceling
+            });
+        };
+        abort_signal.addEventListener('abort', abortHandler);
+    }
+
+    try {
+        // Actually read
+        await read();
+    } finally {
+        if (abort_signal && abortHandler) {
+            abort_signal.removeEventListener('abort', abortHandler);
+        }
+    }
 
     return buffer;
 }

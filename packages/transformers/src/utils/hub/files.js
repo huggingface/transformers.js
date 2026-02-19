@@ -20,10 +20,13 @@ export class FileResponse {
     /**
      * Creates a new `FileResponse` object.
      * @param {string} filePath
+     * @param {Object} options Additional options for creating the file response.
+     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
      */
-    constructor(filePath) {
+    constructor(filePath, { abort_signal = null } = {}) {
         this.filePath = filePath;
         this.headers = new Headers();
+        this.abort_signal = abort_signal;
 
         this.exists = fs.existsSync(filePath);
         if (this.exists) {
@@ -35,12 +38,15 @@ export class FileResponse {
 
             this.updateContentType();
 
-            const stream = fs.createReadStream(filePath);
+            const stream = fs.createReadStream(filePath, { signal: abort_signal });
             this.body = new ReadableStream({
                 start(controller) {
                     stream.on('data', (chunk) => controller.enqueue(chunk));
                     stream.on('end', () => controller.close());
                     stream.on('error', (err) => controller.error(err));
+                    abort_signal?.addEventListener('abort', () => {
+                        controller.error(new Error('Request aborted'));
+                    });
                 },
                 cancel() {
                     stream.destroy();
@@ -69,7 +75,7 @@ export class FileResponse {
      * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
      */
     clone() {
-        let response = new FileResponse(this.filePath);
+        let response = new FileResponse(this.filePath, { abort_signal: this.abort_signal });
         response.exists = this.exists;
         response.status = this.status;
         response.statusText = this.statusText;
@@ -155,10 +161,12 @@ export class FileCache {
      * @param {string} request
      * @param {Response} response
      * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
+     * @param {Object} options Additional options for adding the response to the cache.
+     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
      * The function to call with progress updates
      * @returns {Promise<void>}
      */
-    async put(request, response, progress_callback = undefined) {
+    async put(request, response, progress_callback = undefined, { abort_signal = null } = {}) {
         let filePath = path.join(this.path, request);
 
         try {
@@ -171,13 +179,42 @@ export class FileCache {
             const reader = response.body.getReader();
 
             while (true) {
+                // Check if the request has been aborted
+                if (abort_signal?.aborted) {
+                    reader.cancel();
+                    fileStream.destroy();
+                    throw new Error('Request aborted');
+                }
+
                 const { done, value } = await reader.read();
                 if (done) {
                     break;
                 }
 
+                // Check again after reading
+                if (abort_signal?.aborted) {
+                    reader.cancel();
+                    fileStream.destroy();
+                    throw new Error('Request aborted');
+                }
+
                 await new Promise((resolve, reject) => {
+                    // Set up abort listener
+                    const abortHandler = () => {
+                        reader.cancel();
+                        fileStream.destroy();
+                        reject(new Error('Request aborted'));
+                    };
+
+                    if (abort_signal) {
+                        abort_signal.addEventListener('abort', abortHandler);
+                    }
+
+                    // Write the value to the file stream
                     fileStream.write(value, (err) => {
+                        if (abort_signal) {
+                            abort_signal.removeEventListener('abort', abortHandler);
+                        }
                         if (err) {
                             reject(err);
                             return;

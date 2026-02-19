@@ -43,7 +43,7 @@ export class ImageToImagePipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => ImageToImagePipelineType} */ (Pipeline)
 {
     async _call(images) {
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, { abort_signal: this.abort_signal });
         const inputs = await this.processor(preparedImages);
         const outputs = await this.model(inputs);
 
