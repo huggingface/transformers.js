@@ -1,5 +1,5 @@
 import { get_files } from './get_files.js';
-import { SUPPORTED_TASKS, TASK_ALIASES } from '../pipeline-tasks.js';
+import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
  * Extract component requirements from SUPPORTED_TASKS

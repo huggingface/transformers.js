@@ -40,7 +40,7 @@ import { ImageToImagePipeline } from './pipelines/image-to-image.js';
 import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
 import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
-import { SUPPORTED_TASKS, TASK_ALIASES } from './utils/pipeline-tasks.js';
+import { SUPPORTED_TASKS, TASK_ALIASES } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/cache/get_pipeline_files.js';
 import { get_file_metadata } from './utils/cache/get_file_metadata.js';
 
