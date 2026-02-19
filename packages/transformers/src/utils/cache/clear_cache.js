@@ -91,21 +91,6 @@ async function clear_files_from_cache(modelId, files, options = {}) {
  * @param {boolean} [options.include_tokenizer=true] - Whether to clear tokenizer files
  * @param {boolean} [options.include_processor=true] - Whether to clear processor files
  * @returns {Promise<CacheClearResult>} Object with deletion statistics and file status
- *
- * @example
- * import { clear_cache } from '@huggingface/transformers';
- *
- * // Clear all cached files for a model
- * const result = await clear_cache('Xenova/gpt2');
- * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
- * result.files.forEach(f => {
- *     console.log(`${f.file}: ${f.deleted ? '✓ deleted' : f.wasCached ? '✗ failed' : 'not cached'}`);
- * });
- *
- * @example
- * // Clear only specific dtype/device variant
- * const result = await clear_cache('Xenova/gpt2', { dtype: 'fp16', device: 'webgpu' });
- * console.log(`Cleared ${result.filesDeleted} files`);
  */
 export async function clear_cache(modelId, options = {}) {
     if (!modelId) {
@@ -129,21 +114,6 @@ export async function clear_cache(modelId, options = {}) {
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
  * @returns {Promise<CacheClearResult>} Object with deletion statistics and file status
- *
- * @example
- * import { clear_pipeline_cache } from '@huggingface/transformers';
- *
- * // Clear cached files for a specific pipeline
- * const result = await clear_pipeline_cache('text-generation', 'Xenova/gpt2');
- * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
- * result.files.forEach(f => {
- *     console.log(`${f.file}: ${f.deleted ? '✓ deleted' : f.wasCached ? '✗ failed' : 'not cached'}`);
- * });
- *
- * @example
- * // Background removal (only clears model files, no tokenizer/processor)
- * const result = await clear_pipeline_cache('background-removal', 'Xenova/modnet');
- * console.log(`Cleared ${result.filesDeleted} files`);
  */
 export async function clear_pipeline_cache(task, modelId, options = {}) {
     if (!task) {

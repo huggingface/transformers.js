@@ -64,20 +64,6 @@ async function check_files_cache(modelId, files, options = {}) {
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] Override device
  * @returns {Promise<CacheCheckResult>} Object with allCached boolean and files array with cache status
- *
- * @example
- * import { is_cached } from '@huggingface/transformers';
- *
- * // Check cache status
- * const status = await is_cached('Xenova/gpt2');
- * console.log(status.allCached ? 'All files cached!' : 'Some files need downloading');
- * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
- *
- * // With options
- * const status2 = await is_cached('Xenova/gpt2', { dtype: 'fp16', device: 'webgpu' });
- * status2.files.forEach(f => {
- *     console.log(`${f.file}: ${f.cached ? '✓' : '✗'}`);
- * });
  */
 export async function is_cached(modelId, options = {}) {
     if (!modelId) {
@@ -101,20 +87,6 @@ export async function is_cached(modelId, options = {}) {
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
  * @returns {Promise<CacheCheckResult>} Object with allCached boolean and files array with cache status
- *
- * @example
- * import { is_pipeline_cached } from '@huggingface/transformers';
- *
- * // Check cache status
- * const status = await is_pipeline_cached('text-generation', 'Xenova/gpt2');
- * console.log(status.allCached ? 'Ready to use!' : 'Will download files');
- * status.files.forEach(f => {
- *     console.log(`${f.file}: ${f.cached ? '✓' : '✗'}`);
- * });
- *
- * // Background removal (only needs model, no tokenizer/processor)
- * const status2 = await is_pipeline_cached('background-removal', 'Xenova/modnet');
- * console.log(`Files needed: ${status2.files.length}`); // Should be fewer than full model
  */
 export async function is_pipeline_cached(task, modelId, options = {}) {
     if (!task) {

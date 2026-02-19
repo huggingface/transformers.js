@@ -30,15 +30,6 @@ function get_task_components(task) {
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported
- *
- * @example
- * ```javascript
- * // Get files for a text-generation model (only tokenizer + model)
- * const files = await get_pipeline_files('text-generation', 'Xenova/gpt2');
- *
- * // Get files for an image-classification model (only processor + model)
- * const files = await get_pipeline_files('image-classification', 'Xenova/vit-base');
- * ```
  */
 export async function get_pipeline_files(task, modelId, options = {}) {
     // Apply task aliases
