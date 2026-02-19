@@ -28,8 +28,6 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 /**
  * Internal helper to clear cached files.
  *
- * Uses parallel processing (Promise.all) to delete multiple files concurrently for optimal performance.
- * This is safe because each file deletion is an independent operation with no shared state or side effects.
  *
  * @private
  * @param {string} modelId - The model id
