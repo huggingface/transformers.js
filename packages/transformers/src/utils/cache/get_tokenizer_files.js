@@ -1,4 +1,4 @@
-import { get_file_metadata } from '../hub.js';
+import { get_file_metadata } from './get_file_metadata.js';
 
 /**
  * Returns the list of files that will be loaded for a tokenizer.

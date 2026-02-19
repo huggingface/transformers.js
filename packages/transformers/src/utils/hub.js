@@ -206,9 +206,6 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
     }
 }
 
-// Re-export from cache folder for backward compatibility
-export { get_file_metadata } from './cache/get_file_metadata.js';
-
 /**
  * Loads a resource file from local or remote sources.
  *
