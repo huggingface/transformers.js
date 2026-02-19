@@ -64,14 +64,30 @@ export async function getFile(urlOrPath) {
                     : urlOrPath.toString()
                 : urlOrPath,
         );
-    } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+    } else {
+        return fetch(urlOrPath, {
+            headers: getFetchHeaders(urlOrPath),
+        });
+    }
+}
+
+/**
+ * Generates appropriate HTTP headers for fetching resources.
+ * In Node.js environments, adds User-Agent and Authorization headers when applicable.
+ * In browser environments, returns minimal headers for security.
+ *
+ * @param {URL|string} urlOrPath The URL or path being fetched.
+ * @returns {Headers} A Headers object with appropriate headers for the request.
+ */
+export function getFetchHeaders(urlOrPath) {
+    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
+    const headers = new Headers();
+
+    if (isNode) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
-
-        const headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
-        // Check whether we are making a request to the Hugging Face Hub.
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
             // If an access token is present in the environment variables,
@@ -82,13 +98,13 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
     }
+
+    return headers;
 }
 
 /**

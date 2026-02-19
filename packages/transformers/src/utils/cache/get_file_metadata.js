@@ -4,7 +4,7 @@
 
 import { env } from '../../env.js';
 import { getCache } from '../cache.js';
-import { buildResourcePaths, checkCachedResource, getFile } from '../hub.js';
+import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl } from '../hub/utils.js';
 
 /**
@@ -31,33 +31,9 @@ async function fetch_file_head(urlOrPath) {
         return null;
     }
 
-    if (typeof process !== 'undefined' && process?.release?.name === 'node') {
-        const IS_CI = !!process.env?.TESTING_REMOTELY;
-        const version = env.version;
-
-        const headers = new Headers();
-        headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
-        // Request only the first byte to get metadata without downloading the full file
-        headers.set('Range', 'bytes=0-0');
-
-        // Check whether we are making a request to the Hugging Face Hub.
-        const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
-        if (isHFURL) {
-            // If an access token is present in the environment variables,
-            // we add it to the request headers.
-            const token = process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN;
-            if (token) {
-                headers.set('Authorization', `Bearer ${token}`);
-            }
-        }
-        return fetch(urlOrPath, { method: 'GET', headers });
-    } else {
-        // Running in a browser-environment
-        const headers = new Headers();
-        // Request only the first byte to get metadata without downloading the full file
-        headers.set('Range', 'bytes=0-0');
-        return fetch(urlOrPath, { method: 'GET', headers });
-    }
+    const headers = getFetchHeaders(urlOrPath);
+    headers.set('Range', 'bytes=0-0');
+    return fetch(urlOrPath, { method: 'GET', headers });
 }
 
 /**
