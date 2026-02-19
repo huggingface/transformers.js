@@ -55,7 +55,7 @@ For this application, we will use the [Xenova/nllb-200-distilled-600M](https://h
 
 We can achieve both of these goals by using a [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) and some [React hooks](https://react.dev/reference/react).
 
-1. Create a file called `worker.js` in the `src` directory. This script will do all the heavy-lifing for us, including loading and running of the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class which use the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and use this pipeline for all subsequent calls:
+1. Create a file called `worker.js` in the `src` directory. This script will do all the heavy-lifting for us, including loading and running of the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class which use the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and use this pipeline for all subsequent calls:
 
    ```javascript
    import { pipeline, TextStreamer } from "@huggingface/transformers";

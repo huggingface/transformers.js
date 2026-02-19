@@ -116,6 +116,7 @@ function getNormalizedConfig(config) {
         case 'apertus':
         case 'arcee':
         case 'lfm2':
+        case 'lfm2_moe':
         case 'smollm3':
         case 'olmo':
         case 'olmo2':
@@ -124,6 +125,7 @@ function getNormalizedConfig(config) {
         case 'granite':
         case 'granitemoehybrid':
         case 'cohere':
+        case 'cohere2':
         case 'mistral':
         case 'starcoder2':
         case 'qwen2':
@@ -180,6 +182,12 @@ function getNormalizedConfig(config) {
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_layers';
             mapping['dim_kv'] = 'head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
+        case 'youtu':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_hidden_layers';
+            mapping['dim_kv'] = 'qk_head_dim';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
 
@@ -276,7 +284,7 @@ function getNormalizedConfig(config) {
  * @returns {Record<string, number[]>}
  */
 export function getCacheShapes(config, options) {
-    if (config.model_type === 'lfm2') {
+    if (['lfm2', 'lfm2_moe'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
 

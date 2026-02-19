@@ -62,4 +62,6 @@ export { ModelRegistry } from './utils/cache/ModelRegistry.js';
  * @typedef {import('./tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
+ * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
+ * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
  */

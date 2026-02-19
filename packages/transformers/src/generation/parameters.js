@@ -21,7 +21,7 @@
  * Custom logits processors that complement the default logits processors built from arguments and
  * generation config. If a logit processor is passed that is already created with the arguments or a
  * generation config an error is thrown. This feature is intended for advanced users.
- * @property {import('./stopping_criteria.js').StoppingCriteriaList} [stopping_criteria=null] (`StoppingCriteriaList`, *optional*):
+ * @property {import('./stopping_criteria.js').StoppingCriteria|import('./stopping_criteria.js').StoppingCriteria[]|import('./stopping_criteria.js').StoppingCriteriaList} [stopping_criteria=null] (`StoppingCriteriaList`, *optional*):
  * Custom stopping criteria that complements the default stopping criteria built from arguments and a
  * generation config. If a stopping criteria is passed that is already created with the arguments or a
  * generation config an error is thrown. This feature is intended for advanced users.
