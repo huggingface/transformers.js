@@ -15,6 +15,7 @@ import { saveBlob } from './io.js';
 
 // Will be empty (or not used) if running in browser or web-worker
 import sharp from 'sharp';
+import { logger } from './logger.js';
 
 let createCanvasFunction;
 let ImageDataClass;
@@ -406,7 +407,7 @@ export class RawImage {
                 case 'box':
                 case 'hamming':
                     if (resampleMethod === 'box' || resampleMethod === 'hamming') {
-                        console.warn(
+                        logger.warn(
                             `Resampling method ${resampleMethod} is not yet supported. Using bilinear instead.`,
                         );
                         resampleMethod = 'bilinear';

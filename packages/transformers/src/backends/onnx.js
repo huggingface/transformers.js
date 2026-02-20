@@ -16,13 +16,14 @@
  * @module backends/onnx
  */
 
-import { env, apis } from '../env.js';
+import { env, apis, LogLevel } from '../env.js';
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { isBlobURL, loadWasmBinary, loadWasmFactory, toAbsoluteURL } from './utils/cacheWasm.js';
+import { logger } from '../utils/logger.js';
 export { Tensor } from 'onnxruntime-common';
 
 /**
@@ -46,9 +47,30 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
-/** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
-const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
-const DEFAULT_LOG_LEVEL = 4; // 'fatal';
+/**
+ * Converts any LogLevel value to ONNX Runtime's numeric severity level (0-4).
+ * This handles both standard LogLevel values (10, 20, 30, 40, 50) and custom intermediate values.
+ *
+ * @param {number} logLevel - The LogLevel value to convert
+ * @returns {number} ONNX Runtime severity level (0-4)
+ */
+function getOnnxLogSeverityLevel(logLevel) {
+    // Map LogLevel (10, 20, 30, 40, 50) to ONNX severity (0, 1, 2, 3, 4)
+    // Formula: floor(logLevel / 10) - 1, clamped to [0, 4]
+    return Math.min(Math.max(Math.floor(logLevel / 10) - 1, 0), 4);
+}
+
+/**
+ * Maps ONNX Runtime numeric severity levels to string log levels.
+ * @type {Record<0 | 1 | 2 | 3 | 4, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
+ */
+const ONNX_LOG_LEVEL_NAMES = {
+    0: 'verbose',
+    1: 'info',
+    2: 'warning',
+    3: 'error',
+    4: 'fatal',
+};
 
 /**
  * The list of supported devices, sorted by priority/performance.
@@ -193,7 +215,7 @@ async function ensureWasmLoaded() {
                               ONNX_ENV.wasm.wasmBinary = wasmBinary;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM binary:', err);
+                          logger.warn('Failed to pre-load WASM binary:', err);
                       }
                   })()
                 : Promise.resolve(),
@@ -208,7 +230,7 @@ async function ensureWasmLoaded() {
                               ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM factory:', err);
+                          logger.warn('Failed to pre-load WASM factory:', err);
                       }
                   })()
                 : Promise.resolve(),
@@ -229,8 +251,8 @@ export async function createInferenceSession(buffer_or_path, session_options, se
     await ensureWasmLoaded();
     const load = () =>
         InferenceSession.create(buffer_or_path, {
-            // Set default log level, but allow overriding through session options
-            logSeverityLevel: DEFAULT_LOG_LEVEL,
+            // Set default log severity level, but allow overriding through session options
+            logSeverityLevel: getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING),
             ...session_options,
         });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
@@ -268,7 +290,7 @@ export function isONNXTensor(x) {
 
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = LOG_LEVELS[DEFAULT_LOG_LEVEL];
+ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING)];
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 

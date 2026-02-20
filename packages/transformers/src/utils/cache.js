@@ -1,5 +1,6 @@
 import { apis, env } from '../env.js';
 import { FileCache } from './hub/files.js';
+import { logger } from './logger.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -47,7 +48,7 @@ export async function getCache(file_cache_dir = null) {
             // So, instead of crashing, we just ignore the error and continue without using the cache.
             cache = await caches.open(env.cacheKey);
         } catch (e) {
-            console.warn('An error occurred while opening the browser cache:', e);
+            logger.warn('An error occurred while opening the browser cache:', e);
         }
     }
 

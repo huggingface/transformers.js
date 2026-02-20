@@ -43,6 +43,7 @@ import { PreTrainedModel } from '../modeling_utils.js';
 import { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS } from '../registry.js';
 
 import * as ALL_MODEL_FILES from '../models.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Base class of all AutoModels. Contains the `from_pretrained` function
@@ -114,7 +115,7 @@ class PretrainedMixin {
 
         if (this.BASE_IF_FAIL) {
             if (!CUSTOM_ARCHITECTURES.has(model_type)) {
-                console.warn(`Unknown model class "${model_type}", attempting to construct from base class.`);
+                logger.warn(`Unknown model class "${model_type}", attempting to construct from base class.`);
             }
             return await PreTrainedModel.from_pretrained(pretrained_model_name_or_path, options);
         } else {

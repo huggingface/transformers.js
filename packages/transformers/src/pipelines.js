@@ -42,6 +42,7 @@ import {
 } from './models/auto/modeling_auto.js';
 
 import { dispatchCallback } from './utils/core.js';
+import { logger } from './utils/logger.js';
 
 import { TextClassificationPipeline } from './pipelines/text-classification.js';
 import { TokenClassificationPipeline } from './pipelines/token-classification.js';
@@ -443,7 +444,7 @@ export async function pipeline(
     // Use model if specified, otherwise, use default
     if (!model) {
         model = pipelineInfo.default.model;
-        console.log(`No model specified. Using default model: "${model}".`);
+        logger.info(`No model specified. Using default model: "${model}".`);
         if (!dtype && pipelineInfo.default.dtype) {
             dtype = pipelineInfo.default.dtype;
         }

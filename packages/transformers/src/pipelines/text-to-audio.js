@@ -2,6 +2,7 @@ import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 import { RawAudio } from '../utils/audio.js';
+import { logger } from '../utils/logger.js';
 
 import { AutoModel } from '../models/auto/modeling_auto.js';
 
@@ -194,7 +195,7 @@ export class TextToAudioPipeline
     async _call_text_to_spectrogram(text_inputs, { speaker_embeddings }) {
         // Load vocoder, if not provided
         if (!this.vocoder) {
-            console.log('No vocoder specified, using default HifiGan vocoder.');
+            logger.info('No vocoder specified, using default HifiGan vocoder.');
             this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
         }
 
