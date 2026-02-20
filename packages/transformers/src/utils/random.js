@@ -1,3 +1,5 @@
+import { apis } from '../env.js';
+
 /**
  * Let there be order amidst the chaos.
  *
@@ -19,6 +21,7 @@
 const mt = new Uint32Array(624);
 let idx = 625;
 let _gauss_next = null;
+let _seeded = false;
 
 /**
  * Seeds the Mersenne Twister PRNG with the given value.
@@ -55,6 +58,7 @@ export function seed(n) {
     mt[0] = 0x80000000;
     idx = 624;
     _gauss_next = null;
+    _seeded = true;
 }
 
 /**
@@ -66,6 +70,15 @@ export function seed(n) {
  * @returns {number} A random integer in the range [0, 2^32 - 1].
  */
 function int32() {
+    if (!_seeded) {
+        const buf = new Uint32Array(1);
+        if (apis.IS_CRYPTO_AVAILABLE) {
+            crypto.getRandomValues(buf);
+        } else {
+            buf[0] = Date.now() >>> 0;
+        }
+        seed(buf[0]);
+    }
     if (idx >= 624) {
         for (let k = 0; k < 624; ++k) {
             // twist
