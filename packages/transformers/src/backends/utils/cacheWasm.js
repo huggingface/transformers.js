@@ -65,14 +65,23 @@ export async function loadWasmBinary(wasmURL) {
 
 /**
  * Checks if the current environment supports blob URLs for ES modules.
- * Blob URLs don't work in Service Workers, Chrome extensions, or with multi-threading.
+ * Blob URLs don't work in Service Workers, Chrome extensions, with multi-threading, or with COEP headers.
  * @see https://github.com/huggingface/transformers.js/issues/1532
+ * @see https://github.com/huggingface/transformers.js/issues/1527
  * @returns {boolean} True if blob URLs are safe to use for module imports.
  */
 function canUseBlobURLs() {
     // Don't use blob URLs in Service Workers
     // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
     if (typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) {
+        return false;
+    }
+
+    // Don't use blob URLs if COEP headers are set (Cross-Origin-Embedder-Policy)
+    // COEP blocks cross-origin resources without CORP headers, which breaks CDN loading with blob URLs
+    // crossOriginIsolated = true indicates COEP + COOP headers are set
+    // @ts-ignore - crossOriginIsolated may not exist in all environments
+    if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === true) {
         return false;
     }
 
