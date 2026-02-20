@@ -1,7 +1,7 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
 import { AutoConfig, getCacheShapes } from '../configs.js';
-import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
+import { Tensor, full_like, cat, zeros_like, ones_like, ones, index_select, index_select_async } from '../utils/tensor.js';
 import { DataTypeMap } from '../utils/dtypes.js';
 
 // These will be populated by registry.js
@@ -33,7 +33,9 @@ import {
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
+import { BeamSearchScorer } from '../generation/beam_search.js';
 import { pick } from '../utils/core.js';
+import { log_softmax } from '../utils/maths.js';
 import { ModelOutput } from './modeling_outputs.js';
 
 /**
@@ -1079,27 +1081,85 @@ export class PreTrainedModel extends Callable {
         // }
 
         const numInputs = model_inputs[model_input_name].dims.at(0);
+        const num_beams = generation_config.num_beams;
+        const is_beam_search = num_beams > 1;
 
-        // TODO:
-        // done is a list of booleans to keep track of which inputs are done
-        // const done = new Array(numInputs).fill(false);
-        // For efficiency purposes, we remove completed rows from model_inputs
-        // when the beam is complete, and we keep track of the row index
-        // const rowIndexToBatchIndex = new Map();
+        let beam_scorer = null;
+        /** @type {number[]} */
+        let beam_scores;
+
+        if (is_beam_search) {
+            // Validate beam search configuration
+            if (generation_config.num_beam_groups > 1) {
+                throw new Error('Diverse beam search (num_beam_groups > 1) is not yet supported.');
+            }
+            if (generation_config.do_sample) {
+                throw new Error('Beam sampling (num_beams > 1 with do_sample = true) is not yet supported.');
+            }
+            if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
+                throw new Error('Classifier-free guidance (guidance_scale > 1) is not supported with beam search.');
+            }
+            if (streamer) {
+                throw new Error('Streaming is not supported with beam search.');
+            }
+
+            beam_scorer = new BeamSearchScorer(numInputs, num_beams, {
+                length_penalty: generation_config.length_penalty,
+                early_stopping: generation_config.early_stopping,
+                num_return_sequences: generation_config.num_return_sequences,
+                eos_token_id: generation_config.eos_token_id,
+                pad_token_id: generation_config.pad_token_id,
+            });
+        }
 
         const sampler = LogitsSampler.getSampler(generation_config);
 
-        // TODO make > numInputs
-        const scores = new Array(numInputs).fill(0);
+        const scores = new Array(is_beam_search ? numInputs * num_beams : numInputs).fill(0);
         /** @type {bigint[][]} */
         const all_input_ids = input_ids.tolist();
+
+        if (is_beam_search) {
+            // Expand all_input_ids: [A, B] -> [A, A, A, B, B, B] for num_beams=3
+            const expanded_ids = [];
+            for (const ids of all_input_ids) {
+                for (let b = 0; b < num_beams; ++b) {
+                    expanded_ids.push([...ids]);
+                }
+            }
+            all_input_ids.length = 0;
+            all_input_ids.push(...expanded_ids);
+
+            // Expand model_inputs tensors by repeating each row num_beams times
+            for (const key of [model_input_name, 'attention_mask', 'decoder_attention_mask', 'encoder_outputs']) {
+                const tensor = model_inputs[key];
+                if (tensor instanceof Tensor) {
+                    const [batch, ...rest] = tensor.dims;
+                    const rowSize = rest.length > 0 ? rest.reduce((a, b) => a * b, 1) : 1;
+                    // @ts-ignore
+                    const newData = new tensor.data.constructor(batch * num_beams * rowSize);
+                    for (let i = 0; i < batch; ++i) {
+                        const srcOffset = i * rowSize;
+                        for (let b = 0; b < num_beams; ++b) {
+                            newData.set(
+                                tensor.data.subarray(srcOffset, srcOffset + rowSize),
+                                (i * num_beams + b) * rowSize,
+                            );
+                        }
+                    }
+                    model_inputs[key] = new Tensor(tensor.type, newData, [batch * num_beams, ...rest]);
+                }
+            }
+
+            // Initialize beam_scores: first beam of each input = 0, rest = -1e9
+            beam_scores = new Array(numInputs * num_beams).fill(-1e9);
+            for (let i = 0; i < numInputs; ++i) {
+                beam_scores[i * num_beams] = 0;
+            }
+        }
+
         if (streamer) {
             streamer.put(all_input_ids);
         }
-        // const all_generated_input_ids = Array.from({ length: numInputs }, () => []);
-
-        // NOTE: For now, we don't support spawning new beams
-        // TODO: when we do, we simply copy past key values and accumulate into single large tensor
 
         ////////////////////////////////////////////////////
         // Generic search which handles 4 generation modes:
@@ -1144,39 +1204,125 @@ export class PreTrainedModel extends Callable {
 
             /** @type {[bigint][]} */
             const generated_input_ids = [];
-            // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
-            // Loop over each batch
-            for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
-                const logs = next_tokens_scores[batch_idx];
 
-                const sampledTokens = await sampler(logs);
-                for (const [newTokenId, logProb] of sampledTokens) {
-                    const bigint = BigInt(newTokenId);
-                    // TODO: If branching, use previous beam as a starting point
-                    // update generated ids, model inputs, and length for next step
-                    scores[batch_idx] += logProb;
-                    all_input_ids[batch_idx].push(bigint);
-                    generated_input_ids.push([bigint]);
+            if (is_beam_search) {
+                // Beam search: score all candidates across beams, select top 2*num_beams per batch
+                const vocab_size = next_tokens_scores.dims.at(-1);
+                const total_beams = numInputs * num_beams;
 
-                    // TODO: Support beam search
-                    break;
+                const all_next_tokens = [];
+                const all_next_indices = [];
+                const all_next_scores = [];
+
+                for (let batch_idx = 0; batch_idx < numInputs; ++batch_idx) {
+                    // Collect candidates across all beams for this batch item
+                    /** @type {{score: number, token: bigint, beam_idx: number}[]} */
+                    const candidates = [];
+
+                    for (let beam_idx = 0; beam_idx < num_beams; ++beam_idx) {
+                        const flat_beam = batch_idx * num_beams + beam_idx;
+                        const logits_data = /** @type {Float32Array} */ (next_tokens_scores[flat_beam].data);
+                        const log_probs = log_softmax(logits_data);
+
+                        // Find top 2*num_beams candidates per beam for efficiency
+                        /** @type {{score: number, token: bigint, beam_idx: number}[]} */
+                        const beam_candidates = [];
+                        for (let v = 0; v < vocab_size; ++v) {
+                            beam_candidates.push({
+                                score: beam_scores[flat_beam] + log_probs[v],
+                                token: BigInt(v),
+                                beam_idx,
+                            });
+                        }
+                        beam_candidates.sort((a, b) => b.score - a.score);
+                        candidates.push(...beam_candidates.slice(0, 2 * num_beams));
+                    }
+
+                    // Select top 2*num_beams candidates globally for this batch item
+                    candidates.sort((a, b) => b.score - a.score);
+                    const top_candidates = candidates.slice(0, 2 * num_beams);
+
+                    for (const c of top_candidates) {
+                        all_next_tokens.push(c.token);
+                        all_next_indices.push(c.beam_idx);
+                        all_next_scores.push(c.score);
+                    }
+                }
+
+                // Let beam_scorer process: route EOS to hypotheses, select continuing beams
+                const { next_beam_scores, next_beam_tokens, next_beam_indices } =
+                    beam_scorer.process(all_input_ids, beam_scores, all_next_tokens, all_next_indices, all_next_scores);
+
+                // Reorder all_input_ids based on beam indices and append new tokens
+                const new_all_input_ids = [];
+                for (let i = 0; i < total_beams; ++i) {
+                    new_all_input_ids.push([...all_input_ids[next_beam_indices[i]], next_beam_tokens[i]]);
+                    generated_input_ids.push([next_beam_tokens[i]]);
+                }
+                all_input_ids.length = 0;
+                all_input_ids.push(...new_all_input_ids);
+
+                // Update beam scores
+                for (let i = 0; i < total_beams; ++i) {
+                    beam_scores[i] = next_beam_scores[i];
+                }
+
+                // Reorder KV cache to match beam reordering
+                model_inputs['past_key_values'] = await this._reorder_cache(
+                    this.getPastKeyValues(outputs, model_inputs.past_key_values),
+                    next_beam_indices,
+                );
+            } else {
+                // Greedy / sample: existing behavior
+                for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
+                    const logs = next_tokens_scores[batch_idx];
+
+                    const sampledTokens = await sampler(logs);
+                    for (const [newTokenId, logProb] of sampledTokens) {
+                        const bigint = BigInt(newTokenId);
+                        scores[batch_idx] += logProb;
+                        all_input_ids[batch_idx].push(bigint);
+                        generated_input_ids.push([bigint]);
+                        break;
+                    }
                 }
             }
+
             if (streamer) {
                 streamer.put(generated_input_ids);
             }
 
+            // Check stopping conditions
+            if (is_beam_search && beam_scorer.is_done) {
+                break;
+            }
             const stop = prepared_stopping_criteria(all_input_ids);
             if (stop.every((x) => x)) {
                 break;
             }
 
-            model_inputs = this._update_model_kwargs_for_generation({
-                generated_input_ids,
-                outputs,
-                model_inputs,
-                is_encoder_decoder,
-            });
+            if (is_beam_search) {
+                // For beam search, we already updated past_key_values during reordering.
+                // Now update the remaining model inputs.
+                model_inputs['input_ids'] = new Tensor('int64', generated_input_ids.flat(), [generated_input_ids.length, 1]);
+
+                if (!is_encoder_decoder) {
+                    model_inputs.attention_mask = cat(
+                        [model_inputs.attention_mask, ones([model_inputs.attention_mask.dims[0], 1])],
+                        1,
+                    );
+                }
+
+                // Force recreate position_ids in next iteration
+                model_inputs['position_ids'] = null;
+            } else {
+                model_inputs = this._update_model_kwargs_for_generation({
+                    generated_input_ids,
+                    outputs,
+                    model_inputs,
+                    is_encoder_decoder,
+                });
+            }
         }
 
         if (streamer) {
@@ -1186,8 +1332,23 @@ export class PreTrainedModel extends Callable {
         // Retrieve and dispose all final past key values (including encoder attentions)
         const past_key_values = this.getPastKeyValues(outputs, model_inputs.past_key_values, true);
 
-        // TODO: ensure all_input_ids is padded correctly...
-        const sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
+        let sequences;
+        if (is_beam_search) {
+            // Finalize beam search: select best hypotheses
+            const best_sequences = beam_scorer.finalize(all_input_ids, beam_scores);
+
+            // Pad sequences to equal length for tensor creation
+            const max_len = Math.max(...best_sequences.map(s => s.length));
+            const pad_id = BigInt(generation_config.pad_token_id ?? 0);
+            const padded = best_sequences.map(s => {
+                const p = [...s];
+                while (p.length < max_len) p.push(pad_id);
+                return p;
+            });
+            sequences = new Tensor('int64', padded.flat(), [padded.length, max_len]);
+        } else {
+            sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
+        }
 
         if (generation_config.return_dict_in_generate) {
             return {
@@ -1195,9 +1356,6 @@ export class PreTrainedModel extends Callable {
                 past_key_values,
                 ...attentions,
                 ...return_dict_items,
-                // TODO:
-                // scores,
-                // logits,
             };
         } else {
             // Dispose all remaining tensors
@@ -1251,6 +1409,36 @@ export class PreTrainedModel extends Callable {
             }
         }
         return pkvs;
+    }
+
+    /**
+     * Reorder the past key values cache to match beam reordering.
+     * @param {Object} past_key_values The past key values object.
+     * @param {number[]} beam_indices Indices indicating which beam each new position came from.
+     * @returns {Promise<Object>} Reordered past key values.
+     */
+    async _reorder_cache(past_key_values, beam_indices) {
+        if (!past_key_values) return past_key_values;
+        const reordered = Object.create(null);
+        for (const key in past_key_values) {
+            const tensor = past_key_values[key];
+            const location = tensor.location;
+            if (key.includes('encoder')) {
+                // Encoder PKVs are shared across beams; pass through
+                reordered[key] = tensor;
+            } else {
+                if (tensor.location === 'cpu' || tensor.location === 'cpu-pinned') {
+                    reordered[key] = index_select(tensor, beam_indices);
+                } else {
+                    reordered[key] = await index_select_async(tensor, beam_indices);
+                }
+                // Dispose old tensor if it owns GPU resources
+                if (location === 'gpu-buffer' || location === 'texture' || location === 'ml-tensor') {
+                    tensor.dispose();
+                }
+            }
+        }
+        return reordered;
     }
 
     /**
