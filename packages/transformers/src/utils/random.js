@@ -22,7 +22,6 @@ import { apis } from '../env.js';
 const mt = new Uint32Array(624);
 let idx = 625;
 let _gauss_next = null;
-let _seeded = false;
 
 /**
  * Seeds the Mersenne Twister PRNG.
@@ -69,7 +68,6 @@ export function seed(n) {
     mt[0] = 0x80000000;
     idx = 624;
     _gauss_next = null;
-    _seeded = true;
 }
 
 /**
@@ -81,7 +79,6 @@ export function seed(n) {
  * @returns {number} A random integer in the range [0, 2^32 - 1].
  */
 function int32() {
-    if (!_seeded) seed();
     if (idx >= 624) {
         for (let k = 0; k < 624; ++k) {
             // twist
@@ -182,3 +179,6 @@ export function _weightedIndex(weights) {
 export function choices(population, weights) {
     return population[_weightedIndex(weights)];
 }
+
+// Auto-seed from OS entropy on module load.
+seed();

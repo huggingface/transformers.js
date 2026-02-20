@@ -19,6 +19,14 @@ init();
 const FLOAT_TOL = 1e-15;
 
 describe("random (Mersenne Twister 19937, Python-compatible)", () => {
+  // Must be the first test — verifies auto-seeding at module load produces non-zero output.
+  it("should return non-zero values before any explicit seed() call", () => {
+    const value = random.random();
+    expect(value).not.toBe(0);
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThan(1);
+  });
+
   describe("random()", () => {
     it("should produce the correct sequence for seed(42)", () => {
       const expected = [0.6394267984578837, 0.025010755222666936, 0.27502931836911926, 0.22321073814882275, 0.7364712141640124, 0.6766994874229113, 0.8921795677048454, 0.08693883262941615, 0.4219218196852704, 0.029797219438070344];
