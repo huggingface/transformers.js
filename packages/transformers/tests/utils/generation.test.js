@@ -597,6 +597,25 @@ describe("Beam search", () => {
     );
 
     it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "num_return_sequences > 1",
       async () => {
         const inputs = tokenizer(DUMMY_TEXT);
@@ -691,6 +710,25 @@ describe("Beam search", () => {
           num_beams: 4,
           num_beam_groups: 2,
           diversity_penalty: 0.5,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
           max_new_tokens: 5,
         });
         // Output should have shape [1, seq_len]

@@ -1114,9 +1114,6 @@ export class PreTrainedModel extends Callable {
             if (is_group_beam_search && generation_config.do_sample) {
                 throw new Error('Diverse beam sampling (num_beam_groups > 1 with do_sample = true) is not yet supported.');
             }
-            if (generation_config.do_sample) {
-                throw new Error('Beam sampling (num_beams > 1 with do_sample = true) is not yet supported.');
-            }
             if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
                 throw new Error('Classifier-free guidance (guidance_scale > 1) is not supported with beam search.');
             }
@@ -1362,6 +1359,8 @@ export class PreTrainedModel extends Callable {
                     const all_next_tokens = [];
                     const all_next_indices = [];
                     const all_next_scores = [];
+                    const do_beam_sample = generation_config.do_sample;
+                    const top_k = generation_config.top_k;
 
                     for (let batch_idx = 0; batch_idx < numInputs; ++batch_idx) {
                         // Collect candidates across all beams for this batch item
@@ -1371,20 +1370,51 @@ export class PreTrainedModel extends Callable {
                         for (let beam_idx = 0; beam_idx < num_beams; ++beam_idx) {
                             const flat_beam = batch_idx * num_beams + beam_idx;
                             const logits_data = /** @type {Float32Array} */ (next_tokens_scores[flat_beam].data);
-                            const log_probs = log_softmax(logits_data);
+                            if (do_beam_sample) {
+                                const beam_score = beam_scores[flat_beam];
+                                const beam_vocab = logits_data.length;
+                                let k = top_k > 0 ? Math.min(top_k, beam_vocab) : beam_vocab;
+                                const indices = Array.from({ length: beam_vocab }, (_, i) => i);
+                                indices.sort((a, b) => logits_data[b] - logits_data[a]);
+                                if (k < indices.length) {
+                                    indices.length = k;
+                                }
+                                const maxLogit = logits_data[indices[0]];
+                                const probs = new Array(indices.length);
+                                let sum = 0;
+                                for (let i = 0; i < indices.length; ++i) {
+                                    const val = Math.exp(logits_data[indices[i]] - maxLogit);
+                                    probs[i] = val;
+                                    sum += val;
+                                }
+                                for (let i = 0; i < probs.length; ++i) {
+                                    probs[i] /= sum;
+                                }
+                                for (let s = 0; s < num_beams; ++s) {
+                                    const sampledIndex = sampler.randomSelect(probs);
+                                    const tokenId = indices[sampledIndex];
+                                    candidates.push({
+                                        score: beam_score + Math.log(probs[sampledIndex]),
+                                        token: BigInt(tokenId),
+                                        beam_idx,
+                                    });
+                                }
+                            } else {
+                                const log_probs = log_softmax(logits_data);
 
-                            // Find top 2*num_beams candidates per beam for efficiency
-                            /** @type {{score: number, token: bigint, beam_idx: number}[]} */
-                            const beam_candidates = [];
-                            for (let v = 0; v < vocab_size; ++v) {
-                                beam_candidates.push({
-                                    score: beam_scores[flat_beam] + log_probs[v],
-                                    token: BigInt(v),
-                                    beam_idx,
-                                });
+                                // Find top 2*num_beams candidates per beam for efficiency
+                                /** @type {{score: number, token: bigint, beam_idx: number}[]} */
+                                const beam_candidates = [];
+                                for (let v = 0; v < vocab_size; ++v) {
+                                    beam_candidates.push({
+                                        score: beam_scores[flat_beam] + log_probs[v],
+                                        token: BigInt(v),
+                                        beam_idx,
+                                    });
+                                }
+                                beam_candidates.sort((a, b) => b.score - a.score);
+                                candidates.push(...beam_candidates.slice(0, 2 * num_beams));
                             }
-                            beam_candidates.sort((a, b) => b.score - a.score);
-                            candidates.push(...beam_candidates.slice(0, 2 * num_beams));
                         }
 
                         // Select top 2*num_beams candidates globally for this batch item
