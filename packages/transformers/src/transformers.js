@@ -52,6 +52,21 @@ export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 
+import {
+    seed as _seed,
+    random as _random,
+    gauss as _gauss,
+    shuffle as _shuffle,
+    choices as _choices,
+} from './utils/random.js';
+export const random = Object.freeze({
+    seed: _seed,
+    random: _random,
+    gauss: _gauss,
+    shuffle: _shuffle,
+    choices: _choices,
+});
+
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions

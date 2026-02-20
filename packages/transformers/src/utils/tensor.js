@@ -15,6 +15,8 @@ import { TensorOpRegistry } from '../ops/registry.js';
 
 import { DataTypeMap } from './dtypes.js';
 
+import * as random from './random.js';
+
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
@@ -1591,7 +1593,7 @@ export function rand(size) {
     const length = size.reduce((a, b) => a * b, 1);
     return new Tensor(
         'float32',
-        Float32Array.from({ length }, () => Math.random()),
+        Float32Array.from({ length }, () => random.random()),
         size,
     );
 }
@@ -1603,26 +1605,11 @@ export function rand(size) {
  */
 export function randn(size) {
     const length = size.reduce((a, b) => a * b, 1);
-    const data = new Float32Array(length);
-
-    for (let i = 0; i < length; i += 2) {
-        // Box-Muller transform
-        const u = 1 - Math.random(); // Avoids log(0)
-        const v = Math.random();
-
-        const mag = Math.sqrt(-2.0 * Math.log(u));
-        const angle = 2.0 * Math.PI * v;
-
-        // Assign the first value
-        data[i] = mag * Math.cos(angle);
-
-        // Assign the second value (if valid index)
-        if (i + 1 < length) {
-            data[i + 1] = mag * Math.sin(angle);
-        }
-    }
-
-    return new Tensor('float32', data, size);
+    return new Tensor(
+        'float32',
+        Float32Array.from({ length }, () => random.gauss()),
+        size,
+    );
 }
 
 /**
