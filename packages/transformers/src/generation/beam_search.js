@@ -206,6 +206,16 @@ export class BeamSearchScorer {
      * @returns {bigint[][]} Best sequences, shape [batch_size * num_return_sequences, seq_len].
      */
     finalize(all_input_ids, beam_scores) {
+        return this.finalize_with_scores(all_input_ids, beam_scores).map((x) => x.tokens);
+    }
+
+    /**
+     * Finalize: select best hypotheses and return scores.
+     * @param {bigint[][]} all_input_ids Final sequences, shape [batch_size * num_beams, seq_len].
+     * @param {number[]} beam_scores Final cumulative scores.
+     * @returns {{tokens: bigint[], score: number}[]} Best sequences with scores.
+     */
+    finalize_with_scores(all_input_ids, beam_scores) {
         // For each batch, ensure we have enough hypotheses
         for (let batch_idx = 0; batch_idx < this.batch_size; ++batch_idx) {
             const hyps = this._beam_hyps[batch_idx];
@@ -223,7 +233,7 @@ export class BeamSearchScorer {
             const sorted = [...this._beam_hyps[batch_idx].beams]
                 .sort((a, b) => b.score - a.score);
             for (let i = 0; i < this.num_return_sequences; ++i) {
-                results.push(sorted[i].tokens);
+                results.push(sorted[i]);
             }
         }
         return results;
