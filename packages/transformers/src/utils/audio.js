@@ -18,10 +18,10 @@ import { Tensor, matmul } from './tensor.js';
  * @param {string|URL} url The path/URL to load the audio from.
  * @param {number} sampling_rate The sampling rate to use when decoding the audio.
  * @param {Object} options Additional options for reading the audio.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
-export async function read_audio(url, sampling_rate, { abort_signal = null } = {}) {
+export async function read_audio(url, sampling_rate, { abort_signal = undefined } = {}) {
     if (typeof AudioContext === 'undefined') {
         // Running in node or an environment without AudioContext
         throw Error(

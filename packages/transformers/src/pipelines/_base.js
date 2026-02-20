@@ -16,10 +16,10 @@ import { RawImage } from '../utils/image.js';
  * Prepare images for further tasks.
  * @param {ImagePipelineInputs} images images to prepare.
  * @param {Object} options Additional options for preparing the images.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<RawImage[]>} returns processed images.
  */
-export async function prepareImages(images, { abort_signal = null } = {}) {
+export async function prepareImages(images, { abort_signal = undefined } = {}) {
     if (!Array.isArray(images)) {
         images = [images];
     }
@@ -38,10 +38,10 @@ export async function prepareImages(images, { abort_signal = null } = {}) {
  * @param {AudioPipelineInputs} audios audios to prepare.
  * @param {number} sampling_rate sampling rate of the audios.
  * @param {Object} options Additional options for preparing the audios.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<Float32Array[]>} The preprocessed audio data.
  */
-export async function prepareAudios(audios, sampling_rate, { abort_signal = null } = {}) {
+export async function prepareAudios(audios, sampling_rate, { abort_signal = undefined } = {}) {
     if (!Array.isArray(audios)) {
         audios = [audios];
     }
@@ -102,9 +102,9 @@ export class Pipeline extends Callable {
      * @param {PreTrainedModel} [options.model] The model used by the pipeline.
      * @param {PreTrainedTokenizer} [options.tokenizer=null] The tokenizer used by the pipeline (if any).
      * @param {Processor} [options.processor=null] The processor used by the pipeline (if any).
-     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+     * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
      */
-    constructor({ task, model, tokenizer = null, processor = null, abort_signal = null } = {}) {
+    constructor({ task, model, tokenizer = null, processor = null, abort_signal = undefined } = {}) {
         super();
         this.task = task;
         this.model = model;
@@ -124,7 +124,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
- * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
+ * @property {AbortSignal|null} [abort_signal=undefined] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelTokenizerConstructorArgs} TextPipelineConstructorArgs An object used to instantiate a text-based pipeline.
  */
@@ -134,7 +134,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
- * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
+ * @property {AbortSignal|null} [abort_signal=undefined] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelProcessorConstructorArgs} AudioPipelineConstructorArgs An object used to instantiate an audio-based pipeline.
  * @typedef {ModelProcessorConstructorArgs} ImagePipelineConstructorArgs An object used to instantiate an image-based pipeline.
@@ -146,7 +146,7 @@ export class Pipeline extends Callable {
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
- * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
+ * @property {AbortSignal|null} [abort_signal=undefined] An optional AbortSignal to cancel the request.
  *
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextAudioPipelineConstructorArgs An object used to instantiate a text- and audio-based pipeline.
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextImagePipelineConstructorArgs An object used to instantiate a text- and image-based pipeline.

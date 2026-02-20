@@ -82,10 +82,10 @@ export function handleError(status, remoteURL, fatal) {
  * @param {Response|import('./files.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @param {Object} options Additional options for reading the response.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
-export async function readResponse(response, progress_callback, { abort_signal = null } = {}) {
+export async function readResponse(response, progress_callback, { abort_signal = undefined } = {}) {
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
         console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');

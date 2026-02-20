@@ -98,7 +98,7 @@ export class RawImage {
      * Helper method for reading an image from a variety of input types.
      * @param {RawImage|string|URL|Blob|HTMLCanvasElement|OffscreenCanvas} input
      * @param {Object} options Additional options for reading the image.
-     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+     * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
      * @returns {Promise<RawImage>} The image object.
      *
      * **Example:** Read image from a URL.
@@ -112,7 +112,7 @@ export class RawImage {
      * // }
      * ```
      */
-    static async read(input, { abort_signal = null } = {}) {
+    static async read(input, { abort_signal = undefined } = {}) {
         if (input instanceof RawImage) {
             return input;
         } else if (typeof input === 'string' || input instanceof URL) {
@@ -150,10 +150,10 @@ export class RawImage {
      * Read an image from a URL or file path.
      * @param {string|URL} url The URL or file path to read the image from.
      * @param {Object} options Additional options for reading the image.
-     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+     * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
      * @returns {Promise<RawImage>} The image object.
      */
-    static async fromURL(url, { abort_signal = null } = {}) {
+    static async fromURL(url, { abort_signal = undefined } = {}) {
         const response = await getFile(url, { abort_signal });
         if (response.status !== 200) {
             throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);

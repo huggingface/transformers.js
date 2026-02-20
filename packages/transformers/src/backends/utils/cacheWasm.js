@@ -5,10 +5,10 @@ import { isValidUrl } from '../../utils/hub/utils.js';
  * Loads and caches a file from the given URL.
  * @param {string} url The URL of the file to load.
  * @param {Object} options Additional options for loading the file.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<Response|import('../../utils/hub/files.js').FileResponse|null|string>} The response object, or null if loading failed.
  */
-async function loadAndCacheFile(url, { abort_signal = null } = {}) {
+async function loadAndCacheFile(url, { abort_signal = undefined } = {}) {
     const fileName = url.split('/').pop();
 
     /** @type {import('../../utils/cache.js').CacheInterface|undefined} */

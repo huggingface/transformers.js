@@ -45,11 +45,11 @@ export class RawVideo {
  * @param {Object} [options] Optional parameters.
  * @param {number} [options.num_frames=null] The number of frames to sample uniformly.
  * @param {number} [options.fps=null] The number of frames to sample per second.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the video loading.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the video loading.
  *
  * @returns {Promise<RawVideo>} The loaded video.
  */
-export async function load_video(src, { num_frames = null, fps = null, abort_signal = null } = {}) {
+export async function load_video(src, { num_frames = null, fps = null, abort_signal = undefined } = {}) {
     if (!apis.IS_BROWSER_ENV) {
         throw new Error('`load_video` is currently only supported in browser environments.');
     }

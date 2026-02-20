@@ -28,7 +28,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
  * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
  * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model).
- * @property {AbortSignal|null} [abort_signal=null] An optional AbortSignal to cancel the request.
+ * @property {AbortSignal|null} [abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
@@ -54,10 +54,10 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
  * @param {Object} options Additional options for getting the file.
- * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+ * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath, { abort_signal = null } = {}) {
+export async function getFile(urlOrPath, { abort_signal = undefined } = {}) {
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL

@@ -425,7 +425,7 @@ export async function pipeline(
         subfolder = 'onnx',
         use_external_data_format = null,
         model_file_name = null,
-        abort_signal = null,
+        abort_signal = undefined,
         session_options = {},
     } = {},
 ) {

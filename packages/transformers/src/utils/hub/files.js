@@ -21,9 +21,9 @@ export class FileResponse {
      * Creates a new `FileResponse` object.
      * @param {string} filePath
      * @param {Object} options Additional options for creating the file response.
-     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+     * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
      */
-    constructor(filePath, { abort_signal = null } = {}) {
+    constructor(filePath, { abort_signal = undefined } = {}) {
         this.filePath = filePath;
         this.headers = new Headers();
         this.abort_signal = abort_signal;
@@ -162,11 +162,11 @@ export class FileCache {
      * @param {Response} response
      * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
      * @param {Object} options Additional options for adding the response to the cache.
-     * @param {AbortSignal|null} [options.abort_signal=null] An optional AbortSignal to cancel the request.
+     * @param {AbortSignal|null} [options.abort_signal=undefined] An optional AbortSignal to cancel the request.
      * The function to call with progress updates
      * @returns {Promise<void>}
      */
-    async put(request, response, progress_callback = undefined, { abort_signal = null } = {}) {
+    async put(request, response, progress_callback = undefined, { abort_signal = undefined } = {}) {
         let filePath = path.join(this.path, request);
 
         try {

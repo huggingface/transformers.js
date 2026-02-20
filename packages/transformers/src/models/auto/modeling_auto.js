@@ -71,7 +71,7 @@ class PretrainedMixin {
             local_files_only = false,
             revision = 'main',
             model_file_name = null,
-            abort_signal = null,
+            abort_signal = undefined,
             subfolder = 'onnx',
             device = null,
             dtype = null,
