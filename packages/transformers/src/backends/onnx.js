@@ -48,29 +48,28 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
 });
 
 /**
- * Maps LogLevel from env.js to ONNX Runtime env log levels (strings).
- * ONNX Runtime env log levels: 'verbose' (most detailed) to 'fatal' (least detailed)
- * @type {Record<number, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
+ * Converts any LogLevel value to ONNX Runtime's numeric severity level (0-4).
+ * This handles both standard LogLevel values (10, 20, 30, 40, 50) and custom intermediate values.
+ *
+ * @param {number} logLevel - The LogLevel value to convert
+ * @returns {number} ONNX Runtime severity level (0-4)
  */
-const LOG_LEVEL_MAP = {
-    0: 'fatal', // LogLevel.NONE -> minimal logging
-    1: 'error', // LogLevel.ERROR -> errors only
-    2: 'warning', // LogLevel.WARNING -> warnings and errors
-    3: 'info', // LogLevel.INFO -> info, warnings, and errors
-    4: 'verbose', // LogLevel.DEBUG -> all messages
-};
+function getOnnxLogSeverityLevel(logLevel) {
+    // Map LogLevel (10, 20, 30, 40, 50) to ONNX severity (0, 1, 2, 3, 4)
+    // Formula: floor(logLevel / 10) - 1, clamped to [0, 4]
+    return Math.min(Math.max(Math.floor(logLevel / 10) - 1, 0), 4);
+}
 
 /**
- * Maps LogLevel from env.js to ONNX Runtime session logSeverityLevel (numbers).
- * ONNX Runtime severity: 0=VERBOSE, 1=INFO, 2=WARNING, 3=ERROR, 4=FATAL
- * @type {Record<number, 0 | 1 | 2 | 3 | 4>}
+ * Maps ONNX Runtime numeric severity levels to string log levels.
+ * @type {Record<0 | 1 | 2 | 3 | 4, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
  */
-const LOG_SEVERITY_LEVEL_MAP = {
-    0: 4, // LogLevel.NONE -> FATAL (minimal logging)
-    1: 3, // LogLevel.ERROR -> ERROR
-    2: 2, // LogLevel.WARNING -> WARNING
-    3: 1, // LogLevel.INFO -> INFO
-    4: 0, // LogLevel.DEBUG -> VERBOSE (all messages)
+const ONNX_LOG_LEVEL_NAMES = {
+    0: 'verbose',
+    1: 'info',
+    2: 'warning',
+    3: 'error',
+    4: 'fatal',
 };
 
 /**
@@ -253,7 +252,7 @@ export async function createInferenceSession(buffer_or_path, session_options, se
     const load = () =>
         InferenceSession.create(buffer_or_path, {
             // Set default log severity level, but allow overriding through session options
-            logSeverityLevel: LOG_SEVERITY_LEVEL_MAP[env.logLevel] ?? 2,
+            logSeverityLevel: getOnnxLogSeverityLevel(env.logLevel ?? 30),
             ...session_options,
         });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
@@ -291,7 +290,7 @@ export function isONNXTensor(x) {
 
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = LOG_LEVEL_MAP[env.logLevel] ?? 'warning';
+ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[getOnnxLogSeverityLevel(env.logLevel ?? 30)];
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 

@@ -161,16 +161,16 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
  * @property {4} DEBUG - All messages including debug output (value: 4)
  */
 export const LogLevel = Object.freeze({
-    /** No logging output (value: 0) */
-    NONE: 0,
-    /** Only error messages (value: 1) */
-    ERROR: 1,
-    /** Errors and warnings (value: 2) */
-    WARNING: 2,
-    /** Errors, warnings, and info messages (value: 3) */
-    INFO: 3,
-    /** All messages including debug output (value: 4) */
-    DEBUG: 4,
+    /** All messages including debug output (value: 10) */
+    DEBUG: 10,
+    /** Errors, warnings, and info messages (value: 20) */
+    INFO: 20,
+    /** Errors and warnings (value: 30) */
+    WARNING: 30,
+    /** Only error messages (value: 40) */
+    ERROR: 40,
+    /** No logging output (value: 50) */
+    NONE: 50,
 });
 
 /**
@@ -179,7 +179,7 @@ export const LogLevel = Object.freeze({
  * @property {string} version This version of Transformers.js.
  * @property {{onnx: Partial<import('onnxruntime-common').Env>}} backends Expose environment variables of different backends,
  * allowing users to set these variables if they want to.
- * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
  * @property {string} remoteHost Host URL to load models from. Defaults to the Hugging Face Hub.
