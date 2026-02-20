@@ -15,6 +15,7 @@ import {
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 import { Tensor } from '../utils/tensor.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Constructs an InferenceSession using a model file located at the specified path.
@@ -33,7 +34,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         if (device.hasOwnProperty(fileName)) {
             device = device[fileName];
         } else {
-            console.warn(`device not specified for "${fileName}". Using the default device.`);
+            logger.warn(`device not specified for "${fileName}". Using the default device.`);
             device = null;
         }
     }
@@ -62,7 +63,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
             dtype = dtype[fileName];
         } else {
             dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-            console.warn(
+            logger.warn(
                 `dtype not specified for "${fileName}". Using the default dtype (${dtype}) for this device (${selectedDevice}).`,
             );
         }
@@ -123,7 +124,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     if (free_dimension_overrides) {
         session_options.freeDimensionOverrides ??= free_dimension_overrides;
     } else if (selectedDevice.startsWith('webnn') && !session_options.freeDimensionOverrides) {
-        console.warn(
+        logger.warn(
             `WebNN does not currently support dynamic shapes and requires 'free_dimension_overrides' to be set in config.json, preferably as a field within config["transformers.js_config"]["device_config"]["${selectedDevice}"]. ` +
                 `When 'free_dimension_overrides' is not set, you may experience significant performance degradation.`,
         );
@@ -265,8 +266,8 @@ export async function sessionRun(session, inputs) {
         );
 
         // This usually occurs when the inputs are of the wrong type.
-        console.error(`An error occurred during model execution: "${e}".`);
-        console.error('Inputs given to model:', formatted);
+        logger.error(`An error occurred during model execution: "${e}".`);
+        logger.error('Inputs given to model:', formatted);
         throw e;
     }
 }
@@ -312,7 +313,7 @@ function validateInputs(session, inputs) {
         // No missing inputs, but too many inputs were provided.
         // Warn the user and ignore the extra inputs.
         let ignored = Object.keys(inputs).filter((inputName) => !session.inputNames.includes(inputName));
-        console.warn(
+        logger.warn(
             `WARNING: Too many inputs were provided (${numInputsProvided} > ${numInputsNeeded}). The following inputs will be ignored: "${ignored.join(', ')}".`,
         );
     }

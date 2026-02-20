@@ -135,11 +135,44 @@ const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 /**
+ * Log levels for controlling output verbosity.
+ *
+ * Each level is represented by a number, where higher numbers include all lower level messages.
+ * Use these values to set `env.logLevel`.
+ *
+ * @example
+ * import { env, LogLevel } from '@huggingface/transformers';
+ *
+ * // Set log level to show only errors
+ * env.logLevel = LogLevel.ERROR;
+ *
+ * // Set log level to show errors, warnings, and info
+ * env.logLevel = LogLevel.INFO;
+ *
+ * // Disable all logging
+ * env.logLevel = LogLevel.NONE;
+ *
+ */
+export const LogLevel = Object.freeze({
+    /** All messages including debug output (value: 10) */
+    DEBUG: 10,
+    /** Errors, warnings, and info messages (value: 20) */
+    INFO: 20,
+    /** Errors and warnings (value: 30) */
+    WARNING: 30,
+    /** Only error messages (value: 40) */
+    ERROR: 40,
+    /** No logging output (value: 50) */
+    NONE: 50,
+});
+
+/**
  * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
  * @property {{onnx: Partial<import('onnxruntime-common').Env>}} backends Expose environment variables of different backends,
  * allowing users to set these variables if they want to.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
  * @property {string} remoteHost Host URL to load models from. Defaults to the Hugging Face Hub.
@@ -170,6 +203,9 @@ export const env = {
         // onnxruntime-web/onnxruntime-node
         onnx: {},
     },
+
+    /////////////////// Logging settings ///////////////////
+    logLevel: LogLevel.ERROR,
 
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
