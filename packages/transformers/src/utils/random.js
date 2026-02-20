@@ -1,5 +1,3 @@
-import { apis } from '../env.js';
-
 /**
  * Let there be order amidst the chaos.
  *
@@ -18,20 +16,33 @@ import { apis } from '../env.js';
  *
  * @module utils/random
  */
+
+import { apis } from '../env.js';
+
 const mt = new Uint32Array(624);
 let idx = 625;
 let _gauss_next = null;
 let _seeded = false;
 
 /**
- * Seeds the Mersenne Twister PRNG with the given value.
+ * Seeds the Mersenne Twister PRNG.
  *
- * Initializes the internal state array using the key-scheduling algorithm,
- * ensuring deterministic sequences for any given seed.
+ * When called with a number, initializes the state deterministically from that value.
+ * When called with no arguments (or `undefined`/`null`), seeds from OS entropy
+ * via `crypto.getRandomValues`, matching Python's `random.seed()` behaviour.
  *
- * @param {number} n The seed value. Large numbers are split into 32-bit chunks.
+ * @param {number} [n] The seed value. Omit to seed from OS entropy.
  */
 export function seed(n) {
+    if (n === undefined || n === null) {
+        if (apis.IS_CRYPTO_AVAILABLE) {
+            const buf = new Uint32Array(1);
+            crypto.getRandomValues(buf);
+            n = buf[0];
+        } else {
+            n = Date.now() >>> 0;
+        }
+    }
     const u = (a, b) => Math.imul(a, b) >>> 0,
         key = [];
     for (let v = n || 0; v > 0; v = Math.floor(v / 0x100000000)) key.push(v & 0xffffffff);
@@ -70,15 +81,7 @@ export function seed(n) {
  * @returns {number} A random integer in the range [0, 2^32 - 1].
  */
 function int32() {
-    if (!_seeded) {
-        const buf = new Uint32Array(1);
-        if (apis.IS_CRYPTO_AVAILABLE) {
-            crypto.getRandomValues(buf);
-        } else {
-            buf[0] = Date.now() >>> 0;
-        }
-        seed(buf[0]);
-    }
+    if (!_seeded) seed();
     if (idx >= 624) {
         for (let k = 0; k < 624; ++k) {
             // twist
