@@ -1,3 +1,4 @@
+import { env } from '../../env.js';
 import { getCache } from '../../utils/cache.js';
 import { isValidUrl } from '../../utils/hub/utils.js';
 
@@ -63,11 +64,69 @@ export async function loadWasmBinary(wasmURL) {
 }
 
 /**
- * Loads and caches the WASM Factory for ONNX Runtime.
+ * Checks if the current environment supports blob URLs for ES modules.
+ * Blob URLs don't work in Service Workers, Chrome extensions, or with multi-threading.
+ * @see https://github.com/huggingface/transformers.js/issues/1532
+ * @returns {boolean} True if blob URLs are safe to use for module imports.
+ */
+function canUseBlobURLs() {
+    // Don't use blob URLs in Service Workers
+    // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
+    if (typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) {
+        return false;
+    }
+
+    // Don't use blob URLs if workers are being used with threading
+    if (env.backends?.onnx?.wasm?.numThreads && env.backends.onnx.wasm.numThreads > 1) {
+        return false;
+    }
+
+    // Also check global onnxruntime as a fallback
+    try {
+        // @ts-ignore - onnxruntime may not exist in all environments
+        if (typeof globalThis !== 'undefined' && globalThis.onnxruntime?.env?.wasm?.numThreads) {
+            // @ts-ignore
+            const numThreads = globalThis.onnxruntime.env.wasm.numThreads;
+            if (numThreads > 1) {
+                return false;
+            }
+        }
+    } catch (e) {
+        // Ignore errors checking ONNX config
+    }
+
+    // Don't use blob URLs if WASM proxy is enabled (workers spawned to run WASM)
+    if (env.backends?.onnx?.wasm?.proxy === true) {
+        return false;
+    }
+
+    // Check if the current context is a Chrome extension (which may have restrictions)
+    // @ts-ignore - chrome may not exist in all environments
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Loads and caches the WASM Factory (.mjs file) for ONNX Runtime.
+ * Creates a blob URL from cached content (when safe) to bridge Cache API with dynamic imports used in ORT.
+ * Fixes import.meta.url references to point to the correct base URL.
  * @param {string} libURL The URL of the WASM Factory to load.
- * @returns {Promise<string|null>} The blob URL of the WASM Factory, or null if loading failed.
+ * @returns {Promise<string|null>} The blob URL (if enabled), original URL (if disabled), or null if loading failed.
  */
 export async function loadWasmFactory(libURL) {
+    // Check if we should use blob URLs before doing any work
+    const shouldUseBlobURL = env.useWasmBlobURL === true || (env.useWasmBlobURL === 'auto' && canUseBlobURLs());
+
+    // If blob URLs are not safe or disabled, just return the original URL.
+    // Don't bother caching since dynamic import() won't use the Cache API anyway.
+    if (!shouldUseBlobURL) {
+        return libURL;
+    }
+
+    // Blob URLs are enabled - fetch from cache or network, then create blob URL
     const response = await loadAndCacheFile(libURL);
     if (!response || typeof response === 'string') return null;
 
@@ -79,7 +138,7 @@ export async function loadWasmFactory(libURL) {
         const blob = new Blob([code], { type: 'text/javascript' });
         return URL.createObjectURL(blob);
     } catch (error) {
-        console.warn('Failed to read WASM binary:', error);
+        console.warn('Failed to read WASM factory:', error);
         return null;
     }
 }

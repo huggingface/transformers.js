@@ -155,8 +155,11 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
  * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
  * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries for ONNX Runtime. Defaults to `true` when cache is available.
- * This can improve performance by avoiding repeated downloads of WASM files. Note: Only the WASM binary is cached.
- * The MJS loader file still requires network access unless you use a Service Worker.
+ * This can improve performance and enables offline usage by avoiding repeated downloads of WASM files.
+ * @property {boolean|'auto'} useWasmBlobURL Whether to use blob URLs for WASM factory (.mjs) files. Defaults to 'auto' which automatically
+ * detects safe environments. Set to `true` to force blob URLs (faster but may fail in workers/service workers/extensions),
+ * or `false` to always use original URLs (safer but requires CORS). When 'auto', blob URLs are disabled in Service Workers,
+ * Chrome extensions, and when numThreads > 1.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
  */
 
@@ -190,6 +193,7 @@ export const env = {
     customCache: null,
 
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
+    useWasmBlobURL: 'auto',
     cacheKey: 'transformers-cache',
     //////////////////////////////////////////////////////
 };
