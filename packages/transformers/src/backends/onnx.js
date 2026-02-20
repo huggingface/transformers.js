@@ -16,7 +16,7 @@
  * @module backends/onnx
  */
 
-import { env, apis } from '../env.js';
+import { env, apis, LogLevel } from '../env.js';
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
@@ -252,7 +252,7 @@ export async function createInferenceSession(buffer_or_path, session_options, se
     const load = () =>
         InferenceSession.create(buffer_or_path, {
             // Set default log severity level, but allow overriding through session options
-            logSeverityLevel: getOnnxLogSeverityLevel(env.logLevel ?? 30),
+            logSeverityLevel: getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING),
             ...session_options,
         });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
@@ -290,7 +290,7 @@ export function isONNXTensor(x) {
 
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[getOnnxLogSeverityLevel(env.logLevel ?? 30)];
+ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING)];
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
