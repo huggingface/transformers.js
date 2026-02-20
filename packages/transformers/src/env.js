@@ -152,13 +152,6 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
  * // Disable all logging
  * env.logLevel = LogLevel.NONE;
  *
- * @readonly
- * @enum {number}
- * @property {0} NONE - No logging output
- * @property {1} ERROR - Only error messages (value: 1)
- * @property {2} WARNING - Errors and warnings (value: 2)
- * @property {3} INFO - Errors, warnings, and info messages (value: 3)
- * @property {4} DEBUG - All messages including debug output (value: 4)
  */
 export const LogLevel = Object.freeze({
     /** All messages including debug output (value: 10) */
