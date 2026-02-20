@@ -139,22 +139,7 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
                 };
             }
         } catch (e) {
-            // Range request failed, fall back to regular GET
-            try {
-                const response = await getFile(remoteURL);
-                if (typeof response !== 'string' && response.status >= 200 && response.status < 300) {
-                    const size = response.headers.get('content-length');
-                    const contentType = response.headers.get('content-type');
-                    return {
-                        exists: true,
-                        size: size ? parseInt(size, 10) : undefined,
-                        contentType: contentType || undefined,
-                        fromCache: false,
-                    };
-                }
-            } catch (e2) {
-                // Ignore
-            }
+            // Range request failed most likely because of a network error, timeout, etc.
         }
     }
 
