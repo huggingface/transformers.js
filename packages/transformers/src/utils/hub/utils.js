@@ -1,4 +1,5 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
+import { logger } from '../logger.js';
 
 /**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
@@ -91,7 +92,7 @@ export async function readResponse(response, progress_callback, expectedSize) {
     let total = contentLength ? parseInt(contentLength, 10) : (expectedSize ?? 0);
 
     if (contentLength === null && !expectedSize) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
+        logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
 
     let buffer = new Uint8Array(total);

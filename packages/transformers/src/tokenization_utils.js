@@ -12,6 +12,7 @@ import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
+import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/cache/get_tokenizer_files.js';
 
 /**
@@ -339,13 +340,13 @@ export class PreTrainedTokenizer extends Callable {
             max_length = this.model_max_length;
         } else if (truncation === null) {
             if (padding === true) {
-                console.warn(
+                logger.warn(
                     '`max_length` is ignored when `padding: true` and there is no truncation strategy. ' +
                         "To pad to max length, use `padding: 'max_length'`.",
                 );
                 max_length = this.model_max_length;
             } else if (padding === false) {
-                console.warn(
+                logger.warn(
                     'Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation: true` to explicitly truncate examples to max length.',
                 );
                 truncation = true;

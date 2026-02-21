@@ -1,5 +1,6 @@
 import { PreTrainedTokenizer } from '../../tokenization_utils.js';
 import { mergeArrays } from '../../utils/core.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * @todo This model is not yet supported by Hugging Face's "fast" tokenizers library (https://github.com/huggingface/tokenizers).
@@ -18,7 +19,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
 
         this.supported_language_codes = Array.from(this.get_vocab().keys()).filter((x) => this.languageRegex.test(x));
 
-        console.warn(
+        logger.warn(
             'WARNING: `MarianTokenizer` is not yet supported by Hugging Face\'s "fast" tokenizers library. Therefore, you may experience slightly inaccurate results.',
         );
     }
@@ -45,7 +46,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
             const [language, text] = remainder;
 
             if (!this.supported_language_codes.includes(language)) {
-                console.warn(
+                logger.warn(
                     `Unsupported language code "${language}" detected, which may lead to unexpected behavior. Should be one of: ${JSON.stringify(this.supported_language_codes)}`,
                 );
             }

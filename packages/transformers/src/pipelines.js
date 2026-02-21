@@ -14,6 +14,7 @@
  */
 
 import { dispatchCallback } from './utils/core.js';
+import { logger } from './utils/logger.js';
 
 import { TextClassificationPipeline } from './pipelines/text-classification.js';
 import { TokenClassificationPipeline } from './pipelines/token-classification.js';
@@ -117,7 +118,7 @@ export async function pipeline(
     // Use model if specified, otherwise, use default
     if (!model) {
         model = pipelineInfo.default.model;
-        console.log(`No model specified. Using default model: "${model}".`);
+        logger.info(`No model specified. Using default model: "${model}".`);
         if (!dtype && pipelineInfo.default.dtype) {
             dtype = pipelineInfo.default.dtype;
         }
@@ -294,3 +295,30 @@ export {
     FeatureExtractionPipeline,
     ImageFeatureExtractionPipeline,
 };
+
+// Export pipeline output types
+/**
+ * @typedef {import('./pipelines/fill-mask.js').FillMaskOutput} FillMaskOutput
+ * @typedef {import('./pipelines/text-classification.js').TextClassificationOutput} TextClassificationOutput
+ * @typedef {import('./pipelines/token-classification.js').TokenClassificationOutput} TokenClassificationOutput
+ * @typedef {import('./pipelines/question-answering.js').QuestionAnsweringOutput} QuestionAnsweringOutput
+ * @typedef {import('./pipelines/summarization.js').SummarizationOutput} SummarizationOutput
+ * @typedef {import('./pipelines/translation.js').TranslationOutput} TranslationOutput
+ * @typedef {import('./pipelines/text2text-generation.js').Text2TextGenerationOutput} Text2TextGenerationOutput
+ * @typedef {import('./pipelines/text-generation.js').TextGenerationOutput} TextGenerationOutput
+ * @typedef {import('./pipelines/text-generation.js').TextGenerationStringOutput} TextGenerationStringOutput
+ * @typedef {import('./pipelines/text-generation.js').TextGenerationChatOutput} TextGenerationChatOutput
+ * @typedef {import('./pipelines/zero-shot-classification.js').ZeroShotClassificationOutput} ZeroShotClassificationOutput
+ * @typedef {import('./pipelines/audio-classification.js').AudioClassificationOutput} AudioClassificationOutput
+ * @typedef {import('./pipelines/zero-shot-audio-classification.js').ZeroShotAudioClassificationOutput} ZeroShotAudioClassificationOutput
+ * @typedef {import('./pipelines/automatic-speech-recognition.js').AutomaticSpeechRecognitionOutput} AutomaticSpeechRecognitionOutput
+ * @typedef {import('./pipelines/text-to-audio.js').TextToAudioOutput} TextToAudioOutput
+ * @typedef {import('./pipelines/image-classification.js').ImageClassificationOutput} ImageClassificationOutput
+ * @typedef {import('./pipelines/image-segmentation.js').ImageSegmentationOutput} ImageSegmentationOutput
+ * @typedef {import('./pipelines/image-to-text.js').ImageToTextOutput} ImageToTextOutput
+ * @typedef {import('./pipelines/object-detection.js').ObjectDetectionOutput} ObjectDetectionOutput
+ * @typedef {import('./pipelines/zero-shot-object-detection.js').ZeroShotObjectDetectionOutput} ZeroShotObjectDetectionOutput
+ * @typedef {import('./pipelines/zero-shot-image-classification.js').ZeroShotImageClassificationOutput} ZeroShotImageClassificationOutput
+ * @typedef {import('./pipelines/document-question-answering.js').DocumentQuestionAnsweringOutput} DocumentQuestionAnsweringOutput
+ * @typedef {import('./pipelines/depth-estimation.js').DepthEstimationOutput} DepthEstimationOutput
+ */

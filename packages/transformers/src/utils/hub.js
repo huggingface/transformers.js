@@ -10,6 +10,7 @@ import { FileResponse, FileCache } from './hub/files.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './cache/get_file_metadata.js';
+import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
@@ -217,7 +218,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
             .catch((err) => {
                 // Do not crash if unable to add to cache (e.g., QuotaExceededError).
                 // Rather, log a warning and proceed with execution.
-                console.warn(`Unable to add response to browser cache: ${err}.`);
+                logger.warn(`Unable to add response to browser cache: ${err}.`);
             });
     }
 }
@@ -279,7 +280,7 @@ export async function loadResourceFile(
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
                     // NOTE: error handling is done in the next step (since `response` will be undefined)
-                    console.warn(`Unable to load from local path "${localPath}": "${e}"`);
+                    logger.warn(`Unable to load from local path "${localPath}": "${e}"`);
                 }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
