@@ -1,6 +1,7 @@
 import { getCache } from '../../utils/cache.js';
 import { isValidUrl } from '../../utils/hub/utils.js';
 import { logger } from '../../utils/logger.js';
+import { env } from '../../env.js';
 
 /**
  * Loads and caches a file from the given URL.
@@ -27,7 +28,7 @@ async function loadAndCacheFile(url) {
     }
 
     // If not in cache, fetch it
-    const response = await fetch(url);
+    const response = await env.fetch(url);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);

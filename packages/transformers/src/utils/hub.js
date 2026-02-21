@@ -66,7 +66,7 @@ export async function getFile(urlOrPath) {
                 : urlOrPath,
         );
     } else {
-        return fetch(urlOrPath, {
+        return env.fetch(urlOrPath, {
             headers: getFetchHeaders(urlOrPath),
         });
     }
