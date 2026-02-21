@@ -7866,7 +7866,21 @@ export class PretrainedMixin {
     static BASE_IF_FAIL = false;
 
 
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * Instantiate one of the model classes of the library from a pretrained model.
+     *
+     * The model class to instantiate is selected based on the `model_type` property of the config object
+     * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
+     *
+     * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
+     * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
+     *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
+     *   user or organization name, like `dbmdz/bert-base-german-cased`.
+     * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
+     * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Additional options for loading the model.
+     *
+     * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
+     */
     static async from_pretrained(pretrained_model_name_or_path, {
         progress_callback = null,
         config = null,
@@ -8595,6 +8609,17 @@ export class AutoModelForTextToWaveform extends PretrainedMixin {
  */
 export class AutoModelForCausalLM extends PretrainedMixin {
     static MODEL_CLASS_MAPPINGS = [MODEL_FOR_CAUSAL_LM_MAPPING_NAMES];
+
+    /**
+     * Instantiate a pretrained causal language model from a pretrained model.
+     *
+     * @param {string} pretrained_model_name_or_path The name or path of the pretrained model.
+     * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Additional options for loading the model.
+     * @returns {Promise<PreTrainedModel>} A new instance of a causal language model.
+     */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        return /** @type {Promise<PreTrainedModel>} */ (super.from_pretrained(pretrained_model_name_or_path, options));
+    }
 }
 
 /**
