@@ -52,6 +52,9 @@ export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 
+// Cache and file management
+export { ModelRegistry } from './utils/cache/ModelRegistry.js';
+
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
