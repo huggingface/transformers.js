@@ -1,5 +1,6 @@
 export * from './albert/modeling_albert.js';
 export * from './apertus/modeling_apertus.js';
+export * from './afmoe/modeling_afmoe.js';
 export * from './arcee/modeling_arcee.js';
 export * from './ast/modeling_ast.js';
 export * from './bart/modeling_bart.js';
