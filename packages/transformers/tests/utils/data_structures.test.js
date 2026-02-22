@@ -1,4 +1,5 @@
 import { PriorityQueue, DictionarySplitter, LRUCache } from "../../src/utils/data-structures.js";
+import * as random from "../../src/utils/random.js";
 
 describe("Priority queue", () => {
   const EXAMPLE_ARRAY = [2, 5, 3, 1, 4];
@@ -21,7 +22,7 @@ describe("Priority queue", () => {
 
     // Test with random sizes
     const sizes = [1, 3, 4, 5, 8, 9, 15, 16, 31, 32, 127, 128];
-    const arr = Array.from({ length: 100 }, (_) => Math.random());
+    const arr = Array.from({ length: 100 }, (_) => random.random());
     const max = Math.max(...arr);
     for (const size of sizes) {
       const queue = new PriorityQueue((a, b) => a > b, size);

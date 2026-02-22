@@ -47,6 +47,7 @@ const IS_WEBWORKER_ENV =
 const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
 /**
  * Check if the current environment is Safari browser.
@@ -109,6 +110,9 @@ export const apis = Object.freeze({
 
     /** Whether the path API is available */
     IS_PATH_AVAILABLE,
+
+    /** Whether the crypto API is available */
+    IS_CRYPTO_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;

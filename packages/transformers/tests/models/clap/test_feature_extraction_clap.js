@@ -1,4 +1,5 @@
 import { AutoFeatureExtractor, ClapFeatureExtractor } from "../../../src/transformers.js";
+import * as random from "../../../src/utils/random.js";
 
 import { load_cached_audio } from "../../asset_cache.js";
 import { MAX_FEATURE_EXTRACTOR_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "../../init.js";
@@ -19,10 +20,9 @@ export default () => {
       async () => {
         const audio = await load_cached_audio("mlk");
 
-        // Since truncation uses a random strategy, we override
-        // Math.random to ensure that the test is deterministic
-        const originalRandom = Math.random;
-        Math.random = () => 0.5;
+        // Since truncation uses a random strategy, we seed
+        // the PRNG to ensure that the test is deterministic
+        random.seed(0);
 
         let long_audio = new Float32Array(500000);
         long_audio.set(audio);
@@ -32,18 +32,15 @@ export default () => {
         const { dims, data } = input_features;
         expect(dims).toEqual([1, 1, 1001, 64]);
 
-        expect(input_features.mean().item()).toBeCloseTo(-37.94569396972656);
-        expect(data[0]).toBeCloseTo(-53.32647705078125);
-        expect(data[1]).toBeCloseTo(-47.76755142211914);
-        expect(data[65]).toBeCloseTo(-36.32261276245117);
-        expect(data[1002]).toBeCloseTo(-28.0314884185791);
-        expect(data[10000]).toBeCloseTo(-21.905902862548828);
-        expect(data[60000]).toBeCloseTo(-14.877863883972168);
-        expect(data[64062]).toBeCloseTo(-37.9784049987793);
-        expect(data[64063]).toBeCloseTo(-37.73963928222656);
-
-        // Reset Math.random
-        Math.random = originalRandom;
+        expect(input_features.mean().item()).toBeCloseTo(-37.9171257019043);
+        expect(data[0]).toBeCloseTo(-23.681066513061523);
+        expect(data[1]).toBeCloseTo(-20.759065628051758);
+        expect(data[65]).toBeCloseTo(-25.722291946411133);
+        expect(data[1002]).toBeCloseTo(-2.2271111011505127);
+        expect(data[10000]).toBeCloseTo(-17.393341064453125);
+        expect(data[60000]).toBeCloseTo(-48.419677734375);
+        expect(data[64062]).toBeCloseTo(-35.120487213134766);
+        expect(data[64063]).toBeCloseTo(-36.36371612548828);
       },
       MAX_TEST_EXECUTION_TIME,
     );
