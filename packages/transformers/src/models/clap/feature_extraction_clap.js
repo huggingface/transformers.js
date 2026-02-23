@@ -1,7 +1,7 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
-import * as random from '../../utils/random.js';
+import { random } from '../../utils/random.js';
 
 export class ClapFeatureExtractor extends FeatureExtractor {
     constructor(config) {

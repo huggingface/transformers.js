@@ -15,7 +15,7 @@ import { TensorOpRegistry } from '../ops/registry.js';
 
 import { DataTypeMap } from './dtypes.js';
 
-import * as random from './random.js';
+import { random } from './random.js';
 
 /**
  * @typedef {keyof typeof DataTypeMap} DataType

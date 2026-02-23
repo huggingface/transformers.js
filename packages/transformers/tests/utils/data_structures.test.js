@@ -1,5 +1,5 @@
 import { PriorityQueue, DictionarySplitter, LRUCache } from "../../src/utils/data-structures.js";
-import * as random from "../../src/utils/random.js";
+import { random } from "../../src/utils/random.js";
 
 describe("Priority queue", () => {
   const EXAMPLE_ARRAY = [2, 5, 3, 1, 4];

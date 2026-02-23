@@ -1,5 +1,5 @@
 import { AutoFeatureExtractor, ClapFeatureExtractor } from "../../../src/transformers.js";
-import * as random from "../../../src/utils/random.js";
+import { random } from "../../../src/utils/random.js";
 
 import { load_cached_audio } from "../../asset_cache.js";
 import { MAX_FEATURE_EXTRACTOR_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "../../init.js";
