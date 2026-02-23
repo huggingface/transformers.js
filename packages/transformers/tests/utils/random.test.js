@@ -17,9 +17,6 @@ init();
  * The JS implementation must match Python's output exactly for reproducibility.
  */
 
-// Tolerance for floating-point comparisons
-const FLOAT_TOL = 1e-15;
-
 describe("random (Mersenne Twister 19937, Python-compatible)", () => {
   // Must be the first test — verifies auto-seeding at module load produces non-zero output.
   it("should return non-zero values before any explicit seed() call", () => {
@@ -34,7 +31,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [0.6394267984578837, 0.025010755222666936, 0.27502931836911926, 0.22321073814882275, 0.7364712141640124, 0.6766994874229113, 0.8921795677048454, 0.08693883262941615, 0.4219218196852704, 0.029797219438070344];
       random.seed(42);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.random() - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.random()).toBe(expected[i]);
       }
     });
 
@@ -42,7 +39,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [0.8444218515250481, 0.7579544029403025, 0.420571580830845, 0.25891675029296335, 0.5112747213686085, 0.4049341374504143, 0.7837985890347726, 0.30331272607892745, 0.4765969541523558, 0.5833820394550312];
       random.seed(0);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.random() - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.random()).toBe(expected[i]);
       }
     });
 
@@ -50,7 +47,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [0.41661987254534116, 0.010169169457068361, 0.8252065092537432, 0.2986398551995928, 0.3684116894884757, 0.19366134904507426, 0.5660081687288613, 0.1616878239293682, 0.12426688428353017, 0.4329362680099159];
       random.seed(12345);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.random() - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.random()).toBe(expected[i]);
       }
     });
 
@@ -58,7 +55,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [0.6614192930187859, 0.24151842637090726, 0.6909905728254405, 0.11131596896699081, 0.8184932948202619, 0.4957890371902045, 0.3754628980018908, 0.6967482542555166, 0.5464037278028259, 0.4648564722045134];
       random.seed(2 ** 40 + 17);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.random() - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.random()).toBe(expected[i]);
       }
     });
 
@@ -95,7 +92,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [-0.14409032957792836, -0.1729036003315193, -0.11131586156766246, 0.7019837250988631, -0.12758828378288709, -1.4973534143409575, 0.33231834406771527, -0.2673374784971682, -0.216958684145195, 0.11588478670085507];
       random.seed(42);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.gauss() - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.gauss()).toBe(expected[i]);
       }
     });
 
@@ -103,7 +100,7 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
       const expected = [3.8995546045187948, 5.758236653956967, 5.653854573190089, 6.362796994590186, 5.0943415236981435, 3.4818290248514048, 2.746397968893985, 7.035976389331746, 0.4167692939861194, 3.8652143740326643];
       random.seed(99);
       for (let i = 0; i < expected.length; i++) {
-        expect(Math.abs(random.gauss(5, 2) - expected[i])).toBeLessThan(FLOAT_TOL);
+        expect(random.gauss(5, 2)).toBe(expected[i]);
       }
     });
 
