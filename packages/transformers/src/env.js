@@ -47,6 +47,7 @@ const IS_WEBWORKER_ENV =
 const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
 /**
  * Check if the current environment is Safari browser.
@@ -109,6 +110,9 @@ export const apis = Object.freeze({
 
     /** Whether the path API is available */
     IS_PATH_AVAILABLE,
+
+    /** Whether the crypto API is available */
+    IS_CRYPTO_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
@@ -133,6 +137,11 @@ const DEFAULT_CACHE_DIR = RUNNING_LOCALLY ? path.join(dirname__, '/.cache/') : n
 // Set local model path, based on available APIs
 const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
+
+// Ensure default fetch is called with the correct receiver in browser environments.
+const DEFAULT_FETCH = typeof globalThis.fetch === 'function'
+    ? globalThis.fetch.bind(globalThis)
+    : undefined;
 
 /**
  * Log levels for controlling output verbosity.
@@ -230,7 +239,7 @@ export const env = {
     cacheKey: 'transformers-cache',
 
     /////////////////// Custom fetch /////////////////////
-    fetch: fetch,
+    fetch: DEFAULT_FETCH,
 
     //////////////////////////////////////////////////////
 };
