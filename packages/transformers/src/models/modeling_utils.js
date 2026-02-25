@@ -1159,23 +1159,20 @@ export class PreTrainedModel extends Callable {
             all_input_ids.push(...expanded_ids);
 
             // Expand model_inputs tensors by repeating each row num_beams times
+            const expanded_indices = [];
+            for (let i = 0; i < numInputs; ++i) {
+                for (let b = 0; b < num_beams; ++b) {
+                    expanded_indices.push(i);
+                }
+            }
             for (const key of [model_input_name, 'attention_mask', 'decoder_attention_mask', 'encoder_outputs']) {
                 const tensor = model_inputs[key];
                 if (tensor instanceof Tensor) {
-                    const [batch, ...rest] = tensor.dims;
-                    const rowSize = rest.length > 0 ? rest.reduce((a, b) => a * b, 1) : 1;
-                    // @ts-ignore
-                    const newData = new tensor.data.constructor(batch * num_beams * rowSize);
-                    for (let i = 0; i < batch; ++i) {
-                        const srcOffset = i * rowSize;
-                        for (let b = 0; b < num_beams; ++b) {
-                            newData.set(
-                                tensor.data.subarray(srcOffset, srcOffset + rowSize),
-                                (i * num_beams + b) * rowSize,
-                            );
-                        }
+                    if (tensor.location === 'cpu' || tensor.location === 'cpu-pinned') {
+                        model_inputs[key] = index_select(tensor, expanded_indices);
+                    } else {
+                        model_inputs[key] = await index_select_async(tensor, expanded_indices);
                     }
-                    model_inputs[key] = new Tensor(tensor.type, newData, [batch * num_beams, ...rest]);
                 }
             }
 
