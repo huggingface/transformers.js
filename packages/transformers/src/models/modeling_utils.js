@@ -1585,9 +1585,17 @@ export class PreTrainedModel extends Callable {
         }
 
         if (generation_config.return_dict_in_generate) {
+            let past_key_values_for_return = past_key_values;
+            if (is_beam_search) {
+                console.warn(
+                    'Beam search does not return aligned past_key_values for finalized sequences. ' +
+                        'past_key_values will be null; re-generate without beam search if you need caching.',
+                );
+                past_key_values_for_return = null;
+            }
             return {
                 sequences,
-                past_key_values,
+                past_key_values: past_key_values_for_return,
                 ...attentions,
                 ...return_dict_items,
             };
