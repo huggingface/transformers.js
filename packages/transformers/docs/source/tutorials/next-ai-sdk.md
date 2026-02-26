@@ -37,6 +37,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "export", // optional: export as a static site
+  turbopack: {},
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
