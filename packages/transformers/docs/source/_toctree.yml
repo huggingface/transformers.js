@@ -21,6 +21,8 @@
       title: Building an Electron Application
     - local: tutorials/node
       title: Server-side Inference in Node.js
+    - local: tutorials/next-ai-sdk
+      title: Building a Next.js AI Chatbot with Vercel AI SDK
   title: Tutorials
 - sections:
     - local: guides/webgpu
@@ -31,6 +33,8 @@
       title: Accessing Private/Gated Models
     - local: guides/node-audio-processing
       title: Server-side Audio Processing
+    - local: guides/vercel-ai-sdk
+      title: Using Transformers.js with the Vercel AI SDK
   title: Developer Guides
 - sections:
     - local: api/transformers
