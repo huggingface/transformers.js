@@ -69,8 +69,6 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  * Text content for a message. May include additional properties beyond the ones listed below.
  * @property {'text'} type The type of content (must be 'text').
  * @property {string} text The text content.
- * @property {string} [source_lang_code] The source language code.
- * @property {string} [target_lang_code] The target language code.
  */
 
 /**
