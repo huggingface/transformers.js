@@ -3,7 +3,7 @@
 In this tutorial, we'll build an in-browser AI chatbot using Next.js, Transformers.js, and the Vercel AI SDK v6. The chatbot runs entirely client-side with WebGPU acceleration &mdash; and supports tool calling with human approval.
 
 Useful links:
-- [Source code](https://github.com/huggingface/transformers.js/tree/main/next-vercel-ai-sdk-v6-tool-calling)
+- [Source code](https://github.com/huggingface/transformers.js-examples/tree/main/next-vercel-ai-sdk-v6-tool-calling)
 - [`@browser-ai/transformers-js` docs](https://www.browser-ai.dev/docs/ai-sdk-v6/transformers-js)
 - [Vercel AI SDK docs](https://ai-sdk.dev/)
 
