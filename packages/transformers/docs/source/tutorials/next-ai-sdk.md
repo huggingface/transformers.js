@@ -30,7 +30,7 @@ npm install ai @ai-sdk/react @browser-ai/transformers-js @huggingface/transforme
 
 ## Step 2: Configure Next.js for browser inference
 
-Transformers.js uses ONNX Runtime under the hood. We need to tell Next.js to exclude the Node.js-specific packages when bundling for the browser. Update `next.config.ts`:
+Transformers.js uses ONNX Runtime under the hood for both browser and server-side (Node.js) inference.  In our case we only need the browser runtime so we can tell Next.js to exclude the Node.js-specific packages when bundling for the browser. Update `next.config.ts`
 
 ```typescript
 import type { NextConfig } from "next";
