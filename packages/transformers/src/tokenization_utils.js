@@ -66,9 +66,10 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
 
 /**
  * @typedef {{ type: 'text', text: string, source_lang_code?: string, target_lang_code?: string, [key: string]: any }} TextContent
- * Text content for a message. May include additional properties beyond the ones listed below.
  * @property {'text'} type The type of content (must be 'text').
  * @property {string} text The text content.
+ * @property {string} [source_lang_code] The source language code.
+ * @property {string} [target_lang_code] The target language code.
  */
 
 /**
@@ -80,7 +81,7 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  */
 
 /**
- * @typedef {TextContent | ImageContent | ({ type: string & {}, [key: string]: any })} MessageContent
+ * @typedef {TextContent | ImageContent | { type: string & {}, [key: string]: any }} MessageContent
  * Base type for message content. This is a discriminated union that can be extended with additional content types.
  * Example: `@typedef {TextContent | ImageContent | AudioContent} MessageContent`
  */
