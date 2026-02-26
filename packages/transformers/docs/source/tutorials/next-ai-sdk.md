@@ -430,7 +430,7 @@ Try prompts like:
 
 ## Next steps
 
-- Add more models and a model selector &mdash; see the [full example source](https://github.com/huggingface/transformers.js/tree/main/next-vercel-ai-sdk-v6-tool-calling) for a multi-model implementation with Zustand state management.
+- Add more models and a model selector &mdash; see the [full example source](https://github.com/huggingface/transformers.js-examples/tree/main/next-vercel-ai-sdk-v6-tool-calling) for a multi-model implementation with Zustand state management.
 - Add a browser compatibility check with `doesBrowserSupportTransformersJS()` and fall back to a server-side route if WebGPU is unavailable.
 - Explore the [Vercel AI SDK agents documentation](https://ai-sdk.dev/docs/agents/overview) for more complex agent patterns.
 - See the [Vercel AI SDK guide](../guides/vercel-ai-sdk) for a reference of all supported features (embeddings, vision, transcription, etc.).
