@@ -125,8 +125,6 @@ export async function get_model_files(
         }
     };
 
-    files.push('generation_config-test.json');
-
     // Add model files based on model type
     if (modelType === MODEL_TYPES.DecoderOnly) {
         add_model_file('model', 'model');
