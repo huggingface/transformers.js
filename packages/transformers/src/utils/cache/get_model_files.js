@@ -27,9 +27,7 @@ export async function get_model_files(
     modelId,
     { config = null, dtype: overrideDtype = null, device: overrideDevice = null } = {},
 ) {
-    if (!config) {
-        config = await AutoConfig.from_pretrained(modelId);
-    }
+    config = await AutoConfig.from_pretrained(modelId, { config });
 
     const files = [
         // Add config.json (always loaded)
