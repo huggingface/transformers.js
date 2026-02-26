@@ -16,8 +16,7 @@
     "noEmit": false,
     "emitDeclarationOnly": true,
     "esModuleInterop": true,
-    "composite": true,
-    "strictNullChecks": false
+    "composite": true
   },
   "typeAcquisition": {
     "include": ["jest"]
