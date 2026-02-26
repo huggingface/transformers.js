@@ -72,11 +72,11 @@ That's it &mdash; the handler takes care of model loading, inference, streaming,
 Create `src/app/models.ts` to define which models are available. These are ONNX-format models from Hugging Face:
 
 ```typescript
-export interface ModelConfig {
+import { WorkerLoadOptions } from "@browser-ai/transformers-js";
+
+export interface ModelConfig extends Omit<WorkerLoadOptions, "modelId"> {
   id: string;
   name: string;
-  device?: string;
-  dtype?: string;
   supportsWorker?: boolean;
 }
 
@@ -93,7 +93,7 @@ export const MODELS: ModelConfig[] = [
     name: "Granite 4.0 350M",
     device: "webgpu",
     dtype: "fp16",
-    supportsWorker: false,
+    supportsWorker: true,
   },
 ];
 ```
@@ -224,10 +224,10 @@ export class TransformersChatTransport
 
         if (availability !== "available") {
           await this.model.createSessionWithProgress(
-            (progress: { progress: number }) => {
-              const percent = Math.round(progress.progress * 100);
+            (progress: number) => {
+              const percent = Math.round(progress * 100);
 
-              if (progress.progress >= 1) {
+              if (progress >= 1) {
                 if (downloadProgressId) {
                   writer.write({
                     type: "data-modelDownloadProgress",
