@@ -2,8 +2,6 @@
  * @file Cache clearing utilities for model files
  *
  * Provides functions to clear cached model files from the cache system.
- *
- * @module utils/cache
  */
 
 import { getCache } from '../cache.js';
