@@ -31,7 +31,10 @@ export async function get_model_files(
         config = await AutoConfig.from_pretrained(modelId);
     }
 
-    const files = [];
+    const files = [
+        // Add config.json (always loaded)
+        'config.json',
+    ];
     const custom_config = config['transformers.js_config'] ?? {};
 
     const use_external_data_format = custom_config.use_external_data_format;
@@ -41,8 +44,6 @@ export async function get_model_files(
     let dtype = overrideDtype ?? custom_config.dtype;
 
     // Infer model type from config
-    // We use MODEL_TYPE_MAPPING (the authoritative source used by from_pretrained) when possible,
-    // and fall back to heuristic detection for unknown architectures
     let modelType;
 
     // @ts-ignore - architectures is set via Object.assign in PretrainedConfig constructor
@@ -199,9 +200,6 @@ export async function get_model_files(
         // MODEL_TYPES.EncoderOnly or unknown
         add_model_file('model', 'model');
     }
-
-    // Add config.json (always loaded)
-    files.push('config.json');
 
     return files;
 }
