@@ -6,12 +6,8 @@ import {
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
-import {
-    DATA_TYPES,
-    DEFAULT_DEVICE_DTYPE_MAPPING,
-    DEFAULT_DTYPE_SUFFIX_MAPPING,
-    isWebGpuFp16Supported,
-} from '../utils/dtypes.js';
+import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, resolveDtype } from '../utils/dtypes.js';
+import { selectDevice } from '../utils/devices.js';
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 import { Tensor } from '../utils/tensor.js';
@@ -29,19 +25,11 @@ import { logger } from '../utils/logger.js';
 async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder = false) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
-    let device = options.device ?? custom_config.device;
-    if (device && typeof device !== 'string') {
-        if (device.hasOwnProperty(fileName)) {
-            device = device[fileName];
-        } else {
-            logger.warn(`device not specified for "${fileName}". Using the default device.`);
-            device = null;
-        }
-    }
-
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("../utils/devices.js").DeviceType} */ (
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        selectDevice(options.device ?? custom_config.device, fileName, {
+            warn: (msg) => logger.warn(msg),
+        })
     );
 
     const executionProviders = deviceToExecutionProviders(selectedDevice);
@@ -57,35 +45,18 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // If options.dtype is specified, we use it to choose the suffix for the model file.
     // Otherwise, we use the default dtype for the device.
-    let dtype = options.dtype ?? custom_config.dtype;
-    if (typeof dtype !== 'string') {
-        if (dtype && dtype.hasOwnProperty(fileName)) {
-            dtype = dtype[fileName];
-        } else {
-            dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-            logger.warn(
-                `dtype not specified for "${fileName}". Using the default dtype (${dtype}) for this device (${selectedDevice}).`,
-            );
-        }
+    const rawDtype = options.dtype ?? custom_config.dtype;
+    if (rawDtype && typeof rawDtype !== 'string' && !rawDtype.hasOwnProperty(fileName)) {
+        // dtype is a per-file object but this fileName is not in it
+        const fallback = resolveDtype(rawDtype, fileName, selectedDevice);
+        logger.warn(
+            `dtype not specified for "${fileName}". Using the default dtype (${fallback}) for this device (${selectedDevice}).`,
+        );
     }
 
-    if (dtype === DATA_TYPES.auto) {
-        // Try to choose the auto dtype based on the custom config
-        let config_dtype = custom_config.dtype;
-        if (typeof config_dtype !== 'string') {
-            config_dtype = config_dtype?.[fileName];
-        }
-
-        if (config_dtype && config_dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(config_dtype)) {
-            // Defined by the config, and is not "auto"
-            dtype = config_dtype;
-        } else {
-            // Choose default dtype based on device, falling back to fp32
-            dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-        }
-    }
-
-    const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (dtype);
+    const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (
+        resolveDtype(rawDtype, fileName, selectedDevice, custom_config.dtype)
+    );
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
         throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);

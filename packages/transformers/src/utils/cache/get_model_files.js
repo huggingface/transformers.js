@@ -1,10 +1,6 @@
-import { apis } from '../../env.js';
-import {
-    DATA_TYPES,
-    DEFAULT_DEVICE_DTYPE_MAPPING,
-    DEFAULT_DTYPE_SUFFIX_MAPPING,
-    DEFAULT_DEVICE_DTYPE,
-} from '../dtypes.js';
+import { DEFAULT_DTYPE_SUFFIX_MAPPING, resolveDtype } from '../dtypes.js';
+import { selectDevice } from '../devices.js';
+import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
 import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
@@ -38,7 +34,7 @@ export async function get_model_files(
     const use_external_data_format = custom_config.use_external_data_format;
     const subfolder = 'onnx'; // Always 'onnx' as per the default in from_pretrained
 
-    let device = overrideDevice ?? custom_config.device;
+    const rawDevice = overrideDevice ?? custom_config.device;
     let dtype = overrideDtype ?? custom_config.dtype;
 
     // Infer model type from config
@@ -83,27 +79,10 @@ export async function get_model_files(
         modelType = MODEL_TYPES.EncoderOnly;
     }
 
-    // Helper function to determine dtype for a given file
-    // This reads from config only, matching the actual loading behavior
-    const get_dtype = (fileName) => {
-        if (dtype && typeof dtype === 'object') {
-            const fileDtype = dtype[fileName];
-            if (fileDtype && fileDtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(fileDtype)) {
-                return fileDtype;
-            }
-        }
-
-        if (dtype && typeof dtype === 'string' && dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(dtype)) {
-            return dtype;
-        }
-
-        const selectedDevice = /** @type {string} */ (device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm'));
-        return DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DEFAULT_DEVICE_DTYPE;
-    };
-
     const add_model_file = (fileName, baseName = null) => {
         baseName = baseName ?? fileName;
-        const selectedDtype = get_dtype(fileName);
+        const selectedDevice = selectDevice(rawDevice, fileName);
+        const selectedDtype = resolveDtype(dtype, fileName, selectedDevice);
 
         const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype] ?? '';
         const fullName = `${baseName}${suffix}.onnx`;
@@ -111,14 +90,8 @@ export async function get_model_files(
         files.push(fullPath);
 
         // Check for external data files
-        let external_data_format = use_external_data_format;
-        if (typeof use_external_data_format === 'object' && use_external_data_format !== null) {
-            external_data_format = use_external_data_format[fullName] ?? use_external_data_format[fileName] ?? false;
-        }
-
-        const num_chunks = +external_data_format; // (false=0, true=1, number remains the same)
-        for (let i = 0; i < num_chunks; ++i) {
-            const dataFileName = `${fullName}_data${i === 0 ? '' : '_' + i}`;
+        const num_chunks = resolveExternalDataFormat(use_external_data_format, fullName, fileName);
+        for (const dataFileName of getExternalDataChunkNames(fullName, num_chunks)) {
             const dataFilePath = subfolder ? `${subfolder}/${dataFileName}` : dataFileName;
             files.push(dataFilePath);
         }
