@@ -116,6 +116,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @param {boolean} [options.include_tokenizer=true] - Whether to check for tokenizer files
      * @param {boolean} [options.include_processor=true] - Whether to check for processor files
      * @returns {Promise<string[]>} Array of file paths
@@ -138,6 +139,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of file paths
      *
      * @example
@@ -156,6 +158,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of model file paths
      *
      * @example

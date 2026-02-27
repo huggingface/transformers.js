@@ -18,11 +18,12 @@ import { logger } from '../logger.js';
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
+ * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix).
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(
     modelId,
-    { config = null, dtype: overrideDtype = null, device: overrideDevice = null } = {},
+    { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
 ) {
     config = await AutoConfig.from_pretrained(modelId, { config });
 
@@ -98,12 +99,16 @@ export async function get_model_files(
         }
     };
 
+    // model_file_name overrides the default ONNX file name for single-model architectures
+    // (encoder-only, decoder-only). Multi-component models use fixed names.
+    const singleModelName = model_file_name ?? 'model';
+
     // Add model files based on model type
     if (modelType === MODEL_TYPES.DecoderOnly) {
-        add_model_file('model', 'model');
+        add_model_file('model', singleModelName);
         files.push('generation_config.json');
     } else if (modelType === MODEL_TYPES.DecoderOnlyWithoutHead) {
-        add_model_file('model', 'model');
+        add_model_file('model', singleModelName);
         // Do not load generation_config.json for models without generation head
     } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
         add_model_file('model', 'encoder_model');
@@ -170,7 +175,7 @@ export async function get_model_files(
         add_model_file('voice_decoder');
     } else {
         // MODEL_TYPES.EncoderOnly or unknown
-        add_model_file('model', 'model');
+        add_model_file('model', singleModelName);
     }
 
     return files;
