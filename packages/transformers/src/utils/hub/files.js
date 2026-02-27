@@ -211,8 +211,6 @@ export class FileCache {
         let filePath = path.join(this.path, request);
 
         try {
-            // Check if file exists before attempting to delete
-            await fs.promises.access(filePath);
             await fs.promises.unlink(filePath);
             return true;
         } catch (error) {
