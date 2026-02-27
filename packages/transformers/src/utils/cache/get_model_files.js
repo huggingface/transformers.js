@@ -1,4 +1,4 @@
-import { DEFAULT_DTYPE_SUFFIX_MAPPING, resolveDtype } from '../dtypes.js';
+import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
 import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
@@ -83,7 +83,7 @@ export async function get_model_files(
     const add_model_file = (fileName, baseName = null) => {
         baseName = baseName ?? fileName;
         const selectedDevice = selectDevice(rawDevice, fileName);
-        const selectedDtype = resolveDtype(dtype, fileName, selectedDevice);
+        const selectedDtype = selectDtype(dtype, fileName, selectedDevice);
 
         const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype] ?? '';
         const fullName = `${baseName}${suffix}.onnx`;

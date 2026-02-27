@@ -6,7 +6,7 @@ import {
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
-import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, resolveDtype } from '../utils/dtypes.js';
+import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, selectDtype } from '../utils/dtypes.js';
 import { selectDevice } from '../utils/devices.js';
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
@@ -45,17 +45,11 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // If options.dtype is specified, we use it to choose the suffix for the model file.
     // Otherwise, we use the default dtype for the device.
-    const rawDtype = options.dtype ?? custom_config.dtype;
-    if (rawDtype && typeof rawDtype !== 'string' && !rawDtype.hasOwnProperty(fileName)) {
-        // dtype is a per-file object but this fileName is not in it
-        const fallback = resolveDtype(rawDtype, fileName, selectedDevice);
-        logger.warn(
-            `dtype not specified for "${fileName}". Using the default dtype (${fallback}) for this device (${selectedDevice}).`,
-        );
-    }
-
     const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (
-        resolveDtype(rawDtype, fileName, selectedDevice, custom_config.dtype)
+        selectDtype(options.dtype ?? custom_config.dtype, fileName, selectedDevice, {
+            configDtype: custom_config.dtype,
+            warn: (msg) => logger.warn(msg),
+        })
     );
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
