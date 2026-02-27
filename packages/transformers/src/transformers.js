@@ -13,7 +13,7 @@
  */
 
 // Environment variables
-export { env } from './env.js';
+export { env, LogLevel } from './env.js';
 
 // Pipelines
 export * from './pipelines.js';
@@ -53,10 +53,13 @@ export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 
+export { random } from './utils/random.js';
+
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
  * @typedef {import('./processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
+ * @typedef {import('./tokenization_utils.js').Message} Message
  * @typedef {import('./tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType

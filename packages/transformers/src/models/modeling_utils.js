@@ -37,6 +37,7 @@ import { BeamSearchScorer } from '../generation/beam_search.js';
 import { pick } from '../utils/core.js';
 import { log_softmax } from '../utils/maths.js';
 import { ModelOutput } from './modeling_outputs.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -496,7 +497,7 @@ export class PreTrainedModel extends Callable {
             if (modelType === undefined) {
                 const type = modelName ?? config?.model_type;
                 if (type !== 'custom') {
-                    console.warn(
+                    logger.warn(
                         `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
                     );
                 }
@@ -676,7 +677,7 @@ export class PreTrainedModel extends Callable {
         }
 
         if (generation_config.temperature === 0 && generation_config.do_sample) {
-            console.warn(
+            logger.warn(
                 '`do_sample` changed to false because `temperature: 0` implies greedy sampling (always selecting the most likely token), which is incompatible with `do_sample: true`.',
             );
             generation_config.do_sample = false;

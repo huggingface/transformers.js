@@ -1,5 +1,7 @@
 import { getCache } from '../../utils/cache.js';
 import { isValidUrl } from '../../utils/hub/utils.js';
+import { logger } from '../../utils/logger.js';
+import { env } from '../../env.js';
 
 /**
  * Loads and caches a file from the given URL.
@@ -22,11 +24,11 @@ async function loadAndCacheFile(url) {
             }
         }
     } catch (error) {
-        console.warn(`Failed to load ${fileName} from cache:`, error);
+        logger.warn(`Failed to load ${fileName} from cache:`, error);
     }
 
     // If not in cache, fetch it
-    const response = await fetch(url);
+    const response = await env.fetch(url);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
@@ -37,7 +39,7 @@ async function loadAndCacheFile(url) {
         try {
             await cache.put(url, response.clone());
         } catch (e) {
-            console.warn(`Failed to cache ${fileName}:`, e);
+            logger.warn(`Failed to cache ${fileName}:`, e);
         }
     }
 
@@ -57,7 +59,7 @@ export async function loadWasmBinary(wasmURL) {
     try {
         return await response.arrayBuffer();
     } catch (error) {
-        console.warn('Failed to read WASM binary:', error);
+        logger.warn('Failed to read WASM binary:', error);
         return null;
     }
 }
@@ -79,7 +81,7 @@ export async function loadWasmFactory(libURL) {
         const blob = new Blob([code], { type: 'text/javascript' });
         return URL.createObjectURL(blob);
     } catch (error) {
-        console.warn('Failed to read WASM binary:', error);
+        logger.warn('Failed to read WASM binary:', error);
         return null;
     }
 }

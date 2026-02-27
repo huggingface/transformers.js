@@ -3,21 +3,17 @@ import {
   AutoModelForSeq2SeqLM,
   AutoModelForCausalLM,
   LlamaForCausalLM,
-  LlavaForConditionalGeneration,
 
   // Tokenizers
   AutoTokenizer,
   LlamaTokenizer,
-
-  // Processors
-  AutoProcessor,
-  Processor,
 
   // Other
   TextStreamer,
   RawImage,
   BeamSearchScorer,
   BeamHypotheses,
+  random,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -175,6 +171,40 @@ describe("Generation parameters", () => {
         });
         expect(outputs.tolist()).toEqual([[1n, 22172n, 31583n, 18824n, 16621n, 8136n, 16012n]]);
         expect(outputs.dims.at(-1)).toBeGreaterThanOrEqual(MIN_NEW_TOKENS);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "do_sample (seeded)",
+      async () => {
+        // Seed 42: deterministic sampling
+        random.seed(42);
+        const outputs_seed42_a = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        // Re-seed 42: must reproduce the same output
+        random.seed(42);
+        const outputs_seed42_b = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        // Seed 123: different seed → different output
+        random.seed(123);
+        const outputs_seed123 = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        const expected_seed42 = [[1n, 22172n, 28220n, 5345n, 27342n, 14352n, 24712n, 19249n, 24075n, 19934n, 8678n, 30868n]];
+        const expected_seed123 = [[1n, 22172n, 10131n, 867n, 12403n, 24755n, 16382n, 21742n, 24662n, 19120n, 22952n, 945n]];
+
+        expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
+        expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
+        expect(outputs_seed123.tolist()).toEqual(expected_seed123);
       },
       MAX_TEST_EXECUTION_TIME,
     );

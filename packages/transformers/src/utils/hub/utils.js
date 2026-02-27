@@ -1,4 +1,5 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
+import { logger } from '../logger.js';
 
 /**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
@@ -86,7 +87,7 @@ export function handleError(status, remoteURL, fatal) {
 export async function readResponse(response, progress_callback) {
     const contentLength = response.headers.get('Content-Length');
     if (contentLength === null) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
+        logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
     let total = parseInt(contentLength ?? '0');
     let buffer = new Uint8Array(total);
