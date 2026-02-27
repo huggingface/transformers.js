@@ -360,6 +360,34 @@ export const TASK_ALIASES = Object.freeze({
     embeddings: 'feature-extraction',
 });
 
+export {
+    TextClassificationPipeline,
+    TokenClassificationPipeline,
+    QuestionAnsweringPipeline,
+    FillMaskPipeline,
+    SummarizationPipeline,
+    TranslationPipeline,
+    Text2TextGenerationPipeline,
+    TextGenerationPipeline,
+    ZeroShotClassificationPipeline,
+    AudioClassificationPipeline,
+    ZeroShotAudioClassificationPipeline,
+    AutomaticSpeechRecognitionPipeline,
+    TextToAudioPipeline,
+    ImageToTextPipeline,
+    ImageClassificationPipeline,
+    ImageSegmentationPipeline,
+    BackgroundRemovalPipeline,
+    ZeroShotImageClassificationPipeline,
+    ObjectDetectionPipeline,
+    ZeroShotObjectDetectionPipeline,
+    DocumentQuestionAnsweringPipeline,
+    ImageToImagePipeline,
+    DepthEstimationPipeline,
+    FeatureExtractionPipeline,
+    ImageFeatureExtractionPipeline,
+};
+
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
  * @typedef {keyof typeof TASK_ALIASES} AliasType

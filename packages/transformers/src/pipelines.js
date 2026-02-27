@@ -16,32 +16,35 @@
 import { dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
 
-import { TextClassificationPipeline } from './pipelines/text-classification.js';
-import { TokenClassificationPipeline } from './pipelines/token-classification.js';
-import { QuestionAnsweringPipeline } from './pipelines/question-answering.js';
-import { FillMaskPipeline } from './pipelines/fill-mask.js';
-import { SummarizationPipeline } from './pipelines/summarization.js';
-import { TranslationPipeline } from './pipelines/translation.js';
-import { Text2TextGenerationPipeline } from './pipelines/text2text-generation.js';
-import { TextGenerationPipeline } from './pipelines/text-generation.js';
-import { ZeroShotClassificationPipeline } from './pipelines/zero-shot-classification.js';
-import { AudioClassificationPipeline } from './pipelines/audio-classification.js';
-import { ZeroShotAudioClassificationPipeline } from './pipelines/zero-shot-audio-classification.js';
-import { AutomaticSpeechRecognitionPipeline } from './pipelines/automatic-speech-recognition.js';
-import { TextToAudioPipeline } from './pipelines/text-to-audio.js';
-import { ImageToTextPipeline } from './pipelines/image-to-text.js';
-import { ImageClassificationPipeline } from './pipelines/image-classification.js';
-import { ImageSegmentationPipeline } from './pipelines/image-segmentation.js';
-import { BackgroundRemovalPipeline } from './pipelines/background-removal.js';
-import { ZeroShotImageClassificationPipeline } from './pipelines/zero-shot-image-classification.js';
-import { ObjectDetectionPipeline } from './pipelines/object-detection.js';
-import { ZeroShotObjectDetectionPipeline } from './pipelines/zero-shot-object-detection.js';
-import { DocumentQuestionAnsweringPipeline } from './pipelines/document-question-answering.js';
-import { ImageToImagePipeline } from './pipelines/image-to-image.js';
-import { DepthEstimationPipeline } from './pipelines/depth-estimation.js';
-import { FeatureExtractionPipeline } from './pipelines/feature-extraction.js';
-import { ImageFeatureExtractionPipeline } from './pipelines/image-feature-extraction.js';
-import { SUPPORTED_TASKS, TASK_ALIASES } from './pipelines/index.js';
+import {
+    SUPPORTED_TASKS,
+    TASK_ALIASES,
+    TextClassificationPipeline,
+    TokenClassificationPipeline,
+    QuestionAnsweringPipeline,
+    FillMaskPipeline,
+    SummarizationPipeline,
+    TranslationPipeline,
+    Text2TextGenerationPipeline,
+    TextGenerationPipeline,
+    ZeroShotClassificationPipeline,
+    AudioClassificationPipeline,
+    ZeroShotAudioClassificationPipeline,
+    AutomaticSpeechRecognitionPipeline,
+    TextToAudioPipeline,
+    ImageToTextPipeline,
+    ImageClassificationPipeline,
+    ImageSegmentationPipeline,
+    BackgroundRemovalPipeline,
+    ZeroShotImageClassificationPipeline,
+    ObjectDetectionPipeline,
+    ZeroShotObjectDetectionPipeline,
+    DocumentQuestionAnsweringPipeline,
+    ImageToImagePipeline,
+    DepthEstimationPipeline,
+    FeatureExtractionPipeline,
+    ImageFeatureExtractionPipeline,
+} from './pipelines/index.js';
 import { get_pipeline_files } from './utils/cache/get_pipeline_files.js';
 import { get_file_metadata } from './utils/cache/get_file_metadata.js';
 
