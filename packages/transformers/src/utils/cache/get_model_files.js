@@ -4,6 +4,7 @@ import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-l
 import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
+import { logger } from '../logger.js';
 
 /**
  * Returns the list of files that will be loaded for a model based on its configuration.
@@ -67,7 +68,7 @@ export async function get_model_files(
     // Fall back to EncoderOnly if not found in mapping
     if (!foundInMapping) {
         const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
-        console.warn(
+        logger.warn(
             `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
                 `for model type '${config.model_type}'. Falling back to EncoderOnly (single model.onnx file). ` +
                 `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
