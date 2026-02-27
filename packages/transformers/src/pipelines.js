@@ -124,16 +124,13 @@ export async function pipeline(
         }
     }
 
-    const expected_files = Boolean(progress_callback)
-        ? await get_pipeline_files(task, model, {
-              device,
-              dtype,
-          })
-        : [];
-
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
-    if (Boolean(progress_callback)) {
+    if (progress_callback) {
+        const expected_files = await get_pipeline_files(task, model, {
+            device,
+            dtype,
+        });
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
         metadata.forEach((m, i) => {
