@@ -26,30 +26,21 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 async function check_files_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
 
-    const fileStatuses = [];
-    let allCached = true;
-
     if (!cache) {
+        const fileStatuses = files.map((filename) => ({ file: filename, cached: false }));
         // No cache available, all files considered not cached
-        for (const filename of files) {
-            fileStatuses.push({ file: filename, cached: false });
-        }
         return { allCached: false, files: fileStatuses };
     }
 
-    for (const filename of files) {
-        const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
-        const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
-        const isCached = !!cached;
+    const fileStatuses = await Promise.all(
+        files.map(async (filename) => {
+            const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
+            const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
+            return { file: filename, cached: !!cached };
+        }),
+    );
 
-        fileStatuses.push({ file: filename, cached: isCached });
-
-        if (!isCached) {
-            allCached = false;
-        }
-    }
-
-    return { allCached, files: fileStatuses };
+    return { allCached: fileStatuses.every((f) => f.cached), files: fileStatuses };
 }
 
 /**
