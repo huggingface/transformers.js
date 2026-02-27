@@ -97,13 +97,7 @@ export function selectDtype(dtype, fileName, selectedDevice, { configDtype = nul
         if (configDtype) {
             const fallback = typeof configDtype === 'string' ? configDtype : configDtype?.[fileName];
             if (fallback && fallback !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(fallback)) {
-                result = /** @type {DataType} */ (fallback);
-                if (needsWarn && warn) {
-                    warn(
-                        `dtype not specified for "${fileName}". Using the default dtype (${result}) for this device (${selectedDevice}).`,
-                    );
-                }
-                return result;
+                return /** @type {DataType} */ (fallback);
             }
         }
         result = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DEFAULT_DEVICE_DTYPE;
