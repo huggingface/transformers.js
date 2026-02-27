@@ -3,8 +3,93 @@
  *
  * Provides static methods for:
  * - Discovering which files a model needs
- * - Checking cache status
  * - Getting file metadata
+ * - Checking cache status
+ *
+ * **Example:** Get all files needed for a model
+ * ```javascript
+ * const files = await ModelRegistry.get_files(
+ *   "onnx-community/all-MiniLM-L6-v2-ONNX",
+ *   { dtype: "fp16" },
+ * );
+ * console.log(files); // [ 'config.json', 'onnx/model_fp16.onnx', 'onnx/model_fp16.onnx_data', 'tokenizer.json', 'tokenizer_config.json' ]
+ * ```
+ * 
+ * **Example:** Get all files needed for a specific pipeline task
+ * ```javascript
+ * const files = await ModelRegistry.get_pipeline_files(
+ *   "text-generation",
+ *   "onnx-community/Qwen3-0.6B-ONNX",
+ *   { dtype: "q4" },
+ * );
+ * console.log(files); // [ 'config.json', 'onnx/model_q4.onnx', 'generation_config.json', 'tokenizer.json', 'tokenizer_config.json' ]
+ * ```
+ *
+ * **Example:** Get specific component files
+ * ```javascript
+ * const modelFiles = await ModelRegistry.get_model_files("onnx-community/all-MiniLM-L6-v2-ONNX", { dtype: "q4" });
+ * const tokenizerFiles = await ModelRegistry.get_tokenizer_files("onnx-community/all-MiniLM-L6-v2-ONNX");
+ * const processorFiles = await ModelRegistry.get_processor_files("onnx-community/all-MiniLM-L6-v2-ONNX");
+ * console.log(modelFiles); // [ 'config.json', 'onnx/model_q4.onnx', 'onnx/model_q4.onnx_data' ]
+ * console.log(tokenizerFiles); // [ 'tokenizer.json', 'tokenizer_config.json' ]
+ * console.log(processorFiles); // [ ]
+ * ```
+ * 
+ * **Example:** Check file metadata without downloading
+ * ```javascript
+ * const metadata = await ModelRegistry.get_file_metadata(
+ *   "onnx-community/Qwen3-0.6B-ONNX",
+ *   "config.json"
+ * );
+ * console.log(metadata); // { exists: true, size: 912, contentType: 'application/json', fromCache: true }
+ * ```
+ * 
+ * **Example:** Model cache management
+ * ```javascript
+ * const modelId = "onnx-community/Qwen3-0.6B-ONNX";
+ * const options = { dtype: "q4" };
+ * 
+ * // Check if the model is cached (probably false)
+ * let cacheStatus = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cacheStatus);
+ * // {
+ * //   allCached: false,
+ * //   files: [ { file: 'config.json', cached: true }, { file: 'onnx/model_q4.onnx', cached: false }, { file: 'generation_config.json', cached: false }, { file: 'tokenizer.json', cached: false }, { file: 'tokenizer_config.json', cached: false } ]
+ * // }
+ * 
+ * // Download the model by instantiating a pipeline
+ * const generator = await pipeline("text-generation", modelId, options);
+ * const output = await generator(
+ *   [{ role: "user", content: "What is the capital of France?" }],
+ *   { max_new_tokens: 256, do_sample: false },
+ * );
+ * console.log(output[0].generated_text.at(-1).content); // <think>...</think>\n\nThe capital of France is **Paris**.
+ * 
+ * // Check if the model is cached (should be true now)
+ * cacheStatus = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cacheStatus);
+ * // {
+ * //   allCached: true,
+ * //   files: [ { file: 'config.json', cached: true }, { file: 'onnx/model_q4.onnx', cached: true }, { file: 'generation_config.json', cached: true }, { file: 'tokenizer.json', cached: true }, { file: 'tokenizer_config.json', cached: true } ]
+ * // }
+ * 
+ * // Clear the cache
+ * const clearResult = await ModelRegistry.clear_cache(modelId, options);
+ * console.log(clearResult);
+ * // {
+ * //   filesDeleted: 5,
+ * //   filesCached: 5,
+ * //   files: [ { file: 'config.json', deleted: true, wasCached: true }, { file: 'onnx/model_q4.onnx', deleted: true, wasCached: true }, { file: 'generation_config.json', deleted: true, wasCached: true }, { file: 'tokenizer.json', deleted: true, wasCached: true }, { file: 'tokenizer_config.json', deleted: true, wasCached: true } ]
+ * // }
+ * 
+ * // Check if the model is cached (should be false again)
+ * cacheStatus = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cacheStatus);
+ * // {
+ * //   allCached: false,
+ * //   files: [ { file: 'config.json', cached: true }, { file: 'onnx/model_q4.onnx', cached: false }, { file: 'generation_config.json', cached: false }, { file: 'tokenizer.json', cached: false }, { file: 'tokenizer_config.json', cached: false } ]
+ * // }
+ * ```
  *
  * @module utils/cache
  */
