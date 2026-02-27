@@ -136,7 +136,7 @@ export async function pipeline(
     if (Boolean(progress_callback)) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
-        metadata.map((m, i) => {
+        metadata.forEach((m, i) => {
             if (m.exists) {
                 files_loading[expected_files[i]] = {
                     loaded: 0,
@@ -158,7 +158,7 @@ export async function pipeline(
 
                       const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
                       const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
-                      const progress = (loaded / total) * 100;
+                      const progress = total > 0 ? (loaded / total) * 100 : 0;
 
                       progress_callback({
                           status: 'progress_total',
