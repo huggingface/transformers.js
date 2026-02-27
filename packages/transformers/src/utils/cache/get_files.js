@@ -19,17 +19,12 @@ export async function get_files(
     modelId,
     { config = null, dtype = null, device = null, include_tokenizer = true, include_processor = true } = {},
 ) {
-    const files = [];
+    const files = await get_model_files(modelId, { config, dtype, device });
 
-    // Only check for tokenizer if explicitly requested
     if (include_tokenizer) {
         const tokenizerFiles = await get_tokenizer_files(modelId);
         files.push(...tokenizerFiles);
     }
-
-    files.push(...(await get_model_files(modelId, { config, dtype, device })));
-
-    // Only check for processor if explicitly requested
     if (include_processor) {
         const processorFiles = await get_processor_files(modelId);
         files.push(...processorFiles);
