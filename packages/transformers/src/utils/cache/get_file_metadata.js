@@ -6,6 +6,7 @@ import { env } from '../../env.js';
 import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl } from '../hub/utils.js';
+import { logger } from '../logger.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -33,7 +34,7 @@ async function fetch_file_head(urlOrPath) {
 
     const headers = getFetchHeaders(urlOrPath);
     headers.set('Range', 'bytes=0-0');
-    return fetch(urlOrPath, { method: 'GET', headers });
+    return env.fetch(urlOrPath, { method: 'GET', headers });
 }
 
 /**
@@ -140,6 +141,7 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
             }
         } catch (e) {
             // Range request failed most likely because of a network error, timeout, etc.
+            logger.warn(`Unable to fetch file metadata for "${remoteURL}": ${e}`);
         }
     }
 
