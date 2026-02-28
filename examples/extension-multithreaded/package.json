@@ -1,0 +1,20 @@
+{
+  "name": "extension",
+  "version": "0.0.1",
+  "description": "Transformers.js | Sample browser extension",
+  "scripts": {
+    "build": "webpack",
+    "dev": "webpack --watch"
+  },
+  "type": "module",
+  "author": "Xenova",
+  "license": "MIT",
+  "devDependencies": {
+    "copy-webpack-plugin": "^11.0.0",
+    "html-webpack-plugin": "^5.5.1",
+    "webpack": "^5.79.0"
+  },
+  "dependencies": {
+    "@xenova/transformers": "^2.0.0"
+  }
+}
