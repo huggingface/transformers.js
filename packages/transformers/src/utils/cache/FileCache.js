@@ -42,13 +42,15 @@ export class FileCache {
      */
     async put(request, response, progress_callback = undefined) {
         let filePath = path.join(this.path, request);
+        let tmpPath = filePath + `.tmp.${process.pid}`;
+
         try {
             const contentLength = response.headers.get('Content-Length');
             const total = parseInt(contentLength ?? '0');
             let loaded = 0;
 
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-            const fileStream = fs.createWriteStream(filePath);
+            const fileStream = fs.createWriteStream(tmpPath);
             const reader = response.body.getReader();
 
             while (true) {
@@ -73,11 +75,17 @@ export class FileCache {
                 progress_callback?.({ progress, loaded, total });
             }
 
-            fileStream.close();
+            await new Promise((resolve, reject) => {
+                fileStream.close((err) => (err ? reject(err) : resolve()));
+            });
+
+            // Atomically move the completed temp file to the final path so that
+            // other processes never observe a partially-written file.
+            await fs.promises.rename(tmpPath, filePath);
         } catch (error) {
-            // Clean up the file if an error occurred during download
+            // Clean up the temp file if an error occurred during download
             try {
-                await fs.promises.unlink(filePath);
+                await fs.promises.unlink(tmpPath);
             } catch {}
             throw error;
         }
