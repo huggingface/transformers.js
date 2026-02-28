@@ -7,6 +7,7 @@ import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl } from '../hub/utils.js';
 import { logger } from '../logger.js';
+import { memoizePromise } from '../memoize_promise.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -49,7 +50,18 @@ async function fetch_file_head(urlOrPath) {
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
-export async function get_file_metadata(path_or_repo_id, filename, options = {}) {
+export function get_file_metadata(path_or_repo_id, filename, options = {}) {
+    const key = JSON.stringify([
+        path_or_repo_id,
+        filename,
+        options?.revision,
+        options?.cache_dir,
+        options?.local_files_only,
+    ]);
+    return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
+}
+
+async function _get_file_metadata(path_or_repo_id, filename, options = {}) {
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
