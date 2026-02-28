@@ -42,7 +42,8 @@ export class FileCache {
      */
     async put(request, response, progress_callback = undefined) {
         let filePath = path.join(this.path, request);
-        let tmpPath = filePath + `.tmp.${process.pid}`;
+        // Include both PID and a random suffix so that concurrent put() call within the same process (e.g. multiple pipelines loading the same file in parallel) each get their own temp file and don't corrupt each other's writes.
+        let tmpPath = filePath + `.tmp.${process.pid}.${Math.random().toString(36).slice(2)}`;
 
         try {
             const contentLength = response.headers.get('Content-Length');
@@ -80,7 +81,8 @@ export class FileCache {
             });
 
             // Atomically move the completed temp file to the final path so that
-            // other processes never observe a partially-written file.
+            // concurrent readers (other processes or other in-process calls)
+            // never observe a partially-written file.
             await fs.promises.rename(tmpPath, filePath);
         } catch (error) {
             // Clean up the temp file if an error occurred during download
