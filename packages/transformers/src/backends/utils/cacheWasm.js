@@ -6,7 +6,7 @@ import { env } from '../../env.js';
 /**
  * Loads and caches a file from the given URL.
  * @param {string} url The URL of the file to load.
- * @returns {Promise<Response|import('../../utils/hub/files.js').FileResponse|null|string>} The response object, or null if loading failed.
+ * @returns {Promise<Response|import('../../utils/hub/FileResponse.js').FileResponse|null|string>} The response object, or null if loading failed.
  */
 async function loadAndCacheFile(url) {
     const fileName = url.split('/').pop();

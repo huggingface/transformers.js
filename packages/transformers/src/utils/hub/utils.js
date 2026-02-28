@@ -80,7 +80,7 @@ export function handleError(status, remoteURL, fatal) {
 /**
  * Read and track progress when reading a Response object
  *
- * @param {Response|import('./files.js').FileResponse} response The Response object to read
+ * @param {Response|import('./FileResponse.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
