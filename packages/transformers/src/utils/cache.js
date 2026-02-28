@@ -1,6 +1,7 @@
 import { apis, env } from '../env.js';
 import { FileCache } from './hub/files.js';
 import { logger } from './logger.js';
+import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -34,6 +35,16 @@ export async function getCache(file_cache_dir = null) {
             );
         }
         cache = env.customCache;
+    }
+
+    if (!cache && env.experimental_useCrossOriginStorage) {
+        if (!CrossOriginStorage.isAvailable()) {
+            throw Error(
+                '`env.experimental_useCrossOriginStorage=true`, but the Cross-Origin Storage API is not available in this environment. ' +
+                    'See https://github.com/WICG/cross-origin-storage for browser support and usage instructions.',
+            );
+        }
+        cache = new CrossOriginStorage();
     }
 
     if (!cache && env.useBrowserCache) {
