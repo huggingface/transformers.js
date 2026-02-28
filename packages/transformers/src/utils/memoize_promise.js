@@ -3,8 +3,7 @@
  *
  * Ensures that a given async operation is only initiated once per key.
  * Subsequent calls with the same key return the same pending or resolved promise.
- *
- * @module utils/memoize_promise
+ * Rejected promises are evicted from the cache so callers can retry.
  */
 
 /** @type {Map<string, Promise<any>>} */
@@ -14,6 +13,7 @@ const cache = new Map();
  * Returns the cached promise for `key`, or calls `factory` to create one and caches it.
  * Subsequent calls with the same key return the same promise whether it is still
  * pending or already resolved, so the factory is never invoked more than once per key.
+ * If the promise rejects, the entry is removed from the cache so the operation can be retried.
  *
  * @template T
  * @param {string} key A unique identifier for this async operation.
@@ -25,7 +25,13 @@ export function memoizePromise(key, factory) {
     if (cache.has(key)) {
         return cache.get(key);
     }
-    const promise = Promise.resolve().then(() => factory());
+    const promise = factory().then(
+        (value) => value,
+        (err) => {
+            cache.delete(key);
+            return Promise.reject(err);
+        },
+    );
     cache.set(key, promise);
     return promise;
 }

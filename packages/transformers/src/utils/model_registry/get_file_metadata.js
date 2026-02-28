@@ -61,7 +61,7 @@ export function get_file_metadata(path_or_repo_id, filename, options = {}) {
     return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
 }
 
-async function _get_file_metadata(path_or_repo_id, filename, options = {}) {
+async function _get_file_metadata(path_or_repo_id, filename, options) {
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
