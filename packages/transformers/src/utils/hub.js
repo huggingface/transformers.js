@@ -9,7 +9,7 @@ import { dispatchCallback } from './core.js';
 import { FileResponse, FileCache } from './hub/files.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
-import { get_file_metadata } from './cache/get_file_metadata.js';
+import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';

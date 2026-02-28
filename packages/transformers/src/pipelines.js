@@ -45,8 +45,8 @@ import {
     FeatureExtractionPipeline,
     ImageFeatureExtractionPipeline,
 } from './pipelines/index.js';
-import { get_pipeline_files } from './utils/cache/get_pipeline_files.js';
-import { get_file_metadata } from './utils/cache/get_file_metadata.js';
+import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
+import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType

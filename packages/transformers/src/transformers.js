@@ -54,7 +54,7 @@ export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 export { random } from './utils/random.js';
 
 // Cache and file management
-export { ModelRegistry } from './utils/cache/ModelRegistry.js';
+export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
 // Expose common types used across the library for developers to access
 /**
