@@ -5,6 +5,7 @@
  * @returns {string}
  */
 export function decodeTransducerText(tokenizer, token_ids) {
+    if (!Array.isArray(token_ids) || token_ids.length === 0) return '';
     if (!tokenizer) return token_ids.join(' ');
     return tokenizer.decode(token_ids, { skip_special_tokens: true }).trim();
 }
