@@ -40,6 +40,7 @@ import {
     AutoModelForDepthEstimation,
     AutoModelForImageFeatureExtraction,
 } from './models/auto/modeling_auto.js';
+import { NemoConformerForTDT } from './models/nemo_conformer_tdt/modeling_nemo_conformer_tdt.js';
 
 import { dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
@@ -195,7 +196,7 @@ const SUPPORTED_TASKS = Object.freeze({
     'automatic-speech-recognition': {
         tokenizer: AutoTokenizer,
         pipeline: AutomaticSpeechRecognitionPipeline,
-        model: [AutoModelForSpeechSeq2Seq, AutoModelForCTC],
+        model: [AutoModelForSpeechSeq2Seq, AutoModelForCTC, NemoConformerForTDT],
         processor: AutoProcessor,
         default: {
             // TODO: replace with original

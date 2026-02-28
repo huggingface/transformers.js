@@ -8,6 +8,7 @@ export * from './jina_clip/processing_jina_clip.js';
 export * from './llava/processing_llava.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './moonshine/processing_moonshine.js';
+export * from './nemo_conformer_tdt/processing_nemo_conformer_tdt.js';
 export * from './owlvit/processing_owlvit.js';
 export * from './paligemma/processing_paligemma.js';
 export * from './phi3_v/processing_phi3_v.js';

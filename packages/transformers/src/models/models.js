@@ -102,6 +102,7 @@ export * from './mpt/modeling_mpt.js';
 export * from './mt5/modeling_mt5.js';
 export * from './multi_modality/modeling_multi_modality.js';
 export * from './musicgen/modeling_musicgen.js';
+export * from './nemo_conformer_tdt/modeling_nemo_conformer_tdt.js';
 export * from './nanochat/modeling_nanochat.js';
 export * from './neobert/modeling_neobert.js';
 export * from './nomic_bert/modeling_nomic_bert.js';

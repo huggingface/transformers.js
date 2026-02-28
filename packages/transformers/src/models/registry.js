@@ -41,6 +41,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['unispeech-sat', 'UniSpeechSatModel'],
     ['hubert', 'HubertModel'],
     ['wavlm', 'WavLMModel'],
+    ['nemo-conformer-tdt', 'NemoConformerForTDT'],
     ['audio-spectrogram-transformer', 'ASTModel'],
     ['vits', 'VitsModel'],
     ['pyannote', 'PyAnnoteModel'],
