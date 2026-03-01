@@ -17,20 +17,13 @@ import { logger } from '../utils/logger.js';
  */
 
 /**
- * @typedef {'utterance' | 'word' | 'token' | 'all'} TimestampGranularity
- */
-
-/**
  * @typedef {Object} AutomaticSpeechRecognitionOutput
  * @property {string} text The recognized text.
  * @property {Chunk[]} [chunks] When using `return_timestamps`, the `chunks` will become a list
  * containing all the various text chunks identified by the model.
- * @property {Chunk[]} [tokens] Optional token-level timestamp chunks for models that support them.
- * @property {[number, number]} [utterance] Optional utterance-level timestamp span.
  *
  * @typedef {Object} AutomaticSpeechRecognitionSpecificParams Parameters specific to automatic-speech-recognition pipelines.
  * @property {boolean|'word'} [return_timestamps] Whether to return timestamps or not. Default is `false`.
- * @property {TimestampGranularity} [timestamp_granularity] Granularity used when `return_timestamps` is enabled for Parakeet TDT models. Default is `'word'`.
  * @property {number} [chunk_length_s] The length of audio chunks to process in seconds. Default is 0 (no chunking).
  * @property {number} [stride_length_s] The length of overlap between consecutive audio chunks in seconds. If not provided, defaults to `chunk_length_s / 6`.
  * @property {boolean} [force_full_sequences] Whether to force outputting full sequences or not. Default is `false`.
@@ -310,76 +303,12 @@ export class AutomaticSpeechRecognitionPipeline
     }
 
     /**
-     * @param {any} return_timestamps
-     * @param {any} timestamp_granularity
-     * @returns {TimestampGranularity|null}
-     */
-    _normalizeNemoConformerTimestampGranularity(return_timestamps, timestamp_granularity) {
-        if (!return_timestamps) {
-            return null;
-        }
-
-        const granularity = timestamp_granularity ?? 'word';
-        const allowed = ['utterance', 'word', 'token', 'all'];
-        if (!allowed.includes(granularity)) {
-            throw new Error(
-                `Invalid \`timestamp_granularity\`: "${granularity}". Expected one of: ${allowed.join(', ')}.`,
-            );
-        }
-        return /** @type {TimestampGranularity} */ (granularity);
-    }
-
-    /**
-     * @param {any} result
-     * @param {TimestampGranularity|null} granularity
-     * @returns {AutomaticSpeechRecognitionOutput}
-     */
-    _formatNemoConformerTDTResult(result, granularity) {
-        const text = result.text ?? '';
-        if (!granularity) {
-            return { text };
-        }
-
-        const wordChunks = (result.words ?? []).map((w) => ({
-            text: w.text,
-            timestamp: [w.start_time, w.end_time],
-        }));
-        const tokenChunks = (result.tokens ?? []).map((t) => ({
-            text: t.token ?? t.text ?? '',
-            timestamp: [t.start_time, t.end_time],
-        }));
-        const utterance = result.utterance_timestamp;
-
-        if (granularity === 'utterance') {
-            if (!utterance) {
-                return { text, chunks: [] };
-            }
-            return {
-                text,
-                chunks: [{ text, timestamp: utterance }],
-            };
-        }
-
-        if (granularity === 'word') {
-            return { text, chunks: wordChunks };
-        }
-
-        if (granularity === 'token') {
-            return { text, chunks: tokenChunks };
-        }
-
-        return {
-            text,
-            chunks: wordChunks,
-            tokens: tokenChunks,
-            ...(utterance ? { utterance } : {}),
-        };
-    }
-
-    /**
-     * Nemo Conformer TDT ASR output rules:
-     * - `return_timestamps=false`: `{ text }`
-     * - `return_timestamps=true`: return full raw model transcription payload.
+     * Nemo Conformer TDT ASR pipeline.
+     *
+     * Delegates to model.transcribe() and returns its output directly.
+     * Use `return_timestamps: true` on the pipeline call to get utterance-level data.
+     * For words/tokens/metrics/debug, call model.transcribe() directly with the
+     * extended options (return_words, return_tokens, return_metrics, etc.).
      */
     async _call_nemo_conformer_tdt(audio, kwargs) {
         if (typeof (/** @type {any} */ (this.model).transcribe) !== 'function') {
@@ -397,18 +326,13 @@ export class AutomaticSpeechRecognitionPipeline
             );
         }
 
-        const return_timestamps = kwargs.return_timestamps ?? false;
-        const granularity = this._normalizeNemoConformerTimestampGranularity(
-            return_timestamps,
-            kwargs.timestamp_granularity,
-        );
-        const withTimestamps = granularity !== null;
+        const return_timestamps = !!(kwargs.return_timestamps ?? false);
 
         const decodeOptions = {
             tokenizer: this.tokenizer,
-            return_timestamps: withTimestamps,
-            return_words: granularity === 'word' || granularity === 'all',
-            return_tokens: granularity === 'token' || granularity === 'all',
+            return_timestamps,
+            return_words: return_timestamps,
+            return_metrics: true,
         };
 
         const single = !Array.isArray(audio);
@@ -420,7 +344,7 @@ export class AutomaticSpeechRecognitionPipeline
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);
             const output = await /** @type {any} */ (this.model).transcribe(inputs, decodeOptions);
-            toReturn.push(this._formatNemoConformerTDTResult(output, granularity));
+            toReturn.push(output);
         }
 
         return single ? toReturn[0] : toReturn;

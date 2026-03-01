@@ -112,7 +112,7 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
         };
         const conf = token_confidences?.[i];
         if (conf != null && Number.isFinite(conf)) {
-            tok.confidence = conf;
+            tok.confidence = Math.round(conf * 1e6) / 1e6;
         }
         tokens.push(tok);
 
@@ -127,7 +127,8 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
                         end_time: current.end,
                     };
                     if (current.confs.length > 0) {
-                        word.confidence = current.confs.reduce((a, b) => a + b, 0) / current.confs.length;
+                        word.confidence =
+                            Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
                     }
                     words.push(word);
                 }
@@ -157,7 +158,8 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
                 end_time: current.end,
             };
             if (current.confs.length > 0) {
-                word.confidence = current.confs.reduce((a, b) => a + b, 0) / current.confs.length;
+                word.confidence =
+                    Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
             }
             words.push(word);
         }
@@ -166,7 +168,7 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
     const word_confidences = words.some((x) => x.confidence != null) ? words.map((x) => x.confidence ?? 0) : null;
     const word_avg =
         word_confidences && word_confidences.length > 0
-            ? word_confidences.reduce((a, b) => a + b, 0) / word_confidences.length
+            ? Math.round((word_confidences.reduce((a, b) => a + b, 0) / word_confidences.length) * 1e6) / 1e6
             : null;
 
     return { words, tokens, word_confidences, word_avg };

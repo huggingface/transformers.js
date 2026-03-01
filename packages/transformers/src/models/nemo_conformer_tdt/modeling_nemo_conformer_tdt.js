@@ -46,6 +46,10 @@ function roundMetric(value, digits = 2) {
     return Math.round(value * factor) / factor;
 }
 
+function roundTs(value) {
+    return Math.round(value * 1000) / 1000;
+}
+
 /**
  * @param {Float32Array|number[]} logits
  * @param {number} tokenId
@@ -630,8 +634,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     tokenIds.push(tokenId);
                     const durationFrames = step > 0 ? step : 1;
                     tokenTimestamps.push([
-                        frameIndex * frameTime + timeOffset,
-                        (frameIndex + durationFrames) * frameTime + timeOffset,
+                        roundTs(frameIndex * frameTime + timeOffset),
+                        roundTs((frameIndex + durationFrames) * frameTime + timeOffset),
                     ]);
                     if (tokenConfidences && maybeConfidence) {
                         tokenConfidences.push(maybeConfidence.confidence);
@@ -677,7 +681,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         if (return_timestamps) {
             result.utterance_confidence =
                 tokenConfidences && tokenConfidences.length > 0
-                    ? tokenConfidences.reduce((a, b) => a + b, 0) / tokenConfidences.length
+                    ? roundMetric(tokenConfidences.reduce((a, b) => a + b, 0) / tokenConfidences.length, 6)
                     : null;
 
             result.utterance_timestamp =
@@ -686,7 +690,10 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                           tokenTimestamps[0][0],
                           tokenTimestamps[tokenTimestamps.length - 1][1],
                       ])
-                    : /** @type {[number, number]} */ ([timeOffset, frames.length * frameTime + timeOffset]);
+                    : /** @type {[number, number]} */ ([
+                          roundTs(timeOffset),
+                          roundTs(frames.length * frameTime + timeOffset),
+                      ]);
 
             if (detailed) {
                 if (return_words) result.words = detailed.words;
@@ -695,15 +702,19 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
             result.confidence_scores = {
                 token_avg: result.utterance_confidence,
-                word_avg: detailed?.word_avg ?? null,
+                word_avg: detailed?.word_avg != null ? roundMetric(detailed.word_avg, 6) : null,
                 overall_log_prob:
-                    logProbs && logProbs.length > 0 ? logProbs.reduce((a, b) => a + b, 0) / logProbs.length : null,
+                    logProbs && logProbs.length > 0
+                        ? roundMetric(logProbs.reduce((a, b) => a + b, 0) / logProbs.length, 6)
+                        : null,
             };
 
             if (frameConfidences && frameConfidences.length > 0) {
                 result.confidence_scores.frame = frameConfidences;
-                result.confidence_scores.frame_avg =
-                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length;
+                result.confidence_scores.frame_avg = roundMetric(
+                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
+                    6,
+                );
             }
         }
 
