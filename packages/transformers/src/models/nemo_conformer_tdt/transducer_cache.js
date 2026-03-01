@@ -97,18 +97,18 @@ export class FeatureLRUCache {
 
 function estimateSizeBytes(value) {
     if (value instanceof Tensor) {
-        return value.data?.byteLength ?? 0;
+        return /** @type {any} */ (value.data)?.byteLength ?? 0;
     }
     if (value?.input_features instanceof Tensor) {
-        let bytes = value.input_features.data?.byteLength ?? 0;
+        let bytes = /** @type {any} */ (value.input_features.data)?.byteLength ?? 0;
         if (value.attention_mask instanceof Tensor) {
-            bytes += value.attention_mask.data?.byteLength ?? 0;
+            bytes += /** @type {any} */ (value.attention_mask.data)?.byteLength ?? 0;
         }
         if (value.delta_features instanceof Tensor) {
-            bytes += value.delta_features.data?.byteLength ?? 0;
+            bytes += /** @type {any} */ (value.delta_features.data)?.byteLength ?? 0;
         }
         if (value.delta_delta_features instanceof Tensor) {
-            bytes += value.delta_delta_features.data?.byteLength ?? 0;
+            bytes += /** @type {any} */ (value.delta_delta_features.data)?.byteLength ?? 0;
         }
         return bytes;
     }

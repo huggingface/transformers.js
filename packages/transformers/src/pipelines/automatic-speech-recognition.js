@@ -395,7 +395,7 @@ export class AutomaticSpeechRecognitionPipeline
      * - `timestamp_granularity='all'`: returns `chunks` (word), `tokens`, and `utterance`
      */
     async _call_nemo_conformer_tdt(audio, kwargs) {
-        if (typeof this.model.transcribe !== 'function') {
+        if (typeof /** @type {any} */ (this.model).transcribe !== 'function') {
             throw new Error('Nemo Conformer TDT model does not expose a `transcribe` method.');
         }
         if (!this.processor) {
@@ -432,7 +432,7 @@ export class AutomaticSpeechRecognitionPipeline
         const toReturn = [];
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);
-            const output = await this.model.transcribe(inputs, decodeOptions);
+            const output = await /** @type {any} */ (this.model).transcribe(inputs, decodeOptions);
             toReturn.push(this._formatNemoConformerTDTResult(output, granularity));
         }
 

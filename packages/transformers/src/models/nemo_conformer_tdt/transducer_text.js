@@ -22,7 +22,9 @@ export function buildTransducerWordTimestamps(tokenizer, token_ids, token_timest
         return [];
     }
 
+    /** @type {{ text: string, timestamp: [number, number] }[]} */
     const words = [];
+    /** @type {{ text: string, start: number, end: number } | null} */
     let current = null;
 
     for (let i = 0; i < token_ids.length; ++i) {
@@ -45,6 +47,7 @@ export function buildTransducerWordTimestamps(tokenizer, token_ids, token_timest
                 if (text) {
                     words.push({
                         text,
+                        // Keep tuple shape for TS consumers.
                         timestamp: [current.start, current.end],
                     });
                 }
@@ -65,6 +68,7 @@ export function buildTransducerWordTimestamps(tokenizer, token_ids, token_timest
         if (text) {
             words.push({
                 text,
+                // Keep tuple shape for TS consumers.
                 timestamp: [current.start, current.end],
             });
         }
