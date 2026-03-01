@@ -198,6 +198,11 @@ export const LogLevel = Object.freeze({
  * This can improve performance by avoiding repeated downloads of WASM files. Note: Only the WASM binary is cached.
  * The MJS loader file still requires network access unless you use a Service Worker.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
+ * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
+ * Requires browser support for `navigator.crossOriginStorage`. The `experimental_` prefix indicates that the underlying
+ * browser API is not yet standardised and may change or be removed without a major version bump. See
+ * {@link https://github.com/WICG/cross-origin-storage} for the current spec status.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
 
@@ -235,6 +240,8 @@ export const env = {
 
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
     cacheKey: 'transformers-cache',
+
+    experimental_useCrossOriginStorage: false,
 
     /////////////////// Custom fetch /////////////////////
     fetch: DEFAULT_FETCH,
