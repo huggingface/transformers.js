@@ -1,6 +1,7 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { logger } from '../../utils/logger.js';
 import { FeatureLRUCache, createAudioCacheKey } from './transducer_cache.js';
 import { computeTemporalDeltas } from './transducer_deltas.js';
 
@@ -47,17 +48,17 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
             );
         }
         if (this.delta_order > 0 && !this.delta_concatenate) {
-            console.warn(
+            logger.warn(
                 'NemoConformerTDTFeatureExtractor: `delta_concatenate=false` is set. ' +
-                    '`input_features` will remain base features and deltas are returned in extra fields.',
+                '`input_features` will remain base features and deltas are returned in extra fields.',
             );
         }
 
         this.feature_cache = this.use_feature_cache
             ? new FeatureLRUCache({
-                  max_entries: this.config.feature_cache_max_entries ?? 128,
-                  max_size_mb: this.config.feature_cache_max_size_mb ?? 64,
-              })
+                max_entries: this.config.feature_cache_max_entries ?? 128,
+                max_size_mb: this.config.feature_cache_max_size_mb ?? 64,
+            })
             : null;
     }
 
