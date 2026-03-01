@@ -74,6 +74,10 @@ function getNormalizedConfig(config) {
         case 'gemma3n':
         case 'chatterbox':
         case 'mistral3':
+        case 'qwen2_5_vl':
+        case 'qwen3_vl':
+        case 'qwen3_5':
+        case 'qwen3_5_moe':
             // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;
@@ -131,6 +135,10 @@ function getNormalizedConfig(config) {
         case 'starcoder2':
         case 'qwen2':
         case 'qwen2_vl':
+        case 'qwen2_5_vl_text':
+        case 'qwen3_vl_text':
+        case 'qwen3_5_text':
+        case 'qwen3_5_moe_text':
         case 'phi':
         case 'phi3':
         case 'phi3_v':

@@ -14,6 +14,8 @@ export * from './phi3_v/processing_phi3_v.js';
 export * from './pixtral/processing_pixtral.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './qwen2_vl/processing_qwen2_vl.js';
+export * from './qwen2_5_vl/processing_qwen2_5_vl.js';
+export * from './qwen3_vl/processing_qwen3_vl.js';
 export * from './sam/processing_sam.js';
 export * from './sam2/processing_sam2.js';
 export * from './smolvlm/processing_smolvlm.js';
