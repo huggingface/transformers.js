@@ -351,7 +351,6 @@ export function isONNXProxy() {
     return ONNX_ENV?.wasm?.proxy;
 }
 
-
 /**
  * A function to map Transformers.js log levels to ONNX Runtime log severity
  * levels, and set the log level environment variable in ONNX Runtime.
