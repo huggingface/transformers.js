@@ -2,7 +2,7 @@ import { AutoConfig } from '../../configs.js';
 import { Tensor } from '../../utils/tensor.js';
 import { PreTrainedModel } from '../modeling_utils.js';
 import { constructSessions, sessionRun } from '../session.js';
-import { buildTransducerWordTimestamps, decodeTransducerText } from './transducer_text.js';
+import { buildTransducerDetailedOutputs, decodeTransducerText } from './transducer_text.js';
 
 const NEMO_CONFORMER_TDT_MODEL_TYPE = 'nemo-conformer-tdt';
 
@@ -34,6 +34,42 @@ function argmax(values, offset = 0, length = values.length - offset) {
 
 function toInt(value) {
     return typeof value === 'bigint' ? Number(value) : value;
+}
+
+function nowMs() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
+
+function roundMetric(value, digits = 2) {
+    if (!Number.isFinite(value)) return 0;
+    const factor = 10 ** digits;
+    return Math.round(value * factor) / factor;
+}
+
+/**
+ * @param {Float32Array|number[]} logits
+ * @param {number} tokenId
+ * @param {number} vocabSize
+ * @returns {{ confidence: number, logProb: number }}
+ */
+function confidenceFromLogits(logits, tokenId, vocabSize) {
+    let maxLogit = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < vocabSize; ++i) {
+        if (logits[i] > maxLogit) {
+            maxLogit = logits[i];
+        }
+    }
+
+    let expSum = 0;
+    for (let i = 0; i < vocabSize; ++i) {
+        expSum += Math.exp(logits[i] - maxLogit);
+    }
+    const logSumExp = maxLogit + Math.log(expSum);
+    const logProb = logits[tokenId] - logSumExp;
+    return {
+        confidence: Math.exp(logProb),
+        logProb,
+    };
 }
 
 function inferEncoderOutputLayout(outputTensor) {
@@ -389,7 +425,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         }
 
         if (tokenizer?.get_vocab) {
-            const size = Object.keys(tokenizer.get_vocab()).length;
+            const vocab = tokenizer.get_vocab();
+            const size = vocab instanceof Map ? vocab.size : Object.keys(vocab).length;
             if (size > 0) {
                 return size;
             }
@@ -416,35 +453,63 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
     /**
      * Transcribe model-ready features using TDT decoding.
+     *
+     * - `return_timestamps: false` → `{ text, is_final }` (+ metrics if `return_metrics`)
+     * - `return_timestamps: true`  → adds `utterance_confidence`, `utterance_timestamp`, `confidence_scores`
+     * - `return_words: true` (requires `return_timestamps`) → adds `words` list
+     * - `return_tokens: true` (requires `return_timestamps`) → adds `tokens` list
+     * - `return_metrics` is independent and can be combined with either level.
+     * - Debug flags (`returnFrameConfidences`, `returnFrameIndices`, `returnLogProbs`, `returnTdtSteps`) are independent.
+     *
      * @param {Object} model_inputs Processor outputs (must include `input_features`).
      * @param {Object} [decode_options]
-     * @param {any} [decode_options.tokenizer] Tokenizer used for text reconstruction and word timestamps.
-     * @param {boolean} [decode_options.return_token_timestamps=true]
-     * @param {boolean} [decode_options.return_word_timestamps=true]
-     * @param {boolean} [decode_options.return_utterance_timestamp=true]
+     * @param {any} [decode_options.tokenizer] Tokenizer for text reconstruction and word boundaries.
+     * @param {boolean} [decode_options.return_timestamps=true] Include utterance-level timestamps and confidence averages.
+     * @param {boolean} [decode_options.return_words=false] Include word-level list (requires return_timestamps).
+     * @param {boolean} [decode_options.return_tokens=false] Include token-level list (requires return_timestamps).
+     * @param {boolean} [decode_options.return_metrics=false] Include encoding/decoding timing metrics.
+     * @param {boolean} [decode_options.returnFrameConfidences=false] Include per-frame confidence scores in confidence_scores.
+     * @param {boolean} [decode_options.returnFrameIndices=false] Include per-token encoder frame indices.
+     * @param {boolean} [decode_options.returnLogProbs=false] Include per-token log probabilities.
+     * @param {boolean} [decode_options.returnTdtSteps=false] Include raw TDT duration steps.
+     * @param {number} [decode_options.timeOffset=0] Offset added to all timestamps (seconds).
      * @returns {Promise<{
      *  text: string,
-     *  token_ids: number[],
-     *  token_timestamps?: [number, number][],
-     *  word_timestamps?: { text: string, timestamp: [number, number]}[],
+     *  is_final: boolean,
+     *  utterance_confidence?: number,
      *  utterance_timestamp?: [number, number],
+     *  words?: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
+     *  tokens?: Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
+     *  confidence_scores?: { token_avg: number|null, word_avg: number|null, frame: number[]|null, frame_avg: number|null, overall_log_prob: number|null },
+     *  metrics?: { preprocess_ms: number, encode_ms: number, decode_ms: number, tokenize_ms: number, total_ms: number, rtf: number, rtf_x: number },
+     *  frameIndices?: number[] | null,
+     *  logProbs?: number[] | null,
+     *  tdtSteps?: number[] | null,
      * }>}
      */
     async transcribe(
         model_inputs,
         {
             tokenizer = null,
-            return_token_timestamps = true,
-            return_word_timestamps = true,
-            return_utterance_timestamp = true,
+            return_timestamps = true,
+            return_words = false,
+            return_tokens = false,
+            return_metrics = false,
+            returnFrameConfidences = false,
+            returnFrameIndices = false,
+            returnLogProbs = false,
+            returnTdtSteps = false,
+            timeOffset = 0,
         } = {},
     ) {
+        const totalStart = nowMs();
         const io = this.transducer.io;
         const vocabSize = this._resolveVocabSize(tokenizer);
         this._validateRuntimeConfig(vocabSize);
 
         const { feeds: encoderFeeds, disposables } = this._buildEncoderFeeds(model_inputs);
         let encoderOutputs;
+        const encodeStart = nowMs();
         try {
             encoderOutputs = await this._runEncoder(encoderFeeds);
         } finally {
@@ -452,6 +517,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 tensor.dispose();
             }
         }
+        const encodeMs = nowMs() - encodeStart;
 
         const encoderOutput = this._getEncoderOutput(encoderOutputs);
         let frames;
@@ -473,10 +539,22 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const blankId = this.transducer.blank_token_id;
         const maxSymbolsPerStep = this.transducer.max_symbols_per_step;
 
+        const needConfidences = !!return_timestamps;
+
         /** @type {number[]} */
         const tokenIds = [];
         /** @type {[number, number][]} */
         const tokenTimestamps = [];
+        /** @type {number[] | null} */
+        const tokenConfidences = needConfidences ? [] : null;
+        /** @type {number[] | null} */
+        const frameConfidences = returnFrameConfidences ? [] : null;
+        /** @type {number[] | null} */
+        const frameIndices = returnFrameIndices ? [] : null;
+        /** @type {number[] | null} */
+        const logProbs = returnLogProbs || needConfidences ? [] : null;
+        /** @type {number[] | null} */
+        const tdtSteps = returnTdtSteps ? [] : null;
 
         let decoderState = {
             state1: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
@@ -488,6 +566,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 ? new Tensor('int64', BigInt64Array.from([1n]), [1])
                 : new Tensor('int32', new Int32Array([1]), [1]);
         let emittedOnFrame = 0;
+        const decodeStart = nowMs();
 
         try {
             for (let frameIndex = 0; frameIndex < frames.length; ) {
@@ -522,12 +601,22 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     );
                 }
                 const tokenId = argmax(logitsData, 0, vocabSize);
-
                 const durationStart = this.transducer.duration_start_index ?? vocabSize;
                 const hasDurationLogits = logitsData.length > durationStart;
                 const step = hasDurationLogits
                     ? argmax(logitsData, durationStart, logitsData.length - durationStart) - durationStart
                     : 0;
+                if (tdtSteps) {
+                    tdtSteps.push(step);
+                }
+
+                const maybeConfidence =
+                    needConfidences || returnLogProbs || returnFrameConfidences
+                        ? confidenceFromLogits(logitsData, tokenId, vocabSize)
+                        : null;
+                if (frameConfidences && maybeConfidence) {
+                    frameConfidences.push(maybeConfidence.confidence);
+                }
 
                 const newState = {
                     state1: decoderOutput[io.decoder_output_state_1] ?? decoderState.state1,
@@ -540,7 +629,19 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
                     tokenIds.push(tokenId);
                     const durationFrames = step > 0 ? step : 1;
-                    tokenTimestamps.push([frameIndex * frameTime, (frameIndex + durationFrames) * frameTime]);
+                    tokenTimestamps.push([
+                        frameIndex * frameTime + timeOffset,
+                        (frameIndex + durationFrames) * frameTime + timeOffset,
+                    ]);
+                    if (tokenConfidences && maybeConfidence) {
+                        tokenConfidences.push(maybeConfidence.confidence);
+                    }
+                    if (frameIndices) {
+                        frameIndices.push(frameIndex);
+                    }
+                    if (logProbs && maybeConfidence) {
+                        logProbs.push(maybeConfidence.logProb);
+                    }
                     emittedOnFrame += 1;
                 } else {
                     this._disposeDecoderState(newState, decoderState);
@@ -560,28 +661,77 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             targetLengthTensor.dispose();
             this._disposeDecoderState(decoderState);
         }
+        const decodeMs = nowMs() - decodeStart;
 
+        const tokenizeStart = nowMs();
         const text = decodeTransducerText(tokenizer, tokenIds);
+        const needDetailed = return_timestamps && (return_words || return_tokens);
+        const detailed = needDetailed
+            ? buildTransducerDetailedOutputs(tokenizer, tokenIds, tokenTimestamps, tokenConfidences)
+            : null;
+        const tokenizeMs = nowMs() - tokenizeStart;
 
-        const result = {
-            text,
-            token_ids: tokenIds,
-        };
+        /** @type {any} */
+        const result = { text, is_final: true };
 
-        if (return_token_timestamps) {
-            result.token_timestamps = tokenTimestamps;
-        }
+        if (return_timestamps) {
+            result.utterance_confidence =
+                tokenConfidences && tokenConfidences.length > 0
+                    ? tokenConfidences.reduce((a, b) => a + b, 0) / tokenConfidences.length
+                    : null;
 
-        if (return_word_timestamps) {
-            result.word_timestamps = buildTransducerWordTimestamps(tokenizer, tokenIds, tokenTimestamps);
-        }
+            result.utterance_timestamp =
+                tokenTimestamps.length > 0
+                    ? /** @type {[number, number]} */ ([
+                          tokenTimestamps[0][0],
+                          tokenTimestamps[tokenTimestamps.length - 1][1],
+                      ])
+                    : /** @type {[number, number]} */ ([timeOffset, frames.length * frameTime + timeOffset]);
 
-        if (return_utterance_timestamp) {
-            if (tokenTimestamps.length > 0) {
-                result.utterance_timestamp = [tokenTimestamps[0][0], tokenTimestamps[tokenTimestamps.length - 1][1]];
-            } else {
-                result.utterance_timestamp = [0, frames.length * frameTime];
+            if (detailed) {
+                if (return_words) result.words = detailed.words;
+                if (return_tokens) result.tokens = detailed.tokens;
             }
+
+            result.confidence_scores = {
+                token_avg: result.utterance_confidence,
+                word_avg: detailed?.word_avg ?? null,
+                overall_log_prob:
+                    logProbs && logProbs.length > 0 ? logProbs.reduce((a, b) => a + b, 0) / logProbs.length : null,
+            };
+
+            if (frameConfidences && frameConfidences.length > 0) {
+                result.confidence_scores.frame = frameConfidences;
+                result.confidence_scores.frame_avg =
+                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length;
+            }
+        }
+
+        if (returnFrameIndices) {
+            result.frameIndices = frameIndices;
+        }
+        if (returnLogProbs) {
+            result.logProbs = logProbs;
+        }
+        if (returnTdtSteps) {
+            result.tdtSteps = tdtSteps;
+        }
+
+        if (return_metrics) {
+            const totalMs = nowMs() - totalStart;
+            const utteranceDuration = result.utterance_timestamp
+                ? Math.max(result.utterance_timestamp[1] - result.utterance_timestamp[0], 1e-8)
+                : Math.max(frames.length * frameTime, 1e-8);
+            const rtf = totalMs / 1000 / utteranceDuration;
+            result.metrics = {
+                preprocess_ms: 0.0,
+                encode_ms: roundMetric(encodeMs, 2),
+                decode_ms: roundMetric(decodeMs, 2),
+                tokenize_ms: roundMetric(tokenizeMs, 2),
+                total_ms: roundMetric(totalMs, 2),
+                rtf: roundMetric(rtf, 4),
+                rtf_x: roundMetric(1 / Math.max(rtf, 1e-8), 2),
+            };
         }
 
         return result;

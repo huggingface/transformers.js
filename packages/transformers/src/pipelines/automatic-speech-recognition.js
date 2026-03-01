@@ -340,24 +340,14 @@ export class AutomaticSpeechRecognitionPipeline
             return { text };
         }
 
-        const wordChunks = (result.word_timestamps ?? []).map((item) => ({
-            text: item.text,
-            timestamp: item.timestamp,
+        const wordChunks = (result.words ?? []).map((w) => ({
+            text: w.text,
+            timestamp: [w.start_time, w.end_time],
         }));
-        const tokenChunks = (result.token_timestamps ?? []).map((timestamp, index) => {
-            const tokenId = result.token_ids?.[index];
-            const decodedToken =
-                tokenId == null
-                    ? ''
-                    : (this.tokenizer?.decode([tokenId], {
-                          skip_special_tokens: true,
-                          clean_up_tokenization_spaces: false,
-                      }) ?? '');
-            return {
-                text: decodedToken || (tokenId == null ? '' : `${tokenId}`),
-                timestamp,
-            };
-        });
+        const tokenChunks = (result.tokens ?? []).map((t) => ({
+            text: t.token ?? t.text ?? '',
+            timestamp: [t.start_time, t.end_time],
+        }));
         const utterance = result.utterance_timestamp;
 
         if (granularity === 'utterance') {
@@ -389,13 +379,10 @@ export class AutomaticSpeechRecognitionPipeline
     /**
      * Nemo Conformer TDT ASR output rules:
      * - `return_timestamps=false`: `{ text }`
-     * - `timestamp_granularity='utterance'`: `chunks` contains a single utterance span
-     * - `timestamp_granularity='word'`: `chunks` contains word-level spans
-     * - `timestamp_granularity='token'`: `chunks` contains token-level spans
-     * - `timestamp_granularity='all'`: returns `chunks` (word), `tokens`, and `utterance`
+     * - `return_timestamps=true`: return full raw model transcription payload.
      */
     async _call_nemo_conformer_tdt(audio, kwargs) {
-        if (typeof /** @type {any} */ (this.model).transcribe !== 'function') {
+        if (typeof (/** @type {any} */ (this.model).transcribe) !== 'function') {
             throw new Error('Nemo Conformer TDT model does not expose a `transcribe` method.');
         }
         if (!this.processor) {
@@ -411,17 +398,17 @@ export class AutomaticSpeechRecognitionPipeline
         }
 
         const return_timestamps = kwargs.return_timestamps ?? false;
-        const withTimestamps = return_timestamps !== false;
         const granularity = this._normalizeNemoConformerTimestampGranularity(
-            withTimestamps,
+            return_timestamps,
             kwargs.timestamp_granularity,
         );
+        const withTimestamps = granularity !== null;
 
         const decodeOptions = {
             tokenizer: this.tokenizer,
-            return_token_timestamps: granularity === 'token' || granularity === 'all',
-            return_word_timestamps: granularity === 'word' || granularity === 'all',
-            return_utterance_timestamp: granularity === 'utterance' || granularity === 'all',
+            return_timestamps: withTimestamps,
+            return_words: granularity === 'word' || granularity === 'all',
+            return_tokens: granularity === 'token' || granularity === 'all',
         };
 
         const single = !Array.isArray(audio);
