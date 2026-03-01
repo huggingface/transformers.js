@@ -72,8 +72,8 @@
           title: Core
         - local: api/utils/hub
           title: Hub
-        - local: api/utils/cache
-          title: Cache & File Management
+        - local: api/utils/model_registry
+          title: Model Registry
         - local: api/utils/image
           title: Image
         - local: api/utils/audio
