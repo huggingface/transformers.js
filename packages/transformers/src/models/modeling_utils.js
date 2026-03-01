@@ -98,6 +98,7 @@ export const MODEL_TYPES = {
     ImageAudioTextToText: 13,
     Supertonic: 14,
     Chatterbox: 15,
+    NemoConformerTDT: 16,
 };
 
 const MODEL_TYPE_CONFIG = {
@@ -857,7 +858,7 @@ export class PreTrainedModel extends Callable {
             if (inputs) {
                 throw new Error(
                     '`inputs`: {inputs}` were passed alongside {input_name} which is not allowed. ' +
-                        'Make sure to either pass {inputs} or {input_name}=...',
+                    'Make sure to either pass {inputs} or {input_name}=...',
                 );
             }
         } else {

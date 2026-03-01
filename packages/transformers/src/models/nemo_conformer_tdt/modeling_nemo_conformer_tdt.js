@@ -1,6 +1,12 @@
 import { AutoConfig } from '../../configs.js';
 import { Tensor } from '../../utils/tensor.js';
-import { PreTrainedModel } from '../modeling_utils.js';
+import {
+    PreTrainedModel,
+    MODEL_TYPES,
+    MODEL_TYPE_MAPPING,
+    MODEL_NAME_TO_CLASS_MAPPING,
+    MODEL_CLASS_TO_NAME_MAPPING,
+} from '../modeling_utils.js';
 import { constructSessions, sessionRun } from '../session.js';
 import { buildTransducerDetailedOutputs, decodeTransducerText } from './transducer_text.js';
 
@@ -765,3 +771,11 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         return await this.transcribe(model_inputs);
     }
 }
+
+// Register with ModelRegistry so get_model_files / progress_callback enumerate
+// the correct ONNX files: encoder_model + decoder_model_merged.
+MODEL_TYPE_MAPPING.set('nemo-conformer-tdt', MODEL_TYPES.NemoConformerTDT);
+MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerTDTPreTrainedModel', NemoConformerTDTPreTrainedModel);
+MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerForTDT', NemoConformerForTDT);
+MODEL_CLASS_TO_NAME_MAPPING.set(NemoConformerTDTPreTrainedModel, 'NemoConformerTDTPreTrainedModel');
+MODEL_CLASS_TO_NAME_MAPPING.set(NemoConformerForTDT, 'NemoConformerForTDT');
