@@ -91,7 +91,7 @@
  * // }
  * ```
  *
- * @module utils/ModelRegistry
+ * @module utils/model_registry
  */
 
 import { get_files } from './get_files.js';
