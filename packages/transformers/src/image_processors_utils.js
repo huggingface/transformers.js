@@ -865,11 +865,6 @@ export class ImageProcessor extends Callable {
             return [newWidth, newHeight];
         } else if (this.size_divisibility !== undefined) {
             return enforce_size_divisibility([srcWidth, srcHeight], this.size_divisibility);
-        } else if (this.min_pixels !== undefined && this.max_pixels !== undefined) {
-            // Custom resize logic for Qwen2-VL models
-            // @ts-expect-error TS2339
-            const factor = this.config.patch_size * this.config.merge_size;
-            return smart_resize(srcHeight, srcWidth, factor, this.min_pixels, this.max_pixels);
         } else {
             throw new Error(
                 `Could not resize image due to unsupported \`this.size\` option in config: ${JSON.stringify(size)}`,
