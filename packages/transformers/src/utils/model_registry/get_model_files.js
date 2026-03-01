@@ -5,6 +5,39 @@ import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js'
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
 import { logger } from '../logger.js';
+import { memoizePromise } from '../memoize_promise.js';
+
+/**
+ * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
+ */
+
+/**
+ * Returns a memoized AutoConfig for the given model ID and options.
+ * If the same model ID and options have been requested before — even while
+ * the first request is still in-flight — the cached promise is returned
+ * so that config.json is only fetched once.
+ * When a pre-loaded `config` object is supplied the result is not memoized,
+ * since the caller already has the config and no network operation is performed.
+ *
+ * @param {string} modelId The model id (e.g., "onnx-community/granite-4.0-350m-ONNX-web")
+ * @param {Object} [options]
+ * @param {PretrainedConfig|null} [options.config=null] Pre-loaded config; skips fetching if provided.
+ * @param {string|null} [options.cache_dir=null] Custom local cache directory.
+ * @param {boolean} [options.local_files_only=false] Never hit the network if true.
+ * @param {string} [options.revision='main'] Git branch, tag, or commit SHA.
+ * @returns {Promise<PretrainedConfig>}
+ */
+function get_config(modelId, { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {}) {
+    // When a pre-loaded config is provided, skip memoization — no fetch occurs
+    // and there is no meaningful key to deduplicate on.
+    if (config !== null) {
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision });
+    }
+    const key = JSON.stringify([modelId, cache_dir, local_files_only, revision]);
+    return memoizePromise(key, () =>
+        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision }),
+    );
+}
 
 /**
  * Returns the list of files that will be loaded for a model based on its configuration.
@@ -25,7 +58,7 @@ export async function get_model_files(
     modelId,
     { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
 ) {
-    config = await AutoConfig.from_pretrained(modelId, { config });
+    config = await get_config(modelId, { config });
 
     const files = [
         // Add config.json (always loaded)
