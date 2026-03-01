@@ -202,10 +202,25 @@ export class FileCache {
         }
     }
 
+    /**
+     * Deletes the cache entry for the given request.
+     * @param {string} request
+     * @returns {Promise<boolean>} A Promise that resolves to `true` if the cache entry was deleted, `false` otherwise.
+     */
+    async delete(request) {
+        let filePath = path.join(this.path, request);
+
+        try {
+            await fs.promises.unlink(filePath);
+            return true;
+        } catch (error) {
+            // File doesn't exist or couldn't be deleted
+            return false;
+        }
+    }
+
     // TODO add the rest?
     // addAll(requests: RequestInfo[]): Promise<void>;
-    // delete(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<boolean>;
     // keys(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Request>>;
-    // match(request: RequestInfo | URL, options?: CacheQueryOptions): Promise<Response | undefined>;
     // matchAll(request?: RequestInfo | URL, options?: CacheQueryOptions): Promise<ReadonlyArray<Response>>;
 }

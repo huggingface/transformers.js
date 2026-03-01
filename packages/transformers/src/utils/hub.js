@@ -9,6 +9,7 @@ import { dispatchCallback } from './core.js';
 import { FileResponse, FileCache } from './hub/files.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
+import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
@@ -64,14 +65,30 @@ export async function getFile(urlOrPath) {
                     : urlOrPath.toString()
                 : urlOrPath,
         );
-    } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+    } else {
+        return env.fetch(urlOrPath, {
+            headers: getFetchHeaders(urlOrPath),
+        });
+    }
+}
+
+/**
+ * Generates appropriate HTTP headers for fetching resources.
+ * In Node.js environments, adds User-Agent and Authorization headers when applicable.
+ * In browser environments, returns minimal headers for security.
+ *
+ * @param {URL|string} urlOrPath The URL or path being fetched.
+ * @returns {Headers} A Headers object with appropriate headers for the request.
+ */
+export function getFetchHeaders(urlOrPath) {
+    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
+    const headers = new Headers();
+
+    if (isNode) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
-
-        const headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
-        // Check whether we are making a request to the Hugging Face Hub.
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
             // If an access token is present in the environment variables,
@@ -82,13 +99,13 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return env.fetch(urlOrPath, { headers });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return env.fetch(urlOrPath);
     }
+
+    return headers;
 }
 
 /**
@@ -104,7 +121,7 @@ export async function getFile(urlOrPath) {
  * @returns {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }}
  * An object containing all the paths and URLs for the resource.
  */
-function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -355,14 +372,36 @@ export async function loadResourceFile(
                     total: buffer.length,
                 });
             } else {
-                buffer = await readResponse(response, (data) => {
-                    dispatchCallback(options.progress_callback, {
-                        status: 'progress',
-                        name: path_or_repo_id,
-                        file: filename,
-                        ...data,
-                    });
-                });
+                // Get expected file size from response headers or metadata
+                // This helps with progress tracking when content-length is missing
+                let expectedSize;
+                const contentLength = response.headers.get('content-length');
+                if (contentLength) {
+                    expectedSize = parseInt(contentLength, 10);
+                } else {
+                    // Try to get size from metadata (useful when content-length is missing during download)
+                    try {
+                        const metadata = await get_file_metadata(path_or_repo_id, filename, options);
+                        if (metadata.size) {
+                            expectedSize = metadata.size;
+                        }
+                    } catch (e) {
+                        // Ignore metadata fetch errors
+                    }
+                }
+
+                buffer = await readResponse(
+                    response,
+                    (data) => {
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            ...data,
+                        });
+                    },
+                    expectedSize,
+                );
             }
         }
         result = buffer;

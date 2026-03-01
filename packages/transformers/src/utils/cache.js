@@ -8,6 +8,8 @@ import { logger } from './logger.js';
  * Checks if a request is in the cache and returns the cached response if found.
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
+ * @property {(request: string) => Promise<boolean>} [delete]
+ * Deletes a request from the cache. Returns true if deleted, false otherwise.
  */
 
 /**
