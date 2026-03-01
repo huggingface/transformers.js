@@ -104,22 +104,21 @@ export default () => {
 
         const output = await model.transcribe(inputs, {
           tokenizer,
-          return_token_timestamps: true,
-          return_word_timestamps: true,
-          return_utterance_timestamp: true,
+          return_timestamps: true,
+          return_words: true,
+          return_tokens: true,
         });
 
         expect(output.text).toBe("hello world");
-        expect(output.token_ids).toEqual([1, 2]);
-        expect(output.token_timestamps).toEqual([
-          [0, 0.04],
-          [0.04, 0.12],
-        ]);
-        expect(output.word_timestamps).toEqual([
-          { text: "hello", timestamp: [0, 0.04] },
-          { text: "world", timestamp: [0.04, 0.12] },
-        ]);
         expect(output.utterance_timestamp).toEqual([0, 0.12]);
+        expect(output.words).toEqual([
+          expect.objectContaining({ text: "hello", start_time: 0, end_time: 0.04 }),
+          expect.objectContaining({ text: "world", start_time: 0.04, end_time: 0.12 }),
+        ]);
+        expect(output.tokens).toEqual([
+          expect.objectContaining({ id: 1, start_time: 0, end_time: 0.04 }),
+          expect.objectContaining({ id: 2, start_time: 0.04, end_time: 0.12 }),
+        ]);
       },
       MAX_TEST_EXECUTION_TIME,
     );

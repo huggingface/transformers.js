@@ -133,19 +133,22 @@ export default () => {
           config: { model_type: modelType },
           async transcribe(_inputs, options) {
             calls.push(options);
-            return {
-              text: "hello world",
-              token_ids: [1, 2],
-              token_timestamps: [
-                [0, 0.04],
-                [0.04, 0.08],
-              ],
-              word_timestamps: [
-                { text: "hello", timestamp: [0, 0.04] },
-                { text: "world", timestamp: [0.04, 0.08] },
-              ],
-              utterance_timestamp: [0, 0.08],
-            };
+            const result = { text: "hello world" };
+            if (options.return_timestamps) {
+              result.utterance_timestamp = [0, 0.08];
+              result.utterance_confidence = 0.95;
+              result.confidence_scores = { token_avg: 0.95, word_avg: 0.94, overall_log_prob: -0.05 };
+              if (options.return_words) {
+                result.words = [
+                  { text: "hello", start_time: 0, end_time: 0.04, confidence: 0.96 },
+                  { text: "world", start_time: 0.04, end_time: 0.08, confidence: 0.93 },
+                ];
+              }
+            }
+            if (options.return_metrics) {
+              result.metrics = { total_ms: 42, rtf: 0.01 };
+            }
+            return result;
           },
           async dispose() {},
         };
@@ -153,18 +156,7 @@ export default () => {
         const processor = Object.assign(async () => ({ input_features: {} }), {
           feature_extractor: { config: { sampling_rate: 16000 } },
         });
-        const tokenizer = {
-          decode(ids) {
-            const idArray = Array.isArray(ids) ? ids : [ids];
-            return idArray
-              .map((id) => {
-                if (id === 1 || id === 1n) return " hello";
-                if (id === 2 || id === 2n) return " world";
-                return "";
-              })
-              .join("");
-          },
-        };
+        const tokenizer = {};
 
         return {
           pipe: new AutomaticSpeechRecognitionPipeline({
@@ -177,85 +169,53 @@ export default () => {
         };
       };
 
-      it("dispatches to nemo-conformer-tdt path", async () => {
+      it("returns text and metrics when timestamps disabled", async () => {
         const { pipe, calls } = makeUnitPipe();
         const output = await pipe(new Float32Array(16000), { return_timestamps: false });
-        expect(output).toEqual({ text: "hello world" });
+        expect(output).toEqual({ text: "hello world", metrics: { total_ms: 42, rtf: 0.01 } });
         expect(calls).toHaveLength(1);
+        expect(calls[0]).toMatchObject({
+          return_timestamps: false,
+          return_words: false,
+          return_metrics: true,
+        });
       });
 
-      it("default timestamps use word granularity", async () => {
+      it("returns full output with words when return_timestamps is true", async () => {
         const { pipe, calls } = makeUnitPipe();
         const output = await pipe(new Float32Array(16000), { return_timestamps: true });
-        expect(output).toEqual({
+        expect(output).toMatchObject({
           text: "hello world",
-          chunks: [
-            { text: "hello", timestamp: [0, 0.04] },
-            { text: "world", timestamp: [0.04, 0.08] },
+          utterance_timestamp: [0, 0.08],
+          utterance_confidence: 0.95,
+          words: [
+            { text: "hello", start_time: 0, end_time: 0.04 },
+            { text: "world", start_time: 0.04, end_time: 0.08 },
           ],
+          confidence_scores: { token_avg: 0.95, word_avg: 0.94 },
+          metrics: { total_ms: 42, rtf: 0.01 },
         });
         expect(calls[0]).toMatchObject({
-          return_word_timestamps: true,
-          return_token_timestamps: false,
-          return_utterance_timestamp: false,
-        });
-      });
-
-      it("supports utterance granularity", async () => {
-        const { pipe } = makeUnitPipe();
-        const output = await pipe(new Float32Array(16000), {
           return_timestamps: true,
-          timestamp_granularity: "utterance",
-        });
-        expect(output).toEqual({
-          text: "hello world",
-          chunks: [{ text: "hello world", timestamp: [0, 0.08] }],
+          return_words: true,
+          return_metrics: true,
         });
       });
 
-      it("supports token granularity", async () => {
-        const { pipe } = makeUnitPipe();
-        const output = await pipe(new Float32Array(16000), {
+      it("treats return_timestamps 'word' as truthy (same as true)", async () => {
+        const { pipe, calls } = makeUnitPipe();
+        const output = await pipe(new Float32Array(16000), { return_timestamps: "word" });
+        expect(output).toMatchObject({
+          text: "hello world",
+          utterance_timestamp: [0, 0.08],
+          words: expect.any(Array),
+          metrics: expect.any(Object),
+        });
+        expect(calls[0]).toMatchObject({
           return_timestamps: true,
-          timestamp_granularity: "token",
+          return_words: true,
+          return_metrics: true,
         });
-        expect(output).toEqual({
-          text: "hello world",
-          chunks: [
-            { text: " hello", timestamp: [0, 0.04] },
-            { text: " world", timestamp: [0.04, 0.08] },
-          ],
-        });
-      });
-
-      it("supports all granularities at once", async () => {
-        const { pipe } = makeUnitPipe();
-        const output = await pipe(new Float32Array(16000), {
-          return_timestamps: true,
-          timestamp_granularity: "all",
-        });
-        expect(output).toEqual({
-          text: "hello world",
-          chunks: [
-            { text: "hello", timestamp: [0, 0.04] },
-            { text: "world", timestamp: [0.04, 0.08] },
-          ],
-          tokens: [
-            { text: " hello", timestamp: [0, 0.04] },
-            { text: " world", timestamp: [0.04, 0.08] },
-          ],
-          utterance: [0, 0.08],
-        });
-      });
-
-      it("throws for invalid timestamp granularity", async () => {
-        const { pipe } = makeUnitPipe();
-        await expect(
-          pipe(new Float32Array(16000), {
-            return_timestamps: true,
-            timestamp_granularity: "frame",
-          }),
-        ).rejects.toThrow("Invalid `timestamp_granularity`");
       });
     });
   });
