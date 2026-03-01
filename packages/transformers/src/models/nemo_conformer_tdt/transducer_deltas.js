@@ -16,6 +16,9 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
     if (!Number.isInteger(window) || window <= 0) {
         throw new Error('computeTemporalDeltas expects `window` to be a positive integer.');
     }
+    if (order !== 1 && order !== 2) {
+        throw new Error('computeTemporalDeltas expects `order` to be 1 or 2.');
+    }
 
     const [batch, T, F] = input_features.dims;
     const base = /** @type {Float32Array} */ (input_features.data);
@@ -43,10 +46,10 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
         return new Tensor('float32', concatFloat32([base, delta]), [batch, T, F * 2]);
     }
 
-    const delta_delta = /** @type {{delta: Tensor}} */ (
+    const recursive_result = /** @type {{delta: Tensor}} */ (
         computeTemporalDeltas(delta_tensor, { order: 1, window, concatenate: false })
-    ).delta.data;
-    const delta_delta_tensor = new Tensor('float32', delta_delta, [batch, T, F]);
+    );
+    const delta_delta_tensor = recursive_result.delta;
     if (!concatenate) {
         return {
             delta: delta_tensor,
@@ -54,6 +57,7 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
         };
     }
 
+    const delta_delta = /** @type {Float32Array} */ (delta_delta_tensor.data);
     return new Tensor('float32', concatFloat32([base, delta, delta_delta]), [batch, T, F * 3]);
 }
 

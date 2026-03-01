@@ -84,6 +84,16 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
     if (!tokenizer || token_ids.length === 0 || token_timestamps.length === 0) {
         return { words: [], tokens: [], word_confidences: null, word_avg: null };
     }
+    if (token_ids.length !== token_timestamps.length) {
+        throw new Error(
+            `buildTransducerDetailedOutputs expects equal lengths for token_ids (${token_ids.length}) and token_timestamps (${token_timestamps.length}).`,
+        );
+    }
+    if (token_confidences && token_confidences.length !== token_ids.length) {
+        throw new Error(
+            `buildTransducerDetailedOutputs expects token_confidences length (${token_confidences.length}) to match token_ids length (${token_ids.length}).`,
+        );
+    }
 
     /** @type {Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>} */
     const tokens = [];

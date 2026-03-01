@@ -566,19 +566,23 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         /** @type {number[] | null} */
         const tdtSteps = returnTdtSteps ? [] : null;
 
-        let decoderState = {
-            state1: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
-            state2: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
-        };
+        let decoderState;
+        let targetLengthTensor;
 
-        const targetLengthTensor =
-            this.transducer.decoder_token_length_dtype === 'int64'
-                ? new Tensor('int64', BigInt64Array.from([1n]), [1])
-                : new Tensor('int32', new Int32Array([1]), [1]);
         let emittedOnFrame = 0;
         const decodeStart = nowMs();
 
         try {
+            decoderState = {
+                state1: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
+                state2: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
+            };
+
+            targetLengthTensor =
+                this.transducer.decoder_token_length_dtype === 'int64'
+                    ? new Tensor('int64', BigInt64Array.from([1n]), [1])
+                    : new Tensor('int32', new Int32Array([1]), [1]);
+
             for (let frameIndex = 0; frameIndex < frames.length;) {
                 const frameTensor = this._createFrameTensor(frames[frameIndex]);
                 const prevTokenId = tokenIds.length > 0 ? tokenIds[tokenIds.length - 1] : blankId;
@@ -643,6 +647,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     decoderState = newState;
 
                     tokenIds.push(tokenId);
+                    // TDT duration convention: step=0 means "stay on current frame" (duration index 0 = no advance).
+                    // We still associate the token with this frame, so durationFrames is at least 1.
                     const durationFrames = step > 0 ? step : 1;
                     tokenTimestamps.push([
                         roundTs(frameIndex * frameTime + timeOffset),
@@ -673,8 +679,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 }
             }
         } finally {
-            targetLengthTensor.dispose();
-            this._disposeDecoderState(decoderState);
+            if (targetLengthTensor) targetLengthTensor.dispose();
+            if (decoderState) this._disposeDecoderState(decoderState);
         }
         const decodeMs = nowMs() - decodeStart;
 
@@ -774,7 +780,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
 // Register with ModelRegistry so get_model_files / progress_callback enumerate
 // the correct ONNX files: encoder_model + decoder_model_merged.
-MODEL_TYPE_MAPPING.set('nemo-conformer-tdt', MODEL_TYPES.NemoConformerTDT);
+MODEL_TYPE_MAPPING.set('nemo-conformer-tdt', MODEL_TYPES.NemoConformerTDT);   // model_type key
+MODEL_TYPE_MAPPING.set('NemoConformerForTDT', MODEL_TYPES.NemoConformerTDT);   // architecture key
 MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerTDTPreTrainedModel', NemoConformerTDTPreTrainedModel);
 MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerForTDT', NemoConformerForTDT);
 MODEL_CLASS_TO_NAME_MAPPING.set(NemoConformerTDTPreTrainedModel, 'NemoConformerTDTPreTrainedModel');

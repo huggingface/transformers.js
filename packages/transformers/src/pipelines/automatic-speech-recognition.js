@@ -326,13 +326,13 @@ export class AutomaticSpeechRecognitionPipeline
             );
         }
 
-        const return_timestamps = !!(kwargs.return_timestamps ?? false);
+        const return_timestamps = !!(kwargs.return_timestamps);
 
         const decodeOptions = {
             tokenizer: this.tokenizer,
             return_timestamps,
             return_words: return_timestamps,
-            return_metrics: kwargs.return_metrics ?? false,
+            return_metrics: true,
         };
 
         const single = !Array.isArray(audio);

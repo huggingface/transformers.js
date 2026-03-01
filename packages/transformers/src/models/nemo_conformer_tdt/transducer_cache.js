@@ -17,7 +17,8 @@ export function createAudioCacheKey(audio, sampling_rate = 16000) {
     // Sample stride hash to keep keying cheap for long audio.
     const stride = Math.max(1, Math.floor(audio.length / 4096));
     for (let i = 0; i < audio.length; i += stride) {
-        const q = (audio[i] * 32768) | 0;
+        const sample = Number.isFinite(audio[i]) ? audio[i] : 0;
+        const q = Math.max(-32768, Math.min(32767, Math.round(sample * 32768)));
         hash ^= q;
         hash = Math.imul(hash, 16777619);
     }

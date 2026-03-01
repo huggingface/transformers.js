@@ -129,15 +129,17 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
     async _extract(audio) {
         const features = await this._extract_fbank_features(audio);
 
-        const features_length = Math.floor(
+        const [num_frames, num_features] = features.dims;
+        const raw_features_length = Math.floor(
             (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length,
         );
+        // Clamp to [0, num_frames] to avoid a negative fill offset for very short clips.
+        const features_length = Math.max(0, Math.min(num_frames, raw_features_length));
 
         const features_data = /** @type {Float32Array} */ (features.data);
-        features_data.fill(0, features_length * features.dims[1]);
+        features_data.fill(0, features_length * num_features);
 
         // normalize mel features, ignoring padding
-        const [num_frames, num_features] = features.dims;
         const sum = new Float64Array(num_features);
         const sum_sq = new Float64Array(num_features);
 
@@ -150,17 +152,20 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
             }
         }
 
-        // Calculate mean and standard deviation, then normalize
-        const divisor = features_length > 1 ? features_length - 1 : 1;
-        for (let j = 0; j < num_features; ++j) {
-            const mean = sum[j] / features_length;
-            const variance = (sum_sq[j] - features_length * mean * mean) / divisor;
-            const std = Math.sqrt(variance) + EPSILON;
-            const inv_std = 1 / std;
+        // Skip normalization for empty/very short audio to avoid NaN from divide-by-zero.
+        if (features_length > 0) {
+            // Calculate mean and standard deviation, then normalize
+            const divisor = features_length > 1 ? features_length - 1 : 1;
+            for (let j = 0; j < num_features; ++j) {
+                const mean = sum[j] / features_length;
+                const variance = (sum_sq[j] - features_length * mean * mean) / divisor;
+                const std = Math.sqrt(variance) + EPSILON;
+                const inv_std = 1 / std;
 
-            for (let i = 0; i < features_length; ++i) {
-                const index = i * num_features + j;
-                features_data[index] = (features_data[index] - mean) * inv_std;
+                for (let i = 0; i < features_length; ++i) {
+                    const index = i * num_features + j;
+                    features_data[index] = (features_data[index] - mean) * inv_std;
+                }
             }
         }
 
