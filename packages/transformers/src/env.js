@@ -139,9 +139,7 @@ const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 // Ensure default fetch is called with the correct receiver in browser environments.
-const DEFAULT_FETCH = typeof globalThis.fetch === 'function'
-    ? globalThis.fetch.bind(globalThis)
-    : undefined;
+const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
 
 /**
  * Log levels for controlling output verbosity.

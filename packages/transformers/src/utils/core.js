@@ -32,6 +32,28 @@
  */
 
 /**
+ * @typedef {Object} FileLoadingProgress
+ * @property {number} loaded The number of bytes loaded for this file.
+ * @property {number} total The total number of bytes for this file.
+ */
+
+/**
+ * @typedef {Record<string, FileLoadingProgress>} FilesLoadingMap
+ * A mapping of file names to their loading progress. Each key is a file path and each value contains
+ * the loaded and total bytes for that file.
+ */
+
+/**
+ * @typedef {Object} TotalProgressInfo
+ * @property {'progress_total'} status
+ * @property {string} name The model id or directory path.
+ * @property {number} progress A number between 0 and 100.
+ * @property {number} loaded The number of bytes loaded.
+ * @property {number} total The total number of bytes to be loaded.
+ * @property {FilesLoadingMap} files A mapping of file names to their loading progress.
+ */
+
+/**
  * @typedef {Object} DoneProgressInfo
  * @property {'done'} status
  * @property {string} name The model id or directory path.
@@ -46,7 +68,7 @@
  */
 
 /**
- * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo} ProgressInfo
+ * @typedef {InitiateProgressInfo | DownloadProgressInfo | ProgressStatusInfo | DoneProgressInfo | ReadyProgressInfo | TotalProgressInfo} ProgressInfo
  */
 
 /**

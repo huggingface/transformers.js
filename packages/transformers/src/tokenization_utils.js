@@ -13,6 +13,7 @@ import { getModelJSON } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
+import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -25,11 +26,10 @@ import { logger } from './utils/logger.js';
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
-    const info = await Promise.all([
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer.json', true, options),
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer_config.json', true, options),
-    ]);
-    return info;
+    const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
+    return await Promise.all(
+        tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
+    );
 }
 
 /**
