@@ -131,7 +131,7 @@ function resolveTransducerConfig(config, sessions) {
     if (missingDecoderInputs.length > 0) {
         throw new Error(
             `Nemo Conformer TDT decoder session is missing expected inputs: ${missingDecoderInputs.join(', ')}. ` +
-                'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
+            'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
         );
     }
     const missingDecoderOutputs = [io.decoder_output, io.decoder_output_state_1, io.decoder_output_state_2].filter(
@@ -140,7 +140,7 @@ function resolveTransducerConfig(config, sessions) {
     if (missingDecoderOutputs.length > 0) {
         throw new Error(
             `Nemo Conformer TDT decoder session is missing expected outputs: ${missingDecoderOutputs.join(', ')}. ` +
-                'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
+            'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
         );
     }
 
@@ -151,7 +151,7 @@ function resolveTransducerConfig(config, sessions) {
     if (!(encoderSession.outputNames ?? []).includes(io.encoder_output)) {
         throw new Error(
             `Nemo Conformer TDT encoder session is missing expected output: ${io.encoder_output}. ` +
-                'Override `transformers.js_config.transducer.io.encoder_output` if your export uses a different name.',
+            'Override `transformers.js_config.transducer.io.encoder_output` if your export uses a different name.',
         );
     }
 
@@ -258,7 +258,7 @@ export class NemoConformerTDTPreTrainedModel extends PreTrainedModel {
         if (options.model_file_name && options.model_file_name !== 'encoder_model') {
             throw new Error(
                 'NemoConformerForTDT does not support `model_file_name` override. ' +
-                    'Expected canonical files: `encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`.',
+                'Expected canonical files: `encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`.',
             );
         }
 
@@ -277,8 +277,8 @@ export class NemoConformerTDTPreTrainedModel extends PreTrainedModel {
             const reason = error?.message ?? String(error);
             throw new Error(
                 'Failed to load Nemo Conformer TDT sessions. Expected canonical v4 files under `onnx/`: ' +
-                    '`encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`. ' +
-                    `Original error: ${reason}`,
+                '`encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`. ' +
+                `Original error: ${reason}`,
             );
         }
 
@@ -573,7 +573,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const decodeStart = nowMs();
 
         try {
-            for (let frameIndex = 0; frameIndex < frames.length; ) {
+            for (let frameIndex = 0; frameIndex < frames.length;) {
                 const frameTensor = this._createFrameTensor(frames[frameIndex]);
                 const prevTokenId = tokenIds.length > 0 ? tokenIds[tokenIds.length - 1] : blankId;
                 const tokenTensor =
@@ -600,6 +600,11 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 const logits = decoderOutput[io.decoder_output] ?? Object.values(decoderOutput)[0];
                 const logitsData = logits.data;
                 if (logitsData.length < vocabSize) {
+                    logits.dispose();
+                    this._disposeDecoderState({
+                        state1: decoderOutput[io.decoder_output_state_1],
+                        state2: decoderOutput[io.decoder_output_state_2],
+                    });
                     throw new Error(
                         `Nemo Conformer TDT decoder output is too small (${logitsData.length}) for vocab_size=${vocabSize}.`,
                     );
@@ -687,13 +692,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             result.utterance_timestamp =
                 tokenTimestamps.length > 0
                     ? /** @type {[number, number]} */ ([
-                          tokenTimestamps[0][0],
-                          tokenTimestamps[tokenTimestamps.length - 1][1],
-                      ])
+                        tokenTimestamps[0][0],
+                        tokenTimestamps[tokenTimestamps.length - 1][1],
+                    ])
                     : /** @type {[number, number]} */ ([
-                          roundTs(timeOffset),
-                          roundTs(frames.length * frameTime + timeOffset),
-                      ]);
+                        roundTs(timeOffset),
+                        roundTs(frames.length * frameTime + timeOffset),
+                    ]);
 
             if (detailed) {
                 if (return_words) result.words = detailed.words;
@@ -708,14 +713,18 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                         ? roundMetric(logProbs.reduce((a, b) => a + b, 0) / logProbs.length, 6)
                         : null,
             };
+        }
 
-            if (frameConfidences && frameConfidences.length > 0) {
-                result.confidence_scores.frame = frameConfidences;
-                result.confidence_scores.frame_avg = roundMetric(
-                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
-                    6,
-                );
+        // Frame confidences are independent of return_timestamps — emit whenever requested.
+        if (returnFrameConfidences && frameConfidences && frameConfidences.length > 0) {
+            if (!result.confidence_scores) {
+                result.confidence_scores = {};
             }
+            result.confidence_scores.frame = frameConfidences;
+            result.confidence_scores.frame_avg = roundMetric(
+                frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
+                6,
+            );
         }
 
         if (returnFrameIndices) {

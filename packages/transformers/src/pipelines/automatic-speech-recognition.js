@@ -332,7 +332,7 @@ export class AutomaticSpeechRecognitionPipeline
             tokenizer: this.tokenizer,
             return_timestamps,
             return_words: return_timestamps,
-            return_metrics: true,
+            return_metrics: kwargs.return_metrics ?? false,
         };
 
         const single = !Array.isArray(audio);
@@ -365,7 +365,7 @@ export class AutomaticSpeechRecognitionPipeline
             const max_new_tokens = Math.floor(aud.length / sampling_rate) * 6;
             const outputs = await this.model.generate({ max_new_tokens, ...kwargs, ...inputs });
 
-            const text = this.processor.batch_decode(/** @type {Tensor} */ (outputs), { skip_special_tokens: true })[0];
+            const text = this.processor.batch_decode(/** @type {Tensor} */(outputs), { skip_special_tokens: true })[0];
             toReturn.push({ text });
         }
         return single ? toReturn[0] : toReturn;
