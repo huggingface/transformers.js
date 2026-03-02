@@ -82,17 +82,6 @@ function confidenceFromLogits(logits, tokenId, vocabSize) {
     };
 }
 
-function inferEncoderOutputLayout(outputTensor) {
-    if (outputTensor.dims.length !== 3 || outputTensor.dims[0] !== 1) {
-        throw new Error(
-            `Nemo Conformer TDT expected encoder output dims [1, D, T] or [1, T, D], got [${outputTensor.dims.join(', ')}].`,
-        );
-    }
-
-    // Heuristic fallback: in most Nemo exports D > T.
-    return outputTensor.dims[1] >= outputTensor.dims[2] ? 'BDT' : 'BTD';
-}
-
 function resolveTransducerConfig(config, sessions) {
     const transducerConfig = config['transformers.js_config']?.transducer;
     if (!transducerConfig) {
@@ -137,7 +126,7 @@ function resolveTransducerConfig(config, sessions) {
     if (missingDecoderInputs.length > 0) {
         throw new Error(
             `Nemo Conformer TDT decoder session is missing expected inputs: ${missingDecoderInputs.join(', ')}. ` +
-            'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
+                'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
         );
     }
     const missingDecoderOutputs = [io.decoder_output, io.decoder_output_state_1, io.decoder_output_state_2].filter(
@@ -146,7 +135,7 @@ function resolveTransducerConfig(config, sessions) {
     if (missingDecoderOutputs.length > 0) {
         throw new Error(
             `Nemo Conformer TDT decoder session is missing expected outputs: ${missingDecoderOutputs.join(', ')}. ` +
-            'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
+                'Override I/O names via `transformers.js_config.transducer.io` if your export uses different names.',
         );
     }
 
@@ -157,7 +146,7 @@ function resolveTransducerConfig(config, sessions) {
     if (!(encoderSession.outputNames ?? []).includes(io.encoder_output)) {
         throw new Error(
             `Nemo Conformer TDT encoder session is missing expected output: ${io.encoder_output}. ` +
-            'Override `transformers.js_config.transducer.io.encoder_output` if your export uses a different name.',
+                'Override `transformers.js_config.transducer.io.encoder_output` if your export uses a different name.',
         );
     }
 
@@ -165,6 +154,7 @@ function resolveTransducerConfig(config, sessions) {
     const subsamplingFactor = transducerConfig.subsampling_factor ?? 8;
     const frameShiftS = transducerConfig.frame_shift_s ?? 0.01;
     const blankTokenId = transducerConfig.blank_token_id ?? 0;
+    const encoderOutputLayout = transducerConfig.encoder_output_layout;
     const decoderTokenDType = transducerConfig.decoder_token_dtype ?? 'int32';
     const decoderTokenLengthDType = transducerConfig.decoder_token_length_dtype ?? 'int32';
 
@@ -181,6 +171,9 @@ function resolveTransducerConfig(config, sessions) {
     }
     if (!Number.isFinite(frameShiftS) || frameShiftS <= 0) {
         throw new Error('Invalid `transformers.js_config.transducer.frame_shift_s`: expected a positive number.');
+    }
+    if (encoderOutputLayout !== 'BDT' && encoderOutputLayout !== 'BTD') {
+        throw new Error('Invalid `transformers.js_config.transducer.encoder_output_layout`: expected "BDT" or "BTD".');
     }
     if (!['int32', 'int64'].includes(decoderTokenDType)) {
         throw new Error(
@@ -201,7 +194,7 @@ function resolveTransducerConfig(config, sessions) {
         vocab_size: transducerConfig.vocab_size ?? config.vocab_size ?? null,
         duration_start_index: transducerConfig.duration_start_index ?? null,
         encoder_input_layout: transducerConfig.encoder_input_layout ?? 'BTF',
-        encoder_output_layout: transducerConfig.encoder_output_layout ?? null,
+        encoder_output_layout: encoderOutputLayout,
         encoder_frame_layout: transducerConfig.encoder_frame_layout ?? 'BD1',
         decoder_token_dtype: decoderTokenDType,
         decoder_token_length_dtype: decoderTokenLengthDType,
@@ -264,7 +257,7 @@ export class NemoConformerTDTPreTrainedModel extends PreTrainedModel {
         if (options.model_file_name && options.model_file_name !== 'encoder_model') {
             throw new Error(
                 'NemoConformerForTDT does not support `model_file_name` override. ' +
-                'Expected canonical files: `encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`.',
+                    'Expected canonical files: `encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`.',
             );
         }
 
@@ -283,8 +276,8 @@ export class NemoConformerTDTPreTrainedModel extends PreTrainedModel {
             const reason = error?.message ?? String(error);
             throw new Error(
                 'Failed to load Nemo Conformer TDT sessions. Expected canonical v4 files under `onnx/`: ' +
-                '`encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`. ' +
-                `Original error: ${reason}`,
+                    '`encoder_model{suffix}.onnx` and `decoder_model_merged{suffix}.onnx`. ' +
+                    `Original error: ${reason}`,
             );
         }
 
@@ -316,33 +309,45 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         return outputs[name] ?? Object.values(outputs)[0];
     }
 
-    _encoderOutputToFrames(encoderOutput) {
-        const layout = this.transducer.encoder_output_layout ?? inferEncoderOutputLayout(encoderOutput);
-        const dims = encoderOutput.dims;
-        const data = encoderOutput.data;
-        const frames = [];
+    _getEncoderFrameCount(encoderOutput) {
+        if (encoderOutput.dims.length !== 3 || encoderOutput.dims[0] !== 1) {
+            throw new Error(
+                `Nemo Conformer TDT expected encoder output dims [1, D, T] or [1, T, D], got [${encoderOutput.dims.join(', ')}].`,
+            );
+        }
+        const layout = this.transducer.encoder_output_layout;
+        if (layout === 'BDT') {
+            return encoderOutput.dims[2];
+        }
+        if (layout === 'BTD') {
+            return encoderOutput.dims[1];
+        }
+        throw new Error(
+            `Unsupported encoder output layout "${layout}". Use 'BDT' or 'BTD' in transformers.js_config.transducer.`,
+        );
+    }
+
+    _getFrameData(encoderOutput, frameIndex, reusableFrame) {
+        const layout = this.transducer.encoder_output_layout;
+        if (encoderOutput.type !== 'float32') {
+            throw new Error(`Nemo Conformer TDT expected encoder output type "float32", got "${encoderOutput.type}".`);
+        }
+        const data = /** @type {Float32Array} */ (encoderOutput.data);
 
         if (layout === 'BDT') {
-            const D = dims[1];
-            const T = dims[2];
-            for (let t = 0; t < T; ++t) {
-                const frame = new Float32Array(D);
-                for (let d = 0; d < D; ++d) {
-                    frame[d] = data[d * T + t];
-                }
-                frames.push(frame);
+            const D = encoderOutput.dims[1];
+            const T = encoderOutput.dims[2];
+            const frame = reusableFrame && reusableFrame.length === D ? reusableFrame : new Float32Array(D);
+            for (let d = 0; d < D; ++d) {
+                frame[d] = data[d * T + frameIndex];
             }
-            return frames;
+            return frame;
         }
 
         if (layout === 'BTD') {
-            const T = dims[1];
-            const D = dims[2];
-            for (let t = 0; t < T; ++t) {
-                const offset = t * D;
-                frames.push(new Float32Array(data.subarray(offset, offset + D)));
-            }
-            return frames;
+            const D = encoderOutput.dims[2];
+            const offset = frameIndex * D;
+            return data.subarray(offset, offset + D);
         }
 
         throw new Error(
@@ -530,18 +535,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const encodeMs = nowMs() - encodeStart;
 
         const encoderOutput = this._getEncoderOutput(encoderOutputs);
-        let frames;
-        try {
-            frames = this._encoderOutputToFrames(encoderOutput);
-        } finally {
-            const seen = new Set();
-            for (const value of Object.values(encoderOutputs)) {
-                if (value instanceof Tensor && !seen.has(value)) {
-                    value.dispose();
-                    seen.add(value);
-                }
-            }
-        }
+        const frameCount = this._getEncoderFrameCount(encoderOutput);
         const frameTime = this.transducer.subsampling_factor * this.transducer.frame_shift_s;
 
         const numLayers = this.transducer.decoder.num_layers;
@@ -568,6 +562,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
         let decoderState;
         let targetLengthTensor;
+        let reusableFrame = null;
 
         let emittedOnFrame = 0;
         const decodeStart = nowMs();
@@ -583,8 +578,12 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     ? new Tensor('int64', BigInt64Array.from([1n]), [1])
                     : new Tensor('int32', new Int32Array([1]), [1]);
 
-            for (let frameIndex = 0; frameIndex < frames.length;) {
-                const frameTensor = this._createFrameTensor(frames[frameIndex]);
+            for (let frameIndex = 0; frameIndex < frameCount; ) {
+                const frameData = this._getFrameData(encoderOutput, frameIndex, reusableFrame);
+                if (this.transducer.encoder_output_layout === 'BDT') {
+                    reusableFrame = frameData;
+                }
+                const frameTensor = this._createFrameTensor(frameData);
                 const prevTokenId = tokenIds.length > 0 ? tokenIds[tokenIds.length - 1] : blankId;
                 const tokenTensor =
                     this.transducer.decoder_token_dtype === 'int64'
@@ -681,6 +680,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         } finally {
             if (targetLengthTensor) targetLengthTensor.dispose();
             if (decoderState) this._disposeDecoderState(decoderState);
+            const seen = new Set();
+            for (const value of Object.values(encoderOutputs)) {
+                if (value instanceof Tensor && !seen.has(value)) {
+                    value.dispose();
+                    seen.add(value);
+                }
+            }
         }
         const decodeMs = nowMs() - decodeStart;
 
@@ -704,13 +710,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             result.utterance_timestamp =
                 tokenTimestamps.length > 0
                     ? /** @type {[number, number]} */ ([
-                        tokenTimestamps[0][0],
-                        tokenTimestamps[tokenTimestamps.length - 1][1],
-                    ])
+                          tokenTimestamps[0][0],
+                          tokenTimestamps[tokenTimestamps.length - 1][1],
+                      ])
                     : /** @type {[number, number]} */ ([
-                        roundTs(timeOffset),
-                        roundTs(frames.length * frameTime + timeOffset),
-                    ]);
+                          roundTs(timeOffset),
+                          roundTs(frameCount * frameTime + timeOffset),
+                      ]);
 
             if (detailed) {
                 if (return_words) result.words = detailed.words;
@@ -753,7 +759,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             const totalMs = nowMs() - totalStart;
             const utteranceDuration = result.utterance_timestamp
                 ? Math.max(result.utterance_timestamp[1] - result.utterance_timestamp[0], 1e-8)
-                : Math.max(frames.length * frameTime, 1e-8);
+                : Math.max(frameCount * frameTime, 1e-8);
             const rtf = totalMs / 1000 / utteranceDuration;
             result.metrics = {
                 preprocess_ms: 0.0,
@@ -780,8 +786,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
 // Register with ModelRegistry so get_model_files / progress_callback enumerate
 // the correct ONNX files: encoder_model + decoder_model_merged.
-MODEL_TYPE_MAPPING.set('nemo-conformer-tdt', MODEL_TYPES.NemoConformerTDT);   // model_type key
-MODEL_TYPE_MAPPING.set('NemoConformerForTDT', MODEL_TYPES.NemoConformerTDT);   // architecture key
+MODEL_TYPE_MAPPING.set('nemo-conformer-tdt', MODEL_TYPES.NemoConformerTDT); // model_type key
+MODEL_TYPE_MAPPING.set('NemoConformerForTDT', MODEL_TYPES.NemoConformerTDT); // architecture key
 MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerTDTPreTrainedModel', NemoConformerTDTPreTrainedModel);
 MODEL_NAME_TO_CLASS_MAPPING.set('NemoConformerForTDT', NemoConformerForTDT);
 MODEL_CLASS_TO_NAME_MAPPING.set(NemoConformerTDTPreTrainedModel, 'NemoConformerTDTPreTrainedModel');

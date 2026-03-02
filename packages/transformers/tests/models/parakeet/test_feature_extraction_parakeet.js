@@ -20,7 +20,7 @@ export default () => {
     });
 
     it(
-      "extracts normalized features and mask from synthetic audio",
+      "extracts features and mask from synthetic audio",
       async () => {
         const duration_s = 1.0;
         const total = Math.floor(config.sampling_rate * duration_s);

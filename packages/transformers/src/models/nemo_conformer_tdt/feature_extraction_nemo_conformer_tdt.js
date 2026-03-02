@@ -50,15 +50,15 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
         if (this.delta_order > 0 && !this.delta_concatenate) {
             logger.warn(
                 'NemoConformerTDTFeatureExtractor: `delta_concatenate=false` is set. ' +
-                '`input_features` will remain base features and deltas are returned in extra fields.',
+                    '`input_features` will remain base features and deltas are returned in extra fields.',
             );
         }
 
         this.feature_cache = this.use_feature_cache
             ? new FeatureLRUCache({
-                max_entries: this.config.feature_cache_max_entries ?? 128,
-                max_size_mb: this.config.feature_cache_max_size_mb ?? 64,
-            })
+                  max_entries: this.config.feature_cache_max_entries ?? 128,
+                  max_size_mb: this.config.feature_cache_max_size_mb ?? 64,
+              })
             : null;
     }
 
@@ -69,10 +69,17 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
      */
     async _extract_fbank_features(waveform) {
         // Parakeet uses a custom preemphasis strategy: Apply preemphasis to entire waveform at once
-        const preemphasis = this.config.preemphasis;
+        const preemphasis = this.config.preemphasis ?? 0;
+        if (!Number.isFinite(preemphasis) || preemphasis < 0 || preemphasis >= 1) {
+            throw new Error(
+                `NemoConformerTDTFeatureExtractor expected \`preemphasis\` in [0, 1), got ${this.config.preemphasis}.`,
+            );
+        }
         waveform = new Float64Array(waveform); // Clone to avoid destructive changes
-        for (let j = waveform.length - 1; j >= 1; --j) {
-            waveform[j] -= preemphasis * waveform[j - 1];
+        if (preemphasis !== 0) {
+            for (let j = waveform.length - 1; j >= 1; --j) {
+                waveform[j] -= preemphasis * waveform[j - 1];
+            }
         }
 
         const features = await spectrogram(
@@ -159,7 +166,7 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
             for (let j = 0; j < num_features; ++j) {
                 const mean = sum[j] / features_length;
                 const variance = (sum_sq[j] - features_length * mean * mean) / divisor;
-                const std = Math.sqrt(variance) + EPSILON;
+                const std = Math.sqrt(Math.max(variance, 0)) + EPSILON;
                 const inv_std = 1 / std;
 
                 for (let i = 0; i < features_length; ++i) {

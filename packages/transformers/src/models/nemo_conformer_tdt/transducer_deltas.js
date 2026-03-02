@@ -19,6 +19,9 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
     if (order !== 1 && order !== 2) {
         throw new Error('computeTemporalDeltas expects `order` to be 1 or 2.');
     }
+    if (input_features.type !== 'float32') {
+        throw new Error(`computeTemporalDeltas expects input tensor type "float32", got "${input_features.type}".`);
+    }
 
     const [batch, T, F] = input_features.dims;
     const base = /** @type {Float32Array} */ (input_features.data);
@@ -43,7 +46,7 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
         if (!concatenate) {
             return { delta: delta_tensor };
         }
-        return new Tensor('float32', concatFloat32([base, delta]), [batch, T, F * 2]);
+        return new Tensor('float32', interleaveByFrame([base, delta], T, F), [batch, T, F * 2]);
     }
 
     const recursive_result = /** @type {{delta: Tensor}} */ (
@@ -58,16 +61,26 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
     }
 
     const delta_delta = /** @type {Float32Array} */ (delta_delta_tensor.data);
-    return new Tensor('float32', concatFloat32([base, delta, delta_delta]), [batch, T, F * 3]);
+    return new Tensor('float32', interleaveByFrame([base, delta, delta_delta], T, F), [batch, T, F * 3]);
 }
 
-function concatFloat32(items) {
-    const total = items.reduce((sum, arr) => sum + arr.length, 0);
-    const output = new Float32Array(total);
-    let offset = 0;
+function interleaveByFrame(items, T, F) {
+    const chunkSize = T * F;
     for (const arr of items) {
-        output.set(arr, offset);
-        offset += arr.length;
+        if (arr.length !== chunkSize) {
+            throw new Error(
+                `computeTemporalDeltas expected concatenation arrays with length ${chunkSize}, got ${arr.length}.`,
+            );
+        }
+    }
+
+    const output = new Float32Array(chunkSize * items.length);
+    for (let t = 0; t < T; ++t) {
+        const srcOffset = t * F;
+        const dstOffset = t * F * items.length;
+        for (let i = 0; i < items.length; ++i) {
+            output.set(items[i].subarray(srcOffset, srcOffset + F), dstOffset + i * F);
+        }
     }
     return output;
 }

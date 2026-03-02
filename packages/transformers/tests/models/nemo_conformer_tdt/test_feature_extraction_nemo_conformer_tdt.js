@@ -74,5 +74,17 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it(
+      "validates preemphasis range",
+      async () => {
+        const invalidHigh = new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, preemphasis: 1 });
+        await expect(invalidHigh(audio)).rejects.toThrow("preemphasis");
+
+        const invalidLow = new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, preemphasis: -0.1 });
+        await expect(invalidLow(audio)).rejects.toThrow("preemphasis");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 };

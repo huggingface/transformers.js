@@ -56,6 +56,28 @@ function resolveTokenPiece(tokenizer, id) {
 }
 
 /**
+ * @param {Array<{ text: string, start_time: number, end_time: number, confidence?: number }>} words
+ * @param {{ text: string, start: number, end: number, confs: number[] } | null} current
+ */
+function finalizeAndPushWord(words, current) {
+    if (!current) return;
+
+    const text = current.text.trim();
+    if (!text) return;
+
+    /** @type {{ text: string, start_time: number, end_time: number, confidence?: number }} */
+    const word = {
+        text,
+        start_time: current.start,
+        end_time: current.end,
+    };
+    if (current.confs.length > 0) {
+        word.confidence = Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
+    }
+    words.push(word);
+}
+
+/**
  * Decode token ids into final transcription text.
  * @param {any} tokenizer
  * @param {number[]} token_ids
@@ -76,7 +98,7 @@ export function decodeTransducerText(tokenizer, token_ids) {
  * @returns {{
  *  words: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
  *  tokens: Array<{ token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
- *  word_confidences: number[] | null,
+ *  word_confidences: (number | null)[] | null,
  *  word_avg: number | null,
  * }}
  */
@@ -127,22 +149,7 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
         tokens.push(tok);
 
         if (!current || startsNewWord) {
-            if (current) {
-                const text = current.text.trim();
-                if (text) {
-                    /** @type {{ text: string, start_time: number, end_time: number, confidence?: number }} */
-                    const word = {
-                        text,
-                        start_time: current.start,
-                        end_time: current.end,
-                    };
-                    if (current.confs.length > 0) {
-                        word.confidence =
-                            Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
-                    }
-                    words.push(word);
-                }
-            }
+            finalizeAndPushWord(words, current);
             current = {
                 text: clean,
                 start: ts[0],
@@ -158,28 +165,16 @@ export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_times
         }
     }
 
-    if (current) {
-        const text = current.text.trim();
-        if (text) {
-            /** @type {{ text: string, start_time: number, end_time: number, confidence?: number }} */
-            const word = {
-                text,
-                start_time: current.start,
-                end_time: current.end,
-            };
-            if (current.confs.length > 0) {
-                word.confidence =
-                    Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
-            }
-            words.push(word);
+    finalizeAndPushWord(words, current);
+
+    const word_confidences = words.some((x) => x.confidence != null) ? words.map((x) => x.confidence ?? null) : null;
+    let word_avg = null;
+    if (word_confidences) {
+        const validConfidences = word_confidences.filter((x) => x != null);
+        if (validConfidences.length > 0) {
+            word_avg = Math.round((validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) * 1e6) / 1e6;
         }
     }
-
-    const word_confidences = words.some((x) => x.confidence != null) ? words.map((x) => x.confidence ?? 0) : null;
-    const word_avg =
-        word_confidences && word_confidences.length > 0
-            ? Math.round((word_confidences.reduce((a, b) => a + b, 0) / word_confidences.length) * 1e6) / 1e6
-            : null;
 
     return { words, tokens, word_confidences, word_avg };
 }

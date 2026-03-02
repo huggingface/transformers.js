@@ -111,14 +111,8 @@ export default () => {
 
         expect(output.text).toBe("hello world");
         expect(output.utterance_timestamp).toEqual([0, 0.12]);
-        expect(output.words).toEqual([
-          expect.objectContaining({ text: "hello", start_time: 0, end_time: 0.04 }),
-          expect.objectContaining({ text: "world", start_time: 0.04, end_time: 0.12 }),
-        ]);
-        expect(output.tokens).toEqual([
-          expect.objectContaining({ id: 1, start_time: 0, end_time: 0.04 }),
-          expect.objectContaining({ id: 2, start_time: 0.04, end_time: 0.12 }),
-        ]);
+        expect(output.words).toEqual([expect.objectContaining({ text: "hello", start_time: 0, end_time: 0.04 }), expect.objectContaining({ text: "world", start_time: 0.04, end_time: 0.12 })]);
+        expect(output.tokens).toEqual([expect.objectContaining({ id: 1, start_time: 0, end_time: 0.04 }), expect.objectContaining({ id: 2, start_time: 0.04, end_time: 0.12 })]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -126,6 +120,20 @@ export default () => {
     it("fails fast when transducer config is missing", () => {
       const invalidConfig = { model_type: "nemo-conformer-tdt" };
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("Missing `transformers.js_config.transducer`");
+    });
+
+    it("requires explicit encoder_output_layout in transducer config", () => {
+      const invalidConfig = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            encoder_output_layout: undefined,
+          },
+        },
+      };
+      expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_output_layout");
     });
   });
 
@@ -146,11 +154,29 @@ export default () => {
         expect(split.delta.dims).toEqual([1, 4, 2]);
         expect(split.delta_delta.dims).toEqual([1, 4, 2]);
 
+        const concatOrder1 = computeTemporalDeltas(input, { order: 1, window: 1, concatenate: true });
+        expect(concatOrder1.dims).toEqual([1, 4, 4]);
+        expect(Array.from(concatOrder1.data.slice(0, 8))).toEqual([
+          1,
+          2,
+          0.5,
+          1, // t0: base + delta
+          2,
+          4,
+          1,
+          2, // t1: base + delta
+        ]);
+
         const concat = computeTemporalDeltas(input, { order: 2, window: 1, concatenate: true });
         expect(concat.dims).toEqual([1, 4, 6]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it("rejects non-float32 tensors for temporal deltas", () => {
+      const input = new Tensor("float64", Float64Array.from([1, 2, 2, 4]), [1, 2, 2]);
+      expect(() => computeTemporalDeltas(input, { order: 1, window: 1, concatenate: true })).toThrow('type "float32"');
+    });
 
     it(
       "creates stable audio cache keys",

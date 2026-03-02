@@ -195,6 +195,7 @@ export default () => {
           confidence_scores: { token_avg: 0.95, word_avg: 0.94 },
           metrics: { total_ms: 42, rtf: 0.01 },
         });
+        expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({
           return_timestamps: true,
           return_words: true,
@@ -211,6 +212,7 @@ export default () => {
           words: expect.any(Array),
           metrics: expect.any(Object),
         });
+        expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({
           return_timestamps: true,
           return_words: true,
