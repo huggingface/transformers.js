@@ -5,6 +5,7 @@ import { RawAudio } from '../utils/audio.js';
 import { logger } from '../utils/logger.js';
 
 import { AutoModel } from '../models/auto/modeling_auto.js';
+import { env } from '../env.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -93,7 +94,7 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(await (await fetch(speaker_embeddings)).arrayBuffer());
+            speaker_embeddings = new Float32Array(await (await env.fetch(speaker_embeddings)).arrayBuffer());
         }
 
         if (speaker_embeddings instanceof Float32Array) {

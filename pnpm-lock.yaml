@@ -21,14 +21,14 @@ importers:
         specifier: ^0.5.5
         version: 0.5.5
       '@huggingface/tokenizers':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
       onnxruntime-node:
-        specifier: 1.24.1
-        version: 1.24.1
+        specifier: 1.24.2
+        version: 1.24.2
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260212-1a71a5f46e
-        version: 1.25.0-dev.20260212-1a71a5f46e
+        specifier: 1.25.0-dev.20260221-b2a6e69e82
+        version: 1.25.0-dev.20260221-b2a6e69e82
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -394,8 +394,8 @@ packages:
     resolution: {integrity: sha512-xRlzazC+QZwr6z4ixEqYHo9fgwhTZ3xNSdljlKfUFGZSdlvt166DljRELFUfFytlYOYvo3vTisA/AFOuOAzFQQ==}
     engines: {node: '>=18'}
 
-  '@huggingface/tokenizers@0.1.1':
-    resolution: {integrity: sha512-hNVdOq4kAONjz9FqL6agX1vfpJ57Z9cUDQSVSqRMLT1x31y84XbOXDw2WdxCUiseizA+LEHehwwLLkGsyu8iXQ==}
+  '@huggingface/tokenizers@0.1.2':
+    resolution: {integrity: sha512-6sPNgS2pHowVBXFBuaKKUP0e9+5K2vPyAlmi2bc5PofMkMyi6gttJsq5FKcIDpAjJIONV6Pom9DTjqKazsrdAw==}
 
   '@img/colour@1.0.0':
     resolution: {integrity: sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw==}
@@ -1688,15 +1688,15 @@ packages:
   onnxruntime-common@1.24.0-dev.20251116-b39e144322:
     resolution: {integrity: sha512-BOoomdHYmNRL5r4iQ4bMvsl2t0/hzVQ3OM3PHD0gxeXu1PmggqBv3puZicEUVOA3AtHHYmqZtjMj9FOfGrATTw==}
 
-  onnxruntime-common@1.24.1:
-    resolution: {integrity: sha512-UnV15u4p4XxoIV+jFP4hXPsW93s3QrwLSpi20HUDYHoTfI4z4sjzex3L4XDOxGGZJ/M/catrwAG2go958UQq0w==}
+  onnxruntime-common@1.24.2:
+    resolution: {integrity: sha512-S0FFhJaI05jr1c3HVJ/DuPFB/aYdXmnUBuuQfuvLtcNn7WAfpm2ewSXn1vHs9Wa1l8T8OznhfCEdFv8qCn0/xw==}
 
-  onnxruntime-node@1.24.1:
-    resolution: {integrity: sha512-Ex/oUXKdhDoxvlNxBT3oYtW0MH88yYpPlXQeVQUXpcJQmN24usd/8RCoPLN5kCHwDsiZ+nqsnjciyFRl423dQw==}
+  onnxruntime-node@1.24.2:
+    resolution: {integrity: sha512-ZtTkUHNNk+Xpi2Sq2BcFjzc9Vx4n3o5RxYLgRvdrFzCBsGUU1dQRFf4LM9tCc7vFhPSoZqbvzZtkzRMXoDqKNg==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
-    resolution: {integrity: sha512-ZsQZ+6Suesn98Afjvn/i7ttKEA98DrDQ98tqGjyAIGsmmf6iXg7SzvR1HTGnI14TPG/fzwW5x6r/VPa1YJqclw==}
+  onnxruntime-web@1.25.0-dev.20260221-b2a6e69e82:
+    resolution: {integrity: sha512-rcmI2vWVo5HZk3Gj3v53Ead6e/RdcSLYr/FPYRPE4d8H8ml8s9WVr4AALfv32e4uRFYUxLVVCO038wL69r/Jpg==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -2333,7 +2333,7 @@ snapshots:
 
   '@huggingface/jinja@0.5.5': {}
 
-  '@huggingface/tokenizers@0.1.1': {}
+  '@huggingface/tokenizers@0.1.2': {}
 
   '@img/colour@1.0.0': {}
 
@@ -3825,15 +3825,15 @@ snapshots:
 
   onnxruntime-common@1.24.0-dev.20251116-b39e144322: {}
 
-  onnxruntime-common@1.24.1: {}
+  onnxruntime-common@1.24.2: {}
 
-  onnxruntime-node@1.24.1:
+  onnxruntime-node@1.24.2:
     dependencies:
       adm-zip: 0.5.16
       global-agent: 3.0.0
-      onnxruntime-common: 1.24.1
+      onnxruntime-common: 1.24.2
 
-  onnxruntime-web@1.25.0-dev.20260212-1a71a5f46e:
+  onnxruntime-web@1.25.0-dev.20260221-b2a6e69e82:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9

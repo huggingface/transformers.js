@@ -115,6 +115,7 @@ function getNormalizedConfig(config) {
         case 'nanochat':
         case 'apertus':
         case 'arcee':
+        case 'afmoe':
         case 'lfm2':
         case 'lfm2_moe':
         case 'smollm3':
