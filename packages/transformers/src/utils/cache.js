@@ -39,16 +39,19 @@ export async function getCache(file_cache_dir = null) {
         cache = env.customCache;
     }
 
-    if (!cache && env.experimental_useCrossOriginStorage) {
-        if (!CrossOriginStorage.isAvailable()) {
-            throw Error(
-                '`env.experimental_useCrossOriginStorage=true`, but the Cross-Origin Storage API is not available in this environment. ' +
-                    'Install the Chrome extension to enable Cross-Origin Storage: ' +
-                    'https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih. ' +
-                    'For more information about the API, see https://github.com/WICG/cross-origin-storage',
-            );
+    if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
+        // When the browser cache is also enabled, open it and pass it as a per-request fallback
+        // so that any request for which no file hash can be resolved is served from (or stored
+        // in) the browser cache instead of going all the way back to the network.
+        let browserCache = null;
+        if (env.useBrowserCache && typeof caches !== 'undefined') {
+            try {
+                browserCache = await caches.open(env.cacheKey);
+            } catch (e) {
+                logger.warn('An error occurred while opening the browser cache for CrossOriginStorage fallback:', e);
+            }
         }
-        cache = new CrossOriginStorage();
+        cache = new CrossOriginStorage(browserCache);
     }
 
     if (!cache && env.useBrowserCache) {

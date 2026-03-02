@@ -17,6 +17,17 @@ const HASH_CACHE_NAME = 'experimental_transformers-hash-cache';
  */
 export class CrossOriginStorage {
     /**
+     * @param {import('../cache.js').CacheInterface|null} [fallbackCache]
+     *   An optional fallback cache (e.g. a browser `Cache` opened via `caches.open()`) that is
+     *   consulted when no file hash can be resolved for a given request.  When provided, both
+     *   `match` and `put` delegate to it as a fallback/secondary store.
+     */
+    constructor(fallbackCache = null) {
+        /** @type {import('../cache.js').CacheInterface|null} */
+        this._fallbackCache = fallbackCache;
+    }
+
+    /**
      * Returns whether the `navigator.crossOriginStorage` API is available in the current environment.
      * @returns {boolean}
      */
@@ -26,14 +37,21 @@ export class CrossOriginStorage {
      * Looks up a cached response for the given URL by resolving its SHA-256 hash and requesting
      * the corresponding file handle from cross-origin storage.
      *
+     * Falls back to the `fallbackCache` (if configured) when no file hash can be resolved for
+     * the request.
+     *
      * Implements `CacheInterface.match`.
      *
      * @param {string} request The URL of the resource to look up.
-     * @returns {Promise<Response|undefined>} The cached `Response`, or `undefined` if not found.
+     * @returns {Promise<Response|import('../hub/files.js').FileResponse|string|undefined>} The cached `Response`, or `undefined` if not found.
      */
     match = async (request) => {
         const hashValue = await this._getFileHash(request);
         if (!hashValue) {
+            // No hash available — delegate to fallback cache if one is configured.
+            if (this._fallbackCache) {
+                return this._fallbackCache.match(request);
+            }
             return undefined;
         }
         const hash = { algorithm: HASH_ALGORITHM, value: hashValue };
@@ -43,12 +61,19 @@ export class CrossOriginStorage {
             const blob = await handle.getFile();
             return new Response(blob);
         } catch (err) {
+            // Cross-origin storage lookup failed — delegate to fallback cache if one is configured.
+            if (this._fallbackCache) {
+                return this._fallbackCache.match(request);
+            }
             return undefined;
         }
     };
 
     /**
      * Stores a response in cross-origin storage, keyed by the SHA-256 hash of its body.
+     *
+     * When a `fallbackCache` is configured, also stores the response there so that subsequent
+     * requests that cannot resolve a hash still have a warm entry.
      *
      * Implements `CacheInterface.put`.
      *
@@ -64,6 +89,16 @@ export class CrossOriginStorage {
         const writableStream = await handle.createWritable();
         await writableStream.write(blob);
         await writableStream.close();
+
+        // Populate the fallback cache as well so that a future miss (e.g. hash unavailable)
+        // can still be served without a full network round-trip.
+        if (this._fallbackCache) {
+            try {
+                await this._fallbackCache.put(request, new Response(blob));
+            } catch {
+                // Fallback cache write failure is non-fatal.
+            }
+        }
     };
 
     /**
