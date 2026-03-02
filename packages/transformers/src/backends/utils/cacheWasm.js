@@ -77,7 +77,8 @@ export async function loadWasmFactory(libURL) {
         let code = await response.text();
         // Fix relative paths when loading factory from blob, overwrite import.meta.url with actual baseURL
         const baseUrl = libURL.split('/').slice(0, -1).join('/');
-        code = code.replace(/import\.meta\.url/g, `"${baseUrl}"`);
+        code = code.replaceAll('import.meta.url', `"${baseUrl}"`);
+        code = code.replaceAll('globalThis.process?.versions?.node', 'false');
         const blob = new Blob([code], { type: 'text/javascript' });
         return URL.createObjectURL(blob);
     } catch (error) {

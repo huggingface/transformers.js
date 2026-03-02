@@ -28,14 +28,18 @@ import url from 'node:url';
 
 const VERSION = '4.0.0-next.4';
 
-const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
-const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
+const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
 
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
 const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
+
+const IS_DENO_WEB_RUNTIME = IS_DENO_RUNTIME && IS_WEB_CACHE_AVAILABLE && !IS_FS_AVAILABLE;
+
+const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
+const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node' && !IS_DENO_WEB_RUNTIME;
 
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof window !== 'undefined' && typeof window.document !== 'undefined';
@@ -44,7 +48,6 @@ const IS_WEBWORKER_ENV =
     ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
         self.constructor?.name,
     );
-const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
@@ -220,12 +223,12 @@ export const env = {
     remoteHost: 'https://huggingface.co/',
     remotePathTemplate: '{model}/resolve/{revision}/',
 
-    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV),
+    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
 
     /////////////////// Cache settings ///////////////////
-    useBrowserCache: IS_WEB_CACHE_AVAILABLE && !IS_DENO_RUNTIME,
+    useBrowserCache: IS_WEB_CACHE_AVAILABLE,
 
     useFSCache: IS_FS_AVAILABLE,
     cacheDir: DEFAULT_CACHE_DIR,
