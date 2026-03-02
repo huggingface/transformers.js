@@ -58,6 +58,18 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/transformers-agent:
+    devDependencies:
+      '@huggingface/transformers':
+        specifier: workspace:*
+        version: link:../transformers
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
 packages:
 
   '@babel/code-frame@7.28.6':
