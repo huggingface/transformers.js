@@ -55,9 +55,27 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
  * @returns {number} ONNX Runtime severity level (0-4)
  */
 function getOnnxLogSeverityLevel(logLevel) {
-    // Map LogLevel (10, 20, 30, 40, 50) to ONNX severity (0, 1, 2, 3, 4)
-    // Formula: floor(logLevel / 10) - 1, clamped to [0, 4]
-    return Math.min(Math.max(Math.floor(logLevel / 10) - 1, 0), 4);
+    // ONNX Runtime's log severity levels are defined as follows:
+    // (0) ORT_LOGGING_LEVEL_VERBOSE: Print all log messages.
+    // (1) ORT_LOGGING_LEVEL_INFO: Print info and higher level log messages.
+    // (2) ORT_LOGGING_LEVEL_WARNING: Print warning and higher level log messages.
+    // (3) ORT_LOGGING_LEVEL_ERROR: Print error log messages.
+    // (4) ORT_LOGGING_LEVEL_FATAL: Print only fatal log messages.
+    //
+    // In practice, ONNX Runtime's logging is extremely verbose (especially on session creation).
+    // For this reason, we map multiple LogLevel values to the same ONNX severity level to avoid
+    // overwhelming users with logs.
+    if (logLevel <= LogLevel.DEBUG) {
+        return 0; // ORT_LOGGING_LEVEL_VERBOSE
+    } else if (logLevel <= LogLevel.INFO) {
+        return 2; // ORT_LOGGING_LEVEL_WARNING
+    } else if (logLevel <= LogLevel.WARNING) {
+        return 3; // ORT_LOGGING_LEVEL_ERROR
+    } else if (logLevel <= LogLevel.ERROR) {
+        return 3; // ORT_LOGGING_LEVEL_ERROR
+    } else {
+        return 4; // ORT_LOGGING_LEVEL_FATAL
+    }
 }
 
 /**
@@ -249,10 +267,11 @@ async function ensureWasmLoaded() {
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
+    const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
     const load = () =>
         InferenceSession.create(buffer_or_path, {
             // Set default log severity level, but allow overriding through session options
-            logSeverityLevel: getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING),
+            logSeverityLevel,
             ...session_options,
         });
     const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
@@ -290,7 +309,6 @@ export function isONNXTensor(x) {
 
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING)];
 if (ONNX_ENV?.wasm) {
     // Initialize wasm backend with suitable default settings.
 
@@ -333,5 +351,21 @@ export function isONNXProxy() {
     return ONNX_ENV?.wasm?.proxy;
 }
 
+/**
+ * A function to map Transformers.js log levels to ONNX Runtime log severity
+ * levels, and set the log level environment variable in ONNX Runtime.
+ * @param {number} logLevel The log level to set.
+ */
+function setLogLevel(logLevel) {
+    const severityLevel = getOnnxLogSeverityLevel(logLevel);
+    ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[severityLevel];
+}
+
+// Set the initial log level to be the default Transformers.js log level.
+setLogLevel(env.logLevel ?? LogLevel.WARNING);
+
 // Expose ONNX environment variables to `env.backends.onnx`
-env.backends.onnx = ONNX_ENV;
+env.backends.onnx = {
+    ...ONNX_ENV,
+    setLogLevel,
+};

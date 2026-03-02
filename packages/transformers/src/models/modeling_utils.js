@@ -1227,6 +1227,7 @@ export class PreTrainedModel extends Callable {
                     // Hybrid cache architecture
                     .replace('present_ssm', 'past_ssm') // Mamba
                     .replace('present_conv', 'past_conv') // LFM2
+                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
 
                     // Standard cache architecture
                     .replace('present', 'past_key_values');
@@ -1497,8 +1498,12 @@ export async function generic_text_to_text_forward(
     }
 
     if (!position_ids) {
-        if (self.config.model_type === 'qwen2_vl') {
-            // Special case for qwen2_vl models
+        if (
+            ['qwen2_vl', 'qwen2_5_vl_text', 'qwen3_vl_text', 'qwen3_5_text', 'qwen3_5_moe_text'].includes(
+                self.config.model_type,
+            )
+        ) {
+            // Special case for qwen vl models
             // @ts-ignore
             const { image_grid_thw, video_grid_thw } = kwargs;
             [position_ids] = self.get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask);
@@ -1692,6 +1697,10 @@ export function default_merge_input_ids_with_features({
     if (n_tokens !== n_features) {
         throw new Error(`Number of tokens and features do not match: tokens: ${n_tokens}, features ${n_features}`);
     }
+
+    // Currently, we require modality features to be in float32 for correct scatter behavior.
+    // TODO: In future, detect dtype of embeds and cast modality features to the same dtype before scattering.
+    // modality_features = modality_features.to('float32');
 
     // Equivalent to performing a masked_scatter
     let img = 0;

@@ -28,7 +28,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("../utils/devices.js").DeviceType} */ (
         selectDevice(options.device ?? custom_config.device, fileName, {
-            warn: (msg) => logger.warn(msg),
+            warn: (msg) => logger.info(msg),
         })
     );
 
@@ -48,7 +48,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (
         selectDtype(options.dtype ?? custom_config.dtype, fileName, selectedDevice, {
             configDtype: custom_config.dtype,
-            warn: (msg) => logger.warn(msg),
+            warn: (msg) => logger.info(msg),
         })
     );
 
