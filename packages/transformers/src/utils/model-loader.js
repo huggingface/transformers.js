@@ -2,6 +2,37 @@ import { getModelFile, MAX_EXTERNAL_DATA_CHUNKS } from './hub.js';
 import { apis } from '../env.js';
 
 /**
+ * Resolves an `use_external_data_format` config value to the number of data chunks for a given file.
+ * @param {import('./hub.js').ExternalData|Record<string, import('./hub.js').ExternalData>|null|undefined} config The external data format configuration.
+ * @param {string} fullName The full ONNX file name (e.g., "model_quantized.onnx").
+ * @param {string} fileName The base file name (e.g., "model").
+ * @returns {number} The number of external data chunks (0 if none).
+ */
+export function resolveExternalDataFormat(config, fullName, fileName) {
+    if (!config) return 0;
+    if (typeof config === 'object' && config !== null) {
+        if (config.hasOwnProperty(fullName)) return +config[fullName];
+        if (config.hasOwnProperty(fileName)) return +config[fileName];
+        return 0;
+    }
+    return +config; // (false=0, true=1, number remains the same)
+}
+
+/**
+ * Generates the file names for external data chunks.
+ * @param {string} fullName The full ONNX file name (e.g., "model_quantized.onnx").
+ * @param {number} numChunks The number of external data chunks.
+ * @returns {string[]} Array of external data file names.
+ */
+export function getExternalDataChunkNames(fullName, numChunks) {
+    const names = [];
+    for (let i = 0; i < numChunks; ++i) {
+        names.push(`${fullName}_data${i === 0 ? '' : '_' + i}`);
+    }
+    return names;
+}
+
+/**
  * Loads the core model file.
  *
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
@@ -42,28 +73,15 @@ export async function getModelDataFiles(
     /** @type {Promise<string|{path: string, data: Uint8Array}>[]} */
     let externalDataPromises = [];
 
-    if (use_external_data_format) {
-        let external_data_format;
-        if (typeof use_external_data_format === 'object') {
-            if (use_external_data_format.hasOwnProperty(baseName)) {
-                external_data_format = use_external_data_format[baseName];
-            } else if (use_external_data_format.hasOwnProperty(fileName)) {
-                external_data_format = use_external_data_format[fileName];
-            } else {
-                external_data_format = false;
-            }
-        } else {
-            external_data_format = use_external_data_format;
-        }
-
-        const num_chunks = +external_data_format; // (false=0, true=1, number remains the same)
+    const num_chunks = resolveExternalDataFormat(use_external_data_format, baseName, fileName);
+    if (num_chunks > 0) {
         if (num_chunks > MAX_EXTERNAL_DATA_CHUNKS) {
             throw new Error(
                 `The number of external data chunks (${num_chunks}) exceeds the maximum allowed value (${MAX_EXTERNAL_DATA_CHUNKS}).`,
             );
         }
-        for (let i = 0; i < num_chunks; ++i) {
-            const path = `${baseName}_data${i === 0 ? '' : '_' + i}`;
+        const chunkNames = getExternalDataChunkNames(baseName, num_chunks);
+        for (const path of chunkNames) {
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             externalDataPromises.push(
                 new Promise(async (resolve, reject) => {
