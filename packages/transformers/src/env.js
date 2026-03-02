@@ -139,9 +139,7 @@ const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 // Ensure default fetch is called with the correct receiver in browser environments.
-const DEFAULT_FETCH = typeof globalThis.fetch === 'function'
-    ? globalThis.fetch.bind(globalThis)
-    : undefined;
+const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
 
 /**
  * Log levels for controlling output verbosity.
@@ -202,9 +200,9 @@ export const LogLevel = Object.freeze({
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
  * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
  * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
- * Requires browser support for `navigator.crossOriginStorage`. The `experimental_` prefix indicates that the underlying
- * browser API is not yet standardised and may change or be removed without a major version bump. See
- * {@link https://github.com/WICG/cross-origin-storage} for the current spec status.
+ * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
+ * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
+ * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
 

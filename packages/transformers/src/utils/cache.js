@@ -41,7 +41,9 @@ export async function getCache(file_cache_dir = null) {
         if (!CrossOriginStorage.isAvailable()) {
             throw Error(
                 '`env.experimental_useCrossOriginStorage=true`, but the Cross-Origin Storage API is not available in this environment. ' +
-                    'See https://github.com/WICG/cross-origin-storage for browser support and usage instructions.',
+                    'Install the Chrome extension to enable Cross-Origin Storage: ' +
+                    'https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih. ' +
+                    'For more information about the API, see https://github.com/WICG/cross-origin-storage',
             );
         }
         cache = new CrossOriginStorage();
