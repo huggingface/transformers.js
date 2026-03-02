@@ -1227,6 +1227,7 @@ export class PreTrainedModel extends Callable {
                     // Hybrid cache architecture
                     .replace('present_ssm', 'past_ssm') // Mamba
                     .replace('present_conv', 'past_conv') // LFM2
+                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
 
                     // Standard cache architecture
                     .replace('present', 'past_key_values');
