@@ -46,7 +46,9 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
         if (!concatenate) {
             return { delta: delta_tensor };
         }
-        return new Tensor('float32', interleaveByFrame([base, delta], T, F), [batch, T, F * 2]);
+        const result = new Tensor('float32', interleaveByFrame([base, delta], T, F), [batch, T, F * 2]);
+        delta_tensor.dispose();
+        return result;
     }
 
     const recursive_result = /** @type {{delta: Tensor}} */ (
@@ -61,7 +63,10 @@ export function computeTemporalDeltas(input_features, { order = 1, window = 2, c
     }
 
     const delta_delta = /** @type {Float32Array} */ (delta_delta_tensor.data);
-    return new Tensor('float32', interleaveByFrame([base, delta, delta_delta], T, F), [batch, T, F * 3]);
+    const result = new Tensor('float32', interleaveByFrame([base, delta, delta_delta], T, F), [batch, T, F * 3]);
+    delta_delta_tensor.dispose();
+    delta_tensor.dispose();
+    return result;
 }
 
 function interleaveByFrame(items, T, F) {

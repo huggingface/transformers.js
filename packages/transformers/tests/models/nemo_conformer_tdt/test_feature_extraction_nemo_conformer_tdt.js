@@ -1,4 +1,4 @@
-import { NemoConformerTDTFeatureExtractor } from "../../../src/transformers.js";
+import { NemoConformerTDTFeatureExtractor, Tensor } from "../../../src/transformers.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../../init.js";
 
@@ -50,6 +50,37 @@ export default () => {
         });
         const { input_features } = await extractor(audio);
         expect(input_features.dims[2]).toBe(128 * 3);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "disposes replaced base features when concatenated delta output is used",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          delta_order: 1,
+          delta_window: 2,
+          delta_concatenate: true,
+        });
+
+        const originalDispose = Tensor.prototype.dispose;
+        let disposeCalls = 0;
+        Tensor.prototype.dispose = function () {
+          disposeCalls += 1;
+          return originalDispose.call(this);
+        };
+
+        try {
+          const { input_features } = await extractor(audio);
+          expect(input_features.dims[2]).toBe(80 * 2);
+        } finally {
+          Tensor.prototype.dispose = originalDispose;
+        }
+
+        // One dispose from computeTemporalDeltas intermediate tensor, one from replacing base features tensor.
+        expect(disposeCalls).toBe(2);
       },
       MAX_TEST_EXECUTION_TIME,
     );

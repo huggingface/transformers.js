@@ -254,6 +254,28 @@ export default () => {
       expect(() => computeTemporalDeltas(input, { order: 1, window: 1, concatenate: true })).toThrow('type "float32"');
     });
 
+    it("disposes intermediate delta tensors in concatenate paths", () => {
+      const input = new Tensor("float32", Float32Array.from([1, 2, 2, 4, 3, 6, 4, 8]), [1, 4, 2]);
+      const originalDispose = Tensor.prototype.dispose;
+      let disposeCalls = 0;
+      Tensor.prototype.dispose = function () {
+        disposeCalls += 1;
+        return originalDispose.call(this);
+      };
+
+      try {
+        const order1 = computeTemporalDeltas(input, { order: 1, window: 1, concatenate: true });
+        const order2 = computeTemporalDeltas(input, { order: 2, window: 1, concatenate: true });
+        expect(order1.dims).toEqual([1, 4, 4]);
+        expect(order2.dims).toEqual([1, 4, 6]);
+      } finally {
+        Tensor.prototype.dispose = originalDispose;
+      }
+
+      // order=1 concat disposes one intermediate tensor, order=2 concat disposes two.
+      expect(disposeCalls).toBe(3);
+    });
+
     it(
       "creates stable audio cache keys",
       async () => {

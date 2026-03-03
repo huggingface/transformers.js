@@ -194,6 +194,7 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
                 concatenate: this.delta_concatenate,
             });
             if (delta_result instanceof Tensor) {
+                input_features.dispose();
                 input_features = delta_result;
                 result.input_features = input_features;
             } else {
