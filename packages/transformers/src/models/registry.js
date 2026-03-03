@@ -587,17 +587,18 @@ for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_NAME_TO_CLASS_MAPPING.set(name, model);
 }
 
-export const CUSTOM_ARCHITECTURES = new Map([
+export const CUSTOM_ARCHITECTURES_MAPPING = new Map([
     ['modnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['birefnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['isnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['ben', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
 ]);
-for (const [name, mapping] of CUSTOM_ARCHITECTURES.entries()) {
+for (const [name, mapping] of CUSTOM_ARCHITECTURES_MAPPING.entries()) {
     mapping.set(name, 'PreTrainedModel');
     MODEL_TYPE_MAPPING.set(name, MODEL_TYPES.EncoderOnly);
     MODEL_NAME_TO_CLASS_MAPPING.set(name, PreTrainedModel);
 }
+export const CUSTOM_ARCHITECTURES = new Set(CUSTOM_ARCHITECTURES_MAPPING.keys());
 
 // Default mappings
 MODEL_TYPE_MAPPING.set('PreTrainedModel', MODEL_TYPES.EncoderOnly);
