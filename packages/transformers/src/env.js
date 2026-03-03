@@ -48,6 +48,8 @@ const IS_WEBWORKER_ENV =
     ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
         self.constructor?.name,
     );
+const IS_WEB_ENV = IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME;
+
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
@@ -89,6 +91,9 @@ export const apis = Object.freeze({
 
     /** Whether we are running in a web worker environment */
     IS_WEBWORKER_ENV,
+
+    /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
+    IS_WEB_ENV,
 
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,

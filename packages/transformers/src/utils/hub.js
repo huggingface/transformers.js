@@ -39,7 +39,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
  * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
  * you can specify the folder name here.
- * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the .onnx suffix). Currently only valid for encoder- or decoder-only models.
+ * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).

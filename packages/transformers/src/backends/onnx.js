@@ -176,8 +176,6 @@ export function deviceToExecutionProviders(device = null) {
     throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevices.join(', ')}.`);
 }
 
-const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
-
 /**
  * Currently, Transformers.js doesn't support simultaneous loading of sessions in WASM/WebGPU.
  * For this reason, we need to chain the loading calls.
@@ -274,7 +272,7 @@ export async function createInferenceSession(buffer_or_path, session_options, se
             logSeverityLevel,
             ...session_options,
         });
-    const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
     return session;
 }
@@ -294,7 +292,7 @@ let webInferenceChain = Promise.resolve();
  */
 export async function runInferenceSession(session, ortFeed) {
     const run = () => session.run(ortFeed);
-    const output = await (IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run());
+    const output = await (apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run());
     return output;
 }
 
@@ -306,41 +304,8 @@ export async function runInferenceSession(session, ortFeed) {
 export function isONNXTensor(x) {
     return x instanceof ONNX.Tensor;
 }
-
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-if (ONNX_ENV?.wasm) {
-    // Initialize wasm backend with suitable default settings.
-
-    // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
-    // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
-    if (
-        // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
-        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
-        ONNX_ENV.versions?.web &&
-        !ONNX_ENV.wasm.wasmPaths
-    ) {
-        const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
-
-        ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI
-            ? {
-                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.mjs`,
-                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.wasm`,
-              }
-            : {
-                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.mjs`,
-                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.wasm`,
-              };
-    }
-
-    // Users may wish to proxy the WASM backend to prevent the UI from freezing,
-    // However, this is not necessary when using WebGPU, so we default to false.
-    ONNX_ENV.wasm.proxy = false;
-}
-
-if (ONNX_ENV?.webgpu) {
-    ONNX_ENV.webgpu.powerPreference = 'high-performance';
-}
 
 /**
  * Check if ONNX's WASM backend is being proxied.
@@ -351,21 +316,56 @@ export function isONNXProxy() {
     return ONNX_ENV?.wasm?.proxy;
 }
 
-/**
- * A function to map Transformers.js log levels to ONNX Runtime log severity
- * levels, and set the log level environment variable in ONNX Runtime.
- * @param {number} logLevel The log level to set.
- */
-function setLogLevel(logLevel) {
-    const severityLevel = getOnnxLogSeverityLevel(logLevel);
-    ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[severityLevel];
+if (ONNX_ENV) {
+    if (ONNX_ENV.wasm) {
+        // Initialize wasm backend with suitable default settings.
+
+        // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
+        // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
+        if (
+            // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
+            !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
+            ONNX_ENV.versions?.web &&
+            !ONNX_ENV.wasm.wasmPaths
+        ) {
+            const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
+
+            ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI
+                ? {
+                      mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.mjs`,
+                      wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.wasm`,
+                  }
+                : {
+                      mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.mjs`,
+                      wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.wasm`,
+                  };
+        }
+
+        // Users may wish to proxy the WASM backend to prevent the UI from freezing,
+        // However, this is not necessary when using WebGPU, so we default to false.
+        ONNX_ENV.wasm.proxy = false;
+    }
+
+    if (ONNX_ENV.webgpu) {
+        ONNX_ENV.webgpu.powerPreference = 'high-performance';
+    }
+
+    /**
+     * A function to map Transformers.js log levels to ONNX Runtime log severity
+     * levels, and set the log level environment variable in ONNX Runtime.
+     * @param {number} logLevel The log level to set.
+     */
+    function setLogLevel(logLevel) {
+        const severityLevel = getOnnxLogSeverityLevel(logLevel);
+        ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[severityLevel];
+    }
+
+    // Set the initial log level to be the default Transformers.js log level.
+    setLogLevel(env.logLevel ?? LogLevel.WARNING);
+
+    // Expose ONNX environment variables to `env.backends.onnx`
+    env.backends.onnx = {
+        ...ONNX_ENV,
+        setLogLevel,
+    };
 }
-
-// Set the initial log level to be the default Transformers.js log level.
-setLogLevel(env.logLevel ?? LogLevel.WARNING);
-
-// Expose ONNX environment variables to `env.backends.onnx`
-env.backends.onnx = {
-    ...ONNX_ENV,
-    setLogLevel,
-};
