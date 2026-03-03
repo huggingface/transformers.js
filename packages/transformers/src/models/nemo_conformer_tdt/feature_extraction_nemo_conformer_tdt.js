@@ -119,6 +119,8 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
      *  delta_features?: Tensor;
      *  delta_delta_features?: Tensor;
      * }>} A Promise resolving to an object containing extracted model inputs.
+     *      When cache is enabled, tensor instances are shared with cached entries.
+     *      Do not mutate or dispose returned tensors unless cache is disabled/cleared.
      */
     async _call(audio) {
         validate_audio_inputs(audio, 'NemoConformerTDTFeatureExtractor');
@@ -127,7 +129,7 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
             const key = `${createAudioCacheKey(audio, this.config.sampling_rate)}:${this.delta_order}:${this.delta_window}:${this.delta_concatenate}`;
             const cached = this.feature_cache.get(key);
             if (cached) {
-                return cached;
+                return { ...cached };
             }
 
             const extracted = await this._extract(audio);
