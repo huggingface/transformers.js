@@ -609,12 +609,23 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 }
 
                 const logits = decoderOutput[io.decoder_output] ?? Object.values(decoderOutput)[0];
+                const outputState1 = decoderOutput[io.decoder_output_state_1];
+                const outputState2 = decoderOutput[io.decoder_output_state_2];
+                const seenDecoderTensors = new Set();
+                for (const value of Object.values(decoderOutput)) {
+                    if (!(value instanceof Tensor) || seenDecoderTensors.has(value)) continue;
+                    seenDecoderTensors.add(value);
+                    if (value === logits || value === outputState1 || value === outputState2) {
+                        continue;
+                    }
+                    value.dispose();
+                }
                 const logitsData = logits.data;
                 if (logitsData.length < vocabSize) {
                     logits.dispose();
                     this._disposeDecoderState({
-                        state1: decoderOutput[io.decoder_output_state_1],
-                        state2: decoderOutput[io.decoder_output_state_2],
+                        state1: outputState1,
+                        state2: outputState2,
                     });
                     throw new Error(
                         `Nemo Conformer TDT decoder output is too small (${logitsData.length}) for vocab_size=${vocabSize}.`,
@@ -639,8 +650,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 }
 
                 const newState = {
-                    state1: decoderOutput[io.decoder_output_state_1] ?? decoderState.state1,
-                    state2: decoderOutput[io.decoder_output_state_2] ?? decoderState.state2,
+                    state1: outputState1 ?? decoderState.state1,
+                    state2: outputState2 ?? decoderState.state2,
                 };
 
                 if (tokenId !== blankId) {

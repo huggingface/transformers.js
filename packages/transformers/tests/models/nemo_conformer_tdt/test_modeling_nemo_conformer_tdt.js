@@ -211,6 +211,50 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it(
+      "disposes auxiliary decoder tensor outputs per decode step",
+      async () => {
+        class AuxDecoderOutputModel extends NemoConformerForTDT {
+          constructor(config, sessions) {
+            super(config, sessions, {});
+            this.auxDisposals = 0;
+          }
+
+          async _runEncoder() {
+            return {
+              outputs: new Tensor("float32", new Float32Array([0.1, 0.2]), [1, 2, 1]),
+            };
+          }
+
+          async _runDecoder() {
+            const stateShape = [1, 1, 2];
+            const aux = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 1, 3]);
+            const originalDispose = aux.dispose.bind(aux);
+            aux.dispose = () => {
+              this.auxDisposals += 1;
+              originalDispose();
+            };
+            return {
+              outputs: new Tensor("float32", new Float32Array([10.0, 0.0, 0.0, 8.0, 0.0]), [1, 1, 5]),
+              output_states_1: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+              output_states_2: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+              auxiliary_scores: aux,
+            };
+          }
+        }
+
+        const model = new AuxDecoderOutputModel(BASE_CONFIG, BASE_SESSIONS);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        const output = await model.transcribe(inputs, { return_timestamps: false });
+        expect(output).toEqual(expect.objectContaining({ text: "" }));
+        expect(model.auxDisposals).toBe(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 
   describe("Nemo Conformer TDT utilities", () => {
