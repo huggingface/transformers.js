@@ -157,6 +157,25 @@ export default () => {
     );
 
     it(
+      "rejects non-finite timeOffset",
+      async () => {
+        const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [{ logits: [9.0, 0.0, 0.0, 1.0] }]);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: { decode: () => "" },
+            return_timestamps: true,
+            timeOffset: Number.NaN,
+          }),
+        ).rejects.toThrow("timeOffset");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "fails fast when duration logits are required but missing",
       async () => {
         const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [

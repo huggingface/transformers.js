@@ -533,6 +533,9 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             timeOffset = 0,
         } = {},
     ) {
+        if (!Number.isFinite(timeOffset)) {
+            throw new Error('NemoConformerForTDT.transcribe expected `timeOffset` to be a finite number.');
+        }
         const totalStart = nowMs();
         const io = this.transducer.io;
         const vocabSize = this._resolveVocabSize(tokenizer);
@@ -720,11 +723,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         } finally {
             if (targetLengthTensor) targetLengthTensor.dispose();
             if (decoderState) this._disposeDecoderState(decoderState);
-            const seen = new Set();
-            for (const value of Object.values(encoderOutputs)) {
-                if (value instanceof Tensor && !seen.has(value)) {
-                    value.dispose();
-                    seen.add(value);
+            if (encoderOutputs && typeof encoderOutputs === 'object') {
+                const seen = new Set();
+                for (const value of Object.values(encoderOutputs)) {
+                    if (value instanceof Tensor && !seen.has(value)) {
+                        value.dispose();
+                        seen.add(value);
+                    }
                 }
             }
         }

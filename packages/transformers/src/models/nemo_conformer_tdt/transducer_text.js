@@ -97,7 +97,7 @@ export function decodeTransducerText(tokenizer, token_ids) {
  * @param {number[] | null} token_confidences
  * @returns {{
  *  words: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
- *  tokens: Array<{ token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
+ *  tokens: Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
  *  word_confidences: (number | null)[] | null,
  *  word_avg: number | null,
  * }}
