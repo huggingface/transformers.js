@@ -192,21 +192,10 @@ export async function pipeline(
     const hasTokenizer = expected_files.includes('tokenizer.json');
     const hasProcessor = expected_files.includes('preprocessor_config.json');
 
-    // Load all components in parallel
-    /** @type {Record<string, Promise>} */
-    const pending = Object.create(null);
-
-    if (hasTokenizer) {
-        pending.tokenizer = AutoTokenizer.from_pretrained(model, pretrainedOptions);
-    }
-    if (hasProcessor) {
-        pending.processor = AutoProcessor.from_pretrained(model, pretrainedOptions);
-    }
-
-    // Resolve the correct model class and load it
+    // Resolve the correct model class (needs config when multiple candidates exist)
     const modelClasses = pipelineInfo.model;
+    let modelPromise;
     if (Array.isArray(modelClasses)) {
-        // Load the config once to determine model_type, then pick the right class
         const resolvedConfig = config ?? (await AutoConfig.from_pretrained(model, pretrainedOptions));
         const { model_type } = resolvedConfig;
         const matchedClass = modelClasses.find((cls) => cls.supports(model_type));
@@ -216,19 +205,21 @@ export async function pipeline(
                     `None of the candidate model classes support this type.`,
             );
         }
-        pending.model = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig });
+        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig      });
     } else {
-        pending.model = modelClasses.from_pretrained(model, pretrainedOptions);
+        modelPromise = modelClasses.from_pretrained(model, pretrainedOptions);
     }
 
-    // Wait for all promises to resolve in parallel
-    const keys = Object.keys(pending);
-    const values = await Promise.all(Object.values(pending));
+    // Load all components in parallel
+    const [tokenizer, processor, model_loaded] = await Promise.all([
+        hasTokenizer ? AutoTokenizer.from_pretrained(model, pretrainedOptions) : null,
+        hasProcessor ? AutoProcessor.from_pretrained(model, pretrainedOptions) : null,
+        modelPromise,
+    ]);
 
-    const results = { task };
-    for (let i = 0; i < keys.length; ++i) {
-        results[keys[i]] = values[i];
-    }
+    const results = { task, model: model_loaded };
+    if (tokenizer) results.tokenizer = tokenizer;
+    if (processor) results.processor = processor;
 
     dispatchCallback(progress_callback, {
         status: 'ready',
