@@ -157,6 +157,37 @@ export default () => {
     );
 
     it(
+      "aggregates frame confidences per encoder frame (not per decode step)",
+      async () => {
+        const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [
+          // Frame 0: emit token=1, step=0
+          { logits: [0.0, 4.0, -2.0, 9.0, 1.0, 0.0] },
+          // Frame 0: emit token=2, step=0 (hits max_symbols_per_step and advances frame)
+          { logits: [0.0, -1.0, 3.0, 9.0, 1.0, 0.0] },
+          // Frame 1: emit blank, step=2 -> exits decode loop
+          { logits: [5.0, 0.0, 0.0, 0.0, 1.0, 9.0] },
+        ]);
+
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        const output = await model.transcribe(inputs, {
+          return_timestamps: false,
+          returnFrameConfidences: true,
+        });
+
+        expect(output.confidence_scores.frame).toHaveLength(2);
+        expect(output.confidence_scores.frame[0]).toBeCloseTo(0.9579343795, 6);
+        expect(output.confidence_scores.frame_avg).toBeCloseTo(
+          (output.confidence_scores.frame[0] + output.confidence_scores.frame[1]) / 2,
+          6,
+        );
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "rejects non-finite timeOffset",
       async () => {
         const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [{ logits: [9.0, 0.0, 0.0, 1.0] }]);
@@ -215,6 +246,87 @@ export default () => {
       };
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_output_layout");
     });
+
+    it(
+      "fails fast when named encoder output is missing at runtime",
+      async () => {
+        class MissingEncoderOutputModel extends NemoConformerForTDT {
+          async _runEncoder() {
+            return {
+              outputs: new Tensor("float32", new Float32Array([0.1, 0.2]), [1, 2, 1]),
+            };
+          }
+
+          async _runDecoder() {
+            const stateShape = [1, 1, 2];
+            return {
+              outputs: new Tensor("float32", new Float32Array([9.0, 0.0, 0.0, 8.0]), [1, 1, 4]),
+              output_states_1: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+              output_states_2: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+            };
+          }
+        }
+
+        const config = {
+          ...BASE_CONFIG,
+          "transformers.js_config": {
+            ...BASE_CONFIG["transformers.js_config"],
+            transducer: {
+              ...BASE_CONFIG["transformers.js_config"].transducer,
+              io: { encoder_output: "encoder_out" },
+            },
+          },
+        };
+        const sessions = {
+          ...BASE_SESSIONS,
+          encoder_model: {
+            ...BASE_SESSIONS.encoder_model,
+            outputNames: ["encoder_out"],
+          },
+        };
+        const model = new MissingEncoderOutputModel(config, sessions, {});
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
+          'encoder output "encoder_out" was not returned',
+        );
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "fails fast when named decoder logits output is missing at runtime",
+      async () => {
+        class MissingDecoderOutputModel extends NemoConformerForTDT {
+          async _runEncoder() {
+            return {
+              outputs: new Tensor("float32", new Float32Array([0.1, 0.2]), [1, 2, 1]),
+            };
+          }
+
+          async _runDecoder() {
+            const stateShape = [1, 1, 2];
+            return {
+              unexpected_logits: new Tensor("float32", new Float32Array([9.0, 0.0, 0.0, 8.0]), [1, 1, 4]),
+              output_states_1: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+              output_states_2: new Tensor("float32", new Float32Array([0, 0]), stateShape),
+            };
+          }
+        }
+
+        const model = new MissingDecoderOutputModel(BASE_CONFIG, BASE_SESSIONS, {});
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
+          'decoder output "outputs" was not returned',
+        );
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
 
     it("rejects duplicate decoder output aliases in transducer io config", () => {
       const invalidConfig = {

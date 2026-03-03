@@ -313,7 +313,15 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
     _getEncoderOutput(outputs) {
         const name = this.transducer.io.encoder_output;
-        return outputs[name] ?? Object.values(outputs)[0];
+        const out = outputs?.[name];
+        if (!(out instanceof Tensor)) {
+            const available = outputs && typeof outputs === 'object' ? Object.keys(outputs).join(', ') : '(none)';
+            throw new Error(
+                `Nemo Conformer TDT encoder output "${name}" was not returned by the session. ` +
+                    `Available outputs: ${available}.`,
+            );
+        }
+        return out;
     }
 
     _getEncoderFrameCount(encoderOutput) {
@@ -570,8 +578,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const tokenTimestamps = [];
         /** @type {number[] | null} */
         const tokenConfidences = needConfidences ? [] : null;
-        /** @type {number[] | null} */
-        const frameConfidences = returnFrameConfidences ? [] : null;
+        /** @type {Map<number, { sum: number, count: number }> | null} */
+        const frameConfidenceStats = returnFrameConfidences ? new Map() : null;
         /** @type {number[] | null} */
         const frameIndices = returnFrameIndices ? [] : null;
         /** @type {number[] | null} */
@@ -627,7 +635,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     frameTensor.dispose();
                 }
 
-                const logits = decoderOutput[io.decoder_output] ?? Object.values(decoderOutput)[0];
+                const logits = decoderOutput[io.decoder_output];
                 const outputState1 = decoderOutput[io.decoder_output_state_1];
                 const outputState2 = decoderOutput[io.decoder_output_state_2];
                 const seenDecoderTensors = new Set();
@@ -638,6 +646,18 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                         continue;
                     }
                     value.dispose();
+                }
+                if (!(logits instanceof Tensor)) {
+                    this._disposeDecoderState(
+                        {
+                            state1: outputState1,
+                            state2: outputState2,
+                        },
+                        decoderState,
+                    );
+                    throw new Error(
+                        `Nemo Conformer TDT decoder output "${io.decoder_output}" was not returned by the session.`,
+                    );
                 }
                 const logitsData = logits.data;
                 if (logitsData.length < vocabSize) {
@@ -674,8 +694,14 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     needConfidences || returnLogProbs || returnFrameConfidences
                         ? confidenceFromLogits(logitsData, tokenId, vocabSize)
                         : null;
-                if (frameConfidences && maybeConfidence) {
-                    frameConfidences.push(maybeConfidence.confidence);
+                if (frameConfidenceStats && maybeConfidence) {
+                    const stats = frameConfidenceStats.get(frameIndex);
+                    if (stats) {
+                        stats.sum += maybeConfidence.confidence;
+                        stats.count += 1;
+                    } else {
+                        frameConfidenceStats.set(frameIndex, { sum: maybeConfidence.confidence, count: 1 });
+                    }
                 }
 
                 const newState = {
@@ -779,7 +805,11 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         }
 
         // Frame confidences are independent of return_timestamps — emit whenever requested.
-        if (returnFrameConfidences && frameConfidences && frameConfidences.length > 0) {
+        if (returnFrameConfidences && frameConfidenceStats && frameConfidenceStats.size > 0) {
+            const frameConfidences = [];
+            for (const { sum, count } of frameConfidenceStats.values()) {
+                frameConfidences.push(sum / count);
+            }
             if (!result.confidence_scores) {
                 result.confidence_scores = {};
             }
