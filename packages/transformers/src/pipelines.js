@@ -205,7 +205,7 @@ export async function pipeline(
                     `None of the candidate model classes support this type.`,
             );
         }
-        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig      });
+        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig });
     } else {
         modelPromise = modelClasses.from_pretrained(model, pretrainedOptions);
     }
