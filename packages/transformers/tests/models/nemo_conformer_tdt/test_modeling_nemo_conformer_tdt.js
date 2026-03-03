@@ -1,6 +1,8 @@
 import { NemoConformerForTDT, Tensor } from "../../../src/transformers.js";
 import { createAudioCacheKey, FeatureLRUCache } from "../../../src/models/nemo_conformer_tdt/transducer_cache.js";
 import { computeTemporalDeltas } from "../../../src/models/nemo_conformer_tdt/transducer_deltas.js";
+import { MODEL_TYPE_MAPPING, MODEL_TYPES } from "../../../src/models/modeling_utils.js";
+import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../../init.js";
 
@@ -73,6 +75,11 @@ const BASE_CONFIG = {
 
 export default () => {
   describe("NemoConformerForTDT", () => {
+    it("maps NemoConformerForTDT to MODEL_TYPES.NemoConformerTDT", () => {
+      expect(MODEL_TYPE_MAPPING.get("NemoConformerForTDT")).toBe(MODEL_TYPES.NemoConformerTDT);
+      expect(MODEL_TYPE_MAPPING.get("nemo-conformer-tdt")).toBe(MODEL_TYPES.NemoConformerTDT);
+    });
+
     it(
       "greedily decodes scripted token and duration logits",
       async () => {
@@ -135,6 +142,43 @@ export default () => {
       };
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_output_layout");
     });
+
+    it(
+      "disposes encoder outputs when frame-count validation fails before decode",
+      async () => {
+        class BadEncoderOutputModel extends NemoConformerForTDT {
+          constructor(config, sessions, encoderOutput) {
+            super(config, sessions, {});
+            this.encoderOutput = encoderOutput;
+          }
+
+          async _runEncoder() {
+            return { outputs: this.encoderOutput };
+          }
+        }
+
+        const badEncoderOutput = new Tensor("float32", new Float32Array([0, 1, 2, 3]), [2, 2]);
+        let disposed = 0;
+        const originalDispose = badEncoderOutput.dispose.bind(badEncoderOutput);
+        badEncoderOutput.dispose = () => {
+          disposed += 1;
+          originalDispose();
+        };
+
+        const model = new BadEncoderOutputModel(BASE_CONFIG, BASE_SESSIONS, badEncoderOutput);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: { decode: () => "" },
+          }),
+        ).rejects.toThrow("expected encoder output dims");
+        expect(disposed).toBe(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 
   describe("Nemo Conformer TDT utilities", () => {
@@ -189,6 +233,41 @@ export default () => {
 
         expect(ka1).toEqual(ka2);
         expect(ka1).not.toEqual(kb);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it("uses Nemo encoder selector key when resolving model files", async () => {
+      const files = await get_model_files("dummy/nemo", {
+        local_files_only: true,
+        config: {
+          architectures: ["UnknownArch"],
+          model_type: "nemo-conformer-tdt",
+          "transformers.js_config": {},
+        },
+        dtype: {
+          model: "int8",
+          encoder_model: "fp16",
+          decoder_model_merged: "q4",
+        },
+      });
+      expect(files).toEqual([
+        "config.json",
+        "onnx/encoder_model_fp16.onnx",
+        "onnx/decoder_model_merged_q4.onnx",
+      ]);
+    });
+
+    it(
+      "distinguishes long waveforms that differ at unsampled indices",
+      async () => {
+        const a = new Float32Array(10000);
+        const b = new Float32Array(10000);
+        b[1] = 0.12345; // Index 1 was skipped by the prior stride-based hash for this length.
+
+        const ka = createAudioCacheKey(a, 16000);
+        const kb = createAudioCacheKey(b, 16000);
+        expect(ka).not.toEqual(kb);
       },
       MAX_TEST_EXECUTION_TIME,
     );

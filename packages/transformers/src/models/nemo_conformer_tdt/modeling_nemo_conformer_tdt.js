@@ -534,8 +534,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         }
         const encodeMs = nowMs() - encodeStart;
 
-        const encoderOutput = this._getEncoderOutput(encoderOutputs);
-        const frameCount = this._getEncoderFrameCount(encoderOutput);
+        let frameCount = 0;
+        let encoderOutput = null;
         const frameTime = this.transducer.subsampling_factor * this.transducer.frame_shift_s;
 
         const numLayers = this.transducer.decoder.num_layers;
@@ -568,6 +568,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const decodeStart = nowMs();
 
         try {
+            encoderOutput = this._getEncoderOutput(encoderOutputs);
+            frameCount = this._getEncoderFrameCount(encoderOutput);
             decoderState = {
                 state1: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),
                 state2: new Tensor('float32', new Float32Array(numLayers * hiddenSize), [numLayers, 1, hiddenSize]),

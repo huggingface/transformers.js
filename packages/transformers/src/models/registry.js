@@ -577,6 +577,9 @@ const CUSTOM_MAPPING = [
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
+    // Keep AutoModel lookup in MODEL_MAPPING_NAMES_ENCODER_ONLY while forcing the
+    // correct runtime model type for two-artifact Nemo Conformer TDT loading.
+    ['NemoConformerForTDT', ALL_MODEL_FILES.NemoConformerForTDT, MODEL_TYPES.NemoConformerTDT],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);

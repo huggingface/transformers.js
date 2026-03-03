@@ -167,7 +167,7 @@ export async function get_model_files(
         add_model_file('conditional_decoder');
         files.push('generation_config.json');
     } else if (modelType === MODEL_TYPES.NemoConformerTDT) {
-        add_model_file('model', 'encoder_model');
+        add_model_file('encoder_model');
         add_model_file('decoder_model_merged');
     } else if (modelType === MODEL_TYPES.AutoEncoder) {
         add_model_file('encoder_model');
