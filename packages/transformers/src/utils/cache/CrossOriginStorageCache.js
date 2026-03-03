@@ -31,7 +31,7 @@ export class CrossOriginStorage {
      * Implements `CacheInterface.match`.
      *
      * @param {string} request The URL of the resource to look up.
-     * @returns {Promise<Response|import('../hub/files.js').FileResponse|string|undefined>} The cached `Response`, or `undefined` if not found.
+     * @returns {Promise<Response|undefined>} The cached `Response`, or `undefined` if not found.
      */
     match = async (request) => {
         const hashValue = await this._getFileHash(request);
@@ -52,8 +52,9 @@ export class CrossOriginStorage {
     /**
      * Stores a response in cross-origin storage, keyed by its SHA-256 hash.
      *
-     * For LFS-backed URLs the hash is resolved cheaply from the Git LFS pointer file
-     * (via `_getLfsFileHash`) without reading the response body a second time.
+     * For LFS-backed URLs the hash is resolved cheaply via `_getFileHash` (which checks
+     * `HASH_CACHE_NAME` first, then falls back to fetching the Git LFS pointer file)
+     * without reading the response body a second time.
      *
      * For non-LFS resources the hash is unknown upfront.  In that case the body is consumed
      * in the background: the stream is read to compute the content hash, the file is written
@@ -69,8 +70,6 @@ export class CrossOriginStorage {
     put = async (request, response) => {
         const hashValue = await this._getFileHash(request);
 
-        console.log(request, hashValue);
-
         if (hashValue) {
             // Fast path: LFS hash already known. Consume the body and store directly.
             const blob = await response.blob();
@@ -79,7 +78,7 @@ export class CrossOriginStorage {
             // Slow path: hash unknown. Process in the background so put() returns promptly.
             // The caller already holds a reference to the original response; we receive it
             // here only to buffer and hash its body.
-            this._processAndStore(request, response.body, response.headers);
+            this._processAndStore(request, response.body);
         }
     };
 
@@ -110,10 +109,9 @@ export class CrossOriginStorage {
      *
      * @param {string} request The original resource URL.
      * @param {ReadableStream} stream The response body stream to consume.
-     * @param {Headers} _headers The original response headers (reserved for future use).
      * @returns {Promise<void>}
      */
-    _processAndStore = async (request, stream, _headers) => {
+    _processAndStore = async (request, stream) => {
         try {
             const blob = await new Response(stream).blob();
             const { value: hashHex } = await this._getBlobHash(blob);
@@ -136,8 +134,9 @@ export class CrossOriginStorage {
      * Deletes the cache entry for the given request.
      *
      * Removes the hash entry from `HASH_CACHE_NAME`. Note: cross-origin storage itself does not
-     * expose a delete API, so only the local hash mapping is removed. After deletion, `match`
-     * will no longer be able to resolve the file from cross-origin storage.
+     * expose a delete API, so only the local hash mapping is removed. For non-LFS URLs this
+     * permanently prevents `match` from resolving the file. For LFS-backed URLs, `match` will
+     * re-fetch the LFS pointer file on the next call and repopulate the hash cache automatically.
      *
      * Implements `CacheInterface.delete`.
      *
