@@ -47,6 +47,11 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
                 `NemoConformerTDTFeatureExtractor expected delta_order in {0,1,2}, got ${this.delta_order}.`,
             );
         }
+        if (!Number.isInteger(this.delta_window) || this.delta_window < 1) {
+            throw new Error(
+                `NemoConformerTDTFeatureExtractor expected \`delta_window\` as a positive integer, got ${this.delta_window}.`,
+            );
+        }
         if (this.delta_order > 0 && !this.delta_concatenate) {
             logger.warn(
                 'NemoConformerTDTFeatureExtractor: `delta_concatenate=false` is set. ' +

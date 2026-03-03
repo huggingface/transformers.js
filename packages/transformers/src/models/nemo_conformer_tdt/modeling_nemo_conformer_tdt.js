@@ -107,6 +107,13 @@ function resolveTransducerConfig(config, sessions) {
         ...DEFAULT_TRANSDUCER_IO,
         ...(transducerConfig.io ?? {}),
     };
+    const requiredDecoderOutputs = [io.decoder_output, io.decoder_output_state_1, io.decoder_output_state_2];
+    if (new Set(requiredDecoderOutputs).size !== requiredDecoderOutputs.length) {
+        throw new Error(
+            'Invalid `transformers.js_config.transducer.io`: decoder output names must be distinct ' +
+                '(decoder_output, decoder_output_state_1, decoder_output_state_2).',
+        );
+    }
 
     const decoderSession = sessions?.decoder_model_merged;
     if (!decoderSession) {

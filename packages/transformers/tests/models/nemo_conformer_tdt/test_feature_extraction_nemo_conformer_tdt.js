@@ -117,5 +117,20 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it("validates delta_window at construction time", () => {
+      expect(
+        () => new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, delta_order: 1, delta_window: 0 }),
+      ).toThrow("delta_window");
+      expect(
+        () =>
+          new NemoConformerTDTFeatureExtractor({
+            ...base,
+            feature_size: 80,
+            delta_order: 1,
+            delta_window: 1.5,
+          }),
+      ).toThrow("delta_window");
+    });
   });
 };
