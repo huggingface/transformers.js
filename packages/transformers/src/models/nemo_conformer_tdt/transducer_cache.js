@@ -33,6 +33,12 @@ export class FeatureLRUCache {
      * @param {{max_entries?: number, max_size_mb?: number}} [options]
      */
     constructor({ max_entries = 128, max_size_mb = 64 } = {}) {
+        if (!Number.isInteger(max_entries) || max_entries < 0) {
+            throw new Error('FeatureLRUCache expected `max_entries` to be a non-negative integer.');
+        }
+        if (!Number.isFinite(max_size_mb) || max_size_mb < 0) {
+            throw new Error('FeatureLRUCache expected `max_size_mb` to be a non-negative number.');
+        }
         this.max_entries = max_entries;
         this.max_size_mb = max_size_mb;
         this.cache = new Map();

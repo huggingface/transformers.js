@@ -124,6 +124,38 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it(
+      "clamps token timestamps when step jumps beyond remaining frames",
+      async () => {
+        const tokenizer = {
+          decode(ids) {
+            const idArray = Array.isArray(ids) ? ids : [ids];
+            return idArray.map((id) => (id === 1 || id === 1n ? " token" : "")).join("");
+          },
+        };
+
+        const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [
+          // Emit token=1 with duration index choosing a large step (argmax at tail).
+          { logits: [0.1, 10.0, 0.0, 0.0, 0.0, 0.0, 12.0] },
+        ]);
+
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        const output = await model.transcribe(inputs, {
+          tokenizer,
+          return_timestamps: true,
+          return_tokens: true,
+        });
+
+        expect(output.tokens).toHaveLength(1);
+        expect(output.tokens[0]).toEqual(expect.objectContaining({ start_time: 0, end_time: 0.12 }));
+        expect(output.utterance_timestamp).toEqual([0, 0.12]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
     it("fails fast when transducer config is missing", () => {
       const invalidConfig = { model_type: "nemo-conformer-tdt" };
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("Missing `transformers.js_config.transducer`");
@@ -288,5 +320,12 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it("rejects invalid cache limits", () => {
+      expect(() => new FeatureLRUCache({ max_entries: -1 })).toThrow("max_entries");
+      expect(() => new FeatureLRUCache({ max_entries: 1.25 })).toThrow("max_entries");
+      expect(() => new FeatureLRUCache({ max_size_mb: -1 })).toThrow("max_size_mb");
+      expect(() => new FeatureLRUCache({ max_size_mb: Number.POSITIVE_INFINITY })).toThrow("max_size_mb");
+    });
   });
 };
