@@ -140,6 +140,24 @@ export class AutomaticSpeechRecognitionPipeline
         Pipeline
     )
 {
+    _validateNemoAudio(audio, index) {
+        if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
+            throw new TypeError(
+                `Nemo Conformer TDT pipeline expected audio at index ${index} to be Float32Array or Float64Array.`,
+            );
+        }
+        if (audio.length === 0) {
+            throw new Error(`Nemo Conformer TDT pipeline expected non-empty audio at index ${index}.`);
+        }
+        for (let i = 0; i < audio.length; ++i) {
+            if (!Number.isFinite(audio[i])) {
+                throw new Error(
+                    `Nemo Conformer TDT pipeline expected finite audio samples; found ${audio[i]} at index ${index}:${i}.`,
+                );
+            }
+        }
+    }
+
     async _call(audio, kwargs = {}) {
         switch (this.model.config.model_type) {
             case 'whisper':
@@ -339,6 +357,9 @@ export class AutomaticSpeechRecognitionPipeline
         const batchedAudio = single ? [audio] : audio;
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
         const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+        for (let i = 0; i < preparedAudios.length; ++i) {
+            this._validateNemoAudio(preparedAudios[i], i);
+        }
 
         const toReturn = [];
         for (const aud of preparedAudios) {

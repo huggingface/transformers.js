@@ -219,6 +219,13 @@ export default () => {
           return_metrics: true,
         });
       });
+
+      it("rejects non-finite audio samples before Nemo decoding", async () => {
+        const { pipe } = makeUnitPipe();
+        await expect(pipe(Float32Array.from([0, Number.NaN, 0]), { return_timestamps: false })).rejects.toThrow(
+          "finite audio samples",
+        );
+      });
     });
   });
 };

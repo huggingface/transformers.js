@@ -457,6 +457,11 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
     }
 
     _validateRuntimeConfig(vocabSize) {
+        if (!Number.isInteger(vocabSize) || vocabSize <= 0) {
+            throw new Error(
+                `Invalid Nemo Conformer TDT config: vocab_size=${vocabSize} must be a positive integer.`,
+            );
+        }
         if (this.transducer.blank_token_id >= vocabSize) {
             throw new Error(
                 `Invalid Nemo Conformer TDT config: blank_token_id=${this.transducer.blank_token_id} must be < vocab_size=${vocabSize}.`,
@@ -638,6 +643,16 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 const tokenId = argmax(logitsData, 0, vocabSize);
                 const durationStart = this.transducer.duration_start_index ?? vocabSize;
                 const hasDurationLogits = logitsData.length > durationStart;
+                if (this.transducer.duration_start_index != null && !hasDurationLogits) {
+                    logits.dispose();
+                    this._disposeDecoderState({
+                        state1: outputState1,
+                        state2: outputState2,
+                    });
+                    throw new Error(
+                        `Nemo Conformer TDT decoder output is missing duration logits: expected values beyond index ${durationStart - 1}, got length=${logitsData.length}.`,
+                    );
+                }
                 const step = hasDurationLogits
                     ? argmax(logitsData, durationStart, logitsData.length - durationStart) - durationStart
                     : 0;

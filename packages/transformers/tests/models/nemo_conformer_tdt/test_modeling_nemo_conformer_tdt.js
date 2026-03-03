@@ -156,6 +156,28 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it(
+      "fails fast when duration logits are required but missing",
+      async () => {
+        const model = new MockNemoConformerForTDT(BASE_CONFIG, BASE_SESSIONS, [
+          // Only vocab logits are returned; duration head is missing.
+          { logits: [0.1, 10.0, 0.0] },
+        ]);
+
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: { decode: () => "" },
+            return_timestamps: false,
+          }),
+        ).rejects.toThrow("missing duration logits");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
     it("fails fast when transducer config is missing", () => {
       const invalidConfig = { model_type: "nemo-conformer-tdt" };
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("Missing `transformers.js_config.transducer`");
