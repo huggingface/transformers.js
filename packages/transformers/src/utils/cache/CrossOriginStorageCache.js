@@ -1,3 +1,5 @@
+/// <reference path="./cross-origin-storage.d.ts" />
+
 const HASH_ALGORITHM = 'SHA-256';
 
 /**
