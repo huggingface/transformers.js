@@ -411,8 +411,12 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 let length = null;
                 const attentionMask = model_inputs.attention_mask;
                 if (attentionMask instanceof Tensor) {
-                    const mask = attentionMask.tolist();
-                    length = mask[0].reduce((acc, x) => acc + toInt(x), 0);
+                    const maskData = attentionMask.data;
+                    let sum = 0;
+                    for (let i = 0; i < maskData.length; ++i) {
+                        sum += toInt(maskData[i]);
+                    }
+                    length = sum;
                 } else {
                     length = inputFeatures.dims[1];
                 }
