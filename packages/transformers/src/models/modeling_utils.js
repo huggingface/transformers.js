@@ -38,6 +38,26 @@ import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Extract the past sequence length from a past_key_values object.
+ * For standard models, all entries are attention KV caches with shape [batch, heads, seq_len, head_dim].
+ * For hybrid models (e.g., Qwen3.5 with conv/recurrent + attention layers), the first entry
+ * may be a conv or recurrent state whose dims don't encode a sequence length.
+ * This function finds a `past_key_values.*` entry (standard attention cache) to determine the true past length.
+ *
+ * @param {Record<string, import('../utils/tensor.js').Tensor>} past_key_values
+ * @returns {number} The past sequence length.
+ */
+export function getPastLength(past_key_values) {
+    for (const name in past_key_values) {
+        if (name.startsWith('past_key_values.')) {
+            return past_key_values[name].dims.at(-2);
+        }
+    }
+    // Fallback for non-hybrid models (all entries are attention KV)
+    return Object.values(past_key_values)[0].dims.at(-2);
+}
+
+/**
  * Converts an array or Tensor of integers to an int64 Tensor.
  * @param {any[]|Tensor} items The input integers to be converted.
  * @returns {Tensor} The int64 Tensor with the converted values.
@@ -1485,7 +1505,7 @@ export async function generic_text_to_text_forward(
         } else if (past_key_values && modality_values && input_ids.dims[1] === 1) {
             // This branch handles the cache case.
             const target_length = input_ids.dims[1]; // always 1
-            const past_length = Object.values(past_key_values)[0].dims.at(-2);
+            const past_length = getPastLength(past_key_values);
 
             attention_mask = cat(
                 [
@@ -1616,7 +1636,7 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 }
 
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    const past_length = model_inputs.past_key_values ? Object.values(model_inputs.past_key_values)[0].dims.at(-2) : 0;
+    const past_length = model_inputs.past_key_values ? getPastLength(model_inputs.past_key_values) : 0;
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
