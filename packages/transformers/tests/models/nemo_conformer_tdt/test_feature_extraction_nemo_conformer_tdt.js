@@ -109,12 +109,17 @@ export default () => {
           feature_cache_max_entries: 8,
           feature_cache_max_size_mb: 8,
         });
-        const first = await extractor(audio);
-        const second = await extractor(audio);
+        try {
+          const first = await extractor(audio);
+          const second = await extractor(audio);
 
-        expect(first).toBe(second);
-        expect(extractor.get_cache_stats().entries).toBe(1);
-        extractor.clear_cache();
+          expect(first).not.toBe(second);
+          expect(first.input_features).toBe(second.input_features);
+          expect(first.attention_mask).toBe(second.attention_mask);
+          expect(extractor.get_cache_stats().entries).toBe(1);
+        } finally {
+          extractor.clear_cache();
+        }
         expect(extractor.get_cache_stats().entries).toBe(0);
       },
       MAX_TEST_EXECUTION_TIME,

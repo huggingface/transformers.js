@@ -346,6 +346,26 @@ export default () => {
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("must be distinct");
     });
 
+    it("rejects duplicate decoder input aliases in transducer io config", () => {
+      const invalidConfig = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            io: {
+              decoder_encoder: "encoder_outputs",
+              decoder_token: "targets",
+              decoder_token_length: "target_length",
+              decoder_state_1: "input_states_1",
+              decoder_state_2: "input_states_1",
+            },
+          },
+        },
+      };
+      expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("must be distinct");
+    });
+
     it(
       "disposes encoder outputs when frame-count validation fails before decode",
       async () => {

@@ -107,6 +107,19 @@ function resolveTransducerConfig(config, sessions) {
         ...DEFAULT_TRANSDUCER_IO,
         ...(transducerConfig.io ?? {}),
     };
+    const requiredDecoderInputs = [
+        io.decoder_encoder,
+        io.decoder_token,
+        io.decoder_token_length,
+        io.decoder_state_1,
+        io.decoder_state_2,
+    ];
+    if (new Set(requiredDecoderInputs).size !== requiredDecoderInputs.length) {
+        throw new Error(
+            'Invalid `transformers.js_config.transducer.io`: decoder input names must be distinct ' +
+                '(decoder_encoder, decoder_token, decoder_token_length, decoder_state_1, decoder_state_2).',
+        );
+    }
     const requiredDecoderOutputs = [io.decoder_output, io.decoder_output_state_1, io.decoder_output_state_2];
     if (new Set(requiredDecoderOutputs).size !== requiredDecoderOutputs.length) {
         throw new Error(
@@ -445,6 +458,9 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         }
 
         if (missingInputs.length > 0) {
+            for (const tensor of disposables) {
+                tensor.dispose();
+            }
             throw new Error(
                 `Nemo Conformer TDT encoder session expects additional inputs that are not available: ${missingInputs.join(', ')}.`,
             );
