@@ -40,18 +40,7 @@ export async function getCache(file_cache_dir = null) {
     }
 
     if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
-        // When the browser cache is also enabled, open it and pass it as a per-request fallback
-        // so that any request for which no file hash can be resolved is served from (or stored
-        // in) the browser cache instead of going all the way back to the network.
-        let browserCache = null;
-        if (env.useBrowserCache && typeof caches !== 'undefined') {
-            try {
-                browserCache = await caches.open(env.cacheKey);
-            } catch (e) {
-                logger.warn('An error occurred while opening the browser cache for CrossOriginStorage fallback:', e);
-            }
-        }
-        cache = new CrossOriginStorage(browserCache);
+        cache = new CrossOriginStorage();
     }
 
     if (!cache && env.useBrowserCache) {

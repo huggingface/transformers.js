@@ -16,16 +16,7 @@ const HASH_CACHE_NAME = 'experimental_transformers-hash-cache';
  * @see https://github.com/explainers-by-googlers/cross-origin-storage
  */
 export class CrossOriginStorage {
-    /**
-     * @param {import('../cache.js').CacheInterface|null} [fallbackCache]
-     *   An optional fallback cache (e.g. a browser `Cache` opened via `caches.open()`) that is
-     *   consulted when no file hash can be resolved for a given request.  When provided, both
-     *   `match` and `put` delegate to it as a fallback/secondary store.
-     */
-    constructor(fallbackCache = null) {
-        /** @type {import('../cache.js').CacheInterface|null} */
-        this._fallbackCache = fallbackCache;
-    }
+    constructor() {}
 
     /**
      * Returns whether the `navigator.crossOriginStorage` API is available in the current environment.
@@ -37,9 +28,6 @@ export class CrossOriginStorage {
      * Looks up a cached response for the given URL by resolving its SHA-256 hash and requesting
      * the corresponding file handle from cross-origin storage.
      *
-     * Falls back to the `fallbackCache` (if configured) when no file hash can be resolved for
-     * the request.
-     *
      * Implements `CacheInterface.match`.
      *
      * @param {string} request The URL of the resource to look up.
@@ -48,10 +36,6 @@ export class CrossOriginStorage {
     match = async (request) => {
         const hashValue = await this._getFileHash(request);
         if (!hashValue) {
-            // No hash available — delegate to fallback cache if one is configured.
-            if (this._fallbackCache) {
-                return this._fallbackCache.match(request);
-            }
             return undefined;
         }
         const hash = { algorithm: HASH_ALGORITHM, value: hashValue };
@@ -61,59 +45,160 @@ export class CrossOriginStorage {
             const blob = await handle.getFile();
             return new Response(blob);
         } catch (err) {
-            // Cross-origin storage lookup failed — delegate to fallback cache if one is configured.
-            if (this._fallbackCache) {
-                return this._fallbackCache.match(request);
-            }
             return undefined;
         }
     };
 
     /**
-     * Stores a response in cross-origin storage, keyed by the SHA-256 hash of its body.
+     * Stores a response in cross-origin storage, keyed by its SHA-256 hash.
      *
-     * When a `fallbackCache` is configured, also stores the response there so that subsequent
-     * requests that cannot resolve a hash still have a warm entry.
+     * For LFS-backed URLs the hash is resolved cheaply from the Git LFS pointer file
+     * (via `_getLfsFileHash`) without reading the response body a second time.
+     *
+     * For non-LFS resources the hash is unknown upfront.  In that case the body is consumed
+     * in the background: the stream is read to compute the content hash, the file is written
+     * into cross-origin storage, and the computed hash is persisted to `HASH_CACHE_NAME`
+     * so that future `match` calls can resolve the file without a network round-trip.
      *
      * Implements `CacheInterface.put`.
      *
-     * @param {string} request The URL of the resource (used to derive a cache key).
+     * @param {string} request The URL of the resource (used as the hash-cache key).
      * @param {Response} response The response whose body will be written to the cache.
      * @returns {Promise<void>}
      */
     put = async (request, response) => {
-        const blob = await response.blob();
-        const hash = await this._getBlobHash(blob);
+        const hashValue = await this._getFileHash(request);
+
+        console.log(request, hashValue);
+
+        if (hashValue) {
+            // Fast path: LFS hash already known. Consume the body and store directly.
+            const blob = await response.blob();
+            await this._storeBlobInCOS(blob, hashValue);
+        } else {
+            // Slow path: hash unknown. Process in the background so put() returns promptly.
+            // The caller already holds a reference to the original response; we receive it
+            // here only to buffer and hash its body.
+            this._processAndStore(request, response.body, response.headers);
+        }
+    };
+
+    /**
+     * Writes a blob into cross-origin storage using the given pre-computed hex hash string.
+     *
+     * @param {Blob} blob
+     * @param {string} hashHex Hex-encoded SHA-256 hash of `blob`.
+     * @returns {Promise<void>}
+     */
+    _storeBlobInCOS = async (blob, hashHex) => {
+        const hash = { algorithm: HASH_ALGORITHM, value: hashHex };
         // @ts-expect-error
         const [handle] = await navigator.crossOriginStorage.requestFileHandles([hash], { create: true });
         const writableStream = await handle.createWritable();
         await writableStream.write(blob);
         await writableStream.close();
+    };
 
-        // Populate the fallback cache as well so that a future miss (e.g. hash unavailable)
-        // can still be served without a full network round-trip.
-        if (this._fallbackCache) {
+    /**
+     * Background task for non-LFS resources: consumes `stream`, computes the SHA-256 hash
+     * of the resulting blob, stores it in cross-origin storage, and persists the computed
+     * hash to `HASH_CACHE_NAME` keyed by `request` so future `match` calls can resolve the
+     * file without a network round-trip.
+     *
+     * Called fire-and-forget from `put` — errors are swallowed so failures never surface to
+     * the caller.
+     *
+     * @param {string} request The original resource URL.
+     * @param {ReadableStream} stream The response body stream to consume.
+     * @param {Headers} _headers The original response headers (reserved for future use).
+     * @returns {Promise<void>}
+     */
+    _processAndStore = async (request, stream, _headers) => {
+        try {
+            const blob = await new Response(stream).blob();
+            const { value: hashHex } = await this._getBlobHash(blob);
+
+            await this._storeBlobInCOS(blob, hashHex);
+
+            // Persist the computed hash so future match() calls resolve without the network.
             try {
-                await this._fallbackCache.put(request, new Response(blob));
+                const hashCache = await caches.open(HASH_CACHE_NAME);
+                await hashCache.put(request, new Response(hashHex));
             } catch {
-                // Fallback cache write failure is non-fatal.
+                // Cache API unavailable (e.g. non-secure context): COS entry still written.
             }
+        } catch {
+            // Non-fatal: background store failure must not affect the caller.
         }
     };
 
     /**
-     * Resolves the SHA-256 hash for a Hugging Face resource URL by reading its raw Git LFS
-     * pointer file. Uses a network-first strategy: always attempts a live fetch and persists
-     * the result to the Cache API. Falls back to the cached hash when the network is
-     * unavailable, so cross-origin storage lookups continue to work offline.
+     * Deletes the cache entry for the given request.
      *
-     * Supports any `/resolve/<ref>/` URL (not limited to `/resolve/main/onnx/`).
+     * Removes the hash entry from `HASH_CACHE_NAME`. Note: cross-origin storage itself does not
+     * expose a delete API, so only the local hash mapping is removed. After deletion, `match`
+     * will no longer be able to resolve the file from cross-origin storage.
+     *
+     * Implements `CacheInterface.delete`.
+     *
+     * @param {string} request
+     * @returns {Promise<boolean>} Resolves to `true` if the hash entry was deleted, `false` otherwise.
+     */
+    delete = async (request) => {
+        try {
+            const hashCache = await caches.open(HASH_CACHE_NAME);
+            return await hashCache.delete(request);
+        } catch {
+            return false;
+        }
+    };
+
+    /**
+     * Resolves the SHA-256 hash for a given URL.
+     *
+     * Returns the cached hash immediately if one has been persisted to `HASH_CACHE_NAME`.
+     * Otherwise falls back to `_getLfsFileHash` to retrieve the hash from the Hugging Face
+     * LFS pointer file, persisting the result to `HASH_CACHE_NAME` for future lookups.
+     *
+     * Returns `null` if the hash cannot be determined (e.g. non-LFS URL with no cached entry).
+     *
+     * @param {string} url The resource URL to resolve a hash for.
+     * @returns {Promise<string|null>} The hex-encoded SHA-256 hash, or `null` if unavailable.
+     */
+    _getFileHash = async (url) => {
+        try {
+            const hashCache = await caches.open(HASH_CACHE_NAME);
+            const cached = await hashCache.match(url);
+            if (cached) {
+                return cached.text();
+            }
+
+            const hash = await this._getLfsFileHash(url);
+            if (hash) {
+                const hashCache = await caches.open(HASH_CACHE_NAME);
+                await hashCache.put(url, new Response(hash));
+                return hash;
+            }
+
+            return null;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    /**
+     * Attempts to retrieve the SHA-256 hash for a Hugging Face resource URL from its raw
+     * Git LFS pointer file.
+     *
+     * Only applicable to URLs containing `/resolve/` (i.e. Hugging Face resolved file URLs).
+     * The `/resolve/` segment is rewritten to `/raw/` to fetch the LFS pointer directly.
+     * Returns `null` for non-LFS URLs or when the network request fails.
      *
      * @see https://huggingface.co/docs/hub/en/storage-backends#xet
      * @param {string} url The resolved Hugging Face URL of the resource.
      * @returns {Promise<string|null>} The hex-encoded SHA-256 hash, or `null` if unavailable.
      */
-    _getFileHash = async (url) => {
+    _getLfsFileHash = async (url) => {
         if (!/\/resolve\//.test(url)) {
             return null;
         }
@@ -121,32 +206,13 @@ export class CrossOriginStorage {
         const rawUrl = url.replace(/\/resolve\//, '/raw/');
 
         try {
-            // Network-first: fetch the LFS pointer file and cache the hash for offline use.
+            // fetch the LFS pointer file and return the sha256 hash if present.
             const text = await fetch(rawUrl).then((response) => response.text());
             if (!text.includes('oid sha256:')) {
                 return null;
             }
-            const hash = text.replace(/.*?\n^oid sha256:(\w+)\n.*?$/gm, '$1') || null;
-            if (hash) {
-                try {
-                    const hashCache = await caches.open(HASH_CACHE_NAME);
-                    await hashCache.put(rawUrl, new Response(hash));
-                } catch {
-                    // Cache API unavailable (e.g. non-secure context): hash still returned.
-                }
-            }
-            return hash;
+            return text.replace(/.*?\n^oid sha256:(\w+)\n.*?$/gm, '$1') || null;
         } catch {
-            // Network unavailable: fall back to the last cached hash so offline lookups work.
-            try {
-                const hashCache = await caches.open(HASH_CACHE_NAME);
-                const cached = await hashCache.match(rawUrl);
-                if (cached) {
-                    return cached.text();
-                }
-            } catch {
-                // Cache API also unavailable_ nothing we can do.
-            }
             return null;
         }
     };
