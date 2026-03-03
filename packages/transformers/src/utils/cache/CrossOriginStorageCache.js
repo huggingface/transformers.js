@@ -2,10 +2,16 @@ const HASH_ALGORITHM = 'SHA-256';
 
 /**
  * Name of the Cache API bucket used to persist the url→hash mapping.
- * Kept separate from the main `transformers-cache` bucket so it can be
- * managed (inspected / cleared) independently.
  */
 const HASH_CACHE_NAME = 'experimental_transformers-hash-cache';
+
+/**
+ * Builds the hash descriptor object expected by the cross-origin storage API.
+ *
+ * @param {string} value Hex-encoded SHA-256 hash.
+ * @returns {{ algorithm: string, value: string }}
+ */
+const makeHashDescriptor = (value) => ({ algorithm: HASH_ALGORITHM, value });
 
 /**
  * A cache implementation backed by the experimental `navigator.crossOriginStorage` API,
@@ -16,7 +22,17 @@ const HASH_CACHE_NAME = 'experimental_transformers-hash-cache';
  * @see https://github.com/explainers-by-googlers/cross-origin-storage
  */
 export class CrossOriginStorage {
-    constructor() {}
+    /** @type {Promise<Cache> | null} */
+    #hashCache = null;
+
+    /**
+     * Returns (and lazily opens) the hash cache, reusing the same promise across concurrent callers.
+     * @returns {Promise<Cache>}
+     */
+    _getHashCache = () => {
+        this.#hashCache ??= caches.open(HASH_CACHE_NAME);
+        return this.#hashCache;
+    };
 
     /**
      * Returns whether the `navigator.crossOriginStorage` API is available in the current environment.
@@ -38,13 +54,12 @@ export class CrossOriginStorage {
         if (!hashValue) {
             return undefined;
         }
-        const hash = { algorithm: HASH_ALGORITHM, value: hashValue };
         try {
             // @ts-expect-error
-            const [handle] = await navigator.crossOriginStorage.requestFileHandles([hash]);
+            const [handle] = await navigator.crossOriginStorage.requestFileHandles([makeHashDescriptor(hashValue)]);
             const blob = await handle.getFile();
             return new Response(blob);
-        } catch (err) {
+        } catch {
             return undefined;
         }
     };
@@ -90,9 +105,10 @@ export class CrossOriginStorage {
      * @returns {Promise<void>}
      */
     _storeBlobInCOS = async (blob, hashHex) => {
-        const hash = { algorithm: HASH_ALGORITHM, value: hashHex };
         // @ts-expect-error
-        const [handle] = await navigator.crossOriginStorage.requestFileHandles([hash], { create: true });
+        const [handle] = await navigator.crossOriginStorage.requestFileHandles([makeHashDescriptor(hashHex)], {
+            create: true,
+        });
         const writableStream = await handle.createWritable();
         await writableStream.write(blob);
         await writableStream.close();
@@ -113,14 +129,18 @@ export class CrossOriginStorage {
      */
     _processAndStore = async (request, stream) => {
         try {
-            const blob = await new Response(stream).blob();
-            const { value: hashHex } = await this._getBlobHash(blob);
+            const chunks = [];
+            for await (const chunk of stream) {
+                chunks.push(chunk);
+            }
+            const blob = new Blob(chunks);
+            const hashHex = await this._getBlobHash(blob);
 
             await this._storeBlobInCOS(blob, hashHex);
 
             // Persist the computed hash so future match() calls resolve without the network.
             try {
-                const hashCache = await caches.open(HASH_CACHE_NAME);
+                const hashCache = await this._getHashCache();
                 await hashCache.put(request, new Response(hashHex));
             } catch {
                 // Cache API unavailable (e.g. non-secure context): COS entry still written.
@@ -145,7 +165,7 @@ export class CrossOriginStorage {
      */
     delete = async (request) => {
         try {
-            const hashCache = await caches.open(HASH_CACHE_NAME);
+            const hashCache = await this._getHashCache();
             return await hashCache.delete(request);
         } catch {
             return false;
@@ -166,7 +186,7 @@ export class CrossOriginStorage {
      */
     _getFileHash = async (url) => {
         try {
-            const hashCache = await caches.open(HASH_CACHE_NAME);
+            const hashCache = await this._getHashCache();
             const cached = await hashCache.match(url);
             if (cached) {
                 return cached.text();
@@ -174,13 +194,12 @@ export class CrossOriginStorage {
 
             const hash = await this._getLfsFileHash(url);
             if (hash) {
-                const hashCache = await caches.open(HASH_CACHE_NAME);
                 await hashCache.put(url, new Response(hash));
                 return hash;
             }
 
             return null;
-        } catch (e) {
+        } catch {
             return null;
         }
     };
@@ -198,19 +217,16 @@ export class CrossOriginStorage {
      * @returns {Promise<string|null>} The hex-encoded SHA-256 hash, or `null` if unavailable.
      */
     _getLfsFileHash = async (url) => {
-        if (!/\/resolve\//.test(url)) {
+        if (!url.includes('/resolve/')) {
             return null;
         }
 
-        const rawUrl = url.replace(/\/resolve\//, '/raw/');
+        const rawUrl = url.replace('/resolve/', '/raw/');
 
         try {
-            // fetch the LFS pointer file and return the sha256 hash if present.
-            const text = await fetch(rawUrl).then((response) => response.text());
-            if (!text.includes('oid sha256:')) {
-                return null;
-            }
-            return text.replace(/.*?\n^oid sha256:(\w+)\n.*?$/gm, '$1') || null;
+            const text = await fetch(rawUrl).then((r) => r.text());
+            const match = text.match(/^oid sha256:([0-9a-f]+)$/m);
+            return match ? match[1] : null;
         } catch {
             return null;
         }
@@ -220,18 +236,12 @@ export class CrossOriginStorage {
      * Computes the SHA-256 hash of a `Blob`'s contents.
      *
      * @param {Blob} blob The blob to hash.
-     * @returns {Promise<{algorithm: string, value: string}>} An object containing the algorithm
-     *   identifier (`"SHA-256"`) and the lowercase hex-encoded hash value.
+     * @returns {Promise<string>} The lowercase hex-encoded SHA-256 hash.
      */
     _getBlobHash = async (blob) => {
         const arrayBuffer = await blob.arrayBuffer();
         const hashBuffer = await crypto.subtle.digest(HASH_ALGORITHM, arrayBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
-
-        return {
-            algorithm: HASH_ALGORITHM,
-            value: hashHex,
-        };
+        return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
     };
 }
