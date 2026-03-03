@@ -55,7 +55,6 @@ export class CrossOriginStorage {
             return undefined;
         }
         try {
-            // @ts-expect-error
             const [handle] = await navigator.crossOriginStorage.requestFileHandles([makeHashDescriptor(hashValue)]);
             const blob = await handle.getFile();
             return new Response(blob);
@@ -105,7 +104,6 @@ export class CrossOriginStorage {
      * @returns {Promise<void>}
      */
     _storeBlobInCOS = async (blob, hashHex) => {
-        // @ts-expect-error
         const [handle] = await navigator.crossOriginStorage.requestFileHandles([makeHashDescriptor(hashHex)], {
             create: true,
         });
