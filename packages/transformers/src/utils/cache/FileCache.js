@@ -2,6 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { FileResponse } from '../hub/FileResponse.js';
+import { Random } from '../random.js';
+
+// Create a dedicated random instance for generating unique temporary file names
+const rng = new Random();
 
 /**
  * File system cache implementation that implements the CacheInterface.
@@ -43,7 +47,9 @@ export class FileCache {
     async put(request, response, progress_callback = undefined) {
         let filePath = path.join(this.path, request);
         // Include both PID and a random suffix so that concurrent put() call within the same process (e.g. multiple pipelines loading the same file in parallel) each get their own temp file and don't corrupt each other's writes.
-        let tmpPath = filePath + `.tmp.${process.pid}.${Math.random().toString(36).slice(2)}`;
+        const id = process?.pid ?? Date.now();
+        const randomSuffix = Math.floor(rng.random() * Number.MAX_SAFE_INTEGER).toString(36);
+        let tmpPath = filePath + `.tmp.${id}.${randomSuffix}`;
 
         try {
             const contentLength = response.headers.get('Content-Length');
