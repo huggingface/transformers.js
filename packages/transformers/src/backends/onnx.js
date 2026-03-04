@@ -220,37 +220,52 @@ async function ensureWasmLoaded() {
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
         const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
 
-        // Load the WASM binary first. This must complete before loading the .mjs factory
-        // so that ONNX_ENV.wasm.wasmBinary is set by the time the blob URL factory module
-        // executes. ORT uses `config.locateFile = (fileName) => fileName` when wasmBinary
-        // is already provided, which avoids the `new URL(fileName, import.meta.url)` call
-        // that would fail when import.meta.url is a blob URL.
+        // Load the .wasm binary and .mjs factory in parallel for performance.
+        // The blob URL for the .mjs factory is only applied if wasmBinary loaded successfully:
+        // ORT sets `config.locateFile = (f) => f` only when wasmBinary is provided (ORT PR #27411),
+        // which is what prevents `new URL(fileName, import.meta.url)` from failing when the factory
+        // runs from a blob URL (where import.meta.url is also a blob). Without wasmBinary, we must
+        // leave wasmPaths.mjs as the original URL so ORT can resolve the .wasm path normally.
         let wasmBinaryLoaded = false;
-        if (urls.wasm && !isBlobURL(urls.wasm)) {
-            try {
-                const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
-                if (wasmBinary) {
-                    ONNX_ENV.wasm.wasmBinary = wasmBinary;
-                    wasmBinaryLoaded = true;
-                }
-            } catch (err) {
-                logger.warn('Failed to pre-load WASM binary:', err);
-            }
-        }
+        await Promise.all([
+            // Load and cache the WASM binary
+            urls.wasm && !isBlobURL(urls.wasm)
+                ? (async () => {
+                      try {
+                          const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
+                          if (wasmBinary) {
+                              ONNX_ENV.wasm.wasmBinary = wasmBinary;
+                              wasmBinaryLoaded = true;
+                          }
+                      } catch (err) {
+                          logger.warn('Failed to pre-load WASM binary:', err);
+                      }
+                  })()
+                : Promise.resolve(),
 
-        // Only create a blob URL for the .mjs factory if wasmBinary was successfully loaded.
-        // Without wasmBinary, ORT won't set locateFile and the blob URL's import.meta.url
-        // (which is also a blob URL) would cause `new URL(fileName, import.meta.url)` to fail.
-        if (wasmBinaryLoaded && urls.mjs && !isBlobURL(urls.mjs)) {
-            try {
-                const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
-                if (wasmFactoryBlob) {
-                    // @ts-ignore
-                    ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
-                }
-            } catch (err) {
-                logger.warn('Failed to pre-load WASM factory:', err);
-            }
+            // Load and cache the WASM factory as a blob URL
+            urls.mjs && !isBlobURL(urls.mjs)
+                ? (async () => {
+                      try {
+                          const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
+                          if (wasmFactoryBlob) {
+                              // @ts-ignore
+                              ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
+                          }
+                      } catch (err) {
+                          logger.warn('Failed to pre-load WASM factory:', err);
+                      }
+                  })()
+                : Promise.resolve(),
+        ]);
+
+        // If wasmBinary failed to load, revert wasmPaths.mjs to the original URL.
+        // Both fetches ran in parallel, so the blob URL may have been written before we
+        // knew wasmBinary had failed. Without wasmBinary, ORT won't set locateFile and
+        // `new URL(fileName, import.meta.url)` would fail inside the blob URL factory.
+        if (!wasmBinaryLoaded) {
+            // @ts-ignore
+            ONNX_ENV.wasm.wasmPaths.mjs = urls.mjs;
         }
     })();
 
