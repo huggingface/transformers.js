@@ -1519,11 +1519,19 @@ export async function generic_text_to_text_forward(
 
     if (!position_ids) {
         if (
-            ['qwen2_vl', 'qwen2_5_vl_text', 'qwen3_vl_text', 'qwen3_5_text', 'qwen3_5_moe_text'].includes(
-                self.config.model_type,
-            )
+            // Handle special case for qwen vl models
+            [
+                'qwen2_vl',
+                'qwen2_5_vl',
+                'qwen2_5_vl_text',
+                'qwen3_vl',
+                'qwen3_vl_text',
+                'qwen3_5',
+                'qwen3_5_text',
+                'qwen3_5_moe',
+                'qwen3_5_moe_text',
+            ].includes(self.config.model_type)
         ) {
-            // Special case for qwen vl models
             // @ts-ignore
             const { image_grid_thw, video_grid_thw } = kwargs;
             [position_ids] = self.get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask);
