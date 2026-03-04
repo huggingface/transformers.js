@@ -220,37 +220,38 @@ async function ensureWasmLoaded() {
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
         const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
 
-        // Load and cache both the WASM binary and factory
-        await Promise.all([
-            // Load and cache the WASM binary
-            urls.wasm && !isBlobURL(urls.wasm)
-                ? (async () => {
-                      try {
-                          const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
-                          if (wasmBinary) {
-                              ONNX_ENV.wasm.wasmBinary = wasmBinary;
-                          }
-                      } catch (err) {
-                          logger.warn('Failed to pre-load WASM binary:', err);
-                      }
-                  })()
-                : Promise.resolve(),
+        // Load the WASM binary first. This must complete before loading the .mjs factory
+        // so that ONNX_ENV.wasm.wasmBinary is set by the time the blob URL factory module
+        // executes. ORT uses `config.locateFile = (fileName) => fileName` when wasmBinary
+        // is already provided, which avoids the `new URL(fileName, import.meta.url)` call
+        // that would fail when import.meta.url is a blob URL.
+        let wasmBinaryLoaded = false;
+        if (urls.wasm && !isBlobURL(urls.wasm)) {
+            try {
+                const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
+                if (wasmBinary) {
+                    ONNX_ENV.wasm.wasmBinary = wasmBinary;
+                    wasmBinaryLoaded = true;
+                }
+            } catch (err) {
+                logger.warn('Failed to pre-load WASM binary:', err);
+            }
+        }
 
-            // Load and cache the WASM factory
-            urls.mjs && !isBlobURL(urls.mjs)
-                ? (async () => {
-                      try {
-                          const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
-                          if (wasmFactoryBlob) {
-                              // @ts-ignore
-                              ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
-                          }
-                      } catch (err) {
-                          logger.warn('Failed to pre-load WASM factory:', err);
-                      }
-                  })()
-                : Promise.resolve(),
-        ]);
+        // Only create a blob URL for the .mjs factory if wasmBinary was successfully loaded.
+        // Without wasmBinary, ORT won't set locateFile and the blob URL's import.meta.url
+        // (which is also a blob URL) would cause `new URL(fileName, import.meta.url)` to fail.
+        if (wasmBinaryLoaded && urls.mjs && !isBlobURL(urls.mjs)) {
+            try {
+                const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
+                if (wasmFactoryBlob) {
+                    // @ts-ignore
+                    ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
+                }
+            } catch (err) {
+                logger.warn('Failed to pre-load WASM factory:', err);
+            }
+        }
     })();
 
     return wasmLoadPromise;

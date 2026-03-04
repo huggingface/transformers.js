@@ -122,7 +122,9 @@ function canUseBlobURLs() {
 /**
  * Loads and caches the WASM Factory (.mjs file) for ONNX Runtime.
  * Creates a blob URL from cached content (when safe) to bridge Cache API with dynamic imports used in ORT.
- * Fixes import.meta.url references to point to the correct base URL.
+ * NOTE: Callers must ensure ONNX_ENV.wasm.wasmBinary is set before the returned blob URL is imported,
+ * so that ORT's locateFile override (set when wasmBinary is provided) prevents it from calling
+ * `new URL(fileName, import.meta.url)` — which would fail when import.meta.url is a blob URL.
  * @param {string} libURL The URL of the WASM Factory to load.
  * @returns {Promise<string|null>} The blob URL (if enabled), original URL (if disabled), or null if loading failed.
  */
@@ -142,9 +144,7 @@ export async function loadWasmFactory(libURL) {
 
     try {
         let code = await response.text();
-        // Fix relative paths when loading factory from blob, overwrite import.meta.url with actual baseURL
-        const baseUrl = libURL.split('/').slice(0, -1).join('/');
-        code = code.replaceAll('import.meta.url', `"${baseUrl}"`);
+
         code = code.replaceAll('globalThis.process?.versions?.node', 'false');
         const blob = new Blob([code], { type: 'text/javascript' });
         return URL.createObjectURL(blob);
