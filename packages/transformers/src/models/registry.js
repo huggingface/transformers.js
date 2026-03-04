@@ -131,6 +131,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['apertus', 'ApertusModel'],
     ['nanochat', 'NanoChatModel'],
     ['arcee', 'ArceeModel'],
+    ['afmoe', 'AfmoeModel'],
     ['lfm2', 'Lfm2Model'],
     ['lfm2_moe', 'Lfm2MoeModel'],
     ['smollm3', 'SmolLM3Model'],
@@ -252,6 +253,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['apertus', 'ApertusForCausalLM'],
     ['llama4_text', 'Llama4ForCausalLM'],
     ['arcee', 'ArceeForCausalLM'],
+    ['afmoe', 'AfmoeForCausalLM'],
     ['lfm2', 'Lfm2ForCausalLM'],
     ['lfm2_moe', 'Lfm2MoeForCausalLM'],
     ['smollm3', 'SmolLM3ForCausalLM'],
@@ -348,7 +350,11 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['llava_onevision', 'LlavaOnevisionForConditionalGeneration'],
     ['moondream1', 'Moondream1ForConditionalGeneration'],
     ['florence2', 'Florence2ForConditionalGeneration'],
-    ['qwen2-vl', 'Qwen2VLForConditionalGeneration'],
+    ['qwen2_vl', 'Qwen2VLForConditionalGeneration'],
+    ['qwen2_5_vl', 'Qwen2_5_VLForConditionalGeneration'],
+    ['qwen3_vl', 'Qwen3VLForConditionalGeneration'],
+    ['qwen3_5', 'Qwen3_5ForConditionalGeneration'],
+    ['qwen3_5_moe', 'Qwen3_5MoeForConditionalGeneration'],
     ['idefics3', 'Idefics3ForConditionalGeneration'],
     ['smolvlm', 'SmolVLMForConditionalGeneration'],
     ['paligemma', 'PaliGemmaForConditionalGeneration'],
@@ -581,17 +587,18 @@ for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_NAME_TO_CLASS_MAPPING.set(name, model);
 }
 
-export const CUSTOM_ARCHITECTURES = new Map([
+export const CUSTOM_ARCHITECTURES_MAPPING = new Map([
     ['modnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['birefnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['isnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['ben', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
 ]);
-for (const [name, mapping] of CUSTOM_ARCHITECTURES.entries()) {
+for (const [name, mapping] of CUSTOM_ARCHITECTURES_MAPPING.entries()) {
     mapping.set(name, 'PreTrainedModel');
     MODEL_TYPE_MAPPING.set(name, MODEL_TYPES.EncoderOnly);
     MODEL_NAME_TO_CLASS_MAPPING.set(name, PreTrainedModel);
 }
+export const CUSTOM_ARCHITECTURES = new Set(CUSTOM_ARCHITECTURES_MAPPING.keys());
 
 // Default mappings
 MODEL_TYPE_MAPPING.set('PreTrainedModel', MODEL_TYPES.EncoderOnly);

@@ -2,6 +2,7 @@ import { FeatureExtractor, validate_audio_inputs } from '../../feature_extractio
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
 import { max } from '../../utils/maths.js';
+import { logger } from '../../utils/logger.js';
 
 export class WhisperFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -67,7 +68,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         const length = max_length ?? this.config.n_samples;
         if (audio.length > length) {
             if (audio.length > this.config.n_samples) {
-                console.warn(
+                logger.warn(
                     'Attempting to extract features for audio longer than 30 seconds. ' +
                         'If using a pipeline to extract transcript from a long audio clip, ' +
                         'remember to specify `chunk_length_s` and/or `stride_length_s`.',

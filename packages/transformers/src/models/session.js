@@ -6,15 +6,12 @@ import {
     runInferenceSession,
 } from '../backends/onnx.js';
 import { getCacheShapes } from '../configs.js';
-import {
-    DATA_TYPES,
-    DEFAULT_DEVICE_DTYPE_MAPPING,
-    DEFAULT_DTYPE_SUFFIX_MAPPING,
-    isWebGpuFp16Supported,
-} from '../utils/dtypes.js';
+import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, selectDtype } from '../utils/dtypes.js';
+import { selectDevice } from '../utils/devices.js';
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 import { Tensor } from '../utils/tensor.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Constructs an InferenceSession using a model file located at the specified path.
@@ -28,19 +25,11 @@ import { Tensor } from '../utils/tensor.js';
 async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder = false) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
-    let device = options.device ?? custom_config.device;
-    if (device && typeof device !== 'string') {
-        if (device.hasOwnProperty(fileName)) {
-            device = device[fileName];
-        } else {
-            console.warn(`device not specified for "${fileName}". Using the default device.`);
-            device = null;
-        }
-    }
-
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("../utils/devices.js").DeviceType} */ (
-        device ?? (apis.IS_NODE_ENV ? 'cpu' : 'wasm')
+        selectDevice(options.device ?? custom_config.device, fileName, {
+            warn: (msg) => logger.info(msg),
+        })
     );
 
     const executionProviders = deviceToExecutionProviders(selectedDevice);
@@ -56,35 +45,12 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
 
     // If options.dtype is specified, we use it to choose the suffix for the model file.
     // Otherwise, we use the default dtype for the device.
-    let dtype = options.dtype ?? custom_config.dtype;
-    if (typeof dtype !== 'string') {
-        if (dtype && dtype.hasOwnProperty(fileName)) {
-            dtype = dtype[fileName];
-        } else {
-            dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-            console.warn(
-                `dtype not specified for "${fileName}". Using the default dtype (${dtype}) for this device (${selectedDevice}).`,
-            );
-        }
-    }
-
-    if (dtype === DATA_TYPES.auto) {
-        // Try to choose the auto dtype based on the custom config
-        let config_dtype = custom_config.dtype;
-        if (typeof config_dtype !== 'string') {
-            config_dtype = config_dtype?.[fileName];
-        }
-
-        if (config_dtype && config_dtype !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(config_dtype)) {
-            // Defined by the config, and is not "auto"
-            dtype = config_dtype;
-        } else {
-            // Choose default dtype based on device, falling back to fp32
-            dtype = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DATA_TYPES.fp32;
-        }
-    }
-
-    const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (dtype);
+    const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (
+        selectDtype(options.dtype ?? custom_config.dtype, fileName, selectedDevice, {
+            configDtype: custom_config.dtype,
+            warn: (msg) => logger.info(msg),
+        })
+    );
 
     if (!DEFAULT_DTYPE_SUFFIX_MAPPING.hasOwnProperty(selectedDtype)) {
         throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);
@@ -123,7 +89,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     if (free_dimension_overrides) {
         session_options.freeDimensionOverrides ??= free_dimension_overrides;
     } else if (selectedDevice.startsWith('webnn') && !session_options.freeDimensionOverrides) {
-        console.warn(
+        logger.warn(
             `WebNN does not currently support dynamic shapes and requires 'free_dimension_overrides' to be set in config.json, preferably as a field within config["transformers.js_config"]["device_config"]["${selectedDevice}"]. ` +
                 `When 'free_dimension_overrides' is not set, you may experience significant performance degradation.`,
         );
@@ -265,8 +231,8 @@ export async function sessionRun(session, inputs) {
         );
 
         // This usually occurs when the inputs are of the wrong type.
-        console.error(`An error occurred during model execution: "${e}".`);
-        console.error('Inputs given to model:', formatted);
+        logger.error(`An error occurred during model execution: "${e}".`);
+        logger.error('Inputs given to model:', formatted);
         throw e;
     }
 }
@@ -312,7 +278,7 @@ function validateInputs(session, inputs) {
         // No missing inputs, but too many inputs were provided.
         // Warn the user and ignore the extra inputs.
         let ignored = Object.keys(inputs).filter((inputName) => !session.inputNames.includes(inputName));
-        console.warn(
+        logger.warn(
             `WARNING: Too many inputs were provided (${numInputsProvided} > ${numInputsNeeded}). The following inputs will be ignored: "${ignored.join(', ')}".`,
         );
     }

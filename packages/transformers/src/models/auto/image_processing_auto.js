@@ -2,6 +2,7 @@ import { getModelJSON } from '../../utils/hub.js';
 import { ImageProcessor } from '../../image_processors_utils.js';
 import * as AllImageProcessors from '../image_processors.js';
 import { GITHUB_ISSUE_URL, IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
+import { logger } from '../../utils/logger.js';
 
 export class AutoImageProcessor {
     /** @type {typeof ImageProcessor.from_pretrained} */
@@ -20,7 +21,7 @@ export class AutoImageProcessor {
         if (!image_processor_class) {
             if (key !== undefined) {
                 // Only log a warning if the class is not found and the key is set.
-                console.warn(
+                logger.warn(
                     `Image processor type '${key}' not found, assuming base ImageProcessor. Please report this at ${GITHUB_ISSUE_URL}.`,
                 );
             }

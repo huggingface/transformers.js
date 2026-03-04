@@ -1,6 +1,7 @@
 import { Processor } from '../../processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
+import { logger } from '../../utils/logger.js';
 
 const IMAGE_TOKEN = '<image>';
 
@@ -20,7 +21,7 @@ export class PaliGemmaProcessor extends Processor {
     // `images` is required, `text` is optional
     async _call(/** @type {RawImage|RawImage[]} */ images, text = null, kwargs = {}) {
         if (!text) {
-            console.warn(
+            logger.warn(
                 'You are using PaliGemma without a text prefix. It will perform as a picture-captioning model.',
             );
             text = '';
@@ -46,7 +47,7 @@ export class PaliGemmaProcessor extends Processor {
                 return expanded_sample.slice(0, bos_index) + bos_token + expanded_sample.slice(bos_index) + '\n';
             });
         } else {
-            console.warn(
+            logger.warn(
                 'You are passing both `text` and `images` to `PaliGemmaProcessor`. The processor expects special ' +
                     'image tokens in the text, as many tokens as there are images per each text. It is recommended to ' +
                     'add `<image>` tokens in the very beginning of your text. For this call, we will infer how many images ' +

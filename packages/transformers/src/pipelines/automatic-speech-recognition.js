@@ -2,6 +2,7 @@ import { Pipeline, prepareAudios } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 import { max, round } from '../utils/maths.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -164,10 +165,10 @@ export class AutomaticSpeechRecognitionPipeline
         // TODO use kwargs
 
         if (kwargs.language) {
-            console.warn('`language` parameter is not yet supported for `wav2vec2` models, defaulting to "English".');
+            logger.warn('`language` parameter is not yet supported for `wav2vec2` models, defaulting to "English".');
         }
         if (kwargs.task) {
-            console.warn('`task` parameter is not yet supported for `wav2vec2` models, defaulting to "transcribe".');
+            logger.warn('`task` parameter is not yet supported for `wav2vec2` models, defaulting to "transcribe".');
         }
 
         const single = !Array.isArray(audio);

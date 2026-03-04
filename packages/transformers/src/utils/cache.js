@@ -1,5 +1,6 @@
 import { apis, env } from '../env.js';
 import { FileCache } from './hub/files.js';
+import { logger } from './logger.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -7,6 +8,8 @@ import { FileCache } from './hub/files.js';
  * Checks if a request is in the cache and returns the cached response if found.
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
+ * @property {(request: string) => Promise<boolean>} [delete]
+ * Deletes a request from the cache. Returns true if deleted, false otherwise.
  */
 
 /**
@@ -47,7 +50,7 @@ export async function getCache(file_cache_dir = null) {
             // So, instead of crashing, we just ignore the error and continue without using the cache.
             cache = await caches.open(env.cacheKey);
         } catch (e) {
-            console.warn('An error occurred while opening the browser cache:', e);
+            logger.warn('An error occurred while opening the browser cache:', e);
         }
     }
 

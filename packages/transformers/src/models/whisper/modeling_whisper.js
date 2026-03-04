@@ -10,6 +10,7 @@ import {
 import { medianFilter, dynamic_time_warping } from '../../utils/maths.js';
 import { mergeArrays } from '../../utils/core.js';
 import { ModelOutput } from '../modeling_outputs.js';
+import { logger } from '../../utils/logger.js';
 
 export class WhisperPreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;
@@ -56,7 +57,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         if (generation_config.is_multilingual) {
             if (!language) {
                 // TODO: Implement language detection
-                console.warn('No language specified - defaulting to English (en).');
+                logger.warn('No language specified - defaulting to English (en).');
                 language = 'en';
             }
 
@@ -85,7 +86,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             generation_config.return_timestamps &&
             init_tokens.at(-1) === generation_config.no_timestamps_token_id
         ) {
-            console.warn(
+            logger.warn(
                 '<|notimestamps|> prompt token is removed from generation_config since `return_timestamps` is set to `true`.',
             );
             init_tokens.pop();
@@ -138,7 +139,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
 
             if (generation_config.task === 'translate') {
-                console.warn("Token-level timestamps may not be reliable for task 'translate'.");
+                logger.warn("Token-level timestamps may not be reliable for task 'translate'.");
             }
 
             generation_config.output_attentions = true;
@@ -185,7 +186,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             );
         }
         if (num_frames == null) {
-            console.warn(
+            logger.warn(
                 '`num_frames` has not been set, meaning the entire audio will be analyzed. ' +
                     'This may lead to inaccurate token-level timestamps for short audios (< 30 seconds).',
             );
@@ -194,7 +195,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         // @ts-expect-error TS2339
         let median_filter_width = this.config.median_filter_width;
         if (median_filter_width === undefined) {
-            console.warn('Model config has no `median_filter_width`, using default value of 7.');
+            logger.warn('Model config has no `median_filter_width`, using default value of 7.');
             median_filter_width = 7;
         }
 

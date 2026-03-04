@@ -26,16 +26,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.0.0-next.4';
+const VERSION = '4.0.0-next.5';
 
-const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
-const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
+const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
 
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
 const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
+
+const IS_DENO_WEB_RUNTIME = IS_DENO_RUNTIME && IS_WEB_CACHE_AVAILABLE && !IS_FS_AVAILABLE;
+
+const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
+const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node' && !IS_DENO_WEB_RUNTIME;
 
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof window !== 'undefined' && typeof window.document !== 'undefined';
@@ -44,9 +48,11 @@ const IS_WEBWORKER_ENV =
     ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
         self.constructor?.name,
     );
-const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
+const IS_WEB_ENV = IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME;
+
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
+const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
 /**
  * Check if the current environment is Safari browser.
@@ -86,6 +92,9 @@ export const apis = Object.freeze({
     /** Whether we are running in a web worker environment */
     IS_WEBWORKER_ENV,
 
+    /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
+    IS_WEB_ENV,
+
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
 
@@ -109,6 +118,9 @@ export const apis = Object.freeze({
 
     /** Whether the path API is available */
     IS_PATH_AVAILABLE,
+
+    /** Whether the crypto API is available */
+    IS_CRYPTO_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
@@ -134,12 +146,48 @@ const DEFAULT_CACHE_DIR = RUNNING_LOCALLY ? path.join(dirname__, '/.cache/') : n
 const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
+// Ensure default fetch is called with the correct receiver in browser environments.
+const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
+
+/**
+ * Log levels for controlling output verbosity.
+ *
+ * Each level is represented by a number, where higher numbers include all lower level messages.
+ * Use these values to set `env.logLevel`.
+ *
+ * @example
+ * import { env, LogLevel } from '@huggingface/transformers';
+ *
+ * // Set log level to show only errors
+ * env.logLevel = LogLevel.ERROR;
+ *
+ * // Set log level to show errors, warnings, and info
+ * env.logLevel = LogLevel.INFO;
+ *
+ * // Disable all logging
+ * env.logLevel = LogLevel.NONE;
+ *
+ */
+export const LogLevel = Object.freeze({
+    /** All messages including debug output (value: 10) */
+    DEBUG: 10,
+    /** Errors, warnings, and info messages (value: 20) */
+    INFO: 20,
+    /** Errors and warnings (value: 30) */
+    WARNING: 30,
+    /** Only error messages (value: 40) */
+    ERROR: 40,
+    /** No logging output (value: 50) */
+    NONE: 50,
+});
+
 /**
  * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env>}} backends Expose environment variables of different backends,
+ * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
  * allowing users to set these variables if they want to.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
  * @property {string} remoteHost Host URL to load models from. Defaults to the Hugging Face Hub.
@@ -161,8 +209,10 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
  * or `false` to always use original URLs (safer but requires CORS). When 'auto', blob URLs are disabled in Service Workers,
  * Chrome extensions, and when numThreads > 1.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
 
+let logLevel = LogLevel.WARNING; // Default log level
 /** @type {TransformersEnvironment} */
 export const env = {
     version: VERSION,
@@ -174,17 +224,27 @@ export const env = {
         onnx: {},
     },
 
+    /////////////////// Logging settings ///////////////////
+    get logLevel() {
+        return logLevel;
+    },
+    set logLevel(level) {
+        logLevel = level;
+
+        // invoke hook to set ONNX Runtime log level when Transformers.js log level changes
+        env.backends.onnx?.setLogLevel?.(level);
+    },
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     remoteHost: 'https://huggingface.co/',
     remotePathTemplate: '{model}/resolve/{revision}/',
 
-    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV),
+    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
 
     /////////////////// Cache settings ///////////////////
-    useBrowserCache: IS_WEB_CACHE_AVAILABLE && !IS_DENO_RUNTIME,
+    useBrowserCache: IS_WEB_CACHE_AVAILABLE,
 
     useFSCache: IS_FS_AVAILABLE,
     cacheDir: DEFAULT_CACHE_DIR,
@@ -195,6 +255,10 @@ export const env = {
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
     useWasmBlobURL: 'auto',
     cacheKey: 'transformers-cache',
+
+    /////////////////// Custom fetch /////////////////////
+    fetch: DEFAULT_FETCH,
+
     //////////////////////////////////////////////////////
 };
 

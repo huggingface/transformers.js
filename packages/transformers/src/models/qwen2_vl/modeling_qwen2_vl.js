@@ -17,6 +17,8 @@ export class Qwen2VLPreTrainedModel extends PreTrainedModel {
     ];
 }
 export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
+    image_grid_thw_name = 'grid_thw';
+
     /**
      * Calculate the 3D rope index based on image and video's temporal, height and width in LLM.
      *
@@ -211,8 +213,12 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     }
 
     async encode_image({ pixel_values, image_grid_thw }) {
-        const features = (await sessionRun(this.sessions['vision_encoder'], { pixel_values, grid_thw: image_grid_thw }))
-            .image_features;
+        const features = (
+            await sessionRun(this.sessions['vision_encoder'], {
+                pixel_values,
+                [this.image_grid_thw_name]: image_grid_thw,
+            })
+        ).image_features;
         return features;
     }
 

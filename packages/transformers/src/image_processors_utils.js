@@ -5,6 +5,7 @@ import { RawImage } from './utils/image.js';
 import { calculateReflectOffset } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { IMAGE_PROCESSOR_NAME } from './utils/constants.js';
+import { logger } from './utils/logger.js';
 
 /**
  * Named tuple to indicate the order we are using is (height x width),
@@ -450,7 +451,7 @@ export function post_process_panoptic_segmentation(
     target_sizes = null,
 ) {
     if (label_ids_to_fuse === null) {
-        console.warn('`label_ids_to_fuse` unset. No instance will be fused.');
+        logger.warn('`label_ids_to_fuse` unset. No instance will be fused.');
         label_ids_to_fuse = new Set();
     }
 
@@ -864,11 +865,6 @@ export class ImageProcessor extends Callable {
             return [newWidth, newHeight];
         } else if (this.size_divisibility !== undefined) {
             return enforce_size_divisibility([srcWidth, srcHeight], this.size_divisibility);
-        } else if (this.min_pixels !== undefined && this.max_pixels !== undefined) {
-            // Custom resize logic for Qwen2-VL models
-            // @ts-expect-error TS2339
-            const factor = this.config.patch_size * this.config.merge_size;
-            return smart_resize(srcHeight, srcWidth, factor, this.min_pixels, this.max_pixels);
         } else {
             throw new Error(
                 `Could not resize image due to unsupported \`this.size\` option in config: ${JSON.stringify(size)}`,
