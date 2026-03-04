@@ -16,18 +16,34 @@ export const ignoreModulesPlugin = (modules = []) => ({
     build.onResolve({ filter }, (args) => {
       return { path: args.path, namespace: "ignore-modules" };
     });
-    build.onLoad({ filter: /.*/, namespace: "ignore-modules" }, () => {
-      return {
-        contents: `
-          const noop = () => {};
-          const emptyObj = {};
-          export default emptyObj;
-          export const Readable = { fromWeb: noop };
-          export const pipeline = noop;
-          export const createWriteStream = noop;
-          export const createReadStream = noop;
-        `,
-      };
+    build.onLoad({ filter: /.*/, namespace: "ignore-modules" }, (args) => {
+      switch (args.path) {
+        case "node:stream":
+          return {
+            contents: `
+              const noop = () => {};
+              export default {};
+              export const Readable = { fromWeb: noop };
+            `,
+          };
+        case "node:stream/promises":
+          return {
+            contents: `
+              const noop = () => {};
+              export default {};
+              export const pipeline = noop;
+            `,
+          };
+        case "node:fs":
+        case "node:path":
+        case "node:url":
+        case "sharp":
+        case "onnxruntime-node":
+        default:
+          return {
+            contents: `export default {};`,
+          };
+      }
     });
   },
 });

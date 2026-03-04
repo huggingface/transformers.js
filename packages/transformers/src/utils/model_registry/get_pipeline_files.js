@@ -2,25 +2,9 @@ import { get_files } from './get_files.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
- * Extract component requirements from SUPPORTED_TASKS
- * @private
- * @param {string} task
- * @returns {{tokenizer: boolean, processor: boolean}}
- */
-function get_task_components(task) {
-    const taskConfig = SUPPORTED_TASKS[task];
-    if (!taskConfig) {
-        return null;
-    }
-    return {
-        tokenizer: !!taskConfig.tokenizer,
-        processor: !!taskConfig.processor,
-    };
-}
-
-/**
  * Get all files needed for a specific pipeline task.
- * Automatically determines which components (tokenizer, processor) are needed based on the task.
+ * Automatically detects which components (tokenizer, processor) are needed by checking
+ * whether the model has the corresponding files (tokenizer_config.json, preprocessor_config.json).
  *
  * @param {string} task - The pipeline task (e.g., "text-generation", "image-classification")
  * @param {string} modelId - The model id (e.g., "Xenova/bert-base-uncased")
@@ -36,18 +20,25 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     // Apply task aliases
     task = TASK_ALIASES[task] ?? task;
 
-    // Get component requirements for this task from SUPPORTED_TASKS
-    const components = get_task_components(task);
-    if (!components) {
+    // Validate that the task is supported
+    const taskConfig = SUPPORTED_TASKS[task];
+    if (!taskConfig) {
         throw new Error(
             `Unsupported pipeline task: ${task}. Must be one of [${Object.keys(SUPPORTED_TASKS).join(', ')}]`,
         );
     }
 
-    // Get files with appropriate component flags
+    // Use the task type to determine which components to auto-detect:
+    //  - 'text' tasks: always check tokenizer, skip processor (text models rarely have one)
+    //  - 'audio'/'image' tasks: skip tokenizer, always check processor
+    //  - 'multimodal' tasks: check both
+    const { type } = taskConfig;
+    const include_tokenizer = type !== 'audio' && type !== 'image';
+    const include_processor = type !== 'text';
+
     return get_files(modelId, {
         ...options,
-        include_tokenizer: components.tokenizer,
-        include_processor: components.processor,
+        include_tokenizer,
+        include_processor,
     });
 }

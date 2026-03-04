@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "4.0.0-next.4",
+  "version": "4.0.0-next.5",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./dist/transformers.node.cjs",
   "types": "./types/transformers.d.ts",
@@ -58,7 +58,7 @@
     "@huggingface/jinja": "^0.5.5",
     "@huggingface/tokenizers": "^0.1.2",
     "onnxruntime-node": "1.24.2",
-    "onnxruntime-web": "1.25.0-dev.20260221-b2a6e69e82",
+    "onnxruntime-web": "1.25.0-dev.20260228-6e72d31970",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
