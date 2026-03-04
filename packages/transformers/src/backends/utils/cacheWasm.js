@@ -66,38 +66,28 @@ export async function loadWasmBinary(wasmURL) {
 
 /**
  * Checks if the current environment supports blob URLs for ES modules.
- * Blob URLs don't work in Service Workers, Chrome extensions, with multi-threading, or with COEP headers.
  * @see https://github.com/huggingface/transformers.js/issues/1532
  * @see https://github.com/huggingface/transformers.js/issues/1527
  * @returns {boolean} True if blob URLs are safe to use for module imports.
  */
 function canUseBlobURLs() {
-    // Don't use blob URLs in Service Workers
+    // Don't use blob URLs in Service Workers — dynamic import() of blob URLs is blocked.
     // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
     if (typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) {
         return false;
     }
 
-    // Don't use blob URLs if COEP headers are set (Cross-Origin-Embedder-Policy)
-    // COEP blocks cross-origin resources without CORP headers, which breaks CDN loading with blob URLs
-    // crossOriginIsolated = true indicates COEP + COOP headers are set
-    // @ts-ignore - crossOriginIsolated may not exist in all environments
-    if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === true) {
-        return false;
-    }
-
-    // Don't use blob URLs if workers are being used with threading
+    // Don't use blob URLs if multi-threading is enabled. The .mjs factory spawns workers
+    // via `new Worker(new URL(import.meta.url))`, which fails when import.meta.url is a blob.
     if (env.backends?.onnx?.wasm?.numThreads && env.backends.onnx.wasm.numThreads > 1) {
         return false;
     }
-
-    // Also check global onnxruntime as a fallback
+    // Also check global onnxruntime as a fallback for the numThreads check above
     try {
         // @ts-ignore - onnxruntime may not exist in all environments
         if (typeof globalThis !== 'undefined' && globalThis.onnxruntime?.env?.wasm?.numThreads) {
             // @ts-ignore
-            const numThreads = globalThis.onnxruntime.env.wasm.numThreads;
-            if (numThreads > 1) {
+            if (globalThis.onnxruntime.env.wasm.numThreads > 1) {
                 return false;
             }
         }
@@ -105,12 +95,7 @@ function canUseBlobURLs() {
         // Ignore errors checking ONNX config
     }
 
-    // Don't use blob URLs if WASM proxy is enabled (workers spawned to run WASM)
-    if (env.backends?.onnx?.wasm?.proxy === true) {
-        return false;
-    }
-
-    // Check if the current context is a Chrome extension (which may have restrictions)
+    // Don't use blob URLs in Chrome extensions — import() of blob URLs is blocked.
     // @ts-ignore - chrome may not exist in all environments
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
         return false;
