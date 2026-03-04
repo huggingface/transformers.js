@@ -44,7 +44,7 @@ import { logger } from '../utils/logger.js';
  * may be a conv or recurrent state whose dims don't encode a sequence length.
  * This function finds a `past_key_values.*` entry (standard attention cache) to determine the true past length.
  *
- * @param {Record<string, import('../utils/tensor.js').Tensor>} past_key_values
+ * @param {Record<string, Tensor>} past_key_values
  * @returns {number} The past sequence length.
  */
 export function getPastLength(past_key_values) {
