@@ -1451,7 +1451,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {Tensor} [params.attention_mask=null]
  * @param {Tensor} [params.position_ids=null]
  * @param {Tensor} [params.inputs_embeds=null]
- * @param {Tensor} [params.past_key_values=null]
+ * @param {Record<string, Tensor>} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
  * @returns {Promise<Tensor>} The model's output tensor
