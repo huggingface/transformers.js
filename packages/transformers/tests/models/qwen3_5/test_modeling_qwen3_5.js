@@ -7,7 +7,9 @@ export default () => {
   const dims = [224, 224, 3];
   const image = new RawImage(new Uint8ClampedArray(dims[0] * dims[1] * dims[2]).fill(255), ...dims);
 
-  describe("Qwen3_5ForConditionalGeneration", () => {
+  // TODO: Enable when "Updating cos_cache and sin_cache in RotaryEmbedding" is supported on CPU Execution Provider.
+  // Currently only works on WebGPU.
+  describe.skip("Qwen3_5ForConditionalGeneration", () => {
     const model_id = "onnx-internal-testing/tiny-random-Qwen3_5ForConditionalGeneration";
 
     /** @type {Qwen3_5ForConditionalGeneration} */
