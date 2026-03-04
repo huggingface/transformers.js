@@ -7,6 +7,10 @@ node_modules
 deno.lock
 package-lock.json
 
+# Do not track virtual environment
+venv/
+.venv/
+
 # Do not track build artifacts/generated files
 packages/**/dist
 packages/**/types
