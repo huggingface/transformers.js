@@ -33,9 +33,11 @@
       title: Accessing Private/Gated Models
     - local: guides/node-audio-processing
       title: Server-side Audio Processing
-    - local: guides/vercel-ai-sdk
-      title: Using Transformers.js with the Vercel AI SDK
   title: Developer Guides
+- sections:
+    - local: integrations/vercel-ai-sdk
+      title: Vercel AI SDK
+  title: Integrations
 - sections:
     - local: api/transformers
       title: Index
