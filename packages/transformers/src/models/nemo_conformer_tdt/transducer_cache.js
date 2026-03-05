@@ -63,6 +63,14 @@ export class FeatureLRUCache {
      * @returns {void}
      */
     set(key, value) {
+        // Explicit no-cache mode: keep caller ownership of current values.
+        if (this.max_entries === 0 || this.max_size_mb === 0) {
+            if (this.cache.size > 0) {
+                this.clear();
+            }
+            return;
+        }
+
         const existing = this.cache.get(key);
         if (existing) {
             disposeCachedValue(existing.value);

@@ -484,9 +484,15 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
         if (tokenizer?.get_vocab) {
             const vocab = tokenizer.get_vocab();
-            const size = vocab instanceof Map ? vocab.size : Object.keys(vocab).length;
-            if (size > 0) {
-                return size;
+            if (vocab instanceof Map) {
+                if (vocab.size > 0) {
+                    return vocab.size;
+                }
+            } else if (vocab && typeof vocab === 'object') {
+                const size = Object.keys(vocab).length;
+                if (size > 0) {
+                    return size;
+                }
             }
         }
 

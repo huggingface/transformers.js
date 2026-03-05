@@ -171,6 +171,36 @@ export default () => {
     );
 
     it(
+      "throws explicit vocab resolution error when tokenizer.get_vocab returns a non-object",
+      async () => {
+        const configWithoutVocab = {
+          ...BASE_CONFIG,
+          "transformers.js_config": {
+            ...BASE_CONFIG["transformers.js_config"],
+            transducer: {
+              ...BASE_CONFIG["transformers.js_config"].transducer,
+              vocab_size: undefined,
+            },
+          },
+        };
+        const model = new MockNemoConformerForTDT(configWithoutVocab, BASE_SESSIONS, []);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: {
+              decode: () => "",
+              get_vocab: () => null,
+            },
+          }),
+        ).rejects.toThrow("Unable to resolve vocabulary size");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "greedily decodes scripted token and duration logits",
       async () => {
         const tokenizer = {
@@ -773,6 +803,38 @@ export default () => {
       } finally {
         Tensor.prototype.dispose = originalDispose;
       }
+    });
+
+    it("treats zero cache limits as explicit no-cache mode without disposing inserted values", () => {
+      const byEntries = new FeatureLRUCache({ max_entries: 0, max_size_mb: 4 });
+      const bySize = new FeatureLRUCache({ max_entries: 4, max_size_mb: 0 });
+      const t1 = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]);
+      const t2 = new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]);
+
+      let t1Disposals = 0;
+      const t1Dispose = t1.dispose.bind(t1);
+      t1.dispose = () => {
+        t1Disposals += 1;
+        t1Dispose();
+      };
+      let t2Disposals = 0;
+      const t2Dispose = t2.dispose.bind(t2);
+      t2.dispose = () => {
+        t2Disposals += 1;
+        t2Dispose();
+      };
+
+      byEntries.set("x", t1);
+      bySize.set("y", t2);
+      expect(byEntries.get("x")).toBeNull();
+      expect(bySize.get("y")).toBeNull();
+      expect(t1Disposals).toBe(0);
+      expect(t2Disposals).toBe(0);
+
+      t1.dispose();
+      t2.dispose();
+      expect(t1Disposals).toBe(1);
+      expect(t2Disposals).toBe(1);
     });
 
     it("rejects invalid cache limits", () => {

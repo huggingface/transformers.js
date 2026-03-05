@@ -1,4 +1,4 @@
-import { pipeline, AutomaticSpeechRecognitionPipeline } from "../../src/transformers.js";
+import { pipeline, AutomaticSpeechRecognitionPipeline, Tensor } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -225,6 +225,130 @@ export default () => {
         await expect(pipe(Float32Array.from([0, Number.NaN, 0]), { return_timestamps: false })).rejects.toThrow(
           "finite audio samples",
         );
+      });
+
+      it("disposes processor tensors after Nemo transcription when feature cache is disabled", async () => {
+        let disposeCalls = 0;
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe() {
+            return { text: "ok" };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => {
+          const input_features = new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]);
+          const attention_mask = new Tensor("int64", BigInt64Array.from([1n]), [1, 1]);
+          const trackDispose = (tensor) => {
+            const originalDispose = tensor.dispose.bind(tensor);
+            tensor.dispose = () => {
+              disposeCalls += 1;
+              originalDispose();
+            };
+          };
+          trackDispose(input_features);
+          trackDispose(attention_mask);
+          return { input_features, attention_mask };
+        }, {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(16000), { return_timestamps: false });
+        expect(output).toEqual({ text: "ok" });
+        expect(disposeCalls).toBe(2);
+      });
+
+      it("keeps processor tensors alive when Nemo feature cache owns tensor lifetimes", async () => {
+        let disposeCalls = 0;
+        let lastInputs = null;
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe() {
+            return { text: "ok" };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => {
+          const input_features = new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]);
+          const attention_mask = new Tensor("int64", BigInt64Array.from([1n]), [1, 1]);
+          const trackDispose = (tensor) => {
+            const originalDispose = tensor.dispose.bind(tensor);
+            tensor.dispose = () => {
+              disposeCalls += 1;
+              originalDispose();
+            };
+          };
+          trackDispose(input_features);
+          trackDispose(attention_mask);
+          lastInputs = { input_features, attention_mask };
+          return lastInputs;
+        }, {
+          feature_extractor: {
+            config: { sampling_rate: 16000 },
+            feature_cache: { max_entries: 2, max_size_mb: 8 },
+          },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        try {
+          const output = await pipe(new Float32Array(16000), { return_timestamps: false });
+          expect(output).toEqual({ text: "ok" });
+          expect(disposeCalls).toBe(0);
+        } finally {
+          lastInputs?.input_features.dispose();
+          lastInputs?.attention_mask.dispose();
+        }
+      });
+
+      it("disposes processor tensors when Nemo feature cache limits disable caching", async () => {
+        let disposeCalls = 0;
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe() {
+            return { text: "ok" };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => {
+          const input_features = new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]);
+          const attention_mask = new Tensor("int64", BigInt64Array.from([1n]), [1, 1]);
+          const trackDispose = (tensor) => {
+            const originalDispose = tensor.dispose.bind(tensor);
+            tensor.dispose = () => {
+              disposeCalls += 1;
+              originalDispose();
+            };
+          };
+          trackDispose(input_features);
+          trackDispose(attention_mask);
+          return { input_features, attention_mask };
+        }, {
+          feature_extractor: {
+            config: { sampling_rate: 16000 },
+            feature_cache: { max_entries: 0, max_size_mb: 8 },
+          },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(16000), { return_timestamps: false });
+        expect(output).toEqual({ text: "ok" });
+        expect(disposeCalls).toBe(2);
       });
     });
   });

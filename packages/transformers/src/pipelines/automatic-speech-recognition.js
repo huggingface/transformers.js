@@ -363,11 +363,29 @@ export class AutomaticSpeechRecognitionPipeline
             this._validateNemoAudio(preparedAudios[i], i);
         }
 
+        const featureCache = this.processor.feature_extractor?.feature_cache;
+        const cacheOwnsTensors = !!(
+            featureCache &&
+            featureCache.max_entries > 0 &&
+            featureCache.max_size_mb > 0
+        );
         const toReturn = [];
         for (const aud of preparedAudios) {
             const inputs = await this.processor(aud);
-            const output = await /** @type {any} */ (this.model).transcribe(inputs, decodeOptions);
-            toReturn.push(output);
+            try {
+                const output = await /** @type {any} */ (this.model).transcribe(inputs, decodeOptions);
+                toReturn.push(output);
+            } finally {
+                if (!cacheOwnsTensors) {
+                    const seen = new Set();
+                    for (const value of Object.values(inputs ?? {})) {
+                        if (value instanceof Tensor && !seen.has(value)) {
+                            value.dispose();
+                            seen.add(value);
+                        }
+                    }
+                }
+            }
         }
 
         return single ? toReturn[0] : toReturn;
