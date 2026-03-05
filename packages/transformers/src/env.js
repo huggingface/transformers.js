@@ -95,6 +95,9 @@ export const apis = Object.freeze({
     /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
     IS_WEB_ENV,
 
+    /** Whether we are running in Deno's web runtime (CDN imports, no filesystem access) */
+    IS_DENO_WEB_RUNTIME,
+
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
 

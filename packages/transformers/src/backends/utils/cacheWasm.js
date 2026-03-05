@@ -1,4 +1,4 @@
-import { env } from '../../env.js';
+import { env, apis } from '../../env.js';
 import { getCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -94,6 +94,13 @@ export async function loadWasmFactory(libURL) {
     // Check if we should use blob URLs before doing any work
     const shouldUseBlobURL = env.useWasmBlobURL === true || (env.useWasmBlobURL === 'auto' && canUseBlobURLs());
 
+    // In Deno's web runtime, blob URLs are required to patch out Node.js detection (see below).
+    if (!shouldUseBlobURL && apis.IS_DENO_WEB_RUNTIME) {
+        throw new Error(
+            "env.useWasmBlobURL=false is not supported in Deno's web runtime. Remove the useWasmBlobURL override to allow the factory to be patched correctly.",
+        );
+    }
+
     // If blob URLs are not safe or disabled, just return the original URL.
     // Don't bother caching since dynamic import() won't use the Cache API anyway.
     if (!shouldUseBlobURL) {
@@ -107,6 +114,12 @@ export async function loadWasmFactory(libURL) {
     try {
         let code = await response.text();
 
+        // Patch out the Node.js detection in the factory. Without this, Deno (which exposes
+        // globalThis.process.versions.node) would enter the Node.js branch and try to use
+        // Node.js APIs (worker_threads, fs, etc.) that Deno doesn't support.
+        // Only needed for the asyncify (single-threaded) variant loaded via blob URL. The
+        // module-level pthread auto-start code is unreachable since asyncify never spawns workers.
+        // @see https://github.com/huggingface/transformers.js/pull/1546/
         code = code.replaceAll('globalThis.process?.versions?.node', 'false');
         const blob = new Blob([code], { type: 'text/javascript' });
         return URL.createObjectURL(blob);
