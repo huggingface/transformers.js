@@ -488,6 +488,10 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 if (vocab.size > 0) {
                     return vocab.size;
                 }
+            } else if (Array.isArray(vocab)) {
+                if (vocab.length > 0) {
+                    return vocab.length;
+                }
             } else if (vocab && typeof vocab === 'object') {
                 const size = Object.keys(vocab).length;
                 if (size > 0) {

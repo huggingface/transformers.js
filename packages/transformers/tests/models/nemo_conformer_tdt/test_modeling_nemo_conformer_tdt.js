@@ -200,6 +200,25 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it("resolves vocab size from array tokenizers when config vocab_size is not set", () => {
+      const configWithoutVocab = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            vocab_size: undefined,
+          },
+        },
+      };
+      const model = new MockNemoConformerForTDT(configWithoutVocab, BASE_SESSIONS, []);
+      expect(
+        model._resolveVocabSize({
+          get_vocab: () => ["<blank>", "hello", "world"],
+        }),
+      ).toBe(3);
+    });
+
     it(
       "greedily decodes scripted token and duration logits",
       async () => {
@@ -774,6 +793,25 @@ export default () => {
       }
     });
 
+    it("does not dispose when re-setting the same value object for an existing key", () => {
+      const cache = new FeatureLRUCache({ max_entries: 4, max_size_mb: 4 });
+      const tensor = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]);
+      let disposeCalls = 0;
+      const originalDispose = tensor.dispose.bind(tensor);
+      tensor.dispose = () => {
+        disposeCalls += 1;
+        originalDispose();
+      };
+
+      cache.set("x", tensor);
+      cache.set("x", tensor);
+      expect(cache.get("x")).toBe(tensor);
+      expect(disposeCalls).toBe(0);
+
+      cache.clear();
+      expect(disposeCalls).toBe(1);
+    });
+
     it("disposes tensors on eviction and clear without double-disposing shared refs", () => {
       const cache = new FeatureLRUCache({ max_entries: 1, max_size_mb: 4 });
       const originalDispose = Tensor.prototype.dispose;
@@ -835,6 +873,32 @@ export default () => {
       t2.dispose();
       expect(t1Disposals).toBe(1);
       expect(t2Disposals).toBe(1);
+    });
+
+    it("skips caching oversized values without disposing caller-owned tensors", () => {
+      const cache = new FeatureLRUCache({ max_entries: 4, max_size_mb: 0.000001 });
+      const tensor = new Tensor("float32", new Float32Array([1, 2]), [1, 2]);
+      let disposeCalls = 0;
+      const originalDispose = tensor.dispose.bind(tensor);
+      tensor.dispose = () => {
+        disposeCalls += 1;
+        originalDispose();
+      };
+
+      cache.set("big", tensor);
+      expect(cache.get("big")).toBeNull();
+      expect(disposeCalls).toBe(0);
+
+      tensor.dispose();
+      expect(disposeCalls).toBe(1);
+    });
+
+    it("ignores non-numeric byteLength values in size estimation", () => {
+      const cache = new FeatureLRUCache({ max_entries: 4, max_size_mb: 4 });
+      cache.set("x", { byteLength: "invalid" });
+      expect(cache.stats().entries).toBe(1);
+      expect(cache.stats().size_mb).toBe(0);
+      cache.clear();
     });
 
     it("rejects invalid cache limits", () => {

@@ -71,14 +71,36 @@ export class FeatureLRUCache {
             return;
         }
 
+        const max_bytes = this.max_size_mb * 1024 * 1024;
         const existing = this.cache.get(key);
+        if (existing?.value === value) {
+            // Refresh recency for unchanged value without invalidating caller-owned references.
+            this.cache.delete(key);
+            if (existing.size_bytes <= max_bytes) {
+                this.cache.set(key, existing);
+            } else {
+                this.current_size_bytes -= existing.size_bytes;
+            }
+            return;
+        }
+
+        const size_bytes = estimateSizeBytes(value);
+        if (size_bytes > max_bytes) {
+            // Cannot fit in cache: keep caller ownership and skip caching.
+            if (existing) {
+                disposeCachedValue(existing.value);
+                this.current_size_bytes -= existing.size_bytes;
+                this.cache.delete(key);
+            }
+            return;
+        }
+
         if (existing) {
             disposeCachedValue(existing.value);
             this.current_size_bytes -= existing.size_bytes;
             this.cache.delete(key);
         }
 
-        const size_bytes = estimateSizeBytes(value);
         this.cache.set(key, { value, size_bytes });
         this.current_size_bytes += size_bytes;
         this._evict();
@@ -177,8 +199,9 @@ function estimateSizeBytes(value) {
         }
         return bytes;
     }
-    if (value?.byteLength) {
-        return value.byteLength;
+    const byteLength = value?.byteLength;
+    if (typeof byteLength === 'number' && Number.isFinite(byteLength) && byteLength >= 0) {
+        return byteLength;
     }
     return 0;
 }
