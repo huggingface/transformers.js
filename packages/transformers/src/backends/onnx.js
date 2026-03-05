@@ -22,7 +22,8 @@ import { env, apis, LogLevel } from '../env.js';
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
-import { isBlobURL, loadWasmBinary, loadWasmFactory, toAbsoluteURL } from './utils/cacheWasm.js';
+import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
+import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
 import { logger } from '../utils/logger.js';
 export { Tensor } from 'onnxruntime-common';
 
@@ -308,8 +309,7 @@ let webInferenceChain = Promise.resolve();
  */
 export async function runInferenceSession(session, ortFeed) {
     const run = () => session.run(ortFeed);
-    const output = await (apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run());
-    return output;
+    return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
 }
 
 /**
