@@ -6,6 +6,7 @@ import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 const LLAMA_MODEL_ID = "hf-internal-testing/tiny-random-LlamaForCausalLM";
 const BERT_MODEL_ID = "hf-internal-testing/tiny-random-BertModel";
 const VIT_MODEL_ID = "hf-internal-testing/tiny-random-vit";
+const SPEECHT5_MODEL_ID = "Xenova/speecht5_tts";
 
 // Dedicated model IDs for cache clearing tests to avoid interference with other parallel tests.
 // These must NOT be used in any other test file.
@@ -198,6 +199,16 @@ describe("Cache", () => {
           expect(files).toContain("preprocessor_config.json");
           // image-classification doesn't use a tokenizer
           expect(files).not.toContain("tokenizer.json");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should include processor files for text-to-audio when model provides them",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-to-audio", SPEECHT5_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          expect(files).toContain("preprocessor_config.json");
+          expect(files).toContain("tokenizer.json");
         },
         MAX_TEST_EXECUTION_TIME,
       );
