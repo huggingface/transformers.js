@@ -325,8 +325,10 @@ export class AutomaticSpeechRecognitionPipeline
      *
      * Delegates to model.transcribe() and returns its output directly.
      * Use `return_timestamps: true` on the pipeline call to get utterance-level data.
-     * For words/tokens/metrics/debug, call model.transcribe() directly with the
-     * extended options (return_words, return_tokens, return_metrics, etc.).
+     * This pipeline always requests metrics, and enables word details when
+     * timestamps are requested.
+     * For token-level and debug controls, call `model.transcribe()` directly with
+     * extended options.
      */
     async _call_nemo_conformer_tdt(audio, kwargs) {
         if (typeof (/** @type {any} */ (this.model).transcribe) !== 'function') {

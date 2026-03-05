@@ -175,6 +175,8 @@ function resolveTransducerConfig(config, sessions) {
     const frameShiftS = transducerConfig.frame_shift_s ?? 0.01;
     const blankTokenId = transducerConfig.blank_token_id ?? 0;
     const encoderOutputLayout = transducerConfig.encoder_output_layout;
+    const encoderInputLayout = transducerConfig.encoder_input_layout ?? 'BTF';
+    const encoderFrameLayout = transducerConfig.encoder_frame_layout ?? 'BD1';
     const decoderTokenDType = transducerConfig.decoder_token_dtype ?? 'int32';
     const decoderTokenLengthDType = transducerConfig.decoder_token_length_dtype ?? 'int32';
 
@@ -195,6 +197,12 @@ function resolveTransducerConfig(config, sessions) {
     if (encoderOutputLayout !== 'BDT' && encoderOutputLayout !== 'BTD') {
         throw new Error('Invalid `transformers.js_config.transducer.encoder_output_layout`: expected "BDT" or "BTD".');
     }
+    if (encoderInputLayout !== 'BTF' && encoderInputLayout !== 'BFT') {
+        throw new Error('Invalid `transformers.js_config.transducer.encoder_input_layout`: expected "BTF" or "BFT".');
+    }
+    if (encoderFrameLayout !== 'BD1' && encoderFrameLayout !== 'B1D') {
+        throw new Error('Invalid `transformers.js_config.transducer.encoder_frame_layout`: expected "BD1" or "B1D".');
+    }
     if (!['int32', 'int64'].includes(decoderTokenDType)) {
         throw new Error(
             'Invalid `transformers.js_config.transducer.decoder_token_dtype`: expected "int32" or "int64".',
@@ -213,9 +221,9 @@ function resolveTransducerConfig(config, sessions) {
         frame_shift_s: frameShiftS,
         vocab_size: transducerConfig.vocab_size ?? config.vocab_size ?? null,
         duration_start_index: transducerConfig.duration_start_index ?? null,
-        encoder_input_layout: transducerConfig.encoder_input_layout ?? 'BTF',
+        encoder_input_layout: encoderInputLayout,
         encoder_output_layout: encoderOutputLayout,
-        encoder_frame_layout: transducerConfig.encoder_frame_layout ?? 'BD1',
+        encoder_frame_layout: encoderFrameLayout,
         decoder_token_dtype: decoderTokenDType,
         decoder_token_length_dtype: decoderTokenLengthDType,
         decoder: {
@@ -316,10 +324,10 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
     _disposeDecoderState(state, keepState = null) {
         if (!state) return;
-        if (state.state1 && state.state1 !== keepState?.state1) {
+        if (state.state1 instanceof Tensor && state.state1 !== keepState?.state1) {
             state.state1.dispose();
         }
-        if (state.state2 && state.state2 !== keepState?.state2) {
+        if (state.state2 instanceof Tensor && state.state2 !== keepState?.state2) {
             state.state2.dispose();
         }
     }
@@ -470,7 +478,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
     }
 
     _resolveVocabSize(tokenizer) {
-        if (Number.isInteger(this.transducer.vocab_size) && this.transducer.vocab_size > 0) {
+        if (Number.isInteger(this.transducer.vocab_size)) {
             return this.transducer.vocab_size;
         }
 
@@ -675,6 +683,19 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                         `Nemo Conformer TDT decoder output "${io.decoder_output}" was not returned by the session.`,
                     );
                 }
+                if (!(outputState1 instanceof Tensor) || !(outputState2 instanceof Tensor)) {
+                    logits.dispose();
+                    this._disposeDecoderState(
+                        {
+                            state1: outputState1,
+                            state2: outputState2,
+                        },
+                        decoderState,
+                    );
+                    throw new Error(
+                        `Nemo Conformer TDT decoder state outputs "${io.decoder_output_state_1}" and "${io.decoder_output_state_2}" were not returned by the session.`,
+                    );
+                }
                 const logitsData = logits.data;
                 if (logitsData.length < vocabSize) {
                     logits.dispose();
@@ -721,8 +742,8 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 }
 
                 const newState = {
-                    state1: outputState1 ?? decoderState.state1,
-                    state2: outputState2 ?? decoderState.state2,
+                    state1: outputState1,
+                    state2: outputState2,
                 };
 
                 if (tokenId !== blankId) {

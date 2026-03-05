@@ -26,7 +26,7 @@ export function createAudioCacheKey(audio, sampling_rate = 16000) {
 
 /**
  * Lightweight LRU cache for extracted features.
- * Stores values as-is and tracks approximate memory usage.
+ * Stores values as-is, owns cached tensor lifetimes, and tracks approximate memory usage.
  */
 export class FeatureLRUCache {
     /**
@@ -65,6 +65,7 @@ export class FeatureLRUCache {
     set(key, value) {
         const existing = this.cache.get(key);
         if (existing) {
+            disposeCachedValue(existing.value);
             this.current_size_bytes -= existing.size_bytes;
             this.cache.delete(key);
         }
@@ -76,6 +77,9 @@ export class FeatureLRUCache {
     }
 
     clear() {
+        for (const { value } of this.cache.values()) {
+            disposeCachedValue(value);
+        }
         this.cache.clear();
         this.current_size_bytes = 0;
     }
@@ -96,25 +100,72 @@ export class FeatureLRUCache {
             if (oldest_key === undefined) break;
             const oldest = this.cache.get(oldest_key);
             this.cache.delete(oldest_key);
+            disposeCachedValue(oldest?.value);
             this.current_size_bytes -= oldest?.size_bytes ?? 0;
         }
     }
 }
 
+function tensorByteSize(tensor) {
+    let byteLength = null;
+    try {
+        byteLength = /** @type {any} */ (tensor.data)?.byteLength ?? null;
+    } catch {
+        byteLength = null;
+    }
+    if (typeof byteLength === 'number' && byteLength >= 0) {
+        return byteLength;
+    }
+
+    const bytesPerElement = {
+        bool: 1,
+        int8: 1,
+        uint8: 1,
+        int16: 2,
+        uint16: 2,
+        int32: 4,
+        uint32: 4,
+        int64: 8,
+        uint64: 8,
+        float16: 2,
+        float32: 4,
+        float64: 8,
+    };
+    return tensor.size * (bytesPerElement[tensor.type] ?? 4);
+}
+
+function collectCachedTensors(value, out = new Set()) {
+    if (value instanceof Tensor) {
+        out.add(value);
+        return out;
+    }
+    if (value?.input_features instanceof Tensor) out.add(value.input_features);
+    if (value?.attention_mask instanceof Tensor) out.add(value.attention_mask);
+    if (value?.delta_features instanceof Tensor) out.add(value.delta_features);
+    if (value?.delta_delta_features instanceof Tensor) out.add(value.delta_delta_features);
+    return out;
+}
+
+function disposeCachedValue(value) {
+    for (const tensor of collectCachedTensors(value)) {
+        tensor.dispose();
+    }
+}
+
 function estimateSizeBytes(value) {
     if (value instanceof Tensor) {
-        return /** @type {any} */ (value.data)?.byteLength ?? 0;
+        return tensorByteSize(value);
     }
     if (value?.input_features instanceof Tensor) {
-        let bytes = /** @type {any} */ (value.input_features.data)?.byteLength ?? 0;
+        let bytes = tensorByteSize(value.input_features);
         if (value.attention_mask instanceof Tensor) {
-            bytes += /** @type {any} */ (value.attention_mask.data)?.byteLength ?? 0;
+            bytes += tensorByteSize(value.attention_mask);
         }
         if (value.delta_features instanceof Tensor) {
-            bytes += /** @type {any} */ (value.delta_features.data)?.byteLength ?? 0;
+            bytes += tensorByteSize(value.delta_features);
         }
         if (value.delta_delta_features instanceof Tensor) {
-            bytes += /** @type {any} */ (value.delta_delta_features.data)?.byteLength ?? 0;
+            bytes += tensorByteSize(value.delta_delta_features);
         }
         return bytes;
     }

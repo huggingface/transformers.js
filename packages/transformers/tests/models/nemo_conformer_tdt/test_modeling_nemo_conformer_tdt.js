@@ -81,6 +81,96 @@ export default () => {
     });
 
     it(
+      "throws on invalid runtime config: vocab_size must be > 0",
+      async () => {
+        const invalidConfig = {
+          ...BASE_CONFIG,
+          "transformers.js_config": {
+            ...BASE_CONFIG["transformers.js_config"],
+            transducer: {
+              ...BASE_CONFIG["transformers.js_config"].transducer,
+              vocab_size: 0,
+            },
+          },
+        };
+        const model = new MockNemoConformerForTDT(invalidConfig, BASE_SESSIONS, []);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: {
+              decode: () => "",
+              get_vocab: () => new Map([["a", 0]]),
+            },
+          }),
+        ).rejects.toThrow("vocab_size");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "throws on invalid runtime config: blank_token_id must be < vocab_size",
+      async () => {
+        const invalidConfig = {
+          ...BASE_CONFIG,
+          "transformers.js_config": {
+            ...BASE_CONFIG["transformers.js_config"],
+            transducer: {
+              ...BASE_CONFIG["transformers.js_config"].transducer,
+              blank_token_id: 3,
+            },
+          },
+        };
+        const model = new MockNemoConformerForTDT(invalidConfig, BASE_SESSIONS, []);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: {
+              decode: () => "",
+              get_vocab: () => new Map([["a", 0], ["b", 1], ["c", 2]]),
+            },
+          }),
+        ).rejects.toThrow("blank_token_id");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "throws on invalid runtime config: duration_start_index must be >= vocab_size",
+      async () => {
+        const invalidConfig = {
+          ...BASE_CONFIG,
+          "transformers.js_config": {
+            ...BASE_CONFIG["transformers.js_config"],
+            transducer: {
+              ...BASE_CONFIG["transformers.js_config"].transducer,
+              duration_start_index: 2,
+            },
+          },
+        };
+        const model = new MockNemoConformerForTDT(invalidConfig, BASE_SESSIONS, []);
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
+        };
+
+        await expect(
+          model.transcribe(inputs, {
+            tokenizer: {
+              decode: () => "",
+              get_vocab: () => new Map([["a", 0], ["b", 1], ["c", 2]]),
+            },
+          }),
+        ).rejects.toThrow("duration_start_index");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "greedily decodes scripted token and duration logits",
       async () => {
         const tokenizer = {
@@ -247,6 +337,34 @@ export default () => {
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_output_layout");
     });
 
+    it("rejects invalid encoder_input_layout at construction time", () => {
+      const invalidConfig = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            encoder_input_layout: "BAD",
+          },
+        },
+      };
+      expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_input_layout");
+    });
+
+    it("rejects invalid encoder_frame_layout at construction time", () => {
+      const invalidConfig = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            encoder_frame_layout: "BAD",
+          },
+        },
+      };
+      expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_frame_layout");
+    });
+
     it(
       "fails fast when named encoder output is missing at runtime",
       async () => {
@@ -323,6 +441,35 @@ export default () => {
 
         await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
           'decoder output "outputs" was not returned',
+        );
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "fails fast when named decoder state outputs are missing at runtime",
+      async () => {
+        class MissingDecoderStateOutputsModel extends NemoConformerForTDT {
+          async _runEncoder() {
+            return {
+              outputs: new Tensor("float32", new Float32Array([0.1, 0.2]), [1, 2, 1]),
+            };
+          }
+
+          async _runDecoder() {
+            return {
+              outputs: new Tensor("float32", new Float32Array([9.0, 0.0, 0.0, 8.0]), [1, 1, 4]),
+            };
+          }
+        }
+
+        const model = new MissingDecoderStateOutputsModel(BASE_CONFIG, BASE_SESSIONS, {});
+        const inputs = {
+          input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
+        };
+
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
+          'decoder state outputs "output_states_1" and "output_states_2" were not returned',
         );
       },
       MAX_TEST_EXECUTION_TIME,
@@ -577,6 +724,56 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it("disposes replaced cache entries", () => {
+      const cache = new FeatureLRUCache({ max_entries: 4, max_size_mb: 4 });
+      const originalDispose = Tensor.prototype.dispose;
+      let disposeCalls = 0;
+      Tensor.prototype.dispose = function () {
+        disposeCalls += 1;
+        return originalDispose.call(this);
+      };
+
+      try {
+        cache.set("x", new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]));
+        cache.set("x", new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]));
+        expect(disposeCalls).toBe(1);
+      } finally {
+        Tensor.prototype.dispose = originalDispose;
+        cache.clear();
+      }
+    });
+
+    it("disposes tensors on eviction and clear without double-disposing shared refs", () => {
+      const cache = new FeatureLRUCache({ max_entries: 1, max_size_mb: 4 });
+      const originalDispose = Tensor.prototype.dispose;
+      let disposeCalls = 0;
+      Tensor.prototype.dispose = function () {
+        disposeCalls += 1;
+        return originalDispose.call(this);
+      };
+
+      try {
+        const sharedA = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]);
+        cache.set("a", {
+          input_features: sharedA,
+          attention_mask: sharedA,
+        });
+        const sharedB = new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]);
+        cache.set("b", {
+          input_features: sharedB,
+          attention_mask: sharedB,
+        });
+        // Eviction of "a" should dispose sharedA once, despite duplicate field references.
+        expect(disposeCalls).toBe(1);
+
+        cache.clear();
+        // Clear should dispose sharedB once.
+        expect(disposeCalls).toBe(2);
+      } finally {
+        Tensor.prototype.dispose = originalDispose;
+      }
+    });
 
     it("rejects invalid cache limits", () => {
       expect(() => new FeatureLRUCache({ max_entries: -1 })).toThrow("max_entries");

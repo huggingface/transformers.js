@@ -17,6 +17,21 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
     constructor(config) {
         super(config);
 
+        if (!Number.isInteger(this.config.n_fft) || this.config.n_fft <= 0) {
+            throw new Error(
+                `NemoConformerTDTFeatureExtractor expected \`n_fft\` as a positive integer, got ${this.config.n_fft}.`,
+            );
+        }
+        if (
+            !Number.isInteger(this.config.win_length) ||
+            this.config.win_length <= 0 ||
+            this.config.win_length > this.config.n_fft
+        ) {
+            throw new Error(
+                `NemoConformerTDTFeatureExtractor expected \`win_length\` in [1, n_fft], got win_length=${this.config.win_length}, n_fft=${this.config.n_fft}.`,
+            );
+        }
+
         // Prefer given `mel_filters` from preprocessor_config.json, or calculate them if they don't exist.
         this.config.mel_filters ??= mel_filter_bank(
             Math.floor(1 + this.config.n_fft / 2), // num_frequency_bins
@@ -119,7 +134,7 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
      *  delta_features?: Tensor;
      *  delta_delta_features?: Tensor;
      * }>} A Promise resolving to an object containing extracted model inputs.
-     *      When cache is enabled, tensor instances are shared with cached entries.
+     *      When cache is enabled, tensor instances are shared and owned by the cache.
      *      Do not mutate or dispose returned tensors unless cache is disabled/cleared.
      */
     async _call(audio) {

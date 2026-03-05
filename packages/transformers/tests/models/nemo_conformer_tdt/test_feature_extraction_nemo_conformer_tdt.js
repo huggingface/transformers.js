@@ -69,6 +69,35 @@ export default () => {
     );
 
     it(
+      "supports non-concatenated delta and delta-delta features",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          delta_order: 2,
+          delta_window: 2,
+          delta_concatenate: false,
+        });
+        const { input_features, delta_features, delta_delta_features, attention_mask } = await extractor(audio);
+        try {
+          expect(input_features.dims[0]).toBe(1);
+          expect(input_features.dims[2]).toBe(80);
+          expect(delta_features).toBeDefined();
+          expect(delta_delta_features).toBeDefined();
+          expect(delta_features.dims).toEqual(input_features.dims);
+          expect(delta_delta_features.dims).toEqual(input_features.dims);
+          expect(attention_mask.dims).toEqual([1, input_features.dims[1]]);
+        } finally {
+          input_features.dispose();
+          delta_features?.dispose();
+          delta_delta_features?.dispose();
+          attention_mask.dispose();
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "disposes replaced base features when concatenated delta output is used",
       async () => {
         const extractor = new NemoConformerTDTFeatureExtractor({
@@ -86,11 +115,13 @@ export default () => {
           return originalDispose.call(this);
         };
 
+        let input_features;
         try {
-          const { input_features } = await extractor(audio);
+          ({ input_features } = await extractor(audio));
           expect(input_features.dims[2]).toBe(80 * 2);
         } finally {
           Tensor.prototype.dispose = originalDispose;
+          input_features?.dispose();
         }
 
         // One dispose from computeTemporalDeltas intermediate tensor, one from replacing base features tensor.
@@ -126,6 +157,37 @@ export default () => {
     );
 
     it(
+      "uses feature cache when enabled for non-concatenated delta outputs",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          delta_order: 2,
+          delta_window: 2,
+          delta_concatenate: false,
+          use_feature_cache: true,
+          feature_cache_max_entries: 8,
+          feature_cache_max_size_mb: 8,
+        });
+        try {
+          const first = await extractor(audio);
+          const second = await extractor(audio);
+
+          expect(first).not.toBe(second);
+          expect(first.input_features).toBe(second.input_features);
+          expect(first.attention_mask).toBe(second.attention_mask);
+          expect(first.delta_features).toBe(second.delta_features);
+          expect(first.delta_delta_features).toBe(second.delta_delta_features);
+          expect(extractor.get_cache_stats().entries).toBe(1);
+        } finally {
+          extractor.clear_cache();
+        }
+        expect(extractor.get_cache_stats().entries).toBe(0);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "validates preemphasis range",
       async () => {
         const invalidHigh = new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, preemphasis: 1 });
@@ -150,6 +212,16 @@ export default () => {
             delta_window: 1.5,
           }),
       ).toThrow("delta_window");
+    });
+
+    it("validates n_fft and win_length at construction time", () => {
+      expect(() => new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, n_fft: 0 })).toThrow("n_fft");
+      expect(() => new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, win_length: 0 })).toThrow(
+        "win_length",
+      );
+      expect(() => new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80, win_length: 1024 })).toThrow(
+        "win_length",
+      );
     });
   });
 };
