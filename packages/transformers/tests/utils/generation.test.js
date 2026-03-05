@@ -10,6 +10,9 @@ import {
 
   // Other
   TextStreamer,
+  RawImage,
+  BeamSearchScorer,
+  BeamHypotheses,
   random,
 } from "../../src/transformers.js";
 
@@ -572,5 +575,226 @@ describe("PKV caching", () => {
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("Beam search", () => {
+  describe(`encoder-decoder`, () => {
+    const model_id = "hf-internal-testing/tiny-random-T5ForConditionalGeneration";
+    const DUMMY_TEXT = "hello";
+
+    let model;
+    let tokenizer;
+    beforeAll(async () => {
+      model = await AutoModelForSeq2SeqLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "basic beam search (num_beams=4)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2); // at least BOS + 1 token
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6); // at most BOS + 5 tokens
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "diverse beam search (num_beam_groups=2)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_beam_groups: 2,
+          diversity_penalty: 0.5,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "num_return_sequences > 1",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_return_sequences: 3,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [3, seq_len]
+        expect(outputs.dims[0]).toEqual(3);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam search produces different output from greedy",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const greedy_outputs = await model.generate({
+          ...inputs,
+          max_new_tokens: 5,
+        });
+        const beam_outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Both should succeed and produce valid tensors
+        expect(greedy_outputs.dims[0]).toEqual(1);
+        expect(beam_outputs.dims[0]).toEqual(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam search rejects classifier-free guidance",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        await expect(
+          model.generate({
+            ...inputs,
+            num_beams: 4,
+            guidance_scale: 2,
+            max_new_tokens: 5,
+          }),
+        ).rejects.toThrow("Classifier-free guidance (guidance_scale > 1) is not supported with beam search.");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe(`decoder-only`, () => {
+    const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
+    const DUMMY_TEXT = "hello";
+
+    let model;
+    let tokenizer;
+    beforeAll(async () => {
+      model = await AutoModelForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "basic beam search (num_beams=4)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        // seq_len = prompt_len + generated (up to max_new_tokens)
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3); // at least BOS + prompt + 1 token
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7); // at most BOS + prompt + 5 tokens
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "diverse beam search (num_beam_groups=2)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_beam_groups: 2,
+          diversity_penalty: 0.5,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "num_return_sequences > 1",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_return_sequences: 3,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [3, seq_len]
+        expect(outputs.dims[0]).toEqual(3);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("error cases", () => {
+    it("num_return_sequences > num_beams throws", () => {
+      expect(() => {
+        new BeamSearchScorer(1, 4, { num_return_sequences: 5 });
+      }).toThrow("num_return_sequences (5) must be <= num_beams (4)");
+    });
   });
 });
