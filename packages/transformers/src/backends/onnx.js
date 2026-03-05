@@ -211,6 +211,16 @@ async function ensureWasmLoaded() {
 
     // Check if we should load the WASM binary
     if (!shouldUseWasmCache) {
+        // In Deno's web runtime, the WASM factory must be loaded via blob URL so that
+        // Node.js detection can be patched out (see loadWasmFactory). Without caching,
+        // the factory is imported directly from its URL and Deno would crash trying to
+        // use Node.js APIs. useWasmCache defaults to true in this environment, so this
+        // only happens if the user explicitly disables it.
+        if (apis.IS_DENO_WEB_RUNTIME) {
+            throw new Error(
+                "env.useWasmCache=false is not supported in Deno's web runtime. " + 'Remove the useWasmCache override.',
+            );
+        }
         wasmLoadPromise = Promise.resolve();
         return wasmLoadPromise;
     }

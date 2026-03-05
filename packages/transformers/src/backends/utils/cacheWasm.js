@@ -1,4 +1,4 @@
-import { env, apis } from '../../env.js';
+import { env } from '../../env.js';
 import { getCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -91,23 +91,13 @@ function canUseBlobURLs() {
  * @returns {Promise<string|null>} The blob URL (if enabled), original URL (if disabled), or null if loading failed.
  */
 export async function loadWasmFactory(libURL) {
-    // Check if we should use blob URLs before doing any work
-    const shouldUseBlobURL = env.useWasmBlobURL === true || (env.useWasmBlobURL === 'auto' && canUseBlobURLs());
-
-    // In Deno's web runtime, blob URLs are required to patch out Node.js detection (see below).
-    if (!shouldUseBlobURL && apis.IS_DENO_WEB_RUNTIME) {
-        throw new Error(
-            "env.useWasmBlobURL=false is not supported in Deno's web runtime. Remove the useWasmBlobURL override to allow the factory to be patched correctly.",
-        );
-    }
-
-    // If blob URLs are not safe or disabled, just return the original URL.
+    // If blob URLs are not supported, just return the original URL.
     // Don't bother caching since dynamic import() won't use the Cache API anyway.
-    if (!shouldUseBlobURL) {
+    if (!canUseBlobURLs()) {
         return libURL;
     }
 
-    // Blob URLs are enabled - fetch from cache or network, then create blob URL
+    // Fetch from cache or network, then create blob URL
     const response = await loadAndCacheFile(libURL);
     if (!response || typeof response === 'string') return null;
 

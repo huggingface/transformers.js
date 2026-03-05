@@ -95,7 +95,7 @@ export const apis = Object.freeze({
     /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
     IS_WEB_ENV,
 
-    /** Whether we are running in Deno's web runtime (CDN imports, no filesystem access) */
+    /** Whether we are running in Deno's web runtime (CDN imports, Cache API available, no filesystem) */
     IS_DENO_WEB_RUNTIME,
 
     /** Whether the Cache API is available */
@@ -205,12 +205,8 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
- * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries for ONNX Runtime. Defaults to `true` when cache is available.
- * This can improve performance and enables offline usage by avoiding repeated downloads of WASM files.
- * @property {boolean|'auto'} useWasmBlobURL Whether to use blob URLs for WASM factory (.mjs) files. Defaults to 'auto' which automatically
- * detects safe environments. Set to `true` to force blob URLs (faster but may fail in workers/service workers/extensions),
- * or `false` to always use original URLs (safer but requires CORS). When 'auto', blob URLs are disabled in Service Workers,
- * Chrome extensions, and when numThreads > 1.
+ * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime.
+ * Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
@@ -256,7 +252,6 @@ export const env = {
     customCache: null,
 
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
-    useWasmBlobURL: 'auto',
     cacheKey: 'transformers-cache',
 
     /////////////////// Custom fetch /////////////////////
