@@ -363,7 +363,9 @@ export class AutomaticSpeechRecognitionPipeline
             this._validateNemoAudio(preparedAudios[i], i);
         }
 
-        const featureCache = this.processor.feature_extractor?.feature_cache;
+        const featureCache = /** @type {{ max_entries: number, max_size_mb: number }|null|undefined} */ (
+            /** @type {any} */ (this.processor.feature_extractor)?.feature_cache
+        );
         const cacheOwnsTensors = !!(
             featureCache &&
             featureCache.max_entries > 0 &&

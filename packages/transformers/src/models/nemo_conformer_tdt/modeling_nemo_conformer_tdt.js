@@ -57,7 +57,7 @@ function roundTs(value) {
 }
 
 /**
- * @param {Float32Array|number[]} logits
+ * @param {import('../../utils/tensor.js').Tensor['data']} logits
  * @param {number} tokenId
  * @param {number} vocabSize
  * @returns {{ confidence: number, logProb: number }}
