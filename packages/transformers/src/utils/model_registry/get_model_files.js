@@ -1,7 +1,7 @@
 import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import { MODEL_TYPES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
+import { MODEL_TYPES, MODEL_TYPE_MAPPING, MODEL_MAPPING_NAMES } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
 import { logger } from '../logger.js';
@@ -96,6 +96,17 @@ export async function get_model_files(
         if (mappedType !== undefined) {
             modelType = mappedType;
             foundInMapping = true;
+        }
+
+        if (!foundInMapping) {
+            // As a last resort, map model_type based on MODEL_MAPPING_NAMES
+            for (const mapping of Object.values(MODEL_MAPPING_NAMES)) {
+                if (mapping.has(config.model_type)) {
+                    modelType = MODEL_TYPE_MAPPING.get(mapping.get(config.model_type));
+                    foundInMapping = true;
+                    break;
+                }
+            }
         }
     }
 
