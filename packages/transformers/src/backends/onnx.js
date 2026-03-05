@@ -203,13 +203,13 @@ async function ensureWasmLoaded() {
         return wasmLoadPromise;
     }
 
+    // Check if we should load the WASM binary
     const shouldUseWasmCache =
         env.useWasmCache &&
         typeof ONNX_ENV?.wasm?.wasmPaths === 'object' &&
         ONNX_ENV?.wasm?.wasmPaths?.wasm &&
         ONNX_ENV?.wasm?.wasmPaths?.mjs;
 
-    // Check if we should load the WASM binary
     if (!shouldUseWasmCache) {
         // In Deno's web runtime, the WASM factory must be loaded via blob URL so that
         // Node.js detection can be patched out (see loadWasmFactory). Without caching,
@@ -218,7 +218,7 @@ async function ensureWasmLoaded() {
         // only happens if the user explicitly disables it.
         if (apis.IS_DENO_WEB_RUNTIME) {
             throw new Error(
-                "env.useWasmCache=false is not supported in Deno's web runtime. " + 'Remove the useWasmCache override.',
+                "env.useWasmCache=false is not supported in Deno's web runtime. Remove the useWasmCache override.",
             );
         }
         wasmLoadPromise = Promise.resolve();
@@ -231,12 +231,9 @@ async function ensureWasmLoaded() {
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
         const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
 
-        // Load the .wasm binary and .mjs factory in parallel for performance.
-        // The blob URL for the .mjs factory is only applied if wasmBinary loaded successfully:
-        // ORT sets `config.locateFile = (f) => f` only when wasmBinary is provided (ORT PR #27411),
-        // which is what prevents `new URL(fileName, import.meta.url)` from failing when the factory
-        // runs from a blob URL (where import.meta.url is also a blob). Without wasmBinary, we must
-        // leave wasmPaths.mjs as the original URL so ORT can resolve the .wasm path normally.
+        // Load both in parallel; the .mjs blob URL is only kept if wasmBinary succeeded.
+        // ORT only sets locateFile when wasmBinary is provided (onnxruntime PR https://github.com/microsoft/onnxruntime/pull/27411), which
+        // prevents new URL(fileName, import.meta.url) from failing inside a blob URL factory.
         let wasmBinaryLoaded = false;
         await Promise.all([
             // Load and cache the WASM binary
@@ -270,10 +267,7 @@ async function ensureWasmLoaded() {
                 : Promise.resolve(),
         ]);
 
-        // If wasmBinary failed to load, revert wasmPaths.mjs to the original URL.
-        // Both fetches ran in parallel, so the blob URL may have been written before we
-        // knew wasmBinary had failed. Without wasmBinary, ORT won't set locateFile and
-        // `new URL(fileName, import.meta.url)` would fail inside the blob URL factory.
+        // If wasmBinary failed to load, revert wasmPaths.mjs to the original URL (factory can only be loaded from blob if ONNX_ENV.wasm.wasmBinary is set. @see ORT PR #27411)
         if (!wasmBinaryLoaded) {
             // @ts-ignore
             ONNX_ENV.wasm.wasmPaths.mjs = urls.mjs;
