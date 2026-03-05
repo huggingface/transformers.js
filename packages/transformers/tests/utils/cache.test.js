@@ -205,9 +205,20 @@ describe("Cache", () => {
 
     describe("is_cached", () => {
       it(
+        "should return a boolean",
+        async () => {
+          const cached = await ModelRegistry.is_cached(BERT_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          expect(typeof cached).toBe("boolean");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("is_cached_files", () => {
+      it(
         "should return cache status with correct shape",
         async () => {
-          const status = await ModelRegistry.is_cached(BERT_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          const status = await ModelRegistry.is_cached_files(BERT_MODEL_ID, DEFAULT_MODEL_OPTIONS);
           expect(status).toHaveProperty("allCached");
           expect(typeof status.allCached).toBe("boolean");
           expect(status).toHaveProperty("files");
@@ -222,13 +233,34 @@ describe("Cache", () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "should agree with is_cached on allCached",
+        async () => {
+          const cached = await ModelRegistry.is_cached(BERT_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          const status = await ModelRegistry.is_cached_files(BERT_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          expect(cached).toBe(status.allCached);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("is_pipeline_cached", () => {
       it(
+        "should return a boolean for text-generation pipeline",
+        async () => {
+          const cached = await ModelRegistry.is_pipeline_cached("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          expect(typeof cached).toBe("boolean");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("is_pipeline_cached_files", () => {
+      it(
         "should return cache status for text-generation pipeline",
         async () => {
-          const status = await ModelRegistry.is_pipeline_cached("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          const status = await ModelRegistry.is_pipeline_cached_files("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);
           expect(status).toHaveProperty("allCached");
           expect(typeof status.allCached).toBe("boolean");
           expect(status).toHaveProperty("files");
@@ -238,6 +270,16 @@ describe("Cache", () => {
             expect(entry).toHaveProperty("file");
             expect(entry).toHaveProperty("cached");
           }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should agree with is_pipeline_cached on allCached",
+        async () => {
+          const cached = await ModelRegistry.is_pipeline_cached("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          const status = await ModelRegistry.is_pipeline_cached_files("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);
+          expect(cached).toBe(status.allCached);
         },
         MAX_TEST_EXECUTION_TIME,
       );
@@ -358,6 +400,14 @@ describe("Cache", () => {
       );
 
       it(
+        "should throw for empty modelId in is_cached_files",
+        async () => {
+          await expect(ModelRegistry.is_cached_files("")).rejects.toThrow("modelId is required");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
         "should throw for empty modelId in clear_cache",
         async () => {
           await expect(ModelRegistry.clear_cache("")).rejects.toThrow("modelId is required");
@@ -369,6 +419,14 @@ describe("Cache", () => {
         "should throw for empty task in is_pipeline_cached",
         async () => {
           await expect(ModelRegistry.is_pipeline_cached("", BERT_MODEL_ID)).rejects.toThrow("task is required");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should throw for empty task in is_pipeline_cached_files",
+        async () => {
+          await expect(ModelRegistry.is_pipeline_cached_files("", BERT_MODEL_ID)).rejects.toThrow("task is required");
         },
         MAX_TEST_EXECUTION_TIME,
       );
