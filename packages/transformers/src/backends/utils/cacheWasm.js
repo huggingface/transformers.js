@@ -67,35 +67,16 @@ export async function loadWasmBinary(wasmURL) {
 /**
  * Checks if the current environment supports blob URLs for ES modules.
  * @see https://github.com/huggingface/transformers.js/issues/1532
- * @see https://github.com/huggingface/transformers.js/issues/1527
  * @returns {boolean} True if blob URLs are safe to use for module imports.
  */
 function canUseBlobURLs() {
-    // Don't use blob URLs in Service Workers — dynamic import() of blob URLs is blocked.
+    // Don't use blob URLs in Service Workers: dynamic import() of blob URLs is blocked.
     // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
     if (typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) {
         return false;
     }
 
-    // Don't use blob URLs if multi-threading is enabled. The .mjs factory spawns workers
-    // via `new Worker(new URL(import.meta.url))`, which fails when import.meta.url is a blob.
-    if (env.backends?.onnx?.wasm?.numThreads && env.backends.onnx.wasm.numThreads > 1) {
-        return false;
-    }
-    // Also check global onnxruntime as a fallback for the numThreads check above
-    try {
-        // @ts-ignore - onnxruntime may not exist in all environments
-        if (typeof globalThis !== 'undefined' && globalThis.onnxruntime?.env?.wasm?.numThreads) {
-            // @ts-ignore
-            if (globalThis.onnxruntime.env.wasm.numThreads > 1) {
-                return false;
-            }
-        }
-    } catch (e) {
-        // Ignore errors checking ONNX config
-    }
-
-    // Don't use blob URLs in Chrome extensions — import() of blob URLs is blocked.
+    // Don't use blob URLs in Chrome extensions: import() of blob URLs is blocked.
     // @ts-ignore - chrome may not exist in all environments
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
         return false;
@@ -107,9 +88,6 @@ function canUseBlobURLs() {
 /**
  * Loads and caches the WASM Factory (.mjs file) for ONNX Runtime.
  * Creates a blob URL from cached content (when safe) to bridge Cache API with dynamic imports used in ORT.
- * NOTE: Callers must ensure ONNX_ENV.wasm.wasmBinary is set before the returned blob URL is imported,
- * so that ORT's locateFile override (set when wasmBinary is provided) prevents it from calling
- * `new URL(fileName, import.meta.url)` — which would fail when import.meta.url is a blob URL.
  * @param {string} libURL The URL of the WASM Factory to load.
  * @returns {Promise<string|null>} The blob URL (if enabled), original URL (if disabled), or null if loading failed.
  */
