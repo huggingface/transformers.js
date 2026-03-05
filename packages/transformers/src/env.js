@@ -54,6 +54,9 @@ const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
+// @ts-ignore - chrome may not exist in all environments
+const IS_CHROME_AVAILABLE = typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
+
 /**
  * Check if the current environment is Safari browser.
  * Works in both browser and web worker contexts.
@@ -124,6 +127,9 @@ export const apis = Object.freeze({
 
     /** Whether the crypto API is available */
     IS_CRYPTO_AVAILABLE,
+
+    /** Whether the Chrome runtime API is available */
+    IS_CHROME_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;

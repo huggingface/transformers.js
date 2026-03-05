@@ -1,4 +1,4 @@
-import { env } from '../../env.js';
+import { apis, env } from '../../env.js';
 import { getCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -76,10 +76,7 @@ function canUseBlobURLs() {
     }
 
     // Don't use blob URLs in Chrome extensions: import() of blob URLs is blocked.
-    // @ts-ignore - chrome may not exist in all environments
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
-        return false;
-    }
+    if (apis.IS_CHROME_AVAILABLE) return false;
 
     return true;
 }
