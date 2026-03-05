@@ -753,7 +753,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                     tokenIds.push(tokenId);
                     // TDT duration convention: step=0 means "stay on current frame" (duration index 0 = no advance).
                     // We still associate the token with this frame, so durationFrames is at least 1.
-                    const durationFrames = Math.max(1, step > 0 ? step : 1);
+                    const durationFrames = Math.max(1, step);
                     const endFrame = Math.min(frameCount, frameIndex + durationFrames);
                     tokenTimestamps.push([
                         roundTs(frameIndex * frameTime + timeOffset),
