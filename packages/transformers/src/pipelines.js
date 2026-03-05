@@ -16,6 +16,10 @@
 import { dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
 
+import { AutoTokenizer } from './models/auto/tokenization_auto.js';
+import { AutoProcessor } from './models/auto/processing_auto.js';
+import { AutoConfig } from './configs.js';
+
 import {
     SUPPORTED_TASKS,
     TASK_ALIASES,
@@ -106,8 +110,6 @@ export async function pipeline(
         session_options = {},
     } = {},
 ) {
-    // Helper method to construct pipeline
-
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -127,13 +129,15 @@ export async function pipeline(
         }
     }
 
+    // Determine which files the model needs
+    const expected_files = await get_pipeline_files(task, model, {
+        device,
+        dtype,
+    });
+
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
-        const expected_files = await get_pipeline_files(task, model, {
-            device,
-            dtype,
-        });
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
         metadata.forEach((m, i) => {
@@ -184,15 +188,38 @@ export async function pipeline(
         session_options,
     };
 
-    const classes = new Map([
-        ['tokenizer', pipelineInfo.tokenizer],
-        ['model', pipelineInfo.model],
-        ['processor', pipelineInfo.processor],
+    // Determine which components to load based on the expected files
+    const hasTokenizer = expected_files.includes('tokenizer.json');
+    const hasProcessor = expected_files.includes('preprocessor_config.json');
+
+    // Resolve the correct model class (needs config when multiple candidates exist)
+    const modelClasses = pipelineInfo.model;
+    let modelPromise;
+    if (Array.isArray(modelClasses)) {
+        const resolvedConfig = config ?? (await AutoConfig.from_pretrained(model, pretrainedOptions));
+        const { model_type } = resolvedConfig;
+        const matchedClass = modelClasses.find((cls) => cls.supports(model_type));
+        if (!matchedClass) {
+            throw Error(
+                `Unsupported model type "${model_type}" for task "${task}". ` +
+                    `None of the candidate model classes support this type.`,
+            );
+        }
+        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig });
+    } else {
+        modelPromise = modelClasses.from_pretrained(model, pretrainedOptions);
+    }
+
+    // Load all components in parallel
+    const [tokenizer, processor, model_loaded] = await Promise.all([
+        hasTokenizer ? AutoTokenizer.from_pretrained(model, pretrainedOptions) : null,
+        hasProcessor ? AutoProcessor.from_pretrained(model, pretrainedOptions) : null,
+        modelPromise,
     ]);
 
-    // Load model, tokenizer, and processor (if they exist)
-    const results = await loadItems(classes, model, pretrainedOptions);
-    results.task = task;
+    const results = { task, model: model_loaded };
+    if (tokenizer) results.tokenizer = tokenizer;
+    if (processor) results.processor = processor;
 
     dispatchCallback(progress_callback, {
         status: 'ready',
@@ -202,70 +229,6 @@ export async function pipeline(
 
     const pipelineClass = pipelineInfo.pipeline;
     return new pipelineClass(results);
-}
-
-/**
- * Helper function to get applicable model, tokenizer, or processor classes for a given model.
- * @param {Map<string, any>} mapping The mapping of names to classes, arrays of classes, or null.
- * @param {string} model The name of the model to load.
- * @param {import('./utils/hub.js').PretrainedOptions} pretrainedOptions The options to pass to the `from_pretrained` method.
- * @private
- */
-async function loadItems(mapping, model, pretrainedOptions) {
-    const result = Object.create(null);
-
-    /**@type {Promise[]} */
-    const promises = [];
-    for (const [name, cls] of mapping.entries()) {
-        if (!cls) continue;
-
-        /**@type {Promise} */
-        let promise;
-        if (Array.isArray(cls)) {
-            promise = new Promise(async (resolve, reject) => {
-                let e;
-                for (const c of cls) {
-                    if (c === null) {
-                        // If null, we resolve it immediately, meaning the relevant
-                        // class was not found, but it is optional.
-                        resolve(null);
-                        return;
-                    }
-                    try {
-                        resolve(await c.from_pretrained(model, pretrainedOptions));
-                        return;
-                    } catch (err) {
-                        if (err.message?.includes('Unsupported model type')) {
-                            // If the error is due to an unsupported model type, we
-                            // save the error and try the next class.
-                            e = err;
-                        } else if (err.message?.includes('Could not locate file')) {
-                            e = err;
-                        } else {
-                            reject(err);
-                            return;
-                        }
-                    }
-                }
-                reject(e);
-            });
-        } else {
-            promise = cls.from_pretrained(model, pretrainedOptions);
-        }
-
-        result[name] = promise;
-        promises.push(promise);
-    }
-
-    // Wait for all promises to resolve (in parallel)
-    await Promise.all(promises);
-
-    // Then assign to result
-    for (const [name, promise] of Object.entries(result)) {
-        result[name] = await promise;
-    }
-
-    return result;
 }
 
 export {

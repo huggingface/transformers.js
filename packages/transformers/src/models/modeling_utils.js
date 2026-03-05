@@ -38,6 +38,26 @@ import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Extract the past sequence length from a past_key_values object.
+ * For standard models, all entries are attention KV caches with shape [batch, heads, seq_len, head_dim].
+ * For hybrid models (e.g., Qwen3.5 with conv/recurrent + attention layers), the first entry
+ * may be a conv or recurrent state whose dims don't encode a sequence length.
+ * This function finds a `past_key_values.*` entry (standard attention cache) to determine the true past length.
+ *
+ * @param {Record<string, Tensor>} past_key_values
+ * @returns {number} The past sequence length.
+ */
+export function getPastLength(past_key_values) {
+    for (const name in past_key_values) {
+        if (name.startsWith('past_key_values.')) {
+            return past_key_values[name].dims.at(-2);
+        }
+    }
+    // Fallback for non-hybrid models (all entries are attention KV)
+    return Object.values(past_key_values)[0].dims.at(-2);
+}
+
+/**
  * Converts an array or Tensor of integers to an int64 Tensor.
  * @param {any[]|Tensor} items The input integers to be converted.
  * @returns {Tensor} The int64 Tensor with the converted values.
@@ -1229,6 +1249,7 @@ export class PreTrainedModel extends Callable {
                     // Hybrid cache architecture
                     .replace('present_ssm', 'past_ssm') // Mamba
                     .replace('present_conv', 'past_conv') // LFM2
+                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
 
                     // Standard cache architecture
                     .replace('present', 'past_key_values');
@@ -1432,7 +1453,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {Tensor} [params.attention_mask=null]
  * @param {Tensor} [params.position_ids=null]
  * @param {Tensor} [params.inputs_embeds=null]
- * @param {Tensor} [params.past_key_values=null]
+ * @param {Record<string, Tensor>} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
  * @returns {Promise<Tensor>} The model's output tensor
@@ -1486,7 +1507,7 @@ export async function generic_text_to_text_forward(
         } else if (past_key_values && modality_values && input_ids.dims[1] === 1) {
             // This branch handles the cache case.
             const target_length = input_ids.dims[1]; // always 1
-            const past_length = Object.values(past_key_values)[0].dims.at(-2);
+            const past_length = getPastLength(past_key_values);
 
             attention_mask = cat(
                 [
@@ -1499,8 +1520,20 @@ export async function generic_text_to_text_forward(
     }
 
     if (!position_ids) {
-        if (self.config.model_type === 'qwen2_vl') {
-            // Special case for qwen2_vl models
+        if (
+            // Handle special case for qwen vl models
+            [
+                'qwen2_vl',
+                'qwen2_5_vl',
+                'qwen2_5_vl_text',
+                'qwen3_vl',
+                'qwen3_vl_text',
+                'qwen3_5',
+                'qwen3_5_text',
+                'qwen3_5_moe',
+                'qwen3_5_moe_text',
+            ].includes(self.config.model_type)
+        ) {
             // @ts-ignore
             const { image_grid_thw, video_grid_thw } = kwargs;
             [position_ids] = self.get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask);
@@ -1613,7 +1646,7 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 }
 
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    const past_length = model_inputs.past_key_values ? Object.values(model_inputs.past_key_values)[0].dims.at(-2) : 0;
+    const past_length = model_inputs.past_key_values ? getPastLength(model_inputs.past_key_values) : 0;
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
@@ -1694,6 +1727,10 @@ export function default_merge_input_ids_with_features({
     if (n_tokens !== n_features) {
         throw new Error(`Number of tokens and features do not match: tokens: ${n_tokens}, features ${n_features}`);
     }
+
+    // Currently, we require modality features to be in float32 for correct scatter behavior.
+    // TODO: In future, detect dtype of embeds and cast modality features to the same dtype before scattering.
+    // modality_features = modality_features.to('float32');
 
     // Equivalent to performing a masked_scatter
     let img = 0;

@@ -49,8 +49,12 @@
  * const modelId = "onnx-community/Qwen3-0.6B-ONNX";
  * const options = { dtype: "q4" };
  *
- * // Check if the model is cached (probably false)
- * let cacheStatus = await ModelRegistry.is_cached(modelId, options);
+ * // Quickly check if the model is cached (probably false)
+ * let cached = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cached); // false
+ *
+ * // Get per-file cache detail
+ * let cacheStatus = await ModelRegistry.is_cached_files(modelId, options);
  * console.log(cacheStatus);
  * // {
  * //   allCached: false,
@@ -66,12 +70,8 @@
  * console.log(output[0].generated_text.at(-1).content); // <think>...</think>\n\nThe capital of France is **Paris**.
  *
  * // Check if the model is cached (should be true now)
- * cacheStatus = await ModelRegistry.is_cached(modelId, options);
- * console.log(cacheStatus);
- * // {
- * //   allCached: true,
- * //   files: [ { file: 'config.json', cached: true }, { file: 'onnx/model_q4.onnx', cached: true }, { file: 'generation_config.json', cached: true }, { file: 'tokenizer.json', cached: true }, { file: 'tokenizer_config.json', cached: true } ]
- * // }
+ * cached = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cached); // true
  *
  * // Clear the cache
  * const clearResult = await ModelRegistry.clear_cache(modelId, options);
@@ -83,12 +83,8 @@
  * // }
  *
  * // Check if the model is cached (should be false again)
- * cacheStatus = await ModelRegistry.is_cached(modelId, options);
- * console.log(cacheStatus);
- * // {
- * //   allCached: false,
- * //   files: [ { file: 'config.json', cached: true }, { file: 'onnx/model_q4.onnx', cached: false }, { file: 'generation_config.json', cached: false }, { file: 'tokenizer.json', cached: false }, { file: 'tokenizer_config.json', cached: false } ]
- * // }
+ * cached = await ModelRegistry.is_cached(modelId, options);
+ * console.log(cached); // false
  * ```
  *
  * @module utils/model_registry
@@ -99,7 +95,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 import { get_model_files } from './get_model_files.js';
 import { get_tokenizer_files } from './get_tokenizer_files.js';
 import { get_processor_files } from './get_processor_files.js';
-import { is_cached, is_pipeline_cached } from './is_cached.js';
+import { is_cached, is_cached_files, is_pipeline_cached, is_pipeline_cached_files } from './is_cached.js';
 import { get_file_metadata } from './get_file_metadata.js';
 import { clear_cache, clear_pipeline_cache } from './clear_cache.js';
 
@@ -198,24 +194,74 @@ export class ModelRegistry {
     }
 
     /**
-     * Check if a model and all its required files are cached.
+     * Quickly checks if a model is fully cached by verifying `config.json` is present,
+     * then confirming all required files are cached.
+     * Returns a plain boolean — use `is_cached_files` if you need per-file detail.
      *
      * @param {string} modelId - The model id
      * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
+     * @returns {Promise<boolean>} Whether all required files are cached
      *
      * @example
-     * const status = await ModelRegistry.is_cached('onnx-community/bert-base-uncased-ONNX');
-     * console.log(status.allCached); // true or false
+     * const cached = await ModelRegistry.is_cached('onnx-community/bert-base-uncased-ONNX');
+     * console.log(cached); // true or false
      */
     static async is_cached(modelId, options = {}) {
         return is_cached(modelId, options);
     }
 
     /**
-     * Check if all files for a specific pipeline task are cached.
+     * Checks if all files for a given model are already cached, with per-file detail.
+     * Automatically determines which files are needed using get_files().
+     *
+     * @param {string} modelId - The model id
+     * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
+     *
+     * @example
+     * const status = await ModelRegistry.is_cached_files('onnx-community/bert-base-uncased-ONNX');
+     * console.log(status.allCached); // true or false
+     * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
+     */
+    static async is_cached_files(modelId, options = {}) {
+        return is_cached_files(modelId, options);
+    }
+
+    /**
+     * Quickly checks if all files for a specific pipeline task are cached by verifying
+     * `config.json` is present, then confirming all required files are cached.
+     * Returns a plain boolean — use `is_pipeline_cached_files` if you need per-file detail.
+     *
+     * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
+     * @param {string} modelId - The model id
+     * @param {Object} [options] - Optional parameters
+     * @param {string} [options.cache_dir] - Custom cache directory
+     * @param {string} [options.revision] - Model revision (default: 'main')
+     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
+     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
+     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @returns {Promise<boolean>} Whether all required files are cached
+     *
+     * @example
+     * const cached = await ModelRegistry.is_pipeline_cached('text-generation', 'onnx-community/gpt2-ONNX');
+     * console.log(cached); // true or false
+     */
+    static async is_pipeline_cached(task, modelId, options = {}) {
+        return is_pipeline_cached(task, modelId, options);
+    }
+
+    /**
+     * Checks if all files for a specific pipeline task are already cached, with per-file detail.
      * Automatically determines which components are needed based on the task.
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
@@ -229,11 +275,12 @@ export class ModelRegistry {
      * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
      *
      * @example
-     * const status = await ModelRegistry.is_pipeline_cached('text-generation', 'onnx-community/gpt2-ONNX');
+     * const status = await ModelRegistry.is_pipeline_cached_files('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(status.allCached); // true or false
+     * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
      */
-    static async is_pipeline_cached(task, modelId, options = {}) {
-        return is_pipeline_cached(task, modelId, options);
+    static async is_pipeline_cached_files(task, modelId, options = {}) {
+        return is_pipeline_cached_files(task, modelId, options);
     }
 
     /**
