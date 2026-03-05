@@ -460,6 +460,11 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 } else {
                     length = inputFeatures.dims[1];
                 }
+                if (!Number.isInteger(length) || length < 0) {
+                    throw new Error(
+                        `Nemo Conformer TDT expected a non-negative integer encoder length, got: ${length}.`,
+                    );
+                }
                 const lengthTensor = new Tensor('int64', BigInt64Array.from([BigInt(length)]), [1]);
                 disposables.push(lengthTensor);
                 feeds[name] = lengthTensor;
@@ -713,10 +718,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 const logitsData = logits.data;
                 if (logitsData.length < vocabSize) {
                     logits.dispose();
-                    this._disposeDecoderState({
-                        state1: outputState1,
-                        state2: outputState2,
-                    });
+                    this._disposeDecoderState(
+                        {
+                            state1: outputState1,
+                            state2: outputState2,
+                        },
+                        decoderState,
+                    );
                     throw new Error(
                         `Nemo Conformer TDT decoder output is too small (${logitsData.length}) for vocab_size=${vocabSize}.`,
                     );
@@ -726,10 +734,13 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                 const hasDurationLogits = logitsData.length > durationStart;
                 if (this.transducer.duration_start_index != null && !hasDurationLogits) {
                     logits.dispose();
-                    this._disposeDecoderState({
-                        state1: outputState1,
-                        state2: outputState2,
-                    });
+                    this._disposeDecoderState(
+                        {
+                            state1: outputState1,
+                            state2: outputState2,
+                        },
+                        decoderState,
+                    );
                     throw new Error(
                         `Nemo Conformer TDT decoder output is missing duration logits: expected values beyond index ${durationStart - 1}, got length=${logitsData.length}.`,
                     );

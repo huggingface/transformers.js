@@ -149,7 +149,7 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
 
             const extracted = await this._extract(audio);
             this.feature_cache.set(key, extracted);
-            return extracted;
+            return { ...extracted };
         }
 
         return await this._extract(audio);
