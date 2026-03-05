@@ -32,13 +32,9 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     //  - 'text' tasks: always check tokenizer, skip processor (text models rarely have one)
     //  - 'audio'/'image' tasks: skip tokenizer, always check processor
     //  - 'multimodal' tasks: check both
-    //
-    // NOTE:
-    // `text-to-audio` may load `AutoModelForTextToSpectrogram` models (e.g., SpeechT5),
-    // which require processor files. Keep processor detection enabled for this task.
     const { type } = taskConfig;
     const include_tokenizer = type !== 'audio' && type !== 'image';
-    const include_processor = type !== 'text' || task === 'text-to-audio';
+    const include_processor = type !== 'text';
 
     return get_files(modelId, {
         ...options,
