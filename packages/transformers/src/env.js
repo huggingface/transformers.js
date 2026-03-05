@@ -28,9 +28,11 @@ import url from 'node:url';
 
 const VERSION = '4.0.0-next.5';
 
+const HAS_SELF = typeof self !== 'undefined';
+
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
-const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
+const IS_WEB_CACHE_AVAILABLE = HAS_SELF && 'caches' in self;
 
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
@@ -44,7 +46,7 @@ const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node' &&
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 const IS_WEBWORKER_ENV =
-    typeof self !== 'undefined' &&
+    HAS_SELF &&
     ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
         self.constructor?.name,
     );
@@ -56,6 +58,9 @@ const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRa
 
 // @ts-ignore - chrome may not exist in all environments
 const IS_CHROME_AVAILABLE = typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
+
+// @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
+const IS_SERVICE_WORKER_ENV = typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
 
 /**
  * Check if the current environment is Safari browser.
@@ -97,6 +102,9 @@ export const apis = Object.freeze({
 
     /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
     IS_WEB_ENV,
+
+    /** Whether we are running in a service worker environment */
+    IS_SERVICE_WORKER_ENV,
 
     /** Whether we are running in Deno's web runtime (CDN imports, Cache API available, no filesystem) */
     IS_DENO_WEB_RUNTIME,
