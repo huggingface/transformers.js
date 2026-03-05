@@ -1,4 +1,9 @@
-import { PreTrainedModel, cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
+import {
+    PreTrainedModel,
+    cumsum_masked_fill,
+    default_merge_input_ids_with_image_features,
+    getPastLength,
+} from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
@@ -245,9 +250,37 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 model_inputs.pixel_values = null;
                 // model_inputs.pixel_values_videos = null;
 
-                const delta = BigInt(Object.values(model_inputs.past_key_values)[0].dims.at(-2));
-                const rope_deltas_list = model_inputs.rope_deltas.map((x) => delta + x);
-                model_inputs.position_ids = stack([rope_deltas_list, rope_deltas_list, rope_deltas_list], 0);
+                const past_length = getPastLength(model_inputs.past_key_values);
+
+                if (past_length < model_inputs.input_ids.dims[1]) {
+                    // Externally provided `past_key_values` with full input_ids:
+                    // Compute full position_ids, then slice to only the new (unprocessed) tokens.
+                    const [full_position_ids, rope_deltas] = this.get_rope_index(
+                        model_inputs.input_ids,
+                        model_inputs.image_grid_thw,
+                        model_inputs.video_grid_thw,
+                        model_inputs.attention_mask,
+                    );
+                    model_inputs.rope_deltas = rope_deltas;
+                    model_inputs.position_ids = full_position_ids.slice(null, null, [past_length, null]);
+                    model_inputs.input_ids = model_inputs.input_ids.slice(null, [past_length, null]);
+                } else {
+                    // Auto-regressive case: single new token.
+                    // `rope_deltas` may be absent when generation starts from externally provided `past_key_values`.
+                    // In that case, recompute from current inputs instead of relying on persisted model state.
+                    if (!model_inputs.rope_deltas) {
+                        [, model_inputs.rope_deltas] = this.get_rope_index(
+                            model_inputs.input_ids,
+                            model_inputs.image_grid_thw,
+                            model_inputs.video_grid_thw,
+                            model_inputs.attention_mask,
+                        );
+                    }
+
+                    const delta = BigInt(past_length);
+                    const rope_deltas_list = model_inputs.rope_deltas.map((x) => delta + x);
+                    model_inputs.position_ids = stack([rope_deltas_list, rope_deltas_list, rope_deltas_list], 0);
+                }
             }
         }
 
