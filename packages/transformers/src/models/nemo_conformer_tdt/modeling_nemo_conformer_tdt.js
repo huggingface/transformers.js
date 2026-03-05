@@ -243,6 +243,10 @@ export class NemoConformerTDTPreTrainedModel extends PreTrainedModel {
         this.transducer = resolveTransducerConfig(config, sessions);
     }
 
+    static supports(model_type) {
+        return model_type === NEMO_CONFORMER_TDT_MODEL_TYPE;
+    }
+
     /**
      * Load Nemo Conformer TDT sessions using v4 canonical ONNX filenames.
      * @type {typeof PreTrainedModel.from_pretrained}
