@@ -66,9 +66,9 @@ We have added [a template](https://github.com/huggingface/transformers.js/issues
 
 ## Do you want to implement a new model?
 
-New models are constantly released and if you want to implement a new model, please provide use the [template for new model requests](https://github.com/huggingface/transformers.js/issues/new?template=2_new_model.yml)
+New models are constantly released and if you want to implement a new model, please use the [template for new model requests](https://github.com/huggingface/transformers.js/issues/new?template=2_new_model.yml).
 
-If you are willing to contribute the model yourself, let us know so we can help you add it to 🤗 Transformers.js!
+If you are willing to contribute the model yourself, let us know so we can help you add it to 🤗 Transformers.js! For a full step-by-step guide covering ONNX export and all the code changes required, see [CONTRIBUTING_MODEL.md](./CONTRIBUTING_MODEL.md).
 
 ## Create a Pull Request
 
