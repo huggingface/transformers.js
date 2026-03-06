@@ -57,10 +57,12 @@ const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
 // @ts-ignore - chrome may not exist in all environments
-const IS_CHROME_AVAILABLE = typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
+const IS_CHROME_AVAILABLE =
+    typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
 
 // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
-const IS_SERVICE_WORKER_ENV = typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
+const IS_SERVICE_WORKER_ENV =
+    typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
 
 /**
  * Check if the current environment is Safari browser.

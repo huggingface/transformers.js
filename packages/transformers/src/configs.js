@@ -397,7 +397,7 @@ export function getCacheShapes(config, options) {
         }
         return cache_values;
     } else if (['qwen3_5', 'qwen3_5_moe'].includes(config.model_type)) {
-        return getCacheShapes(/**@type {any} */(config).text_config, options);
+        return getCacheShapes(/**@type {any} */ (config).text_config, options);
     }
 
     return getKeyValueShapes(config, options);
