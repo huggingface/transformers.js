@@ -56,12 +56,12 @@ const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 
-// @ts-ignore - chrome may not exist in all environments
 const IS_CHROME_AVAILABLE =
+    // @ts-ignore - chrome may not exist in all environments
     typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
 
-// @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
 const IS_SERVICE_WORKER_ENV =
+    // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
     typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
 
 /**
