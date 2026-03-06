@@ -361,6 +361,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['qwen2_vl', 'Qwen2VLForConditionalGeneration'],
     ['qwen2_5_vl', 'Qwen2_5_VLForConditionalGeneration'],
     ['qwen3_vl', 'Qwen3VLForConditionalGeneration'],
+    ['qwen3_vl_moe', 'Qwen3VLMoeForConditionalGeneration'],
     ['qwen3_5', 'Qwen3_5ForConditionalGeneration'],
     ['qwen3_5_moe', 'Qwen3_5MoeForConditionalGeneration'],
     ['idefics3', 'Idefics3ForConditionalGeneration'],

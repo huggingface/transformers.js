@@ -130,6 +130,7 @@ export * from './qwen3/modeling_qwen3.js';
 export * from './qwen3_moe/modeling_qwen3_moe.js';
 export * from './qwen3_next/modeling_qwen3_next.js';
 export * from './qwen3_vl/modeling_qwen3_vl.js';
+export * from './qwen3_vl_moe/modeling_qwen3_vl_moe.js';
 export * from './qwen3_5/modeling_qwen3_5.js';
 export * from './qwen3_5_moe/modeling_qwen3_5_moe.js';
 export * from './resnet/modeling_resnet.js';
