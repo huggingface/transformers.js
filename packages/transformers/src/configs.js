@@ -76,6 +76,7 @@ function getNormalizedConfig(config) {
         case 'mistral3':
         case 'qwen2_5_vl':
         case 'qwen3_vl':
+        case 'qwen3_vl_moe':
             // @ts-expect-error TS2339
             init_normalized_config = getNormalizedConfig(config.text_config);
             break;
@@ -132,9 +133,12 @@ function getNormalizedConfig(config) {
         case 'mistral':
         case 'starcoder2':
         case 'qwen2':
+        case 'qwen2_moe':
         case 'qwen2_vl':
         case 'qwen2_5_vl_text':
+        case 'qwen3_moe':
         case 'qwen3_vl_text':
+        case 'qwen3_vl_moe_text':
         case 'phi':
         case 'phi3':
         case 'phi3_v':
@@ -348,7 +352,7 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-    } else if (['qwen3_5', 'qwen3_5_moe'].includes(config.model_type)) {
+    } else if (['qwen3_next', 'qwen3_5_text', 'qwen3_5_moe_text'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
 
@@ -365,7 +369,7 @@ export function getCacheShapes(config, options) {
             linear_key_head_dim,
             linear_value_head_dim,
             linear_conv_kernel_dim,
-        } = /** @type {any} */ (config).text_config;
+        } = /** @type {any} */ (config);
 
         const key_dim = linear_key_head_dim * linear_num_key_heads;
         const value_dim = linear_value_head_dim * linear_num_value_heads;
@@ -392,7 +396,10 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
+    } else if (['qwen3_5', 'qwen3_5_moe'].includes(config.model_type)) {
+        return getCacheShapes(/**@type {any} */(config).text_config, options);
     }
+
     return getKeyValueShapes(config, options);
 }
 
