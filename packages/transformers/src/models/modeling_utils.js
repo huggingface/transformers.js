@@ -118,6 +118,7 @@ export const MODEL_TYPES = {
     ImageAudioTextToText: 13,
     Supertonic: 14,
     Chatterbox: 15,
+    MultimodalLanguageModelOnly: 16,
 };
 
 const MODEL_TYPE_CONFIG = {
@@ -125,64 +126,149 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
+        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
+        decoder_name: 'model',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.DecoderOnlyWithoutHead]: {
         can_generate: false,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
+        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
     [MODEL_TYPES.Seq2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
+        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Vision2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
+        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Musicgen]: {
         can_generate: true,
         forward: seq2seq_forward,
+        sessions: () => ({ model: 'text_encoder', decoder_model_merged: 'decoder_model_merged', encodec_decode: 'encodec_decode' }),
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.EncoderDecoder]: {
         can_generate: false,
         forward: seq2seq_forward,
+        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
+        decoder_name: 'decoder_model_merged',
+    },
+    [MODEL_TYPES.MaskGeneration]: {
+        sessions: () => ({ model: 'vision_encoder', prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder' }),
     },
     [MODEL_TYPES.ImageTextToText]: {
         can_generate: true,
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        sessions: (config) => {
+            const s = { embed_tokens: 'embed_tokens', vision_encoder: 'vision_encoder', decoder_model_merged: 'decoder_model_merged' };
+            if (config.is_encoder_decoder) s['model'] = 'encoder_model';
+            return s;
+        },
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-    },
-    [MODEL_TYPES.Phi3V]: {
-        can_generate: true,
-        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        sessions: () => ({ embed_tokens: 'embed_tokens', audio_encoder: 'audio_encoder', decoder_model_merged: 'decoder_model_merged' }),
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        sessions: () => ({
+            embed_tokens: 'embed_tokens',
+            audio_encoder: 'audio_encoder',
+            vision_encoder: 'vision_encoder',
+            decoder_model_merged: 'decoder_model_merged',
+        }),
+        optional_configs: { generation_config: 'generation_config.json' },
+    },
+    [MODEL_TYPES.Phi3V]: {
+        can_generate: true,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        sessions: () => ({ prepare_inputs_embeds: 'prepare_inputs_embeds', model: 'model', vision_encoder: 'vision_encoder' }),
+        decoder_name: 'model',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.MultiModality]: {
         can_generate: true,
+        sessions: () => ({
+            prepare_inputs_embeds: 'prepare_inputs_embeds',
+            model: 'language_model',
+            lm_head: 'lm_head',
+            gen_head: 'gen_head',
+            gen_img_embeds: 'gen_img_embeds',
+            image_decode: 'image_decode',
+        }),
+        decoder_name: 'model',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AutoEncoder]: {
         can_generate: false,
         forward: auto_encoder_forward,
+        sessions: () => ({ encoder_model: 'encoder_model', decoder_model: 'decoder_model' }),
+    },
+    [MODEL_TYPES.Supertonic]: {
+        sessions: () => ({ text_encoder: 'text_encoder', latent_denoiser: 'latent_denoiser', voice_decoder: 'voice_decoder' }),
     },
     [MODEL_TYPES.Chatterbox]: {
         can_generate: true,
         forward: encoder_forward,
+        sessions: () => ({
+            embed_tokens: 'embed_tokens',
+            speech_encoder: 'speech_encoder',
+            model: 'language_model',
+            conditional_decoder: 'conditional_decoder',
+        }),
+        decoder_name: 'model',
+        optional_configs: { generation_config: 'generation_config.json' },
+    },
+    [MODEL_TYPES.MultimodalLanguageModelOnly]: {
+        can_generate: true,
+        forward: image_text_to_text_forward,
+        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        sessions: () => ({ embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' }),
+        decoder_name: 'decoder_model_merged',
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     default: {
         can_generate: false,
         forward: encoder_forward,
+        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
 };
+
+/**
+ * Get the session configuration for a given model type.
+ * @param {number} modelType The model type enum value.
+ * @param {Object} config The model config.
+ * @param {Object} [options] Loading options.
+ * @returns {{ sessions: Record<string, string>, decoder_name?: string, optional_configs?: Record<string, string> }}
+ */
+export function getSessionsConfig(modelType, config, options = {}) {
+    const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+    return {
+        sessions: typeConfig.sessions(config, options),
+        decoder_name: typeConfig.decoder_name,
+        optional_configs: typeConfig.optional_configs,
+    };
+}
 
 export const MODEL_TYPE_MAPPING = new Map();
 export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
@@ -290,246 +376,27 @@ export class PreTrainedModel extends Callable {
 
         config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
-        let info;
-        if (modelType === MODEL_TYPES.DecoderOnly) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: options.model_file_name ?? 'model',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'encoder_model',
-                        decoder_model_merged: 'decoder_model_merged',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.MaskGeneration) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'vision_encoder',
-                        prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.EncoderDecoder) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'encoder_model',
-                        decoder_model_merged: 'decoder_model_merged',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.ImageTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                vision_encoder: 'vision_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            if (config.is_encoder_decoder) {
-                sessions['model'] = 'encoder_model';
+        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+
+        if (modelType === undefined) {
+            const type = modelName ?? config?.model_type;
+            if (type !== 'custom') {
+                logger.warn(
+                    `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
+                );
             }
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.AudioTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                audio_encoder: 'audio_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.ImageAudioTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                audio_encoder: 'audio_encoder',
-                vision_encoder: 'vision_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Musicgen) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'text_encoder',
-                        decoder_model_merged: 'decoder_model_merged',
-                        encodec_decode: 'encodec_decode',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.MultiModality) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        prepare_inputs_embeds: 'prepare_inputs_embeds',
-                        model: 'language_model',
-                        lm_head: 'lm_head',
-                        gen_head: 'gen_head',
-                        gen_img_embeds: 'gen_img_embeds',
-                        image_decode: 'image_decode',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Phi3V) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        prepare_inputs_embeds: 'prepare_inputs_embeds',
-                        model: 'model',
-                        vision_encoder: 'vision_encoder',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Chatterbox) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        embed_tokens: 'embed_tokens',
-                        speech_encoder: 'speech_encoder',
-                        model: 'language_model',
-                        conditional_decoder: 'conditional_decoder',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.AutoEncoder) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        encoder_model: 'encoder_model',
-                        decoder_model: 'decoder_model',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Supertonic) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        text_encoder: 'text_encoder',
-                        latent_denoiser: 'latent_denoiser',
-                        voice_decoder: 'voice_decoder',
-                    },
-                    options,
-                ),
-            ]);
-        } else {
-            // should be MODEL_TYPES.EncoderOnly or MODEL_TYPES.DecoderOnlyWithoutHead
-            if (modelType === undefined) {
-                const type = modelName ?? config?.model_type;
-                if (type !== 'custom') {
-                    logger.warn(
-                        `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
-                    );
-                }
-            }
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: options.model_file_name ?? 'model',
-                    },
-                    options,
-                ),
-            ]);
         }
+
+        const sessions = typeConfig.sessions(config, options);
+        const promises = [
+            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.decoder_name),
+        ];
+        if (typeConfig.optional_configs) {
+            promises.push(
+                get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options),
+            );
+        }
+        const info = await Promise.all(promises);
 
         // @ts-ignore
         return new this(config, ...info);

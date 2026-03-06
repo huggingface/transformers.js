@@ -1,7 +1,7 @@
 import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import { MODEL_TYPES, MODEL_TYPE_MAPPING, MODEL_MAPPING_NAMES } from '../../models/modeling_utils.js';
+import { MODEL_TYPES, MODEL_TYPE_MAPPING, MODEL_MAPPING_NAMES, getSessionsConfig } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
 import { logger } from '../logger.js';
@@ -110,83 +110,19 @@ export async function get_model_files(
         }
     };
 
-    // model_file_name overrides the default ONNX file name for single-model architectures
-    // (encoder-only, decoder-only). Multi-component models use fixed names.
-    const singleModelName = model_file_name ?? 'model';
+    // Get session configuration from the shared source of truth
+    const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
 
-    // Add model files based on model type
-    if (modelType === MODEL_TYPES.DecoderOnly) {
-        add_model_file('model', singleModelName);
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.DecoderOnlyWithoutHead) {
-        add_model_file('model', singleModelName);
-        // Do not load generation_config.json for models without generation head
-    } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
-        add_model_file('model', 'encoder_model');
-        add_model_file('decoder_model_merged');
-        // Note: generation_config.json is only loaded for generation models (e.g., T5ForConditionalGeneration)
-        // not for base models (e.g., T5Model). Since we can't determine the specific class here,
-        // we include it as it's loaded for most use cases.
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.MaskGeneration) {
-        add_model_file('model', 'vision_encoder');
-        add_model_file('prompt_encoder_mask_decoder');
-    } else if (modelType === MODEL_TYPES.EncoderDecoder) {
-        add_model_file('model', 'encoder_model');
-        add_model_file('decoder_model_merged');
-    } else if (modelType === MODEL_TYPES.ImageTextToText) {
-        add_model_file('embed_tokens');
-        add_model_file('vision_encoder');
-        add_model_file('decoder_model_merged');
-        if (config.is_encoder_decoder) {
-            add_model_file('model', 'encoder_model');
+    // Add model files based on sessions
+    for (const [sessionKey, baseName] of Object.entries(sessions)) {
+        add_model_file(sessionKey, baseName);
+    }
+
+    // Add optional config files
+    if (optional_configs) {
+        for (const configFile of Object.values(optional_configs)) {
+            files.push(configFile);
         }
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.AudioTextToText) {
-        add_model_file('embed_tokens');
-        add_model_file('audio_encoder');
-        add_model_file('decoder_model_merged');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.ImageAudioTextToText) {
-        add_model_file('embed_tokens');
-        add_model_file('audio_encoder');
-        add_model_file('vision_encoder');
-        add_model_file('decoder_model_merged');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.Musicgen) {
-        add_model_file('model', 'text_encoder');
-        add_model_file('decoder_model_merged');
-        add_model_file('encodec_decode');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.MultiModality) {
-        add_model_file('prepare_inputs_embeds');
-        add_model_file('model', 'language_model');
-        add_model_file('lm_head');
-        add_model_file('gen_head');
-        add_model_file('gen_img_embeds');
-        add_model_file('image_decode');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.Phi3V) {
-        add_model_file('prepare_inputs_embeds');
-        add_model_file('model');
-        add_model_file('vision_encoder');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.Chatterbox) {
-        add_model_file('embed_tokens');
-        add_model_file('speech_encoder');
-        add_model_file('model', 'language_model');
-        add_model_file('conditional_decoder');
-        files.push('generation_config.json');
-    } else if (modelType === MODEL_TYPES.AutoEncoder) {
-        add_model_file('encoder_model');
-        add_model_file('decoder_model');
-    } else if (modelType === MODEL_TYPES.Supertonic) {
-        add_model_file('text_encoder');
-        add_model_file('latent_denoiser');
-        add_model_file('voice_decoder');
-    } else {
-        // MODEL_TYPES.EncoderOnly or unknown
-        add_model_file('model', singleModelName);
     }
 
     return files;
