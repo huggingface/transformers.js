@@ -352,7 +352,7 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-    } else if (['qwen3_next', 'qwen3_5_text', 'qwen3_5_moe_text'].includes(config.model_type)) {
+    } else if (['qwen3_next', 'qwen3_5_text', 'qwen3_5_moe_text', 'olmo_hybrid'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
 
@@ -374,8 +374,6 @@ export function getCacheShapes(config, options) {
         const key_dim = linear_key_head_dim * linear_num_key_heads;
         const value_dim = linear_value_head_dim * linear_num_value_heads;
 
-        const conv_dim = key_dim * 2 + value_dim;
-
         const final_head_dim = head_dim ?? hidden_size / num_attention_heads;
         const batch_size = options?.batch_size ?? 1;
         for (let i = 0; i < layer_types.length; ++i) {
@@ -384,7 +382,14 @@ export function getCacheShapes(config, options) {
                     cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, final_head_dim];
                 }
             } else if (layer_types[i] === 'linear_attention') {
-                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_dim, linear_conv_kernel_dim];
+                if (config.model_type === 'olmo_hybrid') {
+                    cache_values[`${conv_prefix}_conv.${i}.key`] = [batch_size, key_dim, linear_conv_kernel_dim];
+                    cache_values[`${conv_prefix}_conv.${i}.value`] = [batch_size, value_dim, linear_conv_kernel_dim];
+                    cache_values[`${conv_prefix}_conv.${i}.query`] = [batch_size, key_dim, linear_conv_kernel_dim];
+                } else {
+                    const conv_dim = key_dim * 2 + value_dim;
+                    cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_dim, linear_conv_kernel_dim];
+                }
                 cache_values[`${conv_prefix}_recurrent.${i}`] = [
                     batch_size,
                     linear_num_value_heads,

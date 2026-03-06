@@ -108,6 +108,7 @@ export * from './nomic_bert/modeling_nomic_bert.js';
 export * from './olmo/modeling_olmo.js';
 export * from './olmo2/modeling_olmo2.js';
 export * from './olmo3/modeling_olmo3.js';
+export * from './olmo_hybrid/modeling_olmo_hybrid.js';
 export * from './openelm/modeling_openelm.js';
 export * from './opt/modeling_opt.js';
 export * from './owlv2/modeling_owlv2.js';
