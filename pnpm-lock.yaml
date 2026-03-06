@@ -24,11 +24,11 @@ importers:
         specifier: ^0.1.2
         version: 0.1.2
       onnxruntime-node:
-        specifier: 1.24.2
-        version: 1.24.2
+        specifier: 1.24.3
+        version: 1.24.3
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260228-6e72d31970
-        version: 1.25.0-dev.20260228-6e72d31970
+        specifier: 1.25.0-dev.20260303-e7e64dc112
+        version: 1.25.0-dev.20260303-e7e64dc112
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -1688,15 +1688,15 @@ packages:
   onnxruntime-common@1.24.0-dev.20251116-b39e144322:
     resolution: {integrity: sha512-BOoomdHYmNRL5r4iQ4bMvsl2t0/hzVQ3OM3PHD0gxeXu1PmggqBv3puZicEUVOA3AtHHYmqZtjMj9FOfGrATTw==}
 
-  onnxruntime-common@1.24.2:
-    resolution: {integrity: sha512-S0FFhJaI05jr1c3HVJ/DuPFB/aYdXmnUBuuQfuvLtcNn7WAfpm2ewSXn1vHs9Wa1l8T8OznhfCEdFv8qCn0/xw==}
+  onnxruntime-common@1.24.3:
+    resolution: {integrity: sha512-GeuPZO6U/LBJXvwdaqHbuUmoXiEdeCjWi/EG7Y1HNnDwJYuk6WUbNXpF6luSUY8yASul3cmUlLGrCCL1ZgVXqA==}
 
-  onnxruntime-node@1.24.2:
-    resolution: {integrity: sha512-ZtTkUHNNk+Xpi2Sq2BcFjzc9Vx4n3o5RxYLgRvdrFzCBsGUU1dQRFf4LM9tCc7vFhPSoZqbvzZtkzRMXoDqKNg==}
+  onnxruntime-node@1.24.3:
+    resolution: {integrity: sha512-JH7+czbc8ALA819vlTgcV+Q214/+VjGeBHDjX81+ZCD0PCVCIFGFNtT0V4sXG/1JXypKPgScQcB3ij/hk3YnTg==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260228-6e72d31970:
-    resolution: {integrity: sha512-8CPC7/P3kAJyC4U40rioGUwKatIcH8K4VDoqGa72jdUgbYJbZ2dsUW4qI8hPYfmo4bJxWDtjZJeaGB1Ld5EZUA==}
+  onnxruntime-web@1.25.0-dev.20260303-e7e64dc112:
+    resolution: {integrity: sha512-ZXyMjd56n9bO/62Hnf97xNxPPzu2t4mDSL7PLwQXyIIh/vMq9Fbmv7vALDTVhayBca1t13f3LOEEP2F9gohyvg==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -3825,15 +3825,15 @@ snapshots:
 
   onnxruntime-common@1.24.0-dev.20251116-b39e144322: {}
 
-  onnxruntime-common@1.24.2: {}
+  onnxruntime-common@1.24.3: {}
 
-  onnxruntime-node@1.24.2:
+  onnxruntime-node@1.24.3:
     dependencies:
       adm-zip: 0.5.16
       global-agent: 3.0.0
-      onnxruntime-common: 1.24.2
+      onnxruntime-common: 1.24.3
 
-  onnxruntime-web@1.25.0-dev.20260228-6e72d31970:
+  onnxruntime-web@1.25.0-dev.20260303-e7e64dc112:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
