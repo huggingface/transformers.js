@@ -135,6 +135,7 @@ function getNormalizedConfig(config) {
         case 'qwen2':
         case 'qwen2_moe':
         case 'qwen2_vl':
+        case 'qwen2_vl_text':
         case 'qwen2_5_vl_text':
         case 'qwen3_moe':
         case 'qwen3_vl_text':

@@ -1389,10 +1389,13 @@ export async function generic_text_to_text_forward(
             // Handle special case for qwen vl models
             [
                 'qwen2_vl',
+                'qwen2_vl_text',
                 'qwen2_5_vl',
                 'qwen2_5_vl_text',
                 'qwen3_vl',
                 'qwen3_vl_text',
+                'qwen3_vl_moe',
+                'qwen3_vl_moe_text',
                 'qwen3_5',
                 'qwen3_5_text',
                 'qwen3_5_moe',
