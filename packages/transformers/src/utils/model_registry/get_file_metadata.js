@@ -34,7 +34,7 @@ async function fetch_file_head(urlOrPath) {
 
     const headers = getFetchHeaders(urlOrPath);
     headers.set('Range', 'bytes=0-0');
-    return env.fetch(urlOrPath, { method: 'GET', headers });
+    return env.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
 }
 
 /**
