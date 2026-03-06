@@ -224,6 +224,11 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime.
  * Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
+ * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
+ * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
+ * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
+ * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
 
@@ -269,6 +274,8 @@ export const env = {
 
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
     cacheKey: 'transformers-cache',
+
+    experimental_useCrossOriginStorage: false,
 
     /////////////////// Custom fetch /////////////////////
     fetch: DEFAULT_FETCH,

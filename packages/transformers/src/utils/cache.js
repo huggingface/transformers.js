@@ -1,6 +1,7 @@
 import { apis, env } from '../env.js';
 import { FileCache } from './cache/FileCache.js';
 import { logger } from './logger.js';
+import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -36,6 +37,10 @@ export async function getCache(file_cache_dir = null) {
             );
         }
         cache = env.customCache;
+    }
+
+    if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
+        cache = new CrossOriginStorage();
     }
 
     if (!cache && env.useBrowserCache) {
