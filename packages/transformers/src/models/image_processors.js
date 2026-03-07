@@ -14,6 +14,7 @@ export * from './grounding_dino/image_processing_grounding_dino.js';
 export * from './idefics3/image_processing_idefics3.js';
 export * from './janus/image_processing_janus.js';
 export * from './jina_clip/image_processing_jina_clip.js';
+export * from './lfm2_vl/image_processing_lfm2_vl.js';
 export * from './llava_onevision/image_processing_llava_onevision.js';
 export * from './mask2former/image_processing_mask2former.js';
 export * from './maskformer/image_processing_maskformer.js';
