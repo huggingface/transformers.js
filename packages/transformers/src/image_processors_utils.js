@@ -14,7 +14,7 @@ import { logger } from './utils/logger.js';
  */
 
 /**
- * @typedef {object} ImageProcessorResult
+ * @typedef {Object} ImageProcessorResult
  * @property {Tensor} pixel_values The pixel values of the batched preprocessed images.
  * @property {HeightWidth[]} original_sizes Array of two-dimensional tuples like [[480, 640]].
  * @property {HeightWidth[]} reshaped_input_sizes Array of two-dimensional tuples like [[1000, 1330]].
@@ -886,7 +886,7 @@ export class ImageProcessor extends Callable {
     }
 
     /**
-     * @typedef {object} PreprocessedImage
+     * @typedef {Object} PreprocessedImage
      * @property {HeightWidth} original_size The original size of the image.
      * @property {HeightWidth} reshaped_input_size The reshaped input size of the image.
      * @property {Tensor} pixel_values The pixel values of the preprocessed image.

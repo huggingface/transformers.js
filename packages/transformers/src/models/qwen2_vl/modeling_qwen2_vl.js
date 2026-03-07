@@ -22,6 +22,9 @@ export class Qwen2VLPreTrainedModel extends PreTrainedModel {
     ];
 }
 export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
+    // NOTE: This is used as the base class for all Qwen VL models and their CausalLM variants.
+    // CausalLM variants (e.g., Qwen2VLForCausalLM) extend this class but load only
+    // embed_tokens + decoder_model_merged (no vision_encoder) via MultimodalLanguageModelOnly type.
     image_grid_thw_name = 'grid_thw';
 
     /**
@@ -287,3 +290,5 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         return model_inputs;
     }
 }
+
+export class Qwen2VLForCausalLM extends Qwen2VLForConditionalGeneration {}

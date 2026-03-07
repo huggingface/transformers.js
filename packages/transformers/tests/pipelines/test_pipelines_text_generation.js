@@ -106,4 +106,58 @@ export default () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
   });
+
+  describe("Text Generation (Qwen3_5 VL model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Qwen3_5ForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "\u0e1e\u0e22\u0e32\u0e1a\u0e32\u0e25Composition directives" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text Generation (Gemma3n model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Gemma3nForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "<unused1821>\u0443\u0440\u0430corporate" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
 };

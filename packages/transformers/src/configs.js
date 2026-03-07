@@ -72,6 +72,7 @@ function getNormalizedConfig(config) {
         case 'voxtral':
         case 'smolvlm':
         case 'gemma3n':
+        case 'lfm2_vl':
         case 'chatterbox':
         case 'mistral3':
         case 'qwen2_5_vl':
@@ -135,6 +136,7 @@ function getNormalizedConfig(config) {
         case 'qwen2':
         case 'qwen2_moe':
         case 'qwen2_vl':
+        case 'qwen2_vl_text':
         case 'qwen2_5_vl_text':
         case 'qwen3_moe':
         case 'qwen3_vl_text':
@@ -401,7 +403,7 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-    } else if (['qwen3_5', 'qwen3_5_moe'].includes(config.model_type)) {
+    } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe'].includes(config.model_type)) {
         return getCacheShapes(/**@type {any} */ (config).text_config, options);
     }
 
