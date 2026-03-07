@@ -72,6 +72,7 @@ function getNormalizedConfig(config) {
         case 'voxtral':
         case 'smolvlm':
         case 'gemma3n':
+        case 'lfm2_vl':
         case 'chatterbox':
         case 'mistral3':
         case 'qwen2_5_vl':
