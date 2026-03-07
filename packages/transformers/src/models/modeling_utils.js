@@ -155,7 +155,11 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.Musicgen]: {
         can_generate: true,
         forward: seq2seq_forward,
-        sessions: () => ({ model: 'text_encoder', decoder_model_merged: 'decoder_model_merged', encodec_decode: 'encodec_decode' }),
+        sessions: () => ({
+            model: 'text_encoder',
+            decoder_model_merged: 'decoder_model_merged',
+            encodec_decode: 'encodec_decode',
+        }),
         decoder_name: 'decoder_model_merged',
         optional_configs: { generation_config: 'generation_config.json' },
     },
@@ -173,7 +177,11 @@ const MODEL_TYPE_CONFIG = {
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
         sessions: (config) => {
-            const s = { embed_tokens: 'embed_tokens', vision_encoder: 'vision_encoder', decoder_model_merged: 'decoder_model_merged' };
+            const s = {
+                embed_tokens: 'embed_tokens',
+                vision_encoder: 'vision_encoder',
+                decoder_model_merged: 'decoder_model_merged',
+            };
             if (config.is_encoder_decoder) s['model'] = 'encoder_model';
             return s;
         },
@@ -184,7 +192,11 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({ embed_tokens: 'embed_tokens', audio_encoder: 'audio_encoder', decoder_model_merged: 'decoder_model_merged' }),
+        sessions: () => ({
+            embed_tokens: 'embed_tokens',
+            audio_encoder: 'audio_encoder',
+            decoder_model_merged: 'decoder_model_merged',
+        }),
         decoder_name: 'decoder_model_merged',
         optional_configs: { generation_config: 'generation_config.json' },
     },
@@ -202,7 +214,11 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.Phi3V]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({ prepare_inputs_embeds: 'prepare_inputs_embeds', model: 'model', vision_encoder: 'vision_encoder' }),
+        sessions: () => ({
+            prepare_inputs_embeds: 'prepare_inputs_embeds',
+            model: 'model',
+            vision_encoder: 'vision_encoder',
+        }),
         decoder_name: 'model',
         optional_configs: { generation_config: 'generation_config.json' },
     },
@@ -225,7 +241,11 @@ const MODEL_TYPE_CONFIG = {
         sessions: () => ({ encoder_model: 'encoder_model', decoder_model: 'decoder_model' }),
     },
     [MODEL_TYPES.Supertonic]: {
-        sessions: () => ({ text_encoder: 'text_encoder', latent_denoiser: 'latent_denoiser', voice_decoder: 'voice_decoder' }),
+        sessions: () => ({
+            text_encoder: 'text_encoder',
+            latent_denoiser: 'latent_denoiser',
+            voice_decoder: 'voice_decoder',
+        }),
     },
     [MODEL_TYPES.Chatterbox]: {
         can_generate: true,
@@ -388,13 +408,9 @@ export class PreTrainedModel extends Callable {
         }
 
         const sessions = typeConfig.sessions(config, options);
-        const promises = [
-            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.decoder_name),
-        ];
+        const promises = [constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.decoder_name)];
         if (typeConfig.optional_configs) {
-            promises.push(
-                get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options),
-            );
+            promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
         }
         const info = await Promise.all(promises);
 

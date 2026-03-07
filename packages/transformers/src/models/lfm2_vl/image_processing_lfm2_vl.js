@@ -98,8 +98,8 @@ function smart_resize(height, width, downsample_factor, min_image_tokens, max_im
         w_bar = Math.max(total_factor, Math.floor(width / beta / total_factor) * total_factor);
     } else if (h_bar * w_bar < min_pixels) {
         const beta = Math.sqrt(min_pixels / (height * width));
-        h_bar = Math.ceil(height * beta / total_factor) * total_factor;
-        w_bar = Math.ceil(width * beta / total_factor) * total_factor;
+        h_bar = Math.ceil((height * beta) / total_factor) * total_factor;
+        w_bar = Math.ceil((width * beta) / total_factor) * total_factor;
     }
 
     return [w_bar, h_bar];
@@ -211,7 +211,10 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const total_factor = this.encoder_patch_size * this.downsample_factor;
         const h_bar = Math.max(this.encoder_patch_size, round_by_factor(height, total_factor));
         const w_bar = Math.max(this.encoder_patch_size, round_by_factor(width, total_factor));
-        return h_bar * w_bar > this.max_image_tokens * (this.encoder_patch_size * this.downsample_factor) ** 2 * this.max_pixels_tolerance;
+        return (
+            h_bar * w_bar >
+            this.max_image_tokens * (this.encoder_patch_size * this.downsample_factor) ** 2 * this.max_pixels_tolerance
+        );
     }
 
     /**
@@ -223,7 +226,11 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
     _get_grid_layout(height, width) {
         const target_ratios = get_target_ratios(this.min_tiles, this.max_tiles);
         const [grid_width, grid_height] = find_closest_aspect_ratio(
-            width / height, target_ratios, width, height, this.tile_size,
+            width / height,
+            target_ratios,
+            width,
+            height,
+            this.tile_size,
         );
         return {
             grid_width,
@@ -262,18 +269,19 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const all_image_sizes = [];
 
         for (const image_batch of batched_images) {
-            const preprocessed = await Promise.all(
-                image_batch.map(x => this.preprocess(x, { do_pad: false })),
-            );
+            const preprocessed = await Promise.all(image_batch.map((x) => this.preprocess(x, { do_pad: false })));
 
             for (const { pixel_values } of preprocessed) {
                 const img = pixel_values.unsqueeze_(0);
                 const [, , height, width] = img.dims;
 
                 const [new_width, new_height] = smart_resize(
-                    height, width,
-                    this.downsample_factor, this.min_image_tokens,
-                    this.max_image_tokens, this.encoder_patch_size,
+                    height,
+                    width,
+                    this.downsample_factor,
+                    this.min_image_tokens,
+                    this.max_image_tokens,
+                    this.encoder_patch_size,
                 );
 
                 /** @type {Tensor[]} */
@@ -284,8 +292,10 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
                 const do_splitting = this.do_image_splitting && !(this.min_tiles === 1 && this.max_tiles === 1);
 
                 if (is_large && do_splitting) {
-                    const { grid_width, grid_height, target_width, target_height } =
-                        this._get_grid_layout(height, width);
+                    const { grid_width, grid_height, target_width, target_height } = this._get_grid_layout(
+                        height,
+                        width,
+                    );
                     num_rows = grid_height;
                     num_cols = grid_width;
 
@@ -334,11 +344,10 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const result = {
             pixel_values: cat(all_pixel_values, 0),
             pixel_attention_mask: stack(all_pixel_masks, 0),
-            spatial_shapes: new Tensor(
-                'int64',
-                BigInt64Array.from(all_spatial_shapes.flat(), BigInt),
-                [all_spatial_shapes.length, 2],
-            ),
+            spatial_shapes: new Tensor('int64', BigInt64Array.from(all_spatial_shapes.flat(), BigInt), [
+                all_spatial_shapes.length,
+                2,
+            ]),
         };
 
         if (return_row_col_info) {

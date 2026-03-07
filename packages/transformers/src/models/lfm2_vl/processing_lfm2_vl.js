@@ -113,13 +113,20 @@ export class Lfm2VlProcessor extends Processor {
                 const result = [parts[0]];
                 for (let i = 1; i < parts.length; ++i) {
                     const tokens_for_image = this._compute_tokens_for_image(
-                        image_sizes[image_idx], encoder_patch_size, downsample_factor,
+                        image_sizes[image_idx],
+                        encoder_patch_size,
+                        downsample_factor,
                     );
-                    result.push(this._build_image_tokens(
-                        image_rows[image_idx], image_cols[image_idx],
-                        tokens_per_tile, tokens_for_image,
-                        image_token, use_thumbnail,
-                    ));
+                    result.push(
+                        this._build_image_tokens(
+                            image_rows[image_idx],
+                            image_cols[image_idx],
+                            tokens_per_tile,
+                            tokens_for_image,
+                            image_token,
+                            use_thumbnail,
+                        ),
+                    );
                     result.push(parts[i]);
                     image_idx++;
                 }

@@ -1,7 +1,12 @@
 import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import { MODEL_TYPES, MODEL_TYPE_MAPPING, MODEL_MAPPING_NAMES, getSessionsConfig } from '../../models/modeling_utils.js';
+import {
+    MODEL_TYPES,
+    MODEL_TYPE_MAPPING,
+    MODEL_MAPPING_NAMES,
+    getSessionsConfig,
+} from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
 import { logger } from '../logger.js';

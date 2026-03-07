@@ -13,8 +13,12 @@ export class Lfm2VlForConditionalGeneration extends LlavaForConditionalGeneratio
     ];
 
     async encode_image({ pixel_values, pixel_attention_mask, spatial_shapes }) {
-        return (await sessionRun(this.sessions['vision_encoder'], {
-            pixel_values, pixel_attention_mask, spatial_shapes,
-        })).image_features;
+        return (
+            await sessionRun(this.sessions['vision_encoder'], {
+                pixel_values,
+                pixel_attention_mask,
+                spatial_shapes,
+            })
+        ).image_features;
     }
 }
