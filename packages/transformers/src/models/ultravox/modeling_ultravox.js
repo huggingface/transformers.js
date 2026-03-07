@@ -17,5 +17,3 @@ export class UltravoxModel extends UltravoxPreTrainedModel {
         });
     }
 }
-
-export class VoxtralForConditionalGeneration extends UltravoxModel {}
