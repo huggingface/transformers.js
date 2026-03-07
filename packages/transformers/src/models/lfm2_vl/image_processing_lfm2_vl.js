@@ -110,7 +110,8 @@ function smart_resize(height, width, downsample_factor, min_image_tokens, max_im
  */
 function convert_image_to_patches(images, patch_size) {
     const [B, C, H, W] = images.dims;
-    const ph = Math.floor(H / patch_size), pw = Math.floor(W / patch_size);
+    const ph = Math.floor(H / patch_size),
+        pw = Math.floor(W / patch_size);
     const patch_dim = patch_size * patch_size * C;
     const data = /** @type {Float32Array} */ (images.data);
     const result = new Float32Array(B * ph * pw * patch_dim);
@@ -220,7 +221,7 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
 
     /** @param {RawImage|RawImage[]|RawImage[][]} images */
     // @ts-expect-error
-    async _call(images, kwargs = {}) {
+    async _call(images, { return_row_col_info = null } = {}) {
         /** @type {RawImage[][]} */
         let batched_images;
         if (!Array.isArray(images)) {
@@ -230,8 +231,6 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         } else {
             batched_images = /** @type {RawImage[][]} */ (images);
         }
-
-        const return_row_col_info = kwargs.return_row_col_info ?? this.return_row_col_info;
 
         /** @type {Tensor[]} */
         const all_pixel_values = [];
@@ -264,7 +263,8 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
 
                 /** @type {Tensor[]} */
                 let tiles;
-                let num_rows = 1, num_cols  = 1;
+                let num_rows = 1,
+                    num_cols = 1;
 
                 const is_large = this._is_image_too_large(height, width);
                 const do_splitting = this.do_image_splitting && !(this.min_tiles === 1 && this.max_tiles === 1);
@@ -320,10 +320,13 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const result = {
             pixel_values: cat(all_pixel_values, 0),
             pixel_attention_mask: stack(all_pixel_masks, 0),
-            spatial_shapes: new Tensor('int64', BigInt64Array.from(all_spatial_shapes.flat(), BigInt), [all_spatial_shapes.length, 2]),
+            spatial_shapes: new Tensor('int64', BigInt64Array.from(all_spatial_shapes.flat(), BigInt), [
+                all_spatial_shapes.length,
+                2,
+            ]),
         };
 
-        if (return_row_col_info) {
+        if (return_row_col_info ?? this.return_row_col_info) {
             result.image_rows = all_rows;
             result.image_cols = all_cols;
             result.image_sizes = all_image_sizes;
