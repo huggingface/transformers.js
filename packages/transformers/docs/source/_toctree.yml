@@ -88,8 +88,6 @@
           title: Tensor
         - local: api/utils/maths
           title: Maths
-        - local: api/utils/data-structures
-          title: Data Structures
         - local: api/utils/logger
           title: Logger
         - local: api/utils/random
