@@ -275,6 +275,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['gemma2', 'Gemma2ForCausalLM'],
     ['vaultgemma', 'VaultGemmaForCausalLM'],
     ['gemma3_text', 'Gemma3ForCausalLM'],
+    ['gemma3', 'Gemma3ForCausalLM'],
     ['helium', 'HeliumForCausalLM'],
     ['glm', 'GlmForCausalLM'],
     ['openelm', 'OpenELMForCausalLM'],
