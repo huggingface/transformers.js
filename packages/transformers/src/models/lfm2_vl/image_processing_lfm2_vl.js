@@ -28,18 +28,13 @@ function find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, i
     let best_ratio_diff = Infinity;
     let best_ratio = [1, 1];
     const area = width * height;
-
     for (const ratio of target_ratios) {
-        const target_aspect_ratio = ratio[0] / ratio[1];
-        const ratio_diff = Math.abs(aspect_ratio - target_aspect_ratio);
-
+        const ratio_diff = Math.abs(aspect_ratio - ratio[0] / ratio[1]);
         if (ratio_diff < best_ratio_diff) {
             best_ratio_diff = ratio_diff;
             best_ratio = ratio;
-        } else if (ratio_diff === best_ratio_diff) {
-            if (area > 0.5 * image_size * image_size * ratio[0] * ratio[1]) {
-                best_ratio = ratio;
-            }
+        } else if (ratio_diff === best_ratio_diff && area > 0.5 * image_size * image_size * ratio[0] * ratio[1]) {
+            best_ratio = ratio;
         }
     }
     return best_ratio;
@@ -69,8 +64,7 @@ function get_target_ratios(min_tiles, max_tiles) {
             }
         }
     }
-    ratios.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
-    return ratios;
+    return ratios.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
 }
 
 /**
@@ -86,8 +80,9 @@ function get_target_ratios(min_tiles, max_tiles) {
  */
 function smart_resize(height, width, downsample_factor, min_image_tokens, max_image_tokens, encoder_patch_size) {
     const total_factor = encoder_patch_size * downsample_factor;
-    const min_pixels = min_image_tokens * (encoder_patch_size * downsample_factor) ** 2;
-    const max_pixels = max_image_tokens * (encoder_patch_size * downsample_factor) ** 2;
+    const f2 = total_factor ** 2;
+    const min_pixels = min_image_tokens * f2;
+    const max_pixels = max_image_tokens * f2;
 
     let h_bar = Math.max(total_factor, round_by_factor(height, total_factor));
     let w_bar = Math.max(total_factor, round_by_factor(width, total_factor));
@@ -114,32 +109,25 @@ function smart_resize(height, width, downsample_factor, min_image_tokens, max_im
  * @returns {Tensor} Shape: [batch, num_patches, patch_size * patch_size * channels]
  */
 function convert_image_to_patches(images, patch_size) {
-    const [batch_size, num_channels, image_height, image_width] = images.dims;
-    const num_patches_h = Math.floor(image_height / patch_size);
-    const num_patches_w = Math.floor(image_width / patch_size);
-    const num_patches = num_patches_h * num_patches_w;
-    const patch_dim = patch_size * patch_size * num_channels;
-
+    const [B, C, H, W] = images.dims;
+    const ph = Math.floor(H / patch_size), pw = Math.floor(W / patch_size);
+    const patch_dim = patch_size * patch_size * C;
     const data = /** @type {Float32Array} */ (images.data);
-    const result = new Float32Array(batch_size * num_patches * patch_dim);
+    const result = new Float32Array(B * ph * pw * patch_dim);
+    const ch_stride = H * W;
 
-    const channel_stride = image_height * image_width;
-    const batch_stride = num_channels * channel_stride;
-
-    for (let b = 0; b < batch_size; ++b) {
-        const b_src = b * batch_stride;
-        const b_dst = b * num_patches * patch_dim;
-        for (let ph = 0; ph < num_patches_h; ++ph) {
-            const y_base = ph * patch_size;
-            for (let pw = 0; pw < num_patches_w; ++pw) {
-                const x_base = pw * patch_size;
-                let offset = b_dst + (ph * num_patches_w + pw) * patch_dim;
-                for (let py = 0; py < patch_size; ++py) {
-                    const row_offset = (y_base + py) * image_width + x_base;
-                    for (let px = 0; px < patch_size; ++px) {
-                        const pixel_offset = row_offset + px;
-                        for (let c = 0; c < num_channels; ++c) {
-                            result[offset++] = data[b_src + c * channel_stride + pixel_offset];
+    for (let b = 0; b < B; ++b) {
+        const b_src = b * C * ch_stride;
+        const b_dst = b * ph * pw * patch_dim;
+        for (let py = 0; py < ph; ++py) {
+            for (let px = 0; px < pw; ++px) {
+                let off = b_dst + (py * pw + px) * patch_dim;
+                for (let dy = 0; dy < patch_size; ++dy) {
+                    const row = (py * patch_size + dy) * W + px * patch_size;
+                    for (let dx = 0; dx < patch_size; ++dx) {
+                        const pixel = row + dx;
+                        for (let c = 0; c < C; ++c) {
+                            result[off++] = data[b_src + c * ch_stride + pixel];
                         }
                     }
                 }
@@ -147,7 +135,7 @@ function convert_image_to_patches(images, patch_size) {
         }
     }
 
-    return new Tensor('float32', result, [batch_size, num_patches, patch_dim]);
+    return new Tensor('float32', result, [B, ph * pw, patch_dim]);
 }
 
 /**
@@ -157,33 +145,23 @@ function convert_image_to_patches(images, patch_size) {
  * @returns {{ padded: Tensor, mask: Tensor }}
  */
 function pad_along_first_dim(patches, target_length) {
-    const current_length = patches.dims[1];
-    const patch_dim = patches.dims[2];
-    const padding_length = target_length - current_length;
-
+    const [, len, dim] = patches.dims;
     const mask_data = new BigInt64Array(target_length);
-    mask_data.fill(1n, 0, current_length);
-    // Remaining is 0n by default
+    mask_data.fill(1n, 0, len);
 
-    let padded;
-    if (padding_length > 0) {
-        const padded_data = new Float32Array(target_length * patch_dim);
+    let padded = patches;
+    if (len < target_length) {
+        const padded_data = new Float32Array(target_length * dim);
         padded_data.set(/** @type {Float32Array} */ (patches.data));
-        padded = new Tensor('float32', padded_data, [1, target_length, patch_dim]);
-    } else {
-        padded = patches;
+        padded = new Tensor('float32', padded_data, [1, target_length, dim]);
     }
 
-    return {
-        padded,
-        mask: new Tensor('int64', mask_data, [target_length]),
-    };
+    return { padded, mask: new Tensor('int64', mask_data, [target_length]) };
 }
 
 export class Lfm2VlImageProcessor extends ImageProcessor {
     constructor(/** @type {Record<string, any>} */ config) {
         super(config);
-
         this.downsample_factor = config.downsample_factor ?? 2;
         this.do_image_splitting = config.do_image_splitting ?? true;
         this.min_tiles = config.min_tiles ?? 2;
@@ -286,7 +264,7 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
 
                 /** @type {Tensor[]} */
                 let tiles;
-                let num_rows, num_cols;
+                let num_rows = 1, num_cols  = 1;
 
                 const is_large = this._is_image_too_large(height, width);
                 const do_splitting = this.do_image_splitting && !(this.min_tiles === 1 && this.max_tiles === 1);
@@ -316,8 +294,6 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
                         tiles.push(await interpolate_4d(img, { size: [new_height, new_width] }));
                     }
                 } else {
-                    num_rows = 1;
-                    num_cols = 1;
                     tiles = [await interpolate_4d(img, { size: [new_height, new_width] })];
                 }
 
@@ -344,10 +320,7 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const result = {
             pixel_values: cat(all_pixel_values, 0),
             pixel_attention_mask: stack(all_pixel_masks, 0),
-            spatial_shapes: new Tensor('int64', BigInt64Array.from(all_spatial_shapes.flat(), BigInt), [
-                all_spatial_shapes.length,
-                2,
-            ]),
+            spatial_shapes: new Tensor('int64', BigInt64Array.from(all_spatial_shapes.flat(), BigInt), [all_spatial_shapes.length, 2]),
         };
 
         if (return_row_col_info) {
