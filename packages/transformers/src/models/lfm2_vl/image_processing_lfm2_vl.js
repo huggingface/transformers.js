@@ -1,6 +1,5 @@
 import { ImageProcessor } from '../../image_processors_utils.js';
-import { Tensor } from '../../utils/tensor.js';
-import { cat, interpolate_4d, stack } from '../../utils/tensor.js';
+import { Tensor, cat, interpolate_4d, stack } from '../../utils/tensor.js';
 
 /**
  * Returns the closest integer to `number` that is divisible by `factor`.
