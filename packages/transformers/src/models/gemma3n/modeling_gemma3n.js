@@ -115,3 +115,5 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
         });
     }
 }
+
+export class Gemma3nForCausalLM extends Gemma3nForConditionalGeneration {}

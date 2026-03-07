@@ -289,6 +289,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['qwen3_vl_moe', 'Qwen3VLMoeForCausalLM'],
     ['qwen3_5', 'Qwen3_5ForCausalLM'],
     ['qwen3_5_moe', 'Qwen3_5MoeForCausalLM'],
+    ['gemma3n', 'Gemma3nForCausalLM'],
     ['phi', 'PhiForCausalLM'],
     ['phi3', 'Phi3ForCausalLM'],
     ['mpt', 'MptForCausalLM'],
@@ -602,6 +603,7 @@ const CUSTOM_MAPPING = [
     ['Qwen3VLMoeForCausalLM', ALL_MODEL_FILES.Qwen3VLMoeForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
     ['Qwen3_5ForCausalLM', ALL_MODEL_FILES.Qwen3_5ForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
     ['Qwen3_5MoeForCausalLM', ALL_MODEL_FILES.Qwen3_5MoeForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
+    ['Gemma3nForCausalLM', ALL_MODEL_FILES.Gemma3nForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);
