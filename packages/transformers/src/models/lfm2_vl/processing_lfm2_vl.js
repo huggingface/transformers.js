@@ -85,7 +85,7 @@ export class Lfm2VlProcessor extends Processor {
                 downsample_factor = 2,
                 encoder_patch_size = 16,
                 use_thumbnail = true,
-            } = this.image_processor.config;
+            } = /** @type {Record<string, any>} */ (this.image_processor.config);
 
             const tokens_per_tile = this._compute_tokens_per_tile(tile_size, encoder_patch_size, downsample_factor);
 

@@ -204,11 +204,16 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
     /**
      * @param {import('../../utils/image.js').RawImage|import('../../utils/image.js').RawImage[]|import('../../utils/image.js').RawImage[][]} images
      */
+    // @ts-expect-error
     async _call(images, kwargs = {}) {
+        /** @type {import('../../utils/image.js').RawImage[][]} */
+        let batched_images;
         if (!Array.isArray(images)) {
-            images = [[images]];
+            batched_images = [[images]];
         } else if (!Array.isArray(images[0])) {
-            images = [/** @type {import('../../utils/image.js').RawImage[]} */ (images)];
+            batched_images = [/** @type {import('../../utils/image.js').RawImage[]} */ (images)];
+        } else {
+            batched_images = /** @type {import('../../utils/image.js').RawImage[][]} */ (images);
         }
 
         const return_row_col_info = kwargs.return_row_col_info ?? this.return_row_col_info;
@@ -220,7 +225,7 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const all_cols = [];
         const all_image_sizes = [];
 
-        for (const image_batch of images) {
+        for (const image_batch of batched_images) {
             // Preprocess each image (resize disabled, rescale+normalize done)
             const preprocessed = await Promise.all(
                 image_batch.map(x => this.preprocess(x, { do_pad: false })),
