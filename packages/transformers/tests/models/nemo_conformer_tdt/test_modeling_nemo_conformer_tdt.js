@@ -1,6 +1,7 @@
 import { NemoConformerForTDT, Tensor } from "../../../src/transformers.js";
 import { createAudioCacheKey, FeatureLRUCache } from "../../../src/models/nemo_conformer_tdt/transducer_cache.js";
 import { computeTemporalDeltas } from "../../../src/models/nemo_conformer_tdt/transducer_deltas.js";
+import { buildTransducerDetailedOutputs } from "../../../src/models/nemo_conformer_tdt/transducer_text.js";
 import { MODEL_TYPE_MAPPING, MODEL_TYPES } from "../../../src/models/modeling_utils.js";
 import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
 
@@ -645,6 +646,71 @@ export default () => {
   });
 
   describe("Nemo Conformer TDT utilities", () => {
+    it("keeps word boundaries from the final decoded text for numeric and punctuation tokens", () => {
+      const rawById = {
+        1: "▁score",
+        2: ".",
+        3: "48",
+        4: "-",
+        5: "year",
+        6: "-",
+        7: "old",
+        8: "▁with",
+        9: "0",
+        10: ".",
+        11: "5",
+      };
+      const tokenizer = {
+        get_vocab() {
+          return rawById;
+        },
+        decode(ids) {
+          if (ids.length === 1) {
+            return rawById[ids[0]].replace(/^▁/, "");
+          }
+          return "score. 48-year-old with 0.5";
+        },
+      };
+
+      const output = buildTransducerDetailedOutputs(
+        tokenizer,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        [
+          [0.0, 0.3],
+          [0.3, 0.4],
+          [0.5, 0.8],
+          [0.8, 0.85],
+          [0.85, 1.05],
+          [1.05, 1.1],
+          [1.1, 1.3],
+          [1.4, 1.7],
+          [1.8, 1.9],
+          [1.9, 1.95],
+          [1.95, 2.05],
+        ],
+      );
+
+      expect(output.words.map((x) => x.text)).toEqual([
+        "score.",
+        "48-year-old",
+        "with",
+        "0.5",
+      ]);
+      expect(output.tokens.map((x) => x.token)).toEqual([
+        "score",
+        ".",
+        "48",
+        "-",
+        "year",
+        "-",
+        "old",
+        "with",
+        "0",
+        ".",
+        "5",
+      ]);
+    });
+
     it(
       "computes delta and delta-delta features",
       async () => {

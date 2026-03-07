@@ -3,6 +3,9 @@ import { Pipeline, prepareAudios } from './_base.js';
 import { Tensor } from '../utils/tensor.js';
 import { max, round } from '../utils/maths.js';
 import { logger } from '../utils/logger.js';
+import {
+    runNemoConformerTDTPipeline,
+} from '../models/nemo_conformer_tdt/utils_nemo_conformer_tdt.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -140,24 +143,6 @@ export class AutomaticSpeechRecognitionPipeline
         Pipeline
     )
 {
-    _validateNemoAudio(audio, index) {
-        if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
-            throw new TypeError(
-                `Nemo Conformer TDT pipeline expected audio at index ${index} to be Float32Array or Float64Array.`,
-            );
-        }
-        if (audio.length === 0) {
-            throw new Error(`Nemo Conformer TDT pipeline expected non-empty audio at index ${index}.`);
-        }
-        for (let i = 0; i < audio.length; ++i) {
-            if (!Number.isFinite(audio[i])) {
-                throw new Error(
-                    `Nemo Conformer TDT pipeline expected finite audio samples; found ${audio[i]} at index ${index}:${i}.`,
-                );
-            }
-        }
-    }
-
     async _call(audio, kwargs = {}) {
         switch (this.model.config.model_type) {
             case 'whisper':
@@ -323,74 +308,19 @@ export class AutomaticSpeechRecognitionPipeline
     /**
      * Nemo Conformer TDT ASR pipeline.
      *
-     * Delegates to model.transcribe() and returns its output directly.
-     * Use `return_timestamps: true` on the pipeline call to get utterance-level data.
-     * This pipeline always requests metrics, and enables word details when
-     * timestamps are requested.
-     * For token-level and debug controls, call `model.transcribe()` directly with
-     * extended options.
+     * Keeps the pipeline surface aligned with the shared ASR task contract:
+     * `{ text }` by default and `{ text, chunks }` when timestamps are requested.
+     * Rich Nemo-specific outputs remain available on direct `model.transcribe()`.
      */
     async _call_nemo_conformer_tdt(audio, kwargs) {
-        if (typeof (/** @type {any} */ (this.model).transcribe) !== 'function') {
-            throw new Error('Nemo Conformer TDT model does not expose a `transcribe` method.');
-        }
-        if (!this.processor) {
-            throw new Error('Nemo Conformer TDT pipeline requires a processor.');
-        }
-        if (!this.tokenizer) {
-            throw new Error('Nemo Conformer TDT pipeline requires a tokenizer.');
-        }
-        if (!this.processor.feature_extractor?.config?.sampling_rate) {
-            throw new Error(
-                'Nemo Conformer TDT pipeline requires `processor.feature_extractor.config.sampling_rate` to prepare audio.',
-            );
-        }
-
-        const return_timestamps = !!(kwargs.return_timestamps);
-
-        const decodeOptions = {
+        return runNemoConformerTDTPipeline({
+            model: this.model,
+            processor: this.processor,
             tokenizer: this.tokenizer,
-            return_timestamps,
-            return_words: return_timestamps,
-            return_metrics: true,
-        };
-
-        const single = !Array.isArray(audio);
-        const batchedAudio = single ? [audio] : audio;
-        const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
-        for (let i = 0; i < preparedAudios.length; ++i) {
-            this._validateNemoAudio(preparedAudios[i], i);
-        }
-
-        const featureCache = /** @type {{ max_entries: number, max_size_mb: number }|null|undefined} */ (
-            /** @type {any} */ (this.processor.feature_extractor)?.feature_cache
-        );
-        const cacheOwnsTensors = !!(
-            featureCache &&
-            featureCache.max_entries > 0 &&
-            featureCache.max_size_mb > 0
-        );
-        const toReturn = [];
-        for (const aud of preparedAudios) {
-            const inputs = await this.processor(aud);
-            try {
-                const output = await /** @type {any} */ (this.model).transcribe(inputs, decodeOptions);
-                toReturn.push(output);
-            } finally {
-                if (!cacheOwnsTensors) {
-                    const seen = new Set();
-                    for (const value of Object.values(inputs ?? {})) {
-                        if (value instanceof Tensor && !seen.has(value)) {
-                            value.dispose();
-                            seen.add(value);
-                        }
-                    }
-                }
-            }
-        }
-
-        return single ? toReturn[0] : toReturn;
+            audio,
+            kwargs,
+            prepareAudios,
+        });
     }
 
     async _call_moonshine(audio, kwargs) {
