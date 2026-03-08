@@ -877,9 +877,8 @@ export class PreTrainedModel extends Callable {
         if (input_name in model_inputs) {
             if (inputs) {
                 throw new Error(
-                    '`inputs` was passed alongside ' +
-                        `\`${input_name}\` which is not allowed. ` +
-                        `Make sure to either pass \`inputs\` or \`${input_name}\`=...`,
+                    '`inputs`: {inputs}` were passed alongside {input_name} which is not allowed. ' +
+                        'Make sure to either pass {inputs} or {input_name}=...',
                 );
             }
         } else {

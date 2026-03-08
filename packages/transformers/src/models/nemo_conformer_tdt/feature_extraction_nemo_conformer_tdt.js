@@ -7,13 +7,21 @@ import { computeTemporalDeltas } from './transducer_deltas.js';
 
 const EPSILON = 1e-5;
 export const NEMO_FEATURE_OUTPUT_OWNERSHIP = Symbol('NemoConformerTDTFeatureOutputOwnership');
+export const NEMO_FEATURE_OUTPUT_RELEASE = Symbol('NemoConformerTDTFeatureOutputRelease');
 
-function tagNemoFeatureOutputOwnership(value, cacheOwnsTensors) {
+function tagNemoFeatureOutputOwnership(value, cacheOwnsTensors, release = null) {
     Object.defineProperty(value, NEMO_FEATURE_OUTPUT_OWNERSHIP, {
         value: cacheOwnsTensors,
         enumerable: false,
         configurable: true,
     });
+    if (release) {
+        Object.defineProperty(value, NEMO_FEATURE_OUTPUT_RELEASE, {
+            value: release,
+            enumerable: false,
+            configurable: true,
+        });
+    }
     return value;
 }
 
@@ -152,14 +160,22 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
 
         if (this.feature_cache) {
             const key = `${createAudioCacheKey(audio, this.config.sampling_rate)}:${this.delta_order}:${this.delta_window}:${this.delta_concatenate}`;
-            const cached = this.feature_cache.get(key);
+            const cached = this.feature_cache.acquire(key);
             if (cached) {
-                return tagNemoFeatureOutputOwnership({ ...cached }, true);
+                return tagNemoFeatureOutputOwnership({ ...cached.value }, true, cached.release);
             }
 
             const extracted = await this._extract(audio);
             const cacheOwnsTensors = this.feature_cache.set(key, extracted);
-            return tagNemoFeatureOutputOwnership({ ...extracted }, cacheOwnsTensors);
+            if (!cacheOwnsTensors) {
+                return tagNemoFeatureOutputOwnership({ ...extracted }, false);
+            }
+
+            const borrowed = this.feature_cache.acquire(key);
+            if (!borrowed) {
+                return tagNemoFeatureOutputOwnership({ ...extracted }, false);
+            }
+            return tagNemoFeatureOutputOwnership({ ...borrowed.value }, true, borrowed.release);
         }
 
         return tagNemoFeatureOutputOwnership(await this._extract(audio), false);

@@ -305,13 +305,6 @@ export class AutomaticSpeechRecognitionPipeline
         return single ? toReturn[0] : toReturn;
     }
 
-    /**
-     * Nemo Conformer TDT ASR pipeline.
-     *
-     * Keeps the pipeline surface aligned with the shared ASR task contract:
-     * `{ text }` by default and `{ text, chunks }` when timestamps are requested.
-     * Rich Nemo-specific outputs remain available on direct `model.transcribe()`.
-     */
     async _call_nemo_conformer_tdt(audio, kwargs) {
         return runNemoConformerTDTPipeline({
             model: this.model,

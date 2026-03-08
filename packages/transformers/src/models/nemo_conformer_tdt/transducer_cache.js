@@ -50,11 +50,29 @@ export class FeatureLRUCache {
      * @returns {any|null}
      */
     get(key) {
-        const entry = this.cache.get(key);
+        const entry = this._touch(key);
         if (!entry) return null;
-        this.cache.delete(key);
-        this.cache.set(key, entry);
         return entry.value;
+    }
+
+    /**
+     * @param {string} key
+     * @returns {{ value: any, release: () => void } | null}
+     */
+    acquire(key) {
+        const entry = this._touch(key);
+        if (!entry) return null;
+
+        entry.borrowers += 1;
+        let released = false;
+        return {
+            value: entry.value,
+            release: () => {
+                if (released) return;
+                released = true;
+                this._releaseEntry(entry);
+            },
+        };
     }
 
     /**
@@ -75,12 +93,12 @@ export class FeatureLRUCache {
         const existing = this.cache.get(key);
         if (existing?.value === value) {
             // Refresh recency for unchanged value without invalidating caller-owned references.
-            this.cache.delete(key);
             if (existing.size_bytes <= max_bytes) {
+                this.cache.delete(key);
                 this.cache.set(key, existing);
                 return true;
             } else {
-                this.current_size_bytes -= existing.size_bytes;
+                this._deleteEntry(key, existing);
                 return false;
             }
         }
@@ -89,31 +107,30 @@ export class FeatureLRUCache {
         if (size_bytes > max_bytes) {
             // Cannot fit in cache: keep caller ownership and skip caching.
             if (existing) {
-                disposeCachedValue(existing.value);
-                this.current_size_bytes -= existing.size_bytes;
-                this.cache.delete(key);
+                this._deleteEntry(key, existing);
             }
             return false;
         }
 
         if (existing) {
-            disposeCachedValue(existing.value);
-            this.current_size_bytes -= existing.size_bytes;
-            this.cache.delete(key);
+            this._deleteEntry(key, existing);
         }
 
-        this.cache.set(key, { value, size_bytes });
+        this.cache.set(key, {
+            value,
+            size_bytes,
+            borrowers: 0,
+            pendingDispose: false,
+        });
         this.current_size_bytes += size_bytes;
         this._evict();
         return this.cache.get(key)?.value === value;
     }
 
     clear() {
-        for (const { value } of this.cache.values()) {
-            disposeCachedValue(value);
+        for (const [key, entry] of Array.from(this.cache.entries())) {
+            this._deleteEntry(key, entry);
         }
-        this.cache.clear();
-        this.current_size_bytes = 0;
     }
 
     stats() {
@@ -131,9 +148,41 @@ export class FeatureLRUCache {
             const oldest_key = this.cache.keys().next().value;
             if (oldest_key === undefined) break;
             const oldest = this.cache.get(oldest_key);
-            this.cache.delete(oldest_key);
-            disposeCachedValue(oldest?.value);
-            this.current_size_bytes -= oldest?.size_bytes ?? 0;
+            if (!oldest) break;
+            this._deleteEntry(oldest_key, oldest);
+        }
+    }
+
+    _touch(key) {
+        const entry = this.cache.get(key);
+        if (!entry) return null;
+        this.cache.delete(key);
+        this.cache.set(key, entry);
+        return entry;
+    }
+
+    _deleteEntry(key, entry) {
+        const current = this.cache.get(key);
+        if (current !== entry) {
+            return;
+        }
+
+        this.cache.delete(key);
+        this.current_size_bytes -= entry.size_bytes;
+        if (entry.borrowers > 0) {
+            entry.pendingDispose = true;
+        } else {
+            disposeCachedValue(entry.value);
+        }
+    }
+
+    _releaseEntry(entry) {
+        if (entry.borrowers > 0) {
+            entry.borrowers -= 1;
+        }
+        if (entry.borrowers === 0 && entry.pendingDispose) {
+            entry.pendingDispose = false;
+            disposeCachedValue(entry.value);
         }
     }
 }

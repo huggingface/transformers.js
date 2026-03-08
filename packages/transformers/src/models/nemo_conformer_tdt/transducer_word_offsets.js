@@ -15,10 +15,23 @@ function getIdToTokenMap(tokenizer) {
     cached = new Map();
     if (tokenizer?.get_vocab) {
         const vocab = tokenizer.get_vocab();
-        const entries = vocab instanceof Map ? vocab.entries() : Object.entries(vocab);
-        for (const [token, id] of entries) {
-            if (Number.isInteger(id)) {
-                cached.set(id, token);
+        if (Array.isArray(vocab)) {
+            for (let id = 0; id < vocab.length; ++id) {
+                if (typeof vocab[id] === 'string') {
+                    cached.set(id, vocab[id]);
+                }
+            }
+        } else if (vocab instanceof Map) {
+            for (const [token, id] of vocab.entries()) {
+                if (Number.isInteger(id)) {
+                    cached.set(id, token);
+                }
+            }
+        } else if (vocab && typeof vocab === 'object') {
+            for (const [token, id] of Object.entries(vocab)) {
+                if (Number.isInteger(id)) {
+                    cached.set(id, token);
+                }
             }
         }
     }
@@ -133,7 +146,7 @@ export function buildTransducerWordOffsets(
     token_confidences = null,
     fullText = '',
 ) {
-    if (!tokenizer || token_ids.length === 0 || token_timestamps.length === 0) {
+    if (!tokenizer) {
         return { words: [], tokens: [], wordAverage: null };
     }
     if (token_ids.length !== token_timestamps.length) {
@@ -145,6 +158,9 @@ export function buildTransducerWordOffsets(
         throw new Error(
             `buildTransducerWordOffsets expects token_confidences length (${token_confidences.length}) to match token_ids length (${token_ids.length}).`,
         );
+    }
+    if (token_ids.length === 0) {
+        return { words: [], tokens: [], wordAverage: null };
     }
 
     /** @type {Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>} */
@@ -206,7 +222,8 @@ export function buildTransducerWordOffsets(
     if (words.some((x) => x.confidence != null)) {
         const validConfidences = words.map((x) => x.confidence).filter((x) => x != null);
         if (validConfidences.length > 0) {
-            wordAverage = Math.round((validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) * 1e6) / 1e6;
+            wordAverage =
+                Math.round((validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) * 1e6) / 1e6;
         }
     }
 

@@ -1,12 +1,9 @@
 import { NemoConformerForTDT, Tensor } from "../../../src/transformers.js";
 import { createAudioCacheKey, FeatureLRUCache } from "../../../src/models/nemo_conformer_tdt/transducer_cache.js";
 import { computeTemporalDeltas } from "../../../src/models/nemo_conformer_tdt/transducer_deltas.js";
-import {
-  buildNemoSegmentChunks,
-  partitionNemoWordsIntoSegments,
-  shouldEndSentenceAfterWord,
-} from "../../../src/models/nemo_conformer_tdt/transducer_segment_offsets.js";
+import { buildNemoSegmentChunks, partitionNemoWordsIntoSegments, shouldEndSentenceAfterWord } from "../../../src/models/nemo_conformer_tdt/transducer_segment_offsets.js";
 import { buildTransducerDetailedOutputs } from "../../../src/models/nemo_conformer_tdt/transducer_text.js";
+import { buildTransducerWordOffsets } from "../../../src/models/nemo_conformer_tdt/transducer_word_offsets.js";
 import { MODEL_TYPE_MAPPING, MODEL_TYPES } from "../../../src/models/modeling_utils.js";
 import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
 
@@ -138,7 +135,12 @@ export default () => {
           model.transcribe(inputs, {
             tokenizer: {
               decode: () => "",
-              get_vocab: () => new Map([["a", 0], ["b", 1], ["c", 2]]),
+              get_vocab: () =>
+                new Map([
+                  ["a", 0],
+                  ["b", 1],
+                  ["c", 2],
+                ]),
             },
           }),
         ).rejects.toThrow("blank_token_id");
@@ -168,7 +170,12 @@ export default () => {
           model.transcribe(inputs, {
             tokenizer: {
               decode: () => "",
-              get_vocab: () => new Map([["a", 0], ["b", 1], ["c", 2]]),
+              get_vocab: () =>
+                new Map([
+                  ["a", 0],
+                  ["b", 1],
+                  ["c", 2],
+                ]),
             },
           }),
         ).rejects.toThrow("duration_start_index");
@@ -326,10 +333,7 @@ export default () => {
 
         expect(output.confidence.frames).toHaveLength(2);
         expect(output.confidence.frames[0]).toBeCloseTo(0.9579343795, 6);
-        expect(output.confidence.frameAverage).toBeCloseTo(
-          (output.confidence.frames[0] + output.confidence.frames[1]) / 2,
-          6,
-        );
+        expect(output.confidence.frameAverage).toBeCloseTo((output.confidence.frames[0] + output.confidence.frames[1]) / 2, 6);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -464,9 +468,7 @@ export default () => {
           input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
         };
 
-        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
-          'encoder output "encoder_out" was not returned',
-        );
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow('encoder output "encoder_out" was not returned');
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -496,9 +498,7 @@ export default () => {
           input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
         };
 
-        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
-          'decoder output "outputs" was not returned',
-        );
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow('decoder output "outputs" was not returned');
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -525,9 +525,7 @@ export default () => {
           input_features: new Tensor("float32", new Float32Array([0, 0, 0, 0, 0, 0]), [1, 3, 2]),
         };
 
-        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow(
-          'decoder state outputs "output_states_1" and "output_states_2" were not returned',
-        );
+        await expect(model.transcribe(inputs, { tokenizer: { decode: () => "" } })).rejects.toThrow('decoder state outputs "output_states_1" and "output_states_2" were not returned');
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -676,13 +674,7 @@ export default () => {
       ];
 
       const segments = partitionNemoWordsIntoSegments(words);
-      expect(segments.map((x) => x.text)).toEqual([
-        "Hello.",
-        "World again.",
-        "U.S. Report update.",
-        "pause",
-        "Next sentence.",
-      ]);
+      expect(segments.map((x) => x.text)).toEqual(["Hello.", "World again.", "U.S. Report update.", "pause", "Next sentence."]);
       expect(segments.map((x) => x.timestamp)).toEqual([
         [0, 0.4],
         [0.5, 1.1],
@@ -743,25 +735,84 @@ export default () => {
         ],
       );
 
-      expect(output.words.map((x) => x.text)).toEqual([
-        "score.",
-        "48-year-old",
-        "with",
-        "0.5",
-      ]);
-      expect(output.tokens.map((x) => x.token)).toEqual([
-        "score",
-        ".",
-        "48",
-        "-",
-        "year",
-        "-",
-        "old",
-        "with",
-        "0",
-        ".",
-        "5",
-      ]);
+      expect(output.words.map((x) => x.text)).toEqual(["score.", "48-year-old", "with", "0.5"]);
+      expect(output.tokens.map((x) => x.token)).toEqual(["score", ".", "48", "-", "year", "-", "old", "with", "0", ".", "5"]);
+    });
+
+    it("builds word offsets from array-backed tokenizer vocabularies", () => {
+      const vocab = ["<blank>", "▁hello", "▁world"];
+      const tokenizer = {
+        get_vocab() {
+          return vocab;
+        },
+        decode(ids) {
+          const pieces = ids.map((id) => vocab[id] ?? "").join("");
+          return pieces.replace(/▁/g, "").trim();
+        },
+      };
+
+      const output = buildTransducerWordOffsets(
+        tokenizer,
+        [1, 2],
+        [
+          [0.0, 0.3],
+          [0.3, 0.6],
+        ],
+        null,
+        "hello world",
+      );
+
+      expect(output.words.map((x) => x.text)).toEqual(["hello", "world"]);
+      expect(output.tokens.map((x) => x.rawToken)).toEqual(["▁hello", "▁world"]);
+      expect(output.tokens.map((x) => x.isWordStart)).toEqual([true, true]);
+    });
+
+    it("falls back to decoded token text when tokenizer vocab metadata is unavailable", () => {
+      const token_ids = [1, 2];
+      const timestamps = [
+        [0.0, 0.3],
+        [0.3, 0.6],
+      ];
+
+      const fromNull = buildTransducerWordOffsets(
+        {
+          get_vocab: () => null,
+          decode(ids) {
+            return ids[0] === 1 ? " hello" : "world";
+          },
+        },
+        token_ids,
+        timestamps,
+        null,
+        "hello world",
+      );
+      const fromPrimitive = buildTransducerWordOffsets(
+        {
+          get_vocab: () => 42,
+          decode(ids) {
+            return ids[0] === 1 ? " hello" : "world";
+          },
+        },
+        token_ids,
+        timestamps,
+        null,
+        "hello world",
+      );
+
+      expect(fromNull.words.map((x) => x.text)).toEqual(["hello", "world"]);
+      expect(fromPrimitive.words.map((x) => x.text)).toEqual(["hello", "world"]);
+    });
+
+    it("rejects mismatched empty timestamp inputs for word offsets", () => {
+      expect(() =>
+        buildTransducerWordOffsets(
+          {
+            decode: () => "hello",
+          },
+          [1],
+          [],
+        ),
+      ).toThrow("equal lengths");
     });
 
     it(
@@ -855,11 +906,7 @@ export default () => {
           decoder_model_merged: "q4",
         },
       });
-      expect(files).toEqual([
-        "config.json",
-        "onnx/encoder_model_fp16.onnx",
-        "onnx/decoder_model_merged_q4.onnx",
-      ]);
+      expect(files).toEqual(["config.json", "onnx/encoder_model_fp16.onnx", "onnx/decoder_model_merged_q4.onnx"]);
     });
 
     it(
@@ -960,6 +1007,38 @@ export default () => {
       } finally {
         Tensor.prototype.dispose = originalDispose;
       }
+    });
+
+    it("defers disposal for borrowed cache entries until they are released", () => {
+      const cache = new FeatureLRUCache({ max_entries: 1, max_size_mb: 4 });
+      const tensorA = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]);
+      const tensorB = new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]);
+      let disposeCalls = 0;
+      const track = (tensor) => {
+        const originalDispose = tensor.dispose.bind(tensor);
+        tensor.dispose = () => {
+          disposeCalls += 1;
+          originalDispose();
+        };
+      };
+      track(tensorA);
+      track(tensorB);
+
+      cache.set("a", tensorA);
+      const borrowedA = cache.acquire("a");
+      expect(borrowedA?.value).toBe(tensorA);
+
+      cache.set("b", tensorB);
+      expect(disposeCalls).toBe(0);
+      borrowedA?.release();
+      expect(disposeCalls).toBe(1);
+
+      const borrowedB = cache.acquire("b");
+      expect(borrowedB?.value).toBe(tensorB);
+      cache.clear();
+      expect(disposeCalls).toBe(1);
+      borrowedB?.release();
+      expect(disposeCalls).toBe(2);
     });
 
     it("treats zero cache limits as explicit no-cache mode without disposing inserted values", () => {

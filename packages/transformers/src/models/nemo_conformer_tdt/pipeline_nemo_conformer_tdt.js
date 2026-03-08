@@ -1,14 +1,12 @@
 import { Tensor } from '../../utils/tensor.js';
-import { NEMO_FEATURE_OUTPUT_OWNERSHIP } from './feature_extraction_nemo_conformer_tdt.js';
+import { NEMO_FEATURE_OUTPUT_OWNERSHIP, NEMO_FEATURE_OUTPUT_RELEASE } from './feature_extraction_nemo_conformer_tdt.js';
 import {
     buildWordChunks,
     buildNemoSegmentChunks,
     joinTimedWords,
     partitionNemoWordsIntoSegments,
 } from './transducer_segment_offsets.js';
-import {
-    dedupeMergedWords,
-} from './transducer_window_merge.js';
+import { dedupeMergedWords } from './transducer_window_merge.js';
 
 const NEMO_AUTO_WINDOW_THRESHOLD_S = 180;
 const NEMO_MIN_CHUNK_LENGTH_S = 20;
@@ -49,6 +47,13 @@ function disposeNemoPipelineInputs(inputs) {
     }
 }
 
+function releaseNemoPipelineInputs(inputs) {
+    const release = inputs?.[NEMO_FEATURE_OUTPUT_RELEASE];
+    if (typeof release === 'function') {
+        release();
+    }
+}
+
 function normalizeNemoChunkLengthS(value) {
     const num = Number(value);
     if (!Number.isFinite(num) || num <= 0) {
@@ -85,7 +90,7 @@ function normalizeNemoSegmentText(text) {
     return String(text ?? '')
         .normalize('NFKC')
         .replace(/[“”]/g, '"')
-        .replace(/[‘’]/g, '\'')
+        .replace(/[‘’]/g, "'")
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();
@@ -97,9 +102,10 @@ function isDuplicateFinalizedNemoSegment(finalizedSegments, segment) {
         return false;
     }
 
-    return finalizedSegments.some((candidate) =>
-        normalizeNemoSegmentText(candidate.text) === normalized &&
-        Math.abs(candidate.timestamp[1] - segment.timestamp[1]) < NEMO_SEGMENT_DEDUP_TOLERANCE_S,
+    return finalizedSegments.some(
+        (candidate) =>
+            normalizeNemoSegmentText(candidate.text) === normalized &&
+            Math.abs(candidate.timestamp[1] - segment.timestamp[1]) < NEMO_SEGMENT_DEDUP_TOLERANCE_S,
     );
 }
 
@@ -139,13 +145,7 @@ function relocateNemoCursorToNearbyGap(target_s, words) {
     return best;
 }
 
-async function runNemoAutoSentenceWindowing({
-    audio,
-    sampling_rate,
-    chunk_length_s,
-    tokenizer,
-    runNemoTranscribe,
-}) {
+async function runNemoAutoSentenceWindowing({ audio, sampling_rate, chunk_length_s, tokenizer, runNemoTranscribe }) {
     const audio_duration_s = audio.length / sampling_rate;
     const fallback_overlap_s = Math.min(NEMO_AUTO_WINDOW_FALLBACK_OVERLAP_S, Math.max(0, chunk_length_s - 1));
     const fallback_advance_s = Math.max(1, chunk_length_s - fallback_overlap_s);
@@ -159,7 +159,11 @@ async function runNemoAutoSentenceWindowing({
     let start_s = 0;
     let shouldMergePending = false;
 
-    for (let windowIndex = 0; windowIndex < maxWindows && start_s < audio_duration_s - NEMO_AUTO_WINDOW_EPSILON_S; ++windowIndex) {
+    for (
+        let windowIndex = 0;
+        windowIndex < maxWindows && start_s < audio_duration_s - NEMO_AUTO_WINDOW_EPSILON_S;
+        ++windowIndex
+    ) {
         const end_s = Math.min(audio_duration_s, start_s + chunk_length_s);
         const start_sample = Math.max(0, Math.min(audio.length - 1, Math.floor(start_s * sampling_rate)));
         const end_sample = Math.max(start_sample + 1, Math.min(audio.length, Math.ceil(end_s * sampling_rate)));
@@ -199,12 +203,11 @@ async function runNemoAutoSentenceWindowing({
                 }
 
                 pendingWords = dedupeMergedWords(pendingSegment.words);
-                shouldMergePending = false;
-
                 const next_start_s = Math.min(
                     audio_duration_s,
                     relocateNemoCursorToNearbyGap(pendingStart_s, windowWords),
                 );
+                shouldMergePending = next_start_s > pendingStart_s + NEMO_AUTO_WINDOW_EPSILON_S;
                 if (next_start_s > start_s + NEMO_AUTO_WINDOW_EPSILON_S) {
                     start_s = next_start_s;
                     continue;
@@ -250,14 +253,7 @@ async function runNemoAutoSentenceWindowing({
  *   prepareAudios: (audio: any[], sampling_rate: number) => Promise<(Float32Array|Float64Array)[]>,
  * }} options
  */
-export async function runNemoConformerTDTPipeline({
-    model,
-    processor,
-    tokenizer,
-    audio,
-    kwargs,
-    prepareAudios,
-}) {
+export async function runNemoConformerTDTPipeline({ model, processor, tokenizer, audio, kwargs, prepareAudios }) {
     if (typeof model?.transcribe !== 'function') {
         throw new Error('Nemo Conformer TDT model does not expose a `transcribe` method.');
     }
@@ -292,7 +288,9 @@ export async function runNemoConformerTDTPipeline({
         try {
             return await model.transcribe(inputs, decodeOptions);
         } finally {
-            if (!cacheOwnsTensors) {
+            if (cacheOwnsTensors) {
+                releaseNemoPipelineInputs(inputs);
+            } else {
                 disposeNemoPipelineInputs(inputs);
             }
         }
@@ -303,11 +301,7 @@ export async function runNemoConformerTDTPipeline({
         const audio_duration_s = aud.length / sampling_rate;
         const autoWindowing = requested_chunk_length_s <= 0 && audio_duration_s > NEMO_AUTO_WINDOW_THRESHOLD_S;
         const chunk_length_s =
-            requested_chunk_length_s > 0
-                ? requested_chunk_length_s
-                : autoWindowing
-                  ? NEMO_AUTO_CHUNK_LENGTH_S
-                  : 0;
+            requested_chunk_length_s > 0 ? requested_chunk_length_s : autoWindowing ? NEMO_AUTO_CHUNK_LENGTH_S : 0;
         const useSentenceWindowing = chunk_length_s > 0;
 
         if (useSentenceWindowing) {
