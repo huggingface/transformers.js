@@ -93,7 +93,7 @@ function consumeAlignedTokenText(fullText, cursor, tokenText) {
 }
 
 /**
- * @param {Array<{ text: string, start_time: number, end_time: number, confidence?: number }>} words
+ * @param {Array<{ text: string, startTime: number, endTime: number, confidence?: number }>} words
  * @param {{ text: string, start: number, end: number, confs: number[] } | null} current
  */
 function finalizeAndPushWord(words, current) {
@@ -102,11 +102,11 @@ function finalizeAndPushWord(words, current) {
     const text = current.text.trim();
     if (!text) return;
 
-    /** @type {{ text: string, start_time: number, end_time: number, confidence?: number }} */
+    /** @type {{ text: string, startTime: number, endTime: number, confidence?: number }} */
     const word = {
         text,
-        start_time: current.start,
-        end_time: current.end,
+        startTime: current.start,
+        endTime: current.end,
     };
     if (current.confs.length > 0) {
         word.confidence = Math.round((current.confs.reduce((a, b) => a + b, 0) / current.confs.length) * 1e6) / 1e6;
@@ -121,10 +121,9 @@ function finalizeAndPushWord(words, current) {
  * @param {number[] | null} token_confidences
  * @param {string} fullText
  * @returns {{
- *  words: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
- *  tokens: Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
- *  word_confidences: (number | null)[] | null,
- *  word_avg: number | null,
+ *  words: Array<{ text: string, startTime: number, endTime: number, confidence?: number }>,
+ *  tokens: Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>,
+ *  wordAverage: number | null,
  * }}
  */
 export function buildTransducerWordOffsets(
@@ -135,7 +134,7 @@ export function buildTransducerWordOffsets(
     fullText = '',
 ) {
     if (!tokenizer || token_ids.length === 0 || token_timestamps.length === 0) {
-        return { words: [], tokens: [], word_confidences: null, word_avg: null };
+        return { words: [], tokens: [], wordAverage: null };
     }
     if (token_ids.length !== token_timestamps.length) {
         throw new Error(
@@ -148,9 +147,9 @@ export function buildTransducerWordOffsets(
         );
     }
 
-    /** @type {Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>} */
+    /** @type {Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>} */
     const tokens = [];
-    /** @type {Array<{ text: string, start_time: number, end_time: number, confidence?: number }>} */
+    /** @type {Array<{ text: string, startTime: number, endTime: number, confidence?: number }>} */
     const words = [];
     let textCursor = 0;
 
@@ -173,10 +172,10 @@ export function buildTransducerWordOffsets(
         const tok = {
             id,
             token: tokenText,
-            raw_token: raw,
-            is_word_start: startsNewWord,
-            start_time: ts[0],
-            end_time: ts[1],
+            rawToken: raw,
+            isWordStart: startsNewWord,
+            startTime: ts[0],
+            endTime: ts[1],
         };
         const conf = token_confidences?.[i];
         if (conf != null && Number.isFinite(conf)) {
@@ -203,14 +202,13 @@ export function buildTransducerWordOffsets(
 
     finalizeAndPushWord(words, current);
 
-    const word_confidences = words.some((x) => x.confidence != null) ? words.map((x) => x.confidence ?? null) : null;
-    let word_avg = null;
-    if (word_confidences) {
-        const validConfidences = word_confidences.filter((x) => x != null);
+    let wordAverage = null;
+    if (words.some((x) => x.confidence != null)) {
+        const validConfidences = words.map((x) => x.confidence).filter((x) => x != null);
         if (validConfidences.length > 0) {
-            word_avg = Math.round((validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) * 1e6) / 1e6;
+            wordAverage = Math.round((validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length) * 1e6) / 1e6;
         }
     }
 
-    return { words, tokens, word_confidences, word_avg };
+    return { words, tokens, wordAverage };
 }

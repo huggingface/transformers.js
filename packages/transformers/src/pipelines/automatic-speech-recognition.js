@@ -5,7 +5,7 @@ import { max, round } from '../utils/maths.js';
 import { logger } from '../utils/logger.js';
 import {
     runNemoConformerTDTPipeline,
-} from '../models/nemo_conformer_tdt/utils_nemo_conformer_tdt.js';
+} from '../models/nemo_conformer_tdt/pipeline_nemo_conformer_tdt.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs

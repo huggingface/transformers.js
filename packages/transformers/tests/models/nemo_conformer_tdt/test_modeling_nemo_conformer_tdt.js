@@ -1,6 +1,11 @@
 import { NemoConformerForTDT, Tensor } from "../../../src/transformers.js";
 import { createAudioCacheKey, FeatureLRUCache } from "../../../src/models/nemo_conformer_tdt/transducer_cache.js";
 import { computeTemporalDeltas } from "../../../src/models/nemo_conformer_tdt/transducer_deltas.js";
+import {
+  buildNemoSegmentChunks,
+  partitionNemoWordsIntoSegments,
+  shouldEndSentenceAfterWord,
+} from "../../../src/models/nemo_conformer_tdt/transducer_segment_offsets.js";
 import { buildTransducerDetailedOutputs } from "../../../src/models/nemo_conformer_tdt/transducer_text.js";
 import { MODEL_TYPE_MAPPING, MODEL_TYPES } from "../../../src/models/modeling_utils.js";
 import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
@@ -251,15 +256,17 @@ export default () => {
 
         const output = await model.transcribe(inputs, {
           tokenizer,
-          return_timestamps: true,
-          return_words: true,
-          return_tokens: true,
+          returnTimestamps: true,
+          returnWords: true,
+          returnTokens: true,
         });
 
         expect(output.text).toBe("hello world");
-        expect(output.utterance_timestamp).toEqual([0, 0.12]);
-        expect(output.words).toEqual([expect.objectContaining({ text: "hello", start_time: 0, end_time: 0.04 }), expect.objectContaining({ text: "world", start_time: 0.04, end_time: 0.12 })]);
-        expect(output.tokens).toEqual([expect.objectContaining({ id: 1, start_time: 0, end_time: 0.04 }), expect.objectContaining({ id: 2, start_time: 0.04, end_time: 0.12 })]);
+        expect(output.isFinal).toBe(true);
+        expect(output.utteranceTimestamp).toEqual([0, 0.12]);
+        expect(output.words).toEqual([expect.objectContaining({ text: "hello", startTime: 0, endTime: 0.04 }), expect.objectContaining({ text: "world", startTime: 0.04, endTime: 0.12 })]);
+        expect(output.tokens).toEqual([expect.objectContaining({ id: 1, startTime: 0, endTime: 0.04 }), expect.objectContaining({ id: 2, startTime: 0.04, endTime: 0.12 })]);
+        expect(output.confidence).toEqual(expect.objectContaining({ utterance: expect.any(Number), wordAverage: expect.any(Number), averageLogProb: expect.any(Number) }));
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -285,13 +292,13 @@ export default () => {
 
         const output = await model.transcribe(inputs, {
           tokenizer,
-          return_timestamps: true,
-          return_tokens: true,
+          returnTimestamps: true,
+          returnTokens: true,
         });
 
         expect(output.tokens).toHaveLength(1);
-        expect(output.tokens[0]).toEqual(expect.objectContaining({ start_time: 0, end_time: 0.12 }));
-        expect(output.utterance_timestamp).toEqual([0, 0.12]);
+        expect(output.tokens[0]).toEqual(expect.objectContaining({ startTime: 0, endTime: 0.12 }));
+        expect(output.utteranceTimestamp).toEqual([0, 0.12]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -313,14 +320,14 @@ export default () => {
         };
 
         const output = await model.transcribe(inputs, {
-          return_timestamps: false,
+          returnTimestamps: false,
           returnFrameConfidences: true,
         });
 
-        expect(output.confidence_scores.frame).toHaveLength(2);
-        expect(output.confidence_scores.frame[0]).toBeCloseTo(0.9579343795, 6);
-        expect(output.confidence_scores.frame_avg).toBeCloseTo(
-          (output.confidence_scores.frame[0] + output.confidence_scores.frame[1]) / 2,
+        expect(output.confidence.frames).toHaveLength(2);
+        expect(output.confidence.frames[0]).toBeCloseTo(0.9579343795, 6);
+        expect(output.confidence.frameAverage).toBeCloseTo(
+          (output.confidence.frames[0] + output.confidence.frames[1]) / 2,
           6,
         );
       },
@@ -338,7 +345,7 @@ export default () => {
         await expect(
           model.transcribe(inputs, {
             tokenizer: { decode: () => "" },
-            return_timestamps: true,
+            returnTimestamps: true,
             timeOffset: Number.NaN,
           }),
         ).rejects.toThrow("timeOffset");
@@ -361,7 +368,7 @@ export default () => {
         await expect(
           model.transcribe(inputs, {
             tokenizer: { decode: () => "" },
-            return_timestamps: false,
+            returnTimestamps: false,
           }),
         ).rejects.toThrow("missing duration logits");
       },
@@ -637,7 +644,7 @@ export default () => {
           input_features: new Tensor("float32", new Float32Array([0, 0]), [1, 1, 2]),
         };
 
-        const output = await model.transcribe(inputs, { return_timestamps: false });
+        const output = await model.transcribe(inputs, { returnTimestamps: false });
         expect(output).toEqual(expect.objectContaining({ text: "" }));
         expect(model.auxDisposals).toBe(1);
       },
@@ -646,6 +653,52 @@ export default () => {
   });
 
   describe("Nemo Conformer TDT utilities", () => {
+    it("uses conservative sentence boundaries for punctuation, abbreviations, and long silences", () => {
+      expect(shouldEndSentenceAfterWord({ text: "Hello." }, { text: "World" }, 0)).toBe(true);
+      expect(shouldEndSentenceAfterWord({ text: "U.S." }, { text: "Report" }, 0)).toBe(false);
+      expect(shouldEndSentenceAfterWord({ text: "3." }, { text: "Title" }, 0)).toBe(false);
+      expect(shouldEndSentenceAfterWord({ text: "I." }, { text: "Overview" }, 0)).toBe(false);
+      expect(shouldEndSentenceAfterWord({ text: "Dr." }, { text: "Brown" }, 0)).toBe(false);
+      expect(shouldEndSentenceAfterWord({ text: "wait" }, { text: "Next" }, 3.2)).toBe(true);
+    });
+
+    it("partitions timed words into conservative sentence-like chunks", () => {
+      const words = [
+        { text: "Hello.", startTime: 0, endTime: 0.4 },
+        { text: "World", startTime: 0.5, endTime: 0.8 },
+        { text: "again.", startTime: 0.8, endTime: 1.1 },
+        { text: "U.S.", startTime: 1.2, endTime: 1.5 },
+        { text: "Report", startTime: 1.6, endTime: 2.0 },
+        { text: "update.", startTime: 2.0, endTime: 2.4 },
+        { text: "pause", startTime: 6.0, endTime: 6.3 },
+        { text: "Next", startTime: 9.5, endTime: 9.8 },
+        { text: "sentence.", startTime: 9.8, endTime: 10.2 },
+      ];
+
+      const segments = partitionNemoWordsIntoSegments(words);
+      expect(segments.map((x) => x.text)).toEqual([
+        "Hello.",
+        "World again.",
+        "U.S. Report update.",
+        "pause",
+        "Next sentence.",
+      ]);
+      expect(segments.map((x) => x.timestamp)).toEqual([
+        [0, 0.4],
+        [0.5, 1.1],
+        [1.2, 2.4],
+        [6.0, 6.3],
+        [9.5, 10.2],
+      ]);
+      expect(buildNemoSegmentChunks(words)).toEqual([
+        { text: "Hello.", timestamp: [0, 0.4] },
+        { text: "World again.", timestamp: [0.5, 1.1] },
+        { text: "U.S. Report update.", timestamp: [1.2, 2.4] },
+        { text: "pause", timestamp: [6.0, 6.3] },
+        { text: "Next sentence.", timestamp: [9.5, 10.2] },
+      ]);
+    });
+
     it("keeps word boundaries from the final decoded text for numeric and punctuation tokens", () => {
       const rawById = {
         1: "▁score",
@@ -827,11 +880,11 @@ export default () => {
       "evicts least-recently-used entries when full",
       async () => {
         const cache = new FeatureLRUCache({ max_entries: 2, max_size_mb: 4 });
-        cache.set("a", new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]));
-        cache.set("b", new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]));
+        expect(cache.set("a", new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]))).toBe(true);
+        expect(cache.set("b", new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]))).toBe(true);
         expect(cache.get("a")).not.toBeNull();
 
-        cache.set("c", new Tensor("float32", new Float32Array([7, 8, 9]), [1, 3]));
+        expect(cache.set("c", new Tensor("float32", new Float32Array([7, 8, 9]), [1, 3]))).toBe(true);
         // `b` should be evicted because `a` was recently accessed.
         expect(cache.get("b")).toBeNull();
         expect(cache.get("a")).not.toBeNull();
@@ -928,8 +981,8 @@ export default () => {
         t2Dispose();
       };
 
-      byEntries.set("x", t1);
-      bySize.set("y", t2);
+      expect(byEntries.set("x", t1)).toBe(false);
+      expect(bySize.set("y", t2)).toBe(false);
       expect(byEntries.get("x")).toBeNull();
       expect(bySize.get("y")).toBeNull();
       expect(t1Disposals).toBe(0);
@@ -951,7 +1004,7 @@ export default () => {
         originalDispose();
       };
 
-      cache.set("big", tensor);
+      expect(cache.set("big", tensor)).toBe(false);
       expect(cache.get("big")).toBeNull();
       expect(disposeCalls).toBe(0);
 

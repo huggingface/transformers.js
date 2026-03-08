@@ -19,10 +19,9 @@ export function decodeTransducerText(tokenizer, token_ids) {
  * @param {[number, number][]} token_timestamps
  * @param {number[] | null} token_confidences
  * @returns {{
- *  words: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
- *  tokens: Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
- *  word_confidences: (number | null)[] | null,
- *  word_avg: number | null,
+ *  words: Array<{ text: string, startTime: number, endTime: number, confidence?: number }>,
+ *  tokens: Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>,
+ *  wordAverage: number | null,
  * }}
  */
 export function buildTransducerDetailedOutputs(tokenizer, token_ids, token_timestamps, token_confidences = null) {

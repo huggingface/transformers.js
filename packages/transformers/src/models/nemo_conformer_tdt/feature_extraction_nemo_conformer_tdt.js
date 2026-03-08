@@ -6,6 +6,16 @@ import { FeatureLRUCache, createAudioCacheKey } from './transducer_cache.js';
 import { computeTemporalDeltas } from './transducer_deltas.js';
 
 const EPSILON = 1e-5;
+export const NEMO_FEATURE_OUTPUT_OWNERSHIP = Symbol('NemoConformerTDTFeatureOutputOwnership');
+
+function tagNemoFeatureOutputOwnership(value, cacheOwnsTensors) {
+    Object.defineProperty(value, NEMO_FEATURE_OUTPUT_OWNERSHIP, {
+        value: cacheOwnsTensors,
+        enumerable: false,
+        configurable: true,
+    });
+    return value;
+}
 
 /**
  * Feature extractor for Nemo Conformer TDT models.
@@ -144,15 +154,15 @@ export class NemoConformerTDTFeatureExtractor extends FeatureExtractor {
             const key = `${createAudioCacheKey(audio, this.config.sampling_rate)}:${this.delta_order}:${this.delta_window}:${this.delta_concatenate}`;
             const cached = this.feature_cache.get(key);
             if (cached) {
-                return { ...cached };
+                return tagNemoFeatureOutputOwnership({ ...cached }, true);
             }
 
             const extracted = await this._extract(audio);
-            this.feature_cache.set(key, extracted);
-            return { ...extracted };
+            const cacheOwnsTensors = this.feature_cache.set(key, extracted);
+            return tagNemoFeatureOutputOwnership({ ...extracted }, cacheOwnsTensors);
         }
 
-        return await this._extract(audio);
+        return tagNemoFeatureOutputOwnership(await this._extract(audio), false);
     }
 
     async _extract(audio) {

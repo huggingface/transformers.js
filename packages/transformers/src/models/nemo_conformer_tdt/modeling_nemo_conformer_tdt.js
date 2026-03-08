@@ -536,54 +536,66 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
     /**
      * Transcribe model-ready features using TDT decoding.
      *
-     * - `return_timestamps: false` → `{ text, is_final }` (+ metrics if `return_metrics`)
-     * - `return_timestamps: true`  → adds `utterance_confidence`, `utterance_timestamp`, `confidence_scores`
-     * - `return_words: true` (requires `return_timestamps`) → adds `words` list
-     * - `return_tokens: true` (requires `return_timestamps`) → adds `tokens` list
-     * - `return_metrics` is independent and can be combined with either level.
+     * - `returnTimestamps: false` → `{ text, isFinal }` (+ metrics if `returnMetrics`)
+     * - `returnTimestamps: true`  → adds `utteranceTimestamp` and grouped `confidence`
+     * - `returnWords: true` (requires `returnTimestamps`) → adds `words` list
+     * - `returnTokens: true` (requires `returnTimestamps`) → adds `tokens` list
+     * - `returnMetrics` is independent and can be combined with either level.
      * - Debug flags (`returnFrameConfidences`, `returnFrameIndices`, `returnLogProbs`, `returnTdtSteps`) are independent.
+     * - Legacy snake_case aliases (`return_timestamps`, `return_words`, `return_tokens`, `return_metrics`) are accepted.
      *
      * @param {Object} model_inputs Processor outputs (must include `input_features`).
      * @param {Object} [decode_options]
      * @param {any} [decode_options.tokenizer] Tokenizer for text reconstruction and word boundaries.
-     * @param {boolean} [decode_options.return_timestamps=true] Include utterance-level timestamps and confidence averages.
-     * @param {boolean} [decode_options.return_words=false] Include word-level list (requires return_timestamps).
-     * @param {boolean} [decode_options.return_tokens=false] Include token-level list (requires return_timestamps).
-     * @param {boolean} [decode_options.return_metrics=false] Include encoding/decoding timing metrics.
-     * @param {boolean} [decode_options.returnFrameConfidences=false] Include per-frame confidence scores in confidence_scores.
+     * @param {boolean} [decode_options.returnTimestamps=true] Include utterance-level timestamps and confidence aggregates.
+     * @param {boolean} [decode_options.return_timestamps] Legacy alias for `returnTimestamps`.
+     * @param {boolean} [decode_options.returnWords=false] Include word-level list (requires `returnTimestamps`).
+     * @param {boolean} [decode_options.return_words] Legacy alias for `returnWords`.
+     * @param {boolean} [decode_options.returnTokens=false] Include token-level list (requires `returnTimestamps`).
+     * @param {boolean} [decode_options.return_tokens] Legacy alias for `returnTokens`.
+     * @param {boolean} [decode_options.returnMetrics=false] Include encoding/decoding timing metrics.
+     * @param {boolean} [decode_options.return_metrics] Legacy alias for `returnMetrics`.
+     * @param {boolean} [decode_options.returnFrameConfidences=false] Include per-frame confidence scores in `confidence`.
      * @param {boolean} [decode_options.returnFrameIndices=false] Include per-token encoder frame indices.
      * @param {boolean} [decode_options.returnLogProbs=false] Include per-token log probabilities.
      * @param {boolean} [decode_options.returnTdtSteps=false] Include raw TDT duration steps.
      * @param {number} [decode_options.timeOffset=0] Offset added to all timestamps (seconds).
      * @returns {Promise<{
      *  text: string,
-     *  is_final: boolean,
-     *  utterance_confidence?: number,
-     *  utterance_timestamp?: [number, number],
-     *  words?: Array<{ text: string, start_time: number, end_time: number, confidence?: number }>,
-     *  tokens?: Array<{ id: number, token: string, raw_token: string, is_word_start: boolean, start_time: number, end_time: number, confidence?: number }>,
-     *  confidence_scores?: { token_avg: number|null, word_avg: number|null, frame: number[]|null, frame_avg: number|null, overall_log_prob: number|null },
-     *  metrics?: { preprocess_ms: number, encode_ms: number, decode_ms: number, tokenize_ms: number, total_ms: number, rtf: number, rtf_x: number },
-     *  frameIndices?: number[] | null,
-     *  logProbs?: number[] | null,
-     *  tdtSteps?: number[] | null,
+     *  isFinal: boolean,
+     *  utteranceTimestamp?: [number, number],
+     *  words?: Array<{ text: string, startTime: number, endTime: number, confidence?: number }>,
+     *  tokens?: Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>,
+     *  confidence?: { utterance?: number|null, wordAverage?: number|null, frames?: number[]|null, frameAverage?: number|null, averageLogProb?: number|null },
+     *  metrics?: { preprocessMs: number, encodeMs: number, decodeMs: number, tokenizeMs: number, totalMs: number, rtf: number, rtfX: number },
+     *  debug?: { frameIndices?: number[] | null, logProbs?: number[] | null, tdtSteps?: number[] | null },
      * }>}
      */
     async transcribe(
         model_inputs,
-        {
+        decode_options = {},
+    ) {
+        const {
             tokenizer = null,
-            return_timestamps = true,
-            return_words = false,
-            return_tokens = false,
-            return_metrics = false,
+            returnTimestamps: returnTimestampsOption,
+            return_timestamps: legacyReturnTimestamps,
+            returnWords: returnWordsOption,
+            return_words: legacyReturnWords,
+            returnTokens: returnTokensOption,
+            return_tokens: legacyReturnTokens,
+            returnMetrics: returnMetricsOption,
+            return_metrics: legacyReturnMetrics,
             returnFrameConfidences = false,
             returnFrameIndices = false,
             returnLogProbs = false,
             returnTdtSteps = false,
             timeOffset = 0,
-        } = {},
-    ) {
+        } = decode_options;
+        const returnTimestamps = returnTimestampsOption ?? legacyReturnTimestamps ?? true;
+        const returnWords = returnWordsOption ?? legacyReturnWords ?? false;
+        const returnTokens = returnTokensOption ?? legacyReturnTokens ?? false;
+        const returnMetrics = returnMetricsOption ?? legacyReturnMetrics ?? false;
+
         if (!Number.isFinite(timeOffset)) {
             throw new Error('NemoConformerForTDT.transcribe expected `timeOffset` to be a finite number.');
         }
@@ -613,7 +625,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         const blankId = this.transducer.blank_token_id;
         const maxSymbolsPerStep = this.transducer.max_symbols_per_step;
 
-        const needConfidences = !!return_timestamps;
+        const needConfidences = !!returnTimestamps;
 
         /** @type {number[]} */
         const tokenIds = [];
@@ -825,44 +837,45 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
         const tokenizeStart = nowMs();
         const text = decodeTransducerText(tokenizer, tokenIds);
-        const needDetailed = return_timestamps && (return_words || return_tokens);
+        const needDetailed = returnTimestamps && (returnWords || returnTokens);
         const detailed = needDetailed
             ? buildTransducerDetailedOutputs(tokenizer, tokenIds, tokenTimestamps, tokenConfidences)
             : null;
         const tokenizeMs = nowMs() - tokenizeStart;
 
         /** @type {any} */
-        const result = { text, is_final: true };
+        const result = { text, isFinal: true };
+        const utteranceConfidence =
+            tokenConfidences && tokenConfidences.length > 0
+                ? roundMetric(tokenConfidences.reduce((a, b) => a + b, 0) / tokenConfidences.length, 6)
+                : null;
+        const utteranceTimestamp =
+            tokenTimestamps.length > 0
+                ? /** @type {[number, number]} */ ([
+                      tokenTimestamps[0][0],
+                      tokenTimestamps[tokenTimestamps.length - 1][1],
+                  ])
+                : /** @type {[number, number]} */ ([
+                      roundTs(timeOffset),
+                      roundTs(frameCount * frameTime + timeOffset),
+                  ]);
+        const averageLogProb =
+            logProbs && logProbs.length > 0
+                ? roundMetric(logProbs.reduce((a, b) => a + b, 0) / logProbs.length, 6)
+                : null;
 
-        if (return_timestamps) {
-            result.utterance_confidence =
-                tokenConfidences && tokenConfidences.length > 0
-                    ? roundMetric(tokenConfidences.reduce((a, b) => a + b, 0) / tokenConfidences.length, 6)
-                    : null;
-
-            result.utterance_timestamp =
-                tokenTimestamps.length > 0
-                    ? /** @type {[number, number]} */ ([
-                          tokenTimestamps[0][0],
-                          tokenTimestamps[tokenTimestamps.length - 1][1],
-                      ])
-                    : /** @type {[number, number]} */ ([
-                          roundTs(timeOffset),
-                          roundTs(frameCount * frameTime + timeOffset),
-                      ]);
+        if (returnTimestamps) {
+            result.utteranceTimestamp = utteranceTimestamp;
 
             if (detailed) {
-                if (return_words) result.words = detailed.words;
-                if (return_tokens) result.tokens = detailed.tokens;
+                if (returnWords) result.words = detailed.words;
+                if (returnTokens) result.tokens = detailed.tokens;
             }
 
-            result.confidence_scores = {
-                token_avg: result.utterance_confidence,
-                word_avg: detailed?.word_avg != null ? roundMetric(detailed.word_avg, 6) : null,
-                overall_log_prob:
-                    logProbs && logProbs.length > 0
-                        ? roundMetric(logProbs.reduce((a, b) => a + b, 0) / logProbs.length, 6)
-                        : null,
+            result.confidence = {
+                utterance: utteranceConfidence,
+                wordAverage: detailed?.wordAverage != null ? roundMetric(detailed.wordAverage, 6) : null,
+                averageLogProb,
             };
         }
 
@@ -872,40 +885,51 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             for (const { sum, count } of frameConfidenceStats.values()) {
                 frameConfidences.push(sum / count);
             }
-            if (!result.confidence_scores) {
-                result.confidence_scores = {};
-            }
-            result.confidence_scores.frame = frameConfidences;
-            result.confidence_scores.frame_avg = roundMetric(
-                frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
-                6,
-            );
+            result.confidence = {
+                ...(result.confidence ?? {}),
+                frames: frameConfidences,
+                frameAverage: roundMetric(
+                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
+                    6,
+                ),
+            };
         }
 
+        if (!returnTimestamps && averageLogProb != null) {
+            result.confidence = {
+                ...(result.confidence ?? {}),
+                averageLogProb,
+            };
+        }
+
+        const debug = {};
         if (returnFrameIndices) {
-            result.frameIndices = frameIndices;
+            debug.frameIndices = frameIndices;
         }
         if (returnLogProbs) {
-            result.logProbs = logProbs;
+            debug.logProbs = logProbs;
         }
         if (returnTdtSteps) {
-            result.tdtSteps = tdtSteps;
+            debug.tdtSteps = tdtSteps;
+        }
+        if (Object.keys(debug).length > 0) {
+            result.debug = debug;
         }
 
-        if (return_metrics) {
+        if (returnMetrics) {
             const totalMs = nowMs() - totalStart;
-            const utteranceDuration = result.utterance_timestamp
-                ? Math.max(result.utterance_timestamp[1] - result.utterance_timestamp[0], 1e-8)
+            const utteranceDuration = result.utteranceTimestamp
+                ? Math.max(result.utteranceTimestamp[1] - result.utteranceTimestamp[0], 1e-8)
                 : Math.max(frameCount * frameTime, 1e-8);
             const rtf = totalMs / 1000 / utteranceDuration;
             result.metrics = {
-                preprocess_ms: 0.0,
-                encode_ms: roundMetric(encodeMs, 2),
-                decode_ms: roundMetric(decodeMs, 2),
-                tokenize_ms: roundMetric(tokenizeMs, 2),
-                total_ms: roundMetric(totalMs, 2),
+                preprocessMs: 0.0,
+                encodeMs: roundMetric(encodeMs, 2),
+                decodeMs: roundMetric(decodeMs, 2),
+                tokenizeMs: roundMetric(tokenizeMs, 2),
+                totalMs: roundMetric(totalMs, 2),
                 rtf: roundMetric(rtf, 4),
-                rtf_x: roundMetric(1 / Math.max(rtf, 1e-8), 2),
+                rtfX: roundMetric(1 / Math.max(rtf, 1e-8), 2),
             };
         }
 

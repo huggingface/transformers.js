@@ -1,4 +1,5 @@
 import { pipeline, AutomaticSpeechRecognitionPipeline, Tensor } from "../../src/transformers.js";
+import { NEMO_FEATURE_OUTPUT_OWNERSHIP } from "../../src/models/nemo_conformer_tdt/feature_extraction_nemo_conformer_tdt.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -127,6 +128,15 @@ export default () => {
     });
 
     describe("nemo-conformer-tdt (unit)", () => {
+      const withNemoTensorOwnership = (value, cacheOwnsTensors) => {
+        Object.defineProperty(value, NEMO_FEATURE_OUTPUT_OWNERSHIP, {
+          value: cacheOwnsTensors,
+          enumerable: false,
+          configurable: true,
+        });
+        return value;
+      };
+
       const makeUnitPipe = (modelType = "nemo-conformer-tdt") => {
         const calls = [];
         const model = {
@@ -134,19 +144,18 @@ export default () => {
           async transcribe(_inputs, options) {
             calls.push(options);
             const result = { text: "hello world" };
-            if (options.return_timestamps) {
-              result.utterance_timestamp = [0, 0.08];
-              result.utterance_confidence = 0.95;
-              result.confidence_scores = { token_avg: 0.95, word_avg: 0.94, overall_log_prob: -0.05 };
-              if (options.return_words) {
+            if (options.returnTimestamps) {
+              result.utteranceTimestamp = [0, 0.08];
+              result.confidence = { utterance: 0.95, wordAverage: 0.94, averageLogProb: -0.05 };
+              if (options.returnWords) {
                 result.words = [
-                  { text: "hello", start_time: 0, end_time: 0.04, confidence: 0.96 },
-                  { text: "world", start_time: 0.04, end_time: 0.08, confidence: 0.93 },
+                  { text: "hello", startTime: 0, endTime: 0.04, confidence: 0.96 },
+                  { text: "world", startTime: 0.04, endTime: 0.08, confidence: 0.93 },
                 ];
               }
             }
-            if (options.return_metrics) {
-              result.metrics = { total_ms: 42, rtf: 0.01 };
+            if (options.returnMetrics) {
+              result.metrics = { totalMs: 42, rtf: 0.01, rtfX: 100 };
             }
             return result;
           },
@@ -185,9 +194,9 @@ export default () => {
         expect(output).toEqual({ text: "hello world" });
         expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({
-          return_timestamps: false,
-          return_words: false,
-          return_metrics: false,
+          returnTimestamps: false,
+          returnWords: false,
+          returnMetrics: false,
         });
       });
 
@@ -202,9 +211,9 @@ export default () => {
         });
         expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({
-          return_timestamps: true,
-          return_words: true,
-          return_metrics: false,
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
         });
       });
 
@@ -220,43 +229,93 @@ export default () => {
         });
         expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({
-          return_timestamps: true,
-          return_words: true,
-          return_metrics: false,
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
         });
       });
 
-      it("merges overlapping windows when Nemo chunking is enabled", async () => {
+      it("builds conservative sentence chunks from Nemo word timestamps", async () => {
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe() {
+            return {
+              text: "Hello. World again. U.S. Report update.",
+              utteranceTimestamp: [0, 2.4],
+              words: [
+                { text: "Hello.", startTime: 0, endTime: 0.4 },
+                { text: "World", startTime: 0.5, endTime: 0.8 },
+                { text: "again.", startTime: 0.8, endTime: 1.1 },
+                { text: "U.S.", startTime: 1.2, endTime: 1.5 },
+                { text: "Report", startTime: 1.6, endTime: 2.0 },
+                { text: "update.", startTime: 2.0, endTime: 2.4 },
+              ],
+            };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => ({ input_features: {} }), {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(16000), { return_timestamps: true });
+        expect(output).toEqual({
+          text: "Hello. World again. U.S. Report update.",
+          chunks: [
+            { text: "Hello.", timestamp: [0, 0.4] },
+            { text: "World again.", timestamp: [0.5, 1.1] },
+            { text: "U.S. Report update.", timestamp: [1.2, 2.4] },
+          ],
+        });
+      });
+
+      it("uses explicit chunk_length_s as a bounded sentence window size override", async () => {
         const calls = [];
+        const outputsByOffset = new Map([
+          [0, {
+            text: "Alpha. Beta. Carry",
+            words: [
+              { text: "Alpha.", startTime: 0, endTime: 1 },
+              { text: "Beta.", startTime: 17, endTime: 18 },
+              { text: "Carry", startTime: 19.95, endTime: 20 },
+            ],
+          }],
+          [19.95, {
+            text: "Carry on. Gamma",
+            words: [
+              { text: "Carry", startTime: 19.95, endTime: 20 },
+              { text: "on.", startTime: 20, endTime: 20.5 },
+              { text: "Gamma", startTime: 37.9, endTime: 38 },
+            ],
+          }],
+          [37.9, {
+            text: "Gamma. Tail resumes. Omega.",
+            words: [
+              { text: "Gamma.", startTime: 37.9, endTime: 39 },
+              { text: "Tail", startTime: 39.2, endTime: 39.6 },
+              { text: "resumes.", startTime: 39.6, endTime: 40.1 },
+              { text: "Omega.", startTime: 40.1, endTime: 40.45 },
+            ],
+          }],
+        ]);
         const model = {
           config: { model_type: "nemo-conformer-tdt" },
           async transcribe(_inputs, options) {
             calls.push(options);
-            if (options.timeOffset === 0) {
-              return {
-                text: "hello world again",
-                words: [
-                  { text: "hello", start_time: 0, end_time: 0.5 },
-                  { text: "world", start_time: 0.5, end_time: 1.1 },
-                  { text: "again", start_time: 1.2, end_time: 1.8 },
-                ],
-                tokens: [
-                  { id: 1, token: "hello", raw_token: "hello", is_word_start: true, start_time: 0, end_time: 0.5 },
-                  { id: 2, token: "world", raw_token: "world", is_word_start: true, start_time: 0.5, end_time: 1.1 },
-                  { id: 3, token: "again", raw_token: "again", is_word_start: true, start_time: 1.2, end_time: 1.8 },
-                ],
-              };
+            const item = outputsByOffset.get(options.timeOffset);
+            if (!item) {
+              throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
             }
             return {
-              text: "again today",
-              words: [
-                { text: "again", start_time: 1.2, end_time: 1.8 },
-                { text: "today", start_time: 1.8, end_time: 2.4 },
-              ],
-              tokens: [
-                { id: 3, token: "again", raw_token: "again", is_word_start: true, start_time: 1.2, end_time: 1.8 },
-                { id: 4, token: "today", raw_token: "today", is_word_start: true, start_time: 1.8, end_time: 2.4 },
-              ],
+              text: item.text,
+              utteranceTimestamp: [item.words[0].startTime, item.words[item.words.length - 1].endTime],
+              words: item.words,
             };
           },
           async dispose() {},
@@ -282,71 +341,228 @@ export default () => {
           processor,
         });
 
-        const output = await pipe(new Float32Array(3 * 16000), {
+        const output = await pipe(new Float32Array(40.5 * 16000), {
           return_timestamps: "word",
           chunk_length_s: 2,
-          stride_length_s: 0.5,
         });
 
         expect(output).toEqual({
-          text: "hello world again today",
+          text: "Alpha. Beta. Carry on. Gamma. Tail resumes. Omega.",
           chunks: [
-            { text: "hello", timestamp: [0, 0.5] },
-            { text: "world", timestamp: [0.5, 1.1] },
-            { text: "again", timestamp: [1.2, 1.8] },
-            { text: "today", timestamp: [1.8, 2.4] },
+            { text: "Alpha.", timestamp: [0, 1] },
+            { text: "Beta.", timestamp: [17, 18] },
+            { text: "Carry", timestamp: [19.95, 20] },
+            { text: "on.", timestamp: [20, 20.5] },
+            { text: "Gamma.", timestamp: [37.9, 39] },
+            { text: "Tail", timestamp: [39.2, 39.6] },
+            { text: "resumes.", timestamp: [39.6, 40.1] },
+            { text: "Omega.", timestamp: [40.1, 40.45] },
           ],
         });
-        expect(calls).toHaveLength(2);
+        expect(calls).toHaveLength(3);
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 19.95, 37.9]);
         expect(calls[0]).toMatchObject({
-          return_timestamps: true,
-          return_words: true,
-          return_tokens: true,
-          return_metrics: false,
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
           timeOffset: 0,
         });
         expect(calls[1]).toMatchObject({
-          return_timestamps: true,
-          return_words: true,
-          return_tokens: true,
-          return_metrics: false,
-          timeOffset: 1,
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
+          timeOffset: 19.95,
+        });
+        expect(calls[2]).toMatchObject({
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
+          timeOffset: 37.9,
         });
       });
 
-      it("reconstructs windowed Nemo text from merged words when token decode drops spaces", async () => {
+      it("replaces boundary-truncated sentences with the longer retranscribed sentence", async () => {
+        const calls = [];
+        const outputsByOffset = new Map([
+          [0, {
+            text: "Alpha. Beta. It won't run away, and it won't come to life.",
+            words: [
+              { text: "Alpha.", startTime: 0, endTime: 1 },
+              { text: "Beta.", startTime: 11, endTime: 12 },
+              { text: "It", startTime: 17.2, endTime: 17.5 },
+              { text: "won't", startTime: 17.5, endTime: 17.9 },
+              { text: "run", startTime: 17.9, endTime: 18.2 },
+              { text: "away,", startTime: 18.2, endTime: 18.6 },
+              { text: "and", startTime: 18.6, endTime: 18.8 },
+              { text: "it", startTime: 18.8, endTime: 19.0 },
+              { text: "won't", startTime: 19.0, endTime: 19.3 },
+              { text: "come", startTime: 19.3, endTime: 19.5 },
+              { text: "to", startTime: 19.5, endTime: 19.65 },
+              { text: "life.", startTime: 19.65, endTime: 19.8 },
+            ],
+          }],
+          [17.2, {
+            text: "It won't run away, and it won't come to life until someone finds it. Omega.",
+            words: [
+              { text: "It", startTime: 17.2, endTime: 17.5 },
+              { text: "won't", startTime: 17.5, endTime: 17.9 },
+              { text: "run", startTime: 17.9, endTime: 18.2 },
+              { text: "away,", startTime: 18.2, endTime: 18.6 },
+              { text: "and", startTime: 18.6, endTime: 18.8 },
+              { text: "it", startTime: 18.8, endTime: 19.0 },
+              { text: "won't", startTime: 19.0, endTime: 19.3 },
+              { text: "come", startTime: 19.3, endTime: 19.5 },
+              { text: "to", startTime: 19.5, endTime: 19.65 },
+              { text: "life", startTime: 19.65, endTime: 19.95 },
+              { text: "until", startTime: 19.95, endTime: 20.4 },
+              { text: "someone", startTime: 20.4, endTime: 21.0 },
+              { text: "finds", startTime: 21.0, endTime: 21.5 },
+              { text: "it.", startTime: 21.5, endTime: 22.0 },
+              { text: "Omega.", startTime: 28, endTime: 29 },
+            ],
+          }],
+        ]);
         const model = {
           config: { model_type: "nemo-conformer-tdt" },
           async transcribe(_inputs, options) {
+            calls.push(options);
+            const item = outputsByOffset.get(options.timeOffset);
+            if (!item) {
+              throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
+            }
+            return {
+              text: item.text,
+              utteranceTimestamp: [item.words[0].startTime, item.words[item.words.length - 1].endTime],
+              words: item.words,
+            };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => ({ input_features: {} }), {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(Math.ceil(31 * 16000)), {
+          return_timestamps: true,
+          chunk_length_s: 20,
+        });
+
+        expect(output).toEqual({
+          text: "Alpha. Beta. It won't run away, and it won't come to life until someone finds it. Omega.",
+          chunks: [
+            { text: "Alpha.", timestamp: [0, 1] },
+            { text: "Beta.", timestamp: [11, 12] },
+            { text: "It won't run away, and it won't come to life until someone finds it.", timestamp: [17.2, 22] },
+            { text: "Omega.", timestamp: [28, 29] },
+          ],
+        });
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 17.2]);
+      });
+
+      it("retranscribes the dropped last sentence from its start without stale carry", async () => {
+        const calls = [];
+        const outputsByOffset = new Map([
+          [0, {
+            text: "Alpha. The pressure gauge mark. He watched as the fruit",
+            words: [
+              { text: "Alpha.", startTime: 0, endTime: 1 },
+              { text: "The", startTime: 16.8, endTime: 17.0 },
+              { text: "pressure", startTime: 17.0, endTime: 17.4 },
+              { text: "gauge", startTime: 17.4, endTime: 17.76 },
+              { text: "mark.", startTime: 17.76, endTime: 18.56 },
+              { text: "He", startTime: 18.56, endTime: 18.72 },
+              { text: "watched", startTime: 18.72, endTime: 18.96 },
+              { text: "as", startTime: 18.96, endTime: 19.04 },
+              { text: "the", startTime: 19.04, endTime: 19.2 },
+              { text: "fruit", startTime: 19.2, endTime: 19.36 },
+            ],
+          }],
+          [18.56, {
+            text: "He watched as the fluid.",
+            words: [
+              { text: "He", startTime: 18.56, endTime: 18.72 },
+              { text: "watched", startTime: 18.72, endTime: 19.12 },
+              { text: "as", startTime: 19.12, endTime: 19.28 },
+              { text: "the", startTime: 19.28, endTime: 19.36 },
+              { text: "fluid.", startTime: 19.36, endTime: 20 },
+            ],
+          }],
+        ]);
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe(_inputs, options) {
+            calls.push(options);
+            const item = outputsByOffset.get(options.timeOffset);
+            if (!item) {
+              throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
+            }
+            return {
+              text: item.text,
+              utteranceTimestamp: [item.words[0].startTime, item.words[item.words.length - 1].endTime],
+              words: item.words,
+            };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => ({ input_features: {} }), {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(Math.ceil(21 * 16000)), {
+          return_timestamps: "word",
+          chunk_length_s: 20,
+        });
+
+        expect(output).toEqual({
+          text: "Alpha. The pressure gauge mark. He watched as the fluid.",
+          chunks: [
+            { text: "Alpha.", timestamp: [0, 1] },
+            { text: "The", timestamp: [16.8, 17] },
+            { text: "pressure", timestamp: [17, 17.4] },
+            { text: "gauge", timestamp: [17.4, 17.76] },
+            { text: "mark.", timestamp: [17.76, 18.56] },
+            { text: "He", timestamp: [18.56, 18.72] },
+            { text: "watched", timestamp: [18.72, 19.12] },
+            { text: "as", timestamp: [19.12, 19.28] },
+            { text: "the", timestamp: [19.28, 19.36] },
+            { text: "fluid.", timestamp: [19.36, 20] },
+          ],
+        });
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 18.56]);
+      });
+
+      it("reconstructs windowed Nemo text from merged words when token decode drops spaces", async () => {
+        const calls = [];
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe(_inputs, options) {
+            calls.push(options);
             if (options.timeOffset === 0) {
               return {
                 text: "score. 48-year-old",
                 words: [
-                  { text: "score.", start_time: 0, end_time: 0.4 },
-                  { text: "48-year-old", start_time: 0.5, end_time: 1.3 },
-                ],
-                tokens: [
-                  { id: 1, token: "score", raw_token: "▁score", is_word_start: true, start_time: 0, end_time: 0.3 },
-                  { id: 2, token: ".", raw_token: ".", is_word_start: false, start_time: 0.3, end_time: 0.4 },
-                  { id: 3, token: "48", raw_token: "48", is_word_start: false, start_time: 0.5, end_time: 0.8 },
-                  { id: 4, token: "-", raw_token: "-", is_word_start: false, start_time: 0.8, end_time: 0.85 },
-                  { id: 5, token: "year", raw_token: "year", is_word_start: false, start_time: 0.85, end_time: 1.05 },
-                  { id: 4, token: "-", raw_token: "-", is_word_start: false, start_time: 1.05, end_time: 1.1 },
-                  { id: 6, token: "old", raw_token: "old", is_word_start: false, start_time: 1.1, end_time: 1.3 },
+                  { text: "score.", startTime: 0, endTime: 0.4 },
+                  { text: "48-year-old", startTime: 0.5, endTime: 1.3 },
                 ],
               };
             }
             return {
               text: "with 0.5",
               words: [
-                { text: "with", start_time: 1.4, end_time: 1.7 },
-                { text: "0.5", start_time: 1.8, end_time: 2.05 },
-              ],
-              tokens: [
-                { id: 7, token: "with", raw_token: "▁with", is_word_start: true, start_time: 1.4, end_time: 1.7 },
-                { id: 8, token: "0", raw_token: "0", is_word_start: false, start_time: 1.8, end_time: 1.9 },
-                { id: 2, token: ".", raw_token: ".", is_word_start: false, start_time: 1.9, end_time: 1.95 },
-                { id: 9, token: "5", raw_token: "5", is_word_start: false, start_time: 1.95, end_time: 2.05 },
+                { text: "with", startTime: 1.4, endTime: 1.7 },
+                { text: "0.5", startTime: 1.8, endTime: 2.05 },
               ],
             };
           },
@@ -378,10 +594,9 @@ export default () => {
           processor,
         });
 
-        const output = await pipe(new Float32Array(3 * 16000), {
+        const output = await pipe(new Float32Array(Math.ceil(20.1 * 16000)), {
           return_timestamps: "word",
-          chunk_length_s: 2,
-          stride_length_s: 0.5,
+          chunk_length_s: 20,
         });
 
         expect(output.text).toBe("score. 48-year-old with 0.5");
@@ -391,39 +606,62 @@ export default () => {
           { text: "with", timestamp: [1.4, 1.7] },
           { text: "0.5", timestamp: [1.8, 2.05] },
         ]);
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 10]);
       });
 
-      it("auto-window long Nemo audio with 90s chunks and 10s stride", async () => {
+      it("auto-windows long Nemo audio with 90s sentence windows", async () => {
         const calls = [];
-        const wordsByOffset = new Map([
-          [0, { id: 1, text: "alpha", start: 0, end: 1 }],
-          [70, { id: 2, text: "beta", start: 85, end: 86 }],
-          [140, { id: 3, text: "gamma", start: 155, end: 156 }],
-          [210, { id: 4, text: "delta", start: 225, end: 226 }],
+        const outputsByOffset = new Map([
+          [0, {
+            text: "Alpha. Beta. Gamma. Carry",
+            words: [
+              { text: "Alpha.", startTime: 0, endTime: 1 },
+              { text: "Beta.", startTime: 30, endTime: 31 },
+              { text: "Gamma.", startTime: 69, endTime: 70 },
+              { text: "Carry", startTime: 84, endTime: 85 },
+            ],
+          }],
+          [84, {
+            text: "Carry on. Delta. Epsilon. Tail",
+            words: [
+              { text: "Carry", startTime: 84, endTime: 85 },
+              { text: "on.", startTime: 86, endTime: 87 },
+              { text: "Delta.", startTime: 110, endTime: 111 },
+              { text: "Epsilon.", startTime: 139, endTime: 140 },
+              { text: "Tail", startTime: 154, endTime: 155 },
+            ],
+          }],
+          [154, {
+            text: "Tail resumes. Zeta. Eta. Final",
+            words: [
+              { text: "Tail", startTime: 154, endTime: 155 },
+              { text: "resumes.", startTime: 156, endTime: 157 },
+              { text: "Zeta.", startTime: 180, endTime: 181 },
+              { text: "Eta.", startTime: 209, endTime: 210 },
+              { text: "Final", startTime: 224, endTime: 225 },
+            ],
+          }],
+          [224, {
+            text: "Final line. Omega.",
+            words: [
+              { text: "Final", startTime: 224, endTime: 225 },
+              { text: "line.", startTime: 226, endTime: 227 },
+              { text: "Omega.", startTime: 250, endTime: 251 },
+            ],
+          }],
         ]);
         const model = {
           config: { model_type: "nemo-conformer-tdt" },
           async transcribe(_inputs, options) {
             calls.push(options);
-            const item = wordsByOffset.get(options.timeOffset);
+            const item = outputsByOffset.get(options.timeOffset);
             if (!item) {
               throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
             }
             return {
               text: item.text,
-              words: [
-                { text: item.text, start_time: item.start, end_time: item.end },
-              ],
-              tokens: [
-                {
-                  id: item.id,
-                  token: item.text,
-                  raw_token: item.text,
-                  is_word_start: true,
-                  start_time: item.start,
-                  end_time: item.end,
-                },
-              ],
+              utteranceTimestamp: [item.words[0].startTime, item.words[item.words.length - 1].endTime],
+              words: item.words,
             };
           },
           async dispose() {},
@@ -452,24 +690,121 @@ export default () => {
         const output = await pipe(new Float32Array(300 * 16000), { return_timestamps: "word" });
 
         expect(output).toEqual({
-          text: "alpha beta gamma delta",
+          text: "Alpha. Beta. Gamma. Carry on. Delta. Epsilon. Tail resumes. Zeta. Eta. Final line. Omega.",
           chunks: [
-            { text: "alpha", timestamp: [0, 1] },
-            { text: "beta", timestamp: [85, 86] },
-            { text: "gamma", timestamp: [155, 156] },
-            { text: "delta", timestamp: [225, 226] },
+            { text: "Alpha.", timestamp: [0, 1] },
+            { text: "Beta.", timestamp: [30, 31] },
+            { text: "Gamma.", timestamp: [69, 70] },
+            { text: "Carry", timestamp: [84, 85] },
+            { text: "on.", timestamp: [86, 87] },
+            { text: "Delta.", timestamp: [110, 111] },
+            { text: "Epsilon.", timestamp: [139, 140] },
+            { text: "Tail", timestamp: [154, 155] },
+            { text: "resumes.", timestamp: [156, 157] },
+            { text: "Zeta.", timestamp: [180, 181] },
+            { text: "Eta.", timestamp: [209, 210] },
+            { text: "Final", timestamp: [224, 225] },
+            { text: "line.", timestamp: [226, 227] },
+            { text: "Omega.", timestamp: [250, 251] },
           ],
         });
         expect(calls).toHaveLength(4);
-        expect(calls.map((x) => x.timeOffset)).toEqual([0, 70, 140, 210]);
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 84, 154, 224]);
         for (const call of calls) {
           expect(call).toMatchObject({
-            return_timestamps: true,
-            return_words: true,
-            return_tokens: true,
-            return_metrics: false,
+            returnTimestamps: true,
+            returnWords: true,
+            returnMetrics: false,
           });
         }
+      });
+
+      it("returns sentence chunks for auto-windowed long Nemo audio", async () => {
+        const calls = [];
+        const outputsByOffset = new Map([
+          [0, {
+            text: "Alpha. Beta. Gamma. Carry",
+            words: [
+              { text: "Alpha.", startTime: 0, endTime: 1 },
+              { text: "Beta.", startTime: 30, endTime: 31 },
+              { text: "Gamma.", startTime: 69, endTime: 70 },
+              { text: "Carry", startTime: 84, endTime: 85 },
+            ],
+          }],
+          [84, {
+            text: "Carry on. Delta. Epsilon. Tail",
+            words: [
+              { text: "Carry", startTime: 84, endTime: 85 },
+              { text: "on.", startTime: 86, endTime: 87 },
+              { text: "Delta.", startTime: 110, endTime: 111 },
+              { text: "Epsilon.", startTime: 139, endTime: 140 },
+              { text: "Tail", startTime: 154, endTime: 155 },
+            ],
+          }],
+          [154, {
+            text: "Tail resumes. Zeta. Eta. Final",
+            words: [
+              { text: "Tail", startTime: 154, endTime: 155 },
+              { text: "resumes.", startTime: 156, endTime: 157 },
+              { text: "Zeta.", startTime: 180, endTime: 181 },
+              { text: "Eta.", startTime: 209, endTime: 210 },
+              { text: "Final", startTime: 224, endTime: 225 },
+            ],
+          }],
+          [224, {
+            text: "Final line. Omega.",
+            words: [
+              { text: "Final", startTime: 224, endTime: 225 },
+              { text: "line.", startTime: 226, endTime: 227 },
+              { text: "Omega.", startTime: 250, endTime: 251 },
+            ],
+          }],
+        ]);
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe(_inputs, options) {
+            calls.push(options);
+            const item = outputsByOffset.get(options.timeOffset);
+            if (!item) {
+              throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
+            }
+            return {
+              text: item.text,
+              utteranceTimestamp: [item.words[0].startTime, item.words[item.words.length - 1].endTime],
+              words: item.words,
+            };
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => ({ input_features: {} }), {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer: {},
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(300 * 16000), { return_timestamps: true });
+
+        expect(output).toEqual({
+          text: "Alpha. Beta. Gamma. Carry on. Delta. Epsilon. Tail resumes. Zeta. Eta. Final line. Omega.",
+          chunks: [
+            { text: "Alpha.", timestamp: [0, 1] },
+            { text: "Beta.", timestamp: [30, 31] },
+            { text: "Gamma.", timestamp: [69, 70] },
+            { text: "Carry on.", timestamp: [84, 87] },
+            { text: "Delta.", timestamp: [110, 111] },
+            { text: "Epsilon.", timestamp: [139, 140] },
+            { text: "Tail resumes.", timestamp: [154, 157] },
+            { text: "Zeta.", timestamp: [180, 181] },
+            { text: "Eta.", timestamp: [209, 210] },
+            { text: "Final line.", timestamp: [224, 227] },
+            { text: "Omega.", timestamp: [250, 251] },
+          ],
+        });
+        expect(calls.map((x) => x.timeOffset)).toEqual([0, 84, 154, 224]);
       });
 
       it("rejects non-finite audio samples before Nemo decoding", async () => {
@@ -500,7 +835,7 @@ export default () => {
           };
           trackDispose(input_features);
           trackDispose(attention_mask);
-          return { input_features, attention_mask };
+          return withNemoTensorOwnership({ input_features, attention_mask }, false);
         }, {
           feature_extractor: { config: { sampling_rate: 16000 } },
         });
@@ -538,13 +873,10 @@ export default () => {
           };
           trackDispose(input_features);
           trackDispose(attention_mask);
-          lastInputs = { input_features, attention_mask };
+          lastInputs = withNemoTensorOwnership({ input_features, attention_mask }, true);
           return lastInputs;
         }, {
-          feature_extractor: {
-            config: { sampling_rate: 16000 },
-            feature_cache: { max_entries: 2, max_size_mb: 8 },
-          },
+          feature_extractor: { config: { sampling_rate: 16000 } },
         });
         const pipe = new AutomaticSpeechRecognitionPipeline({
           task: PIPELINE_ID,
@@ -584,12 +916,9 @@ export default () => {
           };
           trackDispose(input_features);
           trackDispose(attention_mask);
-          return { input_features, attention_mask };
+          return withNemoTensorOwnership({ input_features, attention_mask }, false);
         }, {
-          feature_extractor: {
-            config: { sampling_rate: 16000 },
-            feature_cache: { max_entries: 0, max_size_mb: 8 },
-          },
+          feature_extractor: { config: { sampling_rate: 16000 } },
         });
         const pipe = new AutomaticSpeechRecognitionPipeline({
           task: PIPELINE_ID,

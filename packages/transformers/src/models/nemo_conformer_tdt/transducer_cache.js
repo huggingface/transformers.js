@@ -60,7 +60,7 @@ export class FeatureLRUCache {
     /**
      * @param {string} key
      * @param {any} value
-     * @returns {void}
+     * @returns {boolean} Whether the cache retained ownership of the supplied value.
      */
     set(key, value) {
         // Explicit no-cache mode: keep caller ownership of current values.
@@ -68,7 +68,7 @@ export class FeatureLRUCache {
             if (this.cache.size > 0) {
                 this.clear();
             }
-            return;
+            return false;
         }
 
         const max_bytes = this.max_size_mb * 1024 * 1024;
@@ -78,10 +78,11 @@ export class FeatureLRUCache {
             this.cache.delete(key);
             if (existing.size_bytes <= max_bytes) {
                 this.cache.set(key, existing);
+                return true;
             } else {
                 this.current_size_bytes -= existing.size_bytes;
+                return false;
             }
-            return;
         }
 
         const size_bytes = estimateSizeBytes(value);
@@ -92,7 +93,7 @@ export class FeatureLRUCache {
                 this.current_size_bytes -= existing.size_bytes;
                 this.cache.delete(key);
             }
-            return;
+            return false;
         }
 
         if (existing) {
@@ -104,6 +105,7 @@ export class FeatureLRUCache {
         this.cache.set(key, { value, size_bytes });
         this.current_size_bytes += size_bytes;
         this._evict();
+        return this.cache.get(key)?.value === value;
     }
 
     clear() {

@@ -1,4 +1,5 @@
 import { NemoConformerTDTFeatureExtractor, Tensor } from "../../../src/transformers.js";
+import { NEMO_FEATURE_OUTPUT_OWNERSHIP } from "../../../src/models/nemo_conformer_tdt/feature_extraction_nemo_conformer_tdt.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../../init.js";
 
@@ -152,6 +153,89 @@ export default () => {
           extractor.clear_cache();
         }
         expect(extractor.get_cache_stats().entries).toBe(0);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "marks uncached outputs as caller-owned",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({ ...base, feature_size: 80 });
+        const outputs = await extractor(audio);
+        try {
+          expect(outputs[NEMO_FEATURE_OUTPUT_OWNERSHIP]).toBe(false);
+        } finally {
+          outputs.input_features.dispose();
+          outputs.attention_mask.dispose();
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "marks cached outputs as cache-owned",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          use_feature_cache: true,
+          feature_cache_max_entries: 8,
+          feature_cache_max_size_mb: 8,
+        });
+        try {
+          const first = await extractor(audio);
+          const second = await extractor(audio);
+
+          expect(first[NEMO_FEATURE_OUTPUT_OWNERSHIP]).toBe(true);
+          expect(second[NEMO_FEATURE_OUTPUT_OWNERSHIP]).toBe(true);
+          expect(first.input_features).toBe(second.input_features);
+        } finally {
+          extractor.clear_cache();
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "marks skipped-cache outputs as caller-owned",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          use_feature_cache: true,
+          feature_cache_max_entries: 0,
+          feature_cache_max_size_mb: 8,
+        });
+        const outputs = await extractor(audio);
+        try {
+          expect(outputs[NEMO_FEATURE_OUTPUT_OWNERSHIP]).toBe(false);
+          expect(extractor.get_cache_stats().entries).toBe(0);
+        } finally {
+          outputs.input_features.dispose();
+          outputs.attention_mask.dispose();
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "marks oversized-cache outputs as caller-owned",
+      async () => {
+        const extractor = new NemoConformerTDTFeatureExtractor({
+          ...base,
+          feature_size: 80,
+          use_feature_cache: true,
+          feature_cache_max_entries: 8,
+          feature_cache_max_size_mb: 0.000001,
+        });
+        const outputs = await extractor(audio);
+        try {
+          expect(outputs[NEMO_FEATURE_OUTPUT_OWNERSHIP]).toBe(false);
+          expect(extractor.get_cache_stats().entries).toBe(0);
+        } finally {
+          outputs.input_features.dispose();
+          outputs.attention_mask.dispose();
+        }
       },
       MAX_TEST_EXECUTION_TIME,
     );
