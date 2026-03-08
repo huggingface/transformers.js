@@ -89,11 +89,8 @@ export class VoxtralRealtimeProcessor extends Processor {
                 // Build input_ids: BOS + (num_left_pad_tokens + num_delay_tokens) * [STREAMING_PAD]
                 const num_pad_tokens = NUM_LEFT_PAD_TOKENS + NUM_DELAY_TOKENS;
                 const num_input_tokens = 1 + num_pad_tokens;
-                const input_ids_data = new BigInt64Array(num_input_tokens);
+                const input_ids_data = new BigInt64Array(num_input_tokens).fill(BigInt(STREAMING_PAD_TOKEN_ID));
                 input_ids_data[0] = 1n; // BOS
-                for (let i = 1; i < num_input_tokens; ++i) {
-                    input_ids_data[i] = BigInt(STREAMING_PAD_TOKEN_ID);
-                }
                 const input_ids = new Tensor('int64', input_ids_data, [1, num_input_tokens]);
 
                 return {
