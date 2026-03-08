@@ -37,7 +37,7 @@ export class VoxtralRealtimeProcessor extends Processor {
 
     /** Number of right-pad tokens for non-streaming mode. */
     get num_right_pad_tokens() {
-        return (NUM_DELAY_TOKENS + 1) + OFFLINE_STREAMING_BUFFER_TOKENS;
+        return NUM_DELAY_TOKENS + 1 + OFFLINE_STREAMING_BUFFER_TOKENS;
     }
 
     /** Number of mel frames per text token. */
