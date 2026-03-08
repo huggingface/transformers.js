@@ -3,6 +3,31 @@
  * @type {WeakMap<any, Map<number, string>>}
  */
 const TOKEN_ID_TO_TEXT_CACHE = new WeakMap();
+const LIKELY_DOMAIN_SUFFIXES = new Set([
+    'ai',
+    'app',
+    'au',
+    'biz',
+    'ca',
+    'cn',
+    'co',
+    'com',
+    'de',
+    'dev',
+    'edu',
+    'fr',
+    'gov',
+    'info',
+    'io',
+    'jp',
+    'me',
+    'mil',
+    'net',
+    'org',
+    'tv',
+    'uk',
+    'us',
+]);
 
 /**
  * @param {any} tokenizer
@@ -106,6 +131,46 @@ function consumeAlignedTokenText(fullText, cursor, tokenText) {
 }
 
 /**
+ * @param {Array<{ raw: string, clean: string, startsNewWord: boolean }>} pieces
+ * @param {number} startIndex
+ * @returns {string}
+ */
+function collectUpcomingWordText(pieces, startIndex) {
+    let text = '';
+    for (let i = startIndex; i < pieces.length; ++i) {
+        if (i > startIndex && pieces[i].startsNewWord) {
+            break;
+        }
+        text += pieces[i].clean;
+    }
+    return text;
+}
+
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isLikelyDomainSuffix(text) {
+    const normalized = String(text ?? '')
+        .toLowerCase()
+        .replace(/[.,!?;:]+$/g, '');
+    return LIKELY_DOMAIN_SUFFIXES.has(normalized);
+}
+
+/**
+ * @param {{ text: string, start: number, end: number, confs: number[] } | null} current
+ * @param {Array<{ raw: string, clean: string, startsNewWord: boolean }>} pieces
+ * @param {number} index
+ * @returns {boolean}
+ */
+function shouldMergeDomainSuffixWord(current, pieces, index) {
+    if (!current || !/[A-Za-z0-9-]\.$/.test(current.text.trim())) {
+        return false;
+    }
+    return isLikelyDomainSuffix(collectUpcomingWordText(pieces, index));
+}
+
+/**
  * @param {Array<{ text: string, startTime: number, endTime: number, confidence?: number }>} words
  * @param {{ text: string, start: number, end: number, confs: number[] } | null} current
  */
@@ -168,6 +233,7 @@ export function buildTransducerWordOffsets(
     /** @type {Array<{ text: string, startTime: number, endTime: number, confidence?: number }>} */
     const words = [];
     let textCursor = 0;
+    const pieces = token_ids.map((id) => resolveTokenPiece(tokenizer, id));
 
     /** @type {{ text: string, start: number, end: number, confs: number[] } | null} */
     let current = null;
@@ -175,7 +241,7 @@ export function buildTransducerWordOffsets(
     for (let i = 0; i < token_ids.length; ++i) {
         const id = token_ids[i];
         const ts = token_timestamps[i];
-        const piece = resolveTokenPiece(tokenizer, id);
+        const piece = pieces[i];
         const raw = piece.raw;
         const clean = piece.clean;
         if (!clean) continue;
@@ -183,7 +249,8 @@ export function buildTransducerWordOffsets(
         const aligned = consumeAlignedTokenText(fullText, textCursor, clean);
         textCursor = aligned.cursor;
         const tokenText = aligned.text || clean;
-        const startsNewWord = !current || aligned.skippedWhitespace || piece.startsNewWord;
+        const mergeDomainSuffix = shouldMergeDomainSuffixWord(current, pieces, i);
+        const startsNewWord = !current || (!mergeDomainSuffix && (aligned.skippedWhitespace || piece.startsNewWord));
 
         const tok = {
             id,

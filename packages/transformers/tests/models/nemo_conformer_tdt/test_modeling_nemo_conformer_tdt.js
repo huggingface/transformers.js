@@ -792,6 +792,52 @@ export default () => {
       expect(output.tokens.map((x) => x.token)).toEqual(["score", ".", "48", "-", "year", "-", "old", "with", "0", ".", "5"]);
     });
 
+    it("merges domain suffixes that tokenizer decoding splits after a period", () => {
+      const rawById = {
+        1: "▁L",
+        2: "ib",
+        3: "ri",
+        4: "V",
+        5: "o",
+        6: "x",
+        7: ".",
+        8: "▁or",
+        9: "g",
+        10: ".",
+      };
+      const tokenizer = {
+        get_vocab() {
+          return rawById;
+        },
+        decode(ids) {
+          if (ids.length === 1) {
+            return rawById[ids[0]].replace(/^▁/, "");
+          }
+          return "LibriVox. org.";
+        },
+      };
+
+      const output = buildTransducerDetailedOutputs(
+        tokenizer,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        [
+          [10.88, 10.96],
+          [10.96, 11.12],
+          [11.12, 11.28],
+          [11.28, 11.44],
+          [11.44, 11.6],
+          [11.6, 11.76],
+          [11.76, 11.84],
+          [12.0, 12.08],
+          [12.08, 12.16],
+          [12.16, 12.24],
+        ],
+      );
+
+      expect(output.words.map((x) => x.text)).toEqual(["LibriVox.org."]);
+      expect(output.tokens.map((x) => x.isWordStart)).toEqual([true, false, false, false, false, false, false, false, false, false]);
+    });
+
     it("does not collapse distinct overlapping punctuation-only tokens during merge dedupe", () => {
       expect(
         dedupeMergedWords([
