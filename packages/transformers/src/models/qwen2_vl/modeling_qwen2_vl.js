@@ -1,8 +1,4 @@
-import {
-    PreTrainedModel,
-    cumsum_masked_fill,
-    default_merge_input_ids_with_image_features,
-} from '../modeling_utils.js';
+import { PreTrainedModel, cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
