@@ -1,5 +1,5 @@
 import { sessionRun } from '../session.js';
-import { PreTrainedModel, decoder_forward, decoder_prepare_inputs_for_generation } from '../modeling_utils.js';
+import { PreTrainedModel, getPastLength, decoder_forward, decoder_prepare_inputs_for_generation } from '../modeling_utils.js';
 import { cat, ones, full, Tensor } from '../../utils/tensor.js';
 
 const SILENCE_TOKEN = 4299n;
@@ -105,7 +105,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
                 if (!past_key_values || target_length !== 1) {
                     throw new Error('Incorrect state encountered during generation.');
                 }
-                const past_length = Object.values(past_key_values)[0].dims.at(-2);
+                const past_length = getPastLength(past_key_values);
                 attention_mask = ones([inputs_embeds.dims[0], past_length + target_length]);
             }
         }
