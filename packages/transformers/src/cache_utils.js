@@ -1,4 +1,3 @@
-
 /**
  * A cache class that stores past key values as named tensors.
  */
@@ -26,7 +25,7 @@ export class DynamicCache extends /** @type {new () => Record<string, any>} */ (
                 return this[name].dims.at(-2);
             }
         }
-        throw new Error('Unable to determine sequence length from the cache.')
+        throw new Error('Unable to determine sequence length from the cache.');
     }
 
     /**
