@@ -146,9 +146,6 @@ export function buildTransducerWordOffsets(
     token_confidences = null,
     fullText = '',
 ) {
-    if (!tokenizer) {
-        return { words: [], tokens: [], wordAverage: null };
-    }
     if (token_ids.length !== token_timestamps.length) {
         throw new Error(
             `buildTransducerWordOffsets expects equal lengths for token_ids (${token_ids.length}) and token_timestamps (${token_timestamps.length}).`,
@@ -161,6 +158,9 @@ export function buildTransducerWordOffsets(
     }
     if (token_ids.length === 0) {
         return { words: [], tokens: [], wordAverage: null };
+    }
+    if (!tokenizer) {
+        throw new Error('buildTransducerWordOffsets requires a tokenizer for non-empty token_ids.');
     }
 
     /** @type {Array<{ id: number, token: string, rawToken: string, isWordStart: boolean, startTime: number, endTime: number, confidence?: number }>} */

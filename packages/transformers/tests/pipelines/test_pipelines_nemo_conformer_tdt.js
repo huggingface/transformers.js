@@ -532,6 +532,67 @@ export default () => {
       }
     });
 
+    it("does not truncate long audio when sentence cursor advances one second at a time", async () => {
+      const calls = [];
+      const expectedChunks = Array.from({ length: 13 }, (_, index) => ({
+        text: `Alpha${index}.`,
+        timestamp: [index, index + 0.2],
+      })).concat([{ text: "Omega.", timestamp: [180, 180.5] }]);
+      const expectedText = expectedChunks.map((chunk) => chunk.text).join(" ");
+
+      const model = {
+        async transcribe(_inputs, options) {
+          calls.push(options);
+
+          if (Number.isInteger(options.timeOffset) && options.timeOffset >= 0 && options.timeOffset < 12) {
+            const offset = options.timeOffset;
+            return {
+              text: `Alpha${offset}. Carry`,
+              utteranceTimestamp: [offset, offset + 1.2],
+              words: [
+                { text: `Alpha${offset}.`, startTime: offset, endTime: offset + 0.2 },
+                { text: "Carry", startTime: offset + 1, endTime: offset + 1.2 },
+              ],
+            };
+          }
+
+          if (options.timeOffset === 12) {
+            return {
+              text: "Alpha12. Omega.",
+              utteranceTimestamp: [12, 180.5],
+              words: [
+                { text: "Alpha12.", startTime: 12, endTime: 12.2 },
+                { text: "Omega.", startTime: 180, endTime: 180.5 },
+              ],
+            };
+          }
+
+          if (options.timeOffset === 180) {
+            return {
+              text: "Omega.",
+              utteranceTimestamp: [180, 180.5],
+              words: [{ text: "Omega.", startTime: 180, endTime: 180.5 }],
+            };
+          }
+
+          throw new Error(`Unexpected timeOffset ${options.timeOffset}`);
+        },
+      };
+
+      await expect(
+        runPipeline({
+          model,
+          audio: new Float32Array(181 * SAMPLING_RATE),
+          kwargs: { return_timestamps: true },
+        }),
+      ).resolves.toEqual({
+        text: expectedText,
+        chunks: expectedChunks,
+      });
+
+      expect(calls.map((x) => x.timeOffset)).toEqual([...Array.from({ length: 13 }, (_, index) => index), 180]);
+    });
+
     it("returns sentence chunks for auto-windowed long Nemo audio", async () => {
       const calls = [];
       const outputsByOffset = new Map([

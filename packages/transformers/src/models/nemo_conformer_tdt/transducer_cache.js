@@ -168,10 +168,10 @@ export class FeatureLRUCache {
         }
 
         this.cache.delete(key);
-        this.current_size_bytes -= entry.size_bytes;
         if (entry.borrowers > 0) {
             entry.pendingDispose = true;
         } else {
+            this.current_size_bytes -= entry.size_bytes;
             disposeCachedValue(entry.value);
         }
     }
@@ -182,6 +182,7 @@ export class FeatureLRUCache {
         }
         if (entry.borrowers === 0 && entry.pendingDispose) {
             entry.pendingDispose = false;
+            this.current_size_bytes -= entry.size_bytes;
             disposeCachedValue(entry.value);
         }
     }

@@ -149,7 +149,10 @@ async function runNemoAutoSentenceWindowing({ audio, sampling_rate, chunk_length
     const audio_duration_s = audio.length / sampling_rate;
     const fallback_overlap_s = Math.min(NEMO_AUTO_WINDOW_FALLBACK_OVERLAP_S, Math.max(0, chunk_length_s - 1));
     const fallback_advance_s = Math.max(1, chunk_length_s - fallback_overlap_s);
-    const maxWindows = Math.max(4, Math.ceil(audio_duration_s / fallback_advance_s) * 4);
+    const maxWindows = Math.max(
+        4,
+        Math.ceil(Math.max(0, audio_duration_s - chunk_length_s) / NEMO_CURSOR_MIN_ADVANCE_S) + 2,
+    );
 
     /** @type {Array<{ words: Array<{ text: string, startTime: number, endTime: number, confidence?: number }>, text: string, timestamp: [number, number] }>} */
     const finalizedSegments = [];

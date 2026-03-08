@@ -420,30 +420,33 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         }
 
         const missingInputs = [];
+        let preparedEncoderInput = null;
+        const getPreparedEncoderInput = () => {
+            if (preparedEncoderInput) {
+                return preparedEncoderInput;
+            }
+
+            const layout = this.transducer.encoder_input_layout;
+            if (layout === 'BTF') {
+                preparedEncoderInput = inputFeatures;
+            } else if (layout === 'BFT') {
+                preparedEncoderInput = inputFeatures.transpose(0, 2, 1);
+                disposables.push(preparedEncoderInput);
+            } else {
+                throw new Error(
+                    `Unsupported encoder input layout "${layout}". Use 'BTF' or 'BFT' in transformers.js_config.transducer.`,
+                );
+            }
+            return preparedEncoderInput;
+        };
         for (const name of encoderSession.inputNames) {
+            if (name === 'input_features' || name === 'audio_signal') {
+                feeds[name] = getPreparedEncoderInput();
+                continue;
+            }
+
             if (model_inputs[name] instanceof Tensor) {
                 feeds[name] = model_inputs[name];
-                continue;
-            }
-
-            if (name === 'input_features') {
-                feeds[name] = inputFeatures;
-                continue;
-            }
-
-            if (name === 'audio_signal') {
-                const layout = this.transducer.encoder_input_layout;
-                if (layout === 'BTF') {
-                    feeds[name] = inputFeatures;
-                } else if (layout === 'BFT') {
-                    const transposed = inputFeatures.transpose(0, 2, 1);
-                    disposables.push(transposed);
-                    feeds[name] = transposed;
-                } else {
-                    throw new Error(
-                        `Unsupported encoder input layout "${layout}". Use 'BTF' or 'BFT' in transformers.js_config.transducer.`,
-                    );
-                }
                 continue;
             }
 
@@ -516,9 +519,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
 
     _validateRuntimeConfig(vocabSize) {
         if (!Number.isInteger(vocabSize) || vocabSize <= 0) {
-            throw new Error(
-                `Invalid Nemo Conformer TDT config: vocab_size=${vocabSize} must be a positive integer.`,
-            );
+            throw new Error(`Invalid Nemo Conformer TDT config: vocab_size=${vocabSize} must be a positive integer.`);
         }
         if (this.transducer.blank_token_id >= vocabSize) {
             throw new Error(
@@ -571,10 +572,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
      *  debug?: { frameIndices?: number[] | null, logProbs?: number[] | null, tdtSteps?: number[] | null },
      * }>}
      */
-    async transcribe(
-        model_inputs,
-        decode_options = {},
-    ) {
+    async transcribe(model_inputs, decode_options = {}) {
         const {
             tokenizer = null,
             returnTimestamps: returnTimestampsOption,
@@ -855,10 +853,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
                       tokenTimestamps[0][0],
                       tokenTimestamps[tokenTimestamps.length - 1][1],
                   ])
-                : /** @type {[number, number]} */ ([
-                      roundTs(timeOffset),
-                      roundTs(frameCount * frameTime + timeOffset),
-                  ]);
+                : /** @type {[number, number]} */ ([roundTs(timeOffset), roundTs(frameCount * frameTime + timeOffset)]);
         const averageLogProb =
             logProbs && logProbs.length > 0
                 ? roundMetric(logProbs.reduce((a, b) => a + b, 0) / logProbs.length, 6)
@@ -888,10 +883,7 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
             result.confidence = {
                 ...(result.confidence ?? {}),
                 frames: frameConfidences,
-                frameAverage: roundMetric(
-                    frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length,
-                    6,
-                ),
+                frameAverage: roundMetric(frameConfidences.reduce((a, b) => a + b, 0) / frameConfidences.length, 6),
             };
         }
 

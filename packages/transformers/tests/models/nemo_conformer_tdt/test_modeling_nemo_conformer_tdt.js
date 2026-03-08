@@ -412,6 +412,35 @@ export default () => {
       expect(() => new NemoConformerForTDT(invalidConfig, BASE_SESSIONS, {})).toThrow("encoder_input_layout");
     });
 
+    it("applies encoder_input_layout to canonical input_features feeds", () => {
+      const config = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            encoder_input_layout: "BFT",
+          },
+        },
+      };
+      const model = new NemoConformerForTDT(config, BASE_SESSIONS, {});
+      const input_features = new Tensor("float32", new Float32Array([1, 2, 3, 4, 5, 6]), [1, 3, 2]);
+
+      const { feeds, disposables } = model._buildEncoderFeeds({ input_features });
+
+      try {
+        expect(disposables).toHaveLength(1);
+        expect(feeds.input_features).not.toBe(input_features);
+        expect(feeds.input_features.dims).toEqual([1, 2, 3]);
+        expect(Array.from(feeds.input_features.data)).toEqual([1, 3, 5, 2, 4, 6]);
+      } finally {
+        for (const tensor of disposables) {
+          tensor.dispose();
+        }
+        input_features.dispose();
+      }
+    });
+
     it("rejects invalid encoder_frame_layout at construction time", () => {
       const invalidConfig = {
         ...BASE_CONFIG,
@@ -815,6 +844,10 @@ export default () => {
       ).toThrow("equal lengths");
     });
 
+    it("requires a tokenizer for non-empty word offsets", () => {
+      expect(() => buildTransducerWordOffsets(null, [1], [[0.0, 0.3]], null, "hello")).toThrow("requires a tokenizer");
+    });
+
     it(
       "computes delta and delta-delta features",
       async () => {
@@ -1039,6 +1072,42 @@ export default () => {
       expect(disposeCalls).toBe(1);
       borrowedB?.release();
       expect(disposeCalls).toBe(2);
+    });
+
+    it("keeps borrowed entry bytes counted until release", () => {
+      const cache = new FeatureLRUCache({ max_entries: 4, max_size_mb: 0.00002 });
+      const tensorA = new Tensor("float32", new Float32Array([1, 2, 3]), [1, 3]);
+      const tensorB = new Tensor("float32", new Float32Array([4, 5, 6]), [1, 3]);
+
+      let tensorADisposals = 0;
+      const disposeA = tensorA.dispose.bind(tensorA);
+      tensorA.dispose = () => {
+        tensorADisposals += 1;
+        disposeA();
+      };
+
+      let tensorBDisposals = 0;
+      const disposeB = tensorB.dispose.bind(tensorB);
+      tensorB.dispose = () => {
+        tensorBDisposals += 1;
+        disposeB();
+      };
+
+      expect(cache.set("a", tensorA)).toBe(true);
+      const borrowedA = cache.acquire("a");
+      expect(borrowedA?.value).toBe(tensorA);
+
+      expect(cache.set("b", tensorB)).toBe(false);
+      expect(cache.get("a")).toBeNull();
+      expect(cache.get("b")).toBeNull();
+      expect(cache.stats().entries).toBe(0);
+      expect(cache.stats().size_mb).toBeGreaterThan(0);
+      expect(tensorADisposals).toBe(0);
+      expect(tensorBDisposals).toBe(1);
+
+      borrowedA?.release();
+      expect(cache.stats().size_mb).toBe(0);
+      expect(tensorADisposals).toBe(1);
     });
 
     it("treats zero cache limits as explicit no-cache mode without disposing inserted values", () => {
