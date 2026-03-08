@@ -119,6 +119,7 @@ export const MODEL_TYPES = {
     Supertonic: 14,
     Chatterbox: 15,
     MultimodalLanguageModelOnly: 16,
+    VoxtralRealtime: 17,
 };
 
 const MODEL_TYPE_CONFIG = {
@@ -127,7 +128,7 @@ const MODEL_TYPE_CONFIG = {
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
         sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
-        decoder_name: 'model',
+        cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.DecoderOnlyWithoutHead]: {
@@ -141,7 +142,7 @@ const MODEL_TYPE_CONFIG = {
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
         sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Vision2Seq]: {
@@ -149,7 +150,7 @@ const MODEL_TYPE_CONFIG = {
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
         sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Musicgen]: {
@@ -160,14 +161,14 @@ const MODEL_TYPE_CONFIG = {
             decoder_model_merged: 'decoder_model_merged',
             encodec_decode: 'encodec_decode',
         }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.EncoderDecoder]: {
         can_generate: false,
         forward: seq2seq_forward,
         sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
     },
     [MODEL_TYPES.MaskGeneration]: {
         sessions: () => ({ model: 'vision_encoder', prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder' }),
@@ -185,7 +186,7 @@ const MODEL_TYPE_CONFIG = {
             if (config.is_encoder_decoder) s['model'] = 'encoder_model';
             return s;
         },
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
@@ -197,7 +198,7 @@ const MODEL_TYPE_CONFIG = {
             audio_encoder: 'audio_encoder',
             decoder_model_merged: 'decoder_model_merged',
         }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
@@ -219,7 +220,7 @@ const MODEL_TYPE_CONFIG = {
             model: 'model',
             vision_encoder: 'vision_encoder',
         }),
-        decoder_name: 'model',
+        cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.MultiModality]: {
@@ -232,7 +233,7 @@ const MODEL_TYPE_CONFIG = {
             gen_img_embeds: 'gen_img_embeds',
             image_decode: 'image_decode',
         }),
-        decoder_name: 'model',
+        cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AutoEncoder]: {
@@ -256,7 +257,7 @@ const MODEL_TYPE_CONFIG = {
             model: 'language_model',
             conditional_decoder: 'conditional_decoder',
         }),
-        decoder_name: 'model',
+        cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.MultimodalLanguageModelOnly]: {
@@ -264,7 +265,17 @@ const MODEL_TYPE_CONFIG = {
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
         sessions: () => ({ embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' }),
-        decoder_name: 'decoder_model_merged',
+        cache_sessions: { decoder_model_merged: true },
+        optional_configs: { generation_config: 'generation_config.json' },
+    },
+    [MODEL_TYPES.VoxtralRealtime]: {
+        can_generate: true,
+        sessions: () => ({
+            embed_tokens: 'embed_tokens',
+            audio_encoder: 'audio_encoder',
+            decoder_model_merged: 'decoder_model_merged',
+        }),
+        cache_sessions: { decoder_model_merged: true, audio_encoder: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     default: {
@@ -279,13 +290,13 @@ const MODEL_TYPE_CONFIG = {
  * @param {number} modelType The model type enum value.
  * @param {Object} config The model config.
  * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, decoder_name?: string, optional_configs?: Record<string, string> }}
+ * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
  */
 export function getSessionsConfig(modelType, config, options = {}) {
     const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
     return {
         sessions: typeConfig.sessions(config, options),
-        decoder_name: typeConfig.decoder_name,
+        cache_sessions: typeConfig.cache_sessions,
         optional_configs: typeConfig.optional_configs,
     };
 }
@@ -408,7 +419,9 @@ export class PreTrainedModel extends Callable {
         }
 
         const sessions = typeConfig.sessions(config, options);
-        const promises = [constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.decoder_name)];
+        const promises = [
+            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
+        ];
         if (typeConfig.optional_configs) {
             promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
         }

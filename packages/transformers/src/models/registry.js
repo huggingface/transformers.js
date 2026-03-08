@@ -384,6 +384,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['ultravox', 'UltravoxModel'],
     ['voxtral', 'VoxtralForConditionalGeneration'],
+    ['voxtral_realtime', 'VoxtralRealtimeForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
@@ -606,6 +607,12 @@ const CUSTOM_MAPPING = [
     ['Qwen3_5ForCausalLM', ALL_MODEL_FILES.Qwen3_5ForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
     ['Qwen3_5MoeForCausalLM', ALL_MODEL_FILES.Qwen3_5MoeForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
     ['Gemma3nForCausalLM', ALL_MODEL_FILES.Gemma3nForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
+
+    [
+        'VoxtralRealtimeForConditionalGeneration',
+        ALL_MODEL_FILES.VoxtralRealtimeForConditionalGeneration,
+        MODEL_TYPES.VoxtralRealtime,
+    ],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);

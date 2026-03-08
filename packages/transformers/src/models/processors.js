@@ -23,6 +23,7 @@ export * from './smolvlm/processing_smolvlm.js';
 export * from './speecht5/processing_speecht5.js';
 export * from './ultravox/processing_ultravox.js';
 export * from './voxtral/processing_voxtral.js';
+export * from './voxtral_realtime/processing_voxtral_realtime.js';
 export * from './wav2vec2/processing_wav2vec2.js';
 export * from './wav2vec2_with_lm/processing_wav2vec2_with_lm.js';
 export * from './whisper/processing_whisper.js';

@@ -170,6 +170,7 @@ export * from './vitmatte/modeling_vitmatte.js';
 export * from './vitpose/modeling_vitpose.js';
 export * from './vits/modeling_vits.js';
 export * from './voxtral/modeling_voxtral.js';
+export * from './voxtral_realtime/modeling_voxtral_realtime.js';
 export * from './wav2vec2/modeling_wav2vec2.js';
 export * from './wav2vec2_bert/modeling_wav2vec2_bert.js';
 export * from './wavlm/modeling_wavlm.js';
