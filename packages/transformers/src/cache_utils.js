@@ -2,8 +2,6 @@ import { Tensor } from './utils/tensor.js';
 
 /**
  * A cache class that stores past key values as named tensors.
- * Tensors are stored as own enumerable properties, so spread (`...cache`),
- * bracket access (`cache[name]`), and `Object.assign` work naturally.
  */
 class _DynamicCache {
     /**
@@ -17,9 +15,7 @@ class _DynamicCache {
     }
 
     /**
-     * Get the cached sequence length.
-     * For hybrid models (e.g., Qwen3.5), finds a standard `past_key_values.*`
-     * entry to determine the true past length.
+     * Get the cached sequence length. This requires at least one attention cache entry to be present.
      * @returns {number} The past sequence length.
      */
     get_seq_length() {
