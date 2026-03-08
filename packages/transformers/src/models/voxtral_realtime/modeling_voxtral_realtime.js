@@ -4,6 +4,7 @@ import { getCacheShapes } from '../../configs.js';
 import { Tensor, cat, ones } from '../../utils/tensor.js';
 import { DataTypeMap } from '../../utils/dtypes.js';
 import { LogitsSampler } from '../../generation/logits_sampler.js';
+import { DynamicCache } from '../../cache_utils.js';
 
 export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
     forward_params = ['input_ids', 'attention_mask', 'position_ids', 'input_features', 'past_key_values'];
@@ -63,7 +64,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         const embed_session = this.sessions['embed_tokens'];
 
         // Initialize encoder KV cache using getCacheShapes for consistency with GPU pinning
-        const enc_kv_cache = {};
+        const enc_kv_cache = new DynamicCache();
         let enc_padding_cache;
         {
             const enc_dtype = encoder_session?.config?.kv_cache_dtype ?? 'float32';
@@ -83,7 +84,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         let enc_past_seq_len = 0;
 
         // Initialize decoder KV cache using getCacheShapes for consistency with GPU pinning
-        const decoder_kv = {};
+        const decoder_kv = new DynamicCache();
         {
             const dec_dtype = decoder_session?.config?.kv_cache_dtype ?? 'float32';
             const dec_cls = dec_dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
@@ -272,12 +273,8 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         }
 
         // Dispose KV caches
-        for (const t of Object.values(decoder_kv)) {
-            if (t.location === 'gpu-buffer') t.dispose();
-        }
-        for (const t of Object.values(enc_kv_cache)) {
-            if (t.location === 'gpu-buffer') t.dispose();
-        }
+        decoder_kv.dispose();
+        enc_kv_cache.dispose();
         if (enc_padding_cache.location === 'gpu-buffer') {
             enc_padding_cache.dispose();
         }
