@@ -497,17 +497,30 @@ export class NemoConformerForTDT extends NemoConformerTDTPreTrainedModel {
         if (tokenizer?.get_vocab) {
             const vocab = tokenizer.get_vocab();
             if (vocab instanceof Map) {
-                if (vocab.size > 0) {
-                    return vocab.size;
+                let maxId = -1;
+                for (const id of vocab.values()) {
+                    const numericId = Number(id);
+                    if (Number.isInteger(numericId) && numericId >= 0) {
+                        maxId = Math.max(maxId, numericId);
+                    }
+                }
+                if (maxId >= 0) {
+                    return maxId + 1;
                 }
             } else if (Array.isArray(vocab)) {
                 if (vocab.length > 0) {
                     return vocab.length;
                 }
             } else if (vocab && typeof vocab === 'object') {
-                const size = Object.keys(vocab).length;
-                if (size > 0) {
-                    return size;
+                let maxId = -1;
+                for (const id of Object.values(vocab)) {
+                    const numericId = Number(id);
+                    if (Number.isInteger(numericId) && numericId >= 0) {
+                        maxId = Math.max(maxId, numericId);
+                    }
+                }
+                if (maxId >= 0) {
+                    return maxId + 1;
                 }
             }
         }

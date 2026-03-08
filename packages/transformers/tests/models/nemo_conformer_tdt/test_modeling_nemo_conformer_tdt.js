@@ -4,6 +4,7 @@ import { computeTemporalDeltas } from "../../../src/models/nemo_conformer_tdt/tr
 import { buildNemoSegmentChunks, partitionNemoWordsIntoSegments, shouldEndSentenceAfterWord } from "../../../src/models/nemo_conformer_tdt/transducer_segment_offsets.js";
 import { buildTransducerDetailedOutputs } from "../../../src/models/nemo_conformer_tdt/transducer_text.js";
 import { buildTransducerWordOffsets } from "../../../src/models/nemo_conformer_tdt/transducer_word_offsets.js";
+import { dedupeMergedWords } from "../../../src/models/nemo_conformer_tdt/transducer_window_merge.js";
 import { MODEL_TYPE_MAPPING, MODEL_TYPES } from "../../../src/models/modeling_utils.js";
 import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
 
@@ -230,6 +231,29 @@ export default () => {
           get_vocab: () => ["<blank>", "hello", "world"],
         }),
       ).toBe(3);
+    });
+
+    it("resolves vocab size from the maximum sparse tokenizer id when config vocab_size is not set", () => {
+      const configWithoutVocab = {
+        ...BASE_CONFIG,
+        "transformers.js_config": {
+          ...BASE_CONFIG["transformers.js_config"],
+          transducer: {
+            ...BASE_CONFIG["transformers.js_config"].transducer,
+            vocab_size: undefined,
+          },
+        },
+      };
+      const model = new MockNemoConformerForTDT(configWithoutVocab, BASE_SESSIONS, []);
+      expect(
+        model._resolveVocabSize({
+          get_vocab: () => ({
+            "<blank>": 0,
+            hello: 2,
+            world: 7,
+          }),
+        }),
+      ).toBe(8);
     });
 
     it(
@@ -766,6 +790,19 @@ export default () => {
 
       expect(output.words.map((x) => x.text)).toEqual(["score.", "48-year-old", "with", "0.5"]);
       expect(output.tokens.map((x) => x.token)).toEqual(["score", ".", "48", "-", "year", "-", "old", "with", "0", ".", "5"]);
+    });
+
+    it("does not collapse distinct overlapping punctuation-only tokens during merge dedupe", () => {
+      expect(
+        dedupeMergedWords([
+          { text: ".", startTime: 1.0, endTime: 1.3 },
+          { text: "?", startTime: 1.2, endTime: 1.5 },
+          { text: "?", startTime: 1.2, endTime: 1.6 },
+        ]),
+      ).toEqual([
+        { text: ".", startTime: 1.0, endTime: 1.3 },
+        { text: "?", startTime: 1.2, endTime: 1.6 },
+      ]);
     });
 
     it("builds word offsets from array-backed tokenizer vocabularies", () => {

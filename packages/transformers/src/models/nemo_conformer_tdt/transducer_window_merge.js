@@ -7,14 +7,27 @@ function normalizeMergedWordText(text) {
         .trim();
 }
 
+function normalizeRawMergedWordText(text) {
+    return String(text ?? '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .trim();
+}
+
 export function dedupeMergedWords(words) {
     /** @type {typeof words} */
     const merged = [];
     for (const word of words) {
         const prev = merged.at(-1);
+        const prevText = normalizeMergedWordText(prev?.text);
+        const wordText = normalizeMergedWordText(word.text);
         if (
             prev &&
-            normalizeMergedWordText(prev.text) === normalizeMergedWordText(word.text) &&
+            prevText === wordText &&
+            (
+                prevText.length > 0 ||
+                normalizeRawMergedWordText(prev.text) === normalizeRawMergedWordText(word.text)
+            ) &&
             word.startTime < prev.endTime
         ) {
             const prevDuration = prev.endTime - prev.startTime;
