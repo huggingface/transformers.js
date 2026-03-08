@@ -23,8 +23,8 @@ export default () => {
 
         expect(input_features.mean().item()).toBeCloseTo(0.193456813693047, 3);
         expect(input_features.data[0]).toBeCloseTo(0.255926549434662, 3);
-        expect(input_features.data[1]).toBeCloseTo(0.234105527400970, 3);
-        expect(input_features.data[128]).toBeCloseTo(-0.286222934722900, 3);
+        expect(input_features.data[1]).toBeCloseTo(0.23410552740097, 3);
+        expect(input_features.data[128]).toBeCloseTo(-0.2862229347229, 3);
         expect(input_features.data[129]).toBeCloseTo(-0.625, 3);
         expect(input_features.data[1000]).toBeCloseTo(0.053786396980286, 3);
         expect(input_features.data[10000]).toBeCloseTo(0.320511281490326, 3);
@@ -43,12 +43,11 @@ export default () => {
 
         expect(input_features.mean().item()).toBeCloseTo(0.120253048837185, 3);
         expect(input_features.data[0]).toBeCloseTo(0.255926549434662, 3);
-        expect(input_features.data[1]).toBeCloseTo(0.234105527400970, 3);
+        expect(input_features.data[1]).toBeCloseTo(0.23410552740097, 3);
         expect(input_features.data[128]).toBeCloseTo(0.317371904850006, 3);
         expect(input_features.data[input_features.data.length - 1]).toBeCloseTo(-0.322449326515198, 3);
       },
       MAX_TEST_EXECUTION_TIME,
     );
-
   });
 };

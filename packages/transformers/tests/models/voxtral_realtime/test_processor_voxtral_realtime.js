@@ -73,9 +73,9 @@ export default () => {
         // Verify second chunk (first subsequent)
         const second = chunks[0];
         expect(second.dims).toEqual([1, 128, 8]);
-        expect(second.mean().item()).toBeCloseTo(0.130928903818130, 3);
+        expect(second.mean().item()).toBeCloseTo(0.13092890381813, 3);
         expect(second.data[0]).toBeCloseTo(-0.090936064720154, 3);
-        expect(second.data[second.data.length - 1]).toBeCloseTo(-0.198794126510620, 3);
+        expect(second.data[second.data.length - 1]).toBeCloseTo(-0.19879412651062, 3);
 
         // Verify total chunk count: 155 subsequent chunks
         expect(chunks.length).toBe(155);

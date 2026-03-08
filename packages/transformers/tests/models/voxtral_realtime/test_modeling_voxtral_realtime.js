@@ -20,7 +20,7 @@ export default () => {
     function syntheticAudio() {
       const audio = new Float32Array(16000);
       for (let i = 0; i < audio.length; ++i) {
-        audio[i] = Math.sin(2 * Math.PI * 440 * i / 16000) * 0.5;
+        audio[i] = Math.sin((2 * Math.PI * 440 * i) / 16000) * 0.5;
       }
       return audio;
     }
@@ -31,10 +31,7 @@ export default () => {
       const win_half = Math.floor(n_fft / 2);
 
       // First chunk
-      const first_chunk = await processor(
-        audio.subarray(0, processor.num_samples_first_audio_chunk),
-        { is_streaming: true, is_first_audio_chunk: true },
-      );
+      const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
       yield first_chunk.input_features;
 
       // Subsequent chunks
@@ -43,10 +40,7 @@ export default () => {
 
       while (start_idx + processor.num_samples_per_audio_chunk < audio.length) {
         const end_idx = start_idx + processor.num_samples_per_audio_chunk;
-        const chunk = await processor(
-          audio.slice(start_idx, end_idx),
-          { is_streaming: true, is_first_audio_chunk: false },
-        );
+        const chunk = await processor(audio.slice(start_idx, end_idx), { is_streaming: true, is_first_audio_chunk: false });
         yield chunk.input_features;
 
         mel_frame_idx += processor.audio_length_per_tok;
@@ -60,10 +54,7 @@ export default () => {
         const audio = syntheticAudio();
 
         // Get input_ids from first chunk call
-        const first_chunk = await processor(
-          audio.subarray(0, processor.num_samples_first_audio_chunk),
-          { is_streaming: true, is_first_audio_chunk: true },
-        );
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
 
         const outputs = await model.generate({
           input_ids: first_chunk.input_ids,
@@ -74,12 +65,53 @@ export default () => {
         expect(outputs.tolist()).toEqual([
           [
             /* Input (39 tokens: BOS + 38 STREAMING_PAD) */
-            1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
+            1n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
+            32n,
             /* Generated */
-            28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 98356n,
+            28478n,
+            28478n,
+            28478n,
+            28478n,
+            28478n,
+            28478n,
+            98356n,
           ],
         ]);
       },
@@ -91,10 +123,7 @@ export default () => {
       async () => {
         const audio = syntheticAudio();
 
-        const first_chunk = await processor(
-          audio.subarray(0, processor.num_samples_first_audio_chunk),
-          { is_streaming: true, is_first_audio_chunk: true },
-        );
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
 
         // Simulate receiving chunks with 100ms delays
         async function* delayedChunks() {
@@ -111,15 +140,7 @@ export default () => {
         });
 
         // Same output as without delays — generation is deterministic
-        expect(outputs.tolist()).toEqual([
-          [
-            1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n,
-            28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 98356n,
-          ],
-        ]);
+        expect(outputs.tolist()).toEqual([[1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 98356n]]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
