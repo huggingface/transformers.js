@@ -30,12 +30,16 @@ export class DynamicCache extends /** @type {new () => Record<string, any>} */ (
 
     /**
      * Dispose all contained tensors whose data resides on the GPU.
+     * Returns a promise that resolves when all disposals are complete.
+     * @returns {Promise<void>} Promise that resolves when all GPU tensors are disposed.
      */
-    dispose() {
+    async dispose() {
+        const promises = [];
         for (const t of Object.values(this)) {
             if (t.location === 'gpu-buffer') {
-                t.dispose();
+                promises.push(t.dispose());
             }
         }
+        await Promise.all(promises);
     }
 }
