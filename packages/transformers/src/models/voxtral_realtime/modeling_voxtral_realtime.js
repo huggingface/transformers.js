@@ -1,7 +1,7 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { getCacheShapes } from '../../configs.js';
-import { Tensor, cat, ones } from '../../utils/tensor.js';
+import { Tensor, ones } from '../../utils/tensor.js';
 import { DataTypeMap } from '../../utils/dtypes.js';
 import { LogitsSampler } from '../../generation/logits_sampler.js';
 import { DynamicCache } from '../../cache_utils.js';
@@ -95,9 +95,14 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             }
         }
 
-        // Audio embedding buffer
-        let audio_embed_buffer = new Tensor('float32', new Float32Array(0), [1, 0, text_hidden_size]);
-        let audio_pos = 0;
+        // Audio embedding queue — chunks are consumed front-to-back, then discarded
+        /** @type {{data: import('../../utils/tensor.js').DataArray, tokens: number}[]} */
+        const audio_embed_queue = [];
+        let audio_embed_total_tokens = 0;
+        /** Offset into the first queue entry (partially consumed) */
+        let audio_queue_offset = 0;
+        /** Total audio embed tokens consumed so far */
+        let audio_consumed = 0;
         let stream_exhausted = false;
 
         // Get iterator from the input_features generator/iterable
@@ -118,27 +123,21 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             );
 
             const total_seq_len = enc_past_seq_len + conv2_output_len;
-            const attention_mask = new Tensor('int64', new BigInt64Array(total_seq_len).fill(1n), [1, total_seq_len]);
+            const attention_mask = ones([1, total_seq_len]);
 
-            const encoder_inputs = {
+            const { audio_embeds, present_padding_cache, ...present_cache } = await sessionRun(encoder_session, {
                 input_features: chunk_features,
                 attention_mask,
                 position_ids,
                 past_padding_cache: enc_padding_cache,
                 ...enc_kv_cache,
-            };
-
-            const outputs = await sessionRun(encoder_session, encoder_inputs);
-
-            // Extract outputs by name
-            const output_names = encoder_session.outputNames;
-            const audio_embeds = outputs[output_names[0]];
-            enc_padding_cache = outputs['present_padding_cache'];
+            });
+            enc_padding_cache = present_padding_cache;
 
             // Update encoder KV cache
-            for (const name in outputs) {
+            for (const name in present_cache) {
                 if (name.startsWith('present.')) {
-                    enc_kv_cache[name.replace('present', 'past_key_values')] = outputs[name];
+                    enc_kv_cache[name.replace('present', 'past_key_values')] = present_cache[name];
                 }
             }
             enc_past_seq_len = total_seq_len;
@@ -148,18 +147,15 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
 
         // Helper: fill audio buffer until it has `needed` tokens
         async function fillAudioBuffer(needed) {
-            while (audio_embed_buffer.dims[1] < needed && !stream_exhausted) {
+            while (audio_embed_total_tokens < needed && !stream_exhausted) {
                 const result = await chunks_iter.next();
                 if (result.done) {
                     stream_exhausted = true;
                     break;
                 }
                 const new_embeds = await encodeChunk(result.value);
-                if (audio_embed_buffer.dims[1] === 0) {
-                    audio_embed_buffer = new_embeds;
-                } else {
-                    audio_embed_buffer = cat([audio_embed_buffer, new_embeds], 1);
-                }
+                audio_embed_queue.push({ data: new_embeds.data, tokens: new_embeds.dims[1] });
+                audio_embed_total_tokens += new_embeds.dims[1];
             }
         }
 
@@ -193,7 +189,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         // Generation loop
         for (let step = 0; step < max_new_tokens; ++step) {
             const current_len = current_input_ids.dims[1];
-            const needed = audio_pos + current_len;
+            const needed = audio_consumed + current_len;
 
             // 1. Encode audio chunks until we have enough
             await fillAudioBuffer(needed);
@@ -204,28 +200,41 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             });
 
             // 3. Add audio embeddings for current position(s)
-            const num_audio_tokens = audio_embed_buffer.dims[1];
-            if (audio_pos < num_audio_tokens) {
-                const end_pos = Math.min(audio_pos + current_len, num_audio_tokens);
-                const n = end_pos - audio_pos;
-
-                // Add audio embeddings to text embeddings in-place
+            // Consume from the front of the queue, advancing audio_queue_offset
+            if (audio_embed_queue.length > 0) {
                 const embed_data = inputs_embeds.data;
-                const audio_data = audio_embed_buffer.data;
-                const offset_audio = audio_pos * text_hidden_size;
-                for (let i = 0; i < n * text_hidden_size; ++i) {
-                    embed_data[i] += audio_data[offset_audio + i];
+                let embed_write_pos = 0;
+                let remaining = current_len;
+
+                while (remaining > 0 && audio_embed_queue.length > 0) {
+                    const front = audio_embed_queue[0];
+                    const available = front.tokens - audio_queue_offset;
+                    const n = Math.min(remaining, available);
+
+                    const src_offset = audio_queue_offset * text_hidden_size;
+                    for (let i = 0; i < n * text_hidden_size; ++i) {
+                        embed_data[embed_write_pos * text_hidden_size + i] += front.data[src_offset + i];
+                    }
+
+                    embed_write_pos += n;
+                    remaining -= n;
+                    audio_queue_offset += n;
+
+                    // If we've fully consumed this chunk, discard it
+                    if (audio_queue_offset >= front.tokens) {
+                        audio_embed_queue.shift();
+                        audio_queue_offset = 0;
+                    }
                 }
-                audio_pos = end_pos;
+                audio_consumed += current_len - remaining;
             }
 
             // 4. Run decoder
-            const decoder_inputs = {
+            const decoder_outputs = await sessionRun(decoder_session, {
                 inputs_embeds,
                 attention_mask: ones([1, dec_seq_len]),
                 ...decoder_kv,
-            };
-            const decoder_outputs = await sessionRun(decoder_session, decoder_inputs);
+            });
 
             // Extract logits and update decoder KV cache
             const logits = decoder_outputs.logits;
@@ -240,21 +249,20 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
                 }
             }
 
-            // 6. Sample next token
+            // 5. Sample next token
             const last_logits = logits.slice(null, -1, null).to('float32');
             const next_tokens_scores = prepared_logits_processor(all_input_ids, last_logits);
 
             const sampledTokens = await sampler(next_tokens_scores[0]);
             const newTokenId = sampledTokens[0][0];
             all_input_ids[0].push(newTokenId);
-            const generated_input_ids = [[newTokenId]];
 
             if (streamer) {
-                streamer.put(generated_input_ids);
+                streamer.put([[newTokenId]]);
             }
 
-            // 7. Check stopping criteria
-            if (stream_exhausted && audio_pos >= num_audio_tokens) {
+            // 6. Check stopping criteria
+            if (stream_exhausted && audio_embed_queue.length === 0) {
                 break;
             }
 
@@ -263,7 +271,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
                 break;
             }
 
-            // 8. Update for next step
+            // 7. Update for next step
             current_input_ids = new Tensor('int64', new BigInt64Array([newTokenId]), [1, 1]);
             dec_seq_len += 1;
         }
@@ -277,9 +285,6 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         enc_kv_cache.dispose();
         if (enc_padding_cache.location === 'gpu-buffer') {
             enc_padding_cache.dispose();
-        }
-        if (audio_embed_buffer.location === 'gpu-buffer') {
-            audio_embed_buffer.dispose();
         }
 
         return new Tensor('int64', BigInt64Array.from(all_input_ids.flat()), [
