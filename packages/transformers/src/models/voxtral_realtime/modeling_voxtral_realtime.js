@@ -72,18 +72,6 @@ function createEncoderState(model, input_features) {
 }
 
 /**
- * Disposes encoder state resources.
- * @param {Object} state
- * @private
- */
-function disposeEncoderState(state) {
-    state.enc_kv_cache.dispose();
-    if (state.enc_padding_cache.location === 'gpu-buffer') {
-        state.enc_padding_cache.dispose();
-    }
-}
-
-/**
  * Encodes one audio chunk through the audio encoder.
  * @param {Object} s Encoder state.
  * @param {Tensor} chunk_features Mel spectrogram chunk [1, num_mel_bins, seq_len].
@@ -186,8 +174,8 @@ function addAudioEmbeddings(s, inputs_embeds, current_len) {
 }
 
 /**
- * Stopping criterion that triggers when the audio stream is exhausted and all
- * buffered audio embeddings have been consumed.
+ * Stopping criterion that triggers when the audio stream is exhausted
+ * and all buffered audio embeddings have been consumed.
  * @private
  */
 class AudioExhaustedCriteria extends StoppingCriteria {
@@ -216,7 +204,6 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         }
 
         const { inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], { input_ids });
-
         if (enc) {
             addAudioEmbeddings(enc, inputs_embeds, current_len);
         }
@@ -252,8 +239,9 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         try {
             return await super.generate({ ...params, stopping_criteria });
         } finally {
+            // Cleanup encoder state
+            enc_state.enc_kv_cache.dispose();
             states.delete(this);
-            disposeEncoderState(enc_state);
         }
     }
 }
