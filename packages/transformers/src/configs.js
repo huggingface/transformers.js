@@ -70,6 +70,7 @@ function getNormalizedConfig(config) {
         case 'idefics3':
         case 'ultravox':
         case 'voxtral':
+        case 'voxtral_realtime':
         case 'smolvlm':
         case 'gemma3n':
         case 'chatterbox':
@@ -131,6 +132,7 @@ function getNormalizedConfig(config) {
         case 'cohere':
         case 'cohere2':
         case 'mistral':
+        case 'voxtral_realtime_text':
         case 'starcoder2':
         case 'qwen2':
         case 'qwen2_moe':

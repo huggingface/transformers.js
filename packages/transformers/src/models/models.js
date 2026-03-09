@@ -158,6 +158,7 @@ export * from './t5/modeling_t5.js';
 export * from './table_transformer/modeling_table_transformer.js';
 export * from './trocr/modeling_trocr.js';
 export * from './ultravox/modeling_ultravox.js';
+export * from './voxtral_realtime/modeling_voxtral_realtime.js';
 export * from './unispeech/modeling_unispeech.js';
 export * from './unispeech_sat/modeling_unispeech_sat.js';
 export * from './vaultgemma/modeling_vaultgemma.js';
