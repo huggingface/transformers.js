@@ -1,4 +1,4 @@
-import { PreTrainedModel, decoder_prepare_inputs_for_generation } from '../modeling_utils.js';
+import { PreTrainedModel } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { getCacheShapes } from '../../configs.js';
 import { Tensor, ones } from '../../utils/tensor.js';
@@ -190,7 +190,7 @@ class AudioExhaustedCriteria extends StoppingCriteria {
 }
 
 export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
-    forward_params = ['input_ids', 'attention_mask', 'position_ids', 'input_features', 'past_key_values'];
+    forward_params = ['input_ids', 'attention_mask', 'position_ids', 'past_key_values'];
 }
 
 export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreTrainedModel {
@@ -214,14 +214,6 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         const session = this.sessions['decoder_model_merged'];
         const fixed = pick(decoder_feeds, session.inputNames);
         return await sessionRun(session, fixed);
-    }
-
-    prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
-        // After first iteration, input_features is no longer needed
-        if (model_inputs.past_key_values) {
-            delete model_inputs.input_features;
-        }
-        return decoder_prepare_inputs_for_generation(this, input_ids, model_inputs, generation_config);
     }
 
     async generate({ input_features, stopping_criteria: userStoppingCriteria, ...params }) {

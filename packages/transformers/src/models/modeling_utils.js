@@ -251,6 +251,7 @@ const MODEL_TYPE_CONFIG = {
     },
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
+        prepare_inputs: decoder_prepare_inputs_for_generation,
         sessions: () => ({
             embed_tokens: 'embed_tokens',
             audio_encoder: 'audio_encoder',
