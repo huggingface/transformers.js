@@ -66,7 +66,7 @@ We have added [a template](https://github.com/huggingface/transformers.js/issues
 
 ## Do you want to implement a new model?
 
-New models are constantly released and if you want to implement a new model, please use the [template for new model requests](https://github.com/huggingface/transformers.js/issues/new?template=2_new_model.yml).
+New models are constantly released and if you want to request support for a new model, please use the [template for new model requests](https://github.com/huggingface/transformers.js/issues/new?template=2_new_model.yml).
 
 If you are willing to contribute the model yourself, let us know so we can help you add it to 🤗 Transformers.js! The process of adding support for a new model architecture has three main phases: **exporting the model to ONNX**, then **wiring it into the library**, and finally **adding tests**.
 
@@ -77,7 +77,7 @@ Transformers.js runs models using ONNX Runtime. Before adding a model to the lib
 - For LLMs, we recommend exporting with [https://github.com/microsoft/onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai)
 - For other models, we recommend exporting with [https://github.com/huggingface/optimum-onnx](https://github.com/huggingface/optimum-onnx)
 
-Once exported, upload the ONNX files to the Hugging Face Hub alongside the model's original config and tokenizer files so they can be loaded with `from_pretrained`.
+Once exported, upload the ONNX files to the Hugging Face Hub alongside the model's original config, tokenizer, and other preprocessing files so they can be loaded with `from_pretrained`.
 
 ---
 
