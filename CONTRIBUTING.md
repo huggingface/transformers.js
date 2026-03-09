@@ -49,7 +49,7 @@ The 🤗 Transformers.js library is robust and reliable thanks to users who repo
 Before you report an issue, we would really appreciate it if you could **make sure the bug was not
 already reported** (use the search bar on GitHub under Issues). Your issue should also be related to bugs in the library itself, and not your code.
 
-To create new Issue, please [use one of the templates](https://github.com/huggingface/transformers.js/issues/new/choose) we prepared for you. Most likely the [Bug Report](https://github.com/huggingface/transformers.js/issues/new?template=1_bug-report.yml).
+To create a new issue, please [use one of the templates](https://github.com/huggingface/transformers.js/issues/new/choose) we prepared for you. Most likely the [Bug Report](https://github.com/huggingface/transformers.js/issues/new?template=1_bug-report.yml).
 
 ### Do you want a new feature?
 
@@ -57,7 +57,7 @@ If there is a new feature you'd like to see in 🤗 Transformers.js, please open
 
 1. What is the *motivation* behind this feature? Is it related to a problem or frustration with the library? Is it a feature related to something you need for a project? Is it something you worked on and think it could benefit the community? Whatever it is, we'd love to hear about it!
 2. Describe your requested feature in as much detail as possible. The more you can tell us about it, the better we'll be able to help you.
-3. Provide a *code snippet* that demonstrates the features usage.
+3. Provide a *code snippet* that demonstrates the feature's usage.
 4. If the feature is related to a paper, please include a link.
 
 If your issue is well written we're already 80% of the way there by the time you create it.
@@ -74,8 +74,8 @@ If you are willing to contribute the model yourself, let us know so we can help 
 
 Transformers.js runs models using ONNX Runtime. Before adding a model to the library, you need an ONNX export of it.
 
-- For LLMs, we recommend exporting with [https://github.com/microsoft/onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai)
-- For other models, we recommend exporting with [https://github.com/huggingface/optimum-onnx](https://github.com/huggingface/optimum-onnx)
+- For LLMs, we recommend exporting with [microsoft/onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai)
+- For other models, we recommend exporting with [huggingface/optimum-onnx](https://github.com/huggingface/optimum-onnx)
 
 Once exported, upload the ONNX files to the Hugging Face Hub alongside the model's original config, tokenizer, and other preprocessing files so they can be loaded with `from_pretrained`.
 
@@ -217,8 +217,8 @@ Before writing any code, we strongly advise you to search through the existing P
 issues to make sure nobody is already working on the same thing. If you are
 unsure, it is always a good idea to open an issue to get some feedback.
 
-You will need basic `git` proficiency to contribute to
-🤗 Transformers.js While `git` is not the easiest tool to use, it has the greatest
+You will need basic `git` proficiency to contribute to 🤗 Transformers.js.
+While `git` is not the easiest tool to use, it has the greatest
 manual. Type `git --help` in a shell and enjoy! If you prefer books, [Pro
 Git](https://git-scm.com/book/en/v2) is a very good reference.
 
@@ -247,7 +247,7 @@ Follow the steps below to start contributing:
    cd transformers.js
    ```
 
- 3. Create a new branch to hold your development changes:
+3. Create a new branch to hold your development changes:
 
    ```bash
    git checkout -b a-descriptive-name-for-my-changes
