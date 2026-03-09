@@ -3,8 +3,8 @@ import { sessionRun } from '../session.js';
 import { getCacheShapes } from '../../configs.js';
 import { Tensor, ones } from '../../utils/tensor.js';
 import { DataTypeMap } from '../../utils/dtypes.js';
-import { DynamicCache } from '../../cache_utils.js';
 import { pick } from '../../utils/core.js';
+import { DynamicCache } from '../../cache_utils.js';
 import { StoppingCriteria, StoppingCriteriaList } from '../../generation/stopping_criteria.js';
 
 // Causal conv padding constants
@@ -194,7 +194,7 @@ export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
 }
 
 export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreTrainedModel {
-    async forward({ input_ids, past_key_values, ...rest }) {
+    async forward({ input_ids, past_key_values, ...kwargs }) {
         const current_len = input_ids.dims[1];
 
         const enc = states.get(this);
@@ -208,7 +208,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             addAudioEmbeddings(enc, inputs_embeds, current_len);
         }
 
-        const decoder_feeds = { inputs_embeds, ...rest };
+        const decoder_feeds = { inputs_embeds, ...kwargs };
         this.addPastKeyValues(decoder_feeds, past_key_values);
 
         const session = this.sessions['decoder_model_merged'];
@@ -216,7 +216,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         return await sessionRun(session, fixed);
     }
 
-    async generate({ input_features, stopping_criteria: userStoppingCriteria, ...params }) {
+    async generate({ input_features, stopping_criteria: userStoppingCriteria, ...kwargs }) {
         if (!input_features) {
             throw new Error('input_features (generator/iterable) must be provided');
         }
@@ -229,7 +229,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         if (userStoppingCriteria) stopping_criteria.extend(userStoppingCriteria);
 
         try {
-            return await super.generate({ ...params, stopping_criteria });
+            return await super.generate({ ...kwargs, stopping_criteria });
         } finally {
             // Cleanup encoder state
             enc_state.enc_kv_cache.dispose();
