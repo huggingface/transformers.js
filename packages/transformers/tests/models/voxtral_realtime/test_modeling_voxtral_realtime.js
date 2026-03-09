@@ -1,4 +1,4 @@
-import { VoxtralRealtimeForConditionalGeneration, VoxtralRealtimeProcessor } from "../../../src/transformers.js";
+import { VoxtralRealtimeForConditionalGeneration, VoxtralRealtimeProcessor, Tensor } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -141,6 +141,18 @@ export default () => {
 
         // Same output as without delays — generation is deterministic
         expect(outputs.tolist()).toEqual([[1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 98356n]]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "forward without generate (no encoder state)",
+      async () => {
+        const input_ids = new Tensor("int64", [1n, 32n, 32n], [1, 3]);
+        const attention_mask = new Tensor("int64", [1n, 1n, 1n], [1, 3]);
+
+        const outputs = await model.forward({ input_ids, attention_mask, past_key_values: null });
+        expect(outputs.logits.dims).toEqual([1, 3, expect.any(Number)]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
