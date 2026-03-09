@@ -102,7 +102,6 @@ async function encodeChunk(s, chunk_features) {
 
     const total_seq_len = s.enc_past_seq_len + conv2_output_len;
     const attention_mask = ones([1, total_seq_len]);
-
     const { audio_embeds, present_padding_cache, ...present_cache } = await sessionRun(s.encoder_session, {
         input_features: chunk_features,
         attention_mask,
@@ -110,16 +109,24 @@ async function encodeChunk(s, chunk_features) {
         past_padding_cache: s.enc_padding_cache,
         ...s.enc_kv_cache,
     });
+    // Dispose previous padding cache and update
+    if (s.enc_padding_cache.location === 'gpu-buffer') {
+        s.enc_padding_cache.dispose();
+    }
     s.enc_padding_cache = present_padding_cache;
 
-    // Update encoder KV cache
+    // Update encoder KV cache, disposing previous tensors
     for (const name in present_cache) {
         if (name.startsWith('present.')) {
-            s.enc_kv_cache[name.replace('present', 'past_key_values')] = present_cache[name];
+            const pastName = name.replace('present', 'past_key_values');
+            const prev = s.enc_kv_cache[pastName];
+            if (prev?.location === 'gpu-buffer') {
+                prev.dispose();
+            }
+            s.enc_kv_cache[pastName] = present_cache[name];
         }
     }
     s.enc_past_seq_len = total_seq_len;
-
     return audio_embeds;
 }
 
