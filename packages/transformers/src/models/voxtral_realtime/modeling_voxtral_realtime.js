@@ -61,8 +61,6 @@ function createEncoderState(model, input_features) {
         enc_kv_cache,
         enc_padding_cache,
         enc_past_seq_len: 0,
-        // Audio embedding queue
-        /** @type {{data: import('../../utils/tensor.js').DataArray, tokens: number}[]} */
         audio_embed_queue: [],
         audio_embed_total_tokens: 0,
         audio_queue_offset: 0,
@@ -202,20 +200,20 @@ export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
 
 export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreTrainedModel {
     async forward({ input_ids, past_key_values, ...rest }) {
-        const enc = states.get(this);
-
-        // 1. Fill audio buffer to needed position
         const current_len = input_ids.dims[1];
-        const needed = enc.audio_consumed + current_len;
-        await fillAudioBuffer(enc, needed);
 
-        // 2. Embed tokens
+        const enc = states.get(this);
+        if (enc) {
+            // Fill audio buffer and embed tokens with audio
+            await fillAudioBuffer(enc, enc.audio_consumed + current_len);
+        }
+
         const { inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], { input_ids });
 
-        // 3. Add audio embeddings from queue
-        addAudioEmbeddings(enc, inputs_embeds, current_len);
+        if (enc) {
+            addAudioEmbeddings(enc, inputs_embeds, current_len);
+        }
 
-        // 4. Run decoder
         const decoder_feeds = { inputs_embeds, ...rest };
         this.addPastKeyValues(decoder_feeds, past_key_values);
 
