@@ -49,7 +49,7 @@ The 🤗 Transformers.js library is robust and reliable thanks to users who repo
 Before you report an issue, we would really appreciate it if you could **make sure the bug was not
 already reported** (use the search bar on GitHub under Issues). Your issue should also be related to bugs in the library itself, and not your code.
 
-To create new Issue, please [use on of the templates](https://github.com/huggingface/transformers.js/issues/new/choose) we prepared for you. Most likely the [Bug Report](https://github.com/huggingface/transformers.js/issues/new?template=1_bug-report.yml).
+To create new Issue, please [use one of the templates](https://github.com/huggingface/transformers.js/issues/new/choose) we prepared for you. Most likely the [Bug Report](https://github.com/huggingface/transformers.js/issues/new?template=1_bug-report.yml).
 
 ### Do you want a new feature?
 
@@ -89,7 +89,7 @@ Every model in Transformers.js is built from the same pieces:
 - **Task head classes**: thin wrappers that wrap the output in the right output object (e.g. `MaskedLMOutput`)
 - **A tokenizer and/or processor**: only needed if the model requires a custom one; most models reuse an existing class
 
-All model files live under `packages/transformers/src/models/<model_type>/`. Look at an existing model of the same type to understand what's needed, Most are just a few lines.
+All model files live under `packages/transformers/src/models/<model_type>/`. Look at an existing model of the same type to understand what's needed; most are just a few lines.
 
 #### Model class
 
