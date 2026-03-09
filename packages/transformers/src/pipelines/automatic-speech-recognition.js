@@ -3,6 +3,9 @@ import { Pipeline, prepareAudios } from './_base.js';
 import { Tensor } from '../utils/tensor.js';
 import { max, round } from '../utils/maths.js';
 import { logger } from '../utils/logger.js';
+import {
+    runNemoConformerTDTPipeline,
+} from '../models/nemo_conformer_tdt/pipeline_nemo_conformer_tdt.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -152,6 +155,8 @@ export class AutomaticSpeechRecognitionPipeline
             case 'hubert':
             case 'parakeet_ctc':
                 return this._call_wav2vec2(audio, kwargs);
+            case 'nemo-conformer-tdt':
+                return this._call_nemo_conformer_tdt(audio, kwargs);
             case 'moonshine':
                 return this._call_moonshine(audio, kwargs);
             default:
@@ -298,6 +303,17 @@ export class AutomaticSpeechRecognitionPipeline
             toReturn.push({ text: full_text, ...optional });
         }
         return single ? toReturn[0] : toReturn;
+    }
+
+    async _call_nemo_conformer_tdt(audio, kwargs) {
+        return runNemoConformerTDTPipeline({
+            model: this.model,
+            processor: this.processor,
+            tokenizer: this.tokenizer,
+            audio,
+            kwargs,
+            prepareAudios,
+        });
     }
 
     async _call_moonshine(audio, kwargs) {

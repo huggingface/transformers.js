@@ -82,8 +82,8 @@ export async function get_model_files(
         const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
         logger.warn(
             `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
-                `for model type '${config.model_type}'. Falling back to EncoderOnly (single model.onnx file). ` +
-                `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
+            `for model type '${config.model_type}'. Falling back to EncoderOnly (single model.onnx file). ` +
+            `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
         );
 
         // Always fallback to EncoderOnly (single model.onnx file)
@@ -177,6 +177,9 @@ export async function get_model_files(
         add_model_file('model', 'language_model');
         add_model_file('conditional_decoder');
         files.push('generation_config.json');
+    } else if (modelType === MODEL_TYPES.NemoConformerTDT) {
+        add_model_file('encoder_model');
+        add_model_file('decoder_model_merged');
     } else if (modelType === MODEL_TYPES.AutoEncoder) {
         add_model_file('encoder_model');
         add_model_file('decoder_model');

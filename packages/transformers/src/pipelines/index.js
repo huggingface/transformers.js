@@ -30,6 +30,7 @@ import {
     AutoModelForDepthEstimation,
     AutoModelForImageFeatureExtraction,
 } from '../models/auto/modeling_auto.js';
+import { NemoConformerForTDT } from '../models/nemo_conformer_tdt/modeling_nemo_conformer_tdt.js';
 
 import { TextClassificationPipeline } from './text-classification.js';
 import { TokenClassificationPipeline } from './token-classification.js';
@@ -150,7 +151,7 @@ export const SUPPORTED_TASKS = Object.freeze({
     },
     'automatic-speech-recognition': {
         pipeline: AutomaticSpeechRecognitionPipeline,
-        model: [AutoModelForSpeechSeq2Seq, AutoModelForCTC],
+        model: [AutoModelForSpeechSeq2Seq, AutoModelForCTC, NemoConformerForTDT],
         default: {
             model: 'Xenova/whisper-tiny.en',
         },

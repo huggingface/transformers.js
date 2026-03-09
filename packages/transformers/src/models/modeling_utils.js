@@ -118,6 +118,7 @@ export const MODEL_TYPES = {
     ImageAudioTextToText: 13,
     Supertonic: 14,
     Chatterbox: 15,
+    NemoConformerTDT: 16,
 };
 
 const MODEL_TYPE_CONFIG = {

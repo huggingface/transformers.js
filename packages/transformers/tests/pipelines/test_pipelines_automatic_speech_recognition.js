@@ -96,7 +96,6 @@ export default () => {
       const model_id = "Xenova/tiny-random-Wav2Vec2ForCTC-ONNX";
       const SAMPLING_RATE = 16000;
       const audios = [new Float32Array(SAMPLING_RATE).fill(0), Float32Array.from({ length: SAMPLING_RATE }, (_, i) => i / 16000)];
-      const long_audios = [new Float32Array(SAMPLING_RATE * 60).fill(0), Float32Array.from({ length: SAMPLING_RATE * 60 }, (_, i) => (i % 1000) / 1000)];
 
       const max_new_tokens = 5;
       /** @type {AutomaticSpeechRecognitionPipeline} */
@@ -124,6 +123,83 @@ export default () => {
       afterAll(async () => {
         await pipe?.dispose();
       }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("nemo-conformer-tdt", () => {
+      const makeUnitPipe = () => {
+        const calls = [];
+        const model = {
+          config: { model_type: "nemo-conformer-tdt" },
+          async transcribe(_inputs, options) {
+            calls.push(options);
+            const result = { text: "hello world" };
+            if (options.returnTimestamps) {
+              result.utteranceTimestamp = [0, 0.08];
+              result.words = [
+                { text: "hello", startTime: 0, endTime: 0.04 },
+                { text: "world", startTime: 0.04, endTime: 0.08 },
+              ];
+            }
+            return result;
+          },
+          async dispose() {},
+        };
+        const processor = Object.assign(async () => ({ input_features: {} }), {
+          feature_extractor: { config: { sampling_rate: 16000 } },
+        });
+
+        return {
+          pipe: new AutomaticSpeechRecognitionPipeline({
+            task: PIPELINE_ID,
+            model,
+            tokenizer: {},
+            processor,
+          }),
+          calls,
+        };
+      };
+
+      it("returns text when timestamps are disabled", async () => {
+        const { pipe, calls } = makeUnitPipe();
+        await expect(pipe(new Float32Array(16000), { return_timestamps: false })).resolves.toEqual({
+          text: "hello world",
+        });
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toMatchObject({
+          returnTimestamps: false,
+          returnWords: false,
+          returnMetrics: false,
+        });
+      });
+
+      it("returns sentence chunks when return_timestamps is true", async () => {
+        const { pipe, calls } = makeUnitPipe();
+        await expect(pipe(new Float32Array(16000), { return_timestamps: true })).resolves.toEqual({
+          text: "hello world",
+          chunks: [{ text: "hello world", timestamp: [0, 0.08] }],
+        });
+        expect(calls[0]).toMatchObject({
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
+        });
+      });
+
+      it("returns word chunks when return_timestamps is 'word'", async () => {
+        const { pipe, calls } = makeUnitPipe();
+        await expect(pipe(new Float32Array(16000), { return_timestamps: "word" })).resolves.toEqual({
+          text: "hello world",
+          chunks: [
+            { text: "hello", timestamp: [0, 0.04] },
+            { text: "world", timestamp: [0.04, 0.08] },
+          ],
+        });
+        expect(calls[0]).toMatchObject({
+          returnTimestamps: true,
+          returnWords: true,
+          returnMetrics: false,
+        });
+      });
     });
   });
 };

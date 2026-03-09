@@ -41,6 +41,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['unispeech-sat', 'UniSpeechSatModel'],
     ['hubert', 'HubertModel'],
     ['wavlm', 'WavLMModel'],
+    ['nemo-conformer-tdt', 'NemoConformerForTDT'],
     ['audio-spectrogram-transformer', 'ASTModel'],
     ['vits', 'VitsModel'],
     ['pyannote', 'PyAnnoteModel'],
@@ -589,6 +590,7 @@ const CUSTOM_MAPPING = [
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
+    ['NemoConformerForTDT', ALL_MODEL_FILES.NemoConformerForTDT, MODEL_TYPES.NemoConformerTDT],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);
