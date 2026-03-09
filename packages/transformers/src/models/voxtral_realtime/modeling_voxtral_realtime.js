@@ -12,18 +12,26 @@ const CONV1_LEFT_PAD = 2;
 const CONV2_LEFT_PAD = 1;
 
 /**
+ * WeakMap to hold encoder streaming states for each model instance during generation.
+ * This allows the state to be accessed and modified across the generation process
+ * without exposing it on the model instance itself.
+ * @private
+ * @type {WeakMap<VoxtralRealtimeForConditionalGeneration, Object>}
+ */
+const states = new WeakMap();
+
+/**
  * Creates encoder streaming state for a VoxtralRealtime generation session.
  * @param {VoxtralRealtimeForConditionalGeneration} model
  * @param {Iterable<Tensor>|AsyncIterable<Tensor>} input_features
- * @returns {object} Encoder state object.
+ * @returns {Object} Encoder state object.
  * @private
  */
 function createEncoderState(model, input_features) {
     const { text_config, audio_config } = /** @type {any} */ (model.config);
     const encoder_session = model.sessions['audio_encoder'];
 
-    const num_mel_bins = audio_config.num_mel_bins;
-    const enc_hidden_size = audio_config.hidden_size;
+    const { num_mel_bins, hidden_size: enc_hidden_size } = audio_config;
     const PADDING_CACHE_CHANNELS = num_mel_bins + enc_hidden_size;
 
     // Initialize encoder KV cache
@@ -67,7 +75,7 @@ function createEncoderState(model, input_features) {
 
 /**
  * Disposes encoder state resources.
- * @param {object} state
+ * @param {Object} state
  * @private
  */
 function disposeEncoderState(state) {
@@ -79,7 +87,7 @@ function disposeEncoderState(state) {
 
 /**
  * Encodes one audio chunk through the audio encoder.
- * @param {object} s Encoder state.
+ * @param {Object} s Encoder state.
  * @param {Tensor} chunk_features Mel spectrogram chunk [1, num_mel_bins, seq_len].
  * @returns {Promise<Tensor>} Audio embeddings.
  * @private
@@ -119,7 +127,7 @@ async function encodeChunk(s, chunk_features) {
 
 /**
  * Fills the audio embedding buffer until it has enough tokens.
- * @param {object} s Encoder state.
+ * @param {Object} s Encoder state.
  * @param {number} needed Total number of audio tokens needed.
  * @private
  */
@@ -138,7 +146,7 @@ async function fillAudioBuffer(s, needed) {
 
 /**
  * Adds audio embeddings to text embeddings from the queue.
- * @param {object} s Encoder state.
+ * @param {Object} s Encoder state.
  * @param {Tensor} inputs_embeds Text embeddings tensor (modified in-place).
  * @param {number} current_len Number of tokens to consume.
  * @private
@@ -189,18 +197,13 @@ class AudioExhaustedCriteria extends StoppingCriteria {
 }
 
 export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
-    forward_params = [
-        'input_ids',
-        'attention_mask',
-        'position_ids',
-        'input_features',
-        'past_key_values',
-        '_encoder_state',
-    ];
+    forward_params = ['input_ids', 'attention_mask', 'position_ids', 'input_features', 'past_key_values'];
 }
 
 export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreTrainedModel {
-    async forward({ input_ids, past_key_values, _encoder_state: enc, ...rest }) {
+    async forward({ input_ids, past_key_values, ...rest }) {
+        const enc = states.get(this);
+
         // 1. Fill audio buffer to needed position
         const current_len = input_ids.dims[1];
         const needed = enc.audio_consumed + current_len;
@@ -234,21 +237,17 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             throw new Error('input_features (generator/iterable) must be provided');
         }
 
-        // Create encoder state — flows through model_inputs._encoder_state
         const enc_state = createEncoderState(this, input_features);
+        states.set(this, enc_state);
 
-        // Inject audio-exhaustion stopping criterion (invisible to caller)
         const stopping_criteria = new StoppingCriteriaList();
         stopping_criteria.push(new AudioExhaustedCriteria(enc_state));
         if (userStoppingCriteria) stopping_criteria.extend(userStoppingCriteria);
 
         try {
-            return await super.generate({
-                ...params,
-                _encoder_state: enc_state,
-                stopping_criteria,
-            });
+            return await super.generate({ ...params, stopping_criteria });
         } finally {
+            states.delete(this);
             disposeEncoderState(enc_state);
         }
     }
