@@ -1376,12 +1376,12 @@ export async function generic_text_to_text_forward(
         ...kwargs
     },
 ) {
-    const modality_values = pick(kwargs, modality_input_names);
     if (!inputs_embeds) {
         // 1. Extract the text embeddings.
         inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
 
         // 2. Possibly, merge text and modality values
+        const modality_values = pick(kwargs, modality_input_names);
         if (Object.keys(modality_values).length > 0) {
             if (input_ids.dims[1] !== 1) {
                 const modality_features = await encode_function({
