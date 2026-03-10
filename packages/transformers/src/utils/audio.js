@@ -693,7 +693,9 @@ export async function spectrogram(
                 }
                 break;
             default:
-                throw new Error(`log_mel must be one of null, 'log', 'log10', 'log10_max_norm', or 'dB'. Got '${log_mel}'`);
+                throw new Error(
+                    `log_mel must be one of null, 'log', 'log10', 'log10_max_norm', or 'dB'. Got '${log_mel}'`,
+                );
         }
     }
 

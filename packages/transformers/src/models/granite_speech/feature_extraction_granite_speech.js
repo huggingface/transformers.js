@@ -37,38 +37,21 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
 
         const { n_fft, hop_length, n_mels } = this.config.melspec_kwargs;
 
+        // Truncate to even number of frames for pair-stacking
+        const num_frames = 1 + Math.floor((audio.length - 1) / hop_length);
+        const max_num_frames = num_frames - (num_frames % 2);
+
         const mel = await spectrogram(audio, this.window, n_fft, hop_length, {
             power: 2.0,
             mel_filters: this.mel_filters,
             log_mel: 'log10_max_norm',
+            transpose: true, // [time, n_mels]
+            max_num_frames,
+            do_pad: false,
         });
-        // mel shape: [n_mels, num_frames]
 
-        const num_frames = mel.dims[1];
-        const data = /** @type {Float32Array} */ (mel.data);
-
-        // Transpose [n_mels, time] → [time, n_mels], removing last frame if odd
-        const time = num_frames % 2 === 1 ? num_frames - 1 : num_frames;
-        const transposed = new Float32Array(time * n_mels);
-        for (let t = 0; t < time; ++t) {
-            for (let m = 0; m < n_mels; ++m) {
-                transposed[t * n_mels + m] = data[m * num_frames + t];
-            }
-        }
-
-        // Stack adjacent frame pairs: [time, n_mels] → [time/2, 2*n_mels]
-        // In Python: logmel.reshape(bsz, -1, 2 * logmel.shape[-1])
-        // Adjacent rows [2t, 2t+1] are concatenated along the feature dim
-        const stacked_time = time / 2;
-        const stacked_dim = 2 * n_mels;
-        const stacked = new Float32Array(stacked_time * stacked_dim);
-        for (let t = 0; t < stacked_time; ++t) {
-            const src_offset = 2 * t * n_mels;
-            const dst_offset = t * stacked_dim;
-            stacked.set(transposed.subarray(src_offset, src_offset + stacked_dim), dst_offset);
-        }
-
-        const input_features = new Tensor('float32', stacked, [1, stacked_time, stacked_dim]);
+        // Stack adjacent frame pairs: [time, n_mels] → [1, time/2, 2*n_mels]
+        const input_features = mel.view(-1, 2 * n_mels).unsqueeze_(0);
 
         return { input_features };
     }
