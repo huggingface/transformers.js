@@ -1553,6 +1553,13 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
     const past_length = model_inputs.past_key_values ? model_inputs.past_key_values.get_seq_length() : 0;
 
+    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
+    // avoids computing logits for the entire sequence, significantly reducing memory usage.
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
+    }
+
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
         let dims;
