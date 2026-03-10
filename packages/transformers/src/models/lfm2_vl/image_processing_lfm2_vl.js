@@ -216,8 +216,8 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
             const preprocessed = await Promise.all(image_batch.map((x) => this.preprocess(x, { do_pad: false })));
 
             for (const { pixel_values } of preprocessed) {
+                const [, height, width] = pixel_values.dims;
                 const img = pixel_values.unsqueeze_(0);
-                const [, , height, width] = img.dims;
 
                 const total_factor = this.encoder_patch_size * this.downsample_factor;
                 const f2 = total_factor ** 2;
