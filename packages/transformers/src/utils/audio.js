@@ -452,8 +452,10 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * If supplied, applies this filter bank to create a mel spectrogram.
  * @param {number} [options.mel_floor=1e-10] Minimum value of mel frequency banks.
  * @param {string} [options.log_mel=null] How to convert the spectrogram to log scale. Possible options are:
- * `null` (don't convert), `"log"` (take the natural logarithm) `"log10"` (take the base-10 logarithm), `"dB"` (convert to decibels).
+ * `null` (don't convert), `"log"` (take the natural logarithm), `"log10"` (take the base-10 logarithm), `"dB"` (convert to decibels),
+ * `"log10_max_norm"` (take `log10`, then apply `(max(x, maxVal - 8) + 4) / 4` normalization, where `maxVal` is computed from data or given by `max_log_mel`).
  * Can only be used when `power` is not `null`.
+ * @param {number} [options.max_log_mel=null] When `log_mel` is `"log10_max_norm"`, use this fixed value as the max instead of computing from data.
  * @param {number} [options.reference=1.0] Sets the input spectrogram value that corresponds to 0 dB. For example, use `max(spectrogram)[0]` to set
  * the loudest part to 0 dB. Must be greater than zero.
  * @param {number} [options.min_value=1e-10] The spectrogram will be clipped to this minimum value before conversion to decibels, to avoid taking `log(0)`.
@@ -486,6 +488,7 @@ export async function spectrogram(
         mel_filters = null,
         mel_floor = 1e-10,
         log_mel = null,
+        max_log_mel = null,
         reference = 1.0,
         min_value = 1e-10,
         db_range = null,
@@ -669,6 +672,17 @@ export async function spectrogram(
                     mel_spec_data[i] = Math.log10(mel_spec_data[i]);
                 }
                 break;
+            case 'log10_max_norm': {
+                for (let i = 0; i < o; ++i) {
+                    mel_spec_data[i] = Math.log10(mel_spec_data[i]);
+                }
+                const logMax = max_log_mel ?? max(mel_spec_data)[0];
+                const threshold = logMax - 8.0;
+                for (let i = 0; i < o; ++i) {
+                    mel_spec_data[i] = (Math.max(mel_spec_data[i], threshold) + 4.0) / 4.0;
+                }
+                break;
+            }
             case 'dB':
                 if (power === 1.0) {
                     amplitude_to_db(mel_spec_data, reference, min_value, db_range);
@@ -679,7 +693,7 @@ export async function spectrogram(
                 }
                 break;
             default:
-                throw new Error(`log_mel must be one of null, 'log', 'log10' or 'dB'. Got '${log_mel}'`);
+                throw new Error(`log_mel must be one of null, 'log', 'log10', 'log10_max_norm', or 'dB'. Got '${log_mel}'`);
         }
     }
 

@@ -40,24 +40,12 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
         const mel = await spectrogram(audio, this.window, n_fft, hop_length, {
             power: 2.0,
             mel_filters: this.mel_filters,
-            log_mel: 'log10',
+            log_mel: 'log10_max_norm',
         });
         // mel shape: [n_mels, num_frames]
 
         const num_frames = mel.dims[1];
         const data = /** @type {Float32Array} */ (mel.data);
-
-        // Find global max for normalization
-        let mx = -Infinity;
-        for (let i = 0; i < data.length; ++i) {
-            if (data[i] > mx) mx = data[i];
-        }
-
-        // Apply: max(logmel, mx - 8.0) / 4 + 1
-        const threshold = mx - 8.0;
-        for (let i = 0; i < data.length; ++i) {
-            data[i] = Math.max(data[i], threshold) / 4 + 1;
-        }
 
         // Transpose [n_mels, time] → [time, n_mels], removing last frame if odd
         const time = num_frames % 2 === 1 ? num_frames - 1 : num_frames;

@@ -35,7 +35,7 @@ export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
             ? Math.floor(waveform.length / hop_length)
             : Math.floor((waveform.length - n_fft) / hop_length);
 
-        const features = await spectrogram(
+        return await spectrogram(
             waveform,
             this.window,
             n_fft, // frame_length
@@ -43,23 +43,13 @@ export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
             {
                 power: 2.0,
                 mel_filters,
-                log_mel: 'log10',
+                log_mel: 'log10_max_norm',
+                max_log_mel: global_log_mel_max,
                 center,
                 max_num_frames,
                 do_pad: false,
             },
         );
-
-        // Apply Voxtral normalization: max(log_spec, log_max - 8.0), then (x + 4.0) / 4.0
-        const data = features.data;
-        const logMax = global_log_mel_max ?? -Infinity; // null means use data max (not used in practice)
-        const threshold = logMax - 8.0;
-
-        for (let i = 0; i < data.length; ++i) {
-            data[i] = (Math.max(data[i], threshold) + 4.0) / 4.0;
-        }
-
-        return features;
     }
 
     /**
