@@ -1338,7 +1338,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {Object} params Additional parameters.
  * @param {Function} [params.encode_function] The function to encode the modality values.
  * @param {Function} [params.merge_function] The function to merge the modality features with the input embeddings.
- * @param {string} [params.modality_input_name] The modality input name.
+ * @param {string[]} [params.modality_input_names] The modality input name.
  * @param {string} [params.modality_output_name] The modality output name.
  * @param {Tensor} [params.input_ids=null]
  * @param {Tensor} [params.attention_mask=null]
@@ -1356,7 +1356,7 @@ export async function generic_text_to_text_forward(
         // Generic parameters:
         encode_function,
         merge_function,
-        modality_input_name,
+        modality_input_names,
         modality_output_name,
 
         // Produced by the tokenizer/processor:
@@ -1376,37 +1376,39 @@ export async function generic_text_to_text_forward(
         ...kwargs
     },
 ) {
-    const modality_values = kwargs[modality_input_name];
+    const modality_values = pick(kwargs, modality_input_names);
     if (!inputs_embeds) {
         // 1. Extract the text embeddings.
         inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
 
         // 2. Possibly, merge text and modality values
-        if (modality_values && input_ids.dims[1] !== 1) {
-            const modality_features = await encode_function({
-                // Pass the modality values under its expected key.
-                // The caller knows whether this is audio or image.
-                [modality_input_name]: modality_values,
-                ...kwargs,
-            });
-            ({ inputs_embeds, attention_mask } = merge_function({
-                [modality_output_name]: modality_features,
-                inputs_embeds,
-                input_ids,
-                attention_mask,
-            }));
-        } else if (past_key_values && modality_values && input_ids.dims[1] === 1) {
-            // This branch handles the cache case.
-            const target_length = input_ids.dims[1]; // always 1
-            const past_length = past_key_values.get_seq_length();
+        if (Object.keys(modality_values).length > 0) {
+            if (input_ids.dims[1] !== 1) {
+                const modality_features = await encode_function({
+                    // Pass the modality values under its expected key.
+                    // The caller knows whether this is audio or image.
+                    ...modality_values,
+                    ...kwargs,
+                });
+                ({ inputs_embeds, attention_mask } = merge_function({
+                    [modality_output_name]: modality_features,
+                    inputs_embeds,
+                    input_ids,
+                    attention_mask,
+                }));
+            } else if (past_key_values && input_ids.dims[1] === 1) {
+                // This branch handles the cache case.
+                const target_length = input_ids.dims[1]; // always 1
+                const past_length = past_key_values.get_seq_length();
 
-            attention_mask = cat(
-                [
-                    ones([input_ids.dims[0], past_length]),
-                    attention_mask.slice(null, [attention_mask.dims[1] - target_length, attention_mask.dims[1]]),
-                ],
-                1,
-            );
+                attention_mask = cat(
+                    [
+                        ones([input_ids.dims[0], past_length]),
+                        attention_mask.slice(null, [attention_mask.dims[1] - target_length, attention_mask.dims[1]]),
+                    ],
+                    1,
+                );
+            }
         }
     }
 
@@ -1460,7 +1462,7 @@ export async function generic_text_to_text_forward(
 export async function audio_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
-        modality_input_name: 'audio_values',
+        modality_input_names: ['audio_values', 'input_features'],
         modality_output_name: 'audio_features',
         encode_function: self.encode_audio.bind(self),
         merge_function: self._merge_input_ids_with_audio_features.bind(self),
@@ -1477,7 +1479,7 @@ export async function audio_text_to_text_forward(self, params) {
 export async function image_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
-        modality_input_name: 'pixel_values',
+        modality_input_names: ['pixel_values'],
         modality_output_name: 'image_features',
         encode_function: self.encode_image.bind(self),
         merge_function: self._merge_input_ids_with_image_features.bind(self),
