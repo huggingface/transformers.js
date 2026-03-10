@@ -1200,19 +1200,32 @@ export class PreTrainedModel extends Callable {
         }
     }
 
-    async encode_image({ pixel_values }) {
-        // image_inputs === { pixel_values }
-        return (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
+    /**
+     * Helper function to select valid inputs and run through the appropriate encoder (vision, text, audio) based on the input type.
+     * @param {string} sessionName
+     * @param {Record<string, Tensor>} inputs
+     * @param {string} outputName
+     * @private
+     */
+    async _encode_input(sessionName, inputs, outputName) {
+        if (!Object.hasOwn(this.sessions, sessionName)) {
+            throw new Error(`Model does not have a ${sessionName} session.`);
+        }
+        const session = this.sessions[sessionName];
+        const output = await sessionRun(session, pick(inputs, session.inputNames));
+        return output[outputName];
     }
 
-    async encode_text({ input_ids }) {
-        // text_inputs === { input_ids, attention_mask }
-        return (await sessionRun(this.sessions['embed_tokens'], { input_ids })).inputs_embeds;
+    async encode_image(inputs) {
+        return this._encode_input('vision_encoder', inputs, 'image_features');
     }
 
-    async encode_audio({ audio_values }) {
-        // audio_inputs === { audio_values }
-        return (await sessionRun(this.sessions['audio_encoder'], { audio_values })).audio_features;
+    async encode_text(inputs) {
+        return this._encode_input('embed_tokens', inputs, 'inputs_embeds');
+    }
+
+    async encode_audio(inputs) {
+        return this._encode_input('audio_encoder', inputs, 'audio_features');
     }
 }
 
