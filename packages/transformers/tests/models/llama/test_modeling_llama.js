@@ -71,10 +71,7 @@ export default () => {
             const inputs = tokenizer("hello");
             const { logits } = await model.forward(inputs);
             // Default: returns logits for all tokens
-            console.log(`[${dtype}] forward default logits shape:`, logits.dims);
-            console.log(`[${dtype}] forward default logits[0][0][0..3]:`, logits.data.slice(0, 4));
-            expect(logits.dims[0]).toEqual(1); // batch
-            expect(logits.dims[1]).toEqual(inputs.input_ids.dims[1]); // seq_len (all tokens)
+            expect(logits.dims).toEqual([1, 2, 128256]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -85,9 +82,8 @@ export default () => {
             const inputs = tokenizer("hello");
             const num_logits_to_keep = new Tensor("int64", BigInt64Array.from([0n]), []);
             const { logits } = await model.forward({ ...inputs, num_logits_to_keep });
-            console.log(`[${dtype}] forward nlk=0 logits shape:`, logits.dims);
-            // num_logits_to_keep=0 should return all logits (same as default)
-            expect(logits.dims[1]).toEqual(inputs.input_ids.dims[1]);
+            // num_logits_to_keep=0 returns all logits (same as default)
+            expect(logits.dims).toEqual([1, 2, 128256]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -98,8 +94,8 @@ export default () => {
             const inputs = tokenizer("hello");
             const num_logits_to_keep = new Tensor("int64", BigInt64Array.from([1n]), []);
             const { logits } = await model.forward({ ...inputs, num_logits_to_keep });
-            console.log(`[${dtype}] forward nlk=1 logits shape:`, logits.dims);
-            expect(logits.dims[1]).toEqual(1); // only last token's logits
+            // Only last token's logits
+            expect(logits.dims).toEqual([1, 1, 128256]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -110,8 +106,8 @@ export default () => {
             const inputs = tokenizer("hello world");
             const num_logits_to_keep = new Tensor("int64", BigInt64Array.from([3n]), []);
             const { logits } = await model.forward({ ...inputs, num_logits_to_keep });
-            console.log(`[${dtype}] forward nlk=3 logits shape:`, logits.dims);
-            expect(logits.dims[1]).toEqual(3); // last 3 tokens' logits
+            // Last 3 tokens' logits
+            expect(logits.dims).toEqual([1, 3, 128256]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -124,9 +120,7 @@ export default () => {
               ...inputs,
               max_length: 5,
             });
-            const result = outputs.tolist();
-            console.log(`[${dtype}] generate result:`, JSON.stringify(result.map((r) => r.map((v) => v.toString() + "n"))));
-            expect(result.length).toBeGreaterThan(0);
+            expect(outputs.tolist()).toEqual([[128000n, 15339n, 73474n, 38648n, 56375n]]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -142,8 +136,7 @@ export default () => {
       async () => {
         const pipe = await pipeline("text-generation", model_id, DEFAULT_MODEL_OPTIONS);
         const result = await pipe("hello", { max_new_tokens: 3 });
-        console.log("pipeline result:", JSON.stringify(result));
-        expect(result).toBeDefined();
+        expect(result).toEqual([{ generated_text: "hello-close heroic actively" }]);
         await pipe.dispose();
       },
       MAX_TEST_TIME,
