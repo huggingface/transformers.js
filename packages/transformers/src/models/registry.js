@@ -382,6 +382,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
 ]);
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
+    ['granite_speech', 'GraniteSpeechForConditionalGeneration'],
     ['ultravox', 'UltravoxModel'],
     ['voxtral', 'VoxtralForConditionalGeneration'],
     ['voxtral_realtime', 'VoxtralRealtimeForConditionalGeneration'],

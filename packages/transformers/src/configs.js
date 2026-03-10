@@ -68,6 +68,7 @@ function getNormalizedConfig(config) {
         case 'florence2':
         case 'llava_onevision':
         case 'idefics3':
+        case 'granite_speech':
         case 'ultravox':
         case 'voxtral':
         case 'voxtral_realtime':

@@ -60,6 +60,7 @@ export * from './gpt2/modeling_gpt2.js';
 export * from './gptj/modeling_gptj.js';
 export * from './granite/modeling_granite.js';
 export * from './granitemoehybrid/modeling_granitemoehybrid.js';
+export * from './granite_speech/modeling_granite_speech.js';
 export * from './grounding_dino/modeling_grounding_dino.js';
 export * from './groupvit/modeling_groupvit.js';
 export * from './helium/modeling_helium.js';
