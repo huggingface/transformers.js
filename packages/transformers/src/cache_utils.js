@@ -9,8 +9,16 @@ class _DynamicCache {
      * @param {Record<string, Tensor>} [entries] Initial name→Tensor mappings.
      */
     constructor(entries) {
-        if (entries) {
-            Object.assign(this, entries);
+        if (!entries) return;
+        for (const key in entries) {
+            if (key in this) {
+                throw new TypeError(`Key "${key}" conflicts with an existing property on DynamicCache`);
+            }
+            const value = entries[key];
+            if (!(value instanceof Tensor)) {
+                throw new TypeError(`Expected a Tensor for key "${key}", got ${typeof value}`);
+            }
+            this[key] = value;
         }
     }
 
