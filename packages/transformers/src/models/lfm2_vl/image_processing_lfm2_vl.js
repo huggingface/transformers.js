@@ -1,4 +1,4 @@
-import { ImageProcessor } from '../../image_processors_utils.js';
+import { ImageProcessor, smart_resize } from '../../image_processors_utils.js';
 import { Tensor, cat, interpolate_4d, stack } from '../../utils/tensor.js';
 
 /**
@@ -65,39 +65,6 @@ function get_target_ratios(min_tiles, max_tiles) {
         }
     }
     return ratios.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
-}
-
-/**
- * Smart resize to ensure dimensions are divisible by `encoder_patch_size * downsample_factor`
- * while keeping pixel count within the allowed range.
- * @param {number} height
- * @param {number} width
- * @param {number} downsample_factor
- * @param {number} min_image_tokens
- * @param {number} max_image_tokens
- * @param {number} encoder_patch_size
- * @returns {[number, number]} [width, height]
- */
-function smart_resize(height, width, downsample_factor, min_image_tokens, max_image_tokens, encoder_patch_size) {
-    const total_factor = encoder_patch_size * downsample_factor;
-    const f2 = total_factor ** 2;
-    const min_pixels = min_image_tokens * f2;
-    const max_pixels = max_image_tokens * f2;
-
-    let h_bar = Math.max(total_factor, round_by_factor(height, total_factor));
-    let w_bar = Math.max(total_factor, round_by_factor(width, total_factor));
-
-    if (h_bar * w_bar > max_pixels) {
-        const beta = Math.sqrt((height * width) / max_pixels);
-        h_bar = Math.max(total_factor, Math.floor(height / beta / total_factor) * total_factor);
-        w_bar = Math.max(total_factor, Math.floor(width / beta / total_factor) * total_factor);
-    } else if (h_bar * w_bar < min_pixels) {
-        const beta = Math.sqrt(min_pixels / (height * width));
-        h_bar = Math.ceil((height * beta) / total_factor) * total_factor;
-        w_bar = Math.ceil((width * beta) / total_factor) * total_factor;
-    }
-
-    return [w_bar, h_bar];
 }
 
 /**
@@ -252,14 +219,15 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
                 const img = pixel_values.unsqueeze_(0);
                 const [, , height, width] = img.dims;
 
-                const [new_width, new_height] = smart_resize(
-                    height,
-                    width,
-                    this.downsample_factor,
-                    this.min_image_tokens,
-                    this.max_image_tokens,
-                    this.encoder_patch_size,
-                );
+                const total_factor = this.encoder_patch_size * this.downsample_factor;
+                const f2 = total_factor ** 2;
+                const [new_height, new_width] = smart_resize(
+                    Math.max(total_factor, height),
+                    Math.max(total_factor, width),
+                    total_factor,
+                    this.min_image_tokens * f2,
+                    this.max_image_tokens * f2,
+                ).map((x) => Math.max(total_factor, x));
 
                 /** @type {Tensor[]} */
                 let tiles;

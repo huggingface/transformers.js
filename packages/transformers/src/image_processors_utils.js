@@ -407,7 +407,7 @@ function compute_segments(
  * @returns {[number, number]} The new height and width of the image.
  * @throws {Error} If the height or width is smaller than the factor.
  */
-function smart_resize(height, width, factor = 28, min_pixels = 56 * 56, max_pixels = 14 * 14 * 4 * 1280) {
+export function smart_resize(height, width, factor = 28, min_pixels = 56 * 56, max_pixels = 14 * 14 * 4 * 1280) {
     if (height < factor || width < factor) {
         throw new Error(`height:${height} or width:${width} must be larger than factor:${factor}`);
     } else if (Math.max(height, width) / Math.min(height, width) > 200) {
