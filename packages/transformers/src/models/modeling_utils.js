@@ -1324,6 +1324,15 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         new_model_inputs.position_ids = create_position_ids(new_model_inputs, past_key_values, start_index);
     }
 
+    if (session.inputNames.includes('num_logits_to_keep') && !new_model_inputs.num_logits_to_keep) {
+        // `num_logits_to_keep` specifies the number of prompt logits to calculate during generation.
+        // If unset (or 0), all logits will be calculated. If an integer value, only last `num_logits_to_keep`
+        // logits will be calculated. During generation, the default is 1 because only the logits of the last
+        // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
+        // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
+        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
+    }
+
     // Unpack the `past_key_values` object into model inputs
     self.addPastKeyValues(new_model_inputs, past_key_values);
 
