@@ -59,7 +59,11 @@ export class CrossOriginStorage {
         try {
             const [handle] = await navigator.crossOriginStorage.requestFileHandles([makeHashDescriptor(hashValue)]);
             const blob = await handle.getFile();
-            return new Response(blob);
+            return new Response(blob, {
+                headers: {
+                    'content-length': blob.size,
+                },
+            });
         } catch {
             return undefined;
         }
