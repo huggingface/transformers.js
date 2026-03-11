@@ -18,8 +18,8 @@ importers:
   packages/transformers:
     dependencies:
       '@huggingface/jinja':
-        specifier: ^0.5.5
-        version: 0.5.5
+        specifier: ^0.5.6
+        version: 0.5.6
       '@huggingface/tokenizers':
         specifier: ^0.1.2
         version: 0.1.2
@@ -27,8 +27,8 @@ importers:
         specifier: 1.24.3
         version: 1.24.3
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260303-e7e64dc112
-        version: 1.25.0-dev.20260303-e7e64dc112
+        specifier: 1.25.0-dev.20260307-d626b568e0
+        version: 1.25.0-dev.20260307-d626b568e0
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -390,8 +390,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@huggingface/jinja@0.5.5':
-    resolution: {integrity: sha512-xRlzazC+QZwr6z4ixEqYHo9fgwhTZ3xNSdljlKfUFGZSdlvt166DljRELFUfFytlYOYvo3vTisA/AFOuOAzFQQ==}
+  '@huggingface/jinja@0.5.6':
+    resolution: {integrity: sha512-MyMWyLnjqo+KRJYSH7oWNbsOn5onuIvfXYPcc0WOGxU0eHUV7oAYUoQTl2BMdu7ml+ea/bu11UM+EshbeHwtIA==}
     engines: {node: '>=18'}
 
   '@huggingface/tokenizers@0.1.2':
@@ -1695,8 +1695,8 @@ packages:
     resolution: {integrity: sha512-JH7+czbc8ALA819vlTgcV+Q214/+VjGeBHDjX81+ZCD0PCVCIFGFNtT0V4sXG/1JXypKPgScQcB3ij/hk3YnTg==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260303-e7e64dc112:
-    resolution: {integrity: sha512-ZXyMjd56n9bO/62Hnf97xNxPPzu2t4mDSL7PLwQXyIIh/vMq9Fbmv7vALDTVhayBca1t13f3LOEEP2F9gohyvg==}
+  onnxruntime-web@1.25.0-dev.20260307-d626b568e0:
+    resolution: {integrity: sha512-qUcS5zvNMnmGwGtQ0OBefwF4j52uI1k/VII/o5jjeV7He+St3dVThjSjYbkIEcqy3FnRxFMsXnd7Z6gmsLHchg==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -2331,7 +2331,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.2':
     optional: true
 
-  '@huggingface/jinja@0.5.5': {}
+  '@huggingface/jinja@0.5.6': {}
 
   '@huggingface/tokenizers@0.1.2': {}
 
@@ -3833,7 +3833,7 @@ snapshots:
       global-agent: 3.0.0
       onnxruntime-common: 1.24.3
 
-  onnxruntime-web@1.25.0-dev.20260303-e7e64dc112:
+  onnxruntime-web@1.25.0-dev.20260307-d626b568e0:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
