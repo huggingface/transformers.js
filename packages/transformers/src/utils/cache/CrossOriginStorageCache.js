@@ -61,7 +61,7 @@ export class CrossOriginStorage {
             const blob = await handle.getFile();
             return new Response(blob, {
                 headers: {
-                    'content-length': blob.size,
+                    'content-length': String(blob.size),
                 },
             });
         } catch {
