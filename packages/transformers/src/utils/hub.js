@@ -209,11 +209,14 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
         await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
     } else if (typeof response !== 'string') {
         // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
+        // Explicitly set content-length from the buffer size, since the browser Cache API may strip it.
+        const headers = new Headers(response.headers);
+        headers.set('content-length', result.byteLength.toString());
         await cache
             .put(
                 cacheKey,
                 new Response(/** @type {any} */ (result), {
-                    headers: response.headers,
+                    headers,
                 }),
             )
             .catch((err) => {

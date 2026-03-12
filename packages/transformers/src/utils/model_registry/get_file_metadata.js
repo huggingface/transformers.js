@@ -93,6 +93,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
                 if (typeof response !== 'string' && response.status !== 404) {
                     const size = response.headers.get('content-length');
                     const contentType = response.headers.get('content-type');
+
                     return {
                         exists: true,
                         size: size ? parseInt(size, 10) : undefined,
