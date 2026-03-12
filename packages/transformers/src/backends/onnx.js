@@ -286,20 +286,16 @@ async function ensureWasmLoaded() {
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
 
-    // When ORT releases the last WebGPU session, it calls GPUDevice.destroy() internally.
-    // This permanently invalidates the device, so any subsequent session creation would fail
-    // with "WebGPU device lost: Device was destroyed." Clear the destroyed device reference
-    // so ORT requests a fresh GPUAdapter/GPUDevice on the next session creation.
-    //
-    // NOTE: The ORT type for `ONNX_ENV.webgpu.device` declares its getter as
-    // `Promise<GPUDevice>`, but at runtime the property holds the actual `GPUDevice`
-    // object after ORT initialises it. We cast to `GPUDevice` to access `.lost`.
+    // WORKAROUND for ONNX Runtime issue where destroyed WebGPU device references are not cleared.
+    // When the last session is released with preserveDevice=false (default), the device is destroyed
+    // but env.webgpu.device is not nulled, causing subsequent session creation to fail.
+    // See: https://github.com/microsoft/onnxruntime/pull/27634
     if (ONNX_ENV?.webgpu) {
         const device = /** @type {GPUDevice | null | undefined} */ (/** @type {any} */ (ONNX_ENV.webgpu).device);
         if (device?.lost) {
             const deviceLost = await Promise.race([device.lost.then(() => true), Promise.resolve(false)]);
             if (deviceLost) {
-                // @ts-ignore — setter accepts GPUDevice; we pass null to force ORT to re-create
+                // @ts-ignore — Clear destroyed device reference to force ORT to create a new one
                 ONNX_ENV.webgpu.device = null;
             }
         }

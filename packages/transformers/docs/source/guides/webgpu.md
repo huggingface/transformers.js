@@ -83,6 +83,36 @@ console.log(output);
 // ]
 ```
 
+## Disposing and recreating pipelines
+
+Transformers.js automatically handles WebGPU device lifecycle management when you dispose and recreate pipelines. You can safely use the following pattern:
+
+```js
+import { pipeline } from "@huggingface/transformers";
+
+// Create a pipeline
+const pipe = await pipeline("text-classification", "Xenova/distilbert-base-uncased-finetuned-sst-2-english", {
+  device: "webgpu",
+});
+
+// Use the pipeline
+const result = await pipe("I love transformers!");
+
+// Dispose when done
+await pipe.dispose();
+
+// Create a new pipeline (this works correctly)
+const pipe2 = await pipeline("text-classification", "Xenova/distilbert-base-uncased-finetuned-sst-2-english", {
+  device: "webgpu",
+});
+```
+
+### Technical note
+
+Due to a breaking change in ONNX Runtime Web (introduced in March 2025), the WebGPU device is destroyed when the last session is released. Transformers.js automatically detects destroyed devices and requests a fresh one when needed, so you don't need to worry about this. However, be aware that recreating the WebGPU device has some performance overhead compared to keeping a pipeline alive.
+
+For best performance in production applications, consider keeping your pipelines alive for the lifetime of your application rather than repeatedly creating and disposing them.
+
 ## Reporting bugs and providing feedback
 
 Due to the experimental nature of WebGPU, especially in non-Chromium browsers, you may experience issues when trying to run a model (even it it can run in WASM). If you do, please open [an issue on GitHub](https://github.com/huggingface/transformers.js/issues/new?title=[WebGPU]%20Error%20running%20MODEL_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml) and we'll do our best to address it. Thanks!
