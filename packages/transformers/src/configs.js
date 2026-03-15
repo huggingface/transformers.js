@@ -76,6 +76,7 @@ function getNormalizedConfig(config) {
         case 'gemma3n':
         case 'lfm2_vl':
         case 'chatterbox':
+        case 'lighton_ocr':
         case 'mistral3':
         case 'qwen2_5_vl':
         case 'qwen3_vl':

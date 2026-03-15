@@ -72,6 +72,7 @@ export * from './ijepa/modeling_ijepa.js';
 export * from './jais/modeling_jais.js';
 export * from './jina_clip/modeling_jina_clip.js';
 export * from './lfm2/modeling_lfm2.js';
+export * from './lighton_ocr/modeling_lighton_ocr.js';
 export * from './lfm2_moe/modeling_lfm2_moe.js';
 export * from './lfm2_vl/modeling_lfm2_vl.js';
 export * from './llama/modeling_llama.js';
