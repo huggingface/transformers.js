@@ -166,6 +166,7 @@ function getNormalizedConfig(config) {
         case 'ernie4_5':
         case 'hunyuan_v1_dense':
         case 'falcon_h1':
+        case 'nemotron_h':
         case 'ministral':
         case 'ministral3':
             mapping['num_heads'] = 'num_key_value_heads';
@@ -302,6 +303,8 @@ export function getCacheShapes(config, options) {
     if (!(config instanceof PretrainedConfig)) {
         config = new PretrainedConfig(config);
     }
+
+    const batch_size = options?.batch_size ?? 1;
     if (['lfm2', 'lfm2_moe'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
@@ -311,7 +314,6 @@ export function getCacheShapes(config, options) {
         const { layer_types, num_attention_heads, num_key_value_heads, hidden_size, conv_L_cache } =
             /** @type {any} */ (config);
         const head_dim = hidden_size / num_attention_heads;
-        const batch_size = options?.batch_size ?? 1;
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'full_attention') {
                 for (const kv of ['key', 'value']) {
@@ -322,6 +324,41 @@ export function getCacheShapes(config, options) {
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
+        }
+        return cache_values;
+    } else if (config.model_type === 'nemotron_h') {
+        const pkv_prefix = options?.prefix ?? 'past_key_values';
+        const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+
+        /** @type {Record<string, number[]>} */
+        const cache_values = {};
+
+        const {
+            layers_block_type,
+            num_attention_heads,
+            num_key_value_heads,
+            hidden_size,
+            head_dim,
+            conv_kernel,
+            mamba_num_heads,
+            mamba_head_dim,
+            ssm_state_size,
+            n_groups,
+        } = /** @type {any} */ (config);
+        const final_head_dim = head_dim ?? hidden_size / num_attention_heads;
+
+        const intermediate_size = mamba_num_heads * mamba_head_dim;
+        const conv_d_inner = intermediate_size + 2 * n_groups * ssm_state_size;
+        for (let i = 0; i < layers_block_type.length; ++i) {
+            if (layers_block_type[i] === 'mamba') {
+                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, conv_kernel];
+                cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_num_heads, mamba_head_dim, ssm_state_size];
+            } else if (layers_block_type[i] === 'attention') {
+                for (const kv of ['key', 'value']) {
+                    cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, final_head_dim];
+                }
+            }
+            // mlp layers have no cache, skip them
         }
         return cache_values;
     } else if (['granitemoehybrid', 'falcon_h1'].includes(config.model_type)) {
@@ -346,7 +383,6 @@ export function getCacheShapes(config, options) {
             mamba_d_ssm,
         } = /** @type {any} */ (config);
         const head_dim = hidden_size / num_attention_heads;
-        const batch_size = options?.batch_size ?? 1;
 
         const conv_d_inner = (mamba_d_ssm ?? mamba_expand * hidden_size) + 2 * mamba_n_groups * mamba_d_state;
         for (let i = 0; i < num_hidden_layers; ++i) {
@@ -384,7 +420,6 @@ export function getCacheShapes(config, options) {
         const value_dim = linear_value_head_dim * linear_num_value_heads;
 
         const final_head_dim = head_dim ?? hidden_size / num_attention_heads;
-        const batch_size = options?.batch_size ?? 1;
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'full_attention') {
                 for (const kv of ['key', 'value']) {
