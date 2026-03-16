@@ -23,6 +23,73 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     image_grid_thw_name = 'grid_thw';
 
     /**
+     * Compute text-only 3D rope position IDs (all 3 dims get the same 1D positions).
+     * @param {Tensor} input_ids
+     * @param {Tensor} attention_mask
+     * @returns {[Tensor, Tensor]} [position_ids, mrope_position_deltas]
+     */
+    _get_text_only_rope_index(input_ids, attention_mask) {
+        if (attention_mask) {
+            const { data, dims } = cumsum_masked_fill(attention_mask);
+
+            const position_ids = BigInt64Array.from({ length: 3 * data.length }, (_, i) => data[i % data.length]);
+            /** @type {bigint[]} */
+            const mrope_position_deltas = Array.from(
+                { length: dims[0] },
+                (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n + BigInt(dims[1]),
+            );
+
+            return [
+                new Tensor('int64', position_ids, [3, ...dims]),
+                new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
+            ];
+        } else {
+            const [batch_size, seq_length] = input_ids.dims;
+            const position_ids = BigInt64Array.from({ length: 3 * batch_size * seq_length }, (_, i) =>
+                BigInt(Math.floor((i % seq_length) / batch_size)),
+            );
+
+            return [new Tensor('int64', position_ids, [3, ...input_ids.dims]), zeros([batch_size, 1])];
+        }
+    }
+
+    /**
+     * Reorder per-segment position ID lists from [seg1[t,h,w], seg2[t,h,w], ...] into
+     * global [all_t, all_h, all_w] order, then write back into the position_ids array
+     * respecting attention mask.
+     * @param {number[][]} llm_pos_ids_list List of per-segment position arrays, each of length 3*seg_len
+     * @param {number[]} attn_mask Attention mask for this batch element
+     * @param {number[][][]} position_ids_list [3][batch][seq] output array to write into
+     * @param {number} batch_idx Current batch index
+     * @returns {number[]} Flat reordered positions of length total_len
+     */
+    _reorder_and_write_positions(llm_pos_ids_list, attn_mask, position_ids_list, batch_idx) {
+        const total_len = llm_pos_ids_list.reduce((acc, x) => acc + x.length, 0);
+        const llm_positions = new Array(total_len);
+        let index = 0;
+        for (let x = 0; x < 3; ++x) {
+            for (const val of llm_pos_ids_list) {
+                const seg_len = val.length / 3;
+                for (let z = x * seg_len; z < (x + 1) * seg_len; ++z) {
+                    llm_positions[index++] = val[z];
+                }
+            }
+        }
+
+        let count = 0;
+        for (let y = 0; y < attn_mask.length; ++y) {
+            if (attn_mask[y] == 1) {
+                for (let x = 0; x < 3; ++x) {
+                    position_ids_list[x][batch_idx][y] = llm_positions[(x * total_len) / 3 + count];
+                }
+                ++count;
+            }
+        }
+
+        return llm_positions;
+    }
+
+    /**
      * Calculate the 3D rope index based on image and video's temporal, height and width in LLM.
      *
      * Explanation:
@@ -153,32 +220,12 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                     llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
                 }
 
-                // NOTE: Each item in llm_pos_ids_list is an array of shape (3, text_len),
-                // meaning to perform concatenation along dim=1, we can do the following:
-                const num_items = llm_pos_ids_list.reduce((acc, x) => acc + x.length, 0);
-                /** @type {number[]} */
-                const llm_positions = new Array(num_items);
-                let index = 0;
-                for (let x = 0; x < 3; ++x) {
-                    for (let y = 0; y < llm_pos_ids_list.length; ++y) {
-                        const val = llm_pos_ids_list[y];
-                        const text_len = val.length / 3;
-                        for (let z = x * text_len; z < (x + 1) * text_len; ++z) {
-                            llm_positions[index++] = val[z];
-                        }
-                    }
-                }
-
-                let count = 0;
-                const attn_mask = attention_mask_list[i];
-                for (let y = 0; y < attn_mask.length; ++y) {
-                    if (attn_mask[y] == 1) {
-                        for (let x = 0; x < 3; ++x) {
-                            position_ids_list[x][i][y] = llm_positions[(x * num_items) / 3 + count];
-                        }
-                        ++count;
-                    }
-                }
+                const llm_positions = this._reorder_and_write_positions(
+                    llm_pos_ids_list,
+                    attention_mask_list[i],
+                    position_ids_list,
+                    i,
+                );
 
                 const max_llm_positions = max(llm_positions)[0];
                 mrope_position_deltas.push(max_llm_positions + 1 - total_input_ids[i].length);
@@ -189,29 +236,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
             ];
         } else {
-            // Text-only
-            if (attention_mask) {
-                const { data, dims } = cumsum_masked_fill(attention_mask);
-
-                const position_ids = BigInt64Array.from({ length: 3 * data.length }, (_, i) => data[i % data.length]);
-                /** @type {bigint[]} */
-                const mrope_position_deltas = Array.from(
-                    { length: dims[0] },
-                    (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n + BigInt(dims[1]),
-                );
-
-                return [
-                    new Tensor('int64', position_ids, [3, ...dims]),
-                    new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
-                ];
-            } else {
-                const [batch_size, seq_length] = input_ids.dims;
-                const position_ids = BigInt64Array.from({ length: 3 * batch_size * seq_length }, (_, i) =>
-                    BigInt(Math.floor((i % seq_length) / batch_size)),
-                );
-
-                return [new Tensor('int64', position_ids, [3, ...input_ids.dims]), zeros([batch_size, 1])];
-            }
+            return this._get_text_only_rope_index(input_ids, attention_mask);
         }
     }
 
