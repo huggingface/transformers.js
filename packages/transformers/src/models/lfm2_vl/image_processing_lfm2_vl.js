@@ -221,7 +221,7 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
 
                 const total_factor = this.encoder_patch_size * this.downsample_factor;
                 const f2 = total_factor ** 2;
-                const [new_height, new_width] = smart_resize(
+                const [new_width, new_height] = smart_resize(
                     Math.max(total_factor, height),
                     Math.max(total_factor, width),
                     total_factor,

@@ -380,6 +380,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['gemma3n', 'Gemma3nForConditionalGeneration'],
     ['mistral3', 'Mistral3ForConditionalGeneration'],
     ['lighton_ocr', 'LightOnOcrForConditionalGeneration'],
+    ['glm_ocr', 'GlmOcrForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([

@@ -404,13 +404,24 @@ function compute_segments(
  * @param {number} [factor=28] The factor to use for resizing.
  * @param {number} [min_pixels=56*56] The minimum number of pixels.
  * @param {number} [max_pixels=14*14*4*1280] The maximum number of pixels.
- * @returns {[number, number]} The new height and width of the image.
+ * @param {number} [temporal_factor=1] The temporal factor to include in the pixel budget (e.g. temporal_patch_size for video/3D models).
+ * @returns {[number, number]} The new width and height of the image.
  * @throws {Error} If the height or width is smaller than the factor.
  */
-export function smart_resize(height, width, factor = 28, min_pixels = 56 * 56, max_pixels = 14 * 14 * 4 * 1280) {
+export function smart_resize(
+    height,
+    width,
+    factor = 28,
+    min_pixels = 56 * 56,
+    max_pixels = 14 * 14 * 4 * 1280,
+    temporal_factor = 1,
+) {
     if (height < factor || width < factor) {
-        throw new Error(`height:${height} or width:${width} must be larger than factor:${factor}`);
-    } else if (Math.max(height, width) / Math.min(height, width) > 200) {
+        const scale = Math.max(factor / height, factor / width);
+        height = Math.round(height * scale);
+        width = Math.round(width * scale);
+    }
+    if (Math.max(height, width) / Math.min(height, width) > 200) {
         throw new Error(
             `absolute aspect ratio must be smaller than 200, got ${Math.max(height, width) / Math.min(height, width)}`,
         );
@@ -419,17 +430,17 @@ export function smart_resize(height, width, factor = 28, min_pixels = 56 * 56, m
     let h_bar = Math.round(height / factor) * factor;
     let w_bar = Math.round(width / factor) * factor;
 
-    if (h_bar * w_bar > max_pixels) {
-        const beta = Math.sqrt((height * width) / max_pixels);
-        h_bar = Math.floor(height / beta / factor) * factor;
-        w_bar = Math.floor(width / beta / factor) * factor;
-    } else if (h_bar * w_bar < min_pixels) {
-        const beta = Math.sqrt(min_pixels / (height * width));
+    if (temporal_factor * h_bar * w_bar > max_pixels) {
+        const beta = Math.sqrt((temporal_factor * height * width) / max_pixels);
+        h_bar = Math.max(factor, Math.floor(height / beta / factor) * factor);
+        w_bar = Math.max(factor, Math.floor(width / beta / factor) * factor);
+    } else if (temporal_factor * h_bar * w_bar < min_pixels) {
+        const beta = Math.sqrt(min_pixels / (temporal_factor * height * width));
         h_bar = Math.ceil((height * beta) / factor) * factor;
         w_bar = Math.ceil((width * beta) / factor) * factor;
     }
 
-    return [h_bar, w_bar];
+    return [w_bar, h_bar];
 }
 
 /**

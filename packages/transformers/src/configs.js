@@ -77,6 +77,7 @@ function getNormalizedConfig(config) {
         case 'lfm2_vl':
         case 'chatterbox':
         case 'lighton_ocr':
+        case 'glm_ocr':
         case 'mistral3':
         case 'qwen2_5_vl':
         case 'qwen3_vl':
@@ -157,6 +158,7 @@ function getNormalizedConfig(config) {
             mapping['dim_kv'] = 'head_dim';
             break;
         case 'qwen3':
+        case 'glm_ocr_text':
         case 'gemma':
         case 'gemma2':
         case 'vaultgemma':

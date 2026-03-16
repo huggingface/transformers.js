@@ -1437,6 +1437,8 @@ export async function generic_text_to_text_forward(
                 'qwen3_5_text',
                 'qwen3_5_moe',
                 'qwen3_5_moe_text',
+                'glm_ocr',
+                'glm_ocr_text',
             ].includes(self.config.model_type)
         ) {
             // @ts-ignore
