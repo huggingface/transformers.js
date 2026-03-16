@@ -342,7 +342,8 @@ export function getCacheShapes(config, options) {
         const mamba_d_state = c.mamba_d_state ?? c.ssm_state_size;
         const mamba_n_groups = c.mamba_n_groups ?? c.n_groups;
         const mamba_d_conv = c.mamba_d_conv ?? c.conv_kernel;
-        const mamba_d_ssm = c.mamba_d_ssm ?? (c.mamba_expand ? c.mamba_expand * c.hidden_size : mamba_n_heads * mamba_d_head);
+        const mamba_d_ssm =
+            c.mamba_d_ssm ?? (c.mamba_expand ? c.mamba_expand * c.hidden_size : mamba_n_heads * mamba_d_head);
         const conv_d_inner = mamba_d_ssm + 2 * mamba_n_groups * mamba_d_state;
 
         /** @type {Record<string, number[]>} */
