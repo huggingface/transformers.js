@@ -90,6 +90,100 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     }
 
     /**
+     * Build per-batch position ID segments for multimodal rope.
+     * Override this in subclasses to change how vision/text segments are identified and positioned.
+     * @param {object} params
+     * @param {any[]} params.filtered_ids - attention-masked token IDs for this batch element
+     * @param {any[][]} params.image_grid_thw_list - all image grid dimensions
+     * @param {any[][]} params.video_grid_thw_list - all video grid dimensions
+     * @param {number} params.spatial_merge_size
+     * @param {{image_index: number, video_index: number}} params.state - mutable counters shared across batches
+     * @returns {number[][]} llm_pos_ids_list - segments of [t..., h..., w...] positions
+     */
+    _get_multimodal_rope_positions({
+        filtered_ids,
+        image_grid_thw_list,
+        video_grid_thw_list,
+        spatial_merge_size,
+        state,
+    }) {
+        // @ts-ignore
+        const { image_token_id, video_token_id, vision_start_token_id } = this.config;
+
+        const ids = filtered_ids;
+        const vision_start_indices = ids.reduce((acc, x, idx) => {
+            if (x == vision_start_token_id) acc.push(idx);
+            return acc;
+        }, []);
+
+        const vision_tokens = vision_start_indices.map((x) => ids[x + 1]);
+        const image_nums = vision_tokens.filter((x) => x == image_token_id).length;
+        const video_nums = vision_tokens.filter((x) => x == video_token_id).length;
+
+        /** @type {number[][]} */
+        const llm_pos_ids_list = [];
+        let st = 0;
+        let remain_images = image_nums;
+        let remain_videos = video_nums;
+        for (let j = 0; j < vision_tokens.length; ++j) {
+            const next_image_token = ids.findIndex((x, i) => i > st && x == image_token_id);
+            const next_video_token = ids.findIndex((x, i) => i > st && x == video_token_id);
+
+            const ed_image = remain_images > 0 && next_image_token !== -1 ? next_image_token : ids.length + 1;
+            const ed_video = remain_videos > 0 && next_video_token !== -1 ? next_video_token : ids.length + 1;
+
+            let ed;
+            let t, h, w;
+            if (ed_image < ed_video) {
+                [t, h, w] = image_grid_thw_list[state.image_index];
+                ++state.image_index;
+                --remain_images;
+                ed = ed_image;
+            } else {
+                [t, h, w] = video_grid_thw_list[state.video_index];
+                ++state.video_index;
+                --remain_videos;
+                ed = ed_video;
+            }
+
+            const [llm_grid_t, llm_grid_h, llm_grid_w] = [
+                Number(t),
+                Math.floor(Number(h) / spatial_merge_size),
+                Math.floor(Number(w) / spatial_merge_size),
+            ];
+            const text_len = ed - st;
+            const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
+
+            llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
+
+            const offset = text_len + st_idx;
+            const grid_size = llm_grid_t * llm_grid_h * llm_grid_w;
+            const t_index = Array.from(
+                { length: grid_size },
+                (_, i) => offset + Math.floor(i / (llm_grid_h * llm_grid_w)),
+            );
+            const h_index = Array.from(
+                { length: grid_size },
+                (_, i) => offset + (Math.floor(i / llm_grid_w) % llm_grid_h),
+            );
+            const w_index = Array.from({ length: grid_size }, (_, i) => offset + (i % llm_grid_w));
+
+            llm_pos_ids_list.push([t_index, h_index, w_index].flat());
+
+            st = ed + grid_size;
+        }
+
+        if (st < ids.length) {
+            const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
+            const text_len = ids.length - st;
+
+            llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
+        }
+
+        return llm_pos_ids_list;
+    }
+
+    /**
      * Calculate the 3D rope index based on image and video's temporal, height and width in LLM.
      *
      * Explanation:
@@ -118,107 +212,40 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
      * @param {Tensor} input_ids Indices of input sequence tokens in the vocabulary. Tensor of shape `(batch_size, sequence_length)`.
      * @param {Tensor} image_grid_thw (Optional) The temporal, height and width of feature shape of each image in LLM. Tensor of shape `(num_images, 3)`.
      * @param {Tensor} video_grid_thw (Optional) The temporal, height and width of feature shape of each video in LLM. Tensor of shape `(num_videos, 3)`.
-     * @param {Tensor} attention_mask (Optional) Mask to avoid performing attention on padding token indices. Tensor of shape `(batch_size, sequence_length)`. Mask values selected in `[0, 1]`:
-     * - 1 for tokens that are **not masked**,
-     * - 0 for tokens that are **masked**.
-     * @returns {[Tensor, Tensor]} [position_ids, mrope_position_deltas] with:
-     * - position_ids: Tensor of shape `(3, batch_size, sequence_length)`.
-     * - mrope_position_deltas: Tensor of shape `(batch_size)`.
+     * @param {Tensor} attention_mask (Optional) Mask to avoid performing attention on padding token indices. Tensor of shape `(batch_size, sequence_length)`.
+     * @returns {[Tensor, Tensor]} [position_ids, mrope_position_deltas]
      */
     get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask) {
         // @ts-ignore
-        const { vision_config, image_token_id, video_token_id, vision_start_token_id } = this.config;
+        const { vision_config } = this.config;
         const spatial_merge_size = vision_config.spatial_merge_size ?? 2;
 
-        const mrope_position_deltas = [];
         if (image_grid_thw || video_grid_thw) {
-            let total_input_ids = input_ids.tolist();
+            const total_input_ids = input_ids.tolist();
             if (!attention_mask) {
                 attention_mask = ones_like(input_ids);
             }
 
             const attention_mask_list = attention_mask.tolist();
-            const position_ids_list = Array.from({ length: 3 }, (_) =>
-                Array.from({ length: input_ids.dims[0] }, (_) => Array.from({ length: input_ids.dims[1] }, (_) => 1)),
+            const position_ids_list = Array.from({ length: 3 }, () =>
+                Array.from({ length: input_ids.dims[0] }, () => Array.from({ length: input_ids.dims[1] }, () => 0)),
             );
 
             const image_grid_thw_list = image_grid_thw ? image_grid_thw.tolist() : [];
             const video_grid_thw_list = video_grid_thw ? video_grid_thw.tolist() : [];
+            const state = { image_index: 0, video_index: 0 };
 
-            let image_index = 0;
-            let video_index = 0;
+            const mrope_position_deltas = [];
             for (let i = 0; i < total_input_ids.length; ++i) {
-                const ids = total_input_ids[i].filter((_, j) => attention_mask_list[i][j] == 1);
+                const filtered_ids = total_input_ids[i].filter((_, j) => attention_mask_list[i][j] == 1);
 
-                const vision_start_indices = ids.reduce((acc, x, idx) => {
-                    if (x == vision_start_token_id) acc.push(idx);
-                    return acc;
-                }, []);
-
-                const vision_tokens = vision_start_indices.map((x) => ids[x + 1]);
-                const image_nums = vision_tokens.filter((x) => x == image_token_id).length;
-                const video_nums = vision_tokens.filter((x) => x == video_token_id).length;
-
-                /** @type {number[][]} */
-                let llm_pos_ids_list = [];
-                let st = 0;
-                let remain_images = image_nums;
-                let remain_videos = video_nums;
-                for (let j = 0; j < vision_tokens.length; ++j) {
-                    const next_image_token = ids.findIndex((x, i) => i > st && x == image_token_id);
-                    const next_video_token = ids.findIndex((x, i) => i > st && x == video_token_id);
-
-                    const ed_image = remain_images > 0 && next_image_token !== -1 ? next_image_token : ids.length + 1;
-
-                    const ed_video = remain_videos > 0 && next_video_token !== -1 ? next_video_token : ids.length + 1;
-
-                    let ed;
-                    let t, h, w;
-                    if (ed_image < ed_video) {
-                        [t, h, w] = image_grid_thw_list[image_index];
-                        ++image_index;
-                        --remain_images;
-                        ed = ed_image;
-                    } else {
-                        [t, h, w] = video_grid_thw_list[video_index];
-                        ++video_index;
-                        --remain_videos;
-                        ed = ed_video;
-                    }
-
-                    const [llm_grid_t, llm_grid_h, llm_grid_w] = [
-                        Number(t),
-                        Math.floor(Number(h) / spatial_merge_size),
-                        Math.floor(Number(w) / spatial_merge_size),
-                    ];
-                    const text_len = ed - st;
-                    const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
-
-                    llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
-
-                    const offset = text_len + st_idx;
-                    const grid_size = llm_grid_t * llm_grid_h * llm_grid_w;
-                    const t_index = Array.from(
-                        { length: grid_size },
-                        (_, i) => offset + Math.floor(i / (llm_grid_h * llm_grid_w)),
-                    );
-                    const h_index = Array.from(
-                        { length: grid_size },
-                        (_, i) => offset + (Math.floor(i / llm_grid_w) % llm_grid_h),
-                    );
-                    const w_index = Array.from({ length: grid_size }, (_, i) => offset + (i % llm_grid_w));
-
-                    llm_pos_ids_list.push([t_index, h_index, w_index].flat());
-
-                    st = ed + grid_size;
-                }
-
-                if (st < ids.length) {
-                    const st_idx = llm_pos_ids_list.length > 0 ? max(llm_pos_ids_list.at(-1))[0] + 1 : 0;
-                    const text_len = ids.length - st;
-
-                    llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => st_idx + (i % text_len)));
-                }
+                const llm_pos_ids_list = this._get_multimodal_rope_positions({
+                    filtered_ids,
+                    image_grid_thw_list,
+                    video_grid_thw_list,
+                    spatial_merge_size,
+                    state,
+                });
 
                 const llm_positions = this._reorder_and_write_positions(
                     llm_pos_ids_list,
@@ -227,8 +254,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                     i,
                 );
 
-                const max_llm_positions = max(llm_positions)[0];
-                mrope_position_deltas.push(max_llm_positions + 1 - total_input_ids[i].length);
+                mrope_position_deltas.push(max(llm_positions)[0] + 1 - total_input_ids[i].length);
             }
 
             return [

@@ -1,6 +1,4 @@
 import { Qwen2_5_VLForConditionalGeneration } from '../qwen2_5_vl/modeling_qwen2_5_vl.js';
-import { Tensor, ones_like } from '../../utils/tensor.js';
-import { max } from '../../utils/maths.js';
 
 export class GlmOcrForConditionalGeneration extends Qwen2_5_VLForConditionalGeneration {
     /**
@@ -33,79 +31,48 @@ export class GlmOcrForConditionalGeneration extends Qwen2_5_VLForConditionalGene
      * instead of vision_start_token_id scanning used by Qwen2VL.
      * After a vision segment, position advances by max(h, w) / spatial_merge_size.
      */
-    get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask) {
+    _get_multimodal_rope_positions({
+        filtered_ids,
+        image_grid_thw_list,
+        video_grid_thw_list,
+        spatial_merge_size,
+        state,
+    }) {
         // @ts-ignore
-        const { vision_config, image_token_id } = this.config;
-        const spatial_merge_size = vision_config.spatial_merge_size ?? 2;
+        const { image_token_id } = this.config;
 
-        const mrope_position_deltas = [];
-        if (image_grid_thw || video_grid_thw) {
-            const total_input_ids = input_ids.tolist();
-            if (!attention_mask) {
-                attention_mask = ones_like(input_ids);
+        // Build modality groups: 0=text, 1=image (by image_token_id)
+        const groups = [];
+        let group_start = 0;
+        let current_type = filtered_ids[0] == image_token_id ? 1 : 0;
+        for (let j = 1; j <= filtered_ids.length; ++j) {
+            const t = j < filtered_ids.length ? (filtered_ids[j] == image_token_id ? 1 : 0) : -1;
+            if (t !== current_type) {
+                groups.push([current_type, group_start, j]);
+                group_start = j;
+                current_type = t;
             }
-            const attention_mask_list = attention_mask.tolist();
-            const position_ids_list = Array.from({ length: 3 }, () =>
-                Array.from({ length: input_ids.dims[0] }, () => Array.from({ length: input_ids.dims[1] }, () => 0)),
-            );
-            const image_grid_thw_list = image_grid_thw ? image_grid_thw.tolist() : [];
-
-            let image_index = 0;
-            for (let batch_idx = 0; batch_idx < total_input_ids.length; ++batch_idx) {
-                const ids = total_input_ids[batch_idx];
-                const attn_mask = attention_mask_list[batch_idx];
-                const filtered_ids = ids.filter((_, j) => attn_mask[j] == 1);
-
-                // Build modality groups: 0=text, 1=image (by image_token_id)
-                const groups = [];
-                let group_start = 0;
-                let current_type = filtered_ids[0] == image_token_id ? 1 : 0;
-                for (let j = 1; j <= filtered_ids.length; ++j) {
-                    const t = j < filtered_ids.length ? (filtered_ids[j] == image_token_id ? 1 : 0) : -1;
-                    if (t !== current_type) {
-                        groups.push([current_type, group_start, j]);
-                        group_start = j;
-                        current_type = t;
-                    }
-                }
-
-                let current_pos = 0;
-                /** @type {number[][]} */
-                const llm_pos_ids_list = [];
-
-                for (const [modality_type, start_idx, end_idx] of groups) {
-                    if (modality_type === 0) {
-                        const text_len = end_idx - start_idx;
-                        llm_pos_ids_list.push(
-                            Array.from({ length: 3 * text_len }, (_, i) => current_pos + (i % text_len)),
-                        );
-                        current_pos += text_len;
-                    } else {
-                        const grid_thw = image_grid_thw_list[image_index++].map(Number);
-                        const temp_merge_size = grid_thw[0];
-                        llm_pos_ids_list.push(
-                            this.get_vision_position_ids(current_pos, grid_thw, temp_merge_size, spatial_merge_size),
-                        );
-                        current_pos += Math.max(grid_thw[1], grid_thw[2]) / spatial_merge_size;
-                    }
-                }
-
-                const llm_positions = this._reorder_and_write_positions(
-                    llm_pos_ids_list,
-                    attn_mask,
-                    position_ids_list,
-                    batch_idx,
-                );
-
-                mrope_position_deltas.push(max(llm_positions)[0] + 1 - total_input_ids[batch_idx].length);
-            }
-
-            return [
-                new Tensor('int64', position_ids_list.flat(Infinity), [3, input_ids.dims[0], input_ids.dims[1]]),
-                new Tensor('int64', mrope_position_deltas, [mrope_position_deltas.length, 1]),
-            ];
-        } else {
-            return this._get_text_only_rope_index(input_ids, attention_mask);
         }
+
+        let current_pos = 0;
+        /** @type {number[][]} */
+        const llm_pos_ids_list = [];
+
+        for (const [modality_type, start_idx, end_idx] of groups) {
+            if (modality_type === 0) {
+                const text_len = end_idx - start_idx;
+                llm_pos_ids_list.push(Array.from({ length: 3 * text_len }, (_, i) => current_pos + (i % text_len)));
+                current_pos += text_len;
+            } else {
+                const grid_thw = image_grid_thw_list[state.image_index++].map(Number);
+                const temp_merge_size = grid_thw[0];
+                llm_pos_ids_list.push(
+                    this.get_vision_position_ids(current_pos, grid_thw, temp_merge_size, spatial_merge_size),
+                );
+                current_pos += Math.max(grid_thw[1], grid_thw[2]) / spatial_merge_size;
+            }
+        }
+
+        return llm_pos_ids_list;
     }
 }
