@@ -326,66 +326,29 @@ export function getCacheShapes(config, options) {
             }
         }
         return cache_values;
-    } else if (config.model_type === 'nemotron_h') {
+    } else if (['granitemoehybrid', 'falcon_h1', 'nemotron_h'].includes(config.model_type)) {
         const pkv_prefix = options?.prefix ?? 'past_key_values';
         const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+
+        const c = /** @type {any} */ (config);
+
+        // Normalize config field names across model types
+        const layer_types = c.layer_types ?? c.layers_block_type;
+        const num_layers = c.num_hidden_layers ?? layer_types?.length;
+        const num_key_value_heads = c.num_key_value_heads;
+        const head_dim = c.head_dim ?? c.hidden_size / c.num_attention_heads;
+        const mamba_n_heads = c.mamba_n_heads ?? c.mamba_num_heads;
+        const mamba_d_head = c.mamba_d_head ?? c.mamba_head_dim;
+        const mamba_d_state = c.mamba_d_state ?? c.ssm_state_size;
+        const mamba_n_groups = c.mamba_n_groups ?? c.n_groups;
+        const mamba_d_conv = c.mamba_d_conv ?? c.conv_kernel;
+        const mamba_d_ssm = c.mamba_d_ssm ?? (c.mamba_expand ? c.mamba_expand * c.hidden_size : mamba_n_heads * mamba_d_head);
+        const conv_d_inner = mamba_d_ssm + 2 * mamba_n_groups * mamba_d_state;
 
         /** @type {Record<string, number[]>} */
         const cache_values = {};
 
-        const {
-            layers_block_type,
-            num_attention_heads,
-            num_key_value_heads,
-            hidden_size,
-            head_dim,
-            conv_kernel,
-            mamba_num_heads,
-            mamba_head_dim,
-            ssm_state_size,
-            n_groups,
-        } = /** @type {any} */ (config);
-        const final_head_dim = head_dim ?? hidden_size / num_attention_heads;
-
-        const intermediate_size = mamba_num_heads * mamba_head_dim;
-        const conv_d_inner = intermediate_size + 2 * n_groups * ssm_state_size;
-        for (let i = 0; i < layers_block_type.length; ++i) {
-            if (layers_block_type[i] === 'mamba') {
-                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, conv_kernel];
-                cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_num_heads, mamba_head_dim, ssm_state_size];
-            } else if (layers_block_type[i] === 'attention') {
-                for (const kv of ['key', 'value']) {
-                    cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, final_head_dim];
-                }
-            }
-            // mlp layers have no cache, skip them
-        }
-        return cache_values;
-    } else if (['granitemoehybrid', 'falcon_h1'].includes(config.model_type)) {
-        const pkv_prefix = options?.prefix ?? 'past_key_values';
-        const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
-
-        /** @type {Record<string, number[]>} */
-        const cache_values = {};
-
-        const {
-            layer_types,
-            num_hidden_layers,
-            num_attention_heads,
-            num_key_value_heads,
-            hidden_size,
-            mamba_d_conv,
-            mamba_n_heads,
-            mamba_d_head,
-            mamba_d_state,
-            mamba_n_groups,
-            mamba_expand,
-            mamba_d_ssm,
-        } = /** @type {any} */ (config);
-        const head_dim = hidden_size / num_attention_heads;
-
-        const conv_d_inner = (mamba_d_ssm ?? mamba_expand * hidden_size) + 2 * mamba_n_groups * mamba_d_state;
-        for (let i = 0; i < num_hidden_layers; ++i) {
+        for (let i = 0; i < num_layers; ++i) {
             if (!layer_types || layer_types[i] === 'mamba') {
                 cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, mamba_d_conv];
                 cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_n_heads, mamba_d_head, mamba_d_state];
