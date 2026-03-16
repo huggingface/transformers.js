@@ -11,6 +11,7 @@ import * as ALL_MODEL_FILES from './models.js';
 
 const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['bert', 'BertModel'],
+    ['eurobert', 'EuroBertModel'],
     ['neobert', 'NeoBertModel'],
     ['modernbert', 'ModernBertModel'],
     ['nomic_bert', 'NomicBertModel'],
@@ -191,6 +192,7 @@ const MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['bert', 'BertForSequenceClassification'],
+    ['eurobert', 'EuroBertForSequenceClassification'],
     ['neobert', 'NeoBertForSequenceClassification'],
     ['modernbert', 'ModernBertForSequenceClassification'],
     ['roformer', 'RoFormerForSequenceClassification'],
@@ -214,6 +216,7 @@ const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['bert', 'BertForTokenClassification'],
+    ['eurobert', 'EuroBertForTokenClassification'],
     ['neobert', 'NeoBertForTokenClassification'],
     ['modernbert', 'ModernBertForTokenClassification'],
     ['roformer', 'RoFormerForTokenClassification'],
@@ -317,6 +320,7 @@ const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([['multi_modality', 'Multi
 
 const MODEL_FOR_MASKED_LM_MAPPING_NAMES = new Map([
     ['bert', 'BertForMaskedLM'],
+    ['eurobert', 'EuroBertForMaskedLM'],
     ['neobert', 'NeoBertForMaskedLM'],
     ['modernbert', 'ModernBertForMaskedLM'],
     ['roformer', 'RoFormerForMaskedLM'],

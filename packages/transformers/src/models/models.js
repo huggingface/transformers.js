@@ -41,6 +41,7 @@ export * from './efficientnet/modeling_efficientnet.js';
 export * from './electra/modeling_electra.js';
 export * from './ernie4_5/modeling_ernie4_5.js';
 export * from './esm/modeling_esm.js';
+export * from './eurobert/modeling_eurobert.js';
 export * from './exaone/modeling_exaone.js';
 export * from './falcon/modeling_falcon.js';
 export * from './falcon_h1/modeling_falcon_h1.js';
