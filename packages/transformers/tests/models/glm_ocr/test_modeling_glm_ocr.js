@@ -26,7 +26,6 @@ export default () => {
       processor = await Glm46VProcessor.from_pretrained(model_id);
     }, MAX_MODEL_LOAD_TIME);
 
-    // TODO: Update expected values after running tests
     it(
       "forward",
       async () => {
