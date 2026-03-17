@@ -604,6 +604,7 @@ export class ImageProcessor extends Callable {
         if (
             this.do_pad &&
             !this.pad_size &&
+            !this.size_divisibility &&
             this.size &&
             this.size.width !== undefined &&
             this.size.height !== undefined
@@ -1007,10 +1008,8 @@ export class ImageProcessor extends Callable {
                 const padded = this.pad_image(pixelData, [image.height, image.width, image.channels], this.pad_size);
                 [pixelData, imgDims] = padded; // Update pixel data and image dimensions
             } else if (this.size_divisibility) {
-                const [paddedWidth, paddedHeight] = enforce_size_divisibility(
-                    [imgDims[1], imgDims[0]],
-                    this.size_divisibility,
-                );
+                const paddedWidth = Math.ceil(imgDims[1] / this.size_divisibility) * this.size_divisibility;
+                const paddedHeight = Math.ceil(imgDims[0] / this.size_divisibility) * this.size_divisibility;
                 [pixelData, imgDims] = this.pad_image(pixelData, imgDims, { width: paddedWidth, height: paddedHeight });
             }
         }

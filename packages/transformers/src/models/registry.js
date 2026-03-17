@@ -517,6 +517,7 @@ const MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING_NAMES = new Map([
 const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([['swin2sr', 'Swin2SRForImageSuperResolution']]);
 
 const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
+    ['chmv2', 'CHMv2ForDepthEstimation'],
     ['dpt', 'DPTForDepthEstimation'],
     ['depth_anything', 'DepthAnythingForDepthEstimation'],
     ['glpn', 'GLPNForDepthEstimation'],

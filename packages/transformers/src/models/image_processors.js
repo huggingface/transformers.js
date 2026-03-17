@@ -1,6 +1,7 @@
 export * from './beit/image_processing_beit.js';
 export * from './bit/image_processing_bit.js';
 export * from './chinese_clip/image_processing_chinese_clip.js';
+export * from './chmv2/image_processing_chmv2.js';
 export * from './clip/image_processing_clip.js';
 export * from './convnext/image_processing_convnext.js';
 export * from './deit/image_processing_deit.js';

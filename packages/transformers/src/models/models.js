@@ -12,6 +12,7 @@ export * from './bloom/modeling_bloom.js';
 export * from './camembert/modeling_camembert.js';
 export * from './chatterbox/modeling_chatterbox.js';
 export * from './chinese_clip/modeling_chinese_clip.js';
+export * from './chmv2/modeling_chmv2.js';
 export * from './clap/modeling_clap.js';
 export * from './clip/modeling_clip.js';
 export * from './clipseg/modeling_clipseg.js';
