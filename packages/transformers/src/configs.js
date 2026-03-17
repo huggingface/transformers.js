@@ -158,6 +158,7 @@ function getNormalizedConfig(config) {
             mapping['dim_kv'] = 'head_dim';
             break;
         case 'qwen3':
+        case 'solar_open':
         case 'glm_ocr_text':
         case 'gemma':
         case 'gemma2':
