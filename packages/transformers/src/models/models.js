@@ -24,6 +24,7 @@ export * from './convnextv2/modeling_convnextv2.js';
 export * from './d_fine/modeling_d_fine.js';
 export * from './dac/modeling_dac.js';
 export * from './deberta/modeling_deberta.js';
+export * from './deepseek_v3/modeling_deepseek_v3.js';
 export * from './deberta_v2/modeling_deberta_v2.js';
 export * from './decision_transformer/modeling_decision_transformer.js';
 export * from './deit/modeling_deit.js';

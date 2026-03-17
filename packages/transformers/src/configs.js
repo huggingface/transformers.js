@@ -204,6 +204,7 @@ function getNormalizedConfig(config) {
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
         case 'youtu':
+        case 'deepseek_v3':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['dim_kv'] = 'qk_head_dim';
