@@ -205,6 +205,7 @@ function getNormalizedConfig(config) {
             break;
         case 'youtu':
         case 'deepseek_v3':
+        case 'glm_moe_dsa':
         case 'mistral4':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';

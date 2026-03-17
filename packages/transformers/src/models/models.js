@@ -53,6 +53,7 @@ export * from './gemma2/modeling_gemma2.js';
 export * from './gemma3/modeling_gemma3.js';
 export * from './gemma3n/modeling_gemma3n.js';
 export * from './glm/modeling_glm.js';
+export * from './glm_moe_dsa/modeling_glm_moe_dsa.js';
 export * from './glm_ocr/modeling_glm_ocr.js';
 export * from './glpn/modeling_glpn.js';
 export * from './gpt_bigcode/modeling_gpt_bigcode.js';
