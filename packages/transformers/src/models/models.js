@@ -92,6 +92,7 @@ export * from './metric3dv2/modeling_metric3dv2.js';
 export * from './mgp_str/modeling_mgp_str.js';
 export * from './mimi/modeling_mimi.js';
 export * from './mistral/modeling_mistral.js';
+export * from './mistral4/modeling_mistral4.js';
 export * from './mobilebert/modeling_mobilebert.js';
 export * from './mobilellm/modeling_mobilellm.js';
 export * from './mobilenet_v1/modeling_mobilenet_v1.js';
