@@ -2,7 +2,7 @@ export * from './albert/modeling_albert.js';
 export * from './apertus/modeling_apertus.js';
 export * from './afmoe/modeling_afmoe.js';
 export * from './arcee/modeling_arcee.js';
-export * from './ast/modeling_ast.js';
+export * from './audio_spectrogram_transformer/modeling_audio_spectrogram_transformer.js';
 export * from './bart/modeling_bart.js';
 export * from './beit/modeling_beit.js';
 export * from './bert/modeling_bert.js';
