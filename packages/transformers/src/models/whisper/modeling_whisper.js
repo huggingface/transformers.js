@@ -160,7 +160,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 outputs,
                 generation_config.alignment_heads,
                 generation_config.num_frames,
-                undefined,
+                0.02,
                 init_tokens.length,
             );
         }

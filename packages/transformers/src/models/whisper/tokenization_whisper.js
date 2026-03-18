@@ -199,6 +199,16 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                                     resolved_token_timestamps,
                                     last_language,
                                 );
+
+                                // Cap word end timestamps to the chunk's end timestamp,
+                                // but only if it wouldn't create an inverted range (end < start)
+                                if (chunk.words.length > 0 && chunk.timestamp[1] !== null) {
+                                    for (const word of chunk.words) {
+                                        if (word.timestamp[1] > chunk.timestamp[1] && chunk.timestamp[1] >= word.timestamp[0]) {
+                                            word.timestamp[1] = chunk.timestamp[1];
+                                        }
+                                    }
+                                }
                             }
 
                             chunks.push(chunk);
