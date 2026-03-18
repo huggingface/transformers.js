@@ -204,7 +204,10 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                                 // but only if it wouldn't create an inverted range (end < start)
                                 if (chunk.words.length > 0 && chunk.timestamp[1] !== null) {
                                     for (const word of chunk.words) {
-                                        if (word.timestamp[1] > chunk.timestamp[1] && chunk.timestamp[1] >= word.timestamp[0]) {
+                                        if (
+                                            word.timestamp[1] > chunk.timestamp[1] &&
+                                            chunk.timestamp[1] >= word.timestamp[0]
+                                        ) {
                                             word.timestamp[1] = chunk.timestamp[1];
                                         }
                                     }
