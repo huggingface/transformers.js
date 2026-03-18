@@ -309,7 +309,7 @@ export default () => {
             { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
             { timestamp: [23.6, 27.02], text: " I mean, like I said, we're going through that." },
             { timestamp: [27.02, 29.18], text: " We're losing stars." },
-            { timestamp: [29.18, null], text: " And then we kind of..." },
+            { timestamp: [29.18, 30], text: " And then we kind of..." },
           ],
         };
 
