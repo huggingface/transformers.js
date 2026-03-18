@@ -39,11 +39,8 @@ export default () => {
           async () => {
             const output = await pipe(audios[0], { return_timestamps: true, max_new_tokens });
             const target = {
-              text: " riceUR",
-              chunks: [
-                { timestamp: [0.72, 17.72], text: " rice" },
-                { timestamp: [17.72, null], text: "UR" },
-              ],
+              text: "�를 ис",
+              chunks: [{ timestamp: [28.96, null], text: "�를 ис" }],
             };
             expect(output).toBeCloseToNested(target, 5);
           },
@@ -169,6 +166,93 @@ export default () => {
               text: " I have a dream. Good one day. This nation will rise up. Live out the true meaning of its dream.",
             };
             expect(output).toEqual(target);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
+      });
+
+      afterAll(async () => {
+        await pipe?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
+    describe("whisper (en-only)", () => {
+      const model_id = "onnx-community/whisper-tiny.en_timestamped";
+
+      /** @type {AutomaticSpeechRecognitionPipeline} */
+      let pipe;
+      /** @type {Float64Array} */
+      let audio;
+      beforeAll(async () => {
+        pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+        audio = await load_cached_audio("mlk");
+      }, MAX_MODEL_LOAD_TIME);
+
+      it("should be an instance of AutomaticSpeechRecognitionPipeline", () => {
+        expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
+      });
+
+      describe("batch_size=1", () => {
+        it(
+          "default",
+          async () => {
+            const output = await pipe(audio);
+            const target = {
+              text: " I have a dream that one day this nation will rise up live out the true meaning of its creed",
+            };
+            expect(output).toEqual(target);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
+        it(
+          "transcribe w/ return_timestamps=true",
+          async () => {
+            const output = await pipe(audio, { return_timestamps: true });
+            const target = {
+              text: " I have a dream that one day this nation will rise up and live out the true meaning of its creed.",
+              chunks: [
+                {
+                  timestamp: [0, 11.14],
+                  text: " I have a dream that one day this nation will rise up and live out the true",
+                },
+                { timestamp: [11.14, 14.18], text: " meaning of its creed." },
+              ],
+            };
+            expect(output).toBeCloseToNested(target, 1);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
+        it(
+          "transcribe w/ return_timestamps='word'",
+          async () => {
+            const output = await pipe(audio, { return_timestamps: "word" });
+            const target = {
+              text: " I have a dream that one day this nation will rise up and live out the true meaning of its creed.",
+              chunks: [
+                { text: " I", timestamp: [1.4, 1.7] },
+                { text: " have", timestamp: [1.7, 1.88] },
+                { text: " a", timestamp: [1.88, 2.4] },
+                { text: " dream", timestamp: [2.4, 3.92] },
+                { text: " that", timestamp: [3.92, 4.22] },
+                { text: " one", timestamp: [4.22, 5.12] },
+                { text: " day", timestamp: [5.12, 6.66] },
+                { text: " this", timestamp: [6.66, 7.34] },
+                { text: " nation", timestamp: [7.34, 7.86] },
+                { text: " will", timestamp: [7.86, 8.34] },
+                { text: " rise", timestamp: [8.34, 9.9] },
+                { text: " up", timestamp: [9.9, 10.3] },
+                { text: " and", timestamp: [10.3, 10.6] },
+                { text: " live", timestamp: [10.6, 10.86] },
+                { text: " out", timestamp: [10.86, 11.04] },
+                { text: " the", timestamp: [11.04, 11.14] },
+                { text: " true", timestamp: [11.34, 11.38] },
+                { text: " meaning", timestamp: [11.62, 11.78] },
+                { text: " of", timestamp: [11.78, 12.12] },
+                { text: " its", timestamp: [12.12, 12.64] },
+                { text: " creed.", timestamp: [12.64, 13.6] },
+              ],
+            };
+            expect(output).toBeCloseToNested(target, 1);
           },
           MAX_TEST_EXECUTION_TIME,
         );
