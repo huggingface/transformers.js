@@ -203,6 +203,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         //   num_segment_frames = input_stride * max_source_positions = 3000 mel frames per segment
         // Timestamp token T maps to mel frame position T * input_stride
         const input_stride = 2;
+        // @ts-expect-error ts(2339)
         const max_source_positions = /** @type {number} */ (this.config.max_source_positions);
         const num_segment_frames = input_stride * max_source_positions;
 
@@ -240,13 +241,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 }
             }
 
-            const outputs = await super.generate({
+            const outputs = /** @type {any} */(await super.generate({
                 inputs: segment_features,
                 generation_config,
                 logits_processor,
                 decoder_input_ids: init_tokens,
                 ...kwargs,
-            });
+            }));
 
             // Extract tokens (skip init_tokens prefix)
             const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
