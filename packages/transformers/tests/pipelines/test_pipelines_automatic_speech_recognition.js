@@ -314,7 +314,7 @@ export default () => {
         };
 
         expect(output).toBeCloseToNested(target, 1);
-      });
+      }, MAX_TEST_EXECUTION_TIME);
 
       it(
         "transcribe w/ return_timestamps='word'",
