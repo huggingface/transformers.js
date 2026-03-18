@@ -146,15 +146,11 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             generation_config.return_dict_in_generate = true;
         }
 
-        // For timestamp mode (without word-level timestamps), use seek-based sequential generation.
+        // For timestamp mode, use seek-based sequential generation.
         // This matches Python's WhisperForConditionalGeneration.generate() which uses a seek loop
         // to handle audio that the model doesn't fully transcribe in a single pass.
         // Skip the seek loop when max_new_tokens is explicitly set (e.g., for prefix token tests).
-        if (
-            generation_config.return_timestamps &&
-            !generation_config.return_token_timestamps &&
-            !kwargs.max_new_tokens
-        ) {
+        if (generation_config.return_timestamps && !kwargs.max_new_tokens) {
             return this._generate_with_seek({
                 inputs,
                 generation_config,
@@ -197,6 +193,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         const eos_token_id = Array.isArray(generation_config.eos_token_id)
             ? generation_config.eos_token_id[0]
             : generation_config.eos_token_id;
+        const return_token_timestamps = generation_config.return_token_timestamps;
 
         // input_features shape: [batch=1, n_mels, total_frames]
         const input_features = inputs;
@@ -211,6 +208,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 
         let seek = 0;
         const allTokens = [];
+        const allTokenTimestamps = [];
 
         while (seek < total_frames) {
             // Slice input features for this segment
@@ -251,8 +249,23 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             });
 
             // Extract tokens (skip init_tokens prefix)
-            const sequence = /** @type {Tensor} */ (outputs)[0].tolist().map(Number);
-            const generated_tokens = sequence.slice(init_tokens.length);
+            const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
+            const generated_tokens = raw_sequence[0].tolist().map(Number).slice(init_tokens.length);
+
+            // Extract token-level timestamps for this seek pass if needed
+            let seek_token_timestamps;
+            if (return_token_timestamps) {
+                outputs['token_timestamps'] = this._extract_token_timestamps(
+                    outputs,
+                    generation_config.alignment_heads,
+                    Math.floor((seek_end - seek) / input_stride),
+                    0.02,
+                    init_tokens.length,
+                );
+                const time_offset = (seek / input_stride) * 0.02;
+                seek_token_timestamps = outputs.token_timestamps[0].tolist().slice(init_tokens.length)
+                    .map((/** @type {number} */ t) => t + time_offset);
+            }
 
             // Remove trailing EOS
             if (generated_tokens.length > 0 && generated_tokens[generated_tokens.length - 1] === eos_token_id) {
@@ -318,14 +331,28 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
 
             allTokens.push(...generated_tokens.slice(0, tokens_to_keep));
+            if (seek_token_timestamps) {
+                allTokenTimestamps.push(...seek_token_timestamps.slice(0, tokens_to_keep));
+            }
             seek += segment_offset;
         }
 
         // Add EOS back
         allTokens.push(eos_token_id);
 
-        // Reconstruct output in same format as super.generate()
+        // Reconstruct output
         const full_sequence = [...init_tokens, ...allTokens];
+        if (return_token_timestamps) {
+            // Return dict format with sequences and token_timestamps
+            const sequences = new Tensor('int64', full_sequence.map(BigInt), [1, full_sequence.length]);
+            // Pad token_timestamps to match full_sequence (init_tokens get 0.0)
+            const full_timestamps = [...new Array(init_tokens.length).fill(0), ...allTokenTimestamps, 0];
+            const token_timestamps = new Tensor('float32', new Float32Array(full_timestamps), [
+                1,
+                full_timestamps.length,
+            ]);
+            return { sequences, token_timestamps };
+        }
         return new Tensor('int64', full_sequence.map(BigInt), [1, full_sequence.length]);
     }
 
