@@ -735,7 +735,7 @@ export function window_function(window_length, name, { periodic = true, frame_le
     if (periodic) {
         window = window.subarray(0, window_length);
     }
-    if (frame_length === null) {
+    if (frame_length === null || window_length === frame_length) {
         return window;
     }
     if (window_length > frame_length) {
@@ -744,7 +744,10 @@ export function window_function(window_length, name, { periodic = true, frame_le
         );
     }
 
-    return window;
+    const padded = new Float64Array(frame_length);
+    const offset = center ? Math.floor((frame_length - window_length) / 2) : 0;
+    padded.set(window, offset);
+    return padded;
 }
 
 /**

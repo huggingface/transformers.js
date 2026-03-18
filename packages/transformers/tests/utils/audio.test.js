@@ -152,6 +152,30 @@ describe("Audio utilities", () => {
       expect(Array.from(spec.data.slice(0, 11))).toBeCloseToNested(expected, 4);
     });
 
+    it("should work with window_function frame_length zero-padding", async () => {
+      // Should zero-pad the window to length 16, matching Python behavior.
+      // See https://github.com/huggingface/transformers.js/issues/1387.
+      const waveform = new Float32Array(40);
+      waveform[9] = 1.0;
+
+      const win = window_function(12, "hann", { frame_length: 16 });
+      expect(win.length).toBe(16);
+
+      const numBins = 9;
+      const spec = await spectrogram(waveform, win, 16, 4, {
+        power: 1.0,
+        center: true,
+        pad_mode: "reflect",
+        onesided: true,
+        mel_filters: identityMelFilters(numBins),
+      });
+
+      expect(spec.dims).toEqual([9, 11]);
+
+      const expected = [0.0, 0.0669873, 0.9330127, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+      expect(Array.from(spec.data.slice(0, 11))).toBeCloseToNested(expected, 4);
+    });
+
     describe("shapes", () => {
       const waveform = generateDeterministicWaveform(93680);
 
