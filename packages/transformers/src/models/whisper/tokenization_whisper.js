@@ -434,7 +434,16 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
             }
             const [leftStart, leftStop, rightStart, rightStop] = maxIndices;
             const leftMid = Math.floor((leftStop + leftStart) / 2);
-            const rightMid = Math.floor((rightStop + rightStart) / 2);
+            let rightMid = Math.floor((rightStop + rightStart) / 2);
+
+            // When no overlap is found and we have timestamps, skip right-side tokens
+            // that precede the left's last timestamp to avoid backwards-jumping timestamps.
+            if (use_token_timestamp_sequences && max === 0.0 && leftLength > 0) {
+                const lastLeftTs = left_token_timestamp_sequence[leftLength - 1][0];
+                const idx = token_timestamp_sequences[i].findIndex((ts) => ts[0] >= lastLeftTs);
+                rightMid = idx === -1 ? rightSequence.length : idx;
+            }
+
             totalSequence.push(...leftSequence.slice(0, leftMid));
             leftSequence = rightSequence.slice(rightMid);
             leftLength = leftSequence.length;
