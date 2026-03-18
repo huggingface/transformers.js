@@ -271,9 +271,8 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
             // suppress <|notimestamps|> which is handled by without_timestamps
             batch_logits_data[this.no_timestamps_token_id] = -Infinity;
 
-            if (input_ids[i].length === this.begin_index - 1) {
-                batch_logits_data.fill(-Infinity);
-                batch_logits_data[this.timestamp_begin] = 0;
+            if (input_ids[i].length === this.begin_index) {
+                batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
                 continue;
             }
 
