@@ -1,16 +1,10 @@
 import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import {
-    MODEL_TYPES,
-    MODEL_TYPE_MAPPING,
-    MODEL_MAPPING_NAMES,
-    getSessionsConfig,
-} from '../../models/modeling_utils.js';
+import { getSessionsConfig } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
-import { GITHUB_ISSUE_URL } from '../constants.js';
-import { logger } from '../logger.js';
 import { memoizePromise } from '../memoize_promise.js';
+import { resolve_model_type } from './resolve_model_type.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -32,7 +26,10 @@ import { memoizePromise } from '../memoize_promise.js';
  * @param {string} [options.revision='main'] Git branch, tag, or commit SHA.
  * @returns {Promise<PretrainedConfig>}
  */
-function get_config(modelId, { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {}) {
+export function get_config(
+    modelId,
+    { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+) {
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
@@ -78,57 +75,7 @@ export async function get_model_files(
     let dtype = overrideDtype ?? custom_config.dtype;
 
     // Infer model type from config
-    let modelType;
-
-    // @ts-ignore - architectures is set via Object.assign in PretrainedConfig constructor
-    const architectures = /** @type {string[]} */ (config.architectures || []);
-
-    // Try to find a known architecture in MODEL_TYPE_MAPPING
-    // This ensures we use the same logic as from_pretrained()
-    let foundInMapping = false;
-    for (const arch of architectures) {
-        const mappedType = MODEL_TYPE_MAPPING.get(arch);
-        if (mappedType !== undefined) {
-            modelType = mappedType;
-            foundInMapping = true;
-            break;
-        }
-    }
-
-    // If not found by architecture, try model_type (handles custom models with no architectures)
-    if (!foundInMapping && config.model_type) {
-        const mappedType = MODEL_TYPE_MAPPING.get(config.model_type);
-        if (mappedType !== undefined) {
-            modelType = mappedType;
-            foundInMapping = true;
-        }
-
-        if (!foundInMapping) {
-            // As a last resort, map model_type based on MODEL_MAPPING_NAMES
-            for (const mapping of Object.values(MODEL_MAPPING_NAMES)) {
-                if (mapping.has(config.model_type)) {
-                    modelType = MODEL_TYPE_MAPPING.get(mapping.get(config.model_type));
-                    foundInMapping = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    // Fall back to EncoderOnly if not found in mapping
-    if (!foundInMapping) {
-        const archList = architectures.length > 0 ? architectures.join(', ') : '(none)';
-        logger.warn(
-            `[get_model_files] Architecture(s) not found in MODEL_TYPE_MAPPING: [${archList}] ` +
-                `for model type '${config.model_type}'. Falling back to EncoderOnly (single model.onnx file). ` +
-                `If you encounter issues, please report at: ${GITHUB_ISSUE_URL}`,
-        );
-
-        // Always fallback to EncoderOnly (single model.onnx file)
-        // Other model types (Vision2Seq, Musicgen, etc.) require specific file structures
-        // and should be properly registered in MODEL_TYPE_MAPPING if they are valid.
-        modelType = MODEL_TYPES.EncoderOnly;
-    }
+    const modelType = resolve_model_type(config);
 
     const add_model_file = (fileName, baseName = null) => {
         baseName = baseName ?? fileName;

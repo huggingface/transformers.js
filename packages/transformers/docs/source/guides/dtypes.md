@@ -38,6 +38,33 @@ const output = await generator(messages, { max_new_tokens: 128 });
 console.log(output[0].generated_text.at(-1).content);
 ```
 
+## Detecting available dtypes
+
+Not sure which quantizations a model offers? Use `ModelRegistry.get_available_dtypes()` to probe the repository and find out:
+
+```js
+import { ModelRegistry } from "@huggingface/transformers";
+
+const dtypes = await ModelRegistry.get_available_dtypes(
+  "onnx-community/all-MiniLM-L6-v2-ONNX",
+);
+console.log(dtypes); // e.g., [ 'fp32', 'fp16', 'int8', 'uint8', 'q8', 'q4' ]
+```
+
+This checks which ONNX files exist on the Hugging Face Hub for each dtype. For multi-session models (e.g., encoder-decoder), a dtype is only listed if **all** required session files are present.
+
+You can use this to build UIs that let users pick a quantization level, or to automatically select the smallest available dtype:
+
+```js
+const dtypes = await ModelRegistry.get_available_dtypes("onnx-community/Qwen3-0.6B-ONNX");
+
+// Pick the smallest available quantization, falling back to fp32
+const preferred = ["q4", "q8", "fp16", "fp32"];
+const dtype = preferred.find((d) => dtypes.includes(d)) ?? "fp32";
+
+const generator = await pipeline("text-generation", "onnx-community/Qwen3-0.6B-ONNX", { dtype });
+```
+
 ## Per-module dtypes
 
 Some encoder-decoder models, like Whisper or Florence-2, are extremely sensitive to quantization settings: especially of the encoder. For this reason, we added the ability to select per-module dtypes, which can be done by providing a mapping from module name to dtype.
