@@ -21,6 +21,7 @@ import {
     LogitsProcessorList,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
+    SuppressTokensLogitsProcessor,
     SuppressTokensAtBeginLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
@@ -547,9 +548,9 @@ export class PreTrainedModel extends Callable {
         //     ));
         // }
 
-        // if (generation_config.suppress_tokens !== null) {
-        //     processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
-        // }
+        if (generation_config.suppress_tokens !== null) {
+            processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
+        }
 
         if (generation_config.begin_suppress_tokens !== null) {
             const begin_index =
