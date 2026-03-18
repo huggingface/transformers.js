@@ -160,6 +160,8 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 outputs,
                 generation_config.alignment_heads,
                 generation_config.num_frames,
+                undefined,
+                init_tokens.length,
             );
         }
 
@@ -176,9 +178,16 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
      * @param {number[][]} alignment_heads Alignment heads of the model
      * @param {number} [num_frames=null] Number of frames in the input audio.
      * @param {number} [time_precision=0.02] Precision of the timestamps in seconds
+     * @param {number} [num_input_ids=0] Number of decoder input ids (prefix tokens) to skip in DTW
      * @returns {Tensor} tensor containing the timestamps in seconds for each predicted token
      */
-    _extract_token_timestamps(generate_outputs, alignment_heads, num_frames = null, time_precision = 0.02) {
+    _extract_token_timestamps(
+        generate_outputs,
+        alignment_heads,
+        num_frames = null,
+        time_precision = 0.02,
+        num_input_ids = 0,
+    ) {
         if (!generate_outputs.cross_attentions) {
             throw new Error(
                 'Model outputs must contain cross attentions to extract timestamps. ' +
@@ -253,8 +262,14 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
         }
 
+        // Skip decoder_input_ids in the cross-attention weights
+        const croppedWeights =
+            num_input_ids > 0
+                ? smoothedWeights.slice(null, null, [num_input_ids, smoothedWeights.dims[2]], null)
+                : smoothedWeights;
+
         // Average the different cross-attention heads.
-        const batchedMatrices = [mean(smoothedWeights, 1)];
+        const batchedMatrices = [mean(croppedWeights, 1)];
 
         const timestampsShape = generate_outputs.sequences.dims;
 
@@ -284,7 +299,15 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     jump_times.push(time_indices[i] * time_precision);
                 }
             }
-            timestamps[batch_idx].data.set(jump_times, 1);
+
+            // Pad with num_input_ids zeros at the start (for prefix tokens),
+            // then DTW jump_times, then duplicate last value (for eos token)
+            const padded = new Array(num_input_ids).fill(0);
+            padded.push(...jump_times);
+            if (jump_times.length > 0) {
+                padded.push(jump_times[jump_times.length - 1]);
+            }
+            timestamps[batch_idx].data.set(padded);
         }
 
         return timestamps;
