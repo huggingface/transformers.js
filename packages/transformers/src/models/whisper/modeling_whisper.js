@@ -146,6 +146,24 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             generation_config.return_dict_in_generate = true;
         }
 
+        // For timestamp mode (without word-level timestamps), use seek-based sequential generation.
+        // This matches Python's WhisperForConditionalGeneration.generate() which uses a seek loop
+        // to handle audio that the model doesn't fully transcribe in a single pass.
+        // Skip the seek loop when max_new_tokens is explicitly set (e.g., for prefix token tests).
+        if (
+            generation_config.return_timestamps &&
+            !generation_config.return_token_timestamps &&
+            !kwargs.max_new_tokens
+        ) {
+            return this._generate_with_seek({
+                inputs,
+                generation_config,
+                logits_processor,
+                init_tokens,
+                kwargs,
+            });
+        }
+
         const outputs = await super.generate({
             inputs,
             generation_config,
@@ -166,6 +184,149 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         }
 
         return outputs;
+    }
+
+    /**
+     * Generates with a seek loop for timestamp mode, re-encoding and generating
+     * for each segment until all audio frames are consumed.
+     * This matches Python's WhisperForConditionalGeneration.generate() behavior.
+     * @private
+     */
+    async _generate_with_seek({ inputs, generation_config, logits_processor, init_tokens, kwargs }) {
+        const timestamp_begin = generation_config.no_timestamps_token_id + 1;
+        const eos_token_id = Array.isArray(generation_config.eos_token_id)
+            ? generation_config.eos_token_id[0]
+            : generation_config.eos_token_id;
+
+        // input_features shape: [batch=1, n_mels, total_frames]
+        const input_features = inputs;
+        const total_frames = input_features.dims[2];
+
+        // The encoder downsamples by input_stride (=2 for whisper), so:
+        //   num_segment_frames = input_stride * max_source_positions = 3000 mel frames per segment
+        // Timestamp token T maps to mel frame position T * input_stride
+        const input_stride = 2;
+        const max_source_positions = /** @type {number} */ (this.config.max_source_positions);
+        const num_segment_frames = input_stride * max_source_positions;
+
+        let seek = 0;
+        const allTokens = [];
+
+        while (seek < total_frames) {
+            // Slice input features for this segment
+            const seek_end = Math.min(seek + num_segment_frames, total_frames);
+            const segment_input = input_features.slice(null, null, [seek, seek_end]);
+
+            // Pad to full segment size if needed (whisper expects fixed-length input)
+            let segment_features;
+            const segment_frames = segment_input.dims[2];
+            if (segment_frames < num_segment_frames) {
+                const n_mels = input_features.dims[1];
+                const padded_data = new Float32Array(n_mels * num_segment_frames);
+                const src = /** @type {Float32Array} */ (segment_input.data);
+                // Copy each mel band row separately to handle the stride difference
+                for (let m = 0; m < n_mels; ++m) {
+                    padded_data.set(src.subarray(m * segment_frames, (m + 1) * segment_frames), m * num_segment_frames);
+                }
+                segment_features = new Tensor('float32', padded_data, [1, n_mels, num_segment_frames]);
+            } else {
+                segment_features = segment_input;
+            }
+
+            // Reset logits processor begin_index for each segment
+            if (logits_processor) {
+                for (const proc of logits_processor) {
+                    if ('begin_index' in proc) {
+                        proc.begin_index = init_tokens.length;
+                    }
+                }
+            }
+
+            const outputs = await super.generate({
+                inputs: segment_features,
+                generation_config,
+                logits_processor,
+                decoder_input_ids: init_tokens,
+                ...kwargs,
+            });
+
+            // Extract tokens (skip init_tokens prefix)
+            const sequence = /** @type {Tensor} */ (outputs)[0].tolist().map(Number);
+            const generated_tokens = sequence.slice(init_tokens.length);
+
+            // Remove trailing EOS
+            if (generated_tokens.length > 0 && generated_tokens[generated_tokens.length - 1] === eos_token_id) {
+                generated_tokens.pop();
+            }
+
+            if (generated_tokens.length === 0) {
+                // No tokens generated — skip the rest of the audio
+                break;
+            }
+
+            // Determine seek advancement using the same logic as Python's _retrieve_segment:
+            // 1. Find consecutive timestamp token pairs (segment boundaries)
+            // 2. If the sequence ends with a single timestamp (no speech after it),
+            //    consume all remaining frames in this segment
+            // 3. Otherwise, seek to the last complete segment boundary
+            const is_timestamp = generated_tokens.map((t) => t >= timestamp_begin);
+
+            // Check for single_timestamp_ending: last token is timestamp, second-to-last is not
+            const single_timestamp_ending =
+                generated_tokens.length >= 2 &&
+                is_timestamp[generated_tokens.length - 1] &&
+                !is_timestamp[generated_tokens.length - 2];
+
+            // Find consecutive timestamp pairs (segment boundaries)
+            const segment_boundary_indices = [];
+            for (let i = 0; i < generated_tokens.length - 1; ++i) {
+                if (is_timestamp[i] && is_timestamp[i + 1]) {
+                    segment_boundary_indices.push(i + 1); // index of the second token in the pair
+                }
+            }
+
+            let segment_offset;
+            let tokens_to_keep = generated_tokens.length;
+            if (segment_boundary_indices.length > 0) {
+                if (single_timestamp_ending) {
+                    // Ends with a single timestamp after the last pair — no more speech
+                    segment_offset = seek_end - seek;
+                } else {
+                    // Ends mid-segment — seek to the last pair's end timestamp
+                    // Discard tokens after the last pair (they're from an incomplete segment)
+                    // Keep up to the first token of the last pair (the end-of-segment timestamp),
+                    // excluding the second token (the start-of-next-segment marker)
+                    const last_boundary = segment_boundary_indices[segment_boundary_indices.length - 1];
+                    const last_ts_pos = generated_tokens[last_boundary - 1] - timestamp_begin;
+                    segment_offset = last_ts_pos * input_stride;
+                    tokens_to_keep = last_boundary;
+                }
+            } else {
+                // No consecutive pairs found — consume entire segment
+                segment_offset = seek_end - seek;
+            }
+
+            // Offset timestamp tokens by the current seek position so they're
+            // monotonically increasing across segments. Cap at the maximum valid
+            // timestamp token (30.00s = 1500 positions) to stay within the token vocab.
+            const timestamp_offset = Math.floor(seek / input_stride);
+            const max_timestamp_token = timestamp_begin + 1500;
+            for (let i = 0; i < tokens_to_keep; ++i) {
+                if (generated_tokens[i] >= timestamp_begin) {
+                    generated_tokens[i] = Math.min(generated_tokens[i] + timestamp_offset, max_timestamp_token);
+                }
+            }
+
+            allTokens.push(...generated_tokens.slice(0, tokens_to_keep));
+            seek += segment_offset;
+        }
+
+        // Add EOS back
+        allTokens.push(eos_token_id);
+
+        // Reconstruct output in same format as super.generate()
+        const full_sequence = [...init_tokens, ...allTokens];
+        return new Tensor('int64', full_sequence.map(BigInt), [1, full_sequence.length]);
     }
 
     /**
