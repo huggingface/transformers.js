@@ -263,6 +263,60 @@ export default () => {
       }, MAX_MODEL_DISPOSE_TIME);
     });
 
+    describe("whisper (base)", () => {
+      const model_id = "onnx-community/whisper-base_timestamped";
+
+      /** @type {AutomaticSpeechRecognitionPipeline} */
+      let pipe;
+      /** @type {Float64Array} */
+      let audio;
+      beforeAll(async () => {
+        pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+        audio = await load_cached_audio("whisper_1");
+      }, MAX_MODEL_LOAD_TIME);
+
+      it("should be an instance of AutomaticSpeechRecognitionPipeline", () => {
+        expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
+      });
+
+      it("transcribe w/ return_timestamps='word'", async () => {
+        const output = await pipe(audio, {
+          return_timestamps: true,
+          chunk_length_s: 30,
+          stride_length_s: 5,
+          language: "en",
+        });
+        // Python output for reference:
+        // const target = {
+        //   text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
+        //   chunks: [
+        //     { timestamp: [0.0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
+        //     { timestamp: [5.36, 14.0], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
+        //     { timestamp: [14.0, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
+        //     { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
+        //     { timestamp: [24.24, 23.6], text: "" },
+        //     { timestamp: [27.02, 29.18], text: " I mean, like I said, we're going through that. We're losing stars." },
+        //     { timestamp: [29.18, 30.54], text: " And then we kind of..." },
+        //   ],
+        // };
+
+        const target = {
+          text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
+          chunks: [
+            { timestamp: [0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
+            { timestamp: [5.36, 14], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
+            { timestamp: [14, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
+            { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
+            { timestamp: [23.6, 27.02], text: " I mean, like I said, we're going through that." },
+            { timestamp: [27.02, 29.18], text: " We're losing stars." },
+            { timestamp: [29.18, null], text: " And then we kind of..." },
+          ],
+        };
+
+        expect(output).toBeCloseToNested(target, 1);
+      });
+    });
+
     describe("wav2vec2", () => {
       const model_id = "Xenova/tiny-random-Wav2Vec2ForCTC-ONNX";
       const SAMPLING_RATE = 16000;
