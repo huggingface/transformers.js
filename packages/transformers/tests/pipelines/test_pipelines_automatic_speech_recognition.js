@@ -279,7 +279,7 @@ export default () => {
         expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
       });
 
-      it("transcribe w/ return_timestamps='word'", async () => {
+      it("transcribe w/ return_timestamps=true", async () => {
         const output = await pipe(audio, {
           return_timestamps: true,
           chunk_length_s: 30,
@@ -315,6 +315,110 @@ export default () => {
 
         expect(output).toBeCloseToNested(target, 1);
       });
+
+      it(
+        "transcribe w/ return_timestamps='word'",
+        async () => {
+          // Regression test: word-level timestamps must include content from all seek
+          // passes, not just the first. Without the seek loop for return_token_timestamps,
+          // the text was truncated after "the episode." (~23.6s), missing the final ~7s.
+          const output = await pipe(audio, {
+            return_timestamps: "word",
+            chunk_length_s: 30,
+            stride_length_s: 5,
+            language: "en",
+          });
+
+          const target = {
+            text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
+            chunks: [
+              { text: " everyday", timestamp: [0.42, 0.82] },
+              { text: " style.", timestamp: [0.82, 1.3] },
+              { text: " True", timestamp: [1.56, 1.9] },
+              { text: " classic", timestamp: [1.9, 2.5] },
+              { text: " delivers", timestamp: [2.5, 3.02] },
+              { text: " premium", timestamp: [3.02, 3.54] },
+              { text: " essentials", timestamp: [3.54, 3.84] },
+              { text: " built", timestamp: [3.84, 4.08] },
+              { text: " for", timestamp: [4.08, 4.4] },
+              { text: " real", timestamp: [4.4, 4.8] },
+              { text: " life.", timestamp: [4.92, 5.46] },
+              { text: " Grab", timestamp: [5.64, 6.04] },
+              { text: " yours", timestamp: [6.04, 6.36] },
+              { text: " at", timestamp: [6.36, 6.84] },
+              { text: " Target,", timestamp: [6.84, 7.2] },
+              { text: " Costco,", timestamp: [7.7, 8.28] },
+              { text: " or", timestamp: [8.3, 8.5] },
+              { text: " head", timestamp: [8.5, 8.7] },
+              { text: " to", timestamp: [8.7, 8.92] },
+              { text: " TrueClassic", timestamp: [8.92, 9.68] },
+              { text: ".com", timestamp: [9.68, 10.78] },
+              { text: " slash", timestamp: [10.78, 11.3] },
+              { text: " P4P.", timestamp: [11.3, 12.86] },
+              { text: " Get", timestamp: [13.06, 13.3] },
+              { text: " hooked", timestamp: [13.3, 13.52] },
+              { text: " up", timestamp: [13.52, 13.92] },
+              { text: " today.", timestamp: [13.92, 14] },
+              { text: " Now", timestamp: [14.24, 14.46] },
+              { text: " before", timestamp: [14.46, 14.62] },
+              { text: " we", timestamp: [14.62, 14.82] },
+              { text: " go,", timestamp: [14.82, 15.06] },
+              { text: " just", timestamp: [15.24, 15.42] },
+              { text: " want", timestamp: [15.42, 15.48] },
+              { text: " to", timestamp: [15.48, 15.56] },
+              { text: " give", timestamp: [15.56, 15.68] },
+              { text: " a", timestamp: [15.68, 15.86] },
+              { text: " big", timestamp: [15.86, 16.1] },
+              { text: " shout", timestamp: [16.1, 16.28] },
+              { text: " out", timestamp: [16.28, 16.74] },
+              { text: " to", timestamp: [16.74, 16.9] },
+              { text: " the", timestamp: [16.9, 17.52] },
+              { text: " CEO", timestamp: [17.52, 17.86] },
+              { text: " and", timestamp: [17.86, 18.3] },
+              { text: " founder", timestamp: [18.3, 18.56] },
+              { text: " Ryan", timestamp: [18.6, 18.72] },
+              { text: " brother", timestamp: [18.86, 19.06] },
+              { text: " for", timestamp: [19.06, 19.2] },
+              { text: " coming", timestamp: [19.2, 19.36] },
+              { text: " on", timestamp: [19.36, 19.5] },
+              { text: " our", timestamp: [19.5, 19.74] },
+              { text: " show", timestamp: [19.74, 20.4] },
+              { text: " and", timestamp: [20.4, 20.6] },
+              { text: " just", timestamp: [20.6, 20.86] },
+              { text: " showing", timestamp: [20.86, 21.08] },
+              { text: " some", timestamp: [21.08, 21.26] },
+              { text: " love.", timestamp: [21.26, 21.48] },
+              { text: " Now", timestamp: [21.6, 22.3] },
+              { text: " let's", timestamp: [22.3, 22.46] },
+              { text: " get", timestamp: [22.46, 22.68] },
+              { text: " back", timestamp: [22.68, 23.06] },
+              { text: " to", timestamp: [23.06, 23.2] },
+              { text: " the", timestamp: [23.2, 23.56] },
+              { text: " episode.", timestamp: [23.56, 23.6] },
+              { text: " I", timestamp: [24.42, 24.6] },
+              { text: " mean,", timestamp: [24.6, 25.1] },
+              { text: " like", timestamp: [25.42, 25.54] },
+              { text: " I", timestamp: [25.54, 25.68] },
+              { text: " said,", timestamp: [25.68, 25.9] },
+              { text: " we're", timestamp: [25.9, 26.34] },
+              { text: " going", timestamp: [26.34, 26.58] },
+              { text: " through", timestamp: [26.58, 26.84] },
+              { text: " that.", timestamp: [26.84, 27] },
+              { text: " We're", timestamp: [27.24, 27.54] },
+              { text: " losing", timestamp: [27.54, 28.04] },
+              { text: " stars.", timestamp: [28.04, 28.96] },
+              { text: " And", timestamp: [29.3, 29.38] },
+              { text: " then", timestamp: [29.38, 29.58] },
+              { text: " we", timestamp: [29.58, 29.84] },
+              { text: " kind", timestamp: [29.84, 29.98] },
+              { text: " of", timestamp: [29.98, 29.98] },
+              { text: "...", timestamp: [29.98, 29.98] },
+            ],
+          };
+          expect(output).toBeCloseToNested(target, 1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("wav2vec2", () => {
