@@ -530,14 +530,13 @@ export async function spectrogram(
     }
 
     if (center) {
+        const padding = Math.floor(frame_length / 2);
         switch (pad_mode) {
             case 'reflect': {
-                const half_window = Math.floor((fft_length - 1) / 2) + 1;
-                waveform = padReflect(waveform, half_window, half_window);
+                waveform = padReflect(waveform, padding, padding);
                 break;
             }
             case 'constant': {
-                const padding = Math.floor(fft_length / 2);
                 // @ts-expect-error ts(2351)
                 const padded = new waveform.constructor(waveform.length + 2 * padding);
                 padded.set(waveform, padding);

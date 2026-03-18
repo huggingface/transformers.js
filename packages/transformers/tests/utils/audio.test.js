@@ -189,9 +189,7 @@ describe("Audio utilities", () => {
           onesided: true,
           mel_filters: identityMelFilters(numBins),
         });
-        // NOTE: Python gets (257, 732) because it pads using frame_length.
-        // JS pads using fft_length, which adds more padding, yielding one extra frame.
-        expect(spec.dims).toEqual([257, 733]);
+        expect(spec.dims).toEqual([257, 732]);
       });
 
       it("should produce correct shape with onesided=false and frame_length=512 (padded window)", async () => {
