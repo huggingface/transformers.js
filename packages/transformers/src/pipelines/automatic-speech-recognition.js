@@ -203,7 +203,7 @@ export class AutomaticSpeechRecognitionPipeline
 
         if (return_timestamps === 'word') {
             generation_config['return_token_timestamps'] = true;
-            generation_config['return_timestamps'] = false; // Do not predict timestamp tokens
+            generation_config['return_timestamps'] = true;
         }
 
         const single = !Array.isArray(audio);
@@ -274,11 +274,21 @@ export class AutomaticSpeechRecognitionPipeline
                 // TODO: Right now we only get top beam
                 if (return_timestamps === 'word') {
                     // @ts-expect-error TS2339
-                    chunk.tokens = data.sequences.tolist()[0];
+                    const sequences = data.sequences.tolist()[0];
                     // @ts-expect-error TS2339
-                    chunk.token_timestamps = data.token_timestamps
-                        .tolist()[0]
-                        .map((/** @type {number} */ x) => round(x, 2));
+                    const token_ts = data.token_timestamps.tolist()[0];
+
+                    // Strip decoder_input_ids prefix from sequences and token_timestamps
+                    // to match Python's behavior (where generate() returns sequences without the prefix)
+                    // @ts-expect-error ts(2339)
+                    const timestamp_begin = this.tokenizer.timestamp_begin;
+                    const prefixLength = Math.max(
+                        sequences.findIndex((/** @type {bigint} */ t) => Number(t) >= timestamp_begin),
+                        0,
+                    );
+
+                    chunk.tokens = sequences.slice(prefixLength);
+                    chunk.token_timestamps = token_ts.slice(prefixLength).map((/** @type {number} */ x) => round(x, 2));
                 } else {
                     chunk.tokens = /** @type {Tensor} */ (data)[0].tolist();
                 }

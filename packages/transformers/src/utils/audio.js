@@ -530,14 +530,13 @@ export async function spectrogram(
     }
 
     if (center) {
+        const padding = Math.floor(frame_length / 2);
         switch (pad_mode) {
             case 'reflect': {
-                const half_window = Math.floor((fft_length - 1) / 2) + 1;
-                waveform = padReflect(waveform, half_window, half_window);
+                waveform = padReflect(waveform, padding, padding);
                 break;
             }
             case 'constant': {
-                const padding = Math.floor(fft_length / 2);
                 // @ts-expect-error ts(2351)
                 const padded = new waveform.constructor(waveform.length + 2 * padding);
                 padded.set(waveform, padding);
@@ -736,7 +735,7 @@ export function window_function(window_length, name, { periodic = true, frame_le
     if (periodic) {
         window = window.subarray(0, window_length);
     }
-    if (frame_length === null) {
+    if (frame_length === null || window_length === frame_length) {
         return window;
     }
     if (window_length > frame_length) {
@@ -745,7 +744,10 @@ export function window_function(window_length, name, { periodic = true, frame_le
         );
     }
 
-    return window;
+    const padded = new Float64Array(frame_length);
+    const offset = center ? Math.floor((frame_length - window_length) / 2) : 0;
+    padded.set(window, offset);
+    return padded;
 }
 
 /**
