@@ -33,6 +33,7 @@ const HAS_SELF = typeof self !== 'undefined';
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
 const IS_WEB_CACHE_AVAILABLE = HAS_SELF && 'caches' in self;
+const IS_OPFS_AVAILABLE = typeof navigator !== 'undefined' && typeof navigator.storage?.getDirectory === 'function';
 
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
@@ -113,6 +114,9 @@ export const apis = Object.freeze({
 
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
+
+    /** Whether the Origin Private File System API is available */
+    IS_OPFS_AVAILABLE,
 
     /** Whether the WebGPU API is available */
     IS_WEBGPU_AVAILABLE,
@@ -215,6 +219,7 @@ export const LogLevel = Object.freeze({
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. Defaults to `/models/`.
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
+ * @property {boolean} useOPFSCache Whether to use the Origin Private File System (OPFS) to cache model files. Defaults to `false`.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
@@ -264,6 +269,7 @@ export const env = {
     useFS: IS_FS_AVAILABLE,
 
     /////////////////// Cache settings ///////////////////
+    useOPFSCache: false,
     useBrowserCache: IS_WEB_CACHE_AVAILABLE,
 
     useFSCache: IS_FS_AVAILABLE,
