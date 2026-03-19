@@ -134,6 +134,49 @@ export default () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 
+  describe("Text Generation (Gemma3 model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Gemma3ForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "hellohellohello" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "chat input (single)",
+      async () => {
+        const output = await pipe([{ role: "user", content: "hello" }], { max_new_tokens: 3, do_sample: false });
+        expect(output).toEqual([
+          {
+            generated_text: [
+              { role: "user", content: "hello" },
+              { role: "assistant", content: "\n\n\n" },
+            ],
+          },
+        ]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
   describe("Text Generation (Gemma3n model, text-only)", () => {
     const model_id = "onnx-internal-testing/tiny-random-Gemma3nForConditionalGeneration";
 
