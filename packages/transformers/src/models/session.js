@@ -115,8 +115,16 @@ async function getSession(
         session_options,
     );
 
-    if (externalData.length > 0 && !apis.IS_NODE_ENV) {
-        session_options.externalData = externalData;
+    if (externalData.length > 0) {
+        // In non-Node environments, always pass external data via session options.
+        // In Node.js with filesystem cache, the ONNX runtime locates external data
+        // files automatically relative to the model path, so we skip this.
+        // However, when using a custom cache (which returns Uint8Array instead of a
+        // file path), the ONNX runtime cannot find the files on disk, so we must
+        // supply the data in-memory via session_options.externalData.
+        if (!apis.IS_NODE_ENV || externalData.some(item => typeof item !== 'string')) {
+            session_options.externalData = externalData;
+        }
     }
 
     if (cache_config && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
