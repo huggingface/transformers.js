@@ -1,6 +1,6 @@
 name: "🔧 New pipeline addition"
 description: Submit a proposal/request to implement a new pipeline
-labels: [ "new pipeline" ]
+labels: ["new pipeline"]
 
 body:
   - type: textarea
@@ -17,7 +17,7 @@ body:
     attributes:
       label: Prerequisites
       description: |
-          Please note that Transformers.js relies on the pipeline first being supported in [🤗 Transformers](https://github.com/huggingface/transformers). If the pipeline you are requesting is not yet supported by Transformers, feel free to open up a feature request for it there too.
+        Please note that Transformers.js relies on the pipeline first being supported in [🤗 Transformers](https://github.com/huggingface/transformers). If the pipeline you are requesting is not yet supported by Transformers, feel free to open up a feature request for it there too.
       options:
         - label: "The pipeline is supported in Transformers (i.e., listed [here](https://huggingface.co/docs/transformers/main_classes/pipelines))"
         - label: "The task is listed [here](https://huggingface.co/tasks)"

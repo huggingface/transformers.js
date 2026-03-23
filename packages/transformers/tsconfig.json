@@ -1,0 +1,24 @@
+{
+  // Only include files in the src directory
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    // Tells the compiler to check JS files
+    "checkJs": true,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "outDir": "types",
+    "rootDir": "src",
+    "strict": false,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "esModuleInterop": true,
+    "composite": true
+  },
+  "typeAcquisition": {
+    "include": ["jest"]
+  }
+}

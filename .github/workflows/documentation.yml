@@ -12,8 +12,8 @@ jobs:
     with:
       commit_sha: ${{ github.sha }}
       package: transformers.js
-      path_to_docs: transformers.js/docs/source
-      pre_command: cd transformers.js && npm install && npm run docs-api
+      path_to_docs: transformers.js/packages/transformers/docs/source
+      pre_command: cd transformers.js && corepack enable && ONNXRUNTIME_NODE_INSTALL=skip pnpm install --frozen-lockfile && pnpm --filter @huggingface/transformers docs-api
       additional_args: --not_python_module
     secrets:
       hf_token: ${{ secrets.HF_DOC_BUILD_PUSH }}
