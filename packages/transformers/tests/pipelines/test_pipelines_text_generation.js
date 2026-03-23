@@ -120,6 +120,13 @@ export default () => {
       expect(pipe).toBeInstanceOf(TextGenerationPipeline);
     });
 
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
+    });
+
     it(
       "text input (single)",
       async () => {
@@ -145,6 +152,13 @@ export default () => {
 
     it("should be an instance of TextGenerationPipeline", () => {
       expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
     });
 
     it(
@@ -188,6 +202,13 @@ export default () => {
 
     it("should be an instance of TextGenerationPipeline", () => {
       expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
     });
 
     it(
