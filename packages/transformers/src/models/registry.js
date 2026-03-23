@@ -619,14 +619,6 @@ const CUSTOM_MAPPING = [
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
 
-    ['Qwen2VLForCausalLM', ALL_MODEL_FILES.Qwen2VLForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Qwen2_5_VLForCausalLM', ALL_MODEL_FILES.Qwen2_5_VLForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Qwen3VLForCausalLM', ALL_MODEL_FILES.Qwen3VLForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Qwen3VLMoeForCausalLM', ALL_MODEL_FILES.Qwen3VLMoeForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Qwen3_5ForCausalLM', ALL_MODEL_FILES.Qwen3_5ForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Qwen3_5MoeForCausalLM', ALL_MODEL_FILES.Qwen3_5MoeForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Gemma3nForCausalLM', ALL_MODEL_FILES.Gemma3nForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
-    ['Gemma3ForCausalLM', ALL_MODEL_FILES.Gemma3ForCausalLM, MODEL_TYPES.HybridMultiModalDecoderOnly],
 
     [
         'VoxtralRealtimeForConditionalGeneration',

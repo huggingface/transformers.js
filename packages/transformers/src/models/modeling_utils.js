@@ -99,8 +99,7 @@ export const MODEL_TYPES = {
     ImageAudioTextToText: 13,
     Supertonic: 14,
     Chatterbox: 15,
-    HybridMultiModalDecoderOnly: 16,
-    VoxtralRealtime: 17,
+    VoxtralRealtime: 16,
 };
 
 const MODEL_TYPE_CONFIG = {
@@ -158,12 +157,12 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: (config) => {
+        sessions: (config, options, textOnly) => {
             const s = {
                 embed_tokens: 'embed_tokens',
-                vision_encoder: 'vision_encoder',
                 decoder_model_merged: 'decoder_model_merged',
             };
+            if (!textOnly) s['vision_encoder'] = 'vision_encoder';
             if (config.is_encoder_decoder) s['model'] = 'encoder_model';
             return s;
         },
@@ -185,12 +184,17 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            vision_encoder: 'vision_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
+        sessions: (config, options, textOnly) => {
+            const s = {
+                embed_tokens: 'embed_tokens',
+                decoder_model_merged: 'decoder_model_merged',
+            };
+            if (!textOnly) {
+                s['audio_encoder'] = 'audio_encoder';
+                s['vision_encoder'] = 'vision_encoder';
+            }
+            return s;
+        },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {
@@ -241,23 +245,6 @@ const MODEL_TYPE_CONFIG = {
         cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
-    [MODEL_TYPES.HybridMultiModalDecoderOnly]: {
-        can_generate: true,
-        forward: (self, params) =>
-            self.config.architectures[0].endsWith('ForCausalLM')
-                ? decoder_forward(self, params)
-                : image_text_to_text_forward(self, params),
-        prepare_inputs: (self, ...args) =>
-            self.config.architectures[0].endsWith('ForCausalLM')
-                ? decoder_prepare_inputs_for_generation(self, ...args)
-                : multimodal_text_to_text_prepare_inputs_for_generation(self, ...args),
-        sessions: (config, options) =>
-            config.architectures[0].endsWith('ForCausalLM')
-                ? { model: options.model_file_name ?? 'model' }
-                : { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        cache_sessions: { model: true, decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
-    },
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
         prepare_inputs: decoder_prepare_inputs_for_generation,
@@ -292,6 +279,31 @@ export function getSessionsConfig(modelType, config, options = {}) {
     };
 }
 
+/**
+ * Resolves the model type config for a given class name and config.
+ * @param {string} modelName The name of the class being used to load.
+ * @param {Object} config The model config.
+ * @returns {{ typeConfig: Object, textOnly: boolean, modelType: number|undefined }}
+ */
+function resolveTypeConfig(modelName, config) {
+    let modelType = MODEL_TYPE_MAPPING.get(modelName);
+    let textOnly = false;
+
+    // Detect cross-architecture loading: e.g., ForCausalLM class loading a ForConditionalGeneration model.
+    // In this case, use the native architecture's type config (for forward/sessions) in text-only mode.
+    const nativeArch = config?.architectures?.[0];
+    if (nativeArch && nativeArch !== modelName
+        && modelName?.endsWith('ForCausalLM') && nativeArch.endsWith('ForConditionalGeneration')) {
+        const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
+        if (nativeType !== undefined) {
+            modelType = nativeType;
+            textOnly = true;
+        }
+    }
+
+    return { typeConfig: MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default, textOnly, modelType };
+}
+
 export const MODEL_TYPE_MAPPING = new Map();
 export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
 export const MODEL_CLASS_TO_NAME_MAPPING = new Map();
@@ -318,10 +330,7 @@ export class PreTrainedModel extends Callable {
         this.configs = configs;
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
-
-        // Get configuration for this model type
-        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+        const { typeConfig } = resolveTypeConfig(modelName, config);
 
         this.can_generate = typeConfig.can_generate;
         this._forward = typeConfig.forward;
@@ -394,11 +403,10 @@ export class PreTrainedModel extends Callable {
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
 
         config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
-        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+        const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
 
         if (modelType === undefined) {
             const type = modelName ?? config?.model_type;
@@ -409,7 +417,7 @@ export class PreTrainedModel extends Callable {
             }
         }
 
-        const sessions = typeConfig.sessions(config, options);
+        const sessions = typeConfig.sessions(config, options, textOnly);
         const promises = [
             constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
         ];
