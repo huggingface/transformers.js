@@ -1,5 +1,6 @@
 export * from './chatterbox/processing_chatterbox.js';
 export * from './florence2/processing_florence2.js';
+export * from './gemma3/processing_gemma3.js';
 export * from './gemma3n/processing_gemma3n.js';
 export * from './glm46v/processing_glm46v.js';
 export * from './granite_speech/processing_granite_speech.js';
