@@ -99,7 +99,7 @@ export const MODEL_TYPES = {
     ImageAudioTextToText: 13,
     Supertonic: 14,
     Chatterbox: 15,
-    MultimodalLanguageModelOnly: 16,
+    HybridMultiModalDecoderOnly: 16,
     VoxtralRealtime: 17,
 };
 
@@ -241,12 +241,21 @@ const MODEL_TYPE_CONFIG = {
         cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
-    [MODEL_TYPES.MultimodalLanguageModelOnly]: {
+    [MODEL_TYPES.HybridMultiModalDecoderOnly]: {
         can_generate: true,
-        forward: image_text_to_text_forward,
-        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({ embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
+        forward: (self, params) =>
+            self.config.architectures[0].endsWith('ForCausalLM')
+                ? decoder_forward(self, params)
+                : image_text_to_text_forward(self, params),
+        prepare_inputs: (self, ...args) =>
+            self.config.architectures[0].endsWith('ForCausalLM')
+                ? decoder_prepare_inputs_for_generation(self, ...args)
+                : multimodal_text_to_text_prepare_inputs_for_generation(self, ...args),
+        sessions: (config, options) =>
+            config.architectures[0].endsWith('ForCausalLM')
+                ? { model: options.model_file_name ?? 'model' }
+                : { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
+        cache_sessions: { model: true, decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.VoxtralRealtime]: {
