@@ -13,4 +13,4 @@ export class Gemma3Model extends Gemma3PreTrainedModel {}
 
 export class Gemma3ForCausalLM extends Gemma3PreTrainedModel {}
 
-export class Gemma3ForConditionalGeneration extends LlavaForConditionalGeneration { }
+export class Gemma3ForConditionalGeneration extends LlavaForConditionalGeneration {}
