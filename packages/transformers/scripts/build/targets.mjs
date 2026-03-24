@@ -1,4 +1,4 @@
-import { NODE_IGNORE_MODULES, NODE_EXTERNAL_MODULES, WEB_IGNORE_MODULES, WEB_EXTERNAL_MODULES } from "./constants.mjs";
+import { NODE_IGNORE_MODULES, NODE_EXTERNAL_MODULES, WEB_IGNORE_MODULES, WEB_EXTERNAL_MODULES, REACT_NATIVE_IGNORE_MODULES, REACT_NATIVE_EXTERNAL_MODULES } from "./constants.mjs";
 
 /**
  * Build target configuration
@@ -23,6 +23,28 @@ export const BUILD_TARGETS = [
       format: "esm",
       ignoreModules: WEB_IGNORE_MODULES,
       externalModules: WEB_EXTERNAL_MODULES,
+      usePostBuild: false,
+    },
+  },
+  {
+    name: "React Native Build (ESM)",
+    config: {
+      name: ".native",
+      suffix: ".mjs",
+      format: "esm",
+      ignoreModules: REACT_NATIVE_IGNORE_MODULES,
+      externalModules: REACT_NATIVE_EXTERNAL_MODULES,
+      usePostBuild: false,
+    },
+  },
+  {
+    name: "React Native Build (CJS)",
+    config: {
+      name: ".native",
+      suffix: ".cjs",
+      format: "cjs",
+      ignoreModules: REACT_NATIVE_IGNORE_MODULES,
+      externalModules: REACT_NATIVE_EXTERNAL_MODULES,
       usePostBuild: false,
     },
   },

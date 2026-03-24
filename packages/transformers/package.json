@@ -1,7 +1,7 @@
 {
   "name": "@huggingface/transformers",
   "version": "4.0.0-next.8",
-  "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
+  "description": "State-of-the-art Machine Learning for the web. Run \ud83e\udd17 Transformers directly in your browser, with no need for a server!",
   "main": "./dist/transformers.node.cjs",
   "types": "./types/transformers.d.ts",
   "type": "module",
@@ -9,16 +9,19 @@
     "node": {
       "import": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.mjs"
+        "default": "./dist/transformers.node.mjs",
+        "react-native": "./dist/transformers.native.mjs"
       },
       "require": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.cjs"
+        "default": "./dist/transformers.node.cjs",
+        "react-native": "./dist/transformers.native.cjs"
       }
     },
     "default": {
       "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.web.js"
+      "default": "./dist/transformers.web.js",
+      "react-native": "./dist/transformers.native.mjs"
     }
   },
   "scripts": {
@@ -59,7 +62,9 @@
     "@huggingface/tokenizers": "^0.1.3",
     "onnxruntime-node": "1.24.3",
     "onnxruntime-web": "1.25.0-dev.20260307-d626b568e0",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "native-universal-fs": "^0.2.0",
+    "onnxruntime-react-native": "1.22.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -69,7 +74,8 @@
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
     "jsdoc-to-markdown": "^9.1.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "path-browserify": "^1.0.1"
   },
   "files": [
     "src",
@@ -83,5 +89,6 @@
     "access": "public"
   },
   "jsdelivr": "./dist/transformers.min.js",
-  "unpkg": "./dist/transformers.min.js"
+  "unpkg": "./dist/transformers.min.js",
+  "react-native": "./dist/transformers.native.mjs"
 }

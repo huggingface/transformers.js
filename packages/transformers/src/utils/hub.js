@@ -59,7 +59,13 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  */
 export async function getFile(urlOrPath) {
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
-        return new FileResponse(
+        return apis.IS_REACT_NATIVE_ENV ? await FileResponse.create(
+            urlOrPath instanceof URL
+                ? urlOrPath.protocol === 'file:'
+                    ? urlOrPath.pathname
+                    : urlOrPath.toString()
+                : urlOrPath,
+        ) : new FileResponse(
             urlOrPath instanceof URL
                 ? urlOrPath.protocol === 'file:'
                     ? urlOrPath.pathname
@@ -67,7 +73,7 @@ export async function getFile(urlOrPath) {
                 : urlOrPath,
         );
     } else {
-        return env.fetch(urlOrPath, {
+        return (apis.IS_REACT_NATIVE_ENV ? fetch : env.fetch)(urlOrPath, {
             headers: getFetchHeaders(urlOrPath),
         });
     }
