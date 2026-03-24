@@ -298,6 +298,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['qwen3_vl', 'Qwen3VLForCausalLM'],
     ['qwen3_vl_moe', 'Qwen3VLMoeForCausalLM'],
     ['qwen3_5', 'Qwen3_5ForCausalLM'],
+    ['qwen3_5_text', 'Qwen3_5ForCausalLM'],
     ['qwen3_5_moe', 'Qwen3_5MoeForCausalLM'],
     ['gemma3n', 'Gemma3nForCausalLM'],
     ['phi', 'PhiForCausalLM'],
@@ -618,7 +619,6 @@ const CUSTOM_MAPPING = [
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
-
 
     [
         'VoxtralRealtimeForConditionalGeneration',

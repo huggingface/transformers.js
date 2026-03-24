@@ -292,8 +292,12 @@ function resolveTypeConfig(modelName, config) {
     // Detect cross-architecture loading: e.g., ForCausalLM class loading a ForConditionalGeneration model.
     // In this case, use the native architecture's type config (for forward/sessions) in text-only mode.
     const nativeArch = config?.architectures?.[0];
-    if (nativeArch && nativeArch !== modelName
-        && modelName?.endsWith('ForCausalLM') && nativeArch.endsWith('ForConditionalGeneration')) {
+    if (
+        nativeArch &&
+        nativeArch !== modelName &&
+        modelName?.endsWith('ForCausalLM') &&
+        nativeArch.endsWith('ForConditionalGeneration')
+    ) {
         const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
         if (nativeType !== undefined) {
             modelType = nativeType;

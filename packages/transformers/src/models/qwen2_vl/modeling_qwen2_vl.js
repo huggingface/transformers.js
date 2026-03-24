@@ -286,50 +286,57 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         // Overwritten -- in specific circumstances we don't want to forward image inputs to the model
-        if (model_inputs.attention_mask && !model_inputs.position_ids) {
-            // Calculate position_ids and rope_deltas
-            if (!model_inputs.past_key_values) {
-                [model_inputs.position_ids, model_inputs.rope_deltas] = this.get_rope_index(
+        if (!model_inputs.attention_mask || model_inputs.position_ids) {
+            return model_inputs;
+        }
+
+        const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
+        if (!session.inputNames.includes('position_ids')) {
+            return model_inputs;
+        }
+
+        // Calculate position_ids and rope_deltas
+        if (!model_inputs.past_key_values) {
+            [model_inputs.position_ids, model_inputs.rope_deltas] = this.get_rope_index(
+                model_inputs.input_ids,
+                model_inputs.image_grid_thw,
+                model_inputs.video_grid_thw,
+                model_inputs.attention_mask,
+            );
+        } else {
+            model_inputs.pixel_values = null;
+            // model_inputs.pixel_values_videos = null;
+
+            const past_length = model_inputs.past_key_values.get_seq_length();
+
+            if (past_length < model_inputs.input_ids.dims[1]) {
+                // Externally provided `past_key_values` with full input_ids:
+                // Compute full position_ids, then slice to only the new (unprocessed) tokens.
+                const [full_position_ids, rope_deltas] = this.get_rope_index(
                     model_inputs.input_ids,
                     model_inputs.image_grid_thw,
                     model_inputs.video_grid_thw,
                     model_inputs.attention_mask,
                 );
+                model_inputs.rope_deltas = rope_deltas;
+                model_inputs.position_ids = full_position_ids.slice(null, null, [past_length, null]);
+                model_inputs.input_ids = model_inputs.input_ids.slice(null, [past_length, null]);
             } else {
-                model_inputs.pixel_values = null;
-                // model_inputs.pixel_values_videos = null;
-
-                const past_length = model_inputs.past_key_values.get_seq_length();
-
-                if (past_length < model_inputs.input_ids.dims[1]) {
-                    // Externally provided `past_key_values` with full input_ids:
-                    // Compute full position_ids, then slice to only the new (unprocessed) tokens.
-                    const [full_position_ids, rope_deltas] = this.get_rope_index(
+                // Auto-regressive case: single new token.
+                // `rope_deltas` may be absent when generation starts from externally provided `past_key_values`.
+                // In that case, recompute from current inputs instead of relying on persisted model state.
+                if (!model_inputs.rope_deltas) {
+                    [, model_inputs.rope_deltas] = this.get_rope_index(
                         model_inputs.input_ids,
                         model_inputs.image_grid_thw,
                         model_inputs.video_grid_thw,
                         model_inputs.attention_mask,
                     );
-                    model_inputs.rope_deltas = rope_deltas;
-                    model_inputs.position_ids = full_position_ids.slice(null, null, [past_length, null]);
-                    model_inputs.input_ids = model_inputs.input_ids.slice(null, [past_length, null]);
-                } else {
-                    // Auto-regressive case: single new token.
-                    // `rope_deltas` may be absent when generation starts from externally provided `past_key_values`.
-                    // In that case, recompute from current inputs instead of relying on persisted model state.
-                    if (!model_inputs.rope_deltas) {
-                        [, model_inputs.rope_deltas] = this.get_rope_index(
-                            model_inputs.input_ids,
-                            model_inputs.image_grid_thw,
-                            model_inputs.video_grid_thw,
-                            model_inputs.attention_mask,
-                        );
-                    }
-
-                    const delta = BigInt(past_length);
-                    const rope_deltas_list = model_inputs.rope_deltas.map((x) => delta + x);
-                    model_inputs.position_ids = stack([rope_deltas_list, rope_deltas_list, rope_deltas_list], 0);
                 }
+
+                const delta = BigInt(past_length);
+                const rope_deltas_list = model_inputs.rope_deltas.map((x) => delta + x);
+                model_inputs.position_ids = stack([rope_deltas_list, rope_deltas_list, rope_deltas_list], 0);
             }
         }
 
