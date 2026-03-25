@@ -122,7 +122,7 @@ async function getSession(
         // However, when using a custom cache (which returns Uint8Array instead of a
         // file path), the ONNX runtime cannot find the files on disk, so we must
         // supply the data in-memory via session_options.externalData.
-        if (!apis.IS_NODE_ENV || externalData.some(item => typeof item !== 'string')) {
+        if (!apis.IS_NODE_ENV || externalData.some(item => item instanceof Uint8Array)) {
             session_options.externalData = externalData;
         }
     }
