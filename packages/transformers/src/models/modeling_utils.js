@@ -270,10 +270,10 @@ const MODEL_TYPE_CONFIG = {
  * @param {Object} [options] Loading options.
  * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
  */
-export function getSessionsConfig(modelType, config, options = {}) {
+export function getSessionsConfig(modelType, config, options = {}, textOnly = false) {
     const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
     return {
-        sessions: typeConfig.sessions(config, options),
+        sessions: typeConfig.sessions(config, options, textOnly),
         cache_sessions: typeConfig.cache_sessions,
         optional_configs: typeConfig.optional_configs,
     };
@@ -285,7 +285,7 @@ export function getSessionsConfig(modelType, config, options = {}) {
  * @param {Object} config The model config.
  * @returns {{ typeConfig: Object, textOnly: boolean, modelType: number|undefined }}
  */
-function resolveTypeConfig(modelName, config) {
+export function resolveTypeConfig(modelName, config) {
     let modelType = MODEL_TYPE_MAPPING.get(modelName);
     let textOnly = false;
 
