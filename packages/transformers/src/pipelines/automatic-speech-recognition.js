@@ -332,11 +332,13 @@ export class AutomaticSpeechRecognitionPipeline
         const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
 
         const language = kwargs.language ?? 'en';
+        // @ts-expect-error TS2339
         const decoder_input_ids = this.processor.get_decoder_prompt_ids(language);
 
         const toReturn = [];
         for (const aud of preparedAudios) {
             // Split long audio at energy-based boundaries
+            // @ts-expect-error TS2339
             const audioChunks = feature_extractor.split_audio(aud);
 
             const chunk_texts = [];
@@ -355,6 +357,7 @@ export class AutomaticSpeechRecognitionPipeline
                 chunk_texts.push(text);
             }
 
+            // @ts-expect-error TS2339
             const full_text = this.processor.constructor.join_chunks(chunk_texts, language);
             toReturn.push({ text: full_text });
         }
