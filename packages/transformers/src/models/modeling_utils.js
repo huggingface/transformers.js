@@ -37,6 +37,8 @@ import { pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
+import { get_model_files } from '../utils/model_registry/get_model_files.js';
+import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -418,6 +420,64 @@ export class PreTrainedModel extends Callable {
                 logger.warn(
                     `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
                 );
+            }
+        }
+
+        // If a progress callback is provided, gather file metadata upfront so we
+        // can emit `progress_total` events that aggregate download progress across
+        // all model files. This allows consumers to render a single overall progress bar.
+        if (progress_callback) {
+            /** @type {import('../utils/core.js').FilesLoadingMap} */
+            const files_loading = {};
+
+            try {
+                const expected_files = await get_model_files(pretrained_model_name_or_path, {
+                    config,
+                    dtype,
+                    device,
+                    model_file_name,
+                });
+
+                const metadata = await Promise.all(
+                    expected_files.map((file) => get_file_metadata(pretrained_model_name_or_path, file, options)),
+                );
+                metadata.forEach((m, i) => {
+                    if (m.exists) {
+                        files_loading[expected_files[i]] = {
+                            loaded: 0,
+                            total: m.size ?? 0,
+                        };
+                    }
+                });
+            } catch (e) {
+                // If we fail to get metadata, we can still proceed without total progress.
+                // This may happen with local-only models or custom cache setups.
+                logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
+            }
+
+            if (Object.keys(files_loading).length > 0) {
+                options.progress_callback = /** @param {import('../utils/core.js').ProgressInfo} info */ (info) => {
+                    if (info.status === 'progress') {
+                        files_loading[info.file] = {
+                            loaded: info.loaded,
+                            total: info.total,
+                        };
+
+                        const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+                        const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
+                        const progress = total > 0 ? (loaded / total) * 100 : 0;
+
+                        progress_callback({
+                            status: 'progress_total',
+                            name: info.name,
+                            progress,
+                            loaded,
+                            total,
+                            files: structuredClone(files_loading),
+                        });
+                    }
+                    progress_callback(info);
+                };
             }
         }
 
