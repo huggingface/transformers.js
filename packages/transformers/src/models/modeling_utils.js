@@ -433,10 +433,11 @@ export class PreTrainedModel extends Callable {
             }
         }
 
-        // If a progress callback is provided, gather file metadata upfront so we
-        // can emit `progress_total` events that aggregate download progress across
-        // all model files. This allows consumers to render a single overall progress bar.
-        if (progress_callback) {
+        // If a progress callback is provided AND it hasn't already been wrapped
+        // by pipeline() (which does its own aggregation), gather file metadata
+        // upfront so we can emit `progress_total` events. This lets consumers
+        // render a single overall progress bar when calling from_pretrained() directly.
+        if (progress_callback && !progress_callback._progress_total_wrapped) {
             /** @type {import('../utils/core.js').FilesLoadingMap} */
             const files_loading = {};
 
@@ -453,8 +454,12 @@ export class PreTrainedModel extends Callable {
                 );
                 metadata.forEach((m, i) => {
                     if (m.exists) {
+                        // config.json is fetched by AutoConfig.from_pretrained() above,
+                        // before this tracker is set up. Pre-mark it as fully loaded so
+                        // progress reaches 100%.
+                        const isAlreadyLoaded = expected_files[i] === 'config.json';
                         files_loading[expected_files[i]] = {
-                            loaded: 0,
+                            loaded: isAlreadyLoaded ? (m.size ?? 0) : 0,
                             total: m.size ?? 0,
                         };
                     }
@@ -466,7 +471,7 @@ export class PreTrainedModel extends Callable {
             }
 
             if (Object.keys(files_loading).length > 0) {
-                options.progress_callback = /** @param {import('../utils/core.js').ProgressInfo} info */ (info) => {
+                const wrappedCallback = /** @param {import('../utils/core.js').ProgressInfo} info */ (info) => {
                     if (info.status === 'progress') {
                         files_loading[info.file] = {
                             loaded: info.loaded,
@@ -488,6 +493,8 @@ export class PreTrainedModel extends Callable {
                     }
                     progress_callback(info);
                 };
+                wrappedCallback._progress_total_wrapped = true;
+                options.progress_callback = wrappedCallback;
             }
         }
 
