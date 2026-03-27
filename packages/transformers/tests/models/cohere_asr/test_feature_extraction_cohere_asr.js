@@ -7,7 +7,6 @@ export default () => {
   describe("CohereAsrFeatureExtractor", () => {
     const model_id = "onnx-community/cohere-transcribe-03-2026-ONNX";
 
-    /** @type {CohereAsrFeatureExtractor} */
     let feature_extractor;
     beforeAll(async () => {
       feature_extractor = await AutoFeatureExtractor.from_pretrained(model_id);
@@ -27,14 +26,16 @@ export default () => {
         const mask_sum = attention_mask.data.reduce((a, b) => a + b, 0n);
         expect(Number(mask_sum)).toEqual(1300);
 
-        // Check feature values against JS-computed reference
-        expect(input_features.mean().item()).toBeCloseTo(0.0, 4);
-        expect(input_features.data[0]).toBeCloseTo(1.9016, 4); // [0,0,0]
-        expect(input_features.data[1]).toBeCloseTo(1.4604, 4); // [0,0,1]
-        expect(input_features.data[128]).toBeCloseTo(1.6361, 4); // [0,1,0]
-        expect(input_features.data[127]).toBeCloseTo(-0.8963, 4); // [0,0,127]
-        expect(input_features.data[12800]).toBeCloseTo(0.9839, 4); // [0,100,0]
-        expect(input_features.data[64050]).toBeCloseTo(-0.6128, 4); // [0,500,50]
+        // Check feature values against Python reference
+        // NOTE: Small differences (~1e-3) are expected due to mel filter precision
+        // (librosa float32 vs JS float64) and different dithering PRNGs.
+        expect(input_features.mean().item()).toBeCloseTo(0.0, 3);
+        expect(input_features.data[0]).toBeCloseTo(1.9019224644, 2); // [0,0,0]
+        expect(input_features.data[1]).toBeCloseTo(1.4606336355, 2); // [0,0,1]
+        expect(input_features.data[128]).toBeCloseTo(1.6364065409, 2); // [0,1,0]
+        expect(input_features.data[127]).toBeCloseTo(-0.8954101205, 2); // [0,0,127]
+        expect(input_features.data[12800]).toBeCloseTo(0.9838520288, 2); // [0,100,0]
+        expect(input_features.data[64050]).toBeCloseTo(-0.6117327809, 2); // [0,500,50]
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -45,14 +46,16 @@ export default () => {
         const audio = await load_cached_audio("mlk");
         const { input_features, attention_mask } = await feature_extractor(audio.slice(0, 16000));
 
-        // 1 second of audio at 16kHz: ~100 frames
-        expect(input_features.dims[0]).toEqual(1);
-        expect(input_features.dims[2]).toEqual(128);
-        expect(input_features.dims[1]).toBeGreaterThan(90);
-        expect(input_features.dims[1]).toBeLessThan(110);
+        expect(input_features.dims).toEqual([1, 101, 128]);
+        expect(attention_mask.dims).toEqual([1, 101]);
 
-        expect(attention_mask.dims[0]).toEqual(1);
-        expect(attention_mask.dims[1]).toEqual(input_features.dims[1]);
+        const mask_sum = attention_mask.data.reduce((a, b) => a + b, 0n);
+        expect(Number(mask_sum)).toEqual(100);
+
+        expect(input_features.mean().item()).toBeCloseTo(0.0, 3);
+        expect(input_features.data[0]).toBeCloseTo(1.5188870430, 2); // [0,0,0]
+        expect(input_features.data[1]).toBeCloseTo(1.1131993532, 2); // [0,0,1]
+        expect(input_features.data[128]).toBeCloseTo(1.2305405140, 2); // [0,1,0]
       },
       MAX_TEST_EXECUTION_TIME,
     );
