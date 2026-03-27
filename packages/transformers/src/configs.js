@@ -271,9 +271,15 @@ function getNormalizedConfig(config) {
             mapping['num_decoder_heads'] = 'num_key_value_heads';
             mapping['decoder_hidden_size'] = 'hidden_size';
             mapping['decoder_dim_kv'] = 'head_dim';
-            const { num_hidden_layers: num_encoder_layers, num_attention_heads: num_encoder_heads, hidden_size: encoder_hidden_size } = /** @type {any} */(config).encoder_config;
+            const {
+                num_hidden_layers: num_encoder_layers,
+                num_attention_heads: num_encoder_heads,
+                hidden_size: encoder_hidden_size,
+            } = /** @type {any} */ (config).encoder_config;
             init_normalized_config = {
-                num_encoder_layers, num_encoder_heads, encoder_hidden_size,
+                num_encoder_layers,
+                num_encoder_heads,
+                encoder_hidden_size,
                 // @ts-expect-error TS2339
                 encoder_dim_kv: config.head_dim,
             };

@@ -349,10 +349,9 @@ export class AutomaticSpeechRecognitionPipeline
                     ...kwargs,
                 });
 
-                const text = this.tokenizer.decode(
-                    /** @type {Tensor} */ (outputs)[0].tolist(),
-                    { skip_special_tokens: true },
-                ).trim();
+                const text = this.tokenizer
+                    .decode(/** @type {Tensor} */ (outputs)[0].tolist(), { skip_special_tokens: true })
+                    .trim();
                 chunk_texts.push(text);
             }
 
