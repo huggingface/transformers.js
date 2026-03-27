@@ -266,6 +266,22 @@ function getNormalizedConfig(config) {
             mapping['num_encoder_heads'] = 'encoder_num_key_value_heads';
             mapping['encoder_hidden_size'] = mapping['decoder_hidden_size'] = 'hidden_size';
             break;
+        case 'cohere_asr':
+            mapping['num_decoder_layers'] = 'num_hidden_layers';
+            mapping['num_decoder_heads'] = 'num_key_value_heads';
+            mapping['decoder_hidden_size'] = 'hidden_size';
+            mapping['decoder_dim_kv'] = 'head_dim';
+            init_normalized_config = {
+                // @ts-expect-error TS2339
+                num_encoder_layers: config.encoder_config?.num_hidden_layers,
+                // @ts-expect-error TS2339
+                num_encoder_heads: config.encoder_config?.num_attention_heads,
+                // @ts-expect-error TS2339
+                encoder_hidden_size: config.encoder_config?.hidden_size,
+                // @ts-expect-error TS2339
+                encoder_dim_kv: config.head_dim,
+            };
+            break;
         case 'vision-encoder-decoder':
             // @ts-expect-error TS2339
             const decoderConfig = getNormalizedConfig(config.decoder);

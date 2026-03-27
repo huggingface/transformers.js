@@ -1,4 +1,5 @@
 export * from './chatterbox/processing_chatterbox.js';
+export * from './cohere_asr/processing_cohere_asr.js';
 export * from './florence2/processing_florence2.js';
 export * from './gemma3/processing_gemma3.js';
 export * from './gemma3n/processing_gemma3n.js';

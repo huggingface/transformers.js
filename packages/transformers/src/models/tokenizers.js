@@ -10,6 +10,7 @@ export * from './clip/tokenization_clip.js';
 export * from './code_llama/tokenization_code_llama.js';
 export * from './codegen/tokenization_codegen.js';
 export * from './cohere/tokenization_cohere.js';
+export * from './cohere_asr/tokenization_cohere_asr.js';
 export * from './convbert/tokenization_convbert.js';
 export * from './deberta_v2/tokenization_deberta_v2.js';
 export * from './deberta/tokenization_deberta.js';

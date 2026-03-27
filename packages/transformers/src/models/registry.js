@@ -107,6 +107,7 @@ const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
     ['mbart', 'MBartModel'],
     ['marian', 'MarianModel'],
     ['whisper', 'WhisperModel'],
+    ['cohere_asr', 'CohereAsrModel'],
     ['m2m_100', 'M2M100Model'],
     ['blenderbot', 'BlenderbotModel'],
     ['blenderbot-small', 'BlenderbotSmallModel'],
@@ -185,6 +186,7 @@ export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['whisper', 'WhisperForConditionalGeneration'],
     ['lite-whisper', 'LiteWhisperForConditionalGeneration'],
     ['moonshine', 'MoonshineForConditionalGeneration'],
+    ['cohere_asr', 'CohereAsrForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([['speecht5', 'SpeechT5ForTextToSpeech']]);

@@ -154,6 +154,8 @@ export class AutomaticSpeechRecognitionPipeline
                 return this._call_wav2vec2(audio, kwargs);
             case 'moonshine':
                 return this._call_moonshine(audio, kwargs);
+            case 'cohere_asr':
+                return this._call_cohere_asr(audio, kwargs);
             default:
                 throw new Error(
                     `AutomaticSpeechRecognitionPipeline does not support model type '${this.model.config.model_type}'.`,
@@ -317,6 +319,45 @@ export class AutomaticSpeechRecognitionPipeline
 
             const text = this.processor.batch_decode(/** @type {Tensor} */ (outputs), { skip_special_tokens: true })[0];
             toReturn.push({ text });
+        }
+        return single ? toReturn[0] : toReturn;
+    }
+
+    async _call_cohere_asr(audio, kwargs) {
+        const single = !Array.isArray(audio);
+        const batchedAudio = single ? [audio] : audio;
+
+        const feature_extractor = this.processor.feature_extractor;
+        const sampling_rate = feature_extractor.config.sampling_rate;
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+
+        const language = kwargs.language ?? 'en';
+        const decoder_input_ids = this.processor.get_decoder_prompt_ids(language);
+
+        const toReturn = [];
+        for (const aud of preparedAudios) {
+            // Split long audio at energy-based boundaries
+            const audioChunks = feature_extractor.split_audio(aud);
+
+            const chunk_texts = [];
+            for (const chunk of audioChunks) {
+                const inputs = await this.processor(chunk);
+
+                const outputs = await this.model.generate({
+                    ...inputs,
+                    decoder_input_ids,
+                    ...kwargs,
+                });
+
+                const text = this.tokenizer.decode(
+                    /** @type {Tensor} */ (outputs)[0].tolist(),
+                    { skip_special_tokens: true },
+                ).trim();
+                chunk_texts.push(text);
+            }
+
+            const full_text = this.processor.constructor.join_chunks(chunk_texts, language);
+            toReturn.push({ text: full_text });
         }
         return single ? toReturn[0] : toReturn;
     }
