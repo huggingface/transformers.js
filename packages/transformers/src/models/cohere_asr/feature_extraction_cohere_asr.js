@@ -1,33 +1,8 @@
-import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Random } from '../../utils/random.js';
+import { ParakeetFeatureExtractor } from '../parakeet/feature_extraction_parakeet.js';
 
-const EPSILON = 1e-5;
-
-export class CohereAsrFeatureExtractor extends FeatureExtractor {
-    constructor(config) {
-        super(config);
-
-        this.config.mel_filters ??= mel_filter_bank(
-            Math.floor(1 + this.config.n_fft / 2), // num_frequency_bins (257)
-            this.config.feature_size, // num_mel_filters (128)
-            0.0, // min_frequency
-            this.config.sampling_rate / 2, // max_frequency (8000)
-            this.config.sampling_rate, // sampling_rate (16000)
-            'slaney', // norm
-            'slaney', // mel_scale
-        );
-
-        const window = window_function(this.config.win_length, 'hann', {
-            periodic: false,
-        });
-
-        this.window = new Float64Array(this.config.n_fft);
-        const offset = Math.floor((this.config.n_fft - this.config.win_length) / 2);
-        this.window.set(window, offset);
-    }
-
+export class CohereAsrFeatureExtractor extends ParakeetFeatureExtractor {
     /**
      * Apply deterministic dithering seeded by the waveform length.
      * @param {Float64Array} waveform
@@ -72,7 +47,6 @@ export class CohereAsrFeatureExtractor extends FeatureExtractor {
                 break;
             }
 
-            // Search for quietest point near the chunk boundary
             const search_start = Math.max(idx, idx + chunk_size - boundary_context_size);
             const search_end = Math.min(idx + chunk_size, total_samples);
 
@@ -127,94 +101,17 @@ export class CohereAsrFeatureExtractor extends FeatureExtractor {
     }
 
     /**
-     * Computes the log-Mel spectrogram of the provided audio waveform.
-     * @param {Float64Array} waveform The audio waveform to process.
-     * @returns {Promise<Tensor>} The log-Mel spectrogram tensor.
-     */
-    async _extract_fbank_features(waveform) {
-        // Apply preemphasis
-        const preemphasis = this.config.preemphasis;
-        for (let j = waveform.length - 1; j >= 1; --j) {
-            waveform[j] -= preemphasis * waveform[j - 1];
-        }
-
-        const features = await spectrogram(
-            waveform,
-            this.window, // window
-            this.window.length, // frame_length
-            this.config.hop_length, // hop_length
-            {
-                fft_length: this.config.n_fft,
-                power: 2.0,
-                mel_filters: this.config.mel_filters,
-                log_mel: 'log',
-                mel_floor: -Infinity,
-                pad_mode: 'constant',
-                center: true,
-
-                // Custom
-                transpose: true,
-                mel_offset: 2 ** -24,
-            },
-        );
-
-        return features;
-    }
-
-    /**
      * Extracts features from a given audio waveform.
      * @param {Float32Array|Float64Array} audio The audio data.
-     * @returns {Promise<{ input_features: Tensor; attention_mask: Tensor; }>}
+     * @returns {Promise<{ input_features: import('../../utils/tensor.js').Tensor; attention_mask: import('../../utils/tensor.js').Tensor; }>}
      */
     async _call(audio) {
         validate_audio_inputs(audio, 'CohereAsrFeatureExtractor');
 
-        // Clone to Float64Array and apply dithering
+        // Clone to Float64Array and apply dithering before feature extraction
         const waveform = new Float64Array(audio);
         this._apply_dither(waveform);
 
-        const features = await this._extract_fbank_features(waveform);
-
-        const features_length = Math.floor(
-            (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length,
-        );
-
-        const features_data = /** @type {Float32Array} */ (features.data);
-        features_data.fill(0, features_length * features.dims[1]);
-
-        // Normalize mel features per-feature, ignoring padding
-        const [num_frames, num_features] = features.dims;
-        const sum = new Float64Array(num_features);
-        const sum_sq = new Float64Array(num_features);
-
-        for (let i = 0; i < features_length; ++i) {
-            const offset = i * num_features;
-            for (let j = 0; j < num_features; ++j) {
-                const val = features_data[offset + j];
-                sum[j] += val;
-                sum_sq[j] += val * val;
-            }
-        }
-
-        const divisor = features_length > 1 ? features_length - 1 : 1;
-        for (let j = 0; j < num_features; ++j) {
-            const mean = sum[j] / features_length;
-            const variance = (sum_sq[j] - features_length * mean * mean) / divisor;
-            const std = Math.sqrt(variance) + EPSILON;
-            const inv_std = 1 / std;
-
-            for (let i = 0; i < features_length; ++i) {
-                const index = i * num_features + j;
-                features_data[index] = (features_data[index] - mean) * inv_std;
-            }
-        }
-
-        const mask_data = new BigInt64Array(num_frames);
-        mask_data.fill(1n, 0, features_length);
-
-        return {
-            input_features: features.unsqueeze_(0),
-            attention_mask: new Tensor('int64', mask_data, [1, num_frames]),
-        };
+        return super._call(waveform);
     }
 }
