@@ -899,8 +899,7 @@ export class PreTrainedModel extends Callable {
             decoder_input_ids = toI64Tensor(decoder_input_ids);
         }
 
-        model_kwargs['decoder_attention_mask'] = ones_like(decoder_input_ids);
-        model_inputs['decoder_attention_mask'] = model_kwargs['decoder_attention_mask'];
+        model_inputs['decoder_attention_mask'] = ones_like(decoder_input_ids);
 
         return { input_ids: decoder_input_ids, model_inputs };
     }
@@ -1262,7 +1261,7 @@ export class PreTrainedModel extends Callable {
  * @private
  */
 export async function seq2seq_forward(self, model_inputs) {
-    let { encoder_outputs, input_ids, decoder_input_ids, ...other_decoder_inputs } = model_inputs;
+    let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } = model_inputs;
     // Encode if needed
     if (!encoder_outputs) {
         const encoder_inputs = pick(model_inputs, self.sessions['model'].inputNames);
@@ -1277,11 +1276,10 @@ export async function seq2seq_forward(self, model_inputs) {
         other_decoder_inputs.encoder_attention_mask = model_inputs.attention_mask;
     }
 
-    // Map decoder_attention_mask to attention_mask for the decoder session
-    if (other_decoder_inputs.decoder_attention_mask && !other_decoder_inputs.attention_mask) {
-        other_decoder_inputs.attention_mask = other_decoder_inputs.decoder_attention_mask;
+    // Pass decoder_attention_mask as attention_mask to the decoder session
+    if (decoder_attention_mask && !other_decoder_inputs.attention_mask) {
+        other_decoder_inputs.attention_mask = decoder_attention_mask;
     }
-    delete other_decoder_inputs.decoder_attention_mask;
 
     return await decoder_forward(self, other_decoder_inputs, true);
 }
