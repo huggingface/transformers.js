@@ -270,6 +270,30 @@ const MODEL_TYPE_CONFIG = {
  * @param {Object} [options] Loading options.
  * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
  */
+/**
+ * Detects whether a config describes a cross-architecture load that should
+ * operate in text-only mode (e.g. a ForCausalLM class loading a
+ * ForConditionalGeneration model, where vision/audio encoders should be skipped).
+ *
+ * This is the same detection that {@link resolveTypeConfig} performs, extracted
+ * so that callers without a concrete class name can still determine textOnly.
+ *
+ * @param {Object} config The model config.
+ * @param {number} resolvedModelType The model type resolved from config.
+ * @returns {boolean}
+ */
+export function isTextOnlyConfig(config, resolvedModelType) {
+    const nativeArch = config?.architectures?.[0];
+    if (!nativeArch) return false;
+
+    const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
+    if (nativeType === undefined || nativeType === resolvedModelType) return false;
+
+    // The resolved type differs from the native arch — check if this is the
+    // typical CausalLM-loading-ConditionalGeneration pattern.
+    return nativeArch.endsWith('ForConditionalGeneration');
+}
+
 export function getSessionsConfig(modelType, config, options = {}, textOnly = false) {
     const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
     return {

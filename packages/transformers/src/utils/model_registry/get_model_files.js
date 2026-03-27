@@ -1,7 +1,7 @@
 import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
 import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import { getSessionsConfig, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
+import { getSessionsConfig, isTextOnlyConfig } from '../../models/modeling_utils.js';
 import { AutoConfig } from '../../configs.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
@@ -95,23 +95,10 @@ export async function get_model_files(
         }
     };
 
-    // Detect cross-architecture loading (e.g. ForCausalLM loading a
-    // ForConditionalGeneration model). In text-only mode the sessions
-    // factory should skip vision/audio encoder files.
-    let textOnly = false;
-    const nativeArch = config?.architectures?.[0];
-    if (nativeArch) {
-        const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
-        if (nativeType !== undefined && nativeType !== modelType) {
-            // The resolved modelType came from a CausalLM alias; the native
-            // architecture is a ConditionalGeneration model.  Use the native
-            // type config so we pick up the correct sessions, but skip
-            // vision/audio encoders.
-            if (nativeArch.endsWith('ForConditionalGeneration')) {
-                textOnly = true;
-            }
-        }
-    }
+    // Use the shared helper to detect cross-architecture loading (e.g.
+    // ForCausalLM loading a ForConditionalGeneration model). In text-only
+    // mode the sessions factory skips vision/audio encoder files.
+    const textOnly = isTextOnlyConfig(config, modelType);
 
     // Get session configuration from the shared source of truth
     const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name }, textOnly);
