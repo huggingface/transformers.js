@@ -1,5 +1,19 @@
 import { get_files } from './get_files.js';
+import { get_config } from './get_model_files.js';
+import { resolve_model_type } from './resolve_model_type.js';
+import { MODEL_TYPES } from '../../models/modeling_utils.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
+
+/**
+ * Maps multimodal model types to the encoder session names that should be
+ * excluded when the model is used for a text-only pipeline task.
+ */
+const MULTIMODAL_ENCODER_SESSIONS = {
+    [MODEL_TYPES.ImageTextToText]: ['vision_encoder'],
+    [MODEL_TYPES.AudioTextToText]: ['audio_encoder'],
+    [MODEL_TYPES.ImageAudioTextToText]: ['vision_encoder', 'audio_encoder'],
+    [MODEL_TYPES.VoxtralRealtime]: ['audio_encoder'],
+};
 
 /**
  * Get all files needed for a specific pipeline task.
@@ -36,9 +50,22 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     const include_tokenizer = type !== 'audio' && type !== 'image';
     const include_processor = type !== 'text';
 
-    return get_files(modelId, {
+    let files = await get_files(modelId, {
         ...options,
         include_tokenizer,
         include_processor,
     });
+
+    // For text-only tasks on multimodal models, exclude encoder files
+    // (e.g., vision_encoder, audio_encoder) that are not needed for text generation.
+    if (type === 'text') {
+        const config = await get_config(modelId, options);
+        const modelType = resolve_model_type(config);
+        const excludeSessions = MULTIMODAL_ENCODER_SESSIONS[modelType];
+        if (excludeSessions) {
+            files = files.filter((f) => !excludeSessions.some((s) => f.includes(s)));
+        }
+    }
+
+    return files;
 }

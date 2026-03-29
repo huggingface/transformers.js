@@ -174,11 +174,14 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
+        sessions: (config, options, textOnly) => {
+            const s = {
+                embed_tokens: 'embed_tokens',
+                decoder_model_merged: 'decoder_model_merged',
+            };
+            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
+            return s;
+        },
         cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
@@ -249,11 +252,14 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
+        sessions: (config, options, textOnly) => {
+            const s = {
+                embed_tokens: 'embed_tokens',
+                decoder_model_merged: 'decoder_model_merged',
+            };
+            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
+            return s;
+        },
         cache_sessions: { decoder_model_merged: true, audio_encoder: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
