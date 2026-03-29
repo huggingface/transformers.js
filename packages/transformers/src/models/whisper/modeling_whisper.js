@@ -241,13 +241,15 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 }
             }
 
-            const outputs = /** @type {any} */(await super.generate({
-                inputs: segment_features,
-                generation_config,
-                logits_processor,
-                decoder_input_ids: init_tokens,
-                ...kwargs,
-            }));
+            const outputs = /** @type {any} */ (
+                await super.generate({
+                    inputs: segment_features,
+                    generation_config,
+                    logits_processor,
+                    decoder_input_ids: init_tokens,
+                    ...kwargs,
+                })
+            );
 
             // Extract tokens (skip init_tokens prefix)
             const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
@@ -264,7 +266,9 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     init_tokens.length,
                 );
                 const time_offset = (seek / input_stride) * 0.02;
-                seek_token_timestamps = outputs.token_timestamps[0].tolist().slice(init_tokens.length)
+                seek_token_timestamps = outputs.token_timestamps[0]
+                    .tolist()
+                    .slice(init_tokens.length)
                     .map((/** @type {number} */ t) => t + time_offset);
             }
 

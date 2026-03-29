@@ -279,42 +279,46 @@ export default () => {
         expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
       });
 
-      it("transcribe w/ return_timestamps=true", async () => {
-        const output = await pipe(audio, {
-          return_timestamps: true,
-          chunk_length_s: 30,
-          stride_length_s: 5,
-          language: "en",
-        });
-        // Python output for reference:
-        // const target = {
-        //   text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
-        //   chunks: [
-        //     { timestamp: [0.0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
-        //     { timestamp: [5.36, 14.0], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
-        //     { timestamp: [14.0, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
-        //     { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
-        //     { timestamp: [24.24, 23.6], text: "" },
-        //     { timestamp: [27.02, 29.18], text: " I mean, like I said, we're going through that. We're losing stars." },
-        //     { timestamp: [29.18, 30.54], text: " And then we kind of..." },
-        //   ],
-        // };
+      it(
+        "transcribe w/ return_timestamps=true",
+        async () => {
+          const output = await pipe(audio, {
+            return_timestamps: true,
+            chunk_length_s: 30,
+            stride_length_s: 5,
+            language: "en",
+          });
+          // Python output for reference:
+          // const target = {
+          //   text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
+          //   chunks: [
+          //     { timestamp: [0.0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
+          //     { timestamp: [5.36, 14.0], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
+          //     { timestamp: [14.0, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
+          //     { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
+          //     { timestamp: [24.24, 23.6], text: "" },
+          //     { timestamp: [27.02, 29.18], text: " I mean, like I said, we're going through that. We're losing stars." },
+          //     { timestamp: [29.18, 30.54], text: " And then we kind of..." },
+          //   ],
+          // };
 
-        const target = {
-          text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
-          chunks: [
-            { timestamp: [0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
-            { timestamp: [5.36, 14], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
-            { timestamp: [14, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
-            { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
-            { timestamp: [23.6, 27.02], text: " I mean, like I said, we're going through that." },
-            { timestamp: [27.02, 29.18], text: " We're losing stars." },
-            { timestamp: [29.18, 30], text: " And then we kind of..." },
-          ],
-        };
+          const target = {
+            text: " everyday style. True classic delivers premium essentials built for real life. Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today. Now before we go, just want to give a big shout out to the CEO and founder Ryan brother for coming on our show and just showing some love. Now let's get back to the episode. I mean, like I said, we're going through that. We're losing stars. And then we kind of...",
+            chunks: [
+              { timestamp: [0, 4.8], text: " everyday style. True classic delivers premium essentials built for real life." },
+              { timestamp: [5.36, 14], text: " Grab yours at Target, Costco, or head to TrueClassic.com slash P4P. Get hooked up today." },
+              { timestamp: [14, 18.56], text: " Now before we go, just want to give a big shout out to the CEO and founder Ryan" },
+              { timestamp: [18.56, 23.6], text: " brother for coming on our show and just showing some love. Now let's get back to the episode." },
+              { timestamp: [23.6, 27.02], text: " I mean, like I said, we're going through that." },
+              { timestamp: [27.02, 29.18], text: " We're losing stars." },
+              { timestamp: [29.18, 30], text: " And then we kind of..." },
+            ],
+          };
 
-        expect(output).toBeCloseToNested(target, 1);
-      }, MAX_TEST_EXECUTION_TIME);
+          expect(output).toBeCloseToNested(target, 1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
 
       it(
         "transcribe w/ return_timestamps='word'",
