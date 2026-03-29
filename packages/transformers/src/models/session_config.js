@@ -143,13 +143,6 @@ export const MODEL_SESSION_CONFIG = {
 };
 
 /**
- * Get the session configuration for a given model type.
- * @param {number} modelType The model type enum value.
- * @param {Object} config The model config.
- * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
- */
-/**
  * Returns the text-only session names for a given model type, or `null` if
  * the model type does not define a text-only session set.
  * @param {number} modelType The model type enum value.
@@ -160,6 +153,13 @@ export function getTextOnlySessions(modelType) {
     return typeConfig?.text_only_sessions ?? null;
 }
 
+/**
+ * Get the session configuration for a given model type.
+ * @param {number} modelType The model type enum value.
+ * @param {Object} config The model config.
+ * @param {Object} [options] Loading options.
+ * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
+ */
 export function getSessionsConfig(modelType, config, options = {}) {
     const typeConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
     return {
