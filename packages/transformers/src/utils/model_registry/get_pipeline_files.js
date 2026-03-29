@@ -1,7 +1,7 @@
 import { get_files } from './get_files.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { getTextOnlySessions } from '../../models/modeling_utils.js';
+import { getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**

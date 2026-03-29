@@ -40,6 +40,7 @@ import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
+import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -85,211 +86,80 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export const MODEL_TYPES = {
-    EncoderOnly: 0,
-    EncoderDecoder: 1,
-    Seq2Seq: 2,
-    Vision2Seq: 3,
-    DecoderOnly: 4,
-    DecoderOnlyWithoutHead: 5,
-    MaskGeneration: 6,
-    ImageTextToText: 7,
-    Musicgen: 8,
-    MultiModality: 9,
-    Phi3V: 10,
-    AudioTextToText: 11,
-    AutoEncoder: 12,
-    ImageAudioTextToText: 13,
-    Supertonic: 14,
-    Chatterbox: 15,
-    VoxtralRealtime: 16,
-};
+export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
 
-const MODEL_TYPE_CONFIG = {
+/**
+ * Runtime-only model type configuration (forward functions, generation flags).
+ * Session/file configuration lives in `MODEL_SESSION_CONFIG` (session_config.js)
+ * and is merged in at lookup time by `resolveTypeConfig` to avoid duplication.
+ */
+const MODEL_RUNTIME_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
         can_generate: true,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.DecoderOnlyWithoutHead]: {
         can_generate: false,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
     [MODEL_TYPES.Seq2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Vision2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Musicgen]: {
         can_generate: true,
         forward: seq2seq_forward,
-        sessions: () => ({
-            model: 'text_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-            encodec_decode: 'encodec_decode',
-        }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.EncoderDecoder]: {
         can_generate: false,
         forward: seq2seq_forward,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-    },
-    [MODEL_TYPES.MaskGeneration]: {
-        sessions: () => ({ model: 'vision_encoder', prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder' }),
     },
     [MODEL_TYPES.ImageTextToText]: {
         can_generate: true,
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.ImageTextToText].text_only_sessions };
-            if (!textOnly) s['vision_encoder'] = 'vision_encoder';
-            if (config.is_encoder_decoder) s['model'] = 'encoder_model';
-            return s;
-        },
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.AudioTextToText].text_only_sessions };
-            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
-            return s;
-        },
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.ImageAudioTextToText].text_only_sessions };
-            if (!textOnly) {
-                s['audio_encoder'] = 'audio_encoder';
-                s['vision_encoder'] = 'vision_encoder';
-            }
-            return s;
-        },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            prepare_inputs_embeds: 'prepare_inputs_embeds',
-            model: 'model',
-            vision_encoder: 'vision_encoder',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.MultiModality]: {
         can_generate: true,
-        sessions: () => ({
-            prepare_inputs_embeds: 'prepare_inputs_embeds',
-            model: 'language_model',
-            lm_head: 'lm_head',
-            gen_head: 'gen_head',
-            gen_img_embeds: 'gen_img_embeds',
-            image_decode: 'image_decode',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AutoEncoder]: {
         can_generate: false,
         forward: auto_encoder_forward,
-        sessions: () => ({ encoder_model: 'encoder_model', decoder_model: 'decoder_model' }),
-    },
-    [MODEL_TYPES.Supertonic]: {
-        sessions: () => ({
-            text_encoder: 'text_encoder',
-            latent_denoiser: 'latent_denoiser',
-            voice_decoder: 'voice_decoder',
-        }),
     },
     [MODEL_TYPES.Chatterbox]: {
         can_generate: true,
         forward: encoder_forward,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            speech_encoder: 'speech_encoder',
-            model: 'language_model',
-            conditional_decoder: 'conditional_decoder',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.VoxtralRealtime].text_only_sessions };
-            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
-            return s;
-        },
-        cache_sessions: { decoder_model_merged: true, audio_encoder: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     default: {
         can_generate: false,
         forward: encoder_forward,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
 };
-
-/**
- * Get the session configuration for a given model type.
- * @param {number} modelType The model type enum value.
- * @param {Object} config The model config.
- * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
- */
-export function getSessionsConfig(modelType, config, options = {}) {
-    const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
-    return {
-        sessions: typeConfig.sessions(config, options),
-        cache_sessions: typeConfig.cache_sessions,
-        optional_configs: typeConfig.optional_configs,
-    };
-}
-
-/**
- * Returns the text-only session names for a given model type, or `null` if
- * the model type does not define a text-only session set.
- * @param {number} modelType The model type enum value.
- * @returns {Record<string, string>|null}
- */
-export function getTextOnlySessions(modelType) {
-    const typeConfig = MODEL_TYPE_CONFIG[modelType];
-    return typeConfig?.text_only_sessions ?? null;
-}
 
 /**
  * Resolves the model type config for a given class name and config.
@@ -317,7 +187,9 @@ function resolveTypeConfig(modelName, config) {
         }
     }
 
-    return { typeConfig: MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default, textOnly, modelType };
+    const runtimeConfig = MODEL_RUNTIME_CONFIG[modelType] ?? MODEL_RUNTIME_CONFIG.default;
+    const sessionConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
+    return { typeConfig: { ...runtimeConfig, ...sessionConfig }, textOnly, modelType };
 }
 
 export const MODEL_TYPE_MAPPING = new Map();

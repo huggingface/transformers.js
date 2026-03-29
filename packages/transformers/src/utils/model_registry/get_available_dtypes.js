@@ -1,4 +1,4 @@
-import { getSessionsConfig } from '../../models/modeling_utils.js';
+import { getSessionsConfig } from '../../models/session_config.js';
 import { DEFAULT_DTYPE_SUFFIX_MAPPING } from '../dtypes.js';
 import { get_file_metadata } from './get_file_metadata.js';
 import { get_config } from './get_model_files.js';
