@@ -158,11 +158,9 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
         sessions: (config, options, textOnly) => {
-            const s = {
-                embed_tokens: 'embed_tokens',
-                decoder_model_merged: 'decoder_model_merged',
-            };
+            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.ImageTextToText].text_only_sessions };
             if (!textOnly) s['vision_encoder'] = 'vision_encoder';
             if (config.is_encoder_decoder) s['model'] = 'encoder_model';
             return s;
@@ -174,11 +172,9 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
         sessions: (config, options, textOnly) => {
-            const s = {
-                embed_tokens: 'embed_tokens',
-                decoder_model_merged: 'decoder_model_merged',
-            };
+            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.AudioTextToText].text_only_sessions };
             if (!textOnly) s['audio_encoder'] = 'audio_encoder';
             return s;
         },
@@ -188,11 +184,9 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
+        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
         sessions: (config, options, textOnly) => {
-            const s = {
-                embed_tokens: 'embed_tokens',
-                decoder_model_merged: 'decoder_model_merged',
-            };
+            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.ImageAudioTextToText].text_only_sessions };
             if (!textOnly) {
                 s['audio_encoder'] = 'audio_encoder';
                 s['vision_encoder'] = 'vision_encoder';
@@ -252,11 +246,9 @@ const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
         prepare_inputs: decoder_prepare_inputs_for_generation,
+        text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
         sessions: (config, options, textOnly) => {
-            const s = {
-                embed_tokens: 'embed_tokens',
-                decoder_model_merged: 'decoder_model_merged',
-            };
+            const s = { ...MODEL_TYPE_CONFIG[MODEL_TYPES.VoxtralRealtime].text_only_sessions };
             if (!textOnly) s['audio_encoder'] = 'audio_encoder';
             return s;
         },
@@ -284,6 +276,17 @@ export function getSessionsConfig(modelType, config, options = {}) {
         cache_sessions: typeConfig.cache_sessions,
         optional_configs: typeConfig.optional_configs,
     };
+}
+
+/**
+ * Returns the text-only session names for a given model type, or `null` if
+ * the model type does not define a text-only session set.
+ * @param {number} modelType The model type enum value.
+ * @returns {Record<string, string>|null}
+ */
+export function getTextOnlySessions(modelType) {
+    const typeConfig = MODEL_TYPE_CONFIG[modelType];
+    return typeConfig?.text_only_sessions ?? null;
 }
 
 /**

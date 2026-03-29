@@ -1,7 +1,7 @@
 import { get_files } from './get_files.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { MODEL_TYPES } from '../../models/modeling_utils.js';
+import { getTextOnlySessions } from '../../models/modeling_utils.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
@@ -50,16 +50,11 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     if (task === 'text-generation') {
         const config = await get_config(modelId, options);
         const modelType = resolve_model_type(config);
+        const textOnlySessions = getTextOnlySessions(modelType);
 
-        if (
-            [
-                MODEL_TYPES.ImageTextToText,
-                MODEL_TYPES.AudioTextToText,
-                MODEL_TYPES.ImageAudioTextToText,
-                MODEL_TYPES.VoxtralRealtime,
-            ].includes(modelType)
-        ) {
-            return files.filter((f) => !f.includes('vision_encoder') && !f.includes('audio_encoder'));
+        if (textOnlySessions) {
+            const allowedPrefixes = Object.values(textOnlySessions).map((s) => `onnx/${s}`);
+            return files.filter((f) => !f.startsWith('onnx/') || allowedPrefixes.some((p) => f.startsWith(p)));
         }
     }
 
