@@ -1185,7 +1185,8 @@ export class PreTrainedModel extends Callable {
  * @private
  */
 export async function seq2seq_forward(self, model_inputs) {
-    let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } = model_inputs;
+    let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
+        model_inputs;
     // Encode if needed
     if (!encoder_outputs) {
         const encoder_inputs = pick(model_inputs, self.sessions['model'].inputNames);

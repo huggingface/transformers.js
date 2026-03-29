@@ -53,9 +53,9 @@ export default () => {
         expect(Number(mask_sum)).toEqual(100);
 
         expect(input_features.mean().item()).toBeCloseTo(0.0, 3);
-        expect(input_features.data[0]).toBeCloseTo(1.5188870430, 2); // [0,0,0]
+        expect(input_features.data[0]).toBeCloseTo(1.518887043, 2); // [0,0,0]
         expect(input_features.data[1]).toBeCloseTo(1.1131993532, 2); // [0,0,1]
-        expect(input_features.data[128]).toBeCloseTo(1.2305405140, 2); // [0,1,0]
+        expect(input_features.data[128]).toBeCloseTo(1.230540514, 2); // [0,1,0]
       },
       MAX_TEST_EXECUTION_TIME,
     );
