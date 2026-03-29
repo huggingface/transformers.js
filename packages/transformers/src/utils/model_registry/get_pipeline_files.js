@@ -59,7 +59,7 @@ export async function get_pipeline_files(task, modelId, options = {}) {
                 MODEL_TYPES.VoxtralRealtime,
             ].includes(modelType)
         ) {
-            return files.filter((f) => f.includes('embed_tokens') || f.includes('decoder_model_merged'));
+            return files.filter((f) => !f.includes('vision_encoder') && !f.includes('audio_encoder'));
         }
     }
 
