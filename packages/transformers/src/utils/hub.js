@@ -348,7 +348,11 @@ export async function loadResourceFile(
     });
 
     let result;
-    if (!(apis.IS_NODE_ENV && return_path)) {
+    if (apis.IS_NODE_ENV && return_path) {
+        // In Node.js with return_path, we skip the buffer read (ONNX runtime
+        // loads from disk directly). A completion progress event is emitted
+        // after the caching block below to ensure progress_total reaches 100%.
+    } else {
         /** @type {Uint8Array} */
         let buffer;
 
@@ -421,6 +425,22 @@ export async function loadResourceFile(
         await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
     }
 
+    // In Node.js with return_path, the buffer read is skipped so no progress
+    // events are emitted during loading. Emit a final completion event so
+    // that aggregate progress_total tracking reaches 100%. This is placed
+    // after storeCachedResource so it doesn't conflict with caching progress.
+    if (apis.IS_NODE_ENV && return_path && options.progress_callback && typeof response !== 'string') {
+        const size = parseInt(response.headers.get('content-length'), 10) || 0;
+        dispatchCallback(options.progress_callback, {
+            status: 'progress',
+            name: path_or_repo_id,
+            file: filename,
+            progress: 100,
+            loaded: size,
+            total: size,
+        });
+    }
+
     dispatchCallback(options.progress_callback, {
         status: 'done',
         name: path_or_repo_id,
@@ -450,6 +470,9 @@ export async function loadResourceFile(
 
     throw new Error('Unable to get model file path or buffer.');
 }
+
+/** @type {Map<string, Promise<string|Uint8Array>>} In-flight file loads keyed by repo+filename. */
+const INFLIGHT_LOADS = new Map();
 
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
@@ -487,9 +510,28 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename,
     });
 
-    /** @type {import('./cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir);
-    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
+    // Deduplicate concurrent loads of the same file so progress events are
+    // only emitted by a single download. Without this, parallel callers
+    // (e.g. tokenizer + processor in pipeline()) would race on the same file
+    // and produce interleaved progress that breaks monotonic progress_total.
+    const key = `${path_or_repo_id}::${filename}`;
+    let pending = INFLIGHT_LOADS.get(key);
+    if (!pending) {
+        /** @type {import('./cache.js').CacheInterface | null} */
+        const cache = await getCache(options?.cache_dir);
+        pending = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
+            (result) => {
+                INFLIGHT_LOADS.delete(key);
+                return result;
+            },
+            (err) => {
+                INFLIGHT_LOADS.delete(key);
+                throw err;
+            },
+        );
+        INFLIGHT_LOADS.set(key, pending);
+    }
+    return await pending;
 }
 
 /**
