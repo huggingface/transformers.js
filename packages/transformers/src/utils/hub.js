@@ -270,7 +270,9 @@ export async function loadResourceFile(
     response = await checkCachedResource(cache, localPath, proposedCacheKey);
 
     const cacheHit = response !== undefined;
-    if (!cacheHit) {
+    if (cacheHit) {
+        cacheKey = proposedCacheKey;
+    } else {
         // Caching not available, or file is not cached, so we perform the request
 
         if (env.allowLocalModels) {
