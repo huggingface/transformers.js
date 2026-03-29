@@ -3442,12 +3442,21 @@ export class LlamaTokenizer extends PreTrainedTokenizer {
         super(tokenizerJSON, tokenizerConfig);
 
         this.legacy = tokenizerConfig.legacy ?? true;
+        this.add_prefix_space = tokenizerConfig.add_prefix_space ?? true;
+
+        // Respect padding_side from tokenizer config if provided
+        if (tokenizerConfig.padding_side) {
+            this.padding_side = tokenizerConfig.padding_side;
+        }
+
         if (!this.legacy) {
             // See https://github.com/huggingface/transformers/pull/24565 for more information
             this.normalizer = null;
+            // Respect add_prefix_space: use "never" when false, "first" when true (default)
+            const prepend_scheme = this.add_prefix_space ? "first" : "never";
             this.pre_tokenizer = new MetaspacePreTokenizer({
                 replacement: SPIECE_UNDERLINE,
-                prepend_scheme: "first",
+                prepend_scheme: prepend_scheme,
             });
         }
     }
@@ -3465,7 +3474,12 @@ export class LlamaTokenizer extends PreTrainedTokenizer {
             return super._encode_text(text);
         }
 
-        let tokens = super._encode_text(SPIECE_UNDERLINE + text.replaceAll(SPIECE_UNDERLINE, " "));
+        // Only prepend SPIECE_UNDERLINE when add_prefix_space is true
+        if (this.add_prefix_space) {
+            text = SPIECE_UNDERLINE + text.replaceAll(SPIECE_UNDERLINE, " ");
+        }
+
+        let tokens = super._encode_text(text);
         if (tokens.length > 1 && tokens[0] === SPIECE_UNDERLINE && this.special_tokens.includes(tokens[1])) {
             tokens = tokens.slice(1);
         }
