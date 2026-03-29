@@ -273,7 +273,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
 
             // Remove trailing EOS
-            if (generated_tokens.length > 0 && generated_tokens[generated_tokens.length - 1] === eos_token_id) {
+            if (generated_tokens.length > 0 && generated_tokens.at(-1) === eos_token_id) {
                 generated_tokens.pop();
             }
 
@@ -314,7 +314,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     // Discard tokens after the last pair (they're from an incomplete segment)
                     // Keep up to the first token of the last pair (the end-of-segment timestamp),
                     // excluding the second token (the start-of-next-segment marker)
-                    const last_boundary = segment_boundary_indices[segment_boundary_indices.length - 1];
+                    const last_boundary = segment_boundary_indices.at(-1);
                     const last_ts_pos = generated_tokens[last_boundary - 1] - timestamp_begin;
                     segment_offset = last_ts_pos * input_stride;
                     tokens_to_keep = last_boundary;
@@ -498,7 +498,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             const padded = new Array(num_input_ids).fill(0);
             padded.push(...jump_times);
             if (jump_times.length > 0) {
-                padded.push(jump_times[jump_times.length - 1]);
+                padded.push(jump_times.at(-1));
             }
             timestamps[batch_idx].data.set(padded);
         }
