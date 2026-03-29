@@ -34,7 +34,7 @@ import {
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
-import { createTotalProgressCallback, pick, ProgressCallbackWrapper } from '../utils/core.js';
+import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
@@ -309,7 +309,7 @@ export class PreTrainedModel extends Callable {
         // by pipeline() (which does its own aggregation), gather file metadata
         // upfront so we can emit `progress_total` events. This lets consumers
         // render a single overall progress bar when calling from_pretrained() directly.
-        if (progress_callback && !ProgressCallbackWrapper.isWrapped(progress_callback)) {
+        if (progress_callback && !(progress_callback instanceof DefaultProgressCallback)) {
             /** @type {import('../utils/core.js').FilesLoadingMap} */
             const files_loading = {};
 
@@ -341,7 +341,7 @@ export class PreTrainedModel extends Callable {
             }
 
             if (Object.keys(files_loading).length > 0) {
-                options.progress_callback = createTotalProgressCallback(progress_callback, files_loading);
+                options.progress_callback = new DefaultProgressCallback(progress_callback, files_loading);
             }
         }
 

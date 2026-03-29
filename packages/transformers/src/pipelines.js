@@ -13,7 +13,7 @@
  * @module pipelines
  */
 
-import { createTotalProgressCallback, dispatchCallback } from './utils/core.js';
+import { DefaultProgressCallback, dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
 
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
@@ -153,7 +153,7 @@ export async function pipeline(
 
     const pretrainedOptions = {
         progress_callback: progress_callback
-            ? createTotalProgressCallback(progress_callback, files_loading)
+            ? new DefaultProgressCallback(progress_callback, files_loading)
             : undefined,
         config,
         cache_dir,

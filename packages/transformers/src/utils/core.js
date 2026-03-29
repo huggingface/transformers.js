@@ -7,6 +7,8 @@
  * @module utils/core
  */
 
+import { Callable } from './generic.js';
+
 /**
  * @typedef {Object} InitiateProgressInfo
  * @property {'initiate'} status
@@ -90,76 +92,51 @@ export function dispatchCallback(progress_callback, data) {
     if (progress_callback) progress_callback(data);
 }
 
-const PROGRESS_CALLBACK_WRAPPERS = new WeakMap();
-
 /**
- * Wrapper class for progress callbacks.
+ * A callable progress callback that wraps an original callback and emits
+ * aggregate `progress_total` events. Because it extends `Callable`, instances
+ * can be passed directly wherever a plain callback function is expected.
  *
- * Keeps callback wrapping metadata outside function objects, allowing callers
- * to check whether a callback is already wrapped.
+ * Callers can check `callback instanceof DefaultProgressCallback` to avoid
+ * double-wrapping when both `pipeline()` and `from_pretrained()` would
+ * otherwise each add their own wrapper.
  */
-export class ProgressCallbackWrapper {
+export class DefaultProgressCallback extends Callable {
     /**
      * @param {ProgressCallback} callback The original callback.
-     * @param {(info: ProgressInfo, callback: ProgressCallback) => void} handler
-     * A handler that receives each progress event and the original callback.
+     * @param {FilesLoadingMap} files_loading Mutable map storing per-file progress.
      */
-    constructor(callback, handler) {
+    constructor(callback, files_loading) {
+        super();
         this.callback = callback;
-        this.handler = handler;
-        this.wrapped = (info) => this.handler(info, this.callback);
-
-        PROGRESS_CALLBACK_WRAPPERS.set(this.wrapped, this);
+        this.files_loading = files_loading;
     }
 
     /**
-     * Checks whether a callback has been created by this wrapper class.
-     *
-     * @param {ProgressCallback | null | undefined} callback
-     * @returns {boolean}
+     * @param {ProgressInfo} info
      */
-    static isWrapped(callback) {
-        if (!callback) return false;
-        return PROGRESS_CALLBACK_WRAPPERS.get(callback) instanceof ProgressCallbackWrapper;
-    }
-}
-
-/**
- * Creates a progress callback wrapper that emits `progress_total` events
- * based on the aggregate state of `files_loading`.
- * The wrapper also lets nested loaders detect wrapped callbacks via
- * `ProgressCallbackWrapper.isWrapped(...)` so we avoid double-wrapping and
- * duplicate `progress_total` events without mutating function objects.
- *
- * @param {ProgressCallback} progress_callback The callback to wrap.
- * @param {FilesLoadingMap} files_loading Mutable map storing per-file progress.
- * @returns {ProgressCallback} Wrapped callback.
- */
-export function createTotalProgressCallback(progress_callback, files_loading) {
-    const wrapper = new ProgressCallbackWrapper(progress_callback, (info, callback) => {
+    _call(info) {
         if (info.status === 'progress') {
-            files_loading[info.file] = {
+            this.files_loading[info.file] = {
                 loaded: info.loaded,
                 total: info.total,
             };
 
-            const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
-            const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
+            const loaded = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+            const total = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.total, 0);
             const progress = total > 0 ? (loaded / total) * 100 : 0;
 
-            callback({
+            this.callback({
                 status: 'progress_total',
                 name: info.name,
                 progress,
                 loaded,
                 total,
-                files: structuredClone(files_loading),
+                files: structuredClone(this.files_loading),
             });
         }
-        callback(info);
-    });
-
-    return wrapper.wrapped;
+        this.callback(info);
+    }
 }
 
 /**
