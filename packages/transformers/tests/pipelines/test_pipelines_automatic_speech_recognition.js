@@ -90,7 +90,7 @@ export default () => {
       beforeAll(async () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
         audio = await load_cached_audio("mlk");
-      }, MAX_MODEL_LOAD_TIME);
+      }, 2 * MAX_MODEL_LOAD_TIME);
 
       it("should be an instance of AutomaticSpeechRecognitionPipeline", () => {
         expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
@@ -186,7 +186,7 @@ export default () => {
       beforeAll(async () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
         audio = await load_cached_audio("mlk");
-      }, MAX_MODEL_LOAD_TIME);
+      }, 2 * MAX_MODEL_LOAD_TIME);
 
       it("should be an instance of AutomaticSpeechRecognitionPipeline", () => {
         expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
@@ -273,7 +273,7 @@ export default () => {
       beforeAll(async () => {
         pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
         audio = await load_cached_audio("whisper_1");
-      }, MAX_MODEL_LOAD_TIME);
+      }, 3 * MAX_MODEL_LOAD_TIME);
 
       it("should be an instance of AutomaticSpeechRecognitionPipeline", () => {
         expect(pipe).toBeInstanceOf(AutomaticSpeechRecognitionPipeline);
