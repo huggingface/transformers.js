@@ -33,7 +33,7 @@ import {
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
-import { pick } from '../utils/core.js';
+import { createTotalProgressCallback, pick, ProgressCallbackWrapper } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
@@ -427,7 +427,7 @@ export class PreTrainedModel extends Callable {
         // by pipeline() (which does its own aggregation), gather file metadata
         // upfront so we can emit `progress_total` events. This lets consumers
         // render a single overall progress bar when calling from_pretrained() directly.
-        if (progress_callback && !progress_callback._progress_total_wrapped) {
+        if (progress_callback && !ProgressCallbackWrapper.isWrapped(progress_callback)) {
             /** @type {import('../utils/core.js').FilesLoadingMap} */
             const files_loading = {};
 
@@ -444,9 +444,7 @@ export class PreTrainedModel extends Callable {
                 );
                 metadata.forEach((m, i) => {
                     if (m.exists) {
-                        // config.json is fetched by AutoConfig.from_pretrained() above,
-                        // before this tracker is set up. Pre-mark it as fully loaded so
-                        // progress reaches 100%.
+                        // config.json is fetched by AutoConfig.from_pretrained() above
                         const isAlreadyLoaded = expected_files[i] === 'config.json';
                         files_loading[expected_files[i]] = {
                             loaded: isAlreadyLoaded ? (m.size ?? 0) : 0,
@@ -461,30 +459,7 @@ export class PreTrainedModel extends Callable {
             }
 
             if (Object.keys(files_loading).length > 0) {
-                const wrappedCallback = /** @param {import('../utils/core.js').ProgressInfo} info */ (info) => {
-                    if (info.status === 'progress') {
-                        files_loading[info.file] = {
-                            loaded: info.loaded,
-                            total: info.total,
-                        };
-
-                        const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
-                        const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
-                        const progress = total > 0 ? (loaded / total) * 100 : 0;
-
-                        progress_callback({
-                            status: 'progress_total',
-                            name: info.name,
-                            progress,
-                            loaded,
-                            total,
-                            files: structuredClone(files_loading),
-                        });
-                    }
-                    progress_callback(info);
-                };
-                wrappedCallback._progress_total_wrapped = true;
-                options.progress_callback = wrappedCallback;
+                options.progress_callback = createTotalProgressCallback(progress_callback, files_loading);
             }
         }
 

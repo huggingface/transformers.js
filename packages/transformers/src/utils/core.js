@@ -90,6 +90,78 @@ export function dispatchCallback(progress_callback, data) {
     if (progress_callback) progress_callback(data);
 }
 
+const PROGRESS_CALLBACK_WRAPPERS = new WeakMap();
+
+/**
+ * Wrapper class for progress callbacks.
+ *
+ * Keeps callback wrapping metadata outside function objects, allowing callers
+ * to check whether a callback is already wrapped.
+ */
+export class ProgressCallbackWrapper {
+    /**
+     * @param {ProgressCallback} callback The original callback.
+     * @param {(info: ProgressInfo, callback: ProgressCallback) => void} handler
+     * A handler that receives each progress event and the original callback.
+     */
+    constructor(callback, handler) {
+        this.callback = callback;
+        this.handler = handler;
+        this.wrapped = (info) => this.handler(info, this.callback);
+
+        PROGRESS_CALLBACK_WRAPPERS.set(this.wrapped, this);
+    }
+
+    /**
+     * Checks whether a callback has been created by this wrapper class.
+     *
+     * @param {ProgressCallback | null | undefined} callback
+     * @returns {boolean}
+     */
+    static isWrapped(callback) {
+        if (!callback) return false;
+        return PROGRESS_CALLBACK_WRAPPERS.get(callback) instanceof ProgressCallbackWrapper;
+    }
+}
+
+/**
+ * Creates a progress callback wrapper that emits `progress_total` events
+ * based on the aggregate state of `files_loading`.
+ * The wrapper also lets nested loaders detect wrapped callbacks via
+ * `ProgressCallbackWrapper.isWrapped(...)` so we avoid double-wrapping and
+ * duplicate `progress_total` events without mutating function objects.
+ *
+ * @param {ProgressCallback} progress_callback The callback to wrap.
+ * @param {FilesLoadingMap} files_loading Mutable map storing per-file progress.
+ * @returns {ProgressCallback} Wrapped callback.
+ */
+export function createTotalProgressCallback(progress_callback, files_loading) {
+    const wrapper = new ProgressCallbackWrapper(progress_callback, (info, callback) => {
+        if (info.status === 'progress') {
+            files_loading[info.file] = {
+                loaded: info.loaded,
+                total: info.total,
+            };
+
+            const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+            const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
+            const progress = total > 0 ? (loaded / total) * 100 : 0;
+
+            callback({
+                status: 'progress_total',
+                name: info.name,
+                progress,
+                loaded,
+                total,
+                files: structuredClone(files_loading),
+            });
+        }
+        callback(info);
+    });
+
+    return wrapper.wrapped;
+}
+
 /**
  * Reverses the keys and values of an object.
  *
