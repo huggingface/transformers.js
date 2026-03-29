@@ -39,6 +39,7 @@ import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
+import { MODEL_TYPES } from './session_config.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -84,25 +85,7 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export const MODEL_TYPES = {
-    EncoderOnly: 0,
-    EncoderDecoder: 1,
-    Seq2Seq: 2,
-    Vision2Seq: 3,
-    DecoderOnly: 4,
-    DecoderOnlyWithoutHead: 5,
-    MaskGeneration: 6,
-    ImageTextToText: 7,
-    Musicgen: 8,
-    MultiModality: 9,
-    Phi3V: 10,
-    AudioTextToText: 11,
-    AutoEncoder: 12,
-    ImageAudioTextToText: 13,
-    Supertonic: 14,
-    Chatterbox: 15,
-    VoxtralRealtime: 16,
-};
+export { getSessionsConfig, MODEL_TYPES } from './session_config.js';
 
 const MODEL_TYPE_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
@@ -264,22 +247,6 @@ const MODEL_TYPE_CONFIG = {
         sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
 };
-
-/**
- * Get the session configuration for a given model type.
- * @param {number} modelType The model type enum value.
- * @param {Object} config The model config.
- * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
- */
-export function getSessionsConfig(modelType, config, options = {}) {
-    const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
-    return {
-        sessions: typeConfig.sessions(config, options),
-        cache_sessions: typeConfig.cache_sessions,
-        optional_configs: typeConfig.optional_configs,
-    };
-}
 
 /**
  * Resolves the model type config for a given class name and config.
