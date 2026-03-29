@@ -5,17 +5,6 @@ import { MODEL_TYPES } from '../../models/modeling_utils.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
- * Maps multimodal model types to the encoder session names that should be
- * excluded when the model is used for a text-only pipeline task.
- */
-const MULTIMODAL_ENCODER_SESSIONS = {
-    [MODEL_TYPES.ImageTextToText]: ['vision_encoder'],
-    [MODEL_TYPES.AudioTextToText]: ['audio_encoder'],
-    [MODEL_TYPES.ImageAudioTextToText]: ['vision_encoder', 'audio_encoder'],
-    [MODEL_TYPES.VoxtralRealtime]: ['audio_encoder'],
-};
-
-/**
  * Get all files needed for a specific pipeline task.
  * Automatically detects which components (tokenizer, processor) are needed by checking
  * whether the model has the corresponding files (tokenizer_config.json, preprocessor_config.json).
@@ -50,20 +39,27 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     const include_tokenizer = type !== 'audio' && type !== 'image';
     const include_processor = type !== 'text';
 
-    let files = await get_files(modelId, {
+    const files = await get_files(modelId, {
         ...options,
         include_tokenizer,
         include_processor,
     });
 
-    // For text-only tasks on multimodal models, exclude encoder files
-    // (e.g., vision_encoder, audio_encoder) that are not needed for text generation.
-    if (type === 'text') {
+    // When loading multimodal models via the text-generation pipeline,
+    // only load the sessions needed for text generation (embed_tokens, decoder_model_merged)
+    if (task === 'text-generation') {
         const config = await get_config(modelId, options);
         const modelType = resolve_model_type(config);
-        const excludeSessions = MULTIMODAL_ENCODER_SESSIONS[modelType];
-        if (excludeSessions) {
-            files = files.filter((f) => !excludeSessions.some((s) => f.includes(s)));
+
+        if (
+            [
+                MODEL_TYPES.ImageTextToText,
+                MODEL_TYPES.AudioTextToText,
+                MODEL_TYPES.ImageAudioTextToText,
+                MODEL_TYPES.VoxtralRealtime,
+            ].includes(modelType)
+        ) {
+            return files.filter((f) => f.includes('embed_tokens') || f.includes('decoder_model_merged'));
         }
     }
 
