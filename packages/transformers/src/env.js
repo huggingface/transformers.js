@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.0.0-next.10';
+const VERSION = '4.0.0-next.11';
 
 const HAS_SELF = typeof self !== 'undefined';
 
