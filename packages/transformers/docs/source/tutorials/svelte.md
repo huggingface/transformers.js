@@ -118,7 +118,7 @@ First, let's create some child components. Create a folder called `lib` in the `
    </script>
 
    <div class="progress-container">
-     <div class="progress-bar" style="width: {percentage}%">
+     <div class="progress-bar" style:width="{percentage}%">
        {text} ({percentage.toFixed(2)}%)
      </div>
    </div>
