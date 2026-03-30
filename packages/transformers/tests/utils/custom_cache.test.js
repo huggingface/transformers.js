@@ -6,17 +6,27 @@ init();
 
 /**
  * A naive custom cache implementation that fetches files directly from the
- * Hugging Face Hub on every `match` call (i.e., no real caching).
+ * Hugging Face Hub and stores them in an internal (in-memory) map.
  * This satisfies the CacheInterface contract (`match` + `put`).
  */
 class NaiveFetchCache {
+  constructor() {
+    /** @type {Map<string, Response>} */
+    this.cache = new Map();
+  }
+
   async match(request) {
-    // `request` is a URL string (either the local path or the remote HF Hub URL).
-    // We attempt to fetch it and return the Response directly.
+    const cached = this.cache.get(request);
+    if (cached) {
+      return cached.clone();
+    }
+
+    // Not in cache — attempt a fresh fetch from the URL.
     try {
       const response = await fetch(request);
       if (response.ok) {
-        return response;
+        this.cache.set(request, response);
+        return response.clone();
       }
     } catch {
       // Ignore fetch errors (e.g., invalid URLs like local paths) — treat as cache miss
@@ -25,7 +35,9 @@ class NaiveFetchCache {
   }
 
   async put(request, response) {
-    // No-op: we don't actually store anything.
+    if (!this.cache.has(request)) {
+      this.cache.set(request, response);
+    }
   }
 }
 
