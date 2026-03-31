@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformers.js | Sample Browser Extension</title>
+
+    <link rel="stylesheet" href="sidepanel.css" />
+    <script defer src="sidepanel.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Transformers.js</h1>
+        <h2>Run 🤗 Transformers in a Browser Extension!</h2>
+        <input id="text" placeholder="Enter text here">
+        <div id="model_loading_info">
+            Loading model files:
+        </div>
+        <pre id="output"></pre>
+    </div>
+    <!-- Inference is conducted in the context of a sandboxed iframe to enable the ONNX Runtime to load multiple threads -->
+    <iframe src="sandbox.html" id="sandbox" style="display: none;"></iframe>
+</body>
+
+</html>
