@@ -11,6 +11,7 @@ export * from './donut/image_processing_donut.js';
 export * from './dpt/image_processing_dpt.js';
 export * from './efficientnet/image_processing_efficientnet.js';
 export * from './gemma3/image_processing_gemma3.js';
+export * from './gemma4/image_processing_gemma4.js';
 export * from './glm46v/image_processing_glm46v.js';
 export * from './glpn/image_processing_glpn.js';
 export * from './grounding_dino/image_processing_grounding_dino.js';

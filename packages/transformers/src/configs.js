@@ -74,6 +74,7 @@ function getNormalizedConfig(config) {
         case 'voxtral_realtime':
         case 'smolvlm':
         case 'gemma3n':
+        case 'gemma4':
         case 'lfm2_vl':
         case 'chatterbox':
         case 'lighton_ocr':
@@ -165,6 +166,7 @@ function getNormalizedConfig(config) {
         case 'vaultgemma':
         case 'gemma3_text':
         case 'gemma3n_text':
+        case 'gemma4_text':
         case 'glm':
         case 'helium':
         case 'ernie4_5':
@@ -431,6 +433,30 @@ export function getCacheShapes(config, options) {
                 ];
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
+            }
+        }
+        return cache_values;
+    } else if (['gemma4', 'gemma4_text'].includes(config.model_type)) {
+        const c = /** @type {any} */ (config.model_type === 'gemma4' ? /** @type {any} */ (config).text_config : config);
+        const pkv_prefix = options?.prefix ?? 'past_key_values';
+
+        /** @type {Record<string, number[]>} */
+        const cache_values = {};
+        const num_hidden_layers = c.num_hidden_layers;
+        const num_kv_shared_layers = c.num_kv_shared_layers ?? 0;
+        const num_kv_layers = num_hidden_layers - num_kv_shared_layers;
+        const num_key_value_heads = c.num_key_value_heads;
+        const head_dim = c.head_dim;
+        const global_head_dim = c.global_head_dim ?? head_dim;
+        const layer_types = c.layer_types ?? [];
+
+        // Create `num_kv_layers` unique KV entries, corresponding to the first `num_kv_layers`
+        // model layers (the remaining layers share caches with earlier ones).
+        // Full attention layers use global_head_dim, sliding attention layers use head_dim.
+        for (let i = 0; i < num_kv_layers; ++i) {
+            const dim = layer_types[i] === 'full_attention' ? global_head_dim : head_dim;
+            for (const kv of ['key', 'value']) {
+                cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, dim];
             }
         }
         return cache_values;

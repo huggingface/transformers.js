@@ -303,6 +303,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['qwen3_5_text', 'Qwen3_5ForCausalLM'],
     ['qwen3_5_moe', 'Qwen3_5MoeForCausalLM'],
     ['gemma3n', 'Gemma3nForCausalLM'],
+    ['gemma4', 'Gemma4ForCausalLM'],
     ['phi', 'PhiForCausalLM'],
     ['phi3', 'Phi3ForCausalLM'],
     ['mpt', 'MptForCausalLM'],
@@ -396,6 +397,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['llava_qwen2', 'LlavaQwen2ForCausalLM'],
     ['gemma3', 'Gemma3ForConditionalGeneration'],
     ['gemma3n', 'Gemma3nForConditionalGeneration'],
+    ['gemma4', 'Gemma4ForConditionalGeneration'],
     ['mistral3', 'Mistral3ForConditionalGeneration'],
     ['lighton_ocr', 'LightOnOcrForConditionalGeneration'],
     ['glm_ocr', 'GlmOcrForConditionalGeneration'],
@@ -617,6 +619,11 @@ const CUSTOM_MAPPING = [
     [
         'Gemma3nForConditionalGeneration',
         ALL_MODEL_FILES.Gemma3nForConditionalGeneration,
+        MODEL_TYPES.ImageAudioTextToText,
+    ],
+    [
+        'Gemma4ForConditionalGeneration',
+        ALL_MODEL_FILES.Gemma4ForConditionalGeneration,
         MODEL_TYPES.ImageAudioTextToText,
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
