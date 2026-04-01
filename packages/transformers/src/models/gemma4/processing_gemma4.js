@@ -66,18 +66,6 @@ export class Gemma4Processor extends Processor {
     }
 
     async _call(text, images = null, audio = null, options = {}) {
-        // Handle case where audio is omitted: processor(text, images, options)
-        if (
-            audio !== null &&
-            typeof audio === 'object' &&
-            !(audio instanceof Float32Array) &&
-            !(audio instanceof Float64Array) &&
-            !Array.isArray(audio)
-        ) {
-            options = audio;
-            audio = null;
-        }
-
         if (typeof text === 'string') {
             text = [text];
         }
