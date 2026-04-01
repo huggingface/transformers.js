@@ -49,10 +49,7 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
             }));
             if (input_ids.dims[1] !== 1) {
                 if (pixel_values) {
-                    // Encode the image
-                    const { image_features } = await sessionRun(this.sessions['vision_encoder'], {
-                        pixel_values,
-                    });
+                    const { image_features } = await this._encode_vision({ pixel_values, ...kwargs });
                     ({ inputs_embeds, attention_mask } = this._merge_input_ids_with_image_features({
                         image_features,
                         inputs_embeds,
@@ -91,6 +88,10 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
             true,
         );
         return outputs;
+    }
+
+    _encode_vision(kwargs) {
+        return sessionRun(this.sessions['vision_encoder'], { pixel_values: kwargs.pixel_values });
     }
 
     _merge_input_ids_with_image_features(kwargs) {
