@@ -437,7 +437,9 @@ export function getCacheShapes(config, options) {
         }
         return cache_values;
     } else if (['gemma4', 'gemma4_text'].includes(config.model_type)) {
-        const c = /** @type {any} */ (config.model_type === 'gemma4' ? /** @type {any} */ (config).text_config : config);
+        const c = /** @type {any} */ (
+            config.model_type === 'gemma4' ? /** @type {any} */ (config).text_config : config
+        );
         const pkv_prefix = options?.prefix ?? 'past_key_values';
 
         /** @type {Record<string, number[]>} */
