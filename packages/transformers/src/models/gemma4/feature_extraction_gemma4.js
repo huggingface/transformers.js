@@ -1,109 +1,49 @@
-import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
+import { validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, window_function } from '../../utils/audio.js';
-import { FFT } from '../../utils/maths.js';
+import { spectrogram } from '../../utils/audio.js';
+import { Gemma3nAudioFeatureExtractor } from '../gemma3n/feature_extraction_gemma3n.js';
 
-export class Gemma4AudioFeatureExtractor extends FeatureExtractor {
-    constructor(config) {
-        super(config);
-
-        const { fft_length, feature_size, min_frequency, max_frequency, sampling_rate, frame_length } = this.config;
-
-        this.mel_filters = mel_filter_bank(
-            Math.floor(1 + fft_length / 2),
-            feature_size,
-            min_frequency,
-            max_frequency,
-            sampling_rate,
-            null,
-            'htk',
-            false,
-        );
-        this.window = window_function(frame_length, 'hann');
-    }
-
+export class Gemma4AudioFeatureExtractor extends Gemma3nAudioFeatureExtractor {
     /**
-     * Compute log-Mel spectrogram matching Python's `_extract_spectrogram` exactly.
-     *
-     * Key differences from the shared `spectrogram()` utility:
-     *   1. Semicausal time padding: prepend frame_length // 2 zeros
-     *   2. Frame count uses unfold(size=frame_length+1)
-     *   3. Mel projection done in float64 (matching numpy's auto-promotion)
-     *
-     * @param {Float32Array|Float64Array} waveform
-     * @param {number} original_length Length of real audio before pad-to-multiple.
-     * @returns {{ features: Tensor, mask: Tensor }}
+     * @override
+     * Gemma4 uses semicausal padding, unfold(frame_length+1) framing, and
+     * additive mel_floor — all controlled via flags on the shared spectrogram().
      */
-    _extract_fbank_features(waveform, original_length) {
-        const { frame_length, hop_length, fft_length, mel_floor, feature_size } = this.config;
-        const num_frequency_bins = Math.floor(fft_length / 2) + 1;
+    async _extract_fbank_features(waveform, max_length) {
+        const { frame_length, hop_length, fft_length } = this.config;
 
-        // 1. Prepend semicausal padding
+        // Compute frame count matching Python's unfold(size=frame_length+1, step=hop_length)
         const pad_left = Math.floor(frame_length / 2);
-        // @ts-expect-error ts(2351)
-        const padded = new waveform.constructor(pad_left + waveform.length);
-        padded.set(waveform, pad_left);
+        const padded_length = waveform.length + pad_left; // after semicausal padding
+        const num_frames = Math.floor((padded_length - (frame_length + 1)) / hop_length) + 1;
 
-        // 2. Compute frame count matching Python's unfold(size=frame_length+1, step=hop_length)
-        const frame_size_for_unfold = frame_length + 1;
-        const num_frames = Math.floor((padded.length - frame_size_for_unfold) / hop_length) + 1;
-
-        // 3. STFT: window + FFT per frame, compute magnitude, mel project, log — all in float64
-        const fft = new FFT(fft_length);
-        const inputBuffer = new Float64Array(fft_length);
-        const outputBuffer = new Float64Array(fft.outputBufferSize);
-        const mel_data = new Float32Array(num_frames * feature_size);
-
-        for (let i = 0; i < num_frames; ++i) {
-            const offset = i * hop_length;
-
-            // Load frame and apply window
-            inputBuffer.fill(0);
-            for (let j = 0; j < frame_length; ++j) {
-                inputBuffer[j] = padded[offset + j] * this.window[j];
-            }
-
-            fft.realTransform(outputBuffer, inputBuffer);
-
-            // Magnitude → mel projection → log (all in float64)
-            for (let m = 0; m < feature_size; ++m) {
-                const filter = this.mel_filters[m];
-                let sum = 0;
-                for (let f = 0; f < num_frequency_bins; ++f) {
-                    const f2 = f << 1;
-                    const mag = Math.sqrt(outputBuffer[f2] ** 2 + outputBuffer[f2 + 1] ** 2);
-                    sum += mag * filter[f];
-                }
-                mel_data[i * feature_size + m] = Math.log(sum + mel_floor);
-            }
-        }
-
-        // 4. Build frame-aware attention mask
-        const sample_mask = new Uint8Array(padded.length);
-        sample_mask.fill(1, pad_left, pad_left + original_length);
-
-        const frame_mask = new Uint8Array(num_frames);
-        for (let i = 0; i < num_frames; ++i) {
-            frame_mask[i] = sample_mask[i * hop_length + frame_size_for_unfold - 1] ? 1 : 0;
-        }
-
-        // 5. Zero out features for invalid frames (matching Python's speech * mask[..., None])
-        for (let i = 0; i < num_frames; ++i) {
-            if (!frame_mask[i]) {
-                mel_data.fill(0, i * feature_size, (i + 1) * feature_size);
-            }
-        }
-
-        return {
-            features: new Tensor('float32', mel_data, [num_frames, feature_size]),
-            mask: new Tensor('bool', frame_mask, [num_frames]),
-        };
+        return spectrogram(
+            waveform,
+            this.window,
+            frame_length,
+            hop_length,
+            {
+                fft_length,
+                center: true,
+                pad_mode: 'semicausal',
+                onesided: true,
+                preemphasis: this.config.preemphasis,
+                preemphasis_htk_flavor: this.config.preemphasis_htk_flavor,
+                mel_filters: this.mel_filters,
+                log_mel: 'log',
+                mel_floor: this.config.mel_floor,
+                mel_floor_mode: 'add',
+                remove_dc_offset: false,
+                transpose: true,
+                max_num_frames: num_frames,
+            },
+        );
     }
 
     /**
-     * @param {Float32Array|Float64Array} audio
-     * @param {Object} options
-     * @returns {Promise<{ input_features: Tensor, input_features_mask: Tensor }>}
+     * @override
+     * Tracks original audio length to build a frame-aware attention mask
+     * and zeros out features for invalid (padded) frames.
      */
     async _call(audio, { max_length = 480_000, truncation = true, padding = true, pad_to_multiple_of = 128 } = {}) {
         validate_audio_inputs(audio, 'Gemma4AudioFeatureExtractor');
@@ -121,11 +61,36 @@ export class Gemma4AudioFeatureExtractor extends FeatureExtractor {
             audio = padded_audio;
         }
 
-        const { features, mask } = this._extract_fbank_features(audio, original_length);
+        const features = await this._extract_fbank_features(audio, this.config.max_length);
+        const num_frames = features.dims[0];
+        const num_features = features.dims[1];
+
+        // Build frame-aware mask: a frame is valid only when all its samples are real audio.
+        // After semicausal padding (pad_left zeros prepended), real audio spans
+        // [pad_left, pad_left + original_length) in the padded waveform.
+        const { frame_length, hop_length } = this.config;
+        const pad_left = Math.floor(frame_length / 2);
+        const frame_size_for_unfold = frame_length + 1;
+
+        const sample_mask = new Uint8Array(audio.length + pad_left);
+        sample_mask.fill(1, pad_left, pad_left + original_length);
+
+        const frame_mask = new Uint8Array(num_frames);
+        for (let i = 0; i < num_frames; ++i) {
+            frame_mask[i] = sample_mask[i * hop_length + frame_size_for_unfold - 1] ? 1 : 0;
+        }
+
+        // Zero out features for invalid frames (matching Python's speech * mask[..., None])
+        const feat_data = /** @type {Float32Array} */ (features.data);
+        for (let i = 0; i < num_frames; ++i) {
+            if (!frame_mask[i]) {
+                feat_data.fill(0, i * num_features, (i + 1) * num_features);
+            }
+        }
 
         return {
             input_features: features.unsqueeze_(0),
-            input_features_mask: mask.unsqueeze_(0),
+            input_features_mask: new Tensor('bool', frame_mask, [1, num_frames]),
         };
     }
 }

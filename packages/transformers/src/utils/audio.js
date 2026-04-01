@@ -500,6 +500,7 @@ export async function spectrogram(
         do_pad = true,
         transpose = false,
         mel_offset = 0,
+        mel_floor_mode = 'clamp',
     } = {},
 ) {
     const window_length = window.length;
@@ -539,6 +540,14 @@ export async function spectrogram(
             case 'constant': {
                 // @ts-expect-error ts(2351)
                 const padded = new waveform.constructor(waveform.length + 2 * padding);
+                padded.set(waveform, padding);
+                waveform = padded;
+                break;
+            }
+            case 'semicausal': {
+                // Prepend padding zeros only (no right padding)
+                // @ts-expect-error ts(2351)
+                const padded = new waveform.constructor(waveform.length + padding);
                 padded.set(waveform, padding);
                 waveform = padded;
                 break;
@@ -653,8 +662,14 @@ export async function spectrogram(
     }
 
     const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
-    for (let i = 0; i < mel_spec_data.length; ++i) {
-        mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+    if (mel_floor_mode === 'add') {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + mel_spec_data[i] + mel_floor;
+        }
+    } else {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+        }
     }
 
     if (power !== null && log_mel !== null) {
