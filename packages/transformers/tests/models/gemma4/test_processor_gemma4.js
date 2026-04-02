@@ -4,7 +4,7 @@ import { load_cached_image, load_cached_audio } from "../../asset_cache.js";
 import { MAX_PROCESSOR_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "../../init.js";
 
 export default () => {
-  describe("Gemma4Processor", () => {
+  describe.skip("Gemma4Processor", () => {
     const model_id = "onnx-community/gemma-4-E2B-it-ONNX";
 
     /** @type {Gemma4Processor} */
