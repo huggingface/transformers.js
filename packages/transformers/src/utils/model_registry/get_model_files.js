@@ -54,11 +54,18 @@ export function get_config(
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
  * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix).
+ * @param {number|null} [options.model_type_override=null] Override the resolved model type (one of MODEL_TYPES). Used by get_pipeline_files to pass the type derived from the pipeline's auto class.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(
     modelId,
-    { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
+    {
+        config = null,
+        dtype: overrideDtype = null,
+        device: overrideDevice = null,
+        model_file_name = null,
+        model_type_override = null,
+    } = {},
 ) {
     config = await get_config(modelId, { config });
 
@@ -74,8 +81,8 @@ export async function get_model_files(
     const rawDevice = overrideDevice ?? custom_config.device;
     let dtype = overrideDtype ?? custom_config.dtype;
 
-    // Infer model type from config
-    const modelType = resolve_model_type(config);
+    // Infer model type from config, or use the override provided by the caller (e.g., get_pipeline_files)
+    const modelType = model_type_override ?? resolve_model_type(config);
 
     const add_model_file = (fileName, baseName = null) => {
         baseName = baseName ?? fileName;

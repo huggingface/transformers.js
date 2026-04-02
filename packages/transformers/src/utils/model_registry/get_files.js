@@ -14,6 +14,7 @@ import { get_processor_files } from './get_processor_files.js';
  * @param {string|null} [options.model_file_name=null|null] Override the model file name (excluding .onnx suffix)
  * @param {boolean} [options.include_tokenizer=true] Whether to check for tokenizer files (set to false for vision-only models)
  * @param {boolean} [options.include_processor=true] Whether to check for processor files
+ * @param {number|null} [options.model_type_override=null] Override the resolved model type (one of MODEL_TYPES). Passed through to get_model_files.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_files(
@@ -25,9 +26,10 @@ export async function get_files(
         model_file_name = null,
         include_tokenizer = true,
         include_processor = true,
+        model_type_override = null,
     } = {},
 ) {
-    const files = await get_model_files(modelId, { config, dtype, device, model_file_name });
+    const files = await get_model_files(modelId, { config, dtype, device, model_file_name, model_type_override });
 
     if (include_tokenizer) {
         const tokenizerFiles = await get_tokenizer_files(modelId);
