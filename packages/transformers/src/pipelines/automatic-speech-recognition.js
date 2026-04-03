@@ -141,6 +141,11 @@ export class AutomaticSpeechRecognitionPipeline
     )
 {
     async _call(audio, kwargs = {}) {
+        kwargs = {
+            max_new_tokens: 256,
+            num_beams: 5, 
+            ...kwargs
+        };
         switch (this.model.config.model_type) {
             case 'whisper':
             case 'lite-whisper':

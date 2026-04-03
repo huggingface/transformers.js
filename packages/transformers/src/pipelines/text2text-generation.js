@@ -42,6 +42,12 @@ export class Text2TextGenerationPipeline
 
     /** @type {Text2TextGenerationPipelineCallback} */
     async _call(texts, generate_kwargs = {}) {
+        generate_kwargs = { 
+            max_new_tokens: 256,
+            do_sample: true,
+            temperature: 0.7, 
+            ...generate_kwargs
+        };
         if (!Array.isArray(texts)) {
             texts = [texts];
         }

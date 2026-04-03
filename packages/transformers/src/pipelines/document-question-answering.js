@@ -44,6 +44,10 @@ export class DocumentQuestionAnsweringPipeline
     )
 {
     async _call(image, question, generate_kwargs = {}) {
+        generate_kwargs = {
+            max_new_tokens: 256,
+            ...generate_kwargs
+        };
         if (Array.isArray(image)) {
             if (image.length !== 1) {
                 throw Error('Document Question Answering pipeline currently only supports a batch size of 1.');

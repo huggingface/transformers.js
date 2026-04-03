@@ -105,6 +105,12 @@ export class TextGenerationPipeline
      * @param {Partial<TextGenerationConfig>} generate_kwargs
      */
     async _call(texts, generate_kwargs = {}) {
+        generate_kwargs = { 
+            max_new_tokens: 256,
+            do_sample: true,
+            temperature: 0.7, 
+            ...generate_kwargs
+        };
         let isBatched = false;
         let isChatInput = false;
 
