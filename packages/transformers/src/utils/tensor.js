@@ -506,11 +506,27 @@ export class Tensor {
         }
 
         const this_data = this.data;
-        const fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
+        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+
+        if (is_bigint && p !== 1) {
+            throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
+        }
+
+        let fn, zero;
+        if (is_bigint) {
+            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
+            zero = 0n;
+        } else {
+            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
+            zero = 0;
+        }
 
         if (dim === null) {
             // @ts-ignore
-            const val = this_data.reduce(fn, 0) ** (1 / p);
+            let val = this_data.reduce(fn, zero);
+            if (p !== 1) {
+                val = val ** (1 / p);
+            }
             return new Tensor(this.type, [val], []);
         }
 

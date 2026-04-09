@@ -26,28 +26,43 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.0.0-next.4';
+const VERSION = '4.0.1';
 
-const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
-const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node';
+const HAS_SELF = typeof self !== 'undefined';
+
 const IS_FS_AVAILABLE = !isEmpty(fs);
 const IS_PATH_AVAILABLE = !isEmpty(path);
+const IS_WEB_CACHE_AVAILABLE = HAS_SELF && 'caches' in self;
 
 // Runtime detection
 const IS_DENO_RUNTIME = typeof globalThis.Deno !== 'undefined';
 const IS_BUN_RUNTIME = typeof globalThis.Bun !== 'undefined';
 
+const IS_DENO_WEB_RUNTIME = IS_DENO_RUNTIME && IS_WEB_CACHE_AVAILABLE && !IS_FS_AVAILABLE;
+
+const IS_PROCESS_AVAILABLE = typeof process !== 'undefined';
+const IS_NODE_ENV = IS_PROCESS_AVAILABLE && process?.release?.name === 'node' && !IS_DENO_WEB_RUNTIME;
+
 // Check if various APIs are available (depends on environment)
 const IS_BROWSER_ENV = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 const IS_WEBWORKER_ENV =
-    typeof self !== 'undefined' &&
+    HAS_SELF &&
     ['DedicatedWorkerGlobalScope', 'ServiceWorkerGlobalScope', 'SharedWorkerGlobalScope'].includes(
         self.constructor?.name,
     );
-const IS_WEB_CACHE_AVAILABLE = typeof self !== 'undefined' && 'caches' in self;
+const IS_WEB_ENV = IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME;
+
 const IS_WEBGPU_AVAILABLE = IS_NODE_ENV || (typeof navigator !== 'undefined' && 'gpu' in navigator);
 const IS_WEBNN_AVAILABLE = typeof navigator !== 'undefined' && 'ml' in navigator;
 const IS_CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
+
+const IS_CHROME_AVAILABLE =
+    // @ts-ignore - chrome may not exist in all environments
+    typeof chrome !== 'undefined' && typeof chrome.runtime !== 'undefined' && typeof chrome.runtime.id === 'string';
+
+const IS_SERVICE_WORKER_ENV =
+    // @ts-ignore - ServiceWorkerGlobalScope may not exist in all environments
+    typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
 
 /**
  * Check if the current environment is Safari browser.
@@ -87,6 +102,15 @@ export const apis = Object.freeze({
     /** Whether we are running in a web worker environment */
     IS_WEBWORKER_ENV,
 
+    /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
+    IS_WEB_ENV,
+
+    /** Whether we are running in a service worker environment */
+    IS_SERVICE_WORKER_ENV,
+
+    /** Whether we are running in Deno's web runtime (CDN imports, Cache API available, no filesystem) */
+    IS_DENO_WEB_RUNTIME,
+
     /** Whether the Cache API is available */
     IS_WEB_CACHE_AVAILABLE,
 
@@ -113,6 +137,9 @@ export const apis = Object.freeze({
 
     /** Whether the crypto API is available */
     IS_CRYPTO_AVAILABLE,
+
+    /** Whether the Chrome runtime API is available */
+    IS_CHROME_AVAILABLE,
 });
 
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
@@ -177,7 +204,7 @@ export const LogLevel = Object.freeze({
  * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env>}} backends Expose environment variables of different backends,
+ * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
  * allowing users to set these variables if they want to.
  * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
@@ -194,13 +221,18 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
- * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries for ONNX Runtime. Defaults to `true` when cache is available.
- * This can improve performance by avoiding repeated downloads of WASM files. Note: Only the WASM binary is cached.
- * The MJS loader file still requires network access unless you use a Service Worker.
+ * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime.
+ * Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads.
  * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
+ * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
+ * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
+ * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
+ * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */
 
+let logLevel = LogLevel.WARNING; // Default log level
 /** @type {TransformersEnvironment} */
 export const env = {
     version: VERSION,
@@ -213,19 +245,26 @@ export const env = {
     },
 
     /////////////////// Logging settings ///////////////////
-    logLevel: LogLevel.ERROR,
+    get logLevel() {
+        return logLevel;
+    },
+    set logLevel(level) {
+        logLevel = level;
 
+        // invoke hook to set ONNX Runtime log level when Transformers.js log level changes
+        env.backends.onnx?.setLogLevel?.(level);
+    },
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     remoteHost: 'https://huggingface.co/',
     remotePathTemplate: '{model}/resolve/{revision}/',
 
-    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV),
+    allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
 
     /////////////////// Cache settings ///////////////////
-    useBrowserCache: IS_WEB_CACHE_AVAILABLE && !IS_DENO_RUNTIME,
+    useBrowserCache: IS_WEB_CACHE_AVAILABLE,
 
     useFSCache: IS_FS_AVAILABLE,
     cacheDir: DEFAULT_CACHE_DIR,
@@ -235,6 +274,8 @@ export const env = {
 
     useWasmCache: IS_WEB_CACHE_AVAILABLE || IS_FS_AVAILABLE,
     cacheKey: 'transformers-cache',
+
+    experimental_useCrossOriginStorage: false,
 
     /////////////////// Custom fetch /////////////////////
     fetch: DEFAULT_FETCH,

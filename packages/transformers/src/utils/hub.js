@@ -6,7 +6,8 @@
 
 import { apis, env } from '../env.js';
 import { dispatchCallback } from './core.js';
-import { FileResponse, FileCache } from './hub/files.js';
+import { FileResponse } from './hub/FileResponse.js';
+import { FileCache } from './cache/FileCache.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
@@ -39,7 +40,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
  * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
  * you can specify the folder name here.
- * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the .onnx suffix). Currently only valid for encoder- or decoder-only models.
+ * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
@@ -160,7 +161,7 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
  * @param {import('./cache.js').CacheInterface | null} cache The cache instance to check.
  * @param {string} localPath The local path to try first.
  * @param {string} proposedCacheKey The proposed cache key to try second.
- * @returns {Promise<Response|import('./hub/files.js').FileResponse|undefined|string>}
+ * @returns {Promise<Response|import('./hub/FileResponse.js').FileResponse|undefined|string>}
  * The cached response if found, undefined otherwise.
  */
 export async function checkCachedResource(cache, localPath, proposedCacheKey) {
@@ -182,7 +183,7 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
  * @param {string} filename The name of the file to cache.
  * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
  * @param {string} cacheKey The cache key to use.
- * @param {Response|import('./hub/files.js').FileResponse} response The response to cache.
+ * @param {Response|import('./hub/FileResponse.js').FileResponse} response The response to cache.
  * @param {Uint8Array} [result] The result buffer if already read.
  * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
@@ -208,11 +209,14 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
         await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
     } else if (typeof response !== 'string') {
         // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
+        // Explicitly set content-length from the buffer size, since the browser Cache API may strip it.
+        const headers = new Headers(response.headers);
+        headers.set('content-length', result.byteLength.toString());
         await cache
             .put(
                 cacheKey,
                 new Response(/** @type {any} */ (result), {
-                    headers: response.headers,
+                    headers,
                 }),
             )
             .catch((err) => {
@@ -259,14 +263,16 @@ export async function loadResourceFile(
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|import('./hub/files.js').FileResponse|undefined|string} */
+    /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined|string} */
     let response;
 
     // Check cache
     response = await checkCachedResource(cache, localPath, proposedCacheKey);
 
     const cacheHit = response !== undefined;
-    if (!cacheHit) {
+    if (cacheHit) {
+        cacheKey = proposedCacheKey;
+    } else {
         // Caching not available, or file is not cached, so we perform the request
 
         if (env.allowLocalModels) {
@@ -344,7 +350,11 @@ export async function loadResourceFile(
     });
 
     let result;
-    if (!(apis.IS_NODE_ENV && return_path)) {
+    if (apis.IS_NODE_ENV && return_path) {
+        // In Node.js with return_path, we skip the buffer read (ONNX runtime
+        // loads from disk directly). A completion progress event is emitted
+        // after the caching block below to ensure progress_total reaches 100%.
+    } else {
         /** @type {Uint8Array} */
         let buffer;
 
@@ -417,6 +427,22 @@ export async function loadResourceFile(
         await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
     }
 
+    // In Node.js with return_path, the buffer read is skipped so no progress
+    // events are emitted during loading. Emit a final completion event so
+    // that aggregate progress_total tracking reaches 100%. This is placed
+    // after storeCachedResource so it doesn't conflict with caching progress.
+    if (apis.IS_NODE_ENV && return_path && options.progress_callback && typeof response !== 'string') {
+        const size = parseInt(response.headers.get('content-length'), 10) || 0;
+        dispatchCallback(options.progress_callback, {
+            status: 'progress',
+            name: path_or_repo_id,
+            file: filename,
+            progress: 100,
+            loaded: size,
+            total: size,
+        });
+    }
+
     dispatchCallback(options.progress_callback, {
         status: 'done',
         name: path_or_repo_id,
@@ -446,6 +472,9 @@ export async function loadResourceFile(
 
     throw new Error('Unable to get model file path or buffer.');
 }
+
+/** @type {Map<string, Promise<string|Uint8Array>>} In-flight file loads keyed by repo+filename. */
+const INFLIGHT_LOADS = new Map();
 
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
@@ -483,9 +512,28 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename,
     });
 
-    /** @type {import('./cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir);
-    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
+    // Deduplicate concurrent loads of the same file so progress events are
+    // only emitted by a single download. Without this, parallel callers
+    // (e.g. tokenizer + processor in pipeline()) would race on the same file
+    // and produce interleaved progress that breaks monotonic progress_total.
+    const key = `${path_or_repo_id}::${filename}`;
+    let pending = INFLIGHT_LOADS.get(key);
+    if (!pending) {
+        /** @type {import('./cache.js').CacheInterface | null} */
+        const cache = await getCache(options?.cache_dir);
+        pending = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
+            (result) => {
+                INFLIGHT_LOADS.delete(key);
+                return result;
+            },
+            (err) => {
+                INFLIGHT_LOADS.delete(key);
+                throw err;
+            },
+        );
+        INFLIGHT_LOADS.set(key, pending);
+    }
+    return await pending;
 }
 
 /**

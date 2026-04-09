@@ -18,17 +18,24 @@ import { logger } from '../utils/logger.js';
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
  * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
- * @param {boolean} [is_decoder=false] Whether the model is a decoder model.
+ * @param {boolean} [cache_config=false] Whether to compute cache shapes for GPU-pinned outputs.
+ * @param {string} [session_name] The name of the session (used to determine cache shapes).
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
-async function getSession(pretrained_model_name_or_path, fileName, options, is_decoder = false) {
+async function getSession(
+    pretrained_model_name_or_path,
+    fileName,
+    options,
+    cache_config = false,
+    session_name = undefined,
+) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
     // If the device is not specified, we use the default (supported) execution providers.
     const selectedDevice = /** @type {import("../utils/devices.js").DeviceType} */ (
         selectDevice(options.device ?? custom_config.device, fileName, {
-            warn: (msg) => logger.warn(msg),
+            warn: (msg) => logger.info(msg),
         })
     );
 
@@ -48,7 +55,7 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
     const selectedDtype = /** @type {import("../utils/dtypes.js").DataType} */ (
         selectDtype(options.dtype ?? custom_config.dtype, fileName, selectedDevice, {
             configDtype: custom_config.dtype,
-            warn: (msg) => logger.warn(msg),
+            warn: (msg) => logger.info(msg),
         })
     );
 
@@ -108,13 +115,14 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
         session_options,
     );
 
-    if (externalData.length > 0 && !apis.IS_NODE_ENV) {
+    if (externalData.length > 0 && (!apis.IS_NODE_ENV || externalData.some((data) => typeof data !== 'string'))) {
         session_options.externalData = externalData;
     }
 
-    if (is_decoder && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
+    if (cache_config && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
         const shapes = getCacheShapes(options.config, {
             prefix: 'present',
+            session_name,
         });
         if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
             // Only set preferredOutputLocation if shapes are present and we aren't proxying ONNX
@@ -142,19 +150,22 @@ async function getSession(pretrained_model_name_or_path, fileName, options, is_d
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {Record<string, string>} names The names of the model files to load.
  * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
- * @param {string} [decoder_name] The name of the decoder model, if any.
+ * @param {Record<string, true>} [cache_sessions] A map from session name to `true`, indicating which
+ *   sessions should have GPU-pinned KV cache outputs.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-export async function constructSessions(pretrained_model_name_or_path, names, options, decoder_name = undefined) {
+export async function constructSessions(pretrained_model_name_or_path, names, options, cache_sessions = undefined) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {
+                const cache_config = cache_sessions?.[name] ?? false;
                 const { buffer_or_path, session_options, session_config } = await getSession(
                     pretrained_model_name_or_path,
                     names[name],
                     options,
-                    name === decoder_name,
+                    cache_config,
+                    name,
                 );
                 const session = await createInferenceSession(buffer_or_path, session_options, session_config);
                 return [name, session];

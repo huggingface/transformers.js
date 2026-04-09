@@ -105,7 +105,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
                 if (!past_key_values || target_length !== 1) {
                     throw new Error('Incorrect state encountered during generation.');
                 }
-                const past_length = Object.values(past_key_values)[0].dims.at(-2);
+                const past_length = past_key_values.get_seq_length();
                 attention_mask = ones([inputs_embeds.dims[0], past_length + target_length]);
             }
         }

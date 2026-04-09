@@ -80,7 +80,7 @@ export function handleError(status, remoteURL, fatal) {
 /**
  * Read and track progress when reading a Response object
  *
- * @param {Response|import('./files.js').FileResponse} response The Response object to read
+ * @param {Response|import('./FileResponse.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
  * @param {number} [expectedSize] The expected size of the file (used when content-length header is missing)
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
@@ -131,4 +131,38 @@ export async function readResponse(response, progress_callback, expectedSize) {
     await read();
 
     return buffer;
+}
+
+/**
+ * Checks if the given URL is a blob URL (created via URL.createObjectURL).
+ * Blob URLs should not be cached as they are temporary in-memory references.
+ * @param {string} url - The URL to check.
+ * @returns {boolean} True if the URL is a blob URL, false otherwise.
+ */
+export function isBlobURL(url) {
+    return isValidUrl(url, ['blob:']);
+}
+
+/**
+ * Converts any URL to an absolute URL if needed.
+ * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
+ * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
+ * @param {string} url - The URL to convert (can be relative or absolute).
+ * @returns {string} The absolute URL.
+ */
+export function toAbsoluteURL(url) {
+    let baseURL;
+
+    if (typeof location !== 'undefined' && location.href) {
+        // Browser environment: use location.href
+        baseURL = location.href;
+    } else if (typeof import.meta !== 'undefined' && import.meta.url) {
+        // Node.js/Bun/Deno module environment: use import.meta.url
+        baseURL = import.meta.url;
+    } else {
+        // Fallback: if no base is available, return the URL unchanged
+        return url;
+    }
+
+    return new URL(url, baseURL).href;
 }

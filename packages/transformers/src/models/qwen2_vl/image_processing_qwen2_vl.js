@@ -1,7 +1,21 @@
-import { ImageProcessor } from '../../image_processors_utils.js';
+import { ImageProcessor, smart_resize } from '../../image_processors_utils.js';
 import { cat, Tensor } from '../../utils/tensor.js';
 
 export class Qwen2VLImageProcessor extends ImageProcessor {
+    constructor(config) {
+        super(config);
+        this.min_pixels = config.min_pixels ?? config.size?.shortest_edge;
+        this.max_pixels = config.max_pixels ?? config.size?.longest_edge;
+        this.patch_size = config.patch_size;
+        this.merge_size = config.merge_size;
+    }
+
+    /** @type {ImageProcessor['get_resize_output_image_size']} */
+    get_resize_output_image_size(image, size) {
+        const factor = this.patch_size * this.merge_size;
+        return smart_resize(image.height, image.width, factor, this.min_pixels, this.max_pixels);
+    }
+
     async _call(images, ...args) {
         const { pixel_values, original_sizes, reshaped_input_sizes } = await super._call(images, ...args);
 

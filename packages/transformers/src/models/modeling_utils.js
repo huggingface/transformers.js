@@ -21,6 +21,7 @@ import {
     LogitsProcessorList,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
+    SuppressTokensLogitsProcessor,
     SuppressTokensAtBeginLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
@@ -33,9 +34,13 @@ import {
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
-import { pick } from '../utils/core.js';
+import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
+import { DynamicCache } from '../cache_utils.js';
+import { get_model_files } from '../utils/model_registry/get_model_files.js';
+import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
+import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -81,26 +86,14 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export const MODEL_TYPES = {
-    EncoderOnly: 0,
-    EncoderDecoder: 1,
-    Seq2Seq: 2,
-    Vision2Seq: 3,
-    DecoderOnly: 4,
-    DecoderOnlyWithoutHead: 5,
-    MaskGeneration: 6,
-    ImageTextToText: 7,
-    Musicgen: 8,
-    MultiModality: 9,
-    Phi3V: 10,
-    AudioTextToText: 11,
-    AutoEncoder: 12,
-    ImageAudioTextToText: 13,
-    Supertonic: 14,
-    Chatterbox: 15,
-};
+export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
 
-const MODEL_TYPE_CONFIG = {
+/**
+ * Runtime-only model type configuration (forward functions, generation flags).
+ * Session/file configuration lives in `MODEL_SESSION_CONFIG` (session_config.js)
+ * and is merged in at lookup time by `resolveTypeConfig` to avoid duplication.
+ */
+const MODEL_RUNTIME_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
         can_generate: true,
         forward: decoder_forward,
@@ -139,11 +132,11 @@ const MODEL_TYPE_CONFIG = {
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
     },
-    [MODEL_TYPES.Phi3V]: {
+    [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
     },
-    [MODEL_TYPES.ImageAudioTextToText]: {
+    [MODEL_TYPES.Phi3V]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
     },
@@ -158,11 +151,46 @@ const MODEL_TYPE_CONFIG = {
         can_generate: true,
         forward: encoder_forward,
     },
+    [MODEL_TYPES.VoxtralRealtime]: {
+        can_generate: true,
+        prepare_inputs: decoder_prepare_inputs_for_generation,
+    },
     default: {
         can_generate: false,
         forward: encoder_forward,
     },
 };
+
+/**
+ * Resolves the model type config for a given class name and config.
+ * @param {string} modelName The name of the class being used to load.
+ * @param {Object} config The model config.
+ * @returns {{ typeConfig: Object, textOnly: boolean, modelType: number|undefined }}
+ */
+function resolveTypeConfig(modelName, config) {
+    let modelType = MODEL_TYPE_MAPPING.get(modelName);
+    let textOnly = false;
+
+    // Detect cross-architecture loading: e.g., ForCausalLM class loading a ForConditionalGeneration model.
+    // In this case, use the native architecture's type config (for forward/sessions) in text-only mode.
+    const nativeArch = config?.architectures?.[0];
+    if (
+        nativeArch &&
+        nativeArch !== modelName &&
+        modelName?.endsWith('ForCausalLM') &&
+        nativeArch.endsWith('ForConditionalGeneration')
+    ) {
+        const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
+        if (nativeType !== undefined) {
+            modelType = nativeType;
+            textOnly = true;
+        }
+    }
+
+    const runtimeConfig = MODEL_RUNTIME_CONFIG[modelType] ?? MODEL_RUNTIME_CONFIG.default;
+    const sessionConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
+    return { typeConfig: { ...runtimeConfig, ...sessionConfig }, textOnly, modelType };
+}
 
 export const MODEL_TYPE_MAPPING = new Map();
 export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
@@ -190,10 +218,7 @@ export class PreTrainedModel extends Callable {
         this.configs = configs;
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
-
-        // Get configuration for this model type
-        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+        const { typeConfig } = resolveTypeConfig(modelName, config);
 
         this.can_generate = typeConfig.can_generate;
         this._forward = typeConfig.forward;
@@ -266,250 +291,68 @@ export class PreTrainedModel extends Callable {
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
 
         config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
-        let info;
-        if (modelType === MODEL_TYPES.DecoderOnly) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: options.model_file_name ?? 'model',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Seq2Seq || modelType === MODEL_TYPES.Vision2Seq) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'encoder_model',
-                        decoder_model_merged: 'decoder_model_merged',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.MaskGeneration) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'vision_encoder',
-                        prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.EncoderDecoder) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'encoder_model',
-                        decoder_model_merged: 'decoder_model_merged',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.ImageTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                vision_encoder: 'vision_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            if (config.is_encoder_decoder) {
-                sessions['model'] = 'encoder_model';
+        const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
+
+        if (modelType === undefined) {
+            const type = modelName ?? config?.model_type;
+            if (type !== 'custom') {
+                logger.warn(
+                    `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
+                );
             }
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.AudioTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                audio_encoder: 'audio_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options, 'decoder_model_merged'),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.ImageAudioTextToText) {
-            const sessions = {
-                embed_tokens: 'embed_tokens',
-                audio_encoder: 'audio_encoder',
-                vision_encoder: 'vision_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            info = await Promise.all([
-                constructSessions(pretrained_model_name_or_path, sessions, options),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Musicgen) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: 'text_encoder',
-                        decoder_model_merged: 'decoder_model_merged',
-                        encodec_decode: 'encodec_decode',
-                    },
-                    options,
-                    'decoder_model_merged',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.MultiModality) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        prepare_inputs_embeds: 'prepare_inputs_embeds',
-                        model: 'language_model',
-                        lm_head: 'lm_head',
-                        gen_head: 'gen_head',
-                        gen_img_embeds: 'gen_img_embeds',
-                        image_decode: 'image_decode',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Phi3V) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        prepare_inputs_embeds: 'prepare_inputs_embeds',
-                        model: 'model',
-                        vision_encoder: 'vision_encoder',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Chatterbox) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        embed_tokens: 'embed_tokens',
-                        speech_encoder: 'speech_encoder',
-                        model: 'language_model',
-                        conditional_decoder: 'conditional_decoder',
-                    },
-                    options,
-                    'model',
-                ),
-                get_optional_configs(
-                    pretrained_model_name_or_path,
-                    {
-                        generation_config: 'generation_config.json',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.AutoEncoder) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        encoder_model: 'encoder_model',
-                        decoder_model: 'decoder_model',
-                    },
-                    options,
-                ),
-            ]);
-        } else if (modelType === MODEL_TYPES.Supertonic) {
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        text_encoder: 'text_encoder',
-                        latent_denoiser: 'latent_denoiser',
-                        voice_decoder: 'voice_decoder',
-                    },
-                    options,
-                ),
-            ]);
-        } else {
-            // should be MODEL_TYPES.EncoderOnly or MODEL_TYPES.DecoderOnlyWithoutHead
-            if (modelType === undefined) {
-                const type = modelName ?? config?.model_type;
-                if (type !== 'custom') {
-                    logger.warn(
-                        `Model type for '${type}' not found, assuming encoder-only architecture. Please report this at ${GITHUB_ISSUE_URL}.`,
-                    );
-                }
-            }
-            info = await Promise.all([
-                constructSessions(
-                    pretrained_model_name_or_path,
-                    {
-                        model: options.model_file_name ?? 'model',
-                    },
-                    options,
-                ),
-            ]);
         }
+
+        // If a progress callback is provided AND it hasn't already been wrapped
+        // by pipeline() (which does its own aggregation), gather file metadata
+        // upfront so we can emit `progress_total` events. This lets consumers
+        // render a single overall progress bar when calling from_pretrained() directly.
+        if (progress_callback && !(progress_callback instanceof DefaultProgressCallback)) {
+            /** @type {import('../utils/core.js').FilesLoadingMap} */
+            const files_loading = {};
+
+            try {
+                const expected_files = await get_model_files(pretrained_model_name_or_path, {
+                    config,
+                    dtype,
+                    device,
+                    model_file_name,
+                });
+
+                const metadata = await Promise.all(
+                    expected_files.map((file) => get_file_metadata(pretrained_model_name_or_path, file, options)),
+                );
+                metadata.forEach((m, i) => {
+                    if (m.exists) {
+                        // config.json is fetched by AutoConfig.from_pretrained() above
+                        const isAlreadyLoaded = expected_files[i] === 'config.json';
+                        files_loading[expected_files[i]] = {
+                            loaded: isAlreadyLoaded ? (m.size ?? 0) : 0,
+                            total: m.size ?? 0,
+                        };
+                    }
+                });
+            } catch (e) {
+                // If we fail to get metadata, we can still proceed without total progress.
+                // This may happen with local-only models or custom cache setups.
+                logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
+            }
+
+            if (Object.keys(files_loading).length > 0) {
+                options.progress_callback = new DefaultProgressCallback(progress_callback, files_loading);
+            }
+        }
+
+        const sessions = typeConfig.sessions(config, options, textOnly);
+        const promises = [
+            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
+        ];
+        if (typeConfig.optional_configs) {
+            promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
+        }
+        const info = await Promise.all(promises);
 
         // @ts-ignore
         return new this(config, ...info);
@@ -649,9 +492,9 @@ export class PreTrainedModel extends Callable {
         //     ));
         // }
 
-        // if (generation_config.suppress_tokens !== null) {
-        //     processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
-        // }
+        if (generation_config.suppress_tokens !== null) {
+            processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
+        }
 
         if (generation_config.begin_suppress_tokens !== null) {
             const begin_index =
@@ -833,7 +676,10 @@ export class PreTrainedModel extends Callable {
                 1,
             );
         } else if ('decoder_attention_mask' in model_inputs) {
-            // TODO: update decoder attention mask if the model requires it
+            model_inputs.decoder_attention_mask = cat(
+                [model_inputs.decoder_attention_mask, ones([model_inputs.decoder_attention_mask.dims[0], 1])],
+                1,
+            );
         }
 
         // force recreate position_ids in next iteration
@@ -848,7 +694,7 @@ export class PreTrainedModel extends Callable {
      * @param {Tensor} [params.inputs=null]
      * @param {number} [params.bos_token_id=null]
      * @param {Record<string, Tensor|number[]>} [params.model_kwargs]
-     * @returns {{inputs_tensor: Tensor, model_inputs: Record<string, Tensor>, model_input_name: string}} The model-specific inputs for generation.
+     * @returns {{inputs_tensor: Tensor, model_inputs: Record<string, Tensor> & {past_key_values?: DynamicCache}, model_input_name: string}} The model-specific inputs for generation.
      */
     _prepare_model_inputs({ inputs, bos_token_id, model_kwargs }) {
         const model_inputs = pick(model_kwargs, this.forward_params);
@@ -977,7 +823,7 @@ export class PreTrainedModel extends Callable {
             decoder_input_ids = toI64Tensor(decoder_input_ids);
         }
 
-        model_kwargs['decoder_attention_mask'] = ones_like(decoder_input_ids);
+        model_inputs['decoder_attention_mask'] = ones_like(decoder_input_ids);
 
         return { input_ids: decoder_input_ids, model_inputs };
     }
@@ -1212,13 +1058,15 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * Returns an object containing past key values from the given decoder results object.
+     * Returns a DynamicCache containing past key values from the given decoder results object.
      *
      * @param {Object} decoderResults The decoder results object.
-     * @param {Object} pastKeyValues The previous past key values.
-     * @returns {Object} An object containing past key values.
+     * @param {DynamicCache} pastKeyValues The previous past key values.
+     * @param {boolean} [disposeEncoderPKVs=false] Whether to dispose encoder past key values.
+     * @returns {DynamicCache} A new DynamicCache containing the updated past key values.
      */
     getPastKeyValues(decoderResults, pastKeyValues, disposeEncoderPKVs = false) {
+        /** @type {Record<string, Tensor>} */
         const pkvs = Object.create(null);
 
         for (const name in decoderResults) {
@@ -1227,6 +1075,7 @@ export class PreTrainedModel extends Callable {
                     // Hybrid cache architecture
                     .replace('present_ssm', 'past_ssm') // Mamba
                     .replace('present_conv', 'past_conv') // LFM2
+                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
 
                     // Standard cache architecture
                     .replace('present', 'past_key_values');
@@ -1251,7 +1100,7 @@ export class PreTrainedModel extends Callable {
                 }
             }
         }
-        return pkvs;
+        return new DynamicCache(pkvs);
     }
 
     /**
@@ -1279,8 +1128,8 @@ export class PreTrainedModel extends Callable {
     /**
      * Adds past key values to the decoder feeds object. If pastKeyValues is null, creates new tensors for past key values.
      *
-     * @param {Object} decoderFeeds The decoder feeds object to add past key values to.
-     * @param {Object} pastKeyValues An object containing past key values.
+     * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
+     * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
      */
     addPastKeyValues(decoderFeeds, pastKeyValues) {
         if (pastKeyValues) {
@@ -1299,19 +1148,32 @@ export class PreTrainedModel extends Callable {
         }
     }
 
-    async encode_image({ pixel_values }) {
-        // image_inputs === { pixel_values }
-        return (await sessionRun(this.sessions['vision_encoder'], { pixel_values })).image_features;
+    /**
+     * Helper function to select valid inputs and run through the appropriate encoder (vision, text, audio) based on the input type.
+     * @param {string} sessionName
+     * @param {Record<string, Tensor>} inputs
+     * @param {string} outputName
+     * @private
+     */
+    async _encode_input(sessionName, inputs, outputName) {
+        if (!Object.hasOwn(this.sessions, sessionName)) {
+            throw new Error(`Model does not have a ${sessionName} session.`);
+        }
+        const session = this.sessions[sessionName];
+        const output = await sessionRun(session, pick(inputs, session.inputNames));
+        return output[outputName];
     }
 
-    async encode_text({ input_ids }) {
-        // text_inputs === { input_ids, attention_mask }
-        return (await sessionRun(this.sessions['embed_tokens'], { input_ids })).inputs_embeds;
+    async encode_image(inputs) {
+        return this._encode_input('vision_encoder', inputs, 'image_features');
     }
 
-    async encode_audio({ audio_values }) {
-        // audio_inputs === { audio_values }
-        return (await sessionRun(this.sessions['audio_encoder'], { audio_values })).audio_features;
+    async encode_text(inputs) {
+        return this._encode_input('embed_tokens', inputs, 'inputs_embeds');
+    }
+
+    async encode_audio(inputs) {
+        return this._encode_input('audio_encoder', inputs, 'audio_features');
     }
 }
 
@@ -1323,7 +1185,8 @@ export class PreTrainedModel extends Callable {
  * @private
  */
 export async function seq2seq_forward(self, model_inputs) {
-    let { encoder_outputs, input_ids, decoder_input_ids, ...other_decoder_inputs } = model_inputs;
+    let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
+        model_inputs;
     // Encode if needed
     if (!encoder_outputs) {
         const encoder_inputs = pick(model_inputs, self.sessions['model'].inputNames);
@@ -1336,6 +1199,11 @@ export async function seq2seq_forward(self, model_inputs) {
 
     if (self.sessions['decoder_model_merged'].inputNames.includes('encoder_attention_mask')) {
         other_decoder_inputs.encoder_attention_mask = model_inputs.attention_mask;
+    }
+
+    // Pass decoder_attention_mask as attention_mask to the decoder session
+    if (decoder_attention_mask && !other_decoder_inputs.attention_mask) {
+        other_decoder_inputs.attention_mask = decoder_attention_mask;
     }
 
     return await decoder_forward(self, other_decoder_inputs, true);
@@ -1410,6 +1278,15 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         new_model_inputs.position_ids = create_position_ids(new_model_inputs, past_key_values, start_index);
     }
 
+    if (session.inputNames.includes('num_logits_to_keep') && !new_model_inputs.num_logits_to_keep) {
+        // `num_logits_to_keep` specifies the number of prompt logits to calculate during generation.
+        // If unset (or 0), all logits will be calculated. If an integer value, only last `num_logits_to_keep`
+        // logits will be calculated. During generation, the default is 1 because only the logits of the last
+        // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
+        // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
+        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
+    }
+
     // Unpack the `past_key_values` object into model inputs
     self.addPastKeyValues(new_model_inputs, past_key_values);
 
@@ -1424,13 +1301,13 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {Object} params Additional parameters.
  * @param {Function} [params.encode_function] The function to encode the modality values.
  * @param {Function} [params.merge_function] The function to merge the modality features with the input embeddings.
- * @param {string} [params.modality_input_name] The modality input name.
+ * @param {string[]} [params.modality_input_names] The modality input name.
  * @param {string} [params.modality_output_name] The modality output name.
  * @param {Tensor} [params.input_ids=null]
  * @param {Tensor} [params.attention_mask=null]
  * @param {Tensor} [params.position_ids=null]
  * @param {Tensor} [params.inputs_embeds=null]
- * @param {Tensor} [params.past_key_values=null]
+ * @param {DynamicCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
  * @returns {Promise<Tensor>} The model's output tensor
@@ -1442,7 +1319,7 @@ export async function generic_text_to_text_forward(
         // Generic parameters:
         encode_function,
         merge_function,
-        modality_input_name,
+        modality_input_names,
         modality_output_name,
 
         // Produced by the tokenizer/processor:
@@ -1462,43 +1339,62 @@ export async function generic_text_to_text_forward(
         ...kwargs
     },
 ) {
-    const modality_values = kwargs[modality_input_name];
     if (!inputs_embeds) {
         // 1. Extract the text embeddings.
         inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
 
         // 2. Possibly, merge text and modality values
-        if (modality_values && input_ids.dims[1] !== 1) {
-            const modality_features = await encode_function({
-                // Pass the modality values under its expected key.
-                // The caller knows whether this is audio or image.
-                [modality_input_name]: modality_values,
-                ...kwargs,
-            });
-            ({ inputs_embeds, attention_mask } = merge_function({
-                [modality_output_name]: modality_features,
-                inputs_embeds,
-                input_ids,
-                attention_mask,
-            }));
-        } else if (past_key_values && modality_values && input_ids.dims[1] === 1) {
-            // This branch handles the cache case.
-            const target_length = input_ids.dims[1]; // always 1
-            const past_length = Object.values(past_key_values)[0].dims.at(-2);
+        const modality_values = pick(kwargs, modality_input_names);
+        if (Object.keys(modality_values).length > 0) {
+            if (input_ids.dims[1] !== 1) {
+                const modality_features = await encode_function({
+                    // Pass the modality values under its expected key.
+                    // The caller knows whether this is audio or image.
+                    ...modality_values,
+                    ...kwargs,
+                });
+                ({ inputs_embeds, attention_mask } = merge_function({
+                    [modality_output_name]: modality_features,
+                    inputs_embeds,
+                    input_ids,
+                    attention_mask,
+                }));
+            } else if (past_key_values && input_ids.dims[1] === 1) {
+                // This branch handles the cache case.
+                const target_length = input_ids.dims[1]; // always 1
+                const past_length = past_key_values.get_seq_length();
 
-            attention_mask = cat(
-                [
-                    ones([input_ids.dims[0], past_length]),
-                    attention_mask.slice(null, [attention_mask.dims[1] - target_length, attention_mask.dims[1]]),
-                ],
-                1,
-            );
+                attention_mask = cat(
+                    [
+                        ones([input_ids.dims[0], past_length]),
+                        attention_mask.slice(null, [attention_mask.dims[1] - target_length, attention_mask.dims[1]]),
+                    ],
+                    1,
+                );
+            }
         }
     }
 
     if (!position_ids) {
-        if (self.config.model_type === 'qwen2_vl') {
-            // Special case for qwen2_vl models
+        if (
+            // Handle special case for qwen vl models
+            [
+                'qwen2_vl',
+                'qwen2_vl_text',
+                'qwen2_5_vl',
+                'qwen2_5_vl_text',
+                'qwen3_vl',
+                'qwen3_vl_text',
+                'qwen3_vl_moe',
+                'qwen3_vl_moe_text',
+                'qwen3_5',
+                'qwen3_5_text',
+                'qwen3_5_moe',
+                'qwen3_5_moe_text',
+                'glm_ocr',
+                'glm_ocr_text',
+            ].includes(self.config.model_type)
+        ) {
             // @ts-ignore
             const { image_grid_thw, video_grid_thw } = kwargs;
             [position_ids] = self.get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask);
@@ -1531,7 +1427,7 @@ export async function generic_text_to_text_forward(
 export async function audio_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
-        modality_input_name: 'audio_values',
+        modality_input_names: ['audio_values', 'input_features'],
         modality_output_name: 'audio_features',
         encode_function: self.encode_audio.bind(self),
         merge_function: self._merge_input_ids_with_audio_features.bind(self),
@@ -1548,7 +1444,7 @@ export async function audio_text_to_text_forward(self, params) {
 export async function image_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
-        modality_input_name: 'pixel_values',
+        modality_input_names: ['pixel_values'],
         modality_output_name: 'image_features',
         encode_function: self.encode_image.bind(self),
         merge_function: self._merge_input_ids_with_image_features.bind(self),
@@ -1611,7 +1507,14 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 }
 
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
-    const past_length = model_inputs.past_key_values ? Object.values(model_inputs.past_key_values)[0].dims.at(-2) : 0;
+    const past_length = model_inputs.past_key_values ? model_inputs.past_key_values.get_seq_length() : 0;
+
+    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
+    // avoids computing logits for the entire sequence, significantly reducing memory usage.
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
+    }
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
@@ -1692,6 +1595,10 @@ export function default_merge_input_ids_with_features({
     if (n_tokens !== n_features) {
         throw new Error(`Number of tokens and features do not match: tokens: ${n_tokens}, features ${n_features}`);
     }
+
+    // Currently, we require modality features to be in float32 for correct scatter behavior.
+    // TODO: In future, detect dtype of embeds and cast modality features to the same dtype before scattering.
+    // modality_features = modality_features.to('float32');
 
     // Equivalent to performing a masked_scatter
     let img = 0;

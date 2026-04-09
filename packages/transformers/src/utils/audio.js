@@ -452,8 +452,10 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * If supplied, applies this filter bank to create a mel spectrogram.
  * @param {number} [options.mel_floor=1e-10] Minimum value of mel frequency banks.
  * @param {string} [options.log_mel=null] How to convert the spectrogram to log scale. Possible options are:
- * `null` (don't convert), `"log"` (take the natural logarithm) `"log10"` (take the base-10 logarithm), `"dB"` (convert to decibels).
+ * `null` (don't convert), `"log"` (take the natural logarithm), `"log10"` (take the base-10 logarithm), `"dB"` (convert to decibels),
+ * `"log10_max_norm"` (take `log10`, then apply `(max(x, maxVal - 8) + 4) / 4` normalization, where `maxVal` is computed from data or given by `max_log_mel`).
  * Can only be used when `power` is not `null`.
+ * @param {number} [options.max_log_mel=null] When `log_mel` is `"log10_max_norm"`, use this fixed value as the max instead of computing from data.
  * @param {number} [options.reference=1.0] Sets the input spectrogram value that corresponds to 0 dB. For example, use `max(spectrogram)[0]` to set
  * the loudest part to 0 dB. Must be greater than zero.
  * @param {number} [options.min_value=1e-10] The spectrogram will be clipped to this minimum value before conversion to decibels, to avoid taking `log(0)`.
@@ -468,6 +470,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * @param {boolean} [options.do_pad=true] If `true`, pads the output spectrogram to have `max_num_frames` frames.
  * @param {boolean} [options.transpose=false] If `true`, the returned spectrogram will have shape `(num_frames, num_frequency_bins/num_mel_filters)`. If `false`, the returned spectrogram will have shape `(num_frequency_bins/num_mel_filters, num_frames)`.
  * @param {number} [options.mel_offset=0] Offset to add to the mel spectrogram to avoid taking the log of zero.
+ * @param {string} [options.mel_floor_mode="clamp"] If `mel_offset` is provided, this option determines how to apply it. If `"clamp"`, the mel spectrogram will be clamped to have a minimum value of `mel_offset`. If `"add"`, `mel_offset` will be added to all values of the mel spectrogram.
  * @returns {Promise<Tensor>} Spectrogram of shape `(num_frequency_bins, length)` (regular spectrogram) or shape `(num_mel_filters, length)` (mel spectrogram).
  */
 export async function spectrogram(
@@ -486,6 +489,7 @@ export async function spectrogram(
         mel_filters = null,
         mel_floor = 1e-10,
         log_mel = null,
+        max_log_mel = null,
         reference = 1.0,
         min_value = 1e-10,
         db_range = null,
@@ -497,6 +501,7 @@ export async function spectrogram(
         do_pad = true,
         transpose = false,
         mel_offset = 0,
+        mel_floor_mode = 'clamp',
     } = {},
 ) {
     const window_length = window.length;
@@ -527,16 +532,23 @@ export async function spectrogram(
     }
 
     if (center) {
+        const padding = Math.floor(frame_length / 2);
         switch (pad_mode) {
             case 'reflect': {
-                const half_window = Math.floor((fft_length - 1) / 2) + 1;
-                waveform = padReflect(waveform, half_window, half_window);
+                waveform = padReflect(waveform, padding, padding);
                 break;
             }
             case 'constant': {
-                const padding = Math.floor(fft_length / 2);
                 // @ts-expect-error ts(2351)
                 const padded = new waveform.constructor(waveform.length + 2 * padding);
+                padded.set(waveform, padding);
+                waveform = padded;
+                break;
+            }
+            case 'semicausal': {
+                // Prepend padding zeros only (no right padding)
+                // @ts-expect-error ts(2351)
+                const padded = new waveform.constructor(waveform.length + padding);
                 padded.set(waveform, padding);
                 waveform = padded;
                 break;
@@ -651,8 +663,14 @@ export async function spectrogram(
     }
 
     const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
-    for (let i = 0; i < mel_spec_data.length; ++i) {
-        mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+    if (mel_floor_mode === 'add') {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + mel_spec_data[i] + mel_floor;
+        }
+    } else {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+        }
     }
 
     if (power !== null && log_mel !== null) {
@@ -669,6 +687,17 @@ export async function spectrogram(
                     mel_spec_data[i] = Math.log10(mel_spec_data[i]);
                 }
                 break;
+            case 'log10_max_norm': {
+                for (let i = 0; i < o; ++i) {
+                    mel_spec_data[i] = Math.log10(mel_spec_data[i]);
+                }
+                const logMax = max_log_mel ?? max(mel_spec_data)[0];
+                const threshold = logMax - 8.0;
+                for (let i = 0; i < o; ++i) {
+                    mel_spec_data[i] = (Math.max(mel_spec_data[i], threshold) + 4.0) / 4.0;
+                }
+                break;
+            }
             case 'dB':
                 if (power === 1.0) {
                     amplitude_to_db(mel_spec_data, reference, min_value, db_range);
@@ -679,7 +708,9 @@ export async function spectrogram(
                 }
                 break;
             default:
-                throw new Error(`log_mel must be one of null, 'log', 'log10' or 'dB'. Got '${log_mel}'`);
+                throw new Error(
+                    `log_mel must be one of null, 'log', 'log10', 'log10_max_norm', or 'dB'. Got '${log_mel}'`,
+                );
         }
     }
 
@@ -720,7 +751,7 @@ export function window_function(window_length, name, { periodic = true, frame_le
     if (periodic) {
         window = window.subarray(0, window_length);
     }
-    if (frame_length === null) {
+    if (frame_length === null || window_length === frame_length) {
         return window;
     }
     if (window_length > frame_length) {
@@ -729,7 +760,10 @@ export function window_function(window_length, name, { periodic = true, frame_le
         );
     }
 
-    return window;
+    const padded = new Float64Array(frame_length);
+    const offset = center ? Math.floor((frame_length - window_length) / 2) : 0;
+    padded.set(window, offset);
+    return padded;
 }
 
 /**

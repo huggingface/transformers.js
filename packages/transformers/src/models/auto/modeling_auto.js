@@ -62,6 +62,19 @@ class PretrainedMixin {
      */
     static BASE_IF_FAIL = false;
 
+    /**
+     * Check whether this AutoModel class supports a given model type.
+     * @param {string} model_type The model type from config (e.g., 'bert', 'whisper').
+     * @returns {boolean} Whether this class can handle the given model type.
+     */
+    static supports(model_type) {
+        if (!this.MODEL_CLASS_MAPPINGS) return false;
+        for (const mapping of this.MODEL_CLASS_MAPPINGS) {
+            if (mapping.has(model_type)) return true;
+        }
+        return this.BASE_IF_FAIL;
+    }
+
     /** @type {typeof PreTrainedModel.from_pretrained} */
     static async from_pretrained(
         pretrained_model_name_or_path,
@@ -97,7 +110,7 @@ class PretrainedMixin {
         if (!this.MODEL_CLASS_MAPPINGS) {
             throw new Error('`MODEL_CLASS_MAPPINGS` not implemented for this type of `AutoClass`: ' + this.name);
         }
-        const model_type = options.config.model_type;
+        const { model_type } = options.config;
         for (const MODEL_CLASS_MAPPING of this.MODEL_CLASS_MAPPINGS) {
             let modelInfo = MODEL_CLASS_MAPPING.get(model_type);
             if (!modelInfo) {

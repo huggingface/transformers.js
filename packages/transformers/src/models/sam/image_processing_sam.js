@@ -4,7 +4,7 @@ import { calculateDimensions } from '../../utils/core.js';
 import { interpolate_4d, Tensor } from '../../utils/tensor.js';
 
 /**
- * @typedef {object} SamImageProcessorResult
+ * @typedef {Object} SamImageProcessorResult
  * @property {Tensor} pixel_values
  * @property {import("../../image_processors_utils.js").HeightWidth[]} original_sizes
  * @property {import("../../image_processors_utils.js").HeightWidth[]} reshaped_input_sizes

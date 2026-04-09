@@ -8,9 +8,9 @@ deno.lock
 package-lock.json
 
 # Do not track build artifacts/generated files
-packages/**/dist
-packages/**/types
+packages/*/dist
+packages/*/types
 *.tsbuildinfo
 
 # Do not track coverage reports
-packages/**/coverage
+packages/*/coverage
