@@ -67,7 +67,7 @@ export function jmespath_search(expression, data) {
     };
 
     /**
-     * Parse and evaluate a single primary construct (identifier, literal, @, {}, []).
+     * Parse and evaluate a single primary construct (identifier, literal, `@`, `{}`, `[]`).
      * @param {any} context The current data context.
      * @returns {any}
      */
