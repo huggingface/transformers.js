@@ -29,6 +29,11 @@ class _DynamicCache {
     get_seq_length() {
         /** @type {Record<string, Tensor>} */
         const self = /** @type {any} */ (this);
+
+        if (Object.keys(self).length === 0) {
+            return 0;
+        }
+
         for (const name in self) {
             if (name.startsWith('past_key_values.')) {
                 return self[name].dims.at(-2);
