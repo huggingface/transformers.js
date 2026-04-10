@@ -7,6 +7,7 @@
 import { Tokenizer } from '@huggingface/tokenizers';
 import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
+import { recursive_parse } from './utils/chat_parsing.js';
 
 import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
@@ -752,6 +753,30 @@ export class PreTrainedTokenizer extends Callable {
         }
 
         return rendered;
+    }
+
+    /**
+     * Converts a raw model output string into a parsed message dictionary using the tokenizer's
+     * `response_schema` (or a user-provided schema) to control parsing.
+     *
+     * @param {string | string[]} response The decoded output string(s) from the model.
+     * @param {Object} [options] Options for parsing.
+     * @param {Record<string, any> | null} [options.schema=null] A response schema to use. If not
+     * provided, the tokenizer's `response_schema` from its config will be used.
+     * @returns {Record<string, any> | Record<string, any>[]} The parsed message dict(s).
+     */
+    parse_response(response, { schema = null } = {}) {
+        schema ??= this.config.response_schema ?? null;
+        if (!schema) {
+            throw new Error(
+                'This tokenizer does not have a `response_schema` for parsing chat responses. ' +
+                    'Pass a schema explicitly via the `schema` option.',
+            );
+        }
+        if (Array.isArray(response)) {
+            return response.map((r) => recursive_parse(r, schema));
+        }
+        return recursive_parse(response, schema);
     }
 }
 
