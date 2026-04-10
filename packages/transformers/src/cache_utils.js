@@ -43,6 +43,21 @@ class _DynamicCache {
     }
 
     /**
+     * Update the cache in-place with new entries, disposing replaced GPU tensors.
+     * @param {Record<string, Tensor>} newEntries The new name → Tensor mappings.
+     */
+    update(newEntries) {
+        for (const key in newEntries) {
+            const oldValue = this[key];
+            const newValue = newEntries[key];
+            if (oldValue && oldValue !== newValue && oldValue.location === 'gpu-buffer') {
+                oldValue.dispose();
+            }
+            this[key] = newValue;
+        }
+    }
+
+    /**
      * Dispose all contained tensors whose data resides on the GPU.
      * Returns a promise that resolves when all disposals are complete.
      * @returns {Promise<void>} Promise that resolves when all GPU tensors are disposed.
