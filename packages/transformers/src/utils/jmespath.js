@@ -11,6 +11,18 @@
  * @module utils/jmespath
  */
 
+const WS = /\s/;
+const ID_CHAR = /[a-zA-Z0-9_]/;
+
+/**
+ * Access a field on an object, returning null for non-objects or missing keys.
+ * @param {any} obj
+ * @param {string} key
+ * @returns {any}
+ */
+const fieldAccess = (obj, key) =>
+    (obj !== null && typeof obj === "object" && !Array.isArray(obj)) ? obj[key] ?? null : null;
+
 /**
  * Evaluate a JMESPath expression against data.
  * @param {string} expression The JMESPath expression string.
@@ -19,9 +31,6 @@
  */
 export function jmespath_search(expression, data) {
     let cursor = 0;
-
-    const WS = /\s/;
-    const ID_CHAR = /[a-zA-Z0-9_]/;
 
     /** Advance past whitespace. */
     const skipWhitespace = () => {
@@ -41,15 +50,6 @@ export function jmespath_search(expression, data) {
         }
         return expression.slice(start, cursor);
     };
-
-    /**
-     * Access a field on an object, returning null for non-objects or missing keys.
-     * @param {any} obj
-     * @param {string} key
-     * @returns {any}
-     */
-    const fieldAccess = (obj, key) =>
-        (obj !== null && typeof obj === "object" && !Array.isArray(obj)) ? obj[key] ?? null : null;
 
     /**
      * Parse and evaluate an expression with optional `.rhs` subexpression chaining.
@@ -81,10 +81,13 @@ export function jmespath_search(expression, data) {
         }
 
         if (ch === "'" || ch === '"') {
-            const end = expression.indexOf(ch, ++cursor);
-            const value = expression.slice(cursor, end);
+            const start = ++cursor;
+            const end = expression.indexOf(ch, start);
+            if (end === -1) {
+                throw new Error(`Unterminated string literal in: ${expression}`);
+            }
             cursor = end + 1;
-            return value;
+            return expression.slice(start, end);
         }
 
         if (ch === "{") return parseMultiSelectHash(context);
