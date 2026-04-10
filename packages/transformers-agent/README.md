@@ -205,3 +205,42 @@ for await (const chunk of agent.stream('What changed in Transformers.js v4?')) {
   if (chunk.type === 'done') console.log('\n\nTokens used:', chunk.usage.totalTokens);
 }
 ```
+
+---
+
+## Related APIs and alignment choices
+
+`@huggingface/transformers-agent` intentionally overlaps with existing agent/tool ecosystems, but it does not mirror any one API 1:1.
+
+### AI SDK (tools + tool calling)
+
+The AI SDK offers a broad, provider-agnostic tool-calling layer with many advanced orchestration features (for example strict mode, approval flows, dynamic tools, repair hooks, and extensive step controls).
+
+That is excellent for multi-provider/cloud-first apps, but `transformers-agent` focuses on a different center of gravity:
+
+- local model lifecycle (`isCached()`, `downloadSize()`, `init()` progress)
+- direct runtime knobs (`modelId`, `device`, `dtype`)
+- cache-aware agent ergonomics for iterative on-device runs
+
+In short, AI SDK optimizes for maximum backend flexibility, while `transformers-agent` optimizes for Transformers.js local inference constraints and UX.
+
+### Chrome Prompt API
+
+Chrome's Prompt API is a browser-native session API for Gemini Nano with built-in availability checks, hardware/storage constraints, and multimodal prompting.
+
+It is a great fit when your target is specifically Chrome built-in AI, but it is not a portable Transformers.js abstraction across browser + Node.js runtimes, and it does not expose the same model/runtime controls (`modelId`/`dtype`/`device`) used in Transformers.js workflows.
+
+### Why we do not fully align 1:1
+
+We align where it helps interoperability, especially at the tool contract layer:
+
+- tools follow the W3C WebMCP `ModelContextTool` shape (compatible with `navigator.modelContext.registerTool()`)
+
+But we intentionally keep a Transformers.js-first API because on-device products are dominated by concerns that generic agent APIs do not prioritize:
+
+- download and cache UX before first run
+- deterministic local performance tuning
+- preserving KV cache validity across turns
+- runtime portability between browser and Node.js
+
+So the goal is not to diverge for its own sake: it is to stay compatible with emerging standards while keeping the API optimized for local, on-device inference with Transformers.js.
