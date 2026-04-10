@@ -1,4 +1,4 @@
-import { PreTrainedModel } from '../modeling_utils.js';
+import { PreTrainedModel, addPastKeyValues } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { getCacheShapes } from '../../configs.js';
 import { Tensor, ones } from '../../utils/tensor.js';
@@ -209,7 +209,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         }
 
         const decoder_feeds = { inputs_embeds, ...kwargs };
-        this.addPastKeyValues(decoder_feeds, past_key_values);
+        addPastKeyValues(this, decoder_feeds, past_key_values);
 
         const session = this.sessions['decoder_model_merged'];
         const fixed = pick(decoder_feeds, session.inputNames);
