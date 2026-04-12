@@ -30,6 +30,9 @@
  * through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
  * @property {number[]} [decoder_input_ids=null] (`number[]`, *optional*):
  * If the model is an encoder-decoder model, this argument is used to pass the `decoder_input_ids`.
+ * @property {import('../cache_utils.js').DynamicCache | null} [past_key_values=null] (`DynamicCache`, *optional*):
+ * A cache object that stores previously computed key/value states. When provided, the model will
+ * use these cached states to avoid recomputing them, significantly speeding up sequential generation.
  */
 
 /**
