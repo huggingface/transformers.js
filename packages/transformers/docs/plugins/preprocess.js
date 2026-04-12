@@ -14,24 +14,39 @@ function extractBalancedBraces(text, start) {
   return depth === 0 ? { content: text.slice(start + 1, i - 1), endIndex: i } : null;
 }
 
+function stripLeadingGenericParams(expr) {
+  if (expr[0] !== "<") return expr;
+  let depth = 1, i = 1;
+  while (i < expr.length && depth > 0) {
+    if (expr[i] === "<") depth++;
+    else if (expr[i] === ">") depth--;
+    i++;
+  }
+  return depth === 0 ? expr.slice(i) : expr;
+}
+
 function transformType(expr) {
   let result = expr,
     prev = "";
   while (result !== prev) {
     prev = result;
+    result = stripLeadingGenericParams(result); // <T extends X>(...) -> (...)
     result = result
       .replace(/import\([^)]+\)((?:\.\w+)*)/g, (_, p) => p?.slice(1) || "any") // import() -> Type
       .replace(/\w+\[['"][^\]]+['"]\]\s+extends\s+[^}]+/g, "any") // X['p'] extends ... -> any
       .replace(/(\w+)(?:<[^>]+>)?\[[^\]]+\]/g, "$1") // Type[x] or Type<T>[x] -> Type
       .replace(/keyof\s+typeof\s+\w+/g, "string") // keyof typeof X -> string
       .replace(/typeof\s+\w+/g, "Object") // typeof X -> Object
+      .replace(/\binfer\s+\w+/g, "any") // infer K -> any
+      .replace(/\(\s*\w[\w<>, ]*\s+extends\s+\w+\s*\?[^)]*\)/g, "any") // (X extends Y ? A : B) -> any
+      .replace(/(?<!\w)\(\s*(\w+)\s*\)/g, "$1") // (any) -> any (unwrap parens around simple types, not after words like "function")
       .replace(/(\w+)\?\s*:/g, "$1:") // x?: T -> x: T
       .replace(/;\s*([}\n])/g, " $1")
       .replace(/;\s+/g, ", ") // semicolons -> commas
       .replace(/\{\s*\[\w+\s+in\s+[^\]]+\][^}]*\}/g, "Object") // mapped types -> Object
       .replace(/new\s*\([^)]*\)\s*=>\s*\{[^}]*\}/g, "Function") // new () => {...} -> Function
       .replace(/new\s*\([^)]*\)\s*=>\s*\w+/g, "Function") // new () => T -> Function
-      .replace(/\([^()]*\)\s*=>\s*\w[\w<>|[\]]*/g, "Function") // () => T -> Function
+      .replace(/\([^()]*\)\s*=>\s*\w[\w<>|[\], ]*/g, "Function") // () => T -> Function
       .replace(/\{[^{}]*\}\[\]/g, "Array") // {x:T}[] -> Array
       .replace(/(\w+)<[^>]+>\[\]/g, "Array.<$1>") // T<U>[] -> Array.<T>
       .replace(/\([^()]+\)\[\]/g, "Array") // (A|B)[] -> Array
