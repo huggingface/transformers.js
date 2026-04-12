@@ -32,27 +32,16 @@ import { logger } from '../utils/logger.js';
  * @property {number} [num_frames] The number of frames in the input audio.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & AutomaticSpeechRecognitionSpecificParams} AutomaticSpeechRecognitionConfig
  *
- * @callback AutomaticSpeechRecognitionPipelineCallbackSingle Transcribe the audio sequence given as inputs to text.
- * @param {AudioInput} audio The input audio file(s) to be transcribed. The input is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<AutomaticSpeechRecognitionOutput>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
- *
- * @callback AutomaticSpeechRecognitionPipelineCallbackBatch Transcribe the audio sequences given as inputs to text.
- * @param {AudioInput[]} audio The input audio file(s) to be transcribed. Each entry is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<AutomaticSpeechRecognitionOutput[]>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
- *
- * @typedef {AutomaticSpeechRecognitionPipelineCallbackSingle & AutomaticSpeechRecognitionPipelineCallbackBatch} AutomaticSpeechRecognitionPipelineCallback
- *
  * @typedef {TextAudioPipelineConstructorArgs & AutomaticSpeechRecognitionPipelineCallback & Disposable} AutomaticSpeechRecognitionPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends AudioInput[] ? AutomaticSpeechRecognitionOutput[] : AutomaticSpeechRecognitionOutput} AutomaticSpeechRecognitionPipelineResult
+ */
+
+/**
+ * @typedef {<T extends AudioInput | AudioInput[]>(audio: T, options?: Partial<AutomaticSpeechRecognitionConfig>) => Promise<AutomaticSpeechRecognitionPipelineResult<T>>} AutomaticSpeechRecognitionPipelineCallback
  */
 
 /**

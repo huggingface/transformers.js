@@ -22,23 +22,16 @@ import { logger } from '../utils/logger.js';
  * is 1. If `true`, the labels are considered independent and probabilities are normalized for each
  * candidate by doing a softmax of the entailment score vs. the contradiction score.
  *
- * @callback ZeroShotClassificationPipelineCallbackSingle Classify the sequence(s) given as inputs.
- * @param {string} texts The sequence(s) to classify, will be truncated if the model input is too large.
- * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
- * Can be a single label, a string of comma-separated labels, or a list of labels.
- * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
- * @returns {Promise<ZeroShotClassificationOutput>} An array or object containing the predicted labels and scores.
- *
- * @callback ZeroShotClassificationPipelineCallbackBatch Classify the sequence(s) given as inputs.
- * @param {string[]} texts The sequence(s) to classify, will be truncated if the model input is too large.
- * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
- * Can be a single label, a string of comma-separated labels, or a list of labels.
- * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
- * @returns {Promise<ZeroShotClassificationOutput[]>} An array or object containing the predicted labels and scores.
- *
- * @typedef {ZeroShotClassificationPipelineCallbackSingle & ZeroShotClassificationPipelineCallbackBatch} ZeroShotClassificationPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & ZeroShotClassificationPipelineCallback & Disposable} ZeroShotClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? ZeroShotClassificationOutput[] : ZeroShotClassificationOutput} ZeroShotClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(texts: T, candidate_labels: string | string[], options?: ZeroShotClassificationPipelineOptions) => Promise<ZeroShotClassificationPipelineResult<T>>} ZeroShotClassificationPipelineCallback
  */
 
 /**
