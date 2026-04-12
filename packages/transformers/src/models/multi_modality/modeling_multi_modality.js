@@ -127,7 +127,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     async generate_images(options) {
         this._generation_mode = 'image';
 
-        const start_num_tokens = (options.inputs ?? options[this.main_input_name]).dims[1];
+        const start_num_tokens = /** @type {Tensor} */ (options.inputs ?? options[this.main_input_name]).dims[1];
         const all_tokens = await super.generate(options);
 
         const generated_tokens = /** @type {Tensor} */ (all_tokens).slice(null, [start_num_tokens, null]);

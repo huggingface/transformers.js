@@ -36,7 +36,7 @@
  */
 
 /**
- * @typedef {GenerationFunctionParametersBase & Partial<import('./configuration_utils.js').GenerationConfig> & Record<string, any>} GenerationFunctionParameters
+ * @typedef {GenerationFunctionParametersBase & Partial<import('./configuration_utils.js').GenerationConfig> & {[key: string]: unknown}} GenerationFunctionParameters
  */
 
 export {}; // Ensure this file is treated as a module

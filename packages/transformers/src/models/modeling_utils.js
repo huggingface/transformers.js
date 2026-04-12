@@ -852,7 +852,7 @@ export class PreTrainedModel extends Callable {
         // 3. Define model inputs
         let { inputs_tensor, model_inputs, model_input_name } = this._prepare_model_inputs({
             inputs,
-            model_kwargs: kwargs,
+            model_kwargs: /** @type {Record<string, Tensor|number[]>} */ (kwargs),
         });
 
         const is_encoder_decoder = this.config.is_encoder_decoder;

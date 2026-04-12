@@ -41,17 +41,9 @@ function isChat(x) {
  * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<TextGenerationChatOutput>} An array containing the generated chat(s).
  *
- * @callback TextGenerationPipelineCallbackStringBatched
- * @param {string[]} texts Several prompts to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationStringOutput[]>} An array of arrays, each containing the generated text(s) for the corresponding input.
+ * @typedef {<T extends string[] | Chat[]>(texts: T, options?: Partial<TextGenerationConfig>) => Promise<T extends Chat[] ? TextGenerationChatOutput[] : TextGenerationStringOutput[]>} TextGenerationPipelineCallbackBatched
  *
- * @callback TextGenerationPipelineCallbackChatBatched
- * @param {Chat[]} texts Several chats to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationChatOutput[]>} An array of arrays, each containing the generated chat(s) for the corresponding input.
- *
- * @typedef {TextGenerationPipelineCallbackString & TextGenerationPipelineCallbackChat & TextGenerationPipelineCallbackStringBatched & TextGenerationPipelineCallbackChatBatched} TextGenerationPipelineCallback
+ * @typedef {TextGenerationPipelineCallbackString & TextGenerationPipelineCallbackChat & TextGenerationPipelineCallbackBatched} TextGenerationPipelineCallback
  *
  * @typedef {TextPipelineConstructorArgs & TextGenerationPipelineCallback & Disposable} TextGenerationPipelineType
  */
