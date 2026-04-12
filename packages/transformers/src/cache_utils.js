@@ -74,7 +74,7 @@ class _DynamicCache {
 }
 
 /**
- * @typedef {_DynamicCache & Record<string, Tensor>} DynamicCache
+ * @typedef {Record<string, Tensor> & _DynamicCache} DynamicCache
  */
 
 export const DynamicCache = /** @type {new (entries?: Record<string, Tensor>) => DynamicCache} */ (
