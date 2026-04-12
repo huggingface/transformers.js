@@ -7,8 +7,6 @@
  * Supports: field access, current node (`@`), wildcard projections (`[*]`),
  * multi-select hash (`{key: expr}`), multi-select list (`[expr, ...]`),
  * literal strings (`'value'`), and subexpressions (`a.b`).
- *
- * @module utils/jmespath
  */
 
 const WS = /\s/;
