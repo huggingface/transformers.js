@@ -31,21 +31,16 @@ function isChat(x) {
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
  *
- * @callback TextGenerationPipelineCallbackString
- * @param {string} texts One prompt to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationStringOutput>} An array containing the generated text(s).
- *
- * @callback TextGenerationPipelineCallbackChat
- * @param {Chat} texts One chat to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationChatOutput>} An array containing the generated chat(s).
- *
- * @typedef {<T extends string[] | Chat[]>(texts: T, options?: Partial<TextGenerationConfig>) => Promise<T extends Chat[] ? TextGenerationChatOutput[] : TextGenerationStringOutput[]>} TextGenerationPipelineCallbackBatched
- *
- * @typedef {TextGenerationPipelineCallbackString & TextGenerationPipelineCallbackChat & TextGenerationPipelineCallbackBatched} TextGenerationPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & TextGenerationPipelineCallback & Disposable} TextGenerationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string ? TextGenerationStringOutput : T extends Chat ? TextGenerationChatOutput : T extends string[] ? TextGenerationStringOutput[] : T extends Chat[] ? TextGenerationChatOutput[] : never} TextGenerationResult
+ */
+
+/**
+ * @typedef {<T extends string | Chat | string[] | Chat[]>(texts: T, options?: Partial<TextGenerationConfig>) => Promise<TextGenerationResult<T>>} TextGenerationPipelineCallback
  */
 
 /**
