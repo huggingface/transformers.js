@@ -25,12 +25,47 @@ function stripLeadingGenericParams(expr) {
   return depth === 0 ? expr.slice(i) : expr;
 }
 
+function hasTopLevelConditional(expr) {
+  let angle = 0,
+    paren = 0,
+    brace = 0,
+    bracket = 0;
+
+  for (let i = 0; i < expr.length; ++i) {
+    const ch = expr[i];
+    if (ch === "<") angle++;
+    else if (ch === ">") angle = Math.max(0, angle - 1);
+    else if (ch === "(") paren++;
+    else if (ch === ")") paren = Math.max(0, paren - 1);
+    else if (ch === "{") brace++;
+    else if (ch === "}") brace = Math.max(0, brace - 1);
+    else if (ch === "[") bracket++;
+    else if (ch === "]") bracket = Math.max(0, bracket - 1);
+    else if (ch === "?" && angle === 0 && paren === 0 && brace === 0 && bracket === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function transformType(expr) {
   let result = expr,
     prev = "";
   while (result !== prev) {
     prev = result;
     result = stripLeadingGenericParams(result); // <T extends X>(...) -> (...)
+    if (/^Promise<function\s*\(/.test(result)) {
+      result = "Promise.<Function>";
+      continue;
+    }
+    if (/^function\s*\(/.test(result)) {
+      result = "Function";
+      continue;
+    }
+    if (hasTopLevelConditional(result)) {
+      result = "any";
+      continue;
+    }
     result = result
       .replace(/import\([^)]+\)((?:\.\w+)*)/g, (_, p) => p?.slice(1) || "any") // import() -> Type
       .replace(/\w+\[['"][^\]]+['"]\]\s+extends\s+[^}]+/g, "any") // X['p'] extends ... -> any
@@ -53,7 +88,6 @@ function transformType(expr) {
       .replace(/(\w+)\[\]/g, "Array") // T[] -> Array (simple)
       .replace(/\[\w+\]/g, "Array") // [T] single-element tuple -> Array
       .replace(/\[[^\[\]]*,[^\[\]]*\]/g, "Array") // tuples with commas -> Array
-      .replace(/\w+\s+extends\s+[^?]+\?\s*[^:]+\s*:\s*[^,}>)]+/g, "any") // conditionals -> any
       .replace(/\bnew\s+([A-Z]\w*)\b/g, "$1") // new Type -> Type
       .replace(/,?\s*\[\s*\w+\s*:\s*\w+\s*\]\s*:\s*\w+/g, "") // [key: string]: any -> (removed)
       .replace(/\(\s*(\w+)\s*&\s*\{\s*\}\s*\)/g, "$1") // (string & {}) -> string
