@@ -167,7 +167,68 @@ function getSpecialTokens(tokenizer) {
     return special;
 }
 
-export class PreTrainedTokenizer extends Callable {
+/**
+ * @template {string|string[]} TText
+ * @typedef {TText extends string ? number[] : number[][]} BatchEncodingArrayItem
+ */
+
+/**
+ * @template {string|string[]} TText
+ * @template {boolean} [TReturnTensor=true]
+ * @typedef {TReturnTensor extends true ? Tensor : BatchEncodingArrayItem<TText>} BatchEncodingItem
+ */
+
+/**
+ * @template TItem
+ * @typedef {Object} BatchEncoding
+ * @property {TItem} input_ids List of token ids to be fed to a model.
+ * @property {TItem} attention_mask List of indices specifying which tokens should be attended to by the model.
+ * @property {TItem} [token_type_ids] List of token type ids to be fed to a model.
+ */
+
+/**
+ * @template {string|string[]} TText
+ * @template {boolean} [TReturnTensor=true]
+ * @typedef {Object} TokenizerCallOptions
+ * @property {TText extends string ? string|null : string[]|null} [text_pair=null] Optional second sequence to be encoded. If set, must be the same type as text.
+ * @property {boolean|'max_length'} [padding=false] Whether to pad the input sequences.
+ * @property {boolean} [add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
+ * @property {boolean|null} [truncation=null] Whether to truncate the input sequences.
+ * @property {number|null} [max_length=null] Maximum length of the returned list and optionally padding length.
+ * @property {TReturnTensor} [return_tensor=true] Whether to return the results as Tensors or arrays.
+ * @property {boolean|null} [return_token_type_ids=null] Whether to return the token type ids.
+ */
+
+/**
+ * @typedef {<TText extends string | string[], TReturnTensor extends boolean = true>(text: TText, options?: TokenizerCallOptions<TText, TReturnTensor>) => BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} PreTrainedTokenizerCallback
+ */
+
+/**
+ * @template {boolean} [TTokenize=true]
+ * @template {boolean} [TReturnTensor=true]
+ * @template {boolean} [TReturnDict=true]
+ * @typedef {Object} ApplyChatTemplateOptions
+ * @property {string|null} [chat_template=null] A Jinja template to use for this conversion.
+ * @property {Object[]|null} [tools=null] A list of tools (callable functions) that will be accessible to the model.
+ * @property {Record<string, string>[]|null} [documents=null] Documents that will be accessible to the model.
+ * @property {boolean} [add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate the start of an assistant message.
+ * @property {TTokenize} [tokenize=true] Whether to tokenize the output. If false, the output will be a string.
+ * @property {boolean} [padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
+ * @property {boolean} [truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
+ * @property {number|null} [max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
+ * @property {TReturnTensor} [return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
+ * @property {TReturnDict} [return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
+ * @property {Object} [tokenizer_kwargs={}] Additional options to pass to the tokenizer.
+ */
+
+/**
+ * @template {boolean} [TTokenize=true]
+ * @template {boolean} [TReturnTensor=true]
+ * @template {boolean} [TReturnDict=true]
+ * @typedef {TTokenize extends false ? string : TReturnDict extends false ? BatchEncodingItem<string, TReturnTensor> : BatchEncoding<BatchEncodingItem<string, TReturnTensor>>} ApplyChatTemplateReturn
+ */
+
+export class PreTrainedTokenizer extends /** @type {new (tokenizerJSON: Object, tokenizerConfig: Object) => PreTrainedTokenizerCallback} */ (Callable) {
     return_token_type_ids = false;
 
     padding_side = 'right';
@@ -282,42 +343,22 @@ export class PreTrainedTokenizer extends Callable {
     }
 
     /**
-     * @typedef {number[]|number[][]|Tensor} BatchEncodingItem
-     *
-     * @typedef {Object} BatchEncoding Holds the output of the tokenizer's call function.
-     * @property {BatchEncodingItem} input_ids List of token ids to be fed to a model.
-     * @property {BatchEncodingItem} attention_mask List of indices specifying which tokens should be attended to by the model.
-     * @property {BatchEncodingItem} [token_type_ids] List of token type ids to be fed to a model.
-     */
-
-    /**
      * Encode/tokenize the given text(s).
-     * @param {string|string[]} text The text to tokenize.
-     * @param {Object} options An optional object containing the following properties:
-     * @param {string|string[]} [options.text_pair=null] Optional second sequence to be encoded. If set, must be the same type as text.
-     * @param {boolean|'max_length'} [options.padding=false] Whether to pad the input sequences.
-     * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
-     * @param {boolean|null} [options.truncation=null] Whether to truncate the input sequences.
-     * @param {number|null} [options.max_length=null] Maximum length of the returned list and optionally padding length.
-     * @param {boolean} [options.return_tensor=true] Whether to return the results as Tensors or arrays.
-     * @param {boolean|null} [options.return_token_type_ids=null] Whether to return the token type ids.
-     * @returns {BatchEncoding} Object to be passed to the model.
+     * @template {string|string[]} TText
+     * @template {boolean} [TReturnTensor=true]
+     * @param {TText} text The text to tokenize.
+     * @param {TokenizerCallOptions<TText, TReturnTensor>} [options] Additional tokenization options.
+     * @returns {BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} Object to be passed to the model.
      */
     _call(
         // Required positional arguments
         text,
-
-        // Optional keyword arguments
-        {
-            text_pair = null,
-            add_special_tokens = true,
-            padding = false,
-            truncation = null,
-            max_length = null,
-            return_tensor = true, // Different to HF
-            return_token_type_ids = null,
-        } = {},
+        options = {},
     ) {
+        const { text_pair = null, add_special_tokens = true, padding = false, return_token_type_ids = null } = options;
+        let { truncation = null, max_length = null } = options;
+        const return_tensor = /** @type {TReturnTensor} */ (options.return_tensor ?? true); // Different to HF
+
         const isBatched = Array.isArray(text);
 
         let encodedTokens;
@@ -457,7 +498,7 @@ export class PreTrainedTokenizer extends Callable {
             }
         }
 
-        return /** @type {BatchEncoding} */ (result);
+        return /** @type {BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} */ (result);
     }
 
     /**
@@ -662,52 +703,30 @@ export class PreTrainedTokenizer extends Callable {
      *
      * @param {Message[]} conversation A list of message objects with `"role"` and `"content"` keys,
      * representing the chat history so far.
-     * @param {Object} options An optional object containing the following properties:
-     * @param {string|null} [options.chat_template=null] A Jinja template to use for this conversion. If
-     * this is not passed, the model's chat template will be used instead.
-     * @param {Object[]} [options.tools=null]
-     * A list of tools (callable functions) that will be accessible to the model. If the template does not
-     * support function calling, this argument will have no effect. Each tool should be passed as a JSON Schema,
-     * giving the name, description and argument types for the tool. See our
-     * [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#automated-function-conversion-for-tool-use)
-     * for more information.
-     * @param {Record<string, string>[]} [options.documents=null]
-     * A list of dicts representing documents that will be accessible to the model if it is performing RAG
-     * (retrieval-augmented generation). If the template does not support RAG, this argument will have no
-     * effect. We recommend that each document should be a dict containing "title" and "text" keys. Please
-     * see the RAG section of the [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#arguments-for-RAG)
-     * for examples of passing documents with chat templates.
-     * @param {boolean} [options.add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate
-     * the start of an assistant message. This is useful when you want to generate a response from the model.
-     * Note that this argument will be passed to the chat template, and so it must be supported in the
-     * template for this argument to have any effect.
-     * @param {boolean} [options.tokenize=true] Whether to tokenize the output. If false, the output will be a string.
-     * @param {boolean} [options.padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
-     * @param {boolean} [options.truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
-     * @param {number|null} [options.max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
-     * If not specified, the tokenizer's `max_length` attribute will be used as a default.
-     * @param {boolean} [options.return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
-     * @param {boolean} [options.return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
-     * @param {Object} [options.tokenizer_kwargs={}] Additional options to pass to the tokenizer.
-     * @returns {string | Tensor | number[]| number[][]|BatchEncoding} The tokenized output.
+     * @template {boolean} [TTokenize=true]
+     * @template {boolean} [TReturnTensor=true]
+     * @template {boolean} [TReturnDict=true]
+     * @param {ApplyChatTemplateOptions<TTokenize, TReturnTensor, TReturnDict>} [options] Additional chat template options.
+     * @returns {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} The tokenized output.
      */
     apply_chat_template(
         conversation,
-        {
+        options = {},
+    ) {
+        let {
             tools = null,
             documents = null,
             chat_template = null,
             add_generation_prompt = false,
-            tokenize = true,
+            tokenize = /** @type {TTokenize} */ (true),
             padding = false,
             truncation = false,
             max_length = null,
-            return_tensor = true,
-            return_dict = true,
+            return_tensor = /** @type {TReturnTensor} */ (true),
+            return_dict = /** @type {TReturnDict} */ (true),
             tokenizer_kwargs = {},
             ...kwargs
-        } = {},
-    ) {
+        } = options;
         chat_template = this.get_chat_template({ chat_template, tools });
 
         if (typeof chat_template !== 'string') {
@@ -748,10 +767,10 @@ export class PreTrainedTokenizer extends Callable {
                 return_tensor,
                 ...tokenizer_kwargs,
             });
-            return return_dict ? out : out.input_ids;
+            return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (return_dict ? out : out.input_ids);
         }
 
-        return rendered;
+        return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (rendered);
     }
 }
 

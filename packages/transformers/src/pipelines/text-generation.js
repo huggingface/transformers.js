@@ -124,11 +124,15 @@ export class TextGenerationPipeline
             // If the input is a chat, we need to apply the chat template
             inputs = /** @type {string[]} */ (
                 /** @type {Chat[]} */ (texts).map((x) =>
-                    this.tokenizer.apply_chat_template(x, {
-                        tokenize: false,
-                        add_generation_prompt: true,
-                        ...tokenizer_kwargs,
-                    }),
+                    /** @type {string} */ (
+                        /** @type {unknown} */ (
+                            this.tokenizer.apply_chat_template(x, {
+                                tokenize: false,
+                                add_generation_prompt: true,
+                                ...tokenizer_kwargs,
+                            })
+                        )
+                    ),
                 )
             );
             // Chat template handles these already
