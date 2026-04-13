@@ -706,7 +706,7 @@ export class PreTrainedTokenizer extends /** @type {new (tokenizerJSON: Object, 
      * @template {boolean} [TTokenize=true]
      * @template {boolean} [TReturnTensor=true]
      * @template {boolean} [TReturnDict=true]
-     * @param {ApplyChatTemplateOptions<TTokenize, TReturnTensor, TReturnDict>} [options] An optional object containing the following properties:
+     * @param {Object} [options] An optional object containing the following properties:
      * @param {string|null} [options.chat_template=null] A Jinja template to use for this conversion. If
      * this is not passed, the model's chat template will be used instead.
      * @param {Object[]} [options.tools=null]
@@ -737,7 +737,7 @@ export class PreTrainedTokenizer extends /** @type {new (tokenizerJSON: Object, 
      */
     apply_chat_template(
         conversation,
-        options = {},
+        options = /** @type {ApplyChatTemplateOptions<TTokenize, TReturnTensor, TReturnDict>} */ ({}),
     ) {
         let {
             tools = null,
