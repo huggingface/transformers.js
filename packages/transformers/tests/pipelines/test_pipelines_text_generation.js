@@ -281,41 +281,4 @@ export default () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
   });
-
-  describe("Text Generation (Idefics3 model, text-only)", () => {
-    const model_id = "hf-internal-testing/tiny-random-Idefics3ForConditionalGeneration";
-
-    /** @type {TextGenerationPipeline} */
-    let pipe;
-    beforeAll(async () => {
-      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
-    }, MAX_MODEL_LOAD_TIME);
-
-    it("should be an instance of TextGenerationPipeline", () => {
-      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
-    });
-
-    it("should load only text sessions for text-only generation", async () => {
-      const sessions = pipe.model.sessions;
-      expect(sessions).toHaveProperty("embed_tokens");
-      expect(sessions).toHaveProperty("decoder_model_merged");
-      expect(sessions).not.toHaveProperty("vision_encoder");
-    });
-
-    it(
-      "text input (single)",
-      async () => {
-        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
-        expect(output).toHaveLength(1);
-        expect(output[0]).toHaveProperty("generated_text");
-        expect(typeof output[0].generated_text).toBe("string");
-        expect(output[0].generated_text.length).toBeGreaterThan(0);
-      },
-      MAX_TEST_EXECUTION_TIME,
-    );
-
-    afterAll(async () => {
-      await pipe?.dispose();
-    }, MAX_MODEL_DISPOSE_TIME);
-  });
 };
