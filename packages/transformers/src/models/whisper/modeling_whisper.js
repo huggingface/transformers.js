@@ -117,9 +117,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
     }) {
         generation_config = this._prepare_generation_config(generation_config, kwargs);
 
-        const init_tokens = kwargs.decoder_input_ids instanceof Tensor
-            ? prepareTensorForDecode(kwargs.decoder_input_ids)
-            : kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config);
+        const init_tokens =
+            kwargs.decoder_input_ids instanceof Tensor
+                ? prepareTensorForDecode(kwargs.decoder_input_ids)
+                : (kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config));
 
         if (generation_config.return_timestamps) {
             logits_processor ??= new LogitsProcessorList();

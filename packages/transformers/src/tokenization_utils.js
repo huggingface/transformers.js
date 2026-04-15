@@ -228,7 +228,11 @@ function getSpecialTokens(tokenizer) {
  * @typedef {TTokenize extends false ? string : TReturnDict extends false ? BatchEncodingItem<string, TReturnTensor> : BatchEncoding<BatchEncodingItem<string, TReturnTensor>>} ApplyChatTemplateReturn
  */
 
-export class PreTrainedTokenizer extends /** @type {new (tokenizerJSON: Object, tokenizerConfig: Object) => PreTrainedTokenizerCallback} */ (Callable) {
+export class PreTrainedTokenizer
+    extends /** @type {new (tokenizerJSON: Object, tokenizerConfig: Object) => PreTrainedTokenizerCallback} */ (
+        Callable
+    )
+{
     return_token_type_ids = false;
 
     padding_side = 'right';
@@ -793,7 +797,9 @@ export class PreTrainedTokenizer extends /** @type {new (tokenizerJSON: Object, 
                 return_tensor,
                 ...tokenizer_kwargs,
             });
-            return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (return_dict ? out : out.input_ids);
+            return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (
+                return_dict ? out : out.input_ids
+            );
         }
 
         return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (rendered);

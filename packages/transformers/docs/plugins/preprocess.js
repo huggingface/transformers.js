@@ -16,7 +16,8 @@ function extractBalancedBraces(text, start) {
 
 function stripLeadingGenericParams(expr) {
   if (expr[0] !== "<") return expr;
-  let depth = 1, i = 1;
+  let depth = 1,
+    i = 1;
   while (i < expr.length && depth > 0) {
     if (expr[i] === "<") depth++;
     else if (expr[i] === ">") depth--;
