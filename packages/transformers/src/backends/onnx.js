@@ -178,6 +178,20 @@ export function deviceToExecutionProviders(device = null) {
 }
 
 /**
+ * Get the list of supported devices for the current platform, sorted by
+ * priority/performance (best first, CPU/WASM last).
+ *
+ * This is the same ordering used internally when `device` is set to `"auto"`.
+ * Returns a shallow copy so callers can mutate or iterate without affecting
+ * library internals.
+ *
+ * @returns {import("../utils/devices.js").DeviceType[]} The supported devices.
+ */
+export function getSupportedDevices() {
+    return /** @type {import("../utils/devices.js").DeviceType[]} */ ([...supportedDevices]);
+}
+
+/**
  * Currently, Transformers.js doesn't support simultaneous loading of sessions in WASM/WebGPU.
  * For this reason, we need to chain the loading calls.
  * @type {Promise<any>}
