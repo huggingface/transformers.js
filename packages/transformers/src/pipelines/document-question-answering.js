@@ -43,11 +43,10 @@ export class DocumentQuestionAnsweringPipeline
         Pipeline
     )
 {
+    _default_generation_config = {
+        max_new_tokens: 256,
+    };
     async _call(image, question, generate_kwargs = {}) {
-        generate_kwargs = {
-            max_new_tokens: 256,
-            ...generate_kwargs
-        };
         if (Array.isArray(image)) {
             if (image.length !== 1) {
                 throw Error('Document Question Answering pipeline currently only supports a batch size of 1.');
@@ -73,6 +72,8 @@ export class DocumentQuestionAnsweringPipeline
             // @ts-expect-error Ts2339
             max_length: this.model.config.decoder.max_position_embeddings,
             decoder_input_ids,
+
+            ...this._default_generation_config,
             ...generate_kwargs,
         });
 

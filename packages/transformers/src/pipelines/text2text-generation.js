@@ -37,17 +37,17 @@ import { Tensor } from '../utils/tensor.js';
 export class Text2TextGenerationPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => Text2TextGenerationPipelineType} */ (Pipeline)
 {
+    _default_generation_config = {
+        max_new_tokens: 256,
+        // do_sample: true,
+        // temperature: 0.7,
+    };
+
     /** @type {'generated_text'} */
     _key = 'generated_text';
 
     /** @type {Text2TextGenerationPipelineCallback} */
     async _call(texts, generate_kwargs = {}) {
-        generate_kwargs = { 
-            max_new_tokens: 256,
-            do_sample: true,
-            temperature: 0.7, 
-            ...generate_kwargs
-        };
         if (!Array.isArray(texts)) {
             texts = [texts];
         }
@@ -86,7 +86,11 @@ export class Text2TextGenerationPipeline
             inputs = tokenizer(texts, tokenizer_options);
         }
 
-        const outputTokenIds = await this.model.generate({ ...inputs, ...generate_kwargs });
+        const outputTokenIds = await this.model.generate({
+            ...inputs,
+            ...this._default_generation_config,
+            ...generate_kwargs,
+        });
         return tokenizer
             .batch_decode(/** @type {Tensor} */ (outputTokenIds), {
                 skip_special_tokens: true,

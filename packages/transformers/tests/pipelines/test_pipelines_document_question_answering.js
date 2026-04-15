@@ -25,7 +25,9 @@ export default () => {
           const dims = [64, 32, 3];
           const image = new RawImage(new Uint8ClampedArray(dims[0] * dims[1] * dims[2]).fill(255), ...dims);
           const question = "What is the invoice number?";
-          const output = await pipe(image, question);
+          const output = await pipe(image, question, {
+            max_new_tokens: 5,
+          });
 
           const target = [{ answer: null }];
           expect(output).toEqual(target);
