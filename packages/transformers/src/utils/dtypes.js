@@ -41,7 +41,11 @@ export const DATA_TYPES = Object.freeze({
     uint8: 'uint8',
     q4: 'q4',
     bnb4: 'bnb4',
-    q4f16: 'q4f16', // fp16 model with int4 block weight quantization
+    q4f16: 'q4f16', // fp16 model with 4-bit block weight quantization
+    q2: 'q2',
+    q2f16: 'q2f16', // fp16 model with 2-bit block weight quantization
+    q1: 'q1',
+    q1f16: 'q1f16', // fp16 model with 1-bit block weight quantization
 });
 /** @typedef {keyof typeof DATA_TYPES} DataType */
 
@@ -59,7 +63,11 @@ export const DEFAULT_DTYPE_SUFFIX_MAPPING = Object.freeze({
     [DATA_TYPES.uint8]: '_uint8',
     [DATA_TYPES.q8]: '_quantized',
     [DATA_TYPES.q4]: '_q4',
+    [DATA_TYPES.q2]: '_q2',
+    [DATA_TYPES.q1]: '_q1',
     [DATA_TYPES.q4f16]: '_q4f16',
+    [DATA_TYPES.q2f16]: '_q2f16',
+    [DATA_TYPES.q1f16]: '_q1f16',
     [DATA_TYPES.bnb4]: '_bnb4',
 });
 
