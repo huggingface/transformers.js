@@ -157,6 +157,7 @@ export * from './sapiens/modeling_sapiens.js';
 export * from './segformer/modeling_segformer.js';
 export * from './siglip/modeling_siglip.js';
 export * from './smollm3/modeling_smollm3.js';
+export * from './smolvlm/modeling_smolvlm.js';
 export * from './snac/modeling_snac.js';
 export * from './solar_open/modeling_solar_open.js';
 export * from './speecht5/modeling_speecht5.js';

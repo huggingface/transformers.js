@@ -328,6 +328,8 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
 
     // Also image-text-to-text
     ['phi3_v', 'Phi3VForCausalLM'],
+    ['idefics3', 'Idefics3ForConditionalGeneration'],
+    ['smolvlm', 'SmolVLMForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([['multi_modality', 'MultiModalityCausalLM']]);
