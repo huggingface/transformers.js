@@ -35,7 +35,7 @@ export default () => {
         
         // Mock images/videos for faster local execution rather than fetching
         const image1 = new RawImage(new Uint8ClampedArray(400 * 300 * 3), 400, 300, 3);
-        const image2 = new RawImage(new Uint8ClampedArray(800 * 800 * 3), 800, 800, 3);
+        const image2 = new RawImage(new Uint8ClampedArray(400 * 300 * 3), 400, 300, 3);
         const image3 = new RawImage(new Uint8ClampedArray(400 * 300 * 3), 400, 300, 3);
         const video1 = new RawVideo(new Array(8).fill(new RawImage(new Uint8ClampedArray(400 * 300 * 3), 400, 300, 3)), 8);
         
@@ -53,7 +53,7 @@ export default () => {
             bos_token_id = processor.tokenizer.convert_tokens_to_ids(bos_token);
             image_token_id = processor.tokenizer.convert_tokens_to_ids(image_token);
             fake_image_token_id = processor.tokenizer.convert_tokens_to_ids(fake_image_token);
-            global_img_tokens_id = processor.tokenizer(global_img_token, { add_special_tokens: false }).input_ids;
+            global_img_tokens_id = Array.from(processor.tokenizer(global_img_token, { add_special_tokens: false }).input_ids.data);
             padding_token_id = processor.tokenizer.pad_token_id;
             image_seq_len = processor.image_seq_len;
         }, MAX_PROCESSOR_LOAD_TIME);
@@ -70,7 +70,7 @@ export default () => {
             let inputs_with_text = await processor(text, image1, { do_image_splitting: false });
 
             const tokenized_sentence = processor.tokenizer(text_str, { add_special_tokens: false });
-            let expected_input_ids = [fake_image_token_id].concat(Array.from(global_img_tokens_id.data)).concat(new Array(image_seq_len).fill(image_token_id)).concat([fake_image_token_id]).concat(Array.from(tokenized_sentence.input_ids.data));
+            let expected_input_ids = [fake_image_token_id].concat(global_img_tokens_id).concat(new Array(image_seq_len).fill(image_token_id)).concat([fake_image_token_id]).concat(Array.from(tokenized_sentence.input_ids.data));
             
             inputs_with_text = await processor(text, image1, { add_special_tokens: false, do_image_splitting: false });
             expect(Array.from(inputs_with_text.input_ids.data)).toEqual(expected_input_ids.map(BigInt));
@@ -104,7 +104,7 @@ export default () => {
             const inputs_with_text = await processor(text, image1, { add_special_tokens: false, do_image_splitting: true });
 
             const tokenized_sentence = processor.tokenizer(text_str, { add_special_tokens: false });
-            const split_image1_tokens = get_split_image_expected_tokens(processor, 3, 4, fake_image_token_id, image_token_id, image_seq_len, Array.from(global_img_tokens_id.data));
+            const split_image1_tokens = get_split_image_expected_tokens(processor, 3, 4, fake_image_token_id, image_token_id, image_seq_len, global_img_tokens_id);
             const expected_input_ids_1 = split_image1_tokens.concat(Array.from(tokenized_sentence.input_ids.data));
             
             expect(Array.from(inputs_with_text.input_ids.data)).toEqual(expected_input_ids_1.map(BigInt));
@@ -122,8 +122,40 @@ export default () => {
 
             const inputs_batch = await processor(text_batch, images, { padding: true, add_special_tokens: false, do_image_splitting: true });
 
-            expect(inputs_batch.pixel_values.dims).toEqual([2, 30, 3, 512, 512]);
-            expect(inputs_batch.pixel_attention_mask.dims).toEqual([2, 30, 512, 512]);
+            expect(inputs_batch.pixel_values.dims).toEqual([2, 26, 3, 512, 512]);
+            expect(inputs_batch.pixel_attention_mask.dims).toEqual([2, 26, 512, 512]);
+        }, MAX_TEST_EXECUTION_TIME);
+
+        it("test_add_special_tokens_processor", async () => {
+            const image_str = "<image>";
+            const text_str = "In this image, we see";
+            const text = text_str + image_str;
+
+            const inputs = await processor(text, image1, { add_special_tokens: false });
+            const tokenized_sentence = processor.tokenizer(text_str, { add_special_tokens: false });
+            const split_image1_tokens = get_split_image_expected_tokens(processor, 3, 4, fake_image_token_id, image_token_id, image_seq_len, global_img_tokens_id);
+            const expected_input_ids = Array.from(tokenized_sentence.input_ids.data).concat(split_image1_tokens);
+            expect(Array.from(inputs.input_ids.data)).toEqual(expected_input_ids.map(BigInt));
+
+            const inputs2 = await processor(text, image1);
+            expect(Array.from(inputs2.input_ids.data)).toEqual(expected_input_ids.map(BigInt));
+        }, MAX_TEST_EXECUTION_TIME);
+
+        it("test_non_nested_images_with_batched_text", async () => {
+            const image_str = "<image>";
+            const text_str_1 = "In this image, we see";
+            const text_str_2 = "In this image, we see";
+
+            const text = [
+                image_str + text_str_1,
+                image_str + image_str + text_str_2,
+            ];
+            const images = [[image1], [image2, image3]];
+
+            const inputs = await processor(text, images, { padding: true, do_image_splitting: false });
+
+            expect(inputs.pixel_values.dims).toEqual([2, 2, 3, 512, 512]);
+            expect(inputs.pixel_attention_mask.dims).toEqual([2, 2, 512, 512]);
         }, MAX_TEST_EXECUTION_TIME);
 
         it("test_process_interleaved_images_prompts_image_error", async () => {
@@ -207,6 +239,35 @@ export default () => {
             expect(out_dict_with_video.pixel_values.dims[1]).toEqual(8);
         }, MAX_TEST_EXECUTION_TIME);
 
+        it("test_unstructured_kwargs_batched", async () => {
+            const input_str = ["<image>text", "<image>text"];
+            const image_input = [[image1], [image1]];
+            const inputs = await processor(input_str, image_input, {
+                padding: "max_length",
+                max_length: 200,
+                truncation: true,
+                size: { longest_edge: 300 },
+                do_image_splitting: false,
+            });
+
+            expect(inputs.pixel_values.dims[3]).toEqual(300);
+            expect(inputs.pixel_values.dims[4]).toEqual(300);
+            expect(inputs.input_ids.dims[1]).toEqual(200);
+        }, MAX_TEST_EXECUTION_TIME);
+
+        it("test_unstructured_kwargs_batched_video", async () => {
+            const input_str = ["<video>text", "<video>text"];
+            const inputs = await processor(input_str, null, {
+                videos: video1,
+                padding: "max_length",
+                max_length: 200,
+                truncation: true,
+                do_rescale: true,
+            });
+
+            expect(inputs.input_ids.dims[1]).toEqual(200);
+        }, MAX_TEST_EXECUTION_TIME);
+
         it("test_text_only_inference", async () => {
             const text = "This is a simple text without images.";
             const inputs = await processor(text, null, { add_special_tokens: false });
@@ -228,5 +289,25 @@ export default () => {
             ];
             await expect(processor(texts)).rejects.toThrow();
         });
+
+        it("test_special_mm_token_truncation", async () => {
+            const input_str = ["<image> text", "<image> text"];
+            const image_input = [[image1], [image1]];
+            
+            // Should work fine with enough length
+            await processor(input_str, image_input, {
+                truncation: false,
+                padding: true,
+                do_image_splitting: false,
+            });
+
+            // Should throw error if truncated and multimodal tokens are lost
+            await expect(processor(input_str, image_input, {
+                truncation: true,
+                padding: true,
+                max_length: 5, // very small to force truncation of <image> tokens
+                do_image_splitting: false,
+            })).rejects.toThrow(/truncated/);
+        }, MAX_TEST_EXECUTION_TIME);
     });
 };

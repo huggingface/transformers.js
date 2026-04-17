@@ -114,6 +114,12 @@ export class SmolVLMProcessor extends Processor {
         this.global_img_token = getattr(this.tokenizer, "global_image_token", "<global-img>");
         this.video_token = getattr(this.tokenizer, "video_token", "<video>");
         this.image_seq_len = this.config.image_seq_len ?? 169;
+
+        // Initialize token IDs for validation
+        if (this.tokenizer) {
+            this.image_token_id = this.tokenizer.convert_tokens_to_ids(this.image_token);
+            this.fake_image_token_id = this.tokenizer.convert_tokens_to_ids(this.fake_image_token);
+        }
     }
 
     /**
@@ -163,8 +169,6 @@ export class SmolVLMProcessor extends Processor {
      */
     expand_text_with_video_tokens(text, video_inputs) {
         const { frames, duration, timestamps } = video_inputs;
-        // In python, video_metadata is an iterator over batches.
-        // For simplicity in JS, we assume one video per expansion batch since batching videos isn't fully supported in JS yet.
         
         const num_frames = frames.length;
         const frame_count_word = num2words(num_frames);
@@ -220,11 +224,6 @@ export class SmolVLMProcessor extends Processor {
             options.chat_template = DEFAULT_CHAT_TEMPLATE;
         }
 
-        // To match python perfectly:
-        if (options.processor_kwargs) {
-            // Not supported exactly in JS yet
-        }
-
         return super.apply_chat_template(conversation, options);
     }
 
@@ -267,7 +266,6 @@ export class SmolVLMProcessor extends Processor {
                 images = extracted_images;
             }
 
-            // Create a copy of the conversation without the binary data to prevent the template engine from OOMing
             const text_for_template = text.map(message => ({
                 ...message,
                 content: Array.isArray(message.content) 
@@ -304,7 +302,6 @@ export class SmolVLMProcessor extends Processor {
 
         let inputs = {};
 
-        // Images and videos are mutually exclusive, so process one which is present
         if (images !== null) {
             const vision_inputs = await this.image_processor(images, { ...options, return_row_col_info: true });
             
@@ -318,12 +315,9 @@ export class SmolVLMProcessor extends Processor {
             if (text !== null) {
                 const n_images_in_text = text.map(sample => sample.split(this.image_token).length - 1);
                 
-                // Assuming flat images array mapping 1:1, we don't have nested array checks in JS usually
-                // but we'll try to emulate the exact rows/cols logic
                 if (image_rows === undefined) {
                     image_rows = n_images_in_text.map(n_images => new Array(n_images).fill(0));
                 } else if (image_rows.length !== text.length && text.length === 1) {
-                    // Wrap if missing batch dimension
                     image_rows = [image_rows];
                 }
                 if (image_cols === undefined) {
@@ -332,7 +326,6 @@ export class SmolVLMProcessor extends Processor {
                     image_cols = [image_cols];
                 }
 
-                // Check lengths
                 const n_images_in_images = image_rows.map(r => r.length);
                 for (let i = 0; i < n_images_in_text.length; i++) {
                     if (n_images_in_images[i] !== n_images_in_text[i]) {
@@ -360,20 +353,18 @@ export class SmolVLMProcessor extends Processor {
                 vision_inputs.frames = frames;
                 vision_inputs.duration = videos.duration;
                 vision_inputs.timestamps = videos.frames.map(f => f.timestamp);
-                // Also add video_metadata to emulate python
                 vision_inputs.video_metadata = [{
-                    fps: 24, // fallback
+                    fps: 24, 
                     duration: videos.duration,
                     timestamps: videos.frames.map(f => f.timestamp),
                 }];
             } else {
-                // assume videos is already processed or mocked
                 vision_inputs = videos;
             }
 
             if (text !== null) {
                 const n_videos_in_text = text.map(sample => sample.split(this.video_token).length - 1);
-                const n_videos_in_videos = [1]; // Assuming 1 video per sample for JS
+                const n_videos_in_videos = [1]; 
                 if (n_videos_in_videos[0] !== n_videos_in_text[0]) {
                     throw new Error(`The number of videos in the text ${n_videos_in_text} and videos ${n_videos_in_videos} should be the same.`);
                 }
@@ -384,7 +375,6 @@ export class SmolVLMProcessor extends Processor {
                 delete vision_inputs.video_metadata;
             }
             
-            // For matching Python exactly: we don't output 'frames', 'duration', 'timestamps'
             delete vision_inputs.frames;
             delete vision_inputs.duration;
             delete vision_inputs.timestamps;
@@ -394,6 +384,23 @@ export class SmolVLMProcessor extends Processor {
 
         if (text !== null) {
             const text_inputs = this.tokenizer(text, options);
+            if (options.truncation && options.max_length) {
+                const n_images_in_text = text.map(sample => sample.split(this.image_token).length - 1);
+                for (let i = 0; i < text.length; i++) {
+                    const input_ids = text_inputs.input_ids[i];
+                    if (input_ids.size < options.max_length) {
+                        continue;
+                    }
+
+                    const tokens_data = Array.from(input_ids.data);
+                    const n_images_in_tokens = tokens_data.filter(id => id === BigInt(this.image_token_id)).length;
+                    const expected_images_tokens = n_images_in_text[i] * this.image_seq_len;
+
+                    if (n_images_in_tokens < expected_images_tokens) {
+                        throw new Error("Multimodal tokens were truncated. Please increase `max_length`.");
+                    }
+                }
+            }
             Object.assign(inputs, text_inputs);
         }
 
