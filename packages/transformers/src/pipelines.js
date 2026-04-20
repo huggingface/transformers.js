@@ -13,7 +13,7 @@
  * @module pipelines
  */
 
-import { dispatchCallback } from './utils/core.js';
+import { DefaultProgressCallback, dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
 
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
@@ -153,29 +153,7 @@ export async function pipeline(
 
     const pretrainedOptions = {
         progress_callback: progress_callback
-            ? /** @param {import('./utils/core.js').ProgressInfo} info */
-              (info) => {
-                  if (info.status === 'progress') {
-                      files_loading[info.file] = {
-                          loaded: info.loaded,
-                          total: info.total,
-                      };
-
-                      const loaded = Object.values(files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
-                      const total = Object.values(files_loading).reduce((acc, curr) => acc + curr.total, 0);
-                      const progress = total > 0 ? (loaded / total) * 100 : 0;
-
-                      progress_callback({
-                          status: 'progress_total',
-                          name: info.name,
-                          progress,
-                          loaded,
-                          total,
-                          files: structuredClone(files_loading),
-                      });
-                  }
-                  progress_callback(info);
-              }
+            ? new DefaultProgressCallback(progress_callback, files_loading)
             : undefined,
         config,
         cache_dir,

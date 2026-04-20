@@ -16,25 +16,20 @@ import { softmax } from '../utils/maths.js';
  *
  * @typedef {Object} TextClassificationPipelineOptions Parameters specific to text classification pipelines.
  * @property {number|null} [top_k=1] The number of top predictions to be returned. If set to `null`, all predictions are returned.
- *
- * @callback TextClassificationPipelineCallbackSingle Classify a single text.
- * @param {string} texts The input text to be classified.
- * @param {TextClassificationPipelineOptions} [options] The options to use for text classification.
- * @returns {Promise<TextClassificationOutput>} An object containing the predicted labels and scores.
- *
- * @callback TextClassificationPipelineCallbackBatchTopK Classify a batch of texts and return top-k results for each.
- * @param {string[]} texts The input texts to be classified.
- * @param {{top_k: number|null}} [options] The options to use for text classification.
- * @returns {Promise<TextClassificationOutput[]>} An array of objects containing the predicted labels and scores.
- *
- * @callback TextClassificationPipelineCallbackBatchTop1 Classify a batch of texts and return the top-1 result for each.
- * @param {string[]} texts The input texts to be classified.
- * @param {{top_k: 1} | {} | undefined} [options] The options to use for text classification (where `top_k` is 1 or omitted).
- * @returns {Promise<TextClassificationOutput>} An object containing the predicted labels and scores.
  */
 
 /**
- * @typedef {TextClassificationPipelineCallbackSingle & TextClassificationPipelineCallbackBatchTop1 & TextClassificationPipelineCallbackBatchTopK} TextClassificationPipelineCallback
+ * @template O
+ * @typedef {O extends { top_k: infer K } ? (1 extends K ? false : true) : false} TextClassificationIsTopK
+ */
+
+/**
+ * @template Q, O
+ * @typedef {Q extends string[] ? (TextClassificationIsTopK<O> extends true ? TextClassificationOutput[] : TextClassificationOutput) : TextClassificationOutput} TextClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<Q extends string | string[], const O extends TextClassificationPipelineOptions = {}>(texts: Q, options?: O) => Promise<TextClassificationPipelineResult<Q, O>>} TextClassificationPipelineCallback
  */
 
 /**

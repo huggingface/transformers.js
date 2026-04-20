@@ -107,6 +107,7 @@ const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
     ['mbart', 'MBartModel'],
     ['marian', 'MarianModel'],
     ['whisper', 'WhisperModel'],
+    ['cohere_asr', 'CohereAsrModel'],
     ['m2m_100', 'M2M100Model'],
     ['blenderbot', 'BlenderbotModel'],
     ['blenderbot-small', 'BlenderbotSmallModel'],
@@ -185,6 +186,7 @@ export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['whisper', 'WhisperForConditionalGeneration'],
     ['lite-whisper', 'LiteWhisperForConditionalGeneration'],
     ['moonshine', 'MoonshineForConditionalGeneration'],
+    ['cohere_asr', 'CohereAsrForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([['speecht5', 'SpeechT5ForTextToSpeech']]);
@@ -298,8 +300,10 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['qwen3_vl', 'Qwen3VLForCausalLM'],
     ['qwen3_vl_moe', 'Qwen3VLMoeForCausalLM'],
     ['qwen3_5', 'Qwen3_5ForCausalLM'],
+    ['qwen3_5_text', 'Qwen3_5ForCausalLM'],
     ['qwen3_5_moe', 'Qwen3_5MoeForCausalLM'],
     ['gemma3n', 'Gemma3nForCausalLM'],
+    ['gemma4', 'Gemma4ForCausalLM'],
     ['phi', 'PhiForCausalLM'],
     ['phi3', 'Phi3ForCausalLM'],
     ['mpt', 'MptForCausalLM'],
@@ -391,7 +395,9 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['smolvlm', 'SmolVLMForConditionalGeneration'],
     ['paligemma', 'PaliGemmaForConditionalGeneration'],
     ['llava_qwen2', 'LlavaQwen2ForCausalLM'],
+    ['gemma3', 'Gemma3ForConditionalGeneration'],
     ['gemma3n', 'Gemma3nForConditionalGeneration'],
+    ['gemma4', 'Gemma4ForConditionalGeneration'],
     ['mistral3', 'Mistral3ForConditionalGeneration'],
     ['lighton_ocr', 'LightOnOcrForConditionalGeneration'],
     ['glm_ocr', 'GlmOcrForConditionalGeneration'],
@@ -615,16 +621,13 @@ const CUSTOM_MAPPING = [
         ALL_MODEL_FILES.Gemma3nForConditionalGeneration,
         MODEL_TYPES.ImageAudioTextToText,
     ],
+    [
+        'Gemma4ForConditionalGeneration',
+        ALL_MODEL_FILES.Gemma4ForConditionalGeneration,
+        MODEL_TYPES.ImageAudioTextToText,
+    ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
-
-    ['Qwen2VLForCausalLM', ALL_MODEL_FILES.Qwen2VLForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Qwen2_5_VLForCausalLM', ALL_MODEL_FILES.Qwen2_5_VLForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Qwen3VLForCausalLM', ALL_MODEL_FILES.Qwen3VLForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Qwen3VLMoeForCausalLM', ALL_MODEL_FILES.Qwen3VLMoeForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Qwen3_5ForCausalLM', ALL_MODEL_FILES.Qwen3_5ForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Qwen3_5MoeForCausalLM', ALL_MODEL_FILES.Qwen3_5MoeForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
-    ['Gemma3nForCausalLM', ALL_MODEL_FILES.Gemma3nForCausalLM, MODEL_TYPES.MultimodalLanguageModelOnly],
 
     [
         'VoxtralRealtimeForConditionalGeneration',

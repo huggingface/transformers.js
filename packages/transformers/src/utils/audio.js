@@ -13,16 +13,10 @@ import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
 import { Tensor, matmul } from './tensor.js';
 import { Buffer } from 'buffer';
-import fs from 'node:fs';
 import * as NativeFS from 'native-universal-fs';
 import { logger } from './logger.js';
+import { apis } from '../env.js';
 
-/**
- * Helper function to read audio from a path/URL.
- * @param {string|URL} url The path/URL to load the audio from.
- * @param {number} sampling_rate The sampling rate to use when decoding the audio.
- * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
- */
 /**
  * Helper function to read audio from a path/URL.
  * @param {string|URL} url The path/URL to load the audio from.
@@ -479,6 +473,7 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
  * @param {boolean} [options.do_pad=true] If `true`, pads the output spectrogram to have `max_num_frames` frames.
  * @param {boolean} [options.transpose=false] If `true`, the returned spectrogram will have shape `(num_frames, num_frequency_bins/num_mel_filters)`. If `false`, the returned spectrogram will have shape `(num_frequency_bins/num_mel_filters, num_frames)`.
  * @param {number} [options.mel_offset=0] Offset to add to the mel spectrogram to avoid taking the log of zero.
+ * @param {string} [options.mel_floor_mode="clamp"] If `mel_offset` is provided, this option determines how to apply it. If `"clamp"`, the mel spectrogram will be clamped to have a minimum value of `mel_offset`. If `"add"`, `mel_offset` will be added to all values of the mel spectrogram.
  * @returns {Promise<Tensor>} Spectrogram of shape `(num_frequency_bins, length)` (regular spectrogram) or shape `(num_mel_filters, length)` (mel spectrogram).
  */
 export async function spectrogram(
@@ -509,6 +504,7 @@ export async function spectrogram(
         do_pad = true,
         transpose = false,
         mel_offset = 0,
+        mel_floor_mode = 'clamp',
     } = {},
 ) {
     const window_length = window.length;
@@ -539,16 +535,23 @@ export async function spectrogram(
     }
 
     if (center) {
+        const padding = Math.floor(frame_length / 2);
         switch (pad_mode) {
             case 'reflect': {
-                const half_window = Math.floor((fft_length - 1) / 2) + 1;
-                waveform = padReflect(waveform, half_window, half_window);
+                waveform = padReflect(waveform, padding, padding);
                 break;
             }
             case 'constant': {
-                const padding = Math.floor(fft_length / 2);
                 // @ts-expect-error ts(2351)
                 const padded = new waveform.constructor(waveform.length + 2 * padding);
+                padded.set(waveform, padding);
+                waveform = padded;
+                break;
+            }
+            case 'semicausal': {
+                // Prepend padding zeros only (no right padding)
+                // @ts-expect-error ts(2351)
+                const padded = new waveform.constructor(waveform.length + padding);
                 padded.set(waveform, padding);
                 waveform = padded;
                 break;
@@ -663,8 +666,14 @@ export async function spectrogram(
     }
 
     const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
-    for (let i = 0; i < mel_spec_data.length; ++i) {
-        mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+    if (mel_floor_mode === 'add') {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + mel_spec_data[i] + mel_floor;
+        }
+    } else {
+        for (let i = 0; i < mel_spec_data.length; ++i) {
+            mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+        }
     }
 
     if (power !== null && log_mel !== null) {
@@ -745,7 +754,7 @@ export function window_function(window_length, name, { periodic = true, frame_le
     if (periodic) {
         window = window.subarray(0, window_length);
     }
-    if (frame_length === null) {
+    if (frame_length === null || window_length === frame_length) {
         return window;
     }
     if (window_length > frame_length) {
@@ -754,7 +763,10 @@ export function window_function(window_length, name, { periodic = true, frame_le
         );
     }
 
-    return window;
+    const padded = new Float64Array(frame_length);
+    const offset = center ? Math.floor((frame_length - window_length) / 2) : 0;
+    padded.set(window, offset);
+    return padded;
 }
 
 /**

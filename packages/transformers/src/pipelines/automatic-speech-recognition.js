@@ -32,27 +32,16 @@ import { logger } from '../utils/logger.js';
  * @property {number} [num_frames] The number of frames in the input audio.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & AutomaticSpeechRecognitionSpecificParams} AutomaticSpeechRecognitionConfig
  *
- * @callback AutomaticSpeechRecognitionPipelineCallbackSingle Transcribe the audio sequence given as inputs to text.
- * @param {AudioInput} audio The input audio file(s) to be transcribed. The input is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<AutomaticSpeechRecognitionOutput>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
- *
- * @callback AutomaticSpeechRecognitionPipelineCallbackBatch Transcribe the audio sequences given as inputs to text.
- * @param {AudioInput[]} audio The input audio file(s) to be transcribed. Each entry is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {Partial<AutomaticSpeechRecognitionConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<AutomaticSpeechRecognitionOutput[]>} An object containing the transcription text and optionally timestamps if `return_timestamps` is `true`.
- *
- * @typedef {AutomaticSpeechRecognitionPipelineCallbackSingle & AutomaticSpeechRecognitionPipelineCallbackBatch} AutomaticSpeechRecognitionPipelineCallback
- *
  * @typedef {TextAudioPipelineConstructorArgs & AutomaticSpeechRecognitionPipelineCallback & Disposable} AutomaticSpeechRecognitionPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends AudioInput[] ? AutomaticSpeechRecognitionOutput[] : AutomaticSpeechRecognitionOutput} AutomaticSpeechRecognitionPipelineResult
+ */
+
+/**
+ * @typedef {<T extends AudioInput | AudioInput[]>(audio: T, options?: Partial<AutomaticSpeechRecognitionConfig>) => Promise<AutomaticSpeechRecognitionPipelineResult<T>>} AutomaticSpeechRecognitionPipelineCallback
  */
 
 /**
@@ -140,7 +129,16 @@ export class AutomaticSpeechRecognitionPipeline
         Pipeline
     )
 {
+    _default_generation_config = {
+        // TODO: figure out good defaults for ASR generation parameters
+        // max_new_tokens: 256,
+        // num_beams: 5,
+    };
     async _call(audio, kwargs = {}) {
+        kwargs = {
+            ...this._default_generation_config,
+            ...kwargs,
+        };
         switch (this.model.config.model_type) {
             case 'whisper':
             case 'lite-whisper':
@@ -154,6 +152,8 @@ export class AutomaticSpeechRecognitionPipeline
                 return this._call_wav2vec2(audio, kwargs);
             case 'moonshine':
                 return this._call_moonshine(audio, kwargs);
+            case 'cohere_asr':
+                return this._call_cohere_asr(audio, kwargs);
             default:
                 throw new Error(
                     `AutomaticSpeechRecognitionPipeline does not support model type '${this.model.config.model_type}'.`,
@@ -203,7 +203,7 @@ export class AutomaticSpeechRecognitionPipeline
 
         if (return_timestamps === 'word') {
             generation_config['return_token_timestamps'] = true;
-            generation_config['return_timestamps'] = false; // Do not predict timestamp tokens
+            generation_config['return_timestamps'] = true;
         }
 
         const single = !Array.isArray(audio);
@@ -274,11 +274,21 @@ export class AutomaticSpeechRecognitionPipeline
                 // TODO: Right now we only get top beam
                 if (return_timestamps === 'word') {
                     // @ts-expect-error TS2339
-                    chunk.tokens = data.sequences.tolist()[0];
+                    const sequences = data.sequences.tolist()[0];
                     // @ts-expect-error TS2339
-                    chunk.token_timestamps = data.token_timestamps
-                        .tolist()[0]
-                        .map((/** @type {number} */ x) => round(x, 2));
+                    const token_ts = data.token_timestamps.tolist()[0];
+
+                    // Strip decoder_input_ids prefix from sequences and token_timestamps
+                    // to match Python's behavior (where generate() returns sequences without the prefix)
+                    // @ts-expect-error ts(2339)
+                    const timestamp_begin = this.tokenizer.timestamp_begin;
+                    const prefixLength = Math.max(
+                        sequences.findIndex((/** @type {bigint} */ t) => Number(t) >= timestamp_begin),
+                        0,
+                    );
+
+                    chunk.tokens = sequences.slice(prefixLength);
+                    chunk.token_timestamps = token_ts.slice(prefixLength).map((/** @type {number} */ x) => round(x, 2));
                 } else {
                     chunk.tokens = /** @type {Tensor} */ (data)[0].tolist();
                 }
@@ -317,6 +327,47 @@ export class AutomaticSpeechRecognitionPipeline
 
             const text = this.processor.batch_decode(/** @type {Tensor} */ (outputs), { skip_special_tokens: true })[0];
             toReturn.push({ text });
+        }
+        return single ? toReturn[0] : toReturn;
+    }
+
+    async _call_cohere_asr(audio, kwargs) {
+        const single = !Array.isArray(audio);
+        const batchedAudio = single ? [audio] : audio;
+
+        const feature_extractor = this.processor.feature_extractor;
+        const sampling_rate = feature_extractor.config.sampling_rate;
+        const preparedAudios = await prepareAudios(batchedAudio, sampling_rate);
+
+        const language = kwargs.language ?? 'en';
+        // @ts-expect-error TS2339
+        const decoder_input_ids = this.processor.get_decoder_prompt_ids(language);
+
+        const toReturn = [];
+        for (const aud of preparedAudios) {
+            // Split long audio at energy-based boundaries
+            // @ts-expect-error TS2339
+            const audioChunks = feature_extractor.split_audio(aud);
+
+            const chunk_texts = [];
+            for (const chunk of audioChunks) {
+                const inputs = await this.processor(chunk);
+
+                const outputs = await this.model.generate({
+                    ...inputs,
+                    decoder_input_ids,
+                    ...kwargs,
+                });
+
+                const text = this.tokenizer
+                    .decode(/** @type {Tensor} */ (outputs)[0].tolist(), { skip_special_tokens: true })
+                    .trim();
+                chunk_texts.push(text);
+            }
+
+            // @ts-expect-error TS2339
+            const full_text = this.processor.constructor.join_chunks(chunk_texts, language);
+            toReturn.push({ text: full_text });
         }
         return single ? toReturn[0] : toReturn;
     }

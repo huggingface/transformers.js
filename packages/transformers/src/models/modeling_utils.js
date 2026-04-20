@@ -21,6 +21,7 @@ import {
     LogitsProcessorList,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
+    SuppressTokensLogitsProcessor,
     SuppressTokensAtBeginLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
@@ -33,10 +34,13 @@ import {
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
 import { LogitsSampler } from '../generation/logits_sampler.js';
-import { pick } from '../utils/core.js';
+import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
+import { get_model_files } from '../utils/model_registry/get_model_files.js';
+import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
+import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -82,205 +86,110 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export const MODEL_TYPES = {
-    EncoderOnly: 0,
-    EncoderDecoder: 1,
-    Seq2Seq: 2,
-    Vision2Seq: 3,
-    DecoderOnly: 4,
-    DecoderOnlyWithoutHead: 5,
-    MaskGeneration: 6,
-    ImageTextToText: 7,
-    Musicgen: 8,
-    MultiModality: 9,
-    Phi3V: 10,
-    AudioTextToText: 11,
-    AutoEncoder: 12,
-    ImageAudioTextToText: 13,
-    Supertonic: 14,
-    Chatterbox: 15,
-    MultimodalLanguageModelOnly: 16,
-    VoxtralRealtime: 17,
-};
+export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
 
-const MODEL_TYPE_CONFIG = {
+/**
+ * Runtime-only model type configuration (forward functions, generation flags).
+ * Session/file configuration lives in `MODEL_SESSION_CONFIG` (session_config.js)
+ * and is merged in at lookup time by `resolveTypeConfig` to avoid duplication.
+ */
+const MODEL_RUNTIME_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
         can_generate: true,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.DecoderOnlyWithoutHead]: {
         can_generate: false,
         forward: decoder_forward,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
     [MODEL_TYPES.Seq2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Vision2Seq]: {
         can_generate: true,
         forward: seq2seq_forward,
         prepare_inputs: encoder_decoder_prepare_inputs_for_generation,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Musicgen]: {
         can_generate: true,
         forward: seq2seq_forward,
-        sessions: () => ({
-            model: 'text_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-            encodec_decode: 'encodec_decode',
-        }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.EncoderDecoder]: {
         can_generate: false,
         forward: seq2seq_forward,
-        sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-    },
-    [MODEL_TYPES.MaskGeneration]: {
-        sessions: () => ({ model: 'vision_encoder', prompt_encoder_mask_decoder: 'prompt_encoder_mask_decoder' }),
     },
     [MODEL_TYPES.ImageTextToText]: {
         can_generate: true,
         forward: image_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: (config) => {
-            const s = {
-                embed_tokens: 'embed_tokens',
-                vision_encoder: 'vision_encoder',
-                decoder_model_merged: 'decoder_model_merged',
-            };
-            if (config.is_encoder_decoder) s['model'] = 'encoder_model';
-            return s;
-        },
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
         can_generate: true,
         forward: audio_text_to_text_forward,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            vision_encoder: 'vision_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {
         can_generate: true,
         prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({
-            prepare_inputs_embeds: 'prepare_inputs_embeds',
-            model: 'model',
-            vision_encoder: 'vision_encoder',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.MultiModality]: {
         can_generate: true,
-        sessions: () => ({
-            prepare_inputs_embeds: 'prepare_inputs_embeds',
-            model: 'language_model',
-            lm_head: 'lm_head',
-            gen_head: 'gen_head',
-            gen_img_embeds: 'gen_img_embeds',
-            image_decode: 'image_decode',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AutoEncoder]: {
         can_generate: false,
         forward: auto_encoder_forward,
-        sessions: () => ({ encoder_model: 'encoder_model', decoder_model: 'decoder_model' }),
-    },
-    [MODEL_TYPES.Supertonic]: {
-        sessions: () => ({
-            text_encoder: 'text_encoder',
-            latent_denoiser: 'latent_denoiser',
-            voice_decoder: 'voice_decoder',
-        }),
     },
     [MODEL_TYPES.Chatterbox]: {
         can_generate: true,
         forward: encoder_forward,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            speech_encoder: 'speech_encoder',
-            model: 'language_model',
-            conditional_decoder: 'conditional_decoder',
-        }),
-        cache_sessions: { model: true },
-        optional_configs: { generation_config: 'generation_config.json' },
-    },
-    [MODEL_TYPES.MultimodalLanguageModelOnly]: {
-        can_generate: true,
-        forward: image_text_to_text_forward,
-        prepare_inputs: multimodal_text_to_text_prepare_inputs_for_generation,
-        sessions: () => ({ embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' }),
-        cache_sessions: { decoder_model_merged: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.VoxtralRealtime]: {
         can_generate: true,
         prepare_inputs: decoder_prepare_inputs_for_generation,
-        sessions: () => ({
-            embed_tokens: 'embed_tokens',
-            audio_encoder: 'audio_encoder',
-            decoder_model_merged: 'decoder_model_merged',
-        }),
-        cache_sessions: { decoder_model_merged: true, audio_encoder: true },
-        optional_configs: { generation_config: 'generation_config.json' },
     },
     default: {
         can_generate: false,
         forward: encoder_forward,
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
 };
 
 /**
- * Get the session configuration for a given model type.
- * @param {number} modelType The model type enum value.
+ * Resolves the model type config for a given class name and config.
+ * @param {string} modelName The name of the class being used to load.
  * @param {Object} config The model config.
- * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
+ * @returns {{ typeConfig: Object, textOnly: boolean, modelType: number|undefined }}
  */
-export function getSessionsConfig(modelType, config, options = {}) {
-    const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
-    return {
-        sessions: typeConfig.sessions(config, options),
-        cache_sessions: typeConfig.cache_sessions,
-        optional_configs: typeConfig.optional_configs,
-    };
+function resolveTypeConfig(modelName, config) {
+    let modelType = MODEL_TYPE_MAPPING.get(modelName);
+    let textOnly = false;
+
+    // Detect cross-architecture loading: e.g., ForCausalLM class loading a ForConditionalGeneration model.
+    // In this case, use the native architecture's type config (for forward/sessions) in text-only mode.
+    const nativeArch = config?.architectures?.[0];
+    if (
+        nativeArch &&
+        nativeArch !== modelName &&
+        modelName?.endsWith('ForCausalLM') &&
+        nativeArch.endsWith('ForConditionalGeneration')
+    ) {
+        const nativeType = MODEL_TYPE_MAPPING.get(nativeArch);
+        if (nativeType !== undefined) {
+            modelType = nativeType;
+            textOnly = true;
+        }
+    }
+
+    const runtimeConfig = MODEL_RUNTIME_CONFIG[modelType] ?? MODEL_RUNTIME_CONFIG.default;
+    const sessionConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
+    return { typeConfig: { ...runtimeConfig, ...sessionConfig }, textOnly, modelType };
 }
 
 export const MODEL_TYPE_MAPPING = new Map();
@@ -295,6 +204,7 @@ export class PreTrainedModel extends Callable {
     forward_params = ['input_ids', 'attention_mask'];
 
     _return_dict_in_generate_keys = null;
+
     /**
      * Creates a new instance of the `PreTrainedModel` class.
      * @param {import('../configs.js').PretrainedConfig} config The model configuration.
@@ -309,10 +219,7 @@ export class PreTrainedModel extends Callable {
         this.configs = configs;
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this.constructor);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
-
-        // Get configuration for this model type
-        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+        const { typeConfig } = resolveTypeConfig(modelName, config);
 
         this.can_generate = typeConfig.can_generate;
         this._forward = typeConfig.forward;
@@ -385,11 +292,10 @@ export class PreTrainedModel extends Callable {
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
-        const modelType = MODEL_TYPE_MAPPING.get(modelName);
 
         config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
-        const typeConfig = MODEL_TYPE_CONFIG[modelType] ?? MODEL_TYPE_CONFIG.default;
+        const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
 
         if (modelType === undefined) {
             const type = modelName ?? config?.model_type;
@@ -400,7 +306,47 @@ export class PreTrainedModel extends Callable {
             }
         }
 
-        const sessions = typeConfig.sessions(config, options);
+        // If a progress callback is provided AND it hasn't already been wrapped
+        // by pipeline() (which does its own aggregation), gather file metadata
+        // upfront so we can emit `progress_total` events. This lets consumers
+        // render a single overall progress bar when calling from_pretrained() directly.
+        if (progress_callback && !(progress_callback instanceof DefaultProgressCallback)) {
+            /** @type {import('../utils/core.js').FilesLoadingMap} */
+            const files_loading = {};
+
+            try {
+                const expected_files = await get_model_files(pretrained_model_name_or_path, {
+                    config,
+                    dtype,
+                    device,
+                    model_file_name,
+                });
+
+                const metadata = await Promise.all(
+                    expected_files.map((file) => get_file_metadata(pretrained_model_name_or_path, file, options)),
+                );
+                metadata.forEach((m, i) => {
+                    if (m.exists) {
+                        // config.json is fetched by AutoConfig.from_pretrained() above
+                        const isAlreadyLoaded = expected_files[i] === 'config.json';
+                        files_loading[expected_files[i]] = {
+                            loaded: isAlreadyLoaded ? (m.size ?? 0) : 0,
+                            total: m.size ?? 0,
+                        };
+                    }
+                });
+            } catch (e) {
+                // If we fail to get metadata, we can still proceed without total progress.
+                // This may happen with local-only models or custom cache setups.
+                logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
+            }
+
+            if (Object.keys(files_loading).length > 0) {
+                options.progress_callback = new DefaultProgressCallback(progress_callback, files_loading);
+            }
+        }
+
+        const sessions = typeConfig.sessions(config, options, textOnly);
         const promises = [
             constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
         ];
@@ -547,9 +493,9 @@ export class PreTrainedModel extends Callable {
         //     ));
         // }
 
-        // if (generation_config.suppress_tokens !== null) {
-        //     processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
-        // }
+        if (generation_config.suppress_tokens !== null) {
+            processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
+        }
 
         if (generation_config.begin_suppress_tokens !== null) {
             const begin_index =
@@ -719,7 +665,7 @@ export class PreTrainedModel extends Callable {
      */
     _update_model_kwargs_for_generation({ generated_input_ids, outputs, model_inputs, is_encoder_decoder }) {
         // update past_key_values
-        model_inputs['past_key_values'] = this.getPastKeyValues(outputs, model_inputs.past_key_values);
+        model_inputs['past_key_values'] = getPastKeyValues(outputs, model_inputs.past_key_values);
 
         // update inputs for next run
         model_inputs['input_ids'] = new Tensor('int64', generated_input_ids.flat(), [generated_input_ids.length, 1]);
@@ -731,7 +677,10 @@ export class PreTrainedModel extends Callable {
                 1,
             );
         } else if ('decoder_attention_mask' in model_inputs) {
-            // TODO: update decoder attention mask if the model requires it
+            model_inputs.decoder_attention_mask = cat(
+                [model_inputs.decoder_attention_mask, ones([model_inputs.decoder_attention_mask.dims[0], 1])],
+                1,
+            );
         }
 
         // force recreate position_ids in next iteration
@@ -875,7 +824,7 @@ export class PreTrainedModel extends Callable {
             decoder_input_ids = toI64Tensor(decoder_input_ids);
         }
 
-        model_kwargs['decoder_attention_mask'] = ones_like(decoder_input_ids);
+        model_inputs['decoder_attention_mask'] = ones_like(decoder_input_ids);
 
         return { input_ids: decoder_input_ids, model_inputs };
     }
@@ -903,7 +852,7 @@ export class PreTrainedModel extends Callable {
         // 3. Define model inputs
         let { inputs_tensor, model_inputs, model_input_name } = this._prepare_model_inputs({
             inputs,
-            model_kwargs: kwargs,
+            model_kwargs: /** @type {Record<string, Tensor|number[]>} */ (kwargs),
         });
 
         const is_encoder_decoder = this.config.is_encoder_decoder;
@@ -1018,7 +967,7 @@ export class PreTrainedModel extends Callable {
             if (generation_config.return_dict_in_generate) {
                 if (generation_config.output_attentions) {
                     // Get attentions if they are present
-                    const token_attentions = this.getAttentions(outputs);
+                    const token_attentions = getAttentions(outputs);
                     for (const key in token_attentions) {
                         if (!(key in attentions)) {
                             attentions[key] = [];
@@ -1082,11 +1031,25 @@ export class PreTrainedModel extends Callable {
             streamer.end();
         }
 
-        // Retrieve and dispose all final past key values (including encoder attentions)
-        const past_key_values = this.getPastKeyValues(outputs, model_inputs.past_key_values, true);
-
         // TODO: ensure all_input_ids is padded correctly...
         const sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
+
+        // Update past key values from the final forward pass
+        const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
+
+        // Dispose output tensors not held by the cache
+        const cachedTensors = new Set(Object.values(past_key_values));
+        for (const tensor of Object.values(outputs)) {
+            if (tensor.location === 'gpu-buffer' && !cachedTensors.has(tensor)) {
+                tensor.dispose();
+            }
+        }
+
+        // Dispose cache tensors if no one needs them
+        const keepCacheAlive = 'past_key_values' in kwargs || generation_config.return_dict_in_generate;
+        if (!keepCacheAlive) {
+            await past_key_values.dispose();
+        }
 
         if (generation_config.return_dict_in_generate) {
             return {
@@ -1098,106 +1061,8 @@ export class PreTrainedModel extends Callable {
                 // scores,
                 // logits,
             };
-        } else {
-            // Dispose all remaining tensors
-            for (const tensor of Object.values(outputs)) {
-                if (tensor.location === 'gpu-buffer') {
-                    tensor.dispose();
-                }
-            }
-            return sequences;
         }
-    }
-
-    /**
-     * Returns a DynamicCache containing past key values from the given decoder results object.
-     *
-     * @param {Object} decoderResults The decoder results object.
-     * @param {DynamicCache} pastKeyValues The previous past key values.
-     * @param {boolean} [disposeEncoderPKVs=false] Whether to dispose encoder past key values.
-     * @returns {DynamicCache} A new DynamicCache containing the updated past key values.
-     */
-    getPastKeyValues(decoderResults, pastKeyValues, disposeEncoderPKVs = false) {
-        /** @type {Record<string, Tensor>} */
-        const pkvs = Object.create(null);
-
-        for (const name in decoderResults) {
-            if (name.startsWith('present')) {
-                const newName = name
-                    // Hybrid cache architecture
-                    .replace('present_ssm', 'past_ssm') // Mamba
-                    .replace('present_conv', 'past_conv') // LFM2
-                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
-
-                    // Standard cache architecture
-                    .replace('present', 'past_key_values');
-                const is_encoder_pkv = name.includes('encoder');
-                if (is_encoder_pkv && pastKeyValues) {
-                    // Optimization introduced by optimum to reuse past key values.
-                    // So, we just replace the constant outputs (`decoderResults[name]`) with the previous past key values.
-                    // https://github.com/huggingface/optimum/blob/0bf2c05fb7e1182b52d21b703cfc95fd9e4ea3dc/optimum/onnxruntime/base.py#L677-L704
-                    pkvs[newName] = pastKeyValues[newName];
-                } else {
-                    // decoder or using first encoder PKVs
-                    pkvs[newName] = decoderResults[name];
-                }
-
-                if (pastKeyValues && (!is_encoder_pkv || disposeEncoderPKVs)) {
-                    // - Always dispose decoder PKVs
-                    // - Only dispose encoder past key values when requested (after generation)
-                    const t = pastKeyValues[newName];
-                    if (t.location === 'gpu-buffer') {
-                        t.dispose();
-                    }
-                }
-            }
-        }
-        return new DynamicCache(pkvs);
-    }
-
-    /**
-     * Returns an object containing attentions from the given model output object.
-     *
-     * @param {Object} model_output The output of the model.
-     * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
-     */
-    getAttentions(model_output) {
-        const attentions = {};
-
-        for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
-            for (const name in model_output) {
-                if (name.startsWith(attnName)) {
-                    if (!(attnName in attentions)) {
-                        attentions[attnName] = [];
-                    }
-                    attentions[attnName].push(model_output[name]);
-                }
-            }
-        }
-        return attentions;
-    }
-
-    /**
-     * Adds past key values to the decoder feeds object. If pastKeyValues is null, creates new tensors for past key values.
-     *
-     * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
-     * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
-     */
-    addPastKeyValues(decoderFeeds, pastKeyValues) {
-        if (pastKeyValues) {
-            Object.assign(decoderFeeds, pastKeyValues);
-        } else {
-            const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
-            const batch_size = (decoderFeeds[this.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
-
-            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-            const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
-            const shapes = getCacheShapes(this.config, { batch_size });
-            for (const name in shapes) {
-                const size = shapes[name].reduce((a, b) => a * b, 1);
-                decoderFeeds[name] = new Tensor(dtype, new cls(size), shapes[name]);
-            }
-        }
+        return sequences;
     }
 
     /**
@@ -1237,7 +1102,8 @@ export class PreTrainedModel extends Callable {
  * @private
  */
 export async function seq2seq_forward(self, model_inputs) {
-    let { encoder_outputs, input_ids, decoder_input_ids, ...other_decoder_inputs } = model_inputs;
+    let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
+        model_inputs;
     // Encode if needed
     if (!encoder_outputs) {
         const encoder_inputs = pick(model_inputs, self.sessions['model'].inputNames);
@@ -1250,6 +1116,11 @@ export async function seq2seq_forward(self, model_inputs) {
 
     if (self.sessions['decoder_model_merged'].inputNames.includes('encoder_attention_mask')) {
         other_decoder_inputs.encoder_attention_mask = model_inputs.attention_mask;
+    }
+
+    // Pass decoder_attention_mask as attention_mask to the decoder session
+    if (decoder_attention_mask && !other_decoder_inputs.attention_mask) {
+        other_decoder_inputs.attention_mask = decoder_attention_mask;
     }
 
     return await decoder_forward(self, other_decoder_inputs, true);
@@ -1300,6 +1171,106 @@ export async function auto_encoder_forward(self, model_inputs) {
 }
 
 /**
+ * Returns a DynamicCache containing past key values from the given decoder results object.
+ * Always updates in-place when pastKeyValues is provided; creates a new DynamicCache otherwise.
+ *
+ * @param {Object} decoderResults The decoder results object.
+ * @param {DynamicCache} pastKeyValues The previous past key values.
+ * @returns {DynamicCache} The updated past key values cache.
+ */
+export function getPastKeyValues(decoderResults, pastKeyValues) {
+    /** @type {Record<string, Tensor>} */
+    const pkvs = Object.create(null);
+
+    for (const name in decoderResults) {
+        if (name.startsWith('present')) {
+            const newName = name
+                // Hybrid cache architecture
+                .replace('present_ssm', 'past_ssm') // Mamba
+                .replace('present_conv', 'past_conv') // LFM2
+                .replace('present_recurrent', 'past_recurrent') // Qwen3.5
+
+                // Standard cache architecture
+                .replace('present', 'past_key_values');
+            const is_encoder_pkv = name.includes('encoder');
+            if (is_encoder_pkv && pastKeyValues) {
+                // Optimization introduced by optimum to reuse past key values.
+                // So, we just replace the constant outputs (`decoderResults[name]`) with the previous past key values.
+                // https://github.com/huggingface/optimum/blob/0bf2c05fb7e1182b52d21b703cfc95fd9e4ea3dc/optimum/onnxruntime/base.py#L677-L704
+                pkvs[newName] = pastKeyValues[newName];
+            } else {
+                pkvs[newName] = decoderResults[name];
+            }
+        }
+    }
+
+    if (pastKeyValues) {
+        pastKeyValues.update(pkvs);
+        return pastKeyValues;
+    }
+    return new DynamicCache(pkvs);
+}
+
+/**
+ * Returns an object containing attentions from the given model output object.
+ *
+ * @param {Object} model_output The output of the model.
+ * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
+ */
+export function getAttentions(model_output) {
+    const attentions = {};
+
+    for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
+        for (const name in model_output) {
+            if (name.startsWith(attnName)) {
+                if (!(attnName in attentions)) {
+                    attentions[attnName] = [];
+                }
+                attentions[attnName].push(model_output[name]);
+            }
+        }
+    }
+    return attentions;
+}
+
+/**
+ * Adds past key values to the decoder feeds object. If pastKeyValues is null,
+ * creates a new DynamicCache with zero-filled tensors for each cache entry.
+ *
+ * @param {PreTrainedModel} self The model instance.
+ * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
+ * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
+ * @returns {DynamicCache} The past key values cache (existing or newly created).
+ */
+export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
+    if (pastKeyValues && Object.keys(pastKeyValues).length > 0) {
+        Object.assign(decoderFeeds, pastKeyValues);
+        return pastKeyValues;
+    }
+
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
+
+    const dtype = session?.config?.kv_cache_dtype ?? 'float32';
+    const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
+    const shapes = getCacheShapes(self.config, { batch_size });
+    /** @type {Record<string, Tensor>} */
+    const entries = Object.create(null);
+    for (const name in shapes) {
+        const size = shapes[name].reduce((a, b) => a * b, 1);
+        const t = new Tensor(dtype, new cls(size), shapes[name]);
+        decoderFeeds[name] = t;
+        entries[name] = t;
+    }
+    if (pastKeyValues) {
+        // Populate the (empty) user-provided cache in-place
+        pastKeyValues.update(entries);
+        return pastKeyValues;
+    }
+    return new DynamicCache(entries);
+}
+
+/**
  * Forward pass of a decoder model.
  * @param {Object} self The decoder model.
  * @param {Object} model_inputs The input data to be used for the forward pass.
@@ -1312,7 +1283,9 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
     const { past_key_values, ...new_model_inputs } = model_inputs;
 
     if (session.inputNames.includes('use_cache_branch')) {
-        new_model_inputs.use_cache_branch = boolTensor(!!past_key_values);
+        new_model_inputs.use_cache_branch = boolTensor(
+            past_key_values != null && Object.keys(past_key_values).length > 0,
+        );
     }
     if (
         session.inputNames.includes('position_ids') &&
@@ -1334,7 +1307,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
     }
 
     // Unpack the `past_key_values` object into model inputs
-    self.addPastKeyValues(new_model_inputs, past_key_values);
+    addPastKeyValues(self, new_model_inputs, past_key_values);
 
     // Select only the inputs that are needed for the current session
     const fixed = pick(new_model_inputs, session.inputNames);

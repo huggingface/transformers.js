@@ -168,7 +168,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         );
 
         const new_tokens = sequences.slice(null, [
-            params.input_ids.dims[1], // Exclude start of speech token
+            /** @type {Tensor} */ (params.input_ids).dims[1], // Exclude start of speech token
             -1, // Exclude end of speech token
         ]);
 

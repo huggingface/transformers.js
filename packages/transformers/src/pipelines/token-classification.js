@@ -20,19 +20,16 @@ import { max, softmax } from '../utils/maths.js';
  * @typedef {Object} TokenClassificationPipelineOptions Parameters specific to token classification pipelines.
  * @property {string[]} [ignore_labels] A list of labels to ignore.
  *
- * @callback TokenClassificationPipelineCallbackSingle Classify each token of a single text.
- * @param {string} texts The text to classify.
- * @param {TokenClassificationPipelineOptions} [options] The options to use for token classification.
- * @returns {Promise<TokenClassificationOutput>} The result.
- *
- * @callback TokenClassificationPipelineCallbackBatch Classify each token of multiple texts.
- * @param {string[]} texts The texts to classify.
- * @param {TokenClassificationPipelineOptions} [options] The options to use for token classification.
- * @returns {Promise<TokenClassificationOutput[]>} The result.
- *
- * @typedef {TokenClassificationPipelineCallbackSingle & TokenClassificationPipelineCallbackBatch} TokenClassificationPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & TokenClassificationPipelineCallback & Disposable} TokenClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? TokenClassificationOutput[] : TokenClassificationOutput} TokenClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(texts: T, options?: TokenClassificationPipelineOptions) => Promise<TokenClassificationPipelineResult<T>>} TokenClassificationPipelineCallback
  */
 
 /**

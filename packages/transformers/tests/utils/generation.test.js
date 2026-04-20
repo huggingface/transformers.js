@@ -10,7 +10,9 @@ import {
 
   // Other
   TextStreamer,
+  DynamicCache,
   random,
+  full,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -448,6 +450,19 @@ describe("Streamers", () => {
       ];
       expect(chunks).toEqual(TARGET);
     });
+  });
+});
+
+describe("Dynamic Cache", () => {
+  it("should update and get sequence length correctly", () => {
+    const cache = new DynamicCache();
+    expect(cache.get_seq_length()).toEqual(0);
+
+    cache.update({
+      "past_key_values.0.key": full([1, 2, 16, 32], 0.0),
+      "past_key_values.0.value": full([1, 2, 16, 32], 0.0),
+    });
+    expect(cache.get_seq_length()).toEqual(16);
   });
 });
 

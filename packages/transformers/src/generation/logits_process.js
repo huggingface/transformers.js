@@ -198,6 +198,37 @@ export class ForcedEOSTokenLogitsProcessor extends LogitsProcessor {
 }
 
 /**
+ * A LogitsProcessor that suppresses a list of tokens throughout generation.
+ * Sets their log probs to `-inf` so that they are not generated.
+ */
+export class SuppressTokensLogitsProcessor extends LogitsProcessor {
+    /**
+     * Create a SuppressTokensLogitsProcessor.
+     * @param {number[]} suppress_tokens The IDs of the tokens to suppress.
+     */
+    constructor(suppress_tokens) {
+        super();
+        this.suppress_tokens = suppress_tokens;
+    }
+
+    /**
+     * Suppress the specified tokens by setting their logits to -Infinity.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Tensor} The modified logits.
+     */
+    _call(input_ids, logits) {
+        for (let i = 0; i < input_ids.length; ++i) {
+            const batch_logits_data = /** @type {Float32Array} */ (logits[i].data);
+            for (const token_id of this.suppress_tokens) {
+                batch_logits_data[token_id] = -Infinity;
+            }
+        }
+        return logits;
+    }
+}
+
+/**
  * A LogitsProcessor that suppresses a list of tokens as soon as the `generate` function starts
  * generating using `begin_index` tokens. This should ensure that the tokens defined by
  * `begin_suppress_tokens` at not sampled at the begining of the generation.
@@ -271,9 +302,8 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
             // suppress <|notimestamps|> which is handled by without_timestamps
             batch_logits_data[this.no_timestamps_token_id] = -Infinity;
 
-            if (input_ids[i].length === this.begin_index - 1) {
-                batch_logits_data.fill(-Infinity);
-                batch_logits_data[this.timestamp_begin] = 0;
+            if (input_ids[i].length === this.begin_index) {
+                batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
                 continue;
             }
 

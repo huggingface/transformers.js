@@ -115,7 +115,7 @@ async function getSession(
         session_options,
     );
 
-    if (externalData.length > 0 && !apis.IS_NODE_ENV) {
+    if (externalData.length > 0 && (!apis.IS_NODE_ENV || externalData.some((data) => typeof data !== 'string'))) {
         session_options.externalData = externalData;
     }
 

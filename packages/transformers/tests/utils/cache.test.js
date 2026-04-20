@@ -182,6 +182,102 @@ describe("Cache", () => {
       );
 
       it(
+        "should exclude vision_encoder for text-generation on multimodal model",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-generation", "onnx-community/gemma-3-4b-it-ONNX", {
+            device: "webgpu",
+            dtype: "q4f16",
+          });
+          expect(Array.isArray(files)).toBe(true);
+
+          // Should NOT include vision_encoder
+          expect(files.some((f) => f.includes("vision_encoder"))).toBe(false);
+
+          // Should include only embed_tokens and decoder_model_merged with q4f16 suffix
+          expect(files).toContain("onnx/embed_tokens_q4f16.onnx");
+          expect(files).toContain("onnx/decoder_model_merged_q4f16.onnx");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should exclude vision_encoder for text-generation on ImageTextToText model",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-generation", "onnx-community/Qwen3.5-0.8B-ONNX", {
+            device: "webgpu",
+            dtype: "q4f16",
+          });
+          expect(Array.isArray(files)).toBe(true);
+
+          // Should NOT include vision_encoder
+          expect(files.some((f) => f.includes("vision_encoder"))).toBe(false);
+
+          // Should include embed_tokens and decoder_model_merged
+          expect(files).toContain("onnx/embed_tokens_q4f16.onnx");
+          expect(files).toContain("onnx/decoder_model_merged_q4f16.onnx");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should exclude audio_encoder for text-generation on AudioTextToText model (Voxtral)",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-generation", "onnx-community/Voxtral-Mini-3B-2507-ONNX", {
+            device: "webgpu",
+            dtype: "q4f16",
+          });
+          expect(Array.isArray(files)).toBe(true);
+
+          // Should NOT include audio_encoder
+          expect(files.some((f) => f.includes("audio_encoder"))).toBe(false);
+
+          // Should include embed_tokens and decoder_model_merged
+          expect(files).toContain("onnx/embed_tokens_q4f16.onnx");
+          expect(files).toContain("onnx/decoder_model_merged_q4f16.onnx");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should exclude audio_encoder for text-generation on AudioTextToText model (Ultravox)",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-generation", "onnx-community/ultravox-v0_5-llama-3_2-1b-ONNX", {
+            device: "webgpu",
+            dtype: "q4f16",
+          });
+          expect(Array.isArray(files)).toBe(true);
+
+          // Should NOT include audio_encoder
+          expect(files.some((f) => f.includes("audio_encoder"))).toBe(false);
+
+          // Should include embed_tokens and decoder_model_merged
+          expect(files).toContain("onnx/embed_tokens_q4f16.onnx");
+          expect(files).toContain("onnx/decoder_model_merged_q4f16.onnx");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "should exclude vision_encoder and audio_encoder for text-generation on ImageAudioTextToText model",
+        async () => {
+          const files = await ModelRegistry.get_pipeline_files("text-generation", "onnx-community/gemma-3n-E2B-it-ONNX", {
+            device: "webgpu",
+            dtype: "q4f16",
+          });
+          expect(Array.isArray(files)).toBe(true);
+
+          // Should NOT include vision_encoder or audio_encoder
+          expect(files.some((f) => f.includes("vision_encoder"))).toBe(false);
+          expect(files.some((f) => f.includes("audio_encoder"))).toBe(false);
+
+          // Should include embed_tokens and decoder_model_merged
+          expect(files).toContain("onnx/embed_tokens_q4f16.onnx");
+          expect(files).toContain("onnx/decoder_model_merged_q4f16.onnx");
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
         "should not include processor files for text-only tasks",
         async () => {
           const files = await ModelRegistry.get_pipeline_files("text-generation", LLAMA_MODEL_ID, DEFAULT_MODEL_OPTIONS);

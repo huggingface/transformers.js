@@ -1,4 +1,7 @@
 import { get_files } from './get_files.js';
+import { get_config } from './get_model_files.js';
+import { resolve_model_type } from './resolve_model_type.js';
+import { getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
@@ -36,9 +39,24 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     const include_tokenizer = type !== 'audio' && type !== 'image';
     const include_processor = type !== 'text';
 
-    return get_files(modelId, {
+    const files = await get_files(modelId, {
         ...options,
         include_tokenizer,
         include_processor,
     });
+
+    // When loading multimodal models via the text-generation pipeline,
+    // only load the sessions needed for text generation (embed_tokens, decoder_model_merged)
+    if (task === 'text-generation') {
+        const config = await get_config(modelId, options);
+        const modelType = resolve_model_type(config);
+        const textOnlySessions = getTextOnlySessions(modelType);
+
+        if (textOnlySessions) {
+            const allowedPrefixes = Object.values(textOnlySessions).map((s) => `onnx/${s}`);
+            return files.filter((f) => !f.startsWith('onnx/') || allowedPrefixes.some((p) => f.startsWith(p)));
+        }
+    }
+
+    return files;
 }

@@ -2,8 +2,10 @@ export * from './audio_spectrogram_transformer/feature_extraction_audio_spectrog
 export * from './encodec/feature_extraction_encodec.js';
 export * from './chatterbox/feature_extraction_chatterbox.js';
 export * from './clap/feature_extraction_clap.js';
+export * from './cohere_asr/feature_extraction_cohere_asr.js';
 export * from './dac/feature_extraction_dac.js';
 export * from './gemma3n/feature_extraction_gemma3n.js';
+export * from './gemma4/feature_extraction_gemma4.js';
 export * from './granite_speech/feature_extraction_granite_speech.js';
 export * from './moonshine/feature_extraction_moonshine.js';
 export * from './parakeet/feature_extraction_parakeet.js';

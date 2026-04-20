@@ -43,7 +43,7 @@ export default () => {
               return_timestamps: true,
             });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, /* Generated */ 50366n]]);
+            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, /* Generated */ 51682n]]);
           },
           MAX_TEST_EXECUTION_TIME,
         );
@@ -107,7 +107,7 @@ export default () => {
               return_timestamps: true,
             });
 
-            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, /* Generated */ 50400n]]);
+            expect(outputs.tolist()).toEqual([[/* Prefix */ 50258n, 50259n, 50359n, /* Generated */ 51812n]]);
           },
           MAX_TEST_EXECUTION_TIME,
         );

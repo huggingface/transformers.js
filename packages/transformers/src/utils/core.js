@@ -7,6 +7,8 @@
  * @module utils/core
  */
 
+import { Callable } from './generic.js';
+
 /**
  * @typedef {Object} InitiateProgressInfo
  * @property {'initiate'} status
@@ -88,6 +90,53 @@
  */
 export function dispatchCallback(progress_callback, data) {
     if (progress_callback) progress_callback(data);
+}
+
+/**
+ * A callable progress callback that wraps an original callback and emits
+ * aggregate `progress_total` events. Because it extends `Callable`, instances
+ * can be passed directly wherever a plain callback function is expected.
+ *
+ * Callers can check `callback instanceof DefaultProgressCallback` to avoid
+ * double-wrapping when both `pipeline()` and `from_pretrained()` would
+ * otherwise each add their own wrapper.
+ */
+export class DefaultProgressCallback extends Callable {
+    /**
+     * @param {ProgressCallback} callback The original callback.
+     * @param {FilesLoadingMap} files_loading Mutable map storing per-file progress.
+     */
+    constructor(callback, files_loading) {
+        super();
+        this.callback = callback;
+        this.files_loading = files_loading;
+    }
+
+    /**
+     * @param {ProgressInfo} info
+     */
+    _call(info) {
+        if (info.status === 'progress') {
+            this.files_loading[info.file] = {
+                loaded: info.loaded,
+                total: info.total,
+            };
+
+            const loaded = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+            const total = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.total, 0);
+            const progress = total > 0 ? (loaded / total) * 100 : 0;
+
+            this.callback({
+                status: 'progress_total',
+                name: info.name,
+                progress,
+                loaded,
+                total,
+                files: structuredClone(this.files_loading),
+            });
+        }
+        this.callback(info);
+    }
 }
 
 /**

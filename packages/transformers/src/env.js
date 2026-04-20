@@ -28,7 +28,7 @@ import nodePath from 'node:path';
 import path from 'path-browserify';
 import url from 'node:url';
 
-const VERSION = '4.0.0-next.8';
+const VERSION = '4.1.0';
 
 const HAS_SELF = typeof self !== 'undefined';
 const IS_REACT_NATIVE_ENV = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';

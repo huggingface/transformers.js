@@ -31,29 +31,16 @@ function isChat(x) {
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
  *
- * @callback TextGenerationPipelineCallbackString
- * @param {string} texts One prompt to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationStringOutput>} An array containing the generated text(s).
- *
- * @callback TextGenerationPipelineCallbackChat
- * @param {Chat} texts One chat to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationChatOutput>} An array containing the generated chat(s).
- *
- * @callback TextGenerationPipelineCallbackStringBatched
- * @param {string[]} texts Several prompts to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationStringOutput[]>} An array of arrays, each containing the generated text(s) for the corresponding input.
- *
- * @callback TextGenerationPipelineCallbackChatBatched
- * @param {Chat[]} texts Several chats to complete.
- * @param {Partial<TextGenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
- * @returns {Promise<TextGenerationChatOutput[]>} An array of arrays, each containing the generated chat(s) for the corresponding input.
- *
- * @typedef {TextGenerationPipelineCallbackString & TextGenerationPipelineCallbackChat & TextGenerationPipelineCallbackStringBatched & TextGenerationPipelineCallbackChatBatched} TextGenerationPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & TextGenerationPipelineCallback & Disposable} TextGenerationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string ? TextGenerationStringOutput : T extends Chat ? TextGenerationChatOutput : T extends string[] ? TextGenerationStringOutput[] : T extends Chat[] ? TextGenerationChatOutput[] : never} TextGenerationResult
+ */
+
+/**
+ * @typedef {<T extends string | Chat | string[] | Chat[]>(texts: T, options?: Partial<TextGenerationConfig>) => Promise<TextGenerationResult<T>>} TextGenerationPipelineCallback
  */
 
 /**
@@ -100,6 +87,12 @@ function isChat(x) {
 export class TextGenerationPipeline
     extends /** @type {new (options: TextPipelineConstructorArgs) => TextGenerationPipelineType} */ (Pipeline)
 {
+    _default_generation_config = {
+        max_new_tokens: 256,
+        // do_sample: true,
+        // temperature: 0.7,
+    };
+
     /**
      * @param {string | string[] | import('../tokenization_utils.js').Message[] | import('../tokenization_utils.js').Message[][]} texts
      * @param {Partial<TextGenerationConfig>} generate_kwargs
@@ -136,12 +129,17 @@ export class TextGenerationPipeline
 
             // If the input is a chat, we need to apply the chat template
             inputs = /** @type {string[]} */ (
-                /** @type {Chat[]} */ (texts).map((x) =>
-                    this.tokenizer.apply_chat_template(x, {
-                        tokenize: false,
-                        add_generation_prompt: true,
-                        ...tokenizer_kwargs,
-                    }),
+                /** @type {Chat[]} */ (texts).map(
+                    (x) =>
+                        /** @type {string} */ (
+                            /** @type {unknown} */ (
+                                this.tokenizer.apply_chat_template(x, {
+                                    tokenize: false,
+                                    add_generation_prompt: true,
+                                    ...tokenizer_kwargs,
+                                })
+                            )
+                        ),
                 )
             );
             // Chat template handles these already
@@ -163,6 +161,7 @@ export class TextGenerationPipeline
         const outputTokenIds = /** @type {Tensor} */ (
             await this.model.generate({
                 ...text_inputs,
+                ...this._default_generation_config,
                 ...generate_kwargs,
             })
         );
