@@ -112,12 +112,11 @@ export default () => {
             max_new_tokens: 3,
             do_sample: false,
             tools,
-            add_generation_prompt: false,
           });
 
           const [, options] = spy.mock.calls.at(-1);
           expect(options.tools).toEqual(tools);
-          expect(options.add_generation_prompt).toBe(false);
+          expect(options.add_generation_prompt).toBe(true);
           spy.mockRestore();
         },
         MAX_TEST_EXECUTION_TIME,

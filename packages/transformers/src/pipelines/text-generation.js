@@ -1,6 +1,7 @@
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
+import { pick } from '../utils/core.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -27,7 +28,6 @@ function isChat(x) {
  * @typedef {Object} TextGenerationSpecificParams Parameters specific to text-generation pipelines.
  * @property {boolean} [add_special_tokens] Whether or not to add special tokens when tokenizing the sequences.
  * @property {boolean} [return_full_text=true] If set to `false` only added text is returned, otherwise the full text is returned.
- * @property {boolean} [add_generation_prompt=true] Whether to append the assistant generation prompt when applying a chat template.
  * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
  * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.
  * @property {string|null} [chat_template=null] A specific chat template (or template name) to apply.
@@ -105,7 +105,6 @@ export class TextGenerationPipeline
         const {
             add_special_tokens: add_special_tokens_arg,
             return_full_text: return_full_text_arg,
-            add_generation_prompt,
             tools,
             documents,
             chat_template,
@@ -143,21 +142,10 @@ export class TextGenerationPipeline
             // If the input is a chat, we need to apply the chat template
             const chat_template_kwargs = {
                 tokenize: false,
-                add_generation_prompt: add_generation_prompt ?? true,
+                add_generation_prompt: true,
+                ...pick({ tools, documents, chat_template }, ['tools', 'documents', 'chat_template']),
                 ...tokenizer_kwargs,
             };
-
-            if (tools !== undefined && chat_template_kwargs.tools === undefined) {
-                chat_template_kwargs.tools = tools;
-            }
-
-            if (documents !== undefined && chat_template_kwargs.documents === undefined) {
-                chat_template_kwargs.documents = documents;
-            }
-
-            if (chat_template !== undefined && chat_template_kwargs.chat_template === undefined) {
-                chat_template_kwargs.chat_template = chat_template;
-            }
 
             inputs = /** @type {string[]} */ (
                 /** @type {Chat[]} */ (texts).map(
