@@ -24,8 +24,7 @@
 
 import * as NativeFS from 'native-universal-fs';
 import fs from 'node:fs';
-import nodePath from 'node:path';
-import path from 'path-browserify';
+import path from 'node:path';
 import url from 'node:url';
 
 const VERSION = '4.1.0';
@@ -34,7 +33,7 @@ const HAS_SELF = typeof self !== 'undefined';
 const IS_REACT_NATIVE_ENV = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 
 const IS_FS_AVAILABLE = !isEmpty(fs) || !isEmpty(NativeFS);
-const IS_PATH_AVAILABLE = !isEmpty(nodePath) || !isEmpty(path);
+const IS_PATH_AVAILABLE = !isEmpty(path);
 const IS_WEB_CACHE_AVAILABLE = HAS_SELF && 'caches' in self;
 
 // Runtime detection
@@ -160,9 +159,9 @@ if (IS_REACT_NATIVE_ENV) {
     const _import_meta_url = Object(import.meta).url;
 
     if (_import_meta_url) {
-        dirname__ = nodePath.dirname(nodePath.dirname(url.fileURLToPath(_import_meta_url))); // ESM
+        dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))); // ESM
     } else if (typeof __dirname !== 'undefined') {
-        dirname__ = nodePath.dirname(__dirname); // CommonJS
+        dirname__ = path.dirname(__dirname); // CommonJS
     }
 }
 

@@ -1,8 +1,7 @@
 import * as NativeFS from 'native-universal-fs';
 import { Buffer } from 'buffer';
 import fs from 'node:fs';
-import nodePath from 'node:path';
-import path from 'path-browserify';
+import path from 'node:path';
 
 import { FileResponse } from '../hub/FileResponse.js';
 import { Random } from '../random.js';
@@ -76,7 +75,7 @@ export class FileCache {
                 await NativeFS.writeFile(tmpPath, Buffer.from(combined).toString('base64'), 'base64');
                 await NativeFS.moveFile(tmpPath, filePath);
             } else {
-                await fs.promises.mkdir(nodePath.dirname(filePath), { recursive: true });
+                await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
                 const fileStream = fs.createWriteStream(tmpPath);
                 while (true) {
                     const { done, value } = await reader.read();
