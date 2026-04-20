@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DIST_FOLDER = "dist";
-export const NODE_IGNORE_MODULES = ["onnxruntime-web"];
+export const NODE_IGNORE_MODULES = ["onnxruntime-web", "onnxruntime-react-native", "native-universal-fs", "buffer"];
 export const NODE_EXTERNAL_MODULES = [
   "onnxruntime-common",
   "onnxruntime-node",
@@ -10,10 +10,10 @@ export const NODE_EXTERNAL_MODULES = [
   // node:* modules are handled by externalNodeBuiltinsPlugin
 ];
 
-export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "stream", "stream/promises"];
+export const WEB_IGNORE_MODULES = ["onnxruntime-node", "onnxruntime-react-native", "native-universal-fs", "buffer", "sharp", "fs", "path", "url", "stream", "stream/promises"];
 export const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];
-export const REACT_NATIVE_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "stream", "stream/promises", "url"];
-export const REACT_NATIVE_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-react-native", "react-native"];
+export const REACT_NATIVE_IGNORE_MODULES = ["onnxruntime-node", "onnxruntime-web", "sharp", "fs", "stream", "stream/promises", "url"];
+export const REACT_NATIVE_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-react-native", "native-universal-fs", "buffer", "react-native"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.join(__dirname, "../..");

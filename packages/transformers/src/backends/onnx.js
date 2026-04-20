@@ -111,7 +111,7 @@ if (ORT_SYMBOL in globalThis) {
 } else if (apis.IS_REACT_NATIVE_ENV) {
     ONNX = ONNX_REACT_NATIVE.default ?? ONNX_REACT_NATIVE;
     supportedDevices.push('xnnpack', 'cpu', 'nnapi', 'coreml');
-    defaultDevices = ['xnnpack', 'cpu'];
+    defaultDevices = ['cpu'];
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE;
 

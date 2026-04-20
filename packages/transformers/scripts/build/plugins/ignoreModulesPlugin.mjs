@@ -34,6 +34,10 @@ export const ignoreModulesPlugin = (modules = []) => ({
               export const pipeline = noop;
             `,
           };
+        case "buffer":
+          return {
+            contents: `export const Buffer = globalThis.Buffer; export default { Buffer: globalThis.Buffer };`,
+          };
         case "node:fs":
         case "node:path":
         case "node:url":
