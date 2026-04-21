@@ -36,22 +36,28 @@ function createEncoderState(model, input_features) {
 
     // Initialize encoder KV cache
     const enc_kv_cache = new DynamicCache();
-    const enc_dtype = encoder_session?.config?.kv_cache_dtype ?? 'float32';
-    const enc_cls = enc_dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
     const enc_names = getCacheNames(audio_config);
     const enc_symbols = { batch_size: 1 };
+    /** @type {import('onnxruntime-common').Tensor.Type} */
+    let padding_type = 'float32';
     for (const meta of encoder_session.inputMetadata) {
+        if (meta.name === 'past_padding_cache') {
+            padding_type = meta.type;
+            continue;
+        }
         if (!enc_names.has(meta.name)) continue;
         const shape = resolveCacheShape(meta.shape, enc_symbols);
         const size = shape.reduce((a, b) => a * b, 1);
-        enc_kv_cache[meta.name] = new Tensor(enc_dtype, new enc_cls(size), shape);
+        const cls = DataTypeMap[meta.type];
+        enc_kv_cache[meta.name] = new Tensor(meta.type, new cls(size), shape);
     }
 
-    const enc_padding_cache = new Tensor(enc_dtype, new enc_cls(PADDING_CACHE_CHANNELS * CONV1_LEFT_PAD), [
-        1,
-        PADDING_CACHE_CHANNELS,
-        CONV1_LEFT_PAD,
-    ]);
+    const padding_cls = DataTypeMap[padding_type];
+    const enc_padding_cache = new Tensor(
+        padding_type,
+        new padding_cls(PADDING_CACHE_CHANNELS * CONV1_LEFT_PAD),
+        [1, PADDING_CACHE_CHANNELS, CONV1_LEFT_PAD],
+    );
 
     // Set up iterator from input_features
     const chunks_iter = input_features[Symbol.asyncIterator]?.() ?? input_features[Symbol.iterator]?.();

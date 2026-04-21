@@ -1268,8 +1268,6 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
     const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
     const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
 
-    const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-    const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
     const names = getCacheNames(self.config);
     const num_heads = self.config?.normalized_config?.num_heads;
     /** @type {Record<string, number>} */
@@ -1283,7 +1281,8 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
         if (!names.has(meta.name)) continue;
         const shape = resolveCacheShape(meta.shape, symbols);
         const size = shape.reduce((a, b) => a * b, 1);
-        const t = new Tensor(dtype, new cls(size), shape);
+        const cls = DataTypeMap[meta.type];
+        const t = new Tensor(meta.type, new cls(size), shape);
         decoderFeeds[meta.name] = t;
         entries[meta.name] = t;
     }

@@ -71,18 +71,6 @@ async function getSession(
         throw new Error(`The device (${selectedDevice}) does not support fp16.`);
     }
 
-    // Only valid for models with a decoder
-    const kv_cache_dtype_config = custom_config.kv_cache_dtype;
-    const kv_cache_dtype = kv_cache_dtype_config
-        ? typeof kv_cache_dtype_config === 'string'
-            ? kv_cache_dtype_config
-            : (kv_cache_dtype_config[selectedDtype] ?? 'float32')
-        : undefined;
-
-    if (kv_cache_dtype && !['float32', 'float16'].includes(kv_cache_dtype)) {
-        throw new Error(`Invalid kv_cache_dtype: ${kv_cache_dtype}. Should be one of: float32, float16`);
-    }
-
     // Construct the model file suffix
     const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype];
 
@@ -119,7 +107,7 @@ async function getSession(
         session_options.externalData = externalData;
     }
 
-    if (cache_config && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
+    if (cache_config && selectedDevice === 'webgpu') {
         const names = getCacheNames(options.config, {
             prefix: 'present',
             session_name,
@@ -138,7 +126,6 @@ async function getSession(
     const buffer_or_path = await bufferOrPathPromise;
     const session_config = {
         dtype: selectedDtype,
-        kv_cache_dtype,
         device: selectedDevice,
     };
     return { buffer_or_path, session_options, session_config };
