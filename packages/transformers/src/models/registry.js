@@ -97,6 +97,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['mgp-str', 'MgpstrForSceneTextRecognition'],
 
     ['style_text_to_speech_2', 'StyleTextToSpeech2Model'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterModel'],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
@@ -238,6 +239,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['roberta', 'RobertaForTokenClassification'],
     ['xlm', 'XLMForTokenClassification'],
     ['xlm-roberta', 'XLMRobertaForTokenClassification'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterForTokenClassification'],
 ]);
 
 export const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
