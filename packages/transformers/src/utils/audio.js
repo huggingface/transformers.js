@@ -23,7 +23,7 @@ import { apis } from '../env.js';
  * @param {number} sampling_rate The sampling rate to use when decoding the audio.
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
-export async function read_audio(url, sampling_rate) {
+export async function load_audio(url, sampling_rate) {
     if (typeof AudioContext === 'undefined') {
         // Running in node or an environment without AudioContext
         throw Error(
@@ -77,8 +77,8 @@ export async function read_audio(url, sampling_rate) {
     return audio;
 }
 
-/** @deprecated Use {@link read_audio} instead. */
-export const load_audio = read_audio;
+/** @deprecated Use {@link load_audio} instead. */
+export const read_audio = load_audio;
 
 /**
  * Helper function to generate windows that are special cases of the generalized cosine window.
