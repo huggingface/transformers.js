@@ -77,6 +77,9 @@ export async function read_audio(url, sampling_rate) {
     return audio;
 }
 
+/** @deprecated Use {@link read_audio} instead. */
+export const load_audio = read_audio;
+
 /**
  * Helper function to generate windows that are special cases of the generalized cosine window.
  * See https://www.mathworks.com/help/signal/ug/generalized-cosine-windows.html for more information.
