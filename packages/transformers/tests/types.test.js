@@ -5,6 +5,14 @@ const TS_OPTIONS = {
   skipLibCheck: true,
   module: ts.ModuleKind.ESNext,
   target: ts.ScriptTarget.ESNext,
+  // Match tsconfig.json so `../../src/transformers.js` resolves to the `.js` source
+  // (with adjacent JSDoc types) instead of silently falling through to `any`.
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  allowImportingTsExtensions: true,
+  allowJs: true,
+  checkJs: false,
+  esModuleInterop: true,
+  strict: true,
 };
 
 function getDiagnostics(file) {
@@ -199,6 +207,11 @@ describe("TypeScript expected errors", () => {
         name: "ignore_labels rejects string",
         code: src("token-classification", `"Hello world", { ignore_labels: "bad" }`),
         errors: [{ code: 2322, underline: "ignore_labels", messageIncludes: "string[]" }],
+      },
+      {
+        name: "aggregation_strategy rejects unknown literal",
+        code: src("token-classification", `"Hello world", { aggregation_strategy: "first" }`),
+        errors: [{ code: 2322, underline: "aggregation_strategy", messageIncludes: "AggregationStrategy" }],
       },
     ],
 
