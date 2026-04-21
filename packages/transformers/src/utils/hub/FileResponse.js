@@ -69,10 +69,10 @@ export class FileResponse {
     }
 
     /**
-     * Clone the current FileResponse object.
-     * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
+     * Create a FileResponse, resolving RN metadata asynchronously.
+     * @returns {Promise<FileResponse>}
      */
-    static async create(filePath) {
+    static async create(/** @type {string} */ filePath) {
         const response = new FileResponse(filePath);
         if (apis.IS_REACT_NATIVE_ENV) {
             response.exists = await NativeFS.exists(String(response.url));

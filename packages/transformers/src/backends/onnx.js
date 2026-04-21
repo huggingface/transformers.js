@@ -109,7 +109,7 @@ if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
 } else if (apis.IS_REACT_NATIVE_ENV) {
-    ONNX = ONNX_REACT_NATIVE.default ?? ONNX_REACT_NATIVE;
+    ONNX = /** @type {any} */ (ONNX_REACT_NATIVE).default ?? ONNX_REACT_NATIVE;
     supportedDevices.push('xnnpack', 'cpu', 'nnapi', 'coreml');
     defaultDevices = ['cpu'];
 } else if (apis.IS_NODE_ENV) {

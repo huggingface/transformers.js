@@ -231,6 +231,7 @@ export const LogLevel = Object.freeze({
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. Defaults to `/models/`.
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
+ * @property {boolean} rnUseCanvas Whether to use Canvas API in React Native for image processing. Defaults to `true`.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
