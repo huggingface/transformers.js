@@ -1,23 +1,35 @@
 import ts from "typescript";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const TS_OPTIONS = {
-  noEmit: true,
-  skipLibCheck: true,
-  module: ts.ModuleKind.ESNext,
-  target: ts.ScriptTarget.ESNext,
-  // Match tsconfig.json so `../../src/transformers.js` resolves to the `.js` source
-  // (with adjacent JSDoc types) instead of silently falling through to `any`.
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  allowImportingTsExtensions: true,
-  allowJs: true,
-  checkJs: false,
-  esModuleInterop: true,
-  strict: true,
-};
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TSCONFIG_PATH = resolve(__dirname, "..", "tsconfig.json");
+
+function loadCompilerOptions() {
+  const raw = ts.parseConfigFileTextToJson(TSCONFIG_PATH, readFileSync(TSCONFIG_PATH, "utf8"));
+  if (raw.error) throw new Error(ts.flattenDiagnosticMessageText(raw.error.messageText, "\n"));
+  const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, dirname(TSCONFIG_PATH));
+  return {
+    ...parsed.options,
+    // Tests don't emit.
+    noEmit: true,
+    declaration: false,
+    declarationMap: false,
+    emitDeclarationOnly: false,
+    composite: false,
+    outDir: undefined,
+    rootDir: undefined,
+    strict: true,
+  };
+}
+
+const TS_OPTIONS = loadCompilerOptions();
 
 function getDiagnostics(file) {
   const program = ts.createProgram([file], TS_OPTIONS);
-  return ts.getPreEmitDiagnostics(program);
+  const absFile = resolve(file);
+  return ts.getPreEmitDiagnostics(program).filter((d) => d.file && resolve(d.file.fileName) === absFile);
 }
 
 function formatDiagnostics(diagnostics) {
@@ -43,7 +55,7 @@ function getDiagnosticsFromSource(source) {
     getSourceFile: (f, lang) => (f === virtualPath ? ts.createSourceFile(f, source, lang, true) : defaultHost.getSourceFile(f, lang)),
   };
   const program = ts.createProgram([virtualPath], TS_OPTIONS, host);
-  return [...ts.getPreEmitDiagnostics(program)];
+  return [...ts.getPreEmitDiagnostics(program)].filter((d) => d.file && d.file.fileName === virtualPath);
 }
 
 describe("TypeScript compilation succeeds", () => {
