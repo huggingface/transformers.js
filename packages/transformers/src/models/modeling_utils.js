@@ -1236,7 +1236,7 @@ export function getAttentions(model_output) {
 /**
  * Resolve symbolic dims from ONNX inputMetadata for empty-cache initialization.
  * Each symbolic dim name is looked up in `symbols`; numeric dims pass through.
- * `past_sequence_length` defaults to 0 (empty cache) unless overridden in `symbols`.
+ * Any unresolved symbolic dim defaults to 0.
  * @param {ReadonlyArray<number|string>} metadataShape
  * @param {Record<string, number>} symbols
  * @returns {number[]}
@@ -1244,9 +1244,7 @@ export function getAttentions(model_output) {
 export function resolveCacheShape(metadataShape, symbols) {
     return metadataShape.map((d) => {
         if (typeof d === 'number') return d;
-        if (d in symbols) return symbols[d];
-        if (d === 'past_sequence_length') return 0;
-        throw new Error(`Unresolved symbolic dim: ${d}`);
+        return symbols[d] ?? 0;
     });
 }
 
