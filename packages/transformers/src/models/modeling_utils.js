@@ -1,6 +1,6 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
-import { AutoConfig, getCacheShapes } from '../configs.js';
+import { AutoConfig, getCacheNames } from '../configs.js';
 import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
 import { DataTypeMap } from '../utils/dtypes.js';
 
@@ -1234,6 +1234,23 @@ export function getAttentions(model_output) {
 }
 
 /**
+ * Resolve symbolic dims from ONNX inputMetadata for empty-cache initialization.
+ * Each symbolic dim name is looked up in `symbols`; numeric dims pass through.
+ * `past_sequence_length` defaults to 0 (empty cache) unless overridden in `symbols`.
+ * @param {ReadonlyArray<number|string>} metadataShape
+ * @param {Record<string, number>} symbols
+ * @returns {number[]}
+ */
+export function resolveCacheShape(metadataShape, symbols) {
+    return metadataShape.map((d) => {
+        if (typeof d === 'number') return d;
+        if (d in symbols) return symbols[d];
+        if (d === 'past_sequence_length') return 0;
+        throw new Error(`Unresolved symbolic dim: ${d}`);
+    });
+}
+
+/**
  * Adds past key values to the decoder feeds object. If pastKeyValues is null,
  * creates a new DynamicCache with zero-filled tensors for each cache entry.
  *
@@ -1253,14 +1270,22 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
 
     const dtype = session?.config?.kv_cache_dtype ?? 'float32';
     const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
-    const shapes = getCacheShapes(self.config, { batch_size });
+    const names = getCacheNames(self.config);
+    const num_heads = self.config?.normalized_config?.num_heads;
+    /** @type {Record<string, number>} */
+    const symbols = { batch_size };
+    if (typeof num_heads === 'number') {
+        symbols['batch_size x num_heads'] = batch_size * num_heads;
+    }
     /** @type {Record<string, Tensor>} */
     const entries = Object.create(null);
-    for (const name in shapes) {
-        const size = shapes[name].reduce((a, b) => a * b, 1);
-        const t = new Tensor(dtype, new cls(size), shapes[name]);
-        decoderFeeds[name] = t;
-        entries[name] = t;
+    for (const meta of session.inputMetadata) {
+        if (!names.has(meta.name)) continue;
+        const shape = resolveCacheShape(meta.shape, symbols);
+        const size = shape.reduce((a, b) => a * b, 1);
+        const t = new Tensor(dtype, new cls(size), shape);
+        decoderFeeds[meta.name] = t;
+        entries[meta.name] = t;
     }
     if (pastKeyValues) {
         // Populate the (empty) user-provided cache in-place

@@ -322,146 +322,82 @@ function getNormalizedConfig(config) {
 }
 
 /**
- *
  * @param {PretrainedConfig} config
- * @returns {Record<string, number[]>}
+ * @param {{ prefix?: string, session_name?: string }} [options]
+ * @returns {Set<string>}
  */
-export function getCacheShapes(config, options) {
+export function getCacheNames(config, options) {
     if (!(config instanceof PretrainedConfig)) {
         config = new PretrainedConfig(config);
     }
 
-    const batch_size = options?.batch_size ?? 1;
-    if (['lfm2', 'lfm2_moe'].includes(config.model_type)) {
-        const pkv_prefix = options?.prefix ?? 'past_key_values';
-        const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+    const pkv_prefix = options?.prefix ?? 'past_key_values';
+    const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+    /** @type {Set<string>} */
+    const names = new Set();
 
-        /** @type {Record<string, number[]>} */
-        const cache_values = {};
-        const { layer_types, num_attention_heads, num_key_value_heads, hidden_size, conv_L_cache } =
-            /** @type {any} */ (config);
-        const head_dim = hidden_size / num_attention_heads;
+    if (['lfm2', 'lfm2_moe'].includes(config.model_type)) {
+        const { layer_types } = /** @type {any} */ (config);
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'full_attention') {
-                for (const kv of ['key', 'value']) {
-                    cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, head_dim];
-                }
+                names.add(`${pkv_prefix}.${i}.key`);
+                names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'conv') {
-                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, hidden_size, conv_L_cache];
+                names.add(`${conv_prefix}_conv.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
         }
-        return cache_values;
+        return names;
     } else if (['granitemoehybrid', 'falcon_h1', 'nemotron_h'].includes(config.model_type)) {
-        const pkv_prefix = options?.prefix ?? 'past_key_values';
-        const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
-
         const c = /** @type {any} */ (config);
-
-        // Normalize config field names across model types
         const layer_types = c.layer_types ?? c.layers_block_type;
         const num_layers = c.num_hidden_layers ?? layer_types?.length;
-        const num_key_value_heads = c.num_key_value_heads;
-        const head_dim = c.head_dim ?? c.hidden_size / c.num_attention_heads;
-        const mamba_n_heads = c.mamba_n_heads ?? c.mamba_num_heads;
-        const mamba_d_head = c.mamba_d_head ?? c.mamba_head_dim;
-        const mamba_d_state = c.mamba_d_state ?? c.ssm_state_size;
-        const mamba_n_groups = c.mamba_n_groups ?? c.n_groups;
-        const mamba_d_conv = c.mamba_d_conv ?? c.conv_kernel;
-        const mamba_d_ssm =
-            c.mamba_d_ssm ?? (c.mamba_expand ? c.mamba_expand * c.hidden_size : mamba_n_heads * mamba_d_head);
-        const conv_d_inner = mamba_d_ssm + 2 * mamba_n_groups * mamba_d_state;
-
-        /** @type {Record<string, number[]>} */
-        const cache_values = {};
 
         for (let i = 0; i < num_layers; ++i) {
             if (!layer_types || layer_types[i] === 'mamba') {
-                cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_d_inner, mamba_d_conv];
-                cache_values[`${conv_prefix}_ssm.${i}`] = [batch_size, mamba_n_heads, mamba_d_head, mamba_d_state];
+                names.add(`${conv_prefix}_conv.${i}`);
+                names.add(`${conv_prefix}_ssm.${i}`);
             }
             if (!layer_types || layer_types[i] === 'attention') {
-                for (const kv of ['key', 'value']) {
-                    cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, head_dim];
-                }
+                names.add(`${pkv_prefix}.${i}.key`);
+                names.add(`${pkv_prefix}.${i}.value`);
             }
         }
-        return cache_values;
+        return names;
     } else if (['qwen3_next', 'qwen3_5_text', 'qwen3_5_moe_text', 'olmo_hybrid'].includes(config.model_type)) {
-        const pkv_prefix = options?.prefix ?? 'past_key_values';
-        const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
-
-        /** @type {Record<string, number[]>} */
-        const cache_values = {};
-        const {
-            head_dim,
-            layer_types,
-            num_attention_heads,
-            num_key_value_heads,
-            hidden_size,
-            linear_num_value_heads,
-            linear_num_key_heads,
-            linear_key_head_dim,
-            linear_value_head_dim,
-            linear_conv_kernel_dim,
-        } = /** @type {any} */ (config);
-
-        const key_dim = linear_key_head_dim * linear_num_key_heads;
-        const value_dim = linear_value_head_dim * linear_num_value_heads;
-
-        const final_head_dim = head_dim ?? hidden_size / num_attention_heads;
+        const { layer_types } = /** @type {any} */ (config);
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'full_attention') {
-                for (const kv of ['key', 'value']) {
-                    cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, final_head_dim];
-                }
+                names.add(`${pkv_prefix}.${i}.key`);
+                names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'linear_attention') {
                 if (config.model_type === 'olmo_hybrid') {
-                    cache_values[`${conv_prefix}_conv.${i}.key`] = [batch_size, key_dim, linear_conv_kernel_dim];
-                    cache_values[`${conv_prefix}_conv.${i}.value`] = [batch_size, value_dim, linear_conv_kernel_dim];
-                    cache_values[`${conv_prefix}_conv.${i}.query`] = [batch_size, key_dim, linear_conv_kernel_dim];
+                    names.add(`${conv_prefix}_conv.${i}.key`);
+                    names.add(`${conv_prefix}_conv.${i}.value`);
+                    names.add(`${conv_prefix}_conv.${i}.query`);
                 } else {
-                    const conv_dim = key_dim * 2 + value_dim;
-                    cache_values[`${conv_prefix}_conv.${i}`] = [batch_size, conv_dim, linear_conv_kernel_dim];
+                    names.add(`${conv_prefix}_conv.${i}`);
                 }
-                cache_values[`${conv_prefix}_recurrent.${i}`] = [
-                    batch_size,
-                    linear_num_value_heads,
-                    linear_key_head_dim,
-                    linear_value_head_dim,
-                ];
+                names.add(`${conv_prefix}_recurrent.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
         }
-        return cache_values;
+        return names;
     } else if (['gemma4', 'gemma4_text'].includes(config.model_type)) {
         const c = /** @type {any} */ (
             config.model_type === 'gemma4' ? /** @type {any} */ (config).text_config : config
         );
-        const pkv_prefix = options?.prefix ?? 'past_key_values';
-
-        /** @type {Record<string, number[]>} */
-        const cache_values = {};
         const num_hidden_layers = c.num_hidden_layers;
         const num_kv_shared_layers = c.num_kv_shared_layers ?? 0;
         const num_kv_layers = num_hidden_layers - num_kv_shared_layers;
-        const num_key_value_heads = c.num_key_value_heads;
-        const head_dim = c.head_dim;
-        const global_head_dim = c.global_head_dim ?? head_dim;
-        const layer_types = c.layer_types ?? [];
 
-        // Create `num_kv_layers` unique KV entries, corresponding to the first `num_kv_layers`
-        // model layers (the remaining layers share caches with earlier ones).
-        // Full attention layers use global_head_dim, sliding attention layers use head_dim.
         for (let i = 0; i < num_kv_layers; ++i) {
-            const dim = layer_types[i] === 'full_attention' ? global_head_dim : head_dim;
-            for (const kv of ['key', 'value']) {
-                cache_values[`${pkv_prefix}.${i}.${kv}`] = [batch_size, num_key_value_heads, 0, dim];
-            }
+            names.add(`${pkv_prefix}.${i}.key`);
+            names.add(`${pkv_prefix}.${i}.value`);
         }
-        return cache_values;
+        return names;
     } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {
         let subConfig;
         if (config.model_type === 'voxtral_realtime' && options?.session_name === 'audio_encoder') {
@@ -469,16 +405,20 @@ export function getCacheShapes(config, options) {
         } else {
             subConfig = /** @type {any} */ (config).text_config;
         }
-        return getCacheShapes(subConfig, options);
+        return getCacheNames(subConfig, options);
     }
 
-    return getKeyValueShapes(config, options);
+    return getKeyValueNames(config, { prefix: pkv_prefix });
 }
 
-/** @type {typeof getKeyValueShapes} */
-function getKeyValueShapes(config, { prefix = 'past_key_values', batch_size = 1 } = {}) {
-    /** @type {Record<string, number[]>} */
-    const decoderFeeds = {};
+/**
+ * @param {PretrainedConfig} config
+ * @param {{ prefix?: string }} [options]
+ * @returns {Set<string>}
+ */
+function getKeyValueNames(config, { prefix = 'past_key_values' } = {}) {
+    /** @type {Set<string>} */
+    const names = new Set();
     const normalized_config = config.normalized_config;
 
     if (
@@ -486,70 +426,25 @@ function getKeyValueShapes(config, { prefix = 'past_key_values', batch_size = 1 
         'num_encoder_heads' in normalized_config &&
         'num_decoder_heads' in normalized_config
     ) {
-        const encoder_dim_kv =
-            normalized_config.encoder_dim_kv ??
-            normalized_config.encoder_hidden_size / normalized_config.num_encoder_heads;
-        const decoder_dim_kv =
-            normalized_config.decoder_dim_kv ??
-            normalized_config.decoder_hidden_size / normalized_config.num_decoder_heads;
-
-        const encoder_dims = [batch_size, normalized_config.num_encoder_heads, 0, encoder_dim_kv];
-        const decoder_dims = [batch_size, normalized_config.num_decoder_heads, 0, decoder_dim_kv];
         for (let i = 0; i < normalized_config.num_decoder_layers; ++i) {
-            decoderFeeds[`${prefix}.${i}.encoder.key`] = encoder_dims;
-            decoderFeeds[`${prefix}.${i}.encoder.value`] = encoder_dims;
-            decoderFeeds[`${prefix}.${i}.decoder.key`] = decoder_dims;
-            decoderFeeds[`${prefix}.${i}.decoder.value`] = decoder_dims;
+            names.add(`${prefix}.${i}.encoder.key`);
+            names.add(`${prefix}.${i}.encoder.value`);
+            names.add(`${prefix}.${i}.decoder.key`);
+            names.add(`${prefix}.${i}.decoder.value`);
+        }
+    } else if (normalized_config.multi_query) {
+        // e.g., for `gpt_bigcode`
+        for (let i = 0; i < normalized_config.num_layers; ++i) {
+            names.add(`${prefix}.${i}.key_value`);
         }
     } else {
-        // Decoders
-        const num_heads = normalized_config.num_heads;
-        const num_layers = normalized_config.num_layers;
-        const dim_kv =
-            normalized_config.dim_kv ??
-            normalized_config.hidden_size / (normalized_config.num_attention_heads ?? num_heads);
-
-        if (normalized_config.model_type === 'falcon') {
-            // NOTE: Custom implementation for Falcon
-            const dims = [batch_size * num_heads, 0, dim_kv];
-            for (let i = 0; i < num_layers; ++i) {
-                decoderFeeds[`${prefix}.${i}.key`] = dims;
-                decoderFeeds[`${prefix}.${i}.value`] = dims;
-            }
-        } else if (normalized_config.multi_query) {
-            // e.g., for `gpt_bigcode`
-            const dims = [batch_size * num_heads, 0, 2 * dim_kv];
-
-            for (let i = 0; i < num_layers; ++i) {
-                decoderFeeds[`${prefix}.${i}.key_value`] = dims;
-            }
-        } else if (normalized_config.model_type === 'bloom') {
-            // NOTE: Custom implementation for Bloom
-
-            const keyDims = [batch_size * num_heads, dim_kv, 0]; // [batch_size x num_heads,64,past_sequence_length]
-            const valueDims = [batch_size * num_heads, 0, dim_kv]; // [batch_size x num_heads,past_sequence_length,64]
-            for (let i = 0; i < num_layers; ++i) {
-                decoderFeeds[`${prefix}.${i}.key`] = keyDims;
-                decoderFeeds[`${prefix}.${i}.value`] = valueDims;
-            }
-        } else if (normalized_config.model_type === 'openelm') {
-            for (let i = 0; i < num_layers; ++i) {
-                const dims = [batch_size, num_heads[i], 0, dim_kv];
-
-                decoderFeeds[`${prefix}.${i}.key`] = dims;
-                decoderFeeds[`${prefix}.${i}.value`] = dims;
-            }
-        } else {
-            // Decoder-only
-            const dims = [batch_size, num_heads, 0, dim_kv];
-            for (let i = 0; i < num_layers; ++i) {
-                decoderFeeds[`${prefix}.${i}.key`] = dims;
-                decoderFeeds[`${prefix}.${i}.value`] = dims;
-            }
+        for (let i = 0; i < normalized_config.num_layers; ++i) {
+            names.add(`${prefix}.${i}.key`);
+            names.add(`${prefix}.${i}.value`);
         }
     }
 
-    return decoderFeeds;
+    return names;
 }
 /**
  * Base class for all configuration classes. For more information, see the corresponding

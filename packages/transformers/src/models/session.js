@@ -5,7 +5,7 @@ import {
     isONNXTensor,
     runInferenceSession,
 } from '../backends/onnx.js';
-import { getCacheShapes } from '../configs.js';
+import { getCacheNames } from '../configs.js';
 import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, selectDtype } from '../utils/dtypes.js';
 import { selectDevice } from '../utils/devices.js';
 import { apis } from '../env.js';
@@ -120,15 +120,15 @@ async function getSession(
     }
 
     if (cache_config && selectedDevice === 'webgpu' && kv_cache_dtype_config !== false) {
-        const shapes = getCacheShapes(options.config, {
+        const names = getCacheNames(options.config, {
             prefix: 'present',
             session_name,
         });
-        if (Object.keys(shapes).length > 0 && !isONNXProxy()) {
-            // Only set preferredOutputLocation if shapes are present and we aren't proxying ONNX
+        if (names.size > 0 && !isONNXProxy()) {
+            // Only set preferredOutputLocation if names are present and we aren't proxying ONNX
             /** @type {Record<string, import('onnxruntime-common').Tensor.DataLocation>} */
             const preferredOutputLocation = {};
-            for (const key in shapes) {
+            for (const key of names) {
                 preferredOutputLocation[key] = 'gpu-buffer';
             }
             session_options.preferredOutputLocation = preferredOutputLocation;
