@@ -1,4 +1,8 @@
+import * as NativeFS from 'native-universal-fs';
+import { Buffer } from 'buffer';
 import fs from 'node:fs';
+
+import { apis } from '../../env.js';
 
 /**
  * Mapping from file extensions to MIME types.
@@ -22,9 +26,10 @@ export class FileResponse {
      */
     constructor(filePath) {
         this.filePath = filePath;
+        this.url = String(filePath).startsWith('file://') ? String(filePath) : `file://${filePath}`;
         this.headers = new Headers();
 
-        this.exists = fs.existsSync(filePath);
+        this.exists = apis.IS_REACT_NATIVE_ENV ? false : fs.existsSync(filePath);
         if (this.exists) {
             this.status = 200;
             this.statusText = 'OK';
@@ -67,6 +72,25 @@ export class FileResponse {
      * Clone the current FileResponse object.
      * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
      */
+    static async create(filePath) {
+        const response = new FileResponse(filePath);
+        if (apis.IS_REACT_NATIVE_ENV) {
+            response.exists = await NativeFS.exists(String(response.url));
+            if (response.exists) {
+                response.status = 200;
+                response.statusText = 'OK';
+                const stats = await NativeFS.stat(String(response.url));
+                response.headers.set('content-length', String(stats.size));
+                response.updateContentType();
+            } else {
+                response.status = 404;
+                response.statusText = 'Not Found';
+                response.body = null;
+            }
+        }
+        return response;
+    }
+
     clone() {
         let response = new FileResponse(this.filePath);
         response.exists = this.exists;
@@ -83,6 +107,10 @@ export class FileResponse {
      * @throws {Error} If the file cannot be read.
      */
     async arrayBuffer() {
+        if (apis.IS_REACT_NATIVE_ENV) {
+            const data = Buffer.from(await NativeFS.readFile(String(this.url), 'base64'), 'base64');
+            return /** @type {ArrayBuffer} */ (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+        }
         const data = await fs.promises.readFile(this.filePath);
         return /** @type {ArrayBuffer} */ (data.buffer);
     }
@@ -94,7 +122,7 @@ export class FileResponse {
      * @throws {Error} If the file cannot be read.
      */
     async blob() {
-        const data = await fs.promises.readFile(this.filePath);
+        const data = apis.IS_REACT_NATIVE_ENV ? Buffer.from(await NativeFS.readFile(String(this.url), 'base64'), 'base64') : await fs.promises.readFile(this.filePath);
         return new Blob([/** @type {any} */ (data)], { type: this.headers.get('content-type') });
     }
 
@@ -105,6 +133,9 @@ export class FileResponse {
      * @throws {Error} If the file cannot be read.
      */
     async text() {
+        if (apis.IS_REACT_NATIVE_ENV) {
+            return await NativeFS.readFile(String(this.url), 'utf8');
+        }
         return await fs.promises.readFile(this.filePath, 'utf8');
     }
 

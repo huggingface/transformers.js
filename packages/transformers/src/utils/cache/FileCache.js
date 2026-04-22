@@ -1,3 +1,5 @@
+import * as NativeFS from 'native-universal-fs';
+import { Buffer } from 'buffer';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -28,13 +30,8 @@ export class FileCache {
      */
     async match(request) {
         let filePath = path.join(this.path, request);
-        let file = new FileResponse(filePath);
-
-        if (file.exists) {
-            return file;
-        } else {
-            return undefined;
-        }
+        let file = apis.IS_REACT_NATIVE_ENV ? await FileResponse.create(filePath) : new FileResponse(filePath);
+        return file.exists ? file : undefined;
     }
 
     /**
@@ -60,44 +57,45 @@ export class FileCache {
             const total = parseInt(contentLength ?? '0');
             let loaded = 0;
 
-            await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-            const fileStream = fs.createWriteStream(tmpPath);
             const reader = response.body.getReader();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    break;
+            if (apis.IS_REACT_NATIVE_ENV) {
+                await NativeFS.mkdir(path.dirname(filePath));
+                const chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    const progress = total ? (loaded / total) * 100 : 0;
+                    progress_callback?.({ progress, loaded, total });
                 }
-
-                await new Promise((resolve, reject) => {
-                    fileStream.write(value, (err) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        resolve();
+                const combined = new Uint8Array(loaded);
+                let offset = 0;
+                for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length; }
+                await NativeFS.writeFile(tmpPath, Buffer.from(combined).toString('base64'), 'base64');
+                await NativeFS.moveFile(tmpPath, filePath);
+            } else {
+                await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+                const fileStream = fs.createWriteStream(tmpPath);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    await new Promise((resolve, reject) => {
+                        fileStream.write(value, (err) => err ? reject(err) : resolve());
                     });
+                    loaded += value.length;
+                    const progress = total ? (loaded / total) * 100 : 0;
+                    progress_callback?.({ progress, loaded, total });
+                }
+                await new Promise((resolve, reject) => {
+                    fileStream.close((err) => (err ? reject(err) : resolve()));
                 });
-
-                loaded += value.length;
-                const progress = total ? (loaded / total) * 100 : 0;
-
-                progress_callback?.({ progress, loaded, total });
+                await fs.promises.rename(tmpPath, filePath);
             }
-
-            await new Promise((resolve, reject) => {
-                fileStream.close((err) => (err ? reject(err) : resolve()));
-            });
-
-            // Atomically move the completed temp file to the final path so that
-            // concurrent readers (other processes or other in-process calls)
-            // never observe a partially-written file.
-            await fs.promises.rename(tmpPath, filePath);
         } catch (error) {
             // Clean up the temp file if an error occurred during download
             try {
-                await fs.promises.unlink(tmpPath);
+                if (apis.IS_REACT_NATIVE_ENV) await NativeFS.unlink(tmpPath); else await fs.promises.unlink(tmpPath);
             } catch {}
             throw error;
         }
@@ -112,7 +110,7 @@ export class FileCache {
         let filePath = path.join(this.path, request);
 
         try {
-            await fs.promises.unlink(filePath);
+            if (apis.IS_REACT_NATIVE_ENV) await NativeFS.unlink(filePath); else await fs.promises.unlink(filePath);
             return true;
         } catch (error) {
             // File doesn't exist or couldn't be deleted

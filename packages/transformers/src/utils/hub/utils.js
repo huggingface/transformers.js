@@ -1,3 +1,4 @@
+import { apis } from '../../env.js';
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
 import { logger } from '../logger.js';
 
@@ -29,6 +30,16 @@ export function pathJoin(...parts) {
  * @returns {boolean} True if the string is a valid URL, false otherwise.
  */
 export function isValidUrl(string, protocols = null, validHosts = null) {
+    if (apis.IS_REACT_NATIVE_ENV) {
+        const str = String(string);
+        if (!/^\w+:\/\//.test(str)) return false;
+        if (protocols && !protocols.some((protocol) => str.startsWith(protocol))) return false;
+        if (validHosts) {
+            const match = str.match(/^(\w+\:)\/\/(([^:\/?#]*)(?:\:([0-9]+))?)/);
+            if (!match || !validHosts.includes(match[3])) return false;
+        }
+        return true;
+    }
     let url;
     try {
         url = new URL(string);

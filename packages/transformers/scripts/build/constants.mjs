@@ -12,6 +12,8 @@ export const NODE_EXTERNAL_MODULES = [
 
 export const WEB_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "path", "url", "stream", "stream/promises"];
 export const WEB_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-web"];
+export const REACT_NATIVE_IGNORE_MODULES = ["onnxruntime-node", "sharp", "fs", "stream", "stream/promises", "url"];
+export const REACT_NATIVE_EXTERNAL_MODULES = ["onnxruntime-common", "onnxruntime-react-native", "react-native"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.join(__dirname, "../..");

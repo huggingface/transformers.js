@@ -22,6 +22,7 @@ import { env, apis, LogLevel } from '../env.js';
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
+import * as ONNX_REACT_NATIVE from 'onnxruntime-react-native';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
 import { logger } from '../utils/logger.js';
@@ -41,6 +42,8 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
     coreml: 'coreml', // CoreML
+    xnnpack: 'xnnpack', // XNNPACK
+    nnapi: 'nnapi', // NNAPI
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
@@ -105,6 +108,10 @@ const ORT_SYMBOL = Symbol.for('onnxruntime');
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
+} else if (apis.IS_REACT_NATIVE_ENV) {
+    ONNX = ONNX_REACT_NATIVE.default ?? ONNX_REACT_NATIVE;
+    supportedDevices.push('xnnpack', 'cpu', 'nnapi', 'coreml');
+    defaultDevices = ['xnnpack', 'cpu'];
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE;
 
@@ -167,7 +174,7 @@ export function deviceToExecutionProviders(device = null) {
         case 'auto':
             return supportedDevices;
         case 'gpu':
-            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
+            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu', 'xnnpack', 'nnapi', 'coreml'].includes(x));
     }
 
     if (supportedDevices.includes(device)) {
