@@ -74,6 +74,7 @@ function transformType(expr) {
       .replace(/keyof\s+typeof\s+\w+/g, "string") // keyof typeof X -> string
       .replace(/typeof\s+\w+/g, "Object") // typeof X -> Object
       .replace(/\binfer\s+\w+/g, "any") // infer K -> any
+      .replace(/\breadonly\s+/g, "") // readonly T -> T
       .replace(/\(\s*\w[\w<>, ]*\s+extends\s+\w+\s*\?[^)]*\)/g, "any") // (X extends Y ? A : B) -> any
       .replace(/(?<!\w)\(\s*(\w+)\s*\)/g, "$1") // (any) -> any (unwrap parens around simple types, not after words like "function")
       .replace(/(\w+)\?\s*:/g, "$1:") // x?: T -> x: T
