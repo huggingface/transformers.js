@@ -45,6 +45,7 @@ export { PretrainedConfig, AutoConfig } from './configs.js';
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
+export { GenerationConfig } from './generation/configuration_utils.js';
 
 export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';
