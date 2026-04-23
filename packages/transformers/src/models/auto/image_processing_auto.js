@@ -1,3 +1,7 @@
+/**
+ * @module processors
+ */
+
 import { getModelJSON } from '../../utils/hub.js';
 import { ImageProcessor } from '../../image_processors_utils.js';
 import * as AllImageProcessors from '../image_processors.js';

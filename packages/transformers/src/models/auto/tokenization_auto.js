@@ -1,3 +1,7 @@
+/**
+ * @module tokenizers
+ */
+
 import { PreTrainedTokenizer, loadTokenizer } from '../../tokenization_utils.js';
 import * as AllTokenizers from '../tokenizers.js';
 import { logger } from '../../utils/logger.js';

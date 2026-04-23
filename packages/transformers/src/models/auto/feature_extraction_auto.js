@@ -1,3 +1,7 @@
+/**
+ * @module processors
+ */
+
 import { FEATURE_EXTRACTOR_NAME, GITHUB_ISSUE_URL } from '../../utils/constants.js';
 import { getModelJSON } from '../../utils/hub.js';
 import { FeatureExtractor } from '../../feature_extraction_utils.js';

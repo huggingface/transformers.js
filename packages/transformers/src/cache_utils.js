@@ -1,3 +1,7 @@
+/**
+ * @module models
+ */
+
 import { Tensor } from './utils/tensor.js';
 
 /**

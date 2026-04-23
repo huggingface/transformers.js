@@ -1,3 +1,7 @@
+/**
+ * @module processors
+ */
+
 import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { getModelJSON } from '../../utils/hub.js';
 import { Processor } from '../../processing_utils.js';
