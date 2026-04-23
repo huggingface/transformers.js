@@ -1,79 +1,52 @@
-// Based on [this tutorial](https://github.com/jsdoc2md/jsdoc-to-markdown/wiki/How-to-create-one-output-file-per-class).
+// Generate per-module API markdown from the library's JSDoc comments.
+// We only document items that are available in the public API.
 
 import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
-import jsdoc2md from "jsdoc-to-markdown";
+import { extractEntities } from "./lib/structure.mjs";
+import { buildIR } from "./lib/ir.mjs";
+import { renderModule } from "./lib/render-api.mjs";
+import { collectPublicExports } from "./lib/exports.mjs";
 
 const docs = path.dirname(path.dirname(url.fileURLToPath(import.meta.url)));
 const root = path.dirname(docs);
+const srcDir = path.join(root, "src");
+const outputDir = path.join(root, "docs", "source", "api");
 
-// jsdoc config file
-const conf = path.join(docs, "jsdoc-conf.json");
+const fileEntities = collectJsFiles(srcDir).map((file) => ({
+  file,
+  entities: extractEntities(fs.readFileSync(file, "utf8"), file),
+}));
 
-// input and output paths
-const inputFile = path.join(root, "/src/**/*.js");
-const outputDir = path.join(root, "/docs/source/api/");
+const ir = buildIR(fileEntities);
+const publicNames = collectPublicExports(path.join(srcDir, "transformers.js"));
 
-// get template data
-const templateData = await jsdoc2md.getTemplateData({
-  files: inputFile,
-  configure: conf,
-  "no-cache": true,
-});
+clearExistingMarkdown();
 
-// reduce templateData to an array of module names
-const moduleNames = templateData.reduce((moduleNames, identifier) => {
-  if (identifier.kind === "module") {
-    moduleNames.push(identifier.name);
-  }
-  return moduleNames;
-}, []);
+for (const mod of ir.modules) {
+  const output = renderModule(mod, ir, { publicNames });
+  const outputPath = path.resolve(outputDir, `${mod.name}.md`);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, output);
+  const empty = output.trim().split("\n").length <= 2 ? "  (empty — no public content)" : "";
+  console.log(`wrote ${mod.name}.md${empty}`);
+}
 
-// Clear all existing .md files from output directory (recursively)
-if (fs.existsSync(outputDir)) {
-  const existingFiles = fs.readdirSync(outputDir, { recursive: true });
-  for (const file of existingFiles) {
-    if (file.endsWith(".md")) {
-      fs.unlinkSync(path.join(outputDir, file));
-    }
+function clearExistingMarkdown() {
+  if (!fs.existsSync(outputDir)) return;
+  for (const entry of fs.readdirSync(outputDir, { recursive: true })) {
+    if (entry.endsWith(".md")) fs.unlinkSync(path.join(outputDir, entry));
   }
 }
 
-// create a documentation file for each module
-for (const moduleName of moduleNames) {
-  const template = `{{#module name="${moduleName}"}}{{>docs}}{{/module}}`;
-  console.log(`rendering ${moduleName}, template: ${template}`);
-  let output = await jsdoc2md.render({
-    data: templateData,
-    template: template,
-    "heading-depth": 1,
-    "no-gfm": true,
-    "name-format": "backticks",
-    "no-cache": true,
-    separators: true,
-    configure: conf,
-  });
-
-  // Post-processing
-  output = output.replace(/(^#+\s.+)/gm, "$1\n"); // Add new line after each header
-
-  // Remove <code> tags from headers
-  output = output.replace(/^#+\s.+$/gm, (match) => match.replace(/<\/?code>/g, ""));
-
-  // Replace all generated marker names with ids (for linking), and add group class
-  output = output.replace(/<a name="(\S+)"><\/a>/g, '<a id="$1" class="group"></a>');
-
-  // Unescape some of the characters which jsdoc2md escapes:
-  // TODO: May need to extend this list
-  output = output.replace(/\\([|_&*])/gm, "$1");
-
-  output = output.replaceAll("new exports.", "new ");
-
-  const outputPath = path.resolve(outputDir, `${moduleName}.md`);
-
-  console.log(`Writing to ${outputPath}`);
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, output);
+function collectJsFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectJsFiles(full));
+    else if (entry.name.endsWith(".js")) out.push(full);
+  }
+  return out;
 }
