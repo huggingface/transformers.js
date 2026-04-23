@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareAudios } from './_base.js';
 
 import { softmax } from '../utils/maths.js';

@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
