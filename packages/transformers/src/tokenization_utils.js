@@ -228,6 +228,9 @@ function getSpecialTokens(tokenizer) {
  * @typedef {TTokenize extends false ? string : TReturnDict extends false ? BatchEncodingItem<string, TReturnTensor> : BatchEncoding<BatchEncodingItem<string, TReturnTensor>>} ApplyChatTemplateReturn
  */
 
+/**
+ * `PreTrainedTokenizer` is the base class for all tokenizers in Transformers.js.
+ */
 export class PreTrainedTokenizer
     extends /** @type {new (tokenizerJSON: Object, tokenizerConfig: Object) => PreTrainedTokenizerCallback} */ (
         Callable
