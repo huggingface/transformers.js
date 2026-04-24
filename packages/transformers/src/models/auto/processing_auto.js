@@ -20,13 +20,17 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  *
  * **Example:** Load a processor using `from_pretrained`.
  * ```javascript
+ * import { AutoProcessor } from '@huggingface/transformers';
+ *
  * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
  * ```
  *
  * **Example:** Run an image through a processor.
  * ```javascript
+ * import { AutoProcessor, load_image } from '@huggingface/transformers';
+ *
  * let processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
- * let image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
+ * let image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
  * let image_inputs = await processor(image);
  * // {
  * //   "pixel_values": {

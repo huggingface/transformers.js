@@ -47,7 +47,7 @@ export function validate_audio_inputs(audio, feature_extractor) {
     if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
         throw new Error(
             `${feature_extractor} expects input to be a Float32Array or a Float64Array, but got ${audio?.constructor?.name ?? typeof audio} instead. ` +
-                `If using the feature extractor directly, remember to use \`read_audio(url, sampling_rate)\` to obtain the raw audio data of the file/url.`,
+                `If using the feature extractor directly, remember to use \`load_audio(url, sampling_rate)\` to obtain the raw audio data of the file/url.`,
         );
     }
 }

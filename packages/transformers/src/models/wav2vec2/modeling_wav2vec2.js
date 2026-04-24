@@ -10,11 +10,11 @@ export class Wav2Vec2PreTrainedModel extends PreTrainedModel {}
  * **Example:** Load and run a `Wav2Vec2Model` for feature extraction.
  *
  * ```javascript
- * import { AutoProcessor, AutoModel, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModel, load_audio } from '@huggingface/transformers';
  *
  * // Read and preprocess audio
  * const processor = await AutoProcessor.from_pretrained('Xenova/mms-300m');
- * const audio = await read_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
+ * const audio = await load_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
  * const inputs = await processor(audio);
  *
  * // Run model with inputs
