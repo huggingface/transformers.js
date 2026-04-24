@@ -12,13 +12,15 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  * The chosen feature extractor class is determined by the type specified in the preprocessor config.
  * Typically used for audio models.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { AutoFeatureExtractor, load_audio } from '@huggingface/transformers';
  *
  * const extractor = await AutoFeatureExtractor.from_pretrained('onnx-community/whisper-tiny.en');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
  * const audio = await load_audio(url, 16000);
  * const { input_features } = await extractor(audio);
+ * ```
  */
 export class AutoFeatureExtractor {
     /** @type {typeof FeatureExtractor.from_pretrained} */

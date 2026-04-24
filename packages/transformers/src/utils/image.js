@@ -74,10 +74,12 @@ const CONTENT_TYPE_MAP = new Map([
 /**
  * Represents an image stored as a raw pixel buffer.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { RawImage } from '@huggingface/transformers';
  * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/artemis.jpeg');
  * console.log(image.width, image.height, image.channels);
+ * ```
  */
 export class RawImage {
     /**

@@ -174,7 +174,8 @@ const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.
  * Each level is represented by a number, where higher numbers include all lower level messages.
  * Use these values to set `env.logLevel`.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { env, LogLevel } from '@huggingface/transformers';
  *
  * // Set log level to show only errors
@@ -185,7 +186,7 @@ const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.
  *
  * // Disable all logging
  * env.logLevel = LogLevel.NONE;
- *
+ * ```
  */
 export const LogLevel = Object.freeze({
     /** All messages including debug output (value: 10) */

@@ -507,8 +507,10 @@ export class PretrainedConfig {
 /**
  * Helper class which is used to instantiate pretrained configs with the `from_pretrained` function.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
+ * ```
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */
