@@ -105,7 +105,6 @@ export class Random {
      * then applies the standard MT19937 tempering transform.
      *
      * @returns {number} A random integer in the range [0, 2^32 - 1].
-     * @private
      */
     _int32() {
         const mt = this._mt;
