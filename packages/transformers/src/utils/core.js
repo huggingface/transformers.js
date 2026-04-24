@@ -1,8 +1,9 @@
 /**
- * @file Core utility functions/classes for Transformers.js.
+ * @file Shared types that describe model loading progress.
  *
- * These are only used internally, meaning an end-user shouldn't
- * need to access anything here.
+ * `ProgressInfo` and its discriminated-union variants describe the payload
+ * passed to a `progress_callback` so callers can render download UIs, log
+ * byte counts, and react to the `ready` event.
  *
  * @module utils/core
  */

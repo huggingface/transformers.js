@@ -1,8 +1,9 @@
 /**
- * @file Helper module for image processing.
+ * @file Image I/O and manipulation.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * `RawImage` wraps a raw pixel buffer with width, height, and channel metadata;
+ * use `load_image()` to decode from paths, URLs, or Blobs, and the instance
+ * methods to resize, convert, and save.
  *
  * @module utils/image
  */

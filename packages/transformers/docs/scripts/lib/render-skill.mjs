@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-skill.js -->";
+const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
 
 export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   const ctx = { ir, tasks, publicNames: publicNames ?? null };
@@ -18,17 +19,27 @@ export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   // Rewrite fully-generated reference files.
   const refDir = path.join(skillDir, "references");
   fs.mkdirSync(refDir, { recursive: true });
-  fs.writeFileSync(path.join(refDir, "TASK_EXAMPLES.md"), renderTaskExamples(ctx));
-  fs.writeFileSync(path.join(refDir, "API_SUMMARY.md"), renderApiSummary(ctx));
+  fs.writeFileSync(path.join(refDir, "TASKS.md"), absolutize(renderTasks(ctx)));
 
   // Expand `<!-- @generated:start id=... -->` markers in every hand-written
   // markdown file under the skill directory. Prose outside markers is preserved.
+  // Only the generated blocks get absolutized — hand-authored prose is left alone.
   for (const file of walkMarkdown(skillDir)) {
     const original = fs.readFileSync(file, "utf8");
     if (!original.includes("@generated:start")) continue;
     const injected = injectMarkers(original, ctx);
     if (injected !== original) fs.writeFileSync(file, injected);
   }
+}
+
+// Skill files live outside the docs site, so relative `./foo.md#bar` links —
+// inherited from JSDoc descriptions and from our typedef cross-reference
+// renderer — have to be rewritten to the public docs URL. `.md` becomes the
+// extensionless path the site uses.
+function absolutize(markdown) {
+  return markdown.replace(/\]\(\.\/([^)\s]+?)\.md(#[^)\s]*)?\)/g, (_, page, anchor = "") => {
+    return `](${DOCS_SITE}/${page}${anchor})`;
+  });
 }
 
 function walkMarkdown(dir) {
@@ -52,7 +63,7 @@ function injectMarkers(original, ctx) {
       console.warn(`skill: unknown marker id "${id}"`);
       return match;
     }
-    return `${startTag}\n${content.trimEnd()}\n${endTag}`;
+    return `${startTag}\n${absolutize(content).trimEnd()}\n${endTag}`;
   });
 }
 
@@ -231,7 +242,7 @@ function renderClassSummary(name, ctx) {
     lines.push("**Fields**", "");
     for (const f of fields) {
       const type = f.type ? ` (\`${f.type}\`)` : "";
-      lines.push(`- \`${f.name}\`${type}${f.description ? ` — ${firstLine(f.description)}` : ""}`);
+      lines.push(`- \`${f.name}\`${type}${f.description ? ` — ${firstSentence(f.description)}` : ""}`);
     }
     lines.push("");
   }
@@ -245,7 +256,7 @@ function renderClassSummary(name, ctx) {
         .map((p) => (p.optional ? `[${p.name}]` : p.name))
         .join(", ");
       const ret = m.returns?.type ? ` → \`${prettifyReturnType(m.returns.type)}\`` : "";
-      lines.push(`- \`${m.name}(${params})\`${ret} — ${firstLine(m.description)}`);
+      lines.push(`- \`${m.name}(${params})\`${ret} — ${firstSentence(m.description)}`);
     }
     lines.push("");
   }
@@ -315,34 +326,57 @@ function prepareCell(text) {
     .trim();
 }
 
-function renderTaskExamples(ctx) {
+// Per-task recipe page. Grouped by modality so readers can find the task they
+// want quickly, with a table of contents up front.
+function renderTasks(ctx) {
   const lines = [
     GENERATED_BANNER,
     "",
-    "# Task Examples",
+    "# Tasks",
     "",
-    "Runnable recipes for every task supported by the `pipeline()` API, extracted",
-    "directly from each pipeline class's JSDoc.",
+    "Runnable recipes for every task exposed through the `pipeline()` API, grouped by modality.",
+    "Each section is pulled from the pipeline class's JSDoc, so the examples stay in sync with the library.",
+    "",
+    "## Contents",
     "",
   ];
-  for (const [taskId, info] of ctx.tasks.supportedTasks) {
-    lines.push(`## \`${taskId}\``, "", renderTaskRecipe(taskId, info, ctx), "");
+  const groups = groupTasksByModality(ctx.tasks.supportedTasks);
+  for (const [group, ids] of groups) {
+    lines.push(`**${group}** — ${ids.map((id) => `[\`${id}\`](#${taskAnchor(id)})`).join(" · ")}`, "");
+  }
+  for (const [group, ids] of groups) {
+    lines.push(`## ${group}`, "");
+    for (const id of ids) {
+      const info = ctx.tasks.supportedTasks.get(id);
+      lines.push(`### \`${id}\``, "", renderTaskRecipe(id, info, ctx), "");
+    }
   }
   return finalize(lines);
 }
 
-function renderApiSummary(ctx) {
-  const lines = [GENERATED_BANNER, "", "# API Summary", "", "Condensed index of publicly exported classes and functions.", ""];
-  for (const mod of ctx.ir.modules) {
-    const classes = filterPublic(mod.classes, ctx.publicNames);
-    const functions = filterPublic(mod.functions, ctx.publicNames);
-    if (!classes.length && !functions.length) continue;
-    lines.push(`## \`${mod.name}\``, "");
-    for (const cls of classes) lines.push(`- **\`${cls.name}\`** — ${firstLine(cls.description)}`);
-    for (const fn of functions) lines.push(`- \`${fn.name}()\` — ${firstLine(fn.description)}`);
-    lines.push("");
+function taskAnchor(id) {
+  return id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+// Keyword-based grouping keeps the TOC stable without hard-coding per-task
+// metadata. A task falls into the first modality whose keyword matches its id.
+// Order matters: `text-to-audio` must hit "Audio" before "Text".
+const MODALITY_RULES = [
+  ["Audio", /audio|speech|asr|tts/],
+  ["Vision", /image|vision|depth|object|segment|background|document/],
+  ["Text", /text|translation|summar|generation|question|fill|mask|classification|ner/],
+  ["Embeddings", /feature|embedding/],
+];
+
+function groupTasksByModality(supportedTasks) {
+  const groups = new Map(MODALITY_RULES.map(([name]) => [name, []]));
+  groups.set("Other", []);
+  for (const id of supportedTasks.keys()) {
+    const group = MODALITY_RULES.find(([, re]) => re.test(id))?.[0] ?? "Other";
+    groups.get(group).push(id);
   }
-  return finalize(lines);
+  for (const [name, ids] of [...groups]) if (!ids.length) groups.delete(name);
+  return groups;
 }
 
 function finalize(lines) {
@@ -372,8 +406,22 @@ function findClass(ir, name) {
   return null;
 }
 
-function firstLine(text) {
+// Extract the first complete sentence. A line break inside a paragraph is not
+// a sentence boundary, so we re-flow a paragraph onto one line before cutting.
+function firstSentence(text) {
   if (!text) return "_(undocumented)_";
-  const line = text.split("\n", 1)[0].trim();
-  return line.endsWith(".") ? line : line + ".";
+  const paragraph = text
+    .split(/\n\s*\n/, 1)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  const sanitized = stripDocArtifacts(paragraph);
+  const match = sanitized.match(/^(.+?[.!?])(?=\s|$)/);
+  const sentence = (match ? match[1] : sanitized).trim();
+  return sentence.endsWith(".") || sentence.endsWith("!") || sentence.endsWith("?") ? sentence : sentence + ".";
+}
+
+// Descriptions copied from the Python library sometimes start with
+// `[`TypeName`]` (reST cross-reference syntax). Drop the leading artifact.
+function stripDocArtifacts(text) {
+  return text.replace(/^\[`?[A-Za-z_$][\w$.]*`?\]\s*/, "");
 }

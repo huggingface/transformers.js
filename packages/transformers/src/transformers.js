@@ -1,13 +1,30 @@
 /**
- * @file Entry point for the Transformers.js library. Only the exports from this file
- * are available to the end user, and are grouped as follows:
+ * @file Entry point for the Transformers.js library. Everything re-exported
+ * from this file is part of the public API.
  *
- * 1. [Environment variables](./env)
- * 2. [Pipelines](./pipelines)
- * 3. [Models](./models)
- * 4. [Tokenizers](./tokenizers)
- * 5. [Processors](./processors)
- * 6. [Configs](./configs)
+ * **High-level**
+ * - [`pipeline()`](./pipelines.md#pipeline) — the one-call entry point for every task.
+ * - [Environment](./env.md) — global configuration (`env`, `LogLevel`).
+ *
+ * **Model loading**
+ * - [Pipelines](./pipelines.md) — task-specific pipeline classes.
+ * - [Models](./models.md) — `AutoModel*` classes and the base `PreTrainedModel`.
+ * - [Tokenizers](./tokenizers.md) — `AutoTokenizer` and friends.
+ * - [Processors](./processors.md) — feature extractors and image/audio processors.
+ * - [Configs](./configs.md) — `AutoConfig` and `PretrainedConfig`.
+ *
+ * **Generation**
+ * - [Generation config](./generation/configuration_utils.md) — `GenerationConfig` fields.
+ * - [Logits processors](./generation/logits_process.md) — sampling and constraint logits processors.
+ * - [Stopping criteria](./generation/stopping_criteria.md) — when generation halts.
+ * - [Streamers](./generation/streamers.md) — token streaming.
+ *
+ * **Utilities**
+ * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
+ * - [Audio](./utils/audio.md) — `RawAudio`, `load_audio`.
+ * - [Images](./utils/image.md) — `RawImage`.
+ * - [Model registry](./utils/model_registry.md) — cache and file inspection.
+ * - [Random](./utils/random.md) — seedable MT19937 PRNG.
  *
  * @module transformers
  */

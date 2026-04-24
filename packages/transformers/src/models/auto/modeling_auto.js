@@ -139,7 +139,6 @@ class PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -157,7 +156,6 @@ export class AutoModel extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained sequence classification models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -172,7 +170,6 @@ export class AutoModelForSequenceClassification extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained token classification models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -187,7 +184,6 @@ export class AutoModelForTokenClassification extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained sequence-to-sequence models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -202,7 +198,6 @@ export class AutoModelForSeq2SeqLM extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained sequence-to-sequence speech-to-text models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -217,7 +212,6 @@ export class AutoModelForSpeechSeq2Seq extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained sequence-to-sequence text-to-spectrogram models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -232,7 +226,6 @@ export class AutoModelForTextToSpectrogram extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained text-to-waveform models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -247,7 +240,6 @@ export class AutoModelForTextToWaveform extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained causal language models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -262,7 +254,6 @@ export class AutoModelForCausalLM extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained masked language models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -277,7 +268,6 @@ export class AutoModelForMaskedLM extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained question answering models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -292,7 +282,6 @@ export class AutoModelForQuestionAnswering extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained vision-to-sequence models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -307,7 +296,6 @@ export class AutoModelForVision2Seq extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image classification models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -322,7 +310,6 @@ export class AutoModelForImageClassification extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image segmentation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -337,7 +324,6 @@ export class AutoModelForImageSegmentation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image segmentation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -352,7 +338,6 @@ export class AutoModelForSemanticSegmentation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained universal image segmentation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -367,7 +352,6 @@ export class AutoModelForUniversalSegmentation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained object detection models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -382,7 +366,6 @@ export class AutoModelForObjectDetection extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained zero-shot object detection models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -397,7 +380,6 @@ export class AutoModelForZeroShotObjectDetection extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained mask generation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -412,7 +394,6 @@ export class AutoModelForMaskGeneration extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained connectionist temporal classification (CTC) models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -427,7 +408,6 @@ export class AutoModelForCTC extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained audio classification models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -442,7 +422,6 @@ export class AutoModelForAudioClassification extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained speaker embedding models (X-Vector) with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -457,7 +436,6 @@ export class AutoModelForXVector extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained audio frame (token) classification models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -472,7 +450,6 @@ export class AutoModelForAudioFrameClassification extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained document question answering models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -487,7 +464,6 @@ export class AutoModelForDocumentQuestionAnswering extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image matting models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -502,7 +478,6 @@ export class AutoModelForImageMatting extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image-to-image models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -517,7 +492,6 @@ export class AutoModelForImageToImage extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained depth estimation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -532,7 +506,6 @@ export class AutoModelForDepthEstimation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained surface-normal estimation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -547,7 +520,6 @@ export class AutoModelForNormalEstimation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained pose estimation models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -562,7 +534,6 @@ export class AutoModelForPoseEstimation extends PretrainedMixin {
 
 /**
  * Helper class which is used to instantiate pretrained image feature extraction models with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -578,7 +549,6 @@ export class AutoModelForImageFeatureExtraction extends PretrainedMixin {
 /**
  * Helper class which is used to instantiate pretrained vision-language models that map images and text to text
  * (image+text-to-text) with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript
@@ -594,7 +564,6 @@ export class AutoModelForImageTextToText extends PretrainedMixin {
 /**
  * Helper class which is used to instantiate pretrained audio-language models that map audio and text to text
  * (audio+text-to-text) with the `from_pretrained` function.
- * The chosen model class is determined by the type specified in the model config.
  *
  * **Example:**
  * ```javascript

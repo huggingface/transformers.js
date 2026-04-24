@@ -1,8 +1,8 @@
 /**
- * @file Helper module for audio processing.
+ * @file Audio I/O helpers.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * Decode audio files and URLs into the `Float32Array` pipelines expect,
+ * and wrap generated waveforms in `RawAudio` for playback or saving.
  *
  * @module utils/audio
  */
@@ -76,6 +76,7 @@ export async function load_audio(url, sampling_rate) {
 
 /**
  * @deprecated Use {@link load_audio} instead.
+ * @internal
  */
 export const read_audio = load_audio;
 

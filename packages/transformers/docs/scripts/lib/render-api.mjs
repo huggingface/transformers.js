@@ -29,7 +29,8 @@ export function renderModule(mod, ir, opts = {}) {
     for (const c of constants) out.push(...renderConstant(c, ctx));
   }
   if (mod.typedefs.length) {
-    const rendered = mod.typedefs.flatMap((td) => renderTypedef(td, ctx));
+    const publicTypedefs = mod.typedefs.filter((td) => !isInternalTypedef(td));
+    const rendered = publicTypedefs.flatMap((td) => renderTypedef(td, ctx));
     if (rendered.length) out.push("## Type Definitions", "", ...rendered);
   }
   if (mod.callbacks.length) {
@@ -60,6 +61,13 @@ function renderExample(ex) {
   return lines;
 }
 
+// Descriptions carried over from the Python library sometimes start with a
+// reST-style `[`TypeName`]` cross-reference that JavaScript readers can't follow.
+// Strip the artifact from the start of the first paragraph; leave the rest alone.
+function cleanDescription(text) {
+  return text.trim().replace(/^\[`?([A-Za-z_$][\w$.]*)`?\]\s*/, "");
+}
+
 // `{@link url}` / `{@link url Text}` / `{@link Symbol}` -> markdown.
 function expandInlineLinks(text) {
   return text.replace(/\{@link\s+([^}\s]+)(?:\s+([^}]+))?\}/g, (_, target, label) => {
@@ -72,7 +80,7 @@ function expandInlineLinks(text) {
 
 function renderClass(cls, ctx) {
   const lines = [`### ${cls.name}`, ""];
-  if (cls.description) lines.push(cls.description.trim(), "");
+  if (cls.description) lines.push(cleanDescription(cls.description), "");
   for (const ex of cls.examples) lines.push(...renderExample(ex));
 
   for (const m of cls.members) {
@@ -95,17 +103,18 @@ function renderField(f, ctx, parent) {
   return lines;
 }
 
-// Internal-looking (`_`-prefixed) methods need prose to earn a spot — bare
-// param/return signatures are usually implementation details.
+// `_`-prefixed methods are the library's convention for internal / subclass-only
+// hooks — they're not part of the user-facing API. Exception: `constructor` is
+// kept even though it has no leading underscore.
 function shouldRenderMethod(m) {
-  if (m.name.startsWith("_") && !m.description) return false;
+  if (m.name.startsWith("_")) return false;
   return m.description || m.params?.length || m.returns?.description || m.returns?.type || m.examples?.length || m.throws?.length;
 }
 
 function renderFunction(fn, ctx, depth, parent = null) {
   const lines = [`${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
   if (fn.deprecated) lines.push("> **Deprecated**", "");
-  if (fn.description) lines.push(fn.description.trim(), "");
+  if (fn.description) lines.push(cleanDescription(fn.description), "");
   if (fn.params?.length) {
     lines.push("**Parameters**", "", ...renderParamList(fn.params, ctx), "");
   }
@@ -138,7 +147,7 @@ function signature(fn, parent) {
 
 function renderCallback(cb, ctx) {
   const lines = [`### ${cb.name}`, ""];
-  if (cb.description) lines.push(cb.description.trim(), "");
+  if (cb.description) lines.push(cleanDescription(cb.description), "");
   if (cb.params?.length) {
     lines.push("**Parameters**", "", ...renderParamList(cb.params, ctx), "");
   }
@@ -204,22 +213,36 @@ function simpleName(name) {
 function renderConstant(c, ctx) {
   const type = c.type ? ` : ${renderType(c.type, ctx)}` : "";
   const lines = [`### \`${c.name}\`${type}`, ""];
-  if (c.description) lines.push(c.description.trim(), "");
+  if (c.description) lines.push(cleanDescription(c.description), "");
   for (const ex of c.examples) lines.push(...renderExample(ex));
   return lines;
+}
+
+// Skip typedefs that exist purely to thread generic parameters through the
+// type system (`@typedef {T} Name`, `_`-prefixed names) or that are opaque
+// placeholders with no useful content to show a reader.
+function isInternalTypedef(td) {
+  if (td.name.startsWith("_")) return true;
+  const type = (td.type ?? "").trim();
+  if (/^[A-Z]$/.test(type) && !td.description && !td.properties?.length) return true;
+  if (type === "object" && !td.description && !td.properties?.length) return true;
+  return false;
 }
 
 function renderTypedef(td, ctx) {
   const displayed = td.type ? renderType(td.type, { ...ctx, selfName: td.name }) : "";
   const isSelfReference = displayed === `\`${td.name}\``;
+  const isGenericPassthrough = /^`[A-Z]`$/.test(displayed);
+  const typeIsShowable = displayed && displayed.length < 120 && !displayed.startsWith("`{") && !isSelfReference && !isGenericPassthrough;
 
-  // A typedef whose only job is to re-export a name (`@typedef {import('x').Foo} Foo`)
-  // adds no information — the canonical page is linked from wherever the name appears.
-  if (!td.description && !td.properties?.length && isSelfReference) return [];
+  // Don't emit an empty `### Name` heading. A typedef needs *something* the
+  // reader can't derive from the name alone: a description, properties, or a
+  // concise displayable type.
+  if (!td.description && !td.properties?.length && !typeIsShowable) return [];
 
   const lines = [`### ${td.name}`, ""];
-  if (td.description) lines.push(td.description.trim(), "");
-  if (displayed && displayed.length < 120 && !displayed.startsWith("`{") && !isSelfReference) {
+  if (td.description) lines.push(cleanDescription(td.description), "");
+  if (typeIsShowable) {
     lines.push(`_Type:_ ${displayed}`, "");
   }
   if (td.properties?.length) {

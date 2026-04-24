@@ -17,20 +17,25 @@ const { ir, publicNames } = loadProject(root);
 clearExistingMarkdown();
 
 for (const mod of ir.modules) {
-  if (!hasPublicContent(mod, publicNames)) {
+  const rendered = renderModule(mod, ir, { publicNames });
+  if (!hasPublicBody(rendered)) {
     console.log(`skipped ${mod.name}.md — no public content`);
     continue;
   }
-  const output = renderModule(mod, ir, { publicNames });
   const outputPath = path.resolve(outputDir, `${mod.name}.md`);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, output);
+  fs.writeFileSync(outputPath, rendered);
   console.log(`wrote ${mod.name}.md`);
 }
 
-function hasPublicContent(mod, publicNames) {
-  const isPublic = (item) => publicNames.has(item.name);
-  return mod.classes.some(isPublic) || mod.functions.some(isPublic) || mod.constants.some(isPublic) || mod.typedefs.length > 0 || mod.callbacks.length > 0;
+// A module earns a page when its render produces either a section
+// (classes/functions/constants/typedefs) or a description that links out — the
+// latter covers index / entry-point modules that exist to orient the reader.
+// Modules that reduce to a bare title + prose get skipped.
+function hasPublicBody(markdown) {
+  if (/^## /m.test(markdown)) return true;
+  const body = markdown.replace(/^# [^\n]+\n/, "");
+  return /\]\(/.test(body);
 }
 
 function clearExistingMarkdown() {

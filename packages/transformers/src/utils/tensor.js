@@ -1,8 +1,10 @@
 /**
- * @file Helper module for `Tensor` processing.
+ * @file Tensors and tensor operations.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * `Tensor` is the typed n-dimensional array used throughout the library for
+ * model inputs and outputs. The functions in this module create, transform,
+ * and combine tensors — shape manipulation, slicing, reductions, math ops,
+ * and the `.tolist()` / `.item()` escape hatches back to plain JavaScript.
  *
  * @module utils/tensor
  */

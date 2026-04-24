@@ -200,5 +200,5 @@ function gatherExamples(description) {
 }
 
 function isPrivate(entity) {
-  return entity.tags?.some((t) => t.tag === "private");
+  return entity.tags?.some((t) => t.tag === "private" || t.tag === "internal");
 }
