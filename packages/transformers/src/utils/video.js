@@ -150,123 +150,72 @@ async function readSrcToBytes(src) {
 
 async function loadVideoNode(src, { num_frames, fps }) {
     let wc;
-    try {
-        wc = await import('@napi-rs/webcodecs');
-    } catch (_e) {
-        throw new Error(
-            'Node.js video decoding requires the optional peer dependency `@napi-rs/webcodecs`. ' +
-            'Install it with:\n\n' +
-            '    npm install @napi-rs/webcodecs\n\n' +
-            'Alternatively, pre-decode your frames and pass a `RawVideo` instance directly to the processor.',
-        );
-    }
-    const { Mp4Demuxer, WebMDemuxer, MkvDemuxer, VideoDecoder } = wc;
+    try { wc = await import('@napi-rs/webcodecs'); }
+    catch { throw new Error('Node video decoding requires `npm install @napi-rs/webcodecs`.'); }
 
     const bytes = await readSrcToBytes(src);
-    // Magic byte sniff: MP4 has 'ftyp' at offset 4; Matroska/WebM starts with EBML 0x1A45DFA3.
+    // Container sniff: EBML → MKV/WebM, else assume MP4 (has 'ftyp' @ offset 4).
     const isMkv = bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
-    const Demuxer = isMkv ? (MkvDemuxer ?? WebMDemuxer) : Mp4Demuxer;
+    const Demuxer = isMkv ? (wc.MkvDemuxer ?? wc.WebMDemuxer) : wc.Mp4Demuxer;
 
-    /** @type {number[]} */
     let targetsUs = [];
-    /** @type {Array<{frame: any, dist: number, ts: number} | null>} */
+    /** @type {Array<{f: any, d: number} | null>} */
     let best = [];
-    let framesSeen = 0;
-    let decoderError = null;
+    let err = null;
 
-    const decoder = new VideoDecoder({
-        // Synchronous: decide keep-or-close up front; defer pixel copy until after flush.
-        output: (frame) => {
-            framesSeen++;
-            const ts = Number(frame.timestamp);
-            let bestIdx = 0;
-            let bestDist = Infinity;
-            for (let i = 0; i < targetsUs.length; i++) {
-                const d = Math.abs(ts - targetsUs[i]);
-                if (d < bestDist) {
-                    bestDist = d;
-                    bestIdx = i;
-                }
+    const decoder = new wc.VideoDecoder({
+        // Sync: keep or close up front; defer async pixel copy until after flush.
+        output: (f) => {
+            const ts = Number(f.timestamp);
+            let i = 0, d = Infinity;
+            for (let j = 0; j < targetsUs.length; j++) {
+                const dj = Math.abs(ts - targetsUs[j]);
+                if (dj < d) { d = dj; i = j; }
             }
-            const slot = best[bestIdx];
-            if (!slot || bestDist < slot.dist) {
-                slot?.frame.close?.();
-                best[bestIdx] = { frame, dist: bestDist, ts };
-            } else {
-                frame.close?.();
-            }
+            if (!best[i] || d < best[i].d) { best[i]?.f.close?.(); best[i] = { f, d }; }
+            else f.close?.();
         },
-        error: (e) => {
-            decoderError = e;
-        },
+        error: (e) => (err = e),
     });
 
     const demuxer = new Demuxer({
-        videoOutput: (chunk) => decoder.decode(chunk),
-        error: (e) => {
-            decoderError = e;
-        },
+        videoOutput: (c) => decoder.decode(c),
+        error: (e) => (err = e),
     });
-
     await demuxer.loadBuffer(bytes);
 
-    const duration = Number(demuxer.duration) / 1e6; // μs → s
-    if (!Number.isFinite(duration) || duration <= 0) {
-        throw new Error(`Invalid duration reported by demuxer: ${demuxer.duration}`);
-    }
-
+    const duration = Number(demuxer.duration) / 1e6;
     const sampleTimes = computeSampleTimes(duration, { num_frames, fps });
-    targetsUs = sampleTimes.map((t) => Math.round(t * 1e6));
-    best = sampleTimes.map(() => null);
+    targetsUs = sampleTimes.map(t => Math.round(t * 1e6));
+    best = Array(sampleTimes.length).fill(null);
 
     decoder.configure(demuxer.videoDecoderConfig);
     demuxer.demux();
     await decoder.flush();
     demuxer.close();
     decoder.close();
+    if (err) throw err;
 
-    if (decoderError) throw decoderError;
-    if (framesSeen === 0) {
-        throw new Error('No frames were decoded. The container/codec may be unsupported by @napi-rs/webcodecs.');
+    // Backfill any empty buckets from nearest populated neighbour.
+    for (let i = 0; i < best.length; i++) if (!best[i]) {
+        let near = -1;
+        for (let j = 0; j < best.length; j++)
+            if (best[j] && (near < 0 || Math.abs(i - j) < Math.abs(i - near))) near = j;
+        if (near < 0) throw new Error('No frames decoded.');
+        best[i] = best[near];
     }
 
-    // Fill any empty buckets with the spatially-nearest populated one (can happen when
-    // a sample time falls outside the decoded-frame timestamp range).
-    for (let i = 0; i < best.length; i++) {
-        if (best[i]) continue;
-        let nearest = -1;
-        let dist = Infinity;
-        for (let j = 0; j < best.length; j++) {
-            if (best[j] && Math.abs(i - j) < dist) {
-                dist = Math.abs(i - j);
-                nearest = j;
-            }
-        }
-        if (nearest < 0) throw new Error('No decoded frames available to fill sample buckets.');
-        best[i] = best[nearest];
+    // Copy pixels (once per unique frame), then close.
+    const imgs = new Map();
+    for (const { f } of /** @type {{f: any}[]} */ (best)) {
+        if (imgs.has(f)) continue;
+        const buf = new Uint8Array(f.allocationSize({ format: 'RGBA' }));
+        await f.copyTo(buf, { format: 'RGBA' });
+        const { codedWidth: w, codedHeight: h } = f;
+        imgs.set(f, new RawImage(new Uint8ClampedArray(buf.buffer, buf.byteOffset, w * h * 4), w, h, 4));
     }
+    for (const f of imgs.keys()) f.close?.();
 
-    // Now copy pixel data for the surviving frames.
-    const frames = await Promise.all(best.map(async (slot, i) => {
-        const { frame, ts } = /** @type {{frame: any, ts: number}} */ (slot);
-        const size = frame.allocationSize({ format: 'RGBA' });
-        const buf = new Uint8Array(size);
-        await frame.copyTo(buf, { format: 'RGBA' });
-        const w = frame.codedWidth;
-        const h = frame.codedHeight;
-        const pixels = new Uint8ClampedArray(buf.buffer, buf.byteOffset, w * h * 4);
-        const image = new RawImage(new Uint8ClampedArray(pixels), w, h, 4);
-        return new RawVideoFrame(image, sampleTimes[i]);
-    }));
-
-    // Close any kept frames (deduplicated by identity).
-    const closed = new Set();
-    for (const slot of best) {
-        if (slot && !closed.has(slot.frame)) {
-            slot.frame.close?.();
-            closed.add(slot.frame);
-        }
-    }
-
+    const frames = best.map(({ f }, i) => new RawVideoFrame(imgs.get(f), sampleTimes[i]));
     return new RawVideo(frames, duration);
 }

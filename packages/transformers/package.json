@@ -31,7 +31,9 @@
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
     "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/",
-    "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module"
+    "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module",
+    "test:video:node": "node scripts/test-video.mjs",
+    "test:video:browser": "node scripts/test-video-browser.mjs"
   },
   "repository": {
     "type": "git",
@@ -69,6 +71,7 @@
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
     "jsdoc-to-markdown": "^9.1.3",
+    "playwright": "^1.59.1",
     "typescript": "5.9.3"
   },
   "peerDependencies": {

@@ -35,9 +35,8 @@ function _prompt_split_image(
 
 /**
  * Prompt with expanded image tokens for a single image.
- * @private
  */
-function _prompt_single_image(image_seq_len, fake_token_around_image, image_token, global_img_token) {
+export function _prompt_single_image(image_seq_len, fake_token_around_image, image_token, global_img_token) {
     return (
         `${fake_token_around_image}` +
         `${global_img_token}` +
