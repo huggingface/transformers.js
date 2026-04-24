@@ -25,6 +25,8 @@ export class StoppingCriteria extends Callable {
     }
 }
 /**
+ * A list of `StoppingCriteria` that stops generation when any one of them returns `true`.
+ * Pass an instance via `stopping_criteria` to any generation call to combine multiple stop conditions.
  */
 export class StoppingCriteriaList extends Callable {
     /**
