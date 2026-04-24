@@ -71,6 +71,14 @@
     "jsdoc-to-markdown": "^9.1.3",
     "typescript": "5.9.3"
   },
+  "peerDependencies": {
+    "@napi-rs/webcodecs": "^1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@napi-rs/webcodecs": {
+      "optional": true
+    }
+  },
   "files": [
     "src",
     "dist",
