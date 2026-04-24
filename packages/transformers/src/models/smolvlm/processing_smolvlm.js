@@ -9,11 +9,11 @@ import { load_video, RawVideo } from '../../utils/video.js';
  * }} SmolVLMImageProcessorConfig
  */
 
-const MAX_IMAGE_SIZE = 4096; // Matches Python's safety cap.
+const MAX_IMAGE_SIZE = 4096; // Absolute upper bound for resize target.
 
 /**
- * Port of SmolVLMVideoProcessor.get_resize_output_image_size:
- * resize longest edge to `maxSide`, preserve aspect ratio, force even dims.
+ * Compute an output size with the longest edge equal to `maxSide`,
+ * preserving aspect ratio and forcing even dimensions.
  */
 function aspectPreservingSize(width, height, maxSide) {
     maxSide = Math.min(MAX_IMAGE_SIZE, maxSide);
@@ -139,10 +139,9 @@ export class SmolVLMProcessor extends Idefics3Processor {
             throw new Error('Expected a RawVideo, URL, path, or Blob for the video input.');
         }
 
-        // Python SmolVLMVideoProcessor does a two-pass resize:
-        //   1) longest-edge → size.longest_edge, aspect-preserving, even dims
-        //   2) square → max_image_size.longest_edge (done by Idefics3ImageProcessor with do_image_splitting:false)
-        // Step 1 happens here at the RawImage level so the image processor only needs to do step 2.
+        // Two-pass resize:
+        //   1) longest-edge → size.longest_edge, aspect-preserving, even dims (here, on the RawImage)
+        //   2) square → max_image_size.longest_edge (by Idefics3ImageProcessor with do_image_splitting:false)
         const longestEdge = config.size?.longest_edge;
         const rawFrames = v.frames.map((f) => f.image);
         const frames = longestEdge

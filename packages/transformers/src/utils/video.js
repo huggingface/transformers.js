@@ -69,10 +69,10 @@ export async function load_video(src, { num_frames = null, fps = null, skip_secs
 }
 
 /**
- * Port of transformers SmolVLMVideoProcessor.sample_frames to the time-domain:
+ * Compute uniform sample timestamps (seconds) for a video of the given duration:
  *   - desired = min(round(fps * duration), num_frames), clamped to >= 1
  *   - if skip_secs > 0 AND (duration - 2*skip_secs) > (num_frames * fps): trim both ends by skip_secs
- *   - uniform linspace(start, end, desired); dedupe times rounded to μs (≈ np.unique on indices).
+ *   - uniform linspace(start, end, desired); dedupe times rounded to μs.
  */
 function computeSampleTimes(duration, { num_frames, fps, skip_secs = 1 }) {
     let desired;
