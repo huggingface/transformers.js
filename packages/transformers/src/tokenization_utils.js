@@ -9,10 +9,11 @@ import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
 
 import { isIntegralNumber, mergeArrays } from './utils/core.js';
-import { getModelJSON } from './utils/hub.js';
+import { getModelJSON, getModelText } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
+import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 
 /**
@@ -27,9 +28,26 @@ import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
     const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
-    return await Promise.all(
+    const [tokenizerJSON, tokenizerConfig] = await Promise.all(
         tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
     );
+
+    if (tokenizerConfig?.chat_template == null) {
+        const configTemplate = tokenizerConfig?.chat_template_jinja;
+        const fallbackTemplate = /** @type {any} */ (options?.config)?.chat_template_jinja;
+        const fileTemplate =
+            typeof configTemplate === 'string'
+                ? configTemplate
+                : typeof fallbackTemplate === 'string'
+                  ? fallbackTemplate
+                  : await getModelText(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, false, options);
+
+        if (typeof fileTemplate === 'string' && fileTemplate.length > 0) {
+            tokenizerConfig.chat_template = fileTemplate;
+        }
+    }
+
+    return [tokenizerJSON, tokenizerConfig];
 }
 
 /**

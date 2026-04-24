@@ -697,6 +697,32 @@ describe("Chat templates", () => {
     expect(() => tokenizer.apply_chat_template(chat, { tokenize: false })).toThrow("tokenizer.chat_template is not set and no template argument was passed");
   });
 
+  it("should fallback to config.chat_template_jinja", async () => {
+    const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt-4o", {
+      config: {
+        chat_template_jinja: "{{ messages[0]['content'] }}",
+      },
+    });
+
+    const chat = [{ role: "user", content: "Hello, how are you?" }];
+    const text = tokenizer.apply_chat_template(chat, { tokenize: false });
+    expect(text).toEqual("Hello, how are you?");
+  });
+
+  it(
+    "should fallback to chat_template.jinja",
+    async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("onnx-community/gemma-4-E2B-it-ONNX");
+
+      const chat = [{ role: "user", content: "Hello, how are you?" }];
+      const text = tokenizer.apply_chat_template(chat, { tokenize: false, add_generation_prompt: true });
+
+      expect(typeof text).toBe("string");
+      expect(text).toContain("Hello, how are you?");
+    },
+    MAX_TOKENIZER_LOAD_TIME,
+  );
+
   it("should support default parameters", async () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/Meta-Llama-3.1-Tokenizer");
 
