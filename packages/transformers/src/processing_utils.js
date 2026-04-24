@@ -5,7 +5,7 @@
  * ```javascript
  * import { AutoProcessor, load_audio } from '@huggingface/transformers';
  *
- * const processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
+ * const processor = await AutoProcessor.from_pretrained('onnx-community/whisper-tiny.en');
  * const audio = await load_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
  * const { input_features } = await processor(audio);
  * // Tensor {

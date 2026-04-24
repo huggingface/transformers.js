@@ -22,7 +22,7 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  * ```javascript
  * import { AutoProcessor } from '@huggingface/transformers';
  *
- * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
+ * let processor = await AutoProcessor.from_pretrained('onnx-community/whisper-tiny.en');
  * ```
  *
  * **Example:** Run an image through a processor.
