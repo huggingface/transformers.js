@@ -36,12 +36,14 @@ import { apis } from '../env.js';
  * Each instance has its own independent state, so seeding one instance does not
  * affect any other instance or the global helper functions.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { random } from '@huggingface/transformers';
  *
  * const rng1 = new random.Random(42);
  * const rng2 = new random.Random(42);
  * rng1.random() === rng2.random(); // true (same seed, independent state)
+ * ```
  */
 export class Random {
     constructor(seed) {
@@ -219,12 +221,14 @@ const _default = new Random();
  * It shares a single global state, so if you want to generate independent sequences,
  * construct your own `new random.Random(seed)` instead.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { random } from '@huggingface/transformers';
  * random.seed(42);
  * random.random();     // 0.6394267984578837  (matches Python)
  * random.gauss(0, 1);  // normal-distributed value
  * random.choices(['a', 'b'], [3, 1]);  // weighted pick
+ * ```
  */
 export const random = Object.freeze({
     Random,
