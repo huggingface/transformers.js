@@ -824,6 +824,16 @@ function writeString(view, offset, string) {
     }
 }
 
+/**
+ * An audio buffer paired with its sampling rate.
+ *
+ * @example
+ * import { RawAudio } from '@huggingface/transformers';
+ * const samples = new Float32Array(16000); // 1 second of silence @ 16 kHz
+ * const audio = new RawAudio(samples, 16000);
+ * const blob = audio.toBlob(); // WAV blob for upload or playback
+ * await audio.save('out.wav'); // Saves the audio as a WAV file named 'out.wav'
+ */
 export class RawAudio {
     /**
      * Create a new `RawAudio` object.
