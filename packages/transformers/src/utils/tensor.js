@@ -25,11 +25,13 @@ import { random } from './random.js';
 /**
  * A typed multi-dimensional array.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { Tensor } from '@huggingface/transformers';
  * const tensor = new Tensor('float32', [1, 2, 3, 4, 5, 6], [2, 3]);
  * tensor.dims;    // [2, 3]
  * tensor.tolist(); // [[1, 2, 3], [4, 5, 6]]
+ * ```
  */
 export class Tensor {
     /**
@@ -939,13 +941,6 @@ export class Tensor {
 
 /**
  * This creates a nested array of a given type and depth (see examples).
- *
- * @example
- *   NestArray<string, 1>; // string[]
- * @example
- *   NestArray<number, 2>; // number[][]
- * @example
- *   NestArray<string, 3>; // string[][][] etc.
  * @template T
  * @template {number} Depth
  * @template {never[]} [Acc=[]]
@@ -955,11 +950,13 @@ export class Tensor {
 /**
  * Reshapes a 1-dimensional array into an n-dimensional array, according to the provided dimensions.
  *
- * @example
+ * **Example:**
+ * ```javascript
  *   reshape([10                    ], [1      ]); // Type: number[]      Value: [10]
  *   reshape([1, 2, 3, 4            ], [2, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]); // Type: number[][][]  Value: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [4, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4], [5, 6], [7, 8]]
+ * ```
  * @param {T[]|DataArray} data The input array to reshape.
  * @param {DIM} dimensions The target shape/dimensions.
  * @template T
