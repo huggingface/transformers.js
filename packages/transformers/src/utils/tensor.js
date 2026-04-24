@@ -22,6 +22,15 @@ import { random } from './random.js';
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
 
+/**
+ * A typed multi-dimensional array.
+ *
+ * @example
+ * import { Tensor } from '@huggingface/transformers';
+ * const tensor = new Tensor('float32', [1, 2, 3, 4, 5, 6], [2, 3]);
+ * tensor.dims;    // [2, 3]
+ * tensor.tolist(); // [[1, 2, 3], [4, 5, 6]]
+ */
 export class Tensor {
     /**
      * Dimensions of the tensor.
@@ -136,6 +145,7 @@ export class Tensor {
      * Index into a Tensor object.
      * @param {number} index The index to access.
      * @returns {Tensor} The data at the specified index.
+     * @private
      */
     _getitem(index) {
         const [iterLength, ...iterDims] = this.dims;
@@ -148,21 +158,6 @@ export class Tensor {
         } else {
             return new Tensor(this.type, [this.data[index]], iterDims);
         }
-    }
-
-    /**
-     * @param {number|bigint} item The item to search for in the tensor
-     * @returns {number} The index of the first occurrence of item in the tensor data.
-     */
-    indexOf(item) {
-        const this_data = this.data;
-        for (let index = 0; index < this_data.length; ++index) {
-            // Note: == instead of === so we can match Ints with BigInts
-            if (this_data[index] == item) {
-                return index;
-            }
-        }
-        return -1;
     }
 
     /**
