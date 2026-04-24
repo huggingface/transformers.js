@@ -76,7 +76,7 @@ const CONTENT_TYPE_MAP = new Map([
  *
  * @example
  * import { RawImage } from '@huggingface/transformers';
- * const image = await RawImage.read('https://example.com/photo.jpg');
+ * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/artemis.jpeg');
  * console.log(image.width, image.height, image.channels);
  */
 export class RawImage {

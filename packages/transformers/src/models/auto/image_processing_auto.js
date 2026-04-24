@@ -8,6 +8,17 @@ import * as AllImageProcessors from '../image_processors.js';
 import { GITHUB_ISSUE_URL, IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { logger } from '../../utils/logger.js';
 
+/**
+ * Helper class which is used to instantiate pretrained image processors with the `from_pretrained` function.
+ * The chosen image processor class is determined by the type specified in the preprocessor config.
+ *
+ * @example
+ * import { AutoImageProcessor, load_image } from '@huggingface/transformers';
+ *
+ * const processor = await AutoImageProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/artemis.jpeg');
+ * const { pixel_values } = await processor(image);
+ */
 export class AutoImageProcessor {
     /** @type {typeof ImageProcessor.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
