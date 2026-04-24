@@ -14,6 +14,7 @@ import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
 import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
+import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 
 /**
@@ -40,7 +41,9 @@ export async function loadTokenizer(pretrained_model_name_or_path, options) {
                 ? configTemplate
                 : typeof fallbackTemplate === 'string'
                   ? fallbackTemplate
-                  : await getModelText(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, false, options);
+                  : (await get_file_metadata(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, options)).exists
+                    ? await getModelText(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, false, options)
+                    : null;
 
         if (typeof fileTemplate === 'string' && fileTemplate.length > 0) {
             tokenizerConfig.chat_template = fileTemplate;
