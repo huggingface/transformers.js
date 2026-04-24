@@ -557,6 +557,9 @@ export class MinNewTokensLengthLogitsProcessor extends LogitsProcessor {
     }
 }
 
+/**
+ * LogitsProcessor that enforces that specified sequences will never be selected.
+ */
 export class NoBadWordsLogitsProcessor extends LogitsProcessor {
     /**
      * Create a `NoBadWordsLogitsProcessor`.
