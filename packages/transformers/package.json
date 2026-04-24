@@ -30,6 +30,7 @@
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "python ./docs/scripts/build_readme.py",
     "docs-api": "node ./docs/scripts/generate.js",
+    "docs-skill": "node ./docs/scripts/generate-skill.js",
     "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module"
   },

@@ -48,11 +48,9 @@ function resolveModule(entities) {
   const moduleTag = entities.module?.tags.find((t) => t.tag === "module");
   if (!moduleTag) return null;
   const fileTag = entities.module.tags.find((t) => t.tag === "file");
-  return {
-    name: moduleTag.name,
-    description: fileTag?.description || entities.module.description || "",
-    examples: entities.module.tags.filter((t) => t.tag === "example").map(normalizeExample),
-  };
+  const raw = fileTag?.description || entities.module.description || "";
+  const { description, examples } = gatherExamples(raw);
+  return { name: moduleTag.name, description, examples };
 }
 
 function newModule(name) {
@@ -74,10 +72,11 @@ function ingest(entities, mod) {
   }
   for (const cls of entities.classes) {
     if (isPrivate(cls)) continue;
+    const { description, examples } = gatherExamples(cls.description);
     mod.classes.push({
       name: cls.name,
-      description: cls.description,
-      examples: tagsOf(cls, "example").map(normalizeExample),
+      description,
+      examples,
       skillExamples: tagsOf(cls, "skillExample").map((t) => t.task),
       members: cls.members.filter((m) => !isPrivate(m)).map(buildMember),
     });
@@ -87,11 +86,12 @@ function ingest(entities, mod) {
   }
   for (const v of entities.variables) {
     if (isPrivate(v)) continue;
+    const { description, examples } = gatherExamples(v.description);
     mod.constants.push({
       name: v.name,
       type: typeOf(v),
-      description: v.description,
-      examples: tagsOf(v, "example").map(normalizeExample),
+      description,
+      examples,
     });
   }
 }
@@ -148,13 +148,14 @@ function buildMember(m) {
 }
 
 function buildCallable(fn) {
+  const { description, examples } = gatherExamples(fn.description);
   return {
     name: fn.name,
-    description: fn.description,
+    description,
     params: tagsOf(fn, "param").map(normalizeParam),
     returns: pickReturns(fn),
     throws: tagsOf(fn, "throws").map((t) => ({ type: t.type, description: t.description })),
-    examples: tagsOf(fn, "example").map(normalizeExample),
+    examples,
     skillExamples: tagsOf(fn, "skillExample").map((t) => t.task),
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
   };
@@ -183,18 +184,19 @@ function normalizeParam(tag) {
   };
 }
 
-const FENCE_BLOCK = /```(\w+)?\n([\s\S]*?)\n```/;
-const EXAMPLE_PREFIX = /^(?:\*\*Example[^*]*\*\*|Example)[:\s]*/;
+// Canonical example format: `**Example:** <title>\n```lang\n<code>\n```` inside
+// any JSDoc description body. Extracted into a structured `examples` array so
+// renderers can emit them consistently; the source lines are stripped from
+// the description so they're not rendered twice.
+const INLINE_EXAMPLE = /\*\*Example:\*\*\s*([^\n]*)\n+```(\w+)?\n([\s\S]*?)\n```/g;
 
-function normalizeExample(tag) {
-  const body = tag.body || "";
-  const m = body.match(FENCE_BLOCK);
-  if (!m) return { title: "", language: "javascript", code: body.trim() };
-  return {
-    title: body.slice(0, m.index).trim().replace(EXAMPLE_PREFIX, "").trim(),
-    language: m[1] || "javascript",
-    code: m[2].trim(),
-  };
+function gatherExamples(description) {
+  const examples = [];
+  const cleaned = (description || "").replace(INLINE_EXAMPLE, (_, title, lang, code) => {
+    examples.push({ title: title.trim(), language: lang || "javascript", code: code.trim() });
+    return "";
+  });
+  return { description: cleaned.replace(/\n{3,}/g, "\n\n").trim(), examples };
 }
 
 function isPrivate(entity) {
