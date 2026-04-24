@@ -15,6 +15,9 @@ const is_chinese_char = (cp) =>
     (cp >= 0xf900 && cp <= 0xfaff) ||
     (cp >= 0x2f800 && cp <= 0x2fa1f);
 
+/**
+ * Abstract base class for output streamers.
+ */
 export class BaseStreamer {
     /**
      * Function that is called by `.generate()` to push new tokens
