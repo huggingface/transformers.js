@@ -71,6 +71,14 @@ const CONTENT_TYPE_MAP = new Map([
     ['gif', 'image/gif'],
 ]);
 
+/**
+ * Represents an image stored as a raw pixel buffer.
+ *
+ * @example
+ * import { RawImage } from '@huggingface/transformers';
+ * const image = await RawImage.read('https://example.com/photo.jpg');
+ * console.log(image.width, image.height, image.channels);
+ */
 export class RawImage {
     /**
      * Create a new `RawImage` object.
