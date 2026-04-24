@@ -37,8 +37,10 @@ import { apis } from '../env.js';
  * affect any other instance or the global helper functions.
  *
  * @example
- * const rng1 = new Random(42);
- * const rng2 = new Random(42);
+ * import { random } from '@huggingface/transformers';
+ *
+ * const rng1 = new random.Random(42);
+ * const rng2 = new random.Random(42);
  * rng1.random() === rng2.random(); // true (same seed, independent state)
  */
 export class Random {
