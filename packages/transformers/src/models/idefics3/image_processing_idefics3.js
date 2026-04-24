@@ -37,7 +37,7 @@ export class Idefics3ImageProcessor extends ImageProcessor {
     }
 
     /** @param {RawImage|RawImage[]|RawImage[][]} images */
-    async _call(images, { do_image_splitting = null, return_row_col_info = false, ...options } = {}) {
+    async _call(images, { do_image_splitting = null, return_row_col_info = false } = {}) {
         /** @type {RawImage[][]} */
         let batched_2d_images;
         if (!Array.isArray(images)) {
@@ -72,8 +72,7 @@ export class Idefics3ImageProcessor extends ImageProcessor {
             // Convert images to 4D tensors for easier processing
             images_list.forEach((x) => x.pixel_values.unsqueeze_(0));
 
-            const max_image_size = options.max_image_size ?? options.size ?? this.max_image_size;
-            const { longest_edge } = max_image_size;
+            const { longest_edge } = this.max_image_size;
 
             /** @type {Tensor[]} */
             let images_tensor;
@@ -92,7 +91,7 @@ export class Idefics3ImageProcessor extends ImageProcessor {
 
                         const { frames, num_splits_h, num_splits_w } = await this.split_image(
                             resized,
-                            max_image_size,
+                            this.max_image_size,
                         );
                         image_rows[i] = num_splits_h;
                         image_cols[i] = num_splits_w;

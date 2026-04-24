@@ -3,7 +3,7 @@ import { load_video, RawVideo } from '../../utils/video.js';
 
 /**
  * @typedef {import('../../image_processors_utils.js').ImageProcessorConfig & {
- *   video_sampling?: { fps?: number, max_frames?: number, video_size?: { longest_edge?: number } },
+ *   video_sampling?: { fps?: number, max_frames?: number },
  * }} SmolVLMImageProcessorConfig
  */
 
@@ -117,14 +117,7 @@ export class SmolVLMProcessor extends Idefics3Processor {
 
         const frames = v.frames.map((f) => f.image);
         const timestamps = v.frames.map((f) => f.timestamp);
-        // Idefics3ImageProcessor performs the two-pass resize itself:
-        //   1) preprocess() → longest-edge aspect-preserving via this.size (video_sampling.video_size if set)
-        //   2) do_image_splitting:false → square to max_image_size.longest_edge
-        const vision = await this.image_processor(frames, {
-            ...options,
-            do_image_splitting: false,
-            ...(vs.video_size ? { size: vs.video_size } : {}),
-        });
+        const vision = await this.image_processor(frames, { ...options, do_image_splitting: false });
 
         const texts = (Array.isArray(text) ? text : [text]).map((s) =>
             this._expandVideoTokens(s, frames.length, v.duration, timestamps),
