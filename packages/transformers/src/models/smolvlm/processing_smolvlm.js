@@ -3,33 +3,9 @@ import { load_video, RawVideo } from '../../utils/video.js';
 
 /**
  * @typedef {import('../../image_processors_utils.js').ImageProcessorConfig & {
- *   video_sampling?: { fps?: number, max_frames?: number },
- *   size?: { longest_edge?: number },
- *   max_image_size?: { longest_edge?: number },
+ *   video_sampling?: { fps?: number, max_frames?: number, video_size?: { longest_edge?: number } },
  * }} SmolVLMImageProcessorConfig
  */
-
-const MAX_IMAGE_SIZE = 4096; // Absolute upper bound for resize target.
-
-/**
- * Compute an output size with the longest edge equal to `maxSide`,
- * preserving aspect ratio and forcing even dimensions.
- */
-function aspectPreservingSize(width, height, maxSide) {
-    maxSide = Math.min(MAX_IMAGE_SIZE, maxSide);
-    const aspect = width / height;
-    let w, h;
-    if (width >= height) {
-        w = maxSide;
-        h = Math.floor(w / aspect);
-        if (h % 2) h += 1;
-    } else {
-        h = maxSide;
-        w = Math.floor(h * aspect);
-        if (w % 2) w += 1;
-    }
-    return { width: Math.max(1, w), height: Math.max(1, h) };
-}
 
 const DEFAULT_VIDEO_INTRO =
     'You are provided the following series of {frame_count} frames from a {video_duration} [H:MM:SS] video.\n';
@@ -129,29 +105,26 @@ export class SmolVLMProcessor extends Idefics3Processor {
 
     async _processVideo(text, videos, options) {
         const config = /** @type {SmolVLMImageProcessorConfig} */ (this.image_processor.config);
+        const vs = config.video_sampling ?? { fps: 1, max_frames: 64 };
 
         let v = videos;
         if (typeof v === 'string' || (typeof Blob !== 'undefined' && v instanceof Blob)) {
-            const cfg = config.video_sampling ?? { fps: 1, max_frames: 64 };
-            v = await load_video(v, { fps: cfg.fps, num_frames: cfg.max_frames });
+            v = await load_video(v, { fps: vs.fps, num_frames: vs.max_frames });
         }
         if (!(v instanceof RawVideo)) {
             throw new Error('Expected a RawVideo, URL, path, or Blob for the video input.');
         }
 
-        // Two-pass resize:
-        //   1) longest-edge → size.longest_edge, aspect-preserving, even dims (here, on the RawImage)
-        //   2) square → max_image_size.longest_edge (by Idefics3ImageProcessor with do_image_splitting:false)
-        const longestEdge = config.size?.longest_edge;
-        const rawFrames = v.frames.map((f) => f.image);
-        const frames = longestEdge
-            ? await Promise.all(rawFrames.map(async (img) => {
-                const { width, height } = aspectPreservingSize(img.width, img.height, longestEdge);
-                return (img.width === width && img.height === height) ? img : await img.resize(width, height);
-            }))
-            : rawFrames;
+        const frames = v.frames.map((f) => f.image);
         const timestamps = v.frames.map((f) => f.timestamp);
-        const vision = await this.image_processor(frames, { ...options, do_image_splitting: false });
+        // Idefics3ImageProcessor performs the two-pass resize itself:
+        //   1) preprocess() → longest-edge aspect-preserving via this.size (video_sampling.video_size if set)
+        //   2) do_image_splitting:false → square to max_image_size.longest_edge
+        const vision = await this.image_processor(frames, {
+            ...options,
+            do_image_splitting: false,
+            ...(vs.video_size ? { size: vs.video_size } : {}),
+        });
 
         const texts = (Array.isArray(text) ? text : [text]).map((s) =>
             this._expandVideoTokens(s, frames.length, v.duration, timestamps),
