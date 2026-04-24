@@ -105,6 +105,7 @@ export class Random {
      * then applies the standard MT19937 tempering transform.
      *
      * @returns {number} A random integer in the range [0, 2^32 - 1].
+     * @private
      */
     _int32() {
         const mt = this._mt;
@@ -210,8 +211,20 @@ function _weightedIndexWith(randomFn, weights) {
     return weights.length - 1; // floating-point guard
 }
 
-// Global default instance: mirrors the module-level functions in Python's `random` module.
 const _default = new Random();
+
+/**
+ * The default PRNG instance, mirroring Python's module-level `random` functions.
+ * It shares a single global state, so if you want to generate independent sequences,
+ * construct your own `new random.Random(seed)` instead.
+ *
+ * @example
+ * import { random } from '@huggingface/transformers';
+ * random.seed(42);
+ * random.random();     // 0.6394267984578837  (matches Python)
+ * random.gauss(0, 1);  // normal-distributed value
+ * random.choices(['a', 'b'], [3, 1]);  // weighted pick
+ */
 export const random = Object.freeze({
     Random,
     seed: _default.seed.bind(_default),
