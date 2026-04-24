@@ -48,42 +48,64 @@ export class RawVideo {
  *
  * @param {string|Blob|ArrayBuffer|Uint8Array|HTMLVideoElement} src The video to process.
  * @param {Object} [options] Optional parameters.
- * @param {number} [options.num_frames=null] The number of frames to sample uniformly.
- * @param {number} [options.fps=null] The number of frames to sample per second.
+ * @param {number} [options.num_frames=null] Max number of frames to sample.
+ * @param {number} [options.fps=null] Target frames per second to sample.
+ * @param {number} [options.skip_secs=1] Seconds to skip from start/end when video is long enough.
  *
  * @returns {Promise<RawVideo>} The loaded video.
  */
-export async function load_video(src, { num_frames = null, fps = null } = {}) {
+export async function load_video(src, { num_frames = null, fps = null, skip_secs = 1 } = {}) {
     if (num_frames == null && fps == null) {
         throw new Error('Either num_frames or fps must be provided.');
     }
 
     if (apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV) {
-        return await loadVideoBrowser(src, { num_frames, fps });
+        return await loadVideoBrowser(src, { num_frames, fps, skip_secs });
     }
     if (apis.IS_NODE_ENV) {
-        return await loadVideoNode(src, { num_frames, fps });
+        return await loadVideoNode(src, { num_frames, fps, skip_secs });
     }
     throw new Error('`load_video` is not supported in this environment.');
 }
 
-function computeSampleTimes(duration, { num_frames, fps }) {
-    let count, step;
-    if (num_frames != null) {
-        count = num_frames;
-        step = num_frames === 1 ? 0 : duration / (num_frames - 1);
+/**
+ * Port of transformers SmolVLMVideoProcessor.sample_frames to the time-domain:
+ *   - desired = min(round(fps * duration), num_frames), clamped to >= 1
+ *   - if skip_secs > 0 AND (duration - 2*skip_secs) > (num_frames * fps): trim both ends by skip_secs
+ *   - uniform linspace(start, end, desired); dedupe times rounded to μs (≈ np.unique on indices).
+ */
+function computeSampleTimes(duration, { num_frames, fps, skip_secs = 1 }) {
+    let desired;
+    if (num_frames != null && fps != null) {
+        desired = Math.min(Math.round(fps * duration), num_frames);
+    } else if (fps != null) {
+        desired = Math.round(fps * duration);
     } else {
-        step = 1 / fps;
-        count = Math.floor(duration / step);
+        desired = num_frames;
     }
+    desired = Math.max(1, desired);
+
+    let start = 0;
+    let end = duration;
+    if (skip_secs > 0 && num_frames != null && fps != null
+        && (duration - 2 * skip_secs) > (num_frames * fps)) {
+        start = skip_secs;
+        end = duration - skip_secs;
+    }
+
     const times = [];
-    for (let i = 0; i < count; ++i) {
-        times.push(num_frames === 1 ? duration / 2 : i * step);
+    const seen = new Set();
+    for (let i = 0; i < desired; ++i) {
+        const t = desired === 1 ? (start + end) / 2 : start + (i * (end - start)) / (desired - 1);
+        const key = Math.round(t * 1e6);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        times.push(t);
     }
     return times;
 }
 
-async function loadVideoBrowser(src, { num_frames, fps }) {
+async function loadVideoBrowser(src, { num_frames, fps, skip_secs = 1 }) {
     // TODO: Support efficiently loading all frames using the WebCodecs API.
     // Specfically, https://developer.mozilla.org/en-US/docs/Web/API/VideoDecoder
     const frames = [];
@@ -113,7 +135,7 @@ async function loadVideoBrowser(src, { num_frames, fps }) {
     }
 
     const duration = video.duration;
-    const sampleTimes = computeSampleTimes(duration, { num_frames, fps });
+    const sampleTimes = computeSampleTimes(duration, { num_frames, fps, skip_secs });
 
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
@@ -148,7 +170,7 @@ async function readSrcToBytes(src) {
     return new Uint8Array(await src.arrayBuffer()); // Blob-like
 }
 
-async function loadVideoNode(src, { num_frames, fps }) {
+async function loadVideoNode(src, { num_frames, fps, skip_secs = 1 }) {
     let wc;
     try { wc = await import('@napi-rs/webcodecs'); }
     catch { throw new Error('Node video decoding requires `npm install @napi-rs/webcodecs`.'); }
@@ -185,7 +207,7 @@ async function loadVideoNode(src, { num_frames, fps }) {
     await demuxer.loadBuffer(bytes);
 
     const duration = Number(demuxer.duration) / 1e6;
-    const sampleTimes = computeSampleTimes(duration, { num_frames, fps });
+    const sampleTimes = computeSampleTimes(duration, { num_frames, fps, skip_secs });
     targetsUs = sampleTimes.map(t => Math.round(t * 1e6));
     best = Array(sampleTimes.length).fill(null);
 
