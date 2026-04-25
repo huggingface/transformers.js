@@ -29,8 +29,10 @@
     "build": "node scripts/build.mjs && pnpm typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
     "readme": "node ./docs/scripts/build_readme.js --out ../../README.md",
+    "docs-generate": "node ./docs/scripts/generate-all.js",
     "docs-api": "node ./docs/scripts/generate.js",
     "docs-skill": "node ./docs/scripts/generate-skill.js",
+    "docs-check": "node ./docs/scripts/validate.js",
     "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module"
   },
