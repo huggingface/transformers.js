@@ -128,7 +128,7 @@ const status = document.getElementById("status");
 
 ## Step 3: Create an object detection pipeline
 
-We’re finally ready to create our object detection pipeline! As a reminder, a [pipeline](../pipelines). is a high-level interface provided by the library to perform a specific task. In our case, we will instantiate an object detection pipeline with the `pipeline()` helper function.
+We’re finally ready to create our object detection pipeline! As a reminder, a [pipeline](../pipelines) is a high-level interface provided by the library to perform a specific task. In our case, we will instantiate an object detection pipeline with the `pipeline()` helper function.
 
 Since this can take some time (especially the first time when we have to download the ~40MB model), we first update the `status` paragraph so that the user knows that we’re about to load the model.
 
@@ -138,7 +138,7 @@ status.textContent = "Loading model...";
 
 <Tip>
 
-To keep this tutorial simple, we'll be loading and running the model in the main (UI) thread. This is not recommended for production applications, since the UI will freeze when we're performing these actions. This is because JavaScript is a single-threaded language. To overcome this, you can use a [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) to download and run the model in the background. However, we’re not going to do cover that in this tutorial...
+To keep this tutorial simple, we'll be loading and running the model in the main (UI) thread. This is not recommended for production applications, since the UI will freeze when we're performing these actions. This is because JavaScript is a single-threaded language. To overcome this, you can use a [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) to download and run the model in the background. However, we’re not going to cover that in this tutorial...
 
 </Tip>
 

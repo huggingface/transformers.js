@@ -106,7 +106,7 @@ const transcriber = await pipeline(
 );
 ```
 
-For the full list of options, check out the [PretrainedOptions](./api/utils/hub#module_utils/hub..PretrainedOptions) documentation.
+For the full list of options, check out the [PretrainedOptions](./api/utils/hub#module_utils/hub.PretrainedOptions) documentation.
 
 ### Runtime parameters
 
@@ -134,7 +134,7 @@ const result2 = await translator(result[0].translation_text, {
 // [ { translation_text: 'I like to walk my dog.' } ]
 ```
 
-When using models that support auto-regressive generation, you can specify generation parameters like the number of new tokens, sampling methods, temperature, repetition penalty, and much more. For a full list of available parameters, see to the [GenerationConfig](./api/utils/generation#module_utils/generation.GenerationConfig) class.
+When using models that support auto-regressive generation, you can specify generation parameters like the number of new tokens, sampling methods, temperature, repetition penalty, and much more. For a full list of available parameters, see the [GenerationConfig](./api/generation/configuration_utils#module_generation/configuration_utils.GenerationConfig) class.
 
 For example, to generate a poem using `LaMini-Flan-T5-783M`, you can do:
 
