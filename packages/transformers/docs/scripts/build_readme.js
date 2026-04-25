@@ -1,6 +1,13 @@
 import fs from "node:fs";
+import path from "node:path";
+import url from "node:url";
 
-const DOCS_BASE_URL = "https://huggingface.co/docs/transformers.js";
+import { DOCS_BASE_URL, buildApiSymbolLinks } from "./lib/api-links.mjs";
+import { loadProject } from "./lib/load.mjs";
+
+const scriptFile = url.fileURLToPath(import.meta.url);
+const docsDir = path.dirname(path.dirname(scriptFile));
+const packageRoot = path.dirname(docsDir);
 
 const FILES_TO_INCLUDE = {
   intro: "./docs/snippets/0_introduction.snippet",
@@ -11,7 +18,10 @@ const FILES_TO_INCLUDE = {
   models: "./docs/snippets/5_supported-models.snippet",
 };
 
-// Links that should point somewhere other than the direct docs URL.
+const PIPELINE_API_LINK_PREFIX = `${DOCS_BASE_URL}/api/pipelines#module_pipelines.`;
+
+// Links that should point somewhere other than the direct docs URL. Most are
+// README-local anchors or guide/API pages referenced by snippets.
 const CUSTOM_LINK_MAP = {
   "/custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
   "./api/env": `${DOCS_BASE_URL}/api/env`,
@@ -20,12 +30,26 @@ const CUSTOM_LINK_MAP = {
 };
 
 function main() {
+  const { out } = parseArgs(process.argv.slice(2));
+  const { ir, publicNames } = loadProject(packageRoot);
+  const apiLinks = buildApiSymbolLinks(ir, publicNames);
   const snippets = Object.fromEntries(
-    Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(file, "utf8")]),
+    Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]),
   );
 
-  const readme = fixLinks(renderTemplate(snippets));
-  fs.writeFileSync("README.md", readme, "utf8");
+  const readme = fixLinks(renderTemplate(snippets), apiLinks);
+  fs.writeFileSync(path.resolve(packageRoot, out), readme, "utf8");
+}
+
+function parseArgs(args) {
+  const outIndex = args.indexOf("--out");
+  if (outIndex !== -1 && !args[outIndex + 1]) {
+    throw new Error("Expected a path after --out.");
+  }
+
+  return {
+    out: outIndex === -1 ? "README.md" : args[outIndex + 1],
+  };
 }
 
 function renderTemplate({ intro, installation, quickTour, customUsage, tasks, models }) {
@@ -75,11 +99,15 @@ ${models}
 `;
 }
 
-function fixLinks(markdown) {
+function fixLinks(markdown, apiLinks) {
+  // This is not a complete Markdown parser, just the narrow link rewrite
+  // needed by the README snippets.
   return markdown.replace(/(?<=\])\((.+?)\)/gm, (_, rawLink) => {
     let link = rawLink;
     if (link in CUSTOM_LINK_MAP) {
       link = CUSTOM_LINK_MAP[link];
+    } else if (link.startsWith(PIPELINE_API_LINK_PREFIX)) {
+      link = apiLinks.get(link.slice(PIPELINE_API_LINK_PREFIX.length)) ?? link;
     } else if (link.startsWith("/")) {
       link = `${DOCS_BASE_URL}${link}`;
     }

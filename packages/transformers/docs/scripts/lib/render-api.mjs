@@ -5,6 +5,7 @@
 
 import path from "node:path";
 
+import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 export function renderModule(mod, ir, opts = {}) {
@@ -70,12 +71,12 @@ function buildCallableLinkIndex(ir, publicNames) {
   const links = new Map();
   for (const mod of ir.modules) {
     for (const fn of filterPublic(mod.functions, publicNames)) {
-      links.set(fn.name, { moduleName: mod.name, anchor: callableAnchor(fn.name) });
+      links.set(fn.name, { moduleName: mod.name, anchor: apiSymbolAnchor(mod.name, fn.name) });
     }
     for (const cls of filterPublic(mod.classes, publicNames)) {
       for (const m of cls.members) {
         if (m.kind === "method" && shouldRenderMethod(m)) {
-          links.set(`${cls.name}.${m.name}`, { moduleName: mod.name, anchor: callableAnchor(m.name, cls.name) });
+          links.set(`${cls.name}.${m.name}`, { moduleName: mod.name, anchor: apiMemberAnchor(mod.name, cls.name, m.name) });
         }
       }
     }
@@ -126,11 +127,11 @@ function expandInlineLinks(text, ctx) {
 // ---------- classes, functions, callbacks ----------
 
 function renderClass(cls, ctx) {
-  const lines = [`### ${cls.name}`, ""];
+  const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, cls.name)}"></a>`, "", `### ${cls.name}`, ""];
   if (cls.description) lines.push(cleanDescription(cls.description), "");
   for (const ex of cls.examples) lines.push(...renderExample(ex));
   if (cls.callable) {
-    lines.push(...renderFunction({ ...cls.callable, displayName: cls.name, anchorName: `${cls.name}-call` }, ctx, 4));
+    lines.push(...renderFunction({ ...cls.callable, displayName: cls.name, anchorName: `${cls.name}.call` }, ctx, 4));
   }
 
   for (const m of cls.members) {
@@ -167,7 +168,8 @@ function shouldRenderMethod(m) {
 }
 
 function renderFunction(fn, ctx, depth, parent = null) {
-  const lines = [`<a id="${callableAnchor(fn.anchorName ?? fn.name, parent)}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
+  const anchor = parent ? apiMemberAnchor(ctx.moduleName, parent, fn.anchorName ?? fn.name) : apiSymbolAnchor(ctx.moduleName, fn.anchorName ?? fn.name);
+  const lines = [`<a id="${anchor}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
   // Resolve generic type parameters (`@template {Constraint} T`) inside this
   // function's parameter/return types. Without the constraint map, a `T`
   // would render as `any`.
@@ -208,7 +210,7 @@ function signature(fn, parent) {
 }
 
 function renderCallback(cb, ctx) {
-  const lines = [`### ${cb.name}`, ""];
+  const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, cb.name)}"></a>`, "", `### ${cb.name}`, ""];
   const templateMap = new Map();
   for (const t of cb.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
   const cbCtx = templateMap.size ? { ...ctx, templates: templateMap } : ctx;
@@ -278,7 +280,7 @@ function simpleName(name) {
 
 function renderConstant(c, ctx) {
   const type = c.type ? ` : ${renderType(c.type, ctx)}` : "";
-  const lines = [`### \`${c.name}\`${type}`, ""];
+  const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, c.name)}"></a>`, "", `### \`${c.name}\`${type}`, ""];
   if (c.description) lines.push(cleanDescription(c.description), "");
   for (const ex of c.examples) lines.push(...renderExample(ex));
   return lines;
@@ -308,7 +310,7 @@ function renderTypedef(td, ctx) {
 
   const { displayed, typeIsShowable } = typedefRenderInfo(td, ctx);
 
-  const lines = [`### ${td.name}`, ""];
+  const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, td.name)}"></a>`, "", `### ${td.name}`, ""];
   if (td.description) lines.push(cleanDescription(td.description), "");
   if (typeIsShowable) {
     lines.push(`_Type:_ ${displayed}`, "");
@@ -447,10 +449,7 @@ function linkIfKnown(name, ctx) {
 function linkKnownName(name, label, ctx) {
   const moduleName = ctx.typedefIndex?.get(name);
   if (!moduleName || name === ctx.selfName || !ctx.renderedNames?.has(name)) return null;
-  const anchor = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  const anchor = apiSymbolAnchor(moduleName, name);
   return `[\`${label}\`](${moduleHref(ctx.moduleName, moduleName)}#${anchor})`;
 }
 
@@ -471,17 +470,6 @@ function moduleHref(fromModule, toModule) {
   let rel = path.posix.relative(path.posix.dirname(fromModule), toModule);
   if (!rel.startsWith(".")) rel = `./${rel}`;
   return `${rel}.md`;
-}
-
-function callableAnchor(name, parent = null) {
-  return anchorForName(parent ? `${parent}-${name}` : name);
-}
-
-function anchorForName(name) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 function renderUtilityType(utility, ctx) {

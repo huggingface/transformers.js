@@ -3,7 +3,7 @@
  * this file is considered stable — other imports are internal and may change.
  *
  * **Start here**
- * - [`pipeline()`](./pipelines.md#pipeline) — the one-call entry point for every task.
+ * - [`pipeline()`](./pipelines.md#module_pipelines.pipeline) — the one-call entry point for every task.
  * - [Environment](./env.md) — `env` fields and `LogLevel` enum.
  *
  * **Model loading**
