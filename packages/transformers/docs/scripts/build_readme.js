@@ -23,6 +23,7 @@ const PIPELINE_API_LINK_PREFIX = `${DOCS_BASE_URL}/api/pipelines#module_pipeline
 // Links that should point somewhere other than the direct docs URL. Most are
 // README-local anchors or guide/API pages referenced by snippets.
 const CUSTOM_LINK_MAP = {
+  "./custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
   "/custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
   "./api/env": `${DOCS_BASE_URL}/api/env`,
   "./guides/webgpu": `${DOCS_BASE_URL}/guides/webgpu`,
@@ -33,9 +34,7 @@ function main() {
   const { out } = parseArgs(process.argv.slice(2));
   const { ir, publicNames } = loadProject(packageRoot);
   const apiLinks = buildApiSymbolLinks(ir, publicNames);
-  const snippets = Object.fromEntries(
-    Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]),
-  );
+  const snippets = Object.fromEntries(Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]));
 
   const readme = fixLinks(renderTemplate(snippets), apiLinks);
   fs.writeFileSync(path.resolve(packageRoot, out), readme, "utf8");

@@ -15,7 +15,7 @@ The list of available quantizations depends on the model, but some common ones a
 
 ## Basic usage
 
-**Example:** Run Qwen2.5-0.5B-Instruct in 4-bit quantization ([demo](https://v2.scrimba.com/s0dlcpv0ci))
+**Example:** Run Qwen2.5-0.5B-Instruct in 4-bit quantization
 
 ```js
 import { pipeline } from "@huggingface/transformers";
@@ -67,7 +67,7 @@ const generator = await pipeline("text-generation", "onnx-community/Qwen3-0.6B-O
 
 Some encoder-decoder models, like Whisper or Florence-2, are extremely sensitive to quantization settings: especially of the encoder. For this reason, we added the ability to select per-module dtypes, which can be done by providing a mapping from module name to dtype.
 
-**Example:** Run Florence-2 on WebGPU ([demo](https://v2.scrimba.com/s0pdm485fo))
+**Example:** Run Florence-2 on WebGPU
 
 ```js
 import { Florence2ForConditionalGeneration } from "@huggingface/transformers";
