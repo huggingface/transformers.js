@@ -24,7 +24,7 @@
  * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
  * - [Images](./utils/image.md) — `RawImage`, `load_image()`.
  * - [Audio](./utils/audio.md) — `RawAudio`, `load_audio()`.
- * - `RawVideo` / `load_video()` — _(experimental, exported from the top-level package)_.
+ * - [Video](./utils/video.md) — `RawVideo`, `RawVideoFrame`, `load_video()` _(experimental)_.
  *
  * **Utilities**
  * - [Hub options](./utils/hub.md) — shared `from_pretrained()` option shapes.
