@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-skill.js -->
+<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-all.js -->
 
 # Tasks
 

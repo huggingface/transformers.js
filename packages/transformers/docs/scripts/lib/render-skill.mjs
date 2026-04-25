@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-skill.js -->";
+const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-all.js -->";
 const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
 
 export function renderSkill({ ir, tasks, publicNames, skillDir }) {
