@@ -59,7 +59,7 @@ const output = await classifier(audio, { top_k: 4 });
 Zero shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio when you
 provide an audio and a set of `candidate_labels`.
 
-**Example**: Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
+**Example:** Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
