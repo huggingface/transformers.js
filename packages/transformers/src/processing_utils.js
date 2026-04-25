@@ -1,7 +1,15 @@
 /**
- * @file Processors are used to prepare inputs (e.g., text, image or audio) for a model.
+ * @file Processors turn raw inputs (images, audio, text) into the tensor
+ * shapes a model expects. Pipelines pick the right processor automatically;
+ * call one directly only when you need to preprocess without running
+ * inference.
  *
- * **Example:** Using a `WhisperProcessor` to prepare an audio input for a model.
+ * Three `Auto*` entry points cover the common cases:
+ * - `AutoProcessor` — multi-modal (tokenizer + image/audio), e.g. Whisper, CLIP.
+ * - `AutoImageProcessor` — vision-only models.
+ * - `AutoFeatureExtractor` — audio-only models.
+ *
+ * **Example:** Prepare audio for Whisper.
  * ```javascript
  * import { AutoProcessor, load_audio } from '@huggingface/transformers';
  *
@@ -71,6 +79,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Delegates to the underlying tokenizer's `apply_chat_template`.
      * @param {Parameters<PreTrainedTokenizer['apply_chat_template']>[0]} messages
      * @param {Parameters<PreTrainedTokenizer['apply_chat_template']>[1]} options
      * @returns {ReturnType<PreTrainedTokenizer['apply_chat_template']>}
@@ -87,6 +96,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Decode a batch of tokenized sequences via the underlying tokenizer.
      * @param {Parameters<PreTrainedTokenizer['batch_decode']>} args
      * @returns {ReturnType<PreTrainedTokenizer['batch_decode']>}
      */
@@ -98,6 +108,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Decode a single tokenized sequence via the underlying tokenizer.
      * @param {Parameters<PreTrainedTokenizer['decode']>} args
      * @returns {ReturnType<PreTrainedTokenizer['decode']>}
      */

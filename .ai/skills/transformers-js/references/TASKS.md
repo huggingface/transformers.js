@@ -795,7 +795,7 @@ const output = await generator('how can I become more healthy?', {
 
 Language generation pipeline using any `ModelWithLMHead` or `ModelForCausalLM`.
 This pipeline predicts the words that will follow a specified text prompt.
-For the full list of generation parameters, see [`GenerationConfig`](https://huggingface.co/docs/transformers.js/api/generation/configuration_utils#generationconfig).
+For the full list of generation parameters, see `GenerationConfig`.
 
 **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
 ```javascript

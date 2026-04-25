@@ -824,6 +824,8 @@ export class RawImage {
 }
 
 /**
- * Helper function to load an image from a URL, path, etc.
+ * Load an image from a URL, file path, `Blob`, `HTMLCanvasElement`, or
+ * `OffscreenCanvas`. Equivalent to `RawImage.read`.
+ * @type {typeof RawImage.read}
  */
 export const load_image = RawImage.read.bind(RawImage);

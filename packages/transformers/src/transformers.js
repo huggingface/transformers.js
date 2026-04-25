@@ -1,30 +1,36 @@
 /**
- * @file Entry point for the Transformers.js library. Everything re-exported
- * from this file is part of the public API.
+ * @file Public API of `@huggingface/transformers`. Everything re-exported from
+ * this file is considered stable — other imports are internal and may change.
  *
- * **High-level**
+ * **Start here**
  * - [`pipeline()`](./pipelines.md#pipeline) — the one-call entry point for every task.
- * - [Environment](./env.md) — global configuration (`env`, `LogLevel`).
+ * - [Environment](./env.md) — `env` fields and `LogLevel` enum.
  *
  * **Model loading**
- * - [Pipelines](./pipelines.md) — task-specific pipeline classes.
- * - [Models](./models.md) — `AutoModel*` classes and the base `PreTrainedModel`.
- * - [Tokenizers](./tokenizers.md) — `AutoTokenizer` and friends.
- * - [Processors](./processors.md) — feature extractors and image/audio processors.
- * - [Configs](./configs.md) — `AutoConfig` and `PretrainedConfig`.
+ * - [Pipelines](./pipelines.md) — task-specific pipeline classes (`TextGenerationPipeline`, etc.).
+ * - [Models](./models.md) — `AutoModel*` classes (one per task).
+ * - [Tokenizers](./tokenizers.md) — `AutoTokenizer`, chat templates, `Message`.
+ * - [Processors](./processors.md) — `AutoProcessor`, `AutoImageProcessor`, `AutoFeatureExtractor`.
+ * - [Configs](./configs.md) — `AutoConfig` / `PretrainedConfig`.
  *
  * **Generation**
- * - [Generation config](./generation/configuration_utils.md) — `GenerationConfig` fields.
- * - [Logits processors](./generation/logits_process.md) — sampling and constraint logits processors.
- * - [Stopping criteria](./generation/stopping_criteria.md) — when generation halts.
- * - [Streamers](./generation/streamers.md) — token streaming.
+ * - [Generation config](./generation/configuration_utils.md) — sampling and beam-search parameters.
+ * - [Generation parameters](./generation/parameters.md) — full shape of `generate()` arguments.
+ * - [Logits processors](./generation/logits_process.md) — modify next-token probabilities.
+ * - [Stopping criteria](./generation/stopping_criteria.md) — control when generation halts.
+ * - [Streamers](./generation/streamers.md) — receive tokens as they're produced.
+ *
+ * **Data types and I/O**
+ * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
+ * - [Images](./utils/image.md) — `RawImage`, `load_image()`.
+ * - [Audio](./utils/audio.md) — `RawAudio`, `load_audio()`.
+ * - `RawVideo` / `load_video()` — _(experimental, exported from the top-level package)_.
  *
  * **Utilities**
- * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
- * - [Audio](./utils/audio.md) — `RawAudio`, `load_audio`.
- * - [Images](./utils/image.md) — `RawImage`.
- * - [Model registry](./utils/model_registry.md) — cache and file inspection.
- * - [Random](./utils/random.md) — seedable MT19937 PRNG.
+ * - [Hub options](./utils/hub.md) — shared `from_pretrained()` option shapes.
+ * - [Maths](./utils/maths.md) — `softmax`, `cos_sim`, typed-array helpers.
+ * - [Model registry](./utils/model_registry.md) — inspect or clear the model cache.
+ * - [Random](./utils/random.md) — seedable MT19937 PRNG matching Python's `random`.
  *
  * @module transformers
  */

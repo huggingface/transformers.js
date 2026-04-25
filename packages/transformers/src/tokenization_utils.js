@@ -1,5 +1,11 @@
 /**
- * @file Tokenization utilities
+ * @file Tokenizers turn text into the integer ids a model understands, and
+ * decode model output back into strings. Use `AutoTokenizer.from_pretrained()`
+ * to load the right implementation for a model id — the class is chosen from
+ * the tokenizer's `tokenizer_config.json`.
+ *
+ * For chat-trained models, `tokenizer.apply_chat_template()` renders an
+ * OpenAI-style message list into the model's native prompt format.
  *
  * @module tokenizers
  */
@@ -80,9 +86,10 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  */
 
 /**
+ * A single content block inside a chat message. Extend the union to add
+ * custom types (e.g. `AudioContent`) when targeting a specific model.
+ *
  * @typedef {TextContent | ImageContent | { type: string & {}, [key: string]: any }} MessageContent
- * Base type for message content. This is a discriminated union that can be extended with additional content types.
- * Example: `@typedef {TextContent | ImageContent | AudioContent} MessageContent`
  */
 
 /**
@@ -179,18 +186,23 @@ function getSpecialTokens(tokenizer) {
  */
 
 /**
+ * The object returned from `tokenizer(text)`. The fields are a `Tensor` by
+ * default, or an `Array` when `return_tensor: false` is passed.
+ *
  * @template TItem
  * @typedef {Object} BatchEncoding
- * @property {TItem} input_ids List of token ids to be fed to a model.
- * @property {TItem} attention_mask List of indices specifying which tokens should be attended to by the model.
- * @property {TItem} [token_type_ids] List of token type ids to be fed to a model.
+ * @property {TItem} input_ids Token ids to be fed to the model.
+ * @property {TItem} attention_mask Mask indicating which tokens should be attended to (1) versus padded (0).
+ * @property {TItem} [token_type_ids] Segment ids, present only for tokenizers that distinguish sequence A vs B (e.g. BERT).
  */
 
 /**
+ * Options passed to `tokenizer(text, options)`.
+ *
  * @template {string|string[]} TText
  * @template {boolean} [TReturnTensor=true]
  * @typedef {Object} TokenizerCallOptions
- * @property {TText extends string ? string|null : string[]|null} [text_pair=null] Optional second sequence to be encoded. If set, must be the same type as text.
+ * @property {TText extends string ? string|null : string[]|null} [text_pair=null] Optional second sequence to be encoded. Must match the shape of `text` — string when `text` is a string, array when `text` is an array.
  * @property {boolean|'max_length'} [padding=false] Whether to pad the input sequences.
  * @property {boolean} [add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
  * @property {boolean|null} [truncation=null] Whether to truncate the input sequences.

@@ -1,4 +1,11 @@
 /**
+ * @file Logits processors applied during token generation.
+ *
+ * A `LogitsProcessor` rewrites the probability distribution over the next token —
+ * suppressing specific ids, forcing certain tokens at the start or end,
+ * penalising repetition, and so on. `LogitsProcessorList` composes many
+ * processors; pass one via the `logits_processor` argument of `generate()`.
+ *
  * @module generation/logits_process
  */
 

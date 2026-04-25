@@ -49,8 +49,10 @@ function parseTag(raw) {
   const tag = nameMatch[1];
   let rest = raw.slice(nameMatch[0].length).replace(/^[ \t]+/, "");
 
+  // `@default` is the only tag whose payload starts with a brace but is *not*
+  // a JSDoc type expression — skip the type extraction for it.
   let type = null;
-  if (rest.startsWith("{")) {
+  if (rest.startsWith("{") && tag !== "default") {
     const extracted = extractBalancedBraces(rest, 0);
     if (extracted) {
       type = extracted.content.trim();
@@ -74,8 +76,12 @@ function parseTag(raw) {
     }
     case "callback":
       return { tag, name: rest.trim().split(/\s+/)[0] || null };
-    case "template":
-      return { tag, type, name: rest.trim() };
+    case "template": {
+      // `@template {Constraint} Name description` — just the first identifier
+      // after any optional constraint is the template-parameter name.
+      const m = rest.match(/^([A-Za-z_$][\w$]*)/);
+      return { tag, type, name: m?.[1] ?? null };
+    }
     case "type":
       return { tag, type };
     case "default":

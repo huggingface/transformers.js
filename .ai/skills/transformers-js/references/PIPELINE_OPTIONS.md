@@ -190,7 +190,7 @@ anywhere `generate()` is invoked directly.
 | `eos_token_id`? | `number|number[]` | The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens. _(default: `null`)_ |
 | `encoder_no_repeat_ngram_size`? | `number` | If set to int > 0, all ngrams of that size that occur in the `encoder_input_ids` cannot occur in the `decoder_input_ids`. _(default: `0`)_ |
 | `decoder_start_token_id`? | `number` | If an encoder-decoder model starts decoding with a different token than *bos*, the id of that token. _(default: `null`)_ |
-| `generation_kwargs`? | `Object` | Additional generation kwargs will be forwarded to the `generate` function of the model. Kwargs that are not present in `generate`'s signature will be used in the model forward pass. _(default: ``)_ |
+| `generation_kwargs`? | `Object` | Additional generation kwargs will be forwarded to the `generate` function of the model. Kwargs that are not present in `generate`'s signature will be used in the model forward pass. _(default: `{}`)_ |
 <!-- @generated:end id=fields:GenerationConfig -->
 
 ### Streaming tokens as they're produced

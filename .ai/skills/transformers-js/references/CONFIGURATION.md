@@ -10,21 +10,15 @@ import { env, LogLevel } from "@huggingface/transformers";
 ## Quick examples
 
 <!-- @generated:start id=examples:env -->
-**Example:** Disable remote models.
+**Example:** Load models from your own server and disable remote downloads.
 
 ```javascript
 import { env } from '@huggingface/transformers';
 env.allowRemoteModels = false;
-```
-
-**Example:** Set local model path.
-
-```javascript
-import { env } from '@huggingface/transformers';
 env.localModelPath = '/path/to/local/models/';
 ```
 
-**Example:** Set cache directory.
+**Example:** Point the filesystem cache at a custom directory (Node.js).
 
 ```javascript
 import { env } from '@huggingface/transformers';

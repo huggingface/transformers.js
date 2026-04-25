@@ -64,8 +64,15 @@ function renderExample(ex) {
 // Descriptions carried over from the Python library sometimes start with a
 // reST-style `[`TypeName`]` cross-reference that JavaScript readers can't follow.
 // Strip the artifact from the start of the first paragraph; leave the rest alone.
+// Also normalize `@see Symbol` / `@see {@link Symbol}` to inline markup so it
+// reads as prose rather than raw JSDoc tags — `{@link ...}` is expanded later
+// by `expandInlineLinks`.
 function cleanDescription(text) {
-  return text.trim().replace(/^\[`?([A-Za-z_$][\w$.]*)`?\]\s*/, "");
+  return text
+    .trim()
+    .replace(/^\[`?([A-Za-z_$][\w$.]*)`?\]\s*/, "")
+    .replace(/@see\s+(?=\{@link)/g, "")
+    .replace(/@see\s+`?([A-Za-z_$][\w$.]*)`?/g, "`$1`");
 }
 
 // `{@link url}` / `{@link url Text}` / `{@link Symbol}` -> markdown.
@@ -95,11 +102,15 @@ function renderClass(cls, ctx) {
 }
 
 function renderField(f, ctx, parent) {
+  // Skip undocumented, untyped field entries — pure placeholders with no
+  // reader value. Deprecation flags keep a field visible as a warning.
+  if (!f.type && !f.description && !f.deprecated && f.defaultValue == null) return [];
+
   const type = f.type ? ` : ${renderType(f.type, ctx)}` : "";
   const lines = [`#### \`${parent}.${f.name}\`${type}`, ""];
   if (f.deprecated) lines.push("> **Deprecated**", "");
-  if (f.description) lines.push(f.description.trim(), "");
-  if (f.defaultValue != null) lines.push(`**Default:** \`${f.defaultValue}\``, "");
+  if (f.description) lines.push(cleanDescription(f.description), "");
+  if (f.defaultValue != null && f.defaultValue !== "") lines.push(`**Default:** \`${f.defaultValue}\``, "");
   return lines;
 }
 
@@ -113,15 +124,22 @@ function shouldRenderMethod(m) {
 
 function renderFunction(fn, ctx, depth, parent = null) {
   const lines = [`${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
+  // Resolve generic type parameters (`@template {Constraint} T`) inside this
+  // function's parameter/return types. Without the constraint map, a `T`
+  // would render as `any`.
+  const templateMap = new Map();
+  for (const t of fn.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
+  const fnCtx = templateMap.size ? { ...ctx, templates: templateMap } : ctx;
+
   if (fn.deprecated) lines.push("> **Deprecated**", "");
   if (fn.description) lines.push(cleanDescription(fn.description), "");
   if (fn.params?.length) {
-    lines.push("**Parameters**", "", ...renderParamList(fn.params, ctx), "");
+    lines.push("**Parameters**", "", ...renderParamList(fn.params, fnCtx), "");
   }
   if (fn.returns?.type || fn.returns?.description) {
-    const type = fn.returns.type ? renderType(fn.returns.type, ctx) : "";
-    const desc = fn.returns.description ? ` — ${fn.returns.description.trim()}` : "";
-    lines.push(`**Returns:** ${type}${desc}`, "");
+    const type = fn.returns.type ? renderType(fn.returns.type, fnCtx) : "";
+    const desc = fn.returns.description ? (type ? ` — ${fn.returns.description.trim()}` : fn.returns.description.trim()) : "";
+    lines.push(`**Returns:** ${type}${desc}`.trim(), "");
   }
   if (fn.throws?.length) {
     lines.push("**Throws**", "");
@@ -224,16 +242,33 @@ function renderConstant(c, ctx) {
 function isInternalTypedef(td) {
   if (td.name.startsWith("_")) return true;
   const type = (td.type ?? "").trim();
-  if (/^[A-Z]$/.test(type) && !td.description && !td.properties?.length) return true;
-  if (type === "object" && !td.description && !td.properties?.length) return true;
+  // `@typedef {object} Foo` with no body — nothing to show.
+  if ((type === "object" || type === "Object") && !td.description && !td.properties?.length) return true;
+  // `@typedef {GenericParam} Foo` — bare alias with no description or body.
+  if (/^[A-Za-z_$][\w$.]*$/.test(type) && !td.description && !td.properties?.length) return true;
   return false;
+}
+
+// Generic type parameter names (T, K, V, TItem, TReturnTensor, ...) — show as
+// `any` in rendered types so the reader doesn't chase an undefined symbol.
+function isGenericParamName(name) {
+  return /^T[A-Z][A-Za-z]*$/.test(name) || /^[TKV]$/.test(name);
 }
 
 function renderTypedef(td, ctx) {
   const displayed = td.type ? renderType(td.type, { ...ctx, selfName: td.name }) : "";
   const isSelfReference = displayed === `\`${td.name}\``;
-  const isGenericPassthrough = /^`[A-Z]`$/.test(displayed);
-  const typeIsShowable = displayed && displayed.length < 120 && !displayed.startsWith("`{") && !isSelfReference && !isGenericPassthrough;
+  const isGenericPassthrough = /^`[A-Z][A-Za-z]?`$/.test(displayed);
+  // Collapsed fallbacks (`object`, `unknown`, `any`) carry no real information
+  // — showing `_Type:_ `object`` adds noise without helping the reader.
+  const isOpaque = displayed === "`object`" || displayed === "`unknown`" || displayed === "`any`";
+  // Unions and intersections are worth showing even when long — every variant
+  // is a named type the reader can click through to. Opaque inline object
+  // literals (`{...}`) stay hidden.
+  const isUnionOrIntersection = / \| | & /.test(displayed);
+  const fitsInline = displayed.length < 120;
+  const typeIsShowable =
+    displayed && (isUnionOrIntersection || fitsInline) && !displayed.startsWith("`{") && !isSelfReference && !isGenericPassthrough && !isOpaque;
 
   // Don't emit an empty `### Name` heading. A typedef needs *something* the
   // reader can't derive from the name alone: a description, properties, or a
@@ -263,10 +298,27 @@ export function renderType(raw, ctx, opts = {}) {
   const pretty = prettifyTypeString(raw);
   if (opts.noLink) return `\`${pretty}\``;
 
-  const parts = splitTopLevel(pretty, "|");
-  if (parts.length > 1) return parts.map((p) => renderType(p.trim(), ctx)).join(" | ");
+  // Unions split first. `_`-prefixed variants (internal types from intersections)
+  // are filtered out so they don't leak into the public docs.
+  const unionParts = splitTopLevel(pretty, "|")
+    .map((p) => p.trim())
+    .filter((p) => !/^_[A-Za-z]/.test(p));
+  if (unionParts.length > 1) return unionParts.map((p) => renderType(p, ctx)).join(" | ");
+  if (unionParts.length === 1 && unionParts[0] !== pretty.trim()) return renderType(unionParts[0], ctx);
 
-  if (SIMPLE_NAME.test(pretty)) return linkIfKnown(pretty, ctx) ?? `\`${pretty}\``;
+  // Same for intersections (`A & B`): drop internal variants before joining.
+  const intersectParts = splitTopLevel(pretty, "&")
+    .map((p) => p.trim())
+    .filter((p) => !/^_[A-Za-z]/.test(p));
+  if (intersectParts.length > 1) return intersectParts.map((p) => renderType(p, ctx)).join(" & ");
+  if (intersectParts.length === 1 && intersectParts[0] !== pretty.trim()) return renderType(intersectParts[0], ctx);
+
+  if (SIMPLE_NAME.test(pretty)) {
+    // `@template {Constraint} T` — render `T` as its constraint when we know it.
+    if (ctx.templates?.has(pretty)) return renderType(ctx.templates.get(pretty), { ...ctx, templates: undefined });
+    if (isGenericParamName(pretty)) return "`any`";
+    return linkIfKnown(pretty, ctx) ?? `\`${pretty}\``;
+  }
 
   const indexed = pretty.match(INDEXED_NAME);
   if (indexed) {
@@ -326,7 +378,10 @@ function splitTopLevel(text, sep) {
 }
 
 // Strip noisy TS constructs from a type string without rewriting structure.
-// Anything too complex to read inline collapses to its outermost wrapper.
+// Conditional/mapped/infer types collapse to their outermost wrapper; simple
+// unions of names or long generic lists are preserved so the renderer can
+// split them into individual links.
+const TS_UTILITY_NAMES = new Set(["Parameters", "ReturnType", "ConstructorParameters", "InstanceType", "ThisType"]);
 export function prettifyTypeString(raw) {
   if (!raw) return "";
   let s = raw.trim();
@@ -335,8 +390,11 @@ export function prettifyTypeString(raw) {
   s = s.replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1");
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
 
-  if (s.length > 120 || isGnarly(s)) {
+  if (isGnarly(s)) {
     const outer = s.match(/^([A-Za-z_$][\w$.]*)(?:<|\s|$)/);
+    // Built-in TS utility types are meaningless shorn of their arguments — the
+    // reader is better served by `unknown` than by a naked `Parameters`.
+    if (outer && TS_UTILITY_NAMES.has(outer[1])) return "unknown";
     return outer ? outer[1] : "object";
   }
   return s.replace(/\s+/g, " ").trim();
@@ -355,9 +413,14 @@ function stripLeading(s, open, close) {
 }
 
 // Conditional types (`A extends B ? X : Y`), mapped types (`{ [K in ...] }`),
-// and `infer` are unreadable inline.
+// and `infer` are unreadable inline. So are indexed accesses into typeof
+// expressions (`Parameters<X['foo']>[0]`) — readable names these are not.
 function isGnarly(s) {
   if (/\b(?:infer|extends)\b/.test(s)) return true;
+  // Any bracketed indexing like `X['foo']` or `X[0]` inside the type string —
+  // including inside `Parameters<...>` / `ReturnType<...>` — makes it too
+  // noisy to render verbatim.
+  if (/\[['"0-9]/.test(s)) return true;
   let angle = 0;
   for (let i = 0; i < s.length; i++) {
     if (s[i] === "<") angle++;

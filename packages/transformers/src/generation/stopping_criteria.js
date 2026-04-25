@@ -1,4 +1,11 @@
 /**
+ * @file Stopping criteria for controlling when generation halts.
+ *
+ * Each criterion returns an array of booleans — one per sequence in the batch —
+ * signalling which sequences should stop emitting tokens. Combine multiple
+ * criteria with `StoppingCriteriaList`, and pass that to `generate()` via
+ * the `stopping_criteria` argument.
+ *
  * @module generation/stopping_criteria
  */
 

@@ -9,10 +9,9 @@ import { GITHUB_ISSUE_URL, IMAGE_PROCESSOR_NAME } from '../../utils/constants.js
 import { logger } from '../../utils/logger.js';
 
 /**
- * Helper class which is used to instantiate pretrained image processors with the `from_pretrained` function.
- * The chosen image processor class is determined by the type specified in the preprocessor config.
+ * Loads an image processor from a pretrained id. The concrete class is
+ * selected from the `image_processor_type` in `preprocessor_config.json`.
  *
- * **Example:**
  * ```javascript
  * import { AutoImageProcessor, load_image } from '@huggingface/transformers';
  *

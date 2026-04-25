@@ -8,17 +8,15 @@ import { FeatureExtractor } from '../../feature_extraction_utils.js';
 import * as AllFeatureExtractors from '../feature_extractors.js';
 
 /**
- * Helper class which is used to instantiate pretrained feature extractors with the `from_pretrained` function.
- * The chosen feature extractor class is determined by the type specified in the preprocessor config.
- * Typically used for audio models.
+ * Loads a feature extractor from a pretrained id. The concrete class is
+ * selected from the `feature_extractor_type` in `preprocessor_config.json`.
+ * Most commonly used for audio models.
  *
- * **Example:**
  * ```javascript
  * import { AutoFeatureExtractor, load_audio } from '@huggingface/transformers';
  *
  * const extractor = await AutoFeatureExtractor.from_pretrained('onnx-community/whisper-tiny.en');
- * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
- * const audio = await load_audio(url, 16000);
+ * const audio = await load_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav', 16000);
  * const { input_features } = await extractor(audio);
  * ```
  */

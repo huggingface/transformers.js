@@ -1,19 +1,16 @@
 /**
- * @file Module used to configure Transformers.js.
+ * @file Global configuration for the library. Mutate fields on the exported
+ * `env` object at startup to change where models are loaded from, how files
+ * are cached, and how verbose logging is.
  *
- * **Example:** Disable remote models.
+ * **Example:** Load models from your own server and disable remote downloads.
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.allowRemoteModels = false;
- * ```
- *
- * **Example:** Set local model path.
- * ```javascript
- * import { env } from '@huggingface/transformers';
  * env.localModelPath = '/path/to/local/models/';
  * ```
  *
- * **Example:** Set cache directory.
+ * **Example:** Point the filesystem cache at a custom directory (Node.js).
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.cacheDir = '/path/to/cache/directory/';
@@ -169,23 +166,21 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
 const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
 
 /**
- * Log levels for controlling output verbosity.
+ * Log-level enum. Assign to `env.logLevel` to control how verbose the library
+ * is. Higher values silence more: `DEBUG` (10) surfaces everything,
+ * `NONE` (50) suppresses all output. Default is `WARNING` (30).
  *
- * Each level is represented by a number, where higher numbers include all lower level messages.
- * Use these values to set `env.logLevel`.
+ * | Level     | Value | Shows                                     |
+ * |-----------|-------|-------------------------------------------|
+ * | `DEBUG`   | 10    | Every message, including debug traces.    |
+ * | `INFO`    | 20    | Errors, warnings, and info messages.      |
+ * | `WARNING` | 30    | Errors and warnings.                      |
+ * | `ERROR`   | 40    | Only errors.                              |
+ * | `NONE`    | 50    | Nothing.                                  |
  *
- * **Example:**
  * ```javascript
  * import { env, LogLevel } from '@huggingface/transformers';
- *
- * // Set log level to show only errors
  * env.logLevel = LogLevel.ERROR;
- *
- * // Set log level to show errors, warnings, and info
- * env.logLevel = LogLevel.INFO;
- *
- * // Disable all logging
- * env.logLevel = LogLevel.NONE;
  * ```
  */
 export const LogLevel = Object.freeze({
@@ -202,7 +197,7 @@ export const LogLevel = Object.freeze({
 });
 
 /**
- * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
+ * Shape of the `env` object. Every field is mutable.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
  * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
@@ -234,7 +229,11 @@ export const LogLevel = Object.freeze({
  */
 
 let logLevel = LogLevel.WARNING; // Default log level
-/** @type {TransformersEnvironment} */
+/**
+ * The global configuration object. See `TransformersEnvironment` below for the
+ * full set of fields.
+ * @type {TransformersEnvironment}
+ */
 export const env = {
     version: VERSION,
 

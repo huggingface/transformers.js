@@ -86,6 +86,12 @@ function ingest(entities, mod) {
   }
   for (const v of entities.variables) {
     if (isPrivate(v)) continue;
+    // A `const` annotated with `@param` / `@returns` is a function alias —
+    // hoist it into the functions section so it renders with a proper signature.
+    if (tagsOf(v, "param").length || tagsOf(v, "returns").length) {
+      mod.functions.push(buildCallable(v));
+      continue;
+    }
     const { description, examples } = gatherExamples(v.description);
     mod.constants.push({
       name: v.name,
@@ -155,6 +161,12 @@ function buildCallable(fn) {
     params: tagsOf(fn, "param").map(normalizeParam),
     returns: pickReturns(fn),
     throws: tagsOf(fn, "throws").map((t) => ({ type: t.type, description: t.description })),
+    // `@template {Constraint} Name` maps the generic name to its constraint;
+    // used by the renderer to resolve generic parameter names to something
+    // readable instead of a bare `any`.
+    templates: tagsOf(fn, "template")
+      .map((t) => ({ name: t.name, type: t.type }))
+      .filter((t) => t.name),
     examples,
     skillExamples: tagsOf(fn, "skillExample").map((t) => t.task),
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
