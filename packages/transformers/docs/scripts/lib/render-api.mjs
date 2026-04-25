@@ -13,6 +13,7 @@ export function renderModule(mod, ir, opts = {}) {
     typedefIndex: ir.typedefIndex,
     moduleName: mod.name,
     renderedNames: buildRenderedNameIndex(ir, publicNames),
+    callableLinks: buildCallableLinkIndex(ir, publicNames),
   };
 
   const classes = filterPublic(mod.classes, publicNames);
@@ -46,7 +47,7 @@ export function renderModule(mod, ir, opts = {}) {
   }
 
   return (
-    expandInlineLinks(out.join("\n"))
+    expandInlineLinks(out.join("\n"), ctx)
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd() + "\n"
   );
@@ -63,6 +64,23 @@ function buildRenderedNameIndex(ir, publicNames) {
     }
   }
   return names;
+}
+
+function buildCallableLinkIndex(ir, publicNames) {
+  const links = new Map();
+  for (const mod of ir.modules) {
+    for (const fn of filterPublic(mod.functions, publicNames)) {
+      links.set(fn.name, { moduleName: mod.name, anchor: callableAnchor(fn.name) });
+    }
+    for (const cls of filterPublic(mod.classes, publicNames)) {
+      for (const m of cls.members) {
+        if (m.kind === "method" && shouldRenderMethod(m)) {
+          links.set(`${cls.name}.${m.name}`, { moduleName: mod.name, anchor: callableAnchor(m.name, cls.name) });
+        }
+      }
+    }
+  }
+  return links;
 }
 
 function filterPublic(items, publicNames) {
@@ -96,11 +114,13 @@ function cleanDescription(text) {
 }
 
 // `{@link url}` / `{@link url Text}` / `{@link Symbol}` -> markdown.
-function expandInlineLinks(text) {
-  return text.replace(/\{@link\s+([^}\s]+)(?:\s+([^}]+))?\}/g, (_, target, label) => {
-    const displayed = (label ?? target).trim();
-    return /^https?:\/\//.test(target) ? `[${displayed}](${target})` : `\`${displayed}\``;
-  });
+function expandInlineLinks(text, ctx) {
+  return text
+    .replace(/\{@link\s+([^}\s]+)(?:\s+([^}]+))?\}/g, (_, target, label) => {
+      const displayed = (label ?? target).trim();
+      return /^https?:\/\//.test(target) ? `[${displayed}](${target})` : (linkReference(target, displayed, ctx) ?? `\`${displayed}\``);
+    })
+    .replace(/\[`([A-Za-z_$][\w$]*)`\](?!\()/g, (match, name) => linkIfKnown(name, ctx) ?? match);
 }
 
 // ---------- classes, functions, callbacks ----------
@@ -122,6 +142,7 @@ function renderClass(cls, ctx) {
 }
 
 function renderField(f, ctx, parent) {
+  if (f.name.startsWith("_")) return [];
   // Skip undocumented, untyped field entries — pure placeholders with no
   // reader value. Deprecation flags keep a field visible as a warning.
   if (!f.type && !f.description && !f.deprecated && f.defaultValue == null) return [];
@@ -143,7 +164,7 @@ function shouldRenderMethod(m) {
 }
 
 function renderFunction(fn, ctx, depth, parent = null) {
-  const lines = [`${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
+  const lines = [`<a id="${callableAnchor(fn.name, parent)}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
   // Resolve generic type parameters (`@template {Constraint} T`) inside this
   // function's parameter/return types. Without the constraint map, a `T`
   // would render as `any`.
@@ -303,14 +324,20 @@ function typedefRenderInfo(td, ctx) {
   const isGenericPassthrough = /^`[A-Z][A-Za-z]?`$/.test(displayed);
   // Collapsed fallbacks (`object`, `unknown`, `any`) carry no real information
   // — showing `_Type:_ `object`` adds noise without helping the reader.
-  const isOpaque = displayed === "`object`" || displayed === "`unknown`" || displayed === "`any`";
+  const isOpaque = ["`object`", "`Object`", "`unknown`", "`any`"].includes(displayed);
   // Unions and intersections are worth showing even when long — every variant
   // is a named type the reader can click through to. Opaque inline object
   // literals (`{...}`) stay hidden.
   const isUnionOrIntersection = / \| | & /.test(displayed);
   const fitsInline = displayed.length < 120;
   const typeIsShowable =
-    displayed && (isUnionOrIntersection || fitsInline) && !displayed.startsWith("`{") && !isSelfReference && !isGenericPassthrough && !isOpaque;
+    displayed &&
+    !td.properties?.length &&
+    (isUnionOrIntersection || fitsInline) &&
+    !displayed.startsWith("`{") &&
+    !isSelfReference &&
+    !isGenericPassthrough &&
+    !isOpaque;
 
   return { displayed, typeIsShowable };
 }
@@ -321,6 +348,7 @@ const GENERIC_WRAPPERS = /^(Promise|Array|Record|Map|Set|Iterable|AsyncIterable|
 const NAMED_GENERIC = /^([A-Za-z_$][\w$.]*)<(.+)>$/;
 const SIMPLE_NAME = new RegExp(`^[A-Za-z_$][\\w$.]*$`);
 const INDEXED_NAME = /^([A-Za-z_$][\w$.]*)\[[^\]]+\]$/;
+const TUPLE = /^\[(.*)\]$/;
 
 // Turn a raw JSDoc type string into readable markdown. Prefers author-written
 // names over expanded TS structures; unknown gnarly types become `object`.
@@ -349,6 +377,9 @@ export function renderType(raw, ctx, opts = {}) {
   if (pretty.endsWith("[]")) {
     return renderArrayType(pretty.slice(0, -2), ctx);
   }
+
+  const tuple = pretty.match(TUPLE);
+  if (tuple) return renderTupleType(tuple[1], ctx);
 
   if (SIMPLE_NAME.test(pretty)) {
     // `@template {Constraint} T` — render `T` as its constraint when we know it.
@@ -394,6 +425,13 @@ function renderArrayType(innerRaw, ctx) {
   return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
 }
 
+function renderTupleType(innerRaw, ctx) {
+  const parts = splitTopLevel(innerRaw, ",");
+  if (parts.length === 1 && !parts[0].trim()) return "`[]`";
+  const rendered = parts.map((p) => renderType(p.trim(), ctx)).join(", ");
+  return `[${rendered}]`;
+}
+
 function linkIfKnown(name, ctx) {
   if (!ctx.typedefIndex?.has(name) || name === ctx.selfName) return null;
   return linkKnownName(name, name, ctx);
@@ -409,10 +447,34 @@ function linkKnownName(name, label, ctx) {
   return `[\`${label}\`](${moduleHref(ctx.moduleName, moduleName)}#${anchor})`;
 }
 
+function linkCallable(ref, label, ctx) {
+  const link = ctx.callableLinks?.get(ref);
+  if (!link) return null;
+  return `[\`${label}\`](${moduleHref(ctx.moduleName, link.moduleName)}#${link.anchor})`;
+}
+
+function linkReference(raw, label, ctx) {
+  const ref = parseCallableReference(raw);
+  if (ref?.method) return linkCallable(`${ref.owner}.${ref.method}`, label, ctx) ?? linkKnownName(ref.owner, label, ctx);
+  if (ref) return linkCallable(ref.owner, label, ctx) ?? linkKnownName(ref.owner, label, ctx);
+  return linkKnownName(raw, label, ctx);
+}
+
 function moduleHref(fromModule, toModule) {
   let rel = path.posix.relative(path.posix.dirname(fromModule), toModule);
   if (!rel.startsWith(".")) rel = `./${rel}`;
   return `${rel}.md`;
+}
+
+function callableAnchor(name, parent = null) {
+  return anchorForName(parent ? `${parent}-${name}` : name);
+}
+
+function anchorForName(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function renderUtilityType(utility, ctx) {
@@ -425,9 +487,12 @@ function renderCallableReference(raw, ctx) {
   const ref = parseCallableReference(raw);
   if (!ref) return null;
   if (ref.method) {
+    const key = `${ref.owner}.${ref.method}`;
+    const linked = linkCallable(key, key, ctx);
+    if (linked) return linked;
     return linkKnownName(ref.owner, `${ref.owner}.${ref.method}`, ctx) ?? `\`${ref.owner}.${ref.method}\``;
   }
-  return linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
+  return linkCallable(ref.owner, ref.owner, ctx) ?? linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
 }
 
 // Split `text` on `sep`, ignoring separators inside brackets, braces, parens,

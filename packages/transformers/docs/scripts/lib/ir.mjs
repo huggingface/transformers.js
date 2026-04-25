@@ -187,9 +187,7 @@ function resolveCallableAliases(modules) {
   }
 
   for (const callable of allCallables(modules)) {
-    for (const param of callable.params ?? []) {
-      param.type = resolveUtilityType(param.type, callableIndex) ?? param.type;
-    }
+    callable.params = resolveUtilityParams(callable.params ?? [], callableIndex);
     if (callable.returns?.type) {
       callable.returns.type = resolveUtilityType(callable.returns.type, callableIndex) ?? callable.returns.type;
     }
@@ -247,6 +245,23 @@ function resolveUtilityType(type, callableIndex) {
   return null;
 }
 
+function resolveUtilityParams(params, callableIndex) {
+  const resolved = [];
+  for (const param of params) {
+    const utility = parseUtilityType(param.type);
+    const target = utility && findCallable(utility.target, callableIndex);
+    if (utility?.kind === UTILITY_TYPES.PARAMETERS && utility.index == null && target?.params?.length) {
+      resolved.push(...clone(target.params));
+      continue;
+    }
+    resolved.push({
+      ...param,
+      type: resolveUtilityType(param.type, callableIndex) ?? param.type,
+    });
+  }
+  return resolved;
+}
+
 function findCallable(ref, callableIndex) {
   const key = callableReferenceKey(ref);
   return key ? callableIndex.get(key) : null;
@@ -275,8 +290,12 @@ function normalizeParam(tag) {
     type: tag.type,
     optional: !!tag.optional,
     defaultValue: tag.defaultValue ?? null,
-    description: tag.description || "",
+    description: cleanParamDescription(tag.description || ""),
   };
+}
+
+function cleanParamDescription(description) {
+  return description.replace(/^\([^)]*\boptional\b[^)]*\):\s*/i, "").trim();
 }
 
 // Canonical example format: `**Example:** <title>\n```lang\n<code>\n```` inside

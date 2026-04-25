@@ -146,7 +146,7 @@ function renderTaskList({ tasks }) {
   for (const [taskId, info] of tasks.supportedTasks) {
     const aliases = aliasesFor(taskId, tasks);
     const aliasSuffix = aliases.length ? ` _(alias: ${aliases.map((a) => `\`${a}\``).join(", ")})_` : "";
-    lines.push(`- \`${taskId}\`${aliasSuffix} — default model: \`${info.defaultModel}\``);
+    lines.push(`- [\`${taskId}\`](references/TASKS.md#${taskAnchor(taskId)})${aliasSuffix} — default model: \`${info.defaultModel}\``);
   }
   return lines.join("\n");
 }
@@ -197,7 +197,7 @@ function propertiesTable(props) {
   if (!props.length) return "";
   const lines = ["| Option | Type | Description |", "|--------|------|-------------|"];
   for (const p of props) {
-    const type = p.type ? renderTypedefType(p.type) : "";
+    const type = p.type ? renderTypedefType(p.type, { table: true }) : "";
     const nameCell = p.optional ? `\`${p.name}\`?` : `\`${p.name}\``;
     const desc = prepareCell(p.description) + (p.defaultValue != null ? ` _(default: \`${p.defaultValue}\`)_` : "");
     lines.push(`| ${nameCell} | ${type} | ${desc} |`);
@@ -305,7 +305,7 @@ function findTypedef(ir, name) {
 // Compact display: inside a markdown table cell we want inline code spans.
 // Collapse `import('./x.js').Foo` to `Foo`, long inline object types to
 // `object`, and strip newlines.
-function renderTypedefType(raw) {
+function renderTypedefType(raw, { table = false } = {}) {
   let compact = raw
     .replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1")
     .replace(/\s+/g, " ")
@@ -313,7 +313,8 @@ function renderTypedefType(raw) {
   if (compact.length > 60 && (compact.startsWith("{") || /[({=]/.test(compact))) {
     compact = "object";
   }
-  return "`" + compact.replace(/[`|]/g, (ch) => `\\${ch}`) + "`";
+  const escaped = compact.replace(table ? /[`|]/g : /`/g, (ch) => `\\${ch}`);
+  return "`" + escaped + "`";
 }
 
 // Cells can't contain newlines or un-escaped pipes. `{@link url}` gets turned

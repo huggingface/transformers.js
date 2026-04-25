@@ -35,31 +35,31 @@ Passing no `model` uses the default for that task.
 ## Supported tasks
 
 <!-- @generated:start id=task-list -->
-- `text-classification` _(alias: `sentiment-analysis`)_ — default model: `Xenova/distilbert-base-uncased-finetuned-sst-2-english`
-- `token-classification` _(alias: `ner`)_ — default model: `Xenova/bert-base-multilingual-cased-ner-hrl`
-- `question-answering` — default model: `Xenova/distilbert-base-cased-distilled-squad`
-- `fill-mask` — default model: `onnx-community/ettin-encoder-32m-ONNX`
-- `summarization` — default model: `Xenova/distilbart-cnn-6-6`
-- `translation` — default model: `Xenova/t5-small`
-- `text2text-generation` — default model: `Xenova/flan-t5-small`
-- `text-generation` — default model: `onnx-community/Qwen3-0.6B-ONNX`
-- `zero-shot-classification` — default model: `Xenova/distilbert-base-uncased-mnli`
-- `audio-classification` — default model: `Xenova/wav2vec2-base-superb-ks`
-- `zero-shot-audio-classification` — default model: `Xenova/clap-htsat-unfused`
-- `automatic-speech-recognition` _(alias: `asr`)_ — default model: `Xenova/whisper-tiny.en`
-- `text-to-audio` _(alias: `text-to-speech`)_ — default model: `onnx-community/Supertonic-TTS-ONNX`
-- `image-to-text` — default model: `Xenova/vit-gpt2-image-captioning`
-- `image-classification` — default model: `Xenova/vit-base-patch16-224`
-- `image-segmentation` — default model: `Xenova/detr-resnet-50-panoptic`
-- `background-removal` — default model: `Xenova/modnet`
-- `zero-shot-image-classification` — default model: `Xenova/clip-vit-base-patch32`
-- `object-detection` — default model: `Xenova/detr-resnet-50`
-- `zero-shot-object-detection` — default model: `Xenova/owlvit-base-patch32`
-- `document-question-answering` — default model: `Xenova/donut-base-finetuned-docvqa`
-- `image-to-image` — default model: `Xenova/swin2SR-classical-sr-x2-64`
-- `depth-estimation` — default model: `onnx-community/depth-anything-v2-small`
-- `feature-extraction` _(alias: `embeddings`)_ — default model: `onnx-community/all-MiniLM-L6-v2-ONNX`
-- `image-feature-extraction` — default model: `onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX`
+- [`text-classification`](references/TASKS.md#text-classification) _(alias: `sentiment-analysis`)_ — default model: `Xenova/distilbert-base-uncased-finetuned-sst-2-english`
+- [`token-classification`](references/TASKS.md#token-classification) _(alias: `ner`)_ — default model: `Xenova/bert-base-multilingual-cased-ner-hrl`
+- [`question-answering`](references/TASKS.md#question-answering) — default model: `Xenova/distilbert-base-cased-distilled-squad`
+- [`fill-mask`](references/TASKS.md#fill-mask) — default model: `onnx-community/ettin-encoder-32m-ONNX`
+- [`summarization`](references/TASKS.md#summarization) — default model: `Xenova/distilbart-cnn-6-6`
+- [`translation`](references/TASKS.md#translation) — default model: `Xenova/t5-small`
+- [`text2text-generation`](references/TASKS.md#text2text-generation) — default model: `Xenova/flan-t5-small`
+- [`text-generation`](references/TASKS.md#text-generation) — default model: `onnx-community/Qwen3-0.6B-ONNX`
+- [`zero-shot-classification`](references/TASKS.md#zero-shot-classification) — default model: `Xenova/distilbert-base-uncased-mnli`
+- [`audio-classification`](references/TASKS.md#audio-classification) — default model: `Xenova/wav2vec2-base-superb-ks`
+- [`zero-shot-audio-classification`](references/TASKS.md#zero-shot-audio-classification) — default model: `Xenova/clap-htsat-unfused`
+- [`automatic-speech-recognition`](references/TASKS.md#automatic-speech-recognition) _(alias: `asr`)_ — default model: `Xenova/whisper-tiny.en`
+- [`text-to-audio`](references/TASKS.md#text-to-audio) _(alias: `text-to-speech`)_ — default model: `onnx-community/Supertonic-TTS-ONNX`
+- [`image-to-text`](references/TASKS.md#image-to-text) — default model: `Xenova/vit-gpt2-image-captioning`
+- [`image-classification`](references/TASKS.md#image-classification) — default model: `Xenova/vit-base-patch16-224`
+- [`image-segmentation`](references/TASKS.md#image-segmentation) — default model: `Xenova/detr-resnet-50-panoptic`
+- [`background-removal`](references/TASKS.md#background-removal) — default model: `Xenova/modnet`
+- [`zero-shot-image-classification`](references/TASKS.md#zero-shot-image-classification) — default model: `Xenova/clip-vit-base-patch32`
+- [`object-detection`](references/TASKS.md#object-detection) — default model: `Xenova/detr-resnet-50`
+- [`zero-shot-object-detection`](references/TASKS.md#zero-shot-object-detection) — default model: `Xenova/owlvit-base-patch32`
+- [`document-question-answering`](references/TASKS.md#document-question-answering) — default model: `Xenova/donut-base-finetuned-docvqa`
+- [`image-to-image`](references/TASKS.md#image-to-image) — default model: `Xenova/swin2SR-classical-sr-x2-64`
+- [`depth-estimation`](references/TASKS.md#depth-estimation) — default model: `onnx-community/depth-anything-v2-small`
+- [`feature-extraction`](references/TASKS.md#feature-extraction) _(alias: `embeddings`)_ — default model: `onnx-community/all-MiniLM-L6-v2-ONNX`
+- [`image-feature-extraction`](references/TASKS.md#image-feature-extraction) — default model: `onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX`
 <!-- @generated:end id=task-list -->
 
 For full recipes — every task, grouped by modality, with runnable code —
