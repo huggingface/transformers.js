@@ -431,7 +431,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     ? cross_attentions[l].slice(null, h, null, [0, num_frames])
                     : cross_attentions[l].slice(null, h);
             }),
-        ).transpose(1, 0, 2, 3);
+        ).permute(1, 0, 2, 3);
 
         const [std, calculatedMean] = std_mean(weights, -2, 0, true);
 

@@ -203,7 +203,7 @@ export class RawImage {
         }
 
         if (channel_format === 'CHW') {
-            tensor = tensor.transpose(1, 2, 0);
+            tensor = tensor.permute(1, 2, 0);
         } else if (channel_format === 'HWC') {
             // Do nothing
         } else {
