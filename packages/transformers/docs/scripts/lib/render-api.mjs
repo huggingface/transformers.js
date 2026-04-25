@@ -129,6 +129,9 @@ function renderClass(cls, ctx) {
   const lines = [`### ${cls.name}`, ""];
   if (cls.description) lines.push(cleanDescription(cls.description), "");
   for (const ex of cls.examples) lines.push(...renderExample(ex));
+  if (cls.callable) {
+    lines.push(...renderFunction({ ...cls.callable, displayName: cls.name, anchorName: `${cls.name}-call` }, ctx, 4));
+  }
 
   for (const m of cls.members) {
     if (m.kind === "method") {
@@ -164,7 +167,7 @@ function shouldRenderMethod(m) {
 }
 
 function renderFunction(fn, ctx, depth, parent = null) {
-  const lines = [`<a id="${callableAnchor(fn.name, parent)}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
+  const lines = [`<a id="${callableAnchor(fn.anchorName ?? fn.name, parent)}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
   // Resolve generic type parameters (`@template {Constraint} T`) inside this
   // function's parameter/return types. Without the constraint map, a `T`
   // would render as `any`.
@@ -201,17 +204,21 @@ function signature(fn, parent) {
     .map((p) => (p.optional ? `[${p.name}]` : p.name))
     .join(", ");
   const owner = parent ? `${parent}.` : "";
-  return `\`${owner}${fn.name}(${params})\``;
+  return `\`${owner}${fn.displayName ?? fn.name}(${params})\``;
 }
 
 function renderCallback(cb, ctx) {
   const lines = [`### ${cb.name}`, ""];
+  const templateMap = new Map();
+  for (const t of cb.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
+  const cbCtx = templateMap.size ? { ...ctx, templates: templateMap } : ctx;
+
   if (cb.description) lines.push(cleanDescription(cb.description), "");
   if (cb.params?.length) {
-    lines.push("**Parameters**", "", ...renderParamList(cb.params, ctx), "");
+    lines.push("**Parameters**", "", ...renderParamList(cb.params, cbCtx), "");
   }
   if (cb.returns?.type || cb.returns?.description) {
-    const type = cb.returns.type ? renderType(cb.returns.type, ctx) : "";
+    const type = cb.returns.type ? renderType(cb.returns.type, cbCtx) : "";
     const desc = cb.returns.description ? ` — ${cb.returns.description}` : "";
     lines.push(`**Returns:** ${type}${desc}`, "");
   }

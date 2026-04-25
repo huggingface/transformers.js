@@ -1,22 +1,30 @@
 // Group per-file entities (from structure.mjs) into per-module IR. A module is
 // one `@module <name>` declaration — its output is `docs/api/<name>.md`.
 
+import path from "node:path";
 import { callableReferenceKey, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
 
 export function buildIR(fileEntities) {
   const modules = new Map();
+  const records = fileEntities.map(({ file, entities }) => ({ file, entities, module: resolveModule(entities) }));
+  const moduleByFile = new Map(records.filter((r) => r.module).map((r) => [r.file, r.module.name]));
+  const typeBlocksByFile = buildTypeBlocksByFile(records);
 
-  for (const { entities } of fileEntities) {
-    const mod = resolveModule(entities);
+  for (const { file, entities, module: mod } of records) {
     if (!mod) continue;
     const entry = modules.get(mod.name) ?? newModule(mod.name);
     if (!entry.description && mod.description) entry.description = mod.description;
     entry.examples.push(...mod.examples);
     ingest(entities, entry);
+    for (const helperFile of importedHelperFiles(entities, file, moduleByFile, typeBlocksByFile)) {
+      entry.helperFiles.add(helperFile);
+    }
     modules.set(mod.name, entry);
   }
 
   const moduleList = [...modules.values()];
+  attachImportedHelperTypes(moduleList, typeBlocksByFile);
+  attachClassCallables(moduleList);
   resolveCallableAliases(moduleList);
   return { modules: moduleList, typedefIndex: buildTypedefIndex(modules) };
 }
@@ -67,7 +75,76 @@ function newModule(name) {
     typedefs: [],
     callbacks: [],
     constants: [],
+    helperFiles: new Set(),
   };
+}
+
+function buildTypeBlocksByFile(records) {
+  const byFile = new Map();
+  for (const { file, entities } of records) {
+    const bucket = { typedefs: [], callbacks: [] };
+    for (const block of entities.typedefs) {
+      if (!isPrivate(block)) collectTypedefsFromBlock(block, bucket);
+    }
+    byFile.set(file, bucket);
+  }
+  return byFile;
+}
+
+function importedHelperFiles(entities, file, moduleByFile, typeBlocksByFile) {
+  const out = new Set();
+  for (const block of entities.typedefs) {
+    for (const tag of block.tags) {
+      if (tag.tag !== "typedef") continue;
+      const ref = parseImportedTypeRef(tag.type, file);
+      if (!ref || moduleByFile.has(ref.file) || !typeBlocksByFile.has(ref.file)) continue;
+      out.add(ref.file);
+    }
+  }
+  return out;
+}
+
+function attachImportedHelperTypes(modules, typeBlocksByFile) {
+  for (const mod of modules) {
+    if (!mod.helperFiles.size) continue;
+    const helpers = { typedefs: [], callbacks: [] };
+    for (const file of [...mod.helperFiles].sort()) {
+      const block = typeBlocksByFile.get(file);
+      if (!block) continue;
+      mergeByName(helpers.typedefs, block.typedefs);
+      mergeByName(helpers.callbacks, block.callbacks);
+    }
+    mod.typedefs = dedupeTypes([...helpers.typedefs, ...mod.typedefs]);
+    mod.callbacks = dedupeTypes([...helpers.callbacks, ...mod.callbacks]);
+  }
+}
+
+function mergeByName(target, items) {
+  const seen = new Set(target.map((item) => item.name));
+  for (const item of items) {
+    if (!item.name || seen.has(item.name)) continue;
+    target.push(clone(item));
+    seen.add(item.name);
+  }
+}
+
+function dedupeTypes(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (!item.name || seen.has(item.name)) return false;
+    seen.add(item.name);
+    return true;
+  });
+}
+
+function parseImportedTypeRef(type, fromFile) {
+  const m = type?.trim().match(/^import\(['"]([^'"]+)['"]\)\.([A-Za-z_$][\w$]*)$/);
+  if (!m || !m[1].startsWith(".")) return null;
+  return { file: resolveJsPath(path.resolve(path.dirname(fromFile), m[1])), name: m[2] };
+}
+
+function resolveJsPath(file) {
+  return path.extname(file) ? file : `${file}.js`;
 }
 
 function ingest(entities, mod) {
@@ -83,6 +160,7 @@ function ingest(entities, mod) {
       examples,
       skillExamples: tagsOf(cls, "skillExample").map((t) => t.task),
       members: cls.members.filter((m) => !isPrivate(m)).map(buildMember),
+      callable: null,
     });
   }
   for (const fn of entities.functions) {
@@ -120,13 +198,20 @@ function collectTypedefsFromBlock(block, mod) {
   for (const tag of block.tags) {
     if (tag.tag === "typedef") {
       flush();
-      current = {
-        kind: "typedef",
+      const callable = parseCallableTypedef({
         name: tag.name,
         type: tag.type,
         description: tag.description || (first ? block.description : ""),
-        properties: [],
-      };
+      });
+      current = callable
+        ? { ...callable, kind: "callback" }
+        : {
+            kind: "typedef",
+            name: tag.name,
+            type: tag.type,
+            description: tag.description || (first ? block.description : ""),
+            properties: [],
+          };
       first = false;
     } else if (tag.tag === "callback") {
       flush();
@@ -178,6 +263,182 @@ function buildCallable(fn) {
   };
 }
 
+function attachClassCallables(modules) {
+  for (const mod of modules) {
+    const callbacks = new Map(mod.callbacks.map((cb) => [cb.name, cb]));
+
+    for (const cls of mod.classes) {
+      const callMember = cls.members.find((m) => m.kind === "method" && m.name === "_call");
+      const callbackName = `${cls.name}Callback`;
+      const callback = callbacks.get(callbackName);
+      const source = callback ?? (callMember && hasCallableShape(callMember) ? callMember : null);
+      if (!source) continue;
+
+      cls.callable = {
+        ...normalizeCallable(source),
+        name: cls.name,
+        description: "",
+        deprecated: false,
+      };
+    }
+  }
+}
+
+function normalizeCallable(callable) {
+  const cloned = clone(callable);
+  return {
+    ...cloned,
+    params: cloned.params ?? [],
+    returns: cloned.returns ?? null,
+    aliasType: cloned.aliasType ?? null,
+    throws: cloned.throws ?? [],
+    templates: cloned.templates ?? [],
+    examples: cloned.examples ?? [],
+    skillExamples: cloned.skillExamples ?? [],
+  };
+}
+
+function hasCallableShape(callable) {
+  return !!(callable.params?.length || callable.returns?.type || callable.returns?.description || callable.aliasType);
+}
+
+function parseCallableTypedef(td) {
+  const parsed = parseFunctionType(td.type);
+  if (!parsed) return null;
+  return {
+    name: td.name,
+    description: td.description,
+    params: parsed.params,
+    returns: parsed.returns,
+    aliasType: null,
+    throws: [],
+    templates: parsed.templates,
+    examples: [],
+    skillExamples: [],
+    deprecated: false,
+  };
+}
+
+function parseFunctionType(raw) {
+  if (!raw) return null;
+  let text = raw.trim();
+  const templates = [];
+
+  if (text.startsWith("<")) {
+    const end = matchingBracket(text, 0, "<", ">");
+    if (end === -1) return null;
+    templates.push(...parseTemplateList(text.slice(1, end)));
+    text = text.slice(end + 1).trim();
+  }
+
+  if (!text.startsWith("(")) return null;
+  const paramsEnd = matchingBracket(text, 0, "(", ")");
+  if (paramsEnd === -1 || text.slice(paramsEnd + 1).trimStart().slice(0, 2) !== "=>") return null;
+
+  const params = splitTopLevel(text.slice(1, paramsEnd), ",")
+    .map((part) => parseFunctionTypeParam(part.trim()))
+    .filter(Boolean);
+  const returnType = text.slice(paramsEnd + 1).trimStart().slice(2).trim();
+
+  return {
+    templates,
+    params,
+    returns: returnType ? { type: returnType, description: "" } : null,
+  };
+}
+
+function parseTemplateList(raw) {
+  return splitTopLevel(raw, ",")
+    .map((part) => {
+      const m = part.trim().match(/^([A-Za-z_$][\w$]*)(?:\s+extends\s+(.+))?$/);
+      return m ? { name: m[1], type: m[2]?.trim() ?? null } : null;
+    })
+    .filter(Boolean);
+}
+
+function parseFunctionTypeParam(raw) {
+  if (!raw) return null;
+  const colon = findTopLevel(raw, ":");
+  if (colon === -1) return { name: raw.replace(/\?$/, ""), type: null, optional: raw.endsWith("?"), defaultValue: null, description: "" };
+  const name = raw.slice(0, colon).trim();
+  return {
+    name: name.replace(/\?$/, ""),
+    type: raw.slice(colon + 1).trim(),
+    optional: name.endsWith("?"),
+    defaultValue: null,
+    description: "",
+  };
+}
+
+function matchingBracket(text, start, open, close) {
+  if (text[start] !== open) return -1;
+  let depth = 1;
+  let inStr = null;
+  for (let i = start + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      inStr = ch;
+    } else if (ch === open) {
+      depth++;
+    } else if (ch === close && --depth === 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function findTopLevel(text, needle) {
+  let depth = 0;
+  let inStr = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      inStr = ch;
+    } else if ("<({[".includes(ch)) {
+      depth++;
+    } else if (">)}]".includes(ch)) {
+      depth--;
+    } else if (depth === 0 && ch === needle) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function splitTopLevel(text, sep) {
+  const out = [];
+  let depth = 0;
+  let inStr = null;
+  let buf = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
+      buf += ch;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      inStr = ch;
+      buf += ch;
+    } else if ("<({[".includes(ch)) {
+      depth++;
+      buf += ch;
+    } else if (">)}]".includes(ch)) {
+      depth--;
+      buf += ch;
+    } else if (depth === 0 && ch === sep) {
+      out.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf) out.push(buf);
+  return out.length > 1 ? out : [text];
+}
+
 function resolveCallableAliases(modules) {
   const callableIndex = buildCallableIndex(modules);
 
@@ -199,6 +460,7 @@ function buildCallableIndex(modules) {
   for (const mod of modules) {
     for (const fn of mod.functions) index.set(fn.name, fn);
     for (const cls of mod.classes) {
+      if (cls.callable) index.set(cls.name, cls.callable);
       for (const m of cls.members) {
         if (m.kind === "method") index.set(`${cls.name}.${m.name}`, m);
       }
@@ -211,6 +473,7 @@ function* allCallables(modules) {
   for (const mod of modules) {
     yield* mod.functions;
     for (const cls of mod.classes) {
+      if (cls.callable) yield cls.callable;
       for (const m of cls.members) {
         if (m.kind === "method") yield m;
       }
