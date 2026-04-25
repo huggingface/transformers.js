@@ -534,6 +534,7 @@ export function prettifyTypeString(raw) {
   s = stripLeading(s, "<", ">"); // <T extends X>(...)
   s = s.replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1");
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
+  s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, "'$1'");
 
   if (isRenderableUtilityType(s)) {
     return s.replace(/\s+/g, " ").trim();
