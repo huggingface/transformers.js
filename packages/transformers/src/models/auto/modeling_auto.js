@@ -148,7 +148,10 @@ class PretrainedMixin {
  * ```
  */
 export class AutoModel extends PretrainedMixin {
-    /** @type {Map<string, Object>[]} */
+    /**
+     * @internal
+     * @type {Map<string, Object>[]}
+     */
     // @ts-ignore
     static MODEL_CLASS_MAPPINGS = MODEL_CLASS_TYPE_MAPPING.map((x) => x[0]);
     static BASE_IF_FAIL = true;

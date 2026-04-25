@@ -509,6 +509,8 @@ export class PretrainedConfig {
  * `PretrainedConfig.from_pretrained`.
  *
  * ```javascript
+ * import { AutoConfig } from '@huggingface/transformers';
+ *
  * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
  * ```
  */

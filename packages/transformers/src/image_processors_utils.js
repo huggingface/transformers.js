@@ -1,3 +1,7 @@
+/**
+ * @module processors
+ */
+
 import { Callable } from './utils/generic.js';
 import { Tensor, interpolate, stack } from './utils/tensor.js';
 import { bankers_round, max, min, softmax } from './utils/maths.js';
@@ -60,7 +64,7 @@ function enforce_size_divisibility([width, height], divisor) {
  * Converts bounding boxes from center format to corners format.
  *
  * @param {number[]} arr The coordinate for the center of the box and its width, height dimensions (center_x, center_y, width, height)
- * @returns {number[]} The coodinates for the top-left and bottom-right corners of the box (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+ * @returns {number[]} The coordinates for the top-left and bottom-right corners of the box (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
  */
 export function center_to_corners_format([centerX, centerY, width, height]) {
     return [centerX - width / 2, centerY - height / 2, centerX + width / 2, centerY + height / 2];
@@ -554,17 +558,20 @@ export function post_process_instance_segmentation(outputs, threshold = 0.5, tar
  * Can be overridden by `do_center_crop` in the `preprocess` method.
  * @property {boolean} [do_thumbnail] Whether to resize the image using thumbnail method.
  * @property {boolean} [keep_aspect_ratio] If `true`, the image is resized to the largest possible size such that the aspect ratio is preserved.
- * Can be overidden by `keep_aspect_ratio` in `preprocess`.
+ * Can be overridden by `keep_aspect_ratio` in `preprocess`.
  * @property {number} [ensure_multiple_of] If `do_resize` is `true`, the image is resized to a size that is a multiple of this value.
- * Can be overidden by `ensure_multiple_of` in `preprocess`.
+ * Can be overridden by `ensure_multiple_of` in `preprocess`.
  *
  * @property {number[]} [mean] The mean values for image normalization (same as `image_mean`).
  * @property {number[]} [std] The standard deviation values for image normalization (same as `image_std`).
  */
 
+/**
+ * Base class for image processors.
+ */
 export class ImageProcessor extends Callable {
     /**
-     * Constructs a new `ImageProcessor`.
+     * Create an image processor from a parsed `preprocessor_config.json`.
      * @param {ImageProcessorConfig} config The configuration object.
      */
     constructor(config) {
@@ -776,7 +783,7 @@ export class ImageProcessor extends Callable {
     }
 
     /**
-     * Rescale the image' pixel values by `this.rescale_factor`.
+     * Rescale the image pixel values by `this.rescale_factor`.
      * @param {Float32Array} pixelData The pixel data to rescale.
      * @returns {void}
      */
@@ -1036,10 +1043,8 @@ export class ImageProcessor extends Callable {
     }
 
     /**
-     * Calls the feature extraction process on an array of images,
-     * preprocesses each image, and concatenates the resulting
-     * features into a single Tensor.
-     * @param {RawImage[]} images The image(s) to extract features from.
+     * Preprocess one or more images and batch the result into `pixel_values`.
+     * @param {RawImage|RawImage[]} images The image or images to preprocess.
      * @param {...any} args Additional arguments.
      * @returns {Promise<ImageProcessorResult>} An object containing the concatenated pixel values (and other metadata) of the preprocessed images.
      */
@@ -1080,7 +1085,7 @@ export class ImageProcessor extends Callable {
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
      * @param {import('./utils/hub.js').PretrainedOptions} options Additional options for loading the processor.
      *
-     * @returns {Promise<ImageProcessor>} A new instance of the Processor class.
+     * @returns {Promise<ImageProcessor>} A new image processor instance.
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const preprocessorConfig = await getModelJSON(

@@ -1,13 +1,17 @@
+/**
+ * @module processors
+ */
+
 import { FEATURE_EXTRACTOR_NAME } from './utils/constants.js';
 import { Callable } from './utils/generic.js';
 import { getModelJSON } from './utils/hub.js';
 
 /**
- * Base class for feature extractors.
+ * Base class for audio feature extractors.
  */
 export class FeatureExtractor extends Callable {
     /**
-     * Constructs a new FeatureExtractor instance.
+     * Create a feature extractor from a parsed `preprocessor_config.json`.
      *
      * @param {Object} config The configuration for the feature extractor.
      */
@@ -29,7 +33,7 @@ export class FeatureExtractor extends Callable {
      * - A path to a *directory* containing feature_extractor files, e.g., `./my_model_directory/`.
      * @param {import('./utils/hub.js').PretrainedOptions} options Additional options for loading the feature_extractor.
      *
-     * @returns {Promise<FeatureExtractor>} A new instance of the Feature Extractor class.
+     * @returns {Promise<FeatureExtractor>} A new feature extractor instance.
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const config = await getModelJSON(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME, true, options);

@@ -37,7 +37,8 @@ import { getModelJSON, getModelText } from './utils/hub.js';
  */
 
 /**
- * Represents a Processor that extracts features from an input.
+ * Multi-modal preprocessor that delegates to the tokenizer, image processor,
+ * and/or feature extractor required by a model.
  */
 export class Processor extends Callable {
     static classes = ['image_processor_class', 'tokenizer_class', 'feature_extractor_class'];
@@ -45,10 +46,10 @@ export class Processor extends Callable {
     static uses_chat_template_file = false;
 
     /**
-     * Creates a new Processor with the given components
-     * @param {Object} config
-     * @param {Record<string, Object>} components
-     * @param {string} chat_template
+     * Create a processor from parsed config and its component preprocessors.
+     * @param {Object} config Processor configuration.
+     * @param {Record<string, Object>} components Loaded tokenizer, image processor, and/or feature extractor.
+     * @param {string|null} chat_template Optional chat template loaded from the model repo.
      */
     constructor(config, components, chat_template) {
         super();
@@ -147,7 +148,7 @@ export class Processor extends Callable {
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
      * @param {PretrainedProcessorOptions} options Additional options for loading the processor.
      *
-     * @returns {Promise<Processor>} A new instance of the Processor class.
+     * @returns {Promise<Processor>} A new processor instance.
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const [config, components, chat_template] = await Promise.all([
