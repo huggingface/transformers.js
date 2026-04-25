@@ -1,6 +1,8 @@
 // Group per-file entities (from structure.mjs) into per-module IR. A module is
 // one `@module <name>` declaration — its output is `docs/api/<name>.md`.
 
+import { callableReferenceKey, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
+
 export function buildIR(fileEntities) {
   const modules = new Map();
 
@@ -14,7 +16,9 @@ export function buildIR(fileEntities) {
     modules.set(mod.name, entry);
   }
 
-  return { modules: [...modules.values()], typedefIndex: buildTypedefIndex(modules) };
+  const moduleList = [...modules.values()];
+  resolveCallableAliases(moduleList);
+  return { modules: moduleList, typedefIndex: buildTypedefIndex(modules) };
 }
 
 // Classes win (authoritative for a name). Typedefs fill gaps. Re-export
@@ -160,6 +164,7 @@ function buildCallable(fn) {
     description,
     params: tagsOf(fn, "param").map(normalizeParam),
     returns: pickReturns(fn),
+    aliasType: typeOf(fn),
     throws: tagsOf(fn, "throws").map((t) => ({ type: t.type, description: t.description })),
     // `@template {Constraint} Name` maps the generic name to its constraint;
     // used by the renderer to resolve generic parameter names to something
@@ -171,6 +176,84 @@ function buildCallable(fn) {
     skillExamples: tagsOf(fn, "skillExample").map((t) => t.task),
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
   };
+}
+
+function resolveCallableAliases(modules) {
+  const callableIndex = buildCallableIndex(modules);
+
+  for (const callable of allCallables(modules)) {
+    const target = findCallable(callable.aliasType, callableIndex);
+    if (target && target !== callable) inheritCallable(callable, target);
+  }
+
+  for (const callable of allCallables(modules)) {
+    for (const param of callable.params ?? []) {
+      param.type = resolveUtilityType(param.type, callableIndex) ?? param.type;
+    }
+    if (callable.returns?.type) {
+      callable.returns.type = resolveUtilityType(callable.returns.type, callableIndex) ?? callable.returns.type;
+    }
+  }
+}
+
+function buildCallableIndex(modules) {
+  const index = new Map();
+  for (const mod of modules) {
+    for (const fn of mod.functions) index.set(fn.name, fn);
+    for (const cls of mod.classes) {
+      for (const m of cls.members) {
+        if (m.kind === "method") index.set(`${cls.name}.${m.name}`, m);
+      }
+    }
+  }
+  return index;
+}
+
+function* allCallables(modules) {
+  for (const mod of modules) {
+    yield* mod.functions;
+    for (const cls of mod.classes) {
+      for (const m of cls.members) {
+        if (m.kind === "method") yield m;
+      }
+    }
+  }
+}
+
+function inheritCallable(callable, target) {
+  if (!callable.description) callable.description = target.description;
+  if (!callable.params?.length && target.params?.length) callable.params = clone(target.params);
+  if (!callable.returns && target.returns) callable.returns = clone(target.returns);
+  if (!callable.throws?.length && target.throws?.length) callable.throws = clone(target.throws);
+  if (!callable.templates?.length && target.templates?.length) callable.templates = clone(target.templates);
+  if (!callable.examples?.length && target.examples?.length) callable.examples = clone(target.examples);
+}
+
+function resolveUtilityType(type, callableIndex) {
+  const utility = parseUtilityType(type);
+  if (!utility) return null;
+
+  const target = findCallable(utility.target, callableIndex);
+  if (!target) return null;
+
+  if (utility.kind === UTILITY_TYPES.PARAMETERS && utility.index != null) {
+    return target.params?.[utility.index]?.type ?? null;
+  }
+
+  if (utility.kind === UTILITY_TYPES.RETURN_TYPE && utility.index == null) {
+    return target.returns?.type ?? null;
+  }
+
+  return null;
+}
+
+function findCallable(ref, callableIndex) {
+  const key = callableReferenceKey(ref);
+  return key ? callableIndex.get(key) : null;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function tagsOf(entity, name) {

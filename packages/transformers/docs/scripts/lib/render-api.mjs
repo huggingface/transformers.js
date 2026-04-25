@@ -3,6 +3,8 @@
 // - Never emit raw HTML tables or `&lt;code&gt;` escaping
 // - Filter to the library's public export surface
 
+import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
+
 export function renderModule(mod, ir, opts = {}) {
   const ctx = { typedefIndex: ir.typedefIndex, moduleName: mod.name };
   const publicNames = opts.publicNames ?? null;
@@ -289,6 +291,7 @@ function renderTypedef(td, ctx) {
 // ---------- type rendering ----------
 
 const GENERIC_WRAPPERS = /^(Promise|Array|Record|Map|Set|Iterable|AsyncIterable|Partial|Readonly)<(.+)>$/;
+const NAMED_GENERIC = /^([A-Za-z_$][\w$.]*)<(.+)>$/;
 const SIMPLE_NAME = new RegExp(`^[A-Za-z_$][\\w$.]*$`);
 const INDEXED_NAME = /^([A-Za-z_$][\w$.]*)\[[^\]]+\]$/;
 
@@ -297,6 +300,9 @@ const INDEXED_NAME = /^([A-Za-z_$][\w$.]*)\[[^\]]+\]$/;
 export function renderType(raw, ctx, opts = {}) {
   const pretty = prettifyTypeString(raw);
   if (opts.noLink) return `\`${pretty}\``;
+
+  const utility = parseUtilityType(pretty);
+  if (utility) return renderUtilityType(utility, ctx);
 
   // Unions split first. `_`-prefixed variants (internal types from intersections)
   // are filtered out so they don't leak into the public docs.
@@ -312,6 +318,10 @@ export function renderType(raw, ctx, opts = {}) {
     .filter((p) => !/^_[A-Za-z]/.test(p));
   if (intersectParts.length > 1) return intersectParts.map((p) => renderType(p, ctx)).join(" & ");
   if (intersectParts.length === 1 && intersectParts[0] !== pretty.trim()) return renderType(intersectParts[0], ctx);
+
+  if (pretty.endsWith("[]")) {
+    return renderArrayType(pretty.slice(0, -2), ctx);
+  }
 
   if (SIMPLE_NAME.test(pretty)) {
     // `@template {Constraint} T` — render `T` as its constraint when we know it.
@@ -333,16 +343,57 @@ export function renderType(raw, ctx, opts = {}) {
     return `\`${wrapper[1]}\`<${rendered}>`;
   }
 
+  const namedGeneric = pretty.match(NAMED_GENERIC);
+  if (namedGeneric && ctx.typedefIndex?.has(namedGeneric[1])) {
+    const innerParts = splitTopLevel(namedGeneric[2], ",");
+    const rendered = innerParts.map((p) => renderGenericArgument(p.trim(), ctx)).join(", ");
+    const outer = linkIfKnown(namedGeneric[1], ctx) ?? `\`${namedGeneric[1]}\``;
+    return `${outer}<${rendered}>`;
+  }
+
   return `\`${pretty}\``;
 }
 
+function renderGenericArgument(raw, ctx) {
+  if (SIMPLE_NAME.test(raw) && isGenericParamName(raw) && !ctx.templates?.has(raw)) {
+    return `\`${raw}\``;
+  }
+  return renderType(raw, ctx);
+}
+
+function renderArrayType(innerRaw, ctx) {
+  const rendered = renderType(innerRaw, ctx);
+  const code = rendered.match(/^`([^`]+)`$/);
+  return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
+}
+
 function linkIfKnown(name, ctx) {
+  if (!ctx.typedefIndex?.has(name) || name === ctx.selfName) return null;
+  return linkKnownName(name, name, ctx);
+}
+
+function linkKnownName(name, label, ctx) {
   if (!ctx.typedefIndex?.has(name) || name === ctx.selfName) return null;
   const anchor = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `[\`${name}\`](./${ctx.typedefIndex.get(name)}.md#${anchor})`;
+  return `[\`${label}\`](./${ctx.typedefIndex.get(name)}.md#${anchor})`;
+}
+
+function renderUtilityType(utility, ctx) {
+  const target = renderCallableReference(utility.target, ctx) ?? `\`${prettifyTypeString(utility.target)}\``;
+  const suffix = utility.index == null ? "" : `[\`${utility.index}\`]`;
+  return `\`${utility.kind}\`<${target}>${suffix}`;
+}
+
+function renderCallableReference(raw, ctx) {
+  const ref = parseCallableReference(raw);
+  if (!ref) return null;
+  if (ref.method) {
+    return linkKnownName(ref.owner, `${ref.owner}.${ref.method}`, ctx) ?? `\`${ref.owner}.${ref.method}\``;
+  }
+  return linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
 }
 
 // Split `text` on `sep`, ignoring separators inside brackets, braces, parens,
@@ -381,7 +432,6 @@ function splitTopLevel(text, sep) {
 // Conditional/mapped/infer types collapse to their outermost wrapper; simple
 // unions of names or long generic lists are preserved so the renderer can
 // split them into individual links.
-const TS_UTILITY_NAMES = new Set(["Parameters", "ReturnType", "ConstructorParameters", "InstanceType", "ThisType"]);
 export function prettifyTypeString(raw) {
   if (!raw) return "";
   let s = raw.trim();
@@ -389,6 +439,10 @@ export function prettifyTypeString(raw) {
   s = stripLeading(s, "<", ">"); // <T extends X>(...)
   s = s.replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1");
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
+
+  if (isRenderableUtilityType(s)) {
+    return s.replace(/\s+/g, " ").trim();
+  }
 
   if (isGnarly(s)) {
     const outer = s.match(/^([A-Za-z_$][\w$.]*)(?:<|\s|$)/);
