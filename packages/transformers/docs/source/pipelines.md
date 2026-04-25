@@ -45,8 +45,6 @@ const result = await classifier([
 
 You can also specify a different model to use for the pipeline by passing it as the second argument to the `pipeline()` function. For example, to use a different model for sentiment analysis (like one trained to predict sentiment of a review as a number of stars between 1 and 5), you can do:
 
-<!-- TODO: REPLACE 'nlptown/bert-base-multilingual-uncased-sentiment' with 'nlptown/bert-base-multilingual-uncased-sentiment'-->
-
 ```javascript
 const reviewer = await pipeline(
   "sentiment-analysis",
@@ -62,8 +60,6 @@ const result = await reviewer(
 Transformers.js supports loading any model hosted on the Hugging Face Hub, provided it has ONNX weights (located in a subfolder called `onnx`). For more information on how to convert your PyTorch, TensorFlow, or JAX model to ONNX, see the [conversion section](./custom_usage#convert-your-models-to-onnx).
 
 The `pipeline()` function is a great way to quickly use a pretrained model for inference, as it takes care of all the preprocessing and postprocessing for you. For example, if you want to perform Automatic Speech Recognition (ASR) using OpenAI's Whisper model, you can do:
-
-<!-- TODO: Replace 'Xenova/whisper-small.en' with 'openai/whisper-small.en' -->
 
 ```javascript
 // Create a pipeline for Automatic Speech Recognition
@@ -112,11 +108,9 @@ const transcriber = await pipeline(
 
 For the full list of options, check out the [PretrainedOptions](./api/utils/hub#module_utils/hub..PretrainedOptions) documentation.
 
-### Running
+### Runtime parameters
 
 Many pipelines have additional options that you can specify. For example, when using a model that does multilingual translation, you can specify the source and target languages like this:
-
-<!-- TODO: Replace 'Xenova/nllb-200-distilled-600M' with 'facebook/nllb-200-distilled-600M' -->
 
 ```javascript
 // Create a pipeline for translation
@@ -143,8 +137,6 @@ const result2 = await translator(result[0].translation_text, {
 When using models that support auto-regressive generation, you can specify generation parameters like the number of new tokens, sampling methods, temperature, repetition penalty, and much more. For a full list of available parameters, see to the [GenerationConfig](./api/utils/generation#module_utils/generation.GenerationConfig) class.
 
 For example, to generate a poem using `LaMini-Flan-T5-783M`, you can do:
-
-<!-- TODO: Replace 'Xenova/LaMini-Flan-T5-783M' with 'MBZUAI/LaMini-Flan-T5-783M' -->
 
 ```javascript
 // Create a pipeline for text2text-generation
