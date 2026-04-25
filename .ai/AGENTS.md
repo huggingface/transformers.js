@@ -29,18 +29,28 @@ Before opening a pull request:
 pnpm install
 pnpm --filter @huggingface/transformers test
 pnpm --filter @huggingface/transformers typegen
-pnpm --filter @huggingface/transformers docs-api
+pnpm --filter @huggingface/transformers docs-generate
 ```
 
 ## Documentation generation
 
-The `docs/source/api/` markdown is auto-generated from JSDoc comments in `src/**/*.js`
-by [`docs/scripts/generate.js`](../packages/transformers/docs/scripts/generate.js).
-Regenerate after any JSDoc change:
+Run the full documentation generator after any JSDoc, docs snippet, task metadata,
+or generated skill content change:
 
 ```bash
-pnpm --filter @huggingface/transformers docs-api
+pnpm --filter @huggingface/transformers docs-generate
 ```
 
-The `.ai/skills/transformers-js/references/TASK_EXAMPLES.md` and `API_SUMMARY.md` files
-are also auto-generated (see `docs-skill`). Do not edit them by hand.
+`docs-generate` runs [`docs/scripts/generate-all.js`](../packages/transformers/docs/scripts/generate-all.js),
+which generates:
+
+- `packages/transformers/docs/source/api/**/*.md` from JSDoc comments in
+  `packages/transformers/src/**/*.js`.
+- `.ai/skills/transformers-js/references/TASK_EXAMPLES.md` and
+  `.ai/skills/transformers-js/references/API_SUMMARY.md`.
+
+Do not edit generated API pages or generated skill reference files by hand. Update
+the source JSDoc, docs snippets, or generator modules instead.
+
+The generator also validates generated API pages against `docs/source/_toctree.yml`
+and checks local Markdown links and anchors under `docs/source/`.
