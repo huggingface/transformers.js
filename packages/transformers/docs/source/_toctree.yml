@@ -82,6 +82,8 @@
           title: Image
         - local: api/utils/audio
           title: Audio
+        - local: api/utils/video
+          title: Video
         - local: api/utils/tensor
           title: Tensor
         - local: api/utils/maths
