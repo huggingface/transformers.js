@@ -1,6 +1,35 @@
+import fs from "node:fs";
 
-import re
-README_TEMPLATE = """
+const DOCS_BASE_URL = "https://huggingface.co/docs/transformers.js";
+
+const FILES_TO_INCLUDE = {
+  intro: "./docs/snippets/0_introduction.snippet",
+  quickTour: "./docs/snippets/1_quick-tour.snippet",
+  installation: "./docs/snippets/2_installation.snippet",
+  customUsage: "./docs/snippets/3_custom-usage.snippet",
+  tasks: "./docs/snippets/4_supported-tasks.snippet",
+  models: "./docs/snippets/5_supported-models.snippet",
+};
+
+// Links that should point somewhere other than the direct docs URL.
+const CUSTOM_LINK_MAP = {
+  "/custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
+  "./api/env": `${DOCS_BASE_URL}/api/env`,
+  "./guides/webgpu": `${DOCS_BASE_URL}/guides/webgpu`,
+  "./guides/dtypes": `${DOCS_BASE_URL}/guides/dtypes`,
+};
+
+function main() {
+  const snippets = Object.fromEntries(
+    Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(file, "utf8")]),
+  );
+
+  const readme = fixLinks(renderTemplate(snippets));
+  fs.writeFileSync("README.md", readme, "utf8");
+}
+
+function renderTemplate({ intro, installation, quickTour, customUsage, tasks, models }) {
+  return `
 
 <p align="center">
     <br/>
@@ -20,19 +49,19 @@ README_TEMPLATE = """
     <a href="https://huggingface.co/docs/transformers.js/index"><img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online"></a>
 </p>
 
-{intro}
+${intro}
 
 ## Installation
 
-{installation}
+${installation}
 
 ## Quick tour
 
-{quick_tour}
+${quickTour}
 
 ## Custom usage
 
-{custom_usage}
+${customUsage}
 
 ## Supported tasks/models
 
@@ -40,69 +69,22 @@ Here is the list of all tasks and architectures currently supported by Transform
 
 To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)). You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
 
-{tasks}
+${tasks}
 
-{models}
-"""
-
-
-FILES_TO_INCLUDE = dict(
-    intro='./docs/snippets/0_introduction.snippet',
-    quick_tour='./docs/snippets/1_quick-tour.snippet',
-    installation='./docs/snippets/2_installation.snippet',
-    custom_usage='./docs/snippets/3_custom-usage.snippet',
-    tasks='./docs/snippets/4_supported-tasks.snippet',
-    models='./docs/snippets/5_supported-models.snippet',
-)
-
-DOCS_BASE_URL = 'https://huggingface.co/docs/transformers.js'
-
-# Map of custom links to replace, typically used for links to other sections of the README.
-CUSTOM_LINK_MAP = {
-    '/custom_usage#convert-your-models-to-onnx': '#convert-your-models-to-onnx',
-    './api/env': DOCS_BASE_URL + '/api/env',
-    './guides/webgpu': DOCS_BASE_URL + '/guides/webgpu',
-    './guides/dtypes': DOCS_BASE_URL + '/guides/dtypes',
+${models}
+`;
 }
 
+function fixLinks(markdown) {
+  return markdown.replace(/(?<=\])\((.+?)\)/gm, (_, rawLink) => {
+    let link = rawLink;
+    if (link in CUSTOM_LINK_MAP) {
+      link = CUSTOM_LINK_MAP[link];
+    } else if (link.startsWith("/")) {
+      link = `${DOCS_BASE_URL}${link}`;
+    }
+    return `(${link})`;
+  });
+}
 
-def main():
-
-    file_data = {}
-    for key, file_path in FILES_TO_INCLUDE.items():
-        with open(file_path, encoding='utf-8') as f:
-            file_data[key] = f.read()
-
-    # Fix links:
-    # NOTE: This regex does not match all markdown links, but works for the ones we need to replace.
-    LINK_RE = r'(?<=\])\((.+?)\)'
-
-    def replace_fn(match):
-        link = match.group(1)
-
-        if link in CUSTOM_LINK_MAP:
-            link = CUSTOM_LINK_MAP[link]
-
-        elif link.startswith('/'):
-            # Link to docs
-            link = DOCS_BASE_URL + link
-
-        elif link.startswith('./'):
-            # Relative link to file
-            pass
-
-        elif link.startswith('http'):
-            # Link to external site
-            pass
-
-        return f'({link})'
-
-    result = README_TEMPLATE.format(**file_data)
-    result = re.sub(LINK_RE, replace_fn, result, count=0, flags=re.MULTILINE)
-
-    with open('README.md', 'w', encoding='utf-8') as f:
-        f.write(result)
-
-
-if __name__ == '__main__':
-    main()
+main();
