@@ -46,8 +46,8 @@ which generates:
 
 - `packages/transformers/docs/source/api/**/*.md` from JSDoc comments in
   `packages/transformers/src/**/*.js`.
-- `.ai/skills/transformers-js/references/TASK_EXAMPLES.md` and
-  `.ai/skills/transformers-js/references/API_SUMMARY.md`.
+- Generated sections in `.ai/skills/transformers-js/SKILL.md`.
+- `.ai/skills/transformers-js/references/TASKS.md`.
 
 Do not edit generated API pages or generated skill reference files by hand. Update
 the source JSDoc, docs snippets, or generator modules instead.
