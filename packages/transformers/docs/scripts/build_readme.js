@@ -36,6 +36,7 @@ function main() {
   const apiLinks = buildApiSymbolLinks(ir, publicNames);
   const snippets = Object.fromEntries(Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]));
 
+  snippets.customUsage = demoteHeadings(snippets.customUsage);
   const readme = fixLinks(renderTemplate(snippets), apiLinks);
   fs.writeFileSync(path.resolve(packageRoot, out), readme, "utf8");
 }
@@ -96,6 +97,10 @@ ${tasks}
 
 ${models}
 `;
+}
+
+function demoteHeadings(markdown) {
+  return markdown.replace(/^#{1,5}(?=\s)/gm, "#$&");
 }
 
 function fixLinks(markdown, apiLinks) {

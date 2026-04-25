@@ -210,7 +210,7 @@ async function detect(img) {
 
 <Tip>
 
-NOTE: The `detect` function needs to be asynchronous, since we’ll `await` the result of the the model.
+NOTE: The `detect` function needs to be asynchronous, since we’ll `await` the result of the model.
 
 </Tip>
 

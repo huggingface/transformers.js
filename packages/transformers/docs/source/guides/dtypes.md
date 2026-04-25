@@ -5,7 +5,7 @@ Before Transformers.js v3, we used the `quantized` option to specify whether to 
 The list of available quantizations depends on the model, but some common ones are: full-precision (`"fp32"`), half-precision (`"fp16"`), 8-bit (`"q8"`, `"int8"`, `"uint8"`), and 4-bit (`"q4"`, `"bnb4"`, `"q4f16"`).
 
 <p align="center">
-    <picture> 
+    <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/blog/transformersjs-v3/dtypes-dark.jpg" style="max-width: 100%;">
         <source media="(prefers-color-scheme: light)" srcset="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/blog/transformersjs-v3/dtypes-light.jpg" style="max-width: 100%;">
         <img alt="Available dtypes for mixedbread-ai/mxbai-embed-xsmall-v1" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/blog/transformersjs-v3/dtypes-dark.jpg" style="max-width: 100%;">
@@ -45,7 +45,9 @@ Not sure which quantizations a model offers? Use `ModelRegistry.get_available_dt
 ```js
 import { ModelRegistry } from "@huggingface/transformers";
 
-const dtypes = await ModelRegistry.get_available_dtypes("onnx-community/all-MiniLM-L6-v2-ONNX");
+const dtypes = await ModelRegistry.get_available_dtypes(
+  "onnx-community/all-MiniLM-L6-v2-ONNX",
+);
 console.log(dtypes); // e.g., [ 'fp32', 'fp16', 'int8', 'uint8', 'q8', 'q4' ]
 ```
 
@@ -54,13 +56,19 @@ This checks which ONNX files exist on the Hugging Face Hub for each dtype. For m
 You can use this to build UIs that let users pick a quantization level, or to automatically select the smallest available dtype:
 
 ```js
-const dtypes = await ModelRegistry.get_available_dtypes("onnx-community/Qwen3-0.6B-ONNX");
+const dtypes = await ModelRegistry.get_available_dtypes(
+  "onnx-community/Qwen3-0.6B-ONNX",
+);
 
 // Pick the smallest available quantization, falling back to fp32
 const preferred = ["q4", "q8", "fp16", "fp32"];
 const dtype = preferred.find((d) => dtypes.includes(d)) ?? "fp32";
 
-const generator = await pipeline("text-generation", "onnx-community/Qwen3-0.6B-ONNX", { dtype });
+const generator = await pipeline(
+  "text-generation",
+  "onnx-community/Qwen3-0.6B-ONNX",
+  { dtype },
+);
 ```
 
 ## Per-module dtypes

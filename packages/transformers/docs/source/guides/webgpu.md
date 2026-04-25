@@ -2,7 +2,7 @@
 
 WebGPU is a new web standard for accelerated graphics and compute. The [API](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) enables web developers to use the underlying system's GPU to carry out high-performance computations directly in the browser. WebGPU is the successor to [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API) and provides significantly better performance, because it allows for more direct interaction with modern GPUs. Lastly, it supports general-purpose GPU computations, which makes it just perfect for machine learning!
 
-> [!WARNING]  
+> [!WARNING]
 > As of March 2026, global WebGPU support is around 85% (according to [caniuse.com](https://caniuse.com/webgpu)), meaning some users may not be able to use the API.
 >
 > If the following demos do not work in your browser, you may need to enable it using a feature flag:

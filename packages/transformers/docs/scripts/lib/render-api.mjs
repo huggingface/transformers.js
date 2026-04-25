@@ -49,6 +49,7 @@ export function renderModule(mod, ir, opts = {}) {
 
   return (
     expandInlineLinks(out.join("\n"), ctx)
+      .replace(/[ \t]+$/gm, "")
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd() + "\n"
   );
