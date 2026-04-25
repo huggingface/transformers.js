@@ -333,12 +333,23 @@ function parseFunctionType(raw) {
 
   if (!text.startsWith("(")) return null;
   const paramsEnd = matchingBracket(text, 0, "(", ")");
-  if (paramsEnd === -1 || text.slice(paramsEnd + 1).trimStart().slice(0, 2) !== "=>") return null;
+  if (
+    paramsEnd === -1 ||
+    text
+      .slice(paramsEnd + 1)
+      .trimStart()
+      .slice(0, 2) !== "=>"
+  )
+    return null;
 
   const params = splitTopLevel(text.slice(1, paramsEnd), ",")
     .map((part) => parseFunctionTypeParam(part.trim()))
     .filter(Boolean);
-  const returnType = text.slice(paramsEnd + 1).trimStart().slice(2).trim();
+  const returnType = text
+    .slice(paramsEnd + 1)
+    .trimStart()
+    .slice(2)
+    .trim();
 
   return {
     templates,
