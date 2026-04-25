@@ -220,14 +220,18 @@ function getSpecialTokens(tokenizer) {
  * @template {boolean} [TReturnTensor=true]
  * @template {boolean} [TReturnDict=true]
  * @typedef {Object} ApplyChatTemplateOptions
- * @property {string|null} [chat_template=null] A Jinja template to use for this conversion.
- * @property {Object[]|null} [tools=null] A list of tools (callable functions) that will be accessible to the model.
- * @property {Record<string, string>[]|null} [documents=null] Documents that will be accessible to the model.
+ * @property {string|null} [chat_template=null] A Jinja template to use for this conversion. If omitted, the model's chat template is used.
+ * @property {Object[]|null} [tools=null] JSON Schema tool definitions exposed to templates that support function calling.
+ * See the [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#automated-function-conversion-for-tool-use).
+ * @property {Record<string, string>[]|null} [documents=null] Documents exposed to templates that support retrieval-augmented generation.
+ * See the [RAG section](https://huggingface.co/docs/transformers/main/en/chat_templating#arguments-for-RAG) of the chat templating guide.
  * @property {boolean} [add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate the start of an assistant message.
+ * The template must support this argument for it to have any effect.
  * @property {TTokenize} [tokenize=true] Whether to tokenize the output. If false, the output will be a string.
  * @property {boolean} [padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
  * @property {boolean} [truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
- * @property {number|null} [max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
+ * @property {number|null} [max_length=null] Maximum length (in tokens) to use for padding or truncation. If omitted, the tokenizer's `max_length` is used.
+ * Has no effect if tokenize is false.
  * @property {TReturnTensor} [return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
  * @property {TReturnDict} [return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
  * @property {Object} [tokenizer_kwargs={}] Additional options to pass to the tokenizer.
@@ -725,33 +729,8 @@ export class PreTrainedTokenizer
      * @template {boolean} [TTokenize=true]
      * @template {boolean} [TReturnTensor=true]
      * @template {boolean} [TReturnDict=true]
-     * @param {Object} [options] An optional object containing the following properties:
-     * @param {string|null} [options.chat_template=null] A Jinja template to use for this conversion. If
-     * this is not passed, the model's chat template will be used instead.
-     * @param {Object[]} [options.tools=null]
-     * A list of tools (callable functions) that will be accessible to the model. If the template does not
-     * support function calling, this argument will have no effect. Each tool should be passed as a JSON Schema,
-     * giving the name, description and argument types for the tool. See our
-     * [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#automated-function-conversion-for-tool-use)
-     * for more information.
-     * @param {Record<string, string>[]} [options.documents=null]
-     * A list of dicts representing documents that will be accessible to the model if it is performing RAG
-     * (retrieval-augmented generation). If the template does not support RAG, this argument will have no
-     * effect. We recommend that each document should be a dict containing "title" and "text" keys. Please
-     * see the RAG section of the [chat templating guide](https://huggingface.co/docs/transformers/main/en/chat_templating#arguments-for-RAG)
-     * for examples of passing documents with chat templates.
-     * @param {boolean} [options.add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate
-     * the start of an assistant message. This is useful when you want to generate a response from the model.
-     * Note that this argument will be passed to the chat template, and so it must be supported in the
-     * template for this argument to have any effect.
-     * @param {TTokenize} [options.tokenize=true] Whether to tokenize the output. If false, the output will be a string.
-     * @param {boolean} [options.padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
-     * @param {boolean} [options.truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
-     * @param {number|null} [options.max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
-     * If not specified, the tokenizer's `max_length` attribute will be used as a default.
-     * @param {TReturnTensor} [options.return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
-     * @param {TReturnDict} [options.return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
-     * @param {Object} [options.tokenizer_kwargs={}] Additional options to pass to the tokenizer.
+     * @param {ApplyChatTemplateOptions<TTokenize, TReturnTensor, TReturnDict>} [options] Options controlling
+     * template rendering and tokenization.
      * @returns {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} The tokenized output.
      */
     apply_chat_template(
