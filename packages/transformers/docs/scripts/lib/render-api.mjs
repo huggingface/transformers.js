@@ -3,11 +3,17 @@
 // - Never emit raw HTML tables or `&lt;code&gt;` escaping
 // - Filter to the library's public export surface
 
+import path from "node:path";
+
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 export function renderModule(mod, ir, opts = {}) {
-  const ctx = { typedefIndex: ir.typedefIndex, moduleName: mod.name };
   const publicNames = opts.publicNames ?? null;
+  const ctx = {
+    typedefIndex: ir.typedefIndex,
+    moduleName: mod.name,
+    renderedNames: buildRenderedNameIndex(ir, publicNames),
+  };
 
   const classes = filterPublic(mod.classes, publicNames);
   const functions = filterPublic(mod.functions, publicNames);
@@ -31,8 +37,7 @@ export function renderModule(mod, ir, opts = {}) {
     for (const c of constants) out.push(...renderConstant(c, ctx));
   }
   if (mod.typedefs.length) {
-    const publicTypedefs = mod.typedefs.filter((td) => !isInternalTypedef(td));
-    const rendered = publicTypedefs.flatMap((td) => renderTypedef(td, ctx));
+    const rendered = mod.typedefs.flatMap((td) => renderTypedef(td, ctx));
     if (rendered.length) out.push("## Type Definitions", "", ...rendered);
   }
   if (mod.callbacks.length) {
@@ -45,6 +50,19 @@ export function renderModule(mod, ir, opts = {}) {
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd() + "\n"
   );
+}
+
+function buildRenderedNameIndex(ir, publicNames) {
+  const names = new Set();
+  const ctx = { typedefIndex: ir.typedefIndex, renderedNames: names };
+  for (const mod of ir.modules) {
+    for (const cls of filterPublic(mod.classes, publicNames)) names.add(cls.name);
+    for (const cb of mod.callbacks) names.add(cb.name);
+    for (const td of mod.typedefs) {
+      if (shouldRenderTypedef(td, { ...ctx, moduleName: mod.name })) names.add(td.name);
+    }
+  }
+  return names;
 }
 
 function filterPublic(items, publicNames) {
@@ -258,6 +276,28 @@ function isGenericParamName(name) {
 }
 
 function renderTypedef(td, ctx) {
+  if (!shouldRenderTypedef(td, ctx)) return [];
+
+  const { displayed, typeIsShowable } = typedefRenderInfo(td, ctx);
+
+  const lines = [`### ${td.name}`, ""];
+  if (td.description) lines.push(cleanDescription(td.description), "");
+  if (typeIsShowable) {
+    lines.push(`_Type:_ ${displayed}`, "");
+  }
+  if (td.properties?.length) {
+    lines.push("**Properties**", "", ...renderParamList(td.properties, ctx), "");
+  }
+  return lines;
+}
+
+function shouldRenderTypedef(td, ctx) {
+  if (isInternalTypedef(td)) return false;
+  const { typeIsShowable } = typedefRenderInfo(td, ctx);
+  return !!(td.description || td.properties?.length || typeIsShowable);
+}
+
+function typedefRenderInfo(td, ctx) {
   const displayed = td.type ? renderType(td.type, { ...ctx, selfName: td.name }) : "";
   const isSelfReference = displayed === `\`${td.name}\``;
   const isGenericPassthrough = /^`[A-Z][A-Za-z]?`$/.test(displayed);
@@ -272,20 +312,7 @@ function renderTypedef(td, ctx) {
   const typeIsShowable =
     displayed && (isUnionOrIntersection || fitsInline) && !displayed.startsWith("`{") && !isSelfReference && !isGenericPassthrough && !isOpaque;
 
-  // Don't emit an empty `### Name` heading. A typedef needs *something* the
-  // reader can't derive from the name alone: a description, properties, or a
-  // concise displayable type.
-  if (!td.description && !td.properties?.length && !typeIsShowable) return [];
-
-  const lines = [`### ${td.name}`, ""];
-  if (td.description) lines.push(cleanDescription(td.description), "");
-  if (typeIsShowable) {
-    lines.push(`_Type:_ ${displayed}`, "");
-  }
-  if (td.properties?.length) {
-    lines.push("**Properties**", "", ...renderParamList(td.properties, ctx), "");
-  }
-  return lines;
+  return { displayed, typeIsShowable };
 }
 
 // ---------- type rendering ----------
@@ -373,12 +400,19 @@ function linkIfKnown(name, ctx) {
 }
 
 function linkKnownName(name, label, ctx) {
-  if (!ctx.typedefIndex?.has(name) || name === ctx.selfName) return null;
+  const moduleName = ctx.typedefIndex?.get(name);
+  if (!moduleName || name === ctx.selfName || !ctx.renderedNames?.has(name)) return null;
   const anchor = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `[\`${label}\`](./${ctx.typedefIndex.get(name)}.md#${anchor})`;
+  return `[\`${label}\`](${moduleHref(ctx.moduleName, moduleName)}#${anchor})`;
+}
+
+function moduleHref(fromModule, toModule) {
+  let rel = path.posix.relative(path.posix.dirname(fromModule), toModule);
+  if (!rel.startsWith(".")) rel = `./${rel}`;
+  return `${rel}.md`;
 }
 
 function renderUtilityType(utility, ctx) {

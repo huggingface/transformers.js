@@ -313,7 +313,7 @@ function renderTypedefType(raw) {
   if (compact.length > 60 && (compact.startsWith("{") || /[({=]/.test(compact))) {
     compact = "object";
   }
-  return "`" + compact.replace(/`/g, "\\`") + "`";
+  return "`" + compact.replace(/[`|]/g, (ch) => `\\${ch}`) + "`";
 }
 
 // Cells can't contain newlines or un-escaped pipes. `{@link url}` gets turned

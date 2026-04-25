@@ -42,13 +42,13 @@ env.cacheDir = '/path/to/cache/directory/';
 | `useFS` | `boolean` | Whether to use the file system to load files. By default, it is `true` if available. |
 | `useBrowserCache` | `boolean` | Whether to use Cache API to cache models. By default, it is `true` if available. |
 | `useFSCache` | `boolean` | Whether to use the file system to cache files. By default, it is `true` if available. |
-| `cacheDir` | `string|null` | The directory to use for caching files with the file system. By default, it is `./.cache`. |
+| `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `./.cache`. |
 | `useCustomCache` | `boolean` | Whether to use a custom cache system (defined by `customCache`), defaults to `false`. |
-| `customCache` | `CacheInterface|null` | The custom cache to use. Defaults to `null`. Note: this must be an object which implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache. |
+| `customCache` | `CacheInterface\|null` | The custom cache to use. Defaults to `null`. Note: this must be an object which implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache. |
 | `useWasmCache` | `boolean` | Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime. Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads. |
 | `cacheKey` | `string` | The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'. |
 | `experimental_useCrossOriginStorage` | `boolean` | Whether to use the Cross-Origin Storage API to cache model files across origins, allowing different sites to share the same cached model weights. Defaults to `false`. Requires the Cross-Origin Storage Chrome extension: https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih. The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be removed without a major version bump. For more information, see https://github.com/WICG/cross-origin-storage. |
-| `fetch` | `(input: string | URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
+| `fetch` | `(input: string \| URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
 <!-- @generated:end id=typedef:TransformersEnvironment -->
 
 ## Log levels

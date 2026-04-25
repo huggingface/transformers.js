@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
+import { stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
+
 export function collectPublicExports(entryFile) {
   const names = new Set();
   walk(path.resolve(entryFile), new Set(), names);
@@ -93,20 +95,6 @@ function addFrozenNamespaceMembers(init, names) {
   }
 }
 
-function unwrapObjectFreeze(init) {
-  if (!init || !ts.isCallExpression(init)) return null;
-  const callee = init.expression;
-  const isFreeze =
-    ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === "Object" && callee.name.text === "freeze";
-  if (!isFreeze) return null;
-  const arg = init.arguments[0];
-  return arg && ts.isObjectLiteralExpression(arg) ? arg : null;
-}
-
 function hasExportModifier(node) {
   return !!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-}
-
-function stripQuotes(s) {
-  return s.replace(/^['"`]|['"`]$/g, "");
 }

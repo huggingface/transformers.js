@@ -5,6 +5,8 @@
 import ts from "typescript";
 import fs from "node:fs";
 
+import { stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
+
 export function extractTaskCatalog(indexFile) {
   const source = fs.readFileSync(indexFile, "utf8");
   const sf = ts.createSourceFile(indexFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
@@ -24,13 +26,6 @@ export function extractTaskCatalog(indexFile) {
   });
 
   return { supportedTasks, aliases };
-}
-
-// `Object.freeze({...})` -> the ObjectLiteralExpression argument, or null.
-function unwrapObjectFreeze(init) {
-  if (!init || !ts.isCallExpression(init)) return null;
-  const arg = init.arguments[0];
-  return arg && ts.isObjectLiteralExpression(arg) ? arg : null;
 }
 
 function parseSupportedTasks(literal, sf, out) {
@@ -61,8 +56,4 @@ function parseAliases(literal, sf, out) {
     if (!ts.isPropertyAssignment(prop)) continue;
     out.set(stripQuotes(prop.name.getText(sf)), stripQuotes(prop.initializer.getText(sf)));
   }
-}
-
-function stripQuotes(s) {
-  return s.replace(/^['"`]|['"`]$/g, "");
 }
