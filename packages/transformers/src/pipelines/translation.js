@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Text2TextGenerationPipeline } from './text2text-generation.js';
 
 /**

@@ -129,9 +129,11 @@ export class ModelRegistry {
      * @param {boolean} [options.include_processor=true] - Whether to check for processor files
      * @returns {Promise<string[]>} Array of file paths
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const files = await ModelRegistry.get_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['config.json', 'tokenizer.json', 'onnx/model_q4.onnx', ...]
+     * ```
      */
     static async get_files(modelId, options = {}) {
         return get_files(modelId, options);
@@ -150,9 +152,11 @@ export class ModelRegistry {
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of file paths
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const files = await ModelRegistry.get_pipeline_files('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(files); // ['config.json', 'tokenizer.json', 'onnx/model_q4.onnx', ...]
+     * ```
      */
     static async get_pipeline_files(task, modelId, options = {}) {
         return get_pipeline_files(task, modelId, options);
@@ -169,9 +173,11 @@ export class ModelRegistry {
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of model file paths
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const files = await ModelRegistry.get_model_files('onnx-community/bert-base-uncased-ONNX');
      * console.log(files); // ['config.json', 'onnx/model_q4.onnx', 'generation_config.json']
+     * ```
      */
     static async get_model_files(modelId, options = {}) {
         return get_model_files(modelId, options);
@@ -183,9 +189,11 @@ export class ModelRegistry {
      * @param {string} modelId - The model id
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const files = await ModelRegistry.get_tokenizer_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['tokenizer.json', 'tokenizer_config.json']
+     * ```
      */
     static async get_tokenizer_files(modelId) {
         return get_tokenizer_files(modelId);
@@ -197,9 +205,11 @@ export class ModelRegistry {
      * @param {string} modelId - The model id
      * @returns {Promise<string[]>} Array of processor file paths
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const files = await ModelRegistry.get_processor_files('onnx-community/vit-base-patch16-224-ONNX');
      * console.log(files); // ['preprocessor_config.json']
+     * ```
      */
     static async get_processor_files(modelId) {
         return get_processor_files(modelId);
@@ -221,9 +231,11 @@ export class ModelRegistry {
      * @param {boolean} [options.local_files_only=false] - Only check local files
      * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8'])
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const dtypes = await ModelRegistry.get_available_dtypes('onnx-community/all-MiniLM-L6-v2-ONNX');
      * console.log(dtypes); // ['fp32', 'fp16', 'int8', 'uint8', 'q8', 'q4']
+     * ```
      */
     static async get_available_dtypes(modelId, options = {}) {
         return get_available_dtypes(modelId, options);
@@ -243,9 +255,11 @@ export class ModelRegistry {
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @returns {Promise<boolean>} Whether all required files are cached
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const cached = await ModelRegistry.is_cached('onnx-community/bert-base-uncased-ONNX');
      * console.log(cached); // true or false
+     * ```
      */
     static async is_cached(modelId, options = {}) {
         return is_cached(modelId, options);
@@ -264,10 +278,12 @@ export class ModelRegistry {
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const status = await ModelRegistry.is_cached_files('onnx-community/bert-base-uncased-ONNX');
      * console.log(status.allCached); // true or false
      * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
+     * ```
      */
     static async is_cached_files(modelId, options = {}) {
         return is_cached_files(modelId, options);
@@ -288,9 +304,11 @@ export class ModelRegistry {
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @returns {Promise<boolean>} Whether all required files are cached
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const cached = await ModelRegistry.is_pipeline_cached('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(cached); // true or false
+     * ```
      */
     static async is_pipeline_cached(task, modelId, options = {}) {
         return is_pipeline_cached(task, modelId, options);
@@ -310,10 +328,12 @@ export class ModelRegistry {
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const status = await ModelRegistry.is_pipeline_cached_files('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(status.allCached); // true or false
      * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
+     * ```
      */
     static async is_pipeline_cached_files(task, modelId, options = {}) {
         return is_pipeline_cached_files(task, modelId, options);
@@ -327,9 +347,11 @@ export class ModelRegistry {
      * @param {import('../hub.js').PretrainedOptions} [options] - Optional parameters
      * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} File metadata
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const metadata = await ModelRegistry.get_file_metadata('onnx-community/gpt2-ONNX', 'config.json');
      * console.log(metadata.exists, metadata.size); // true, 665
+     * ```
      */
     static async get_file_metadata(path_or_repo_id, filename, options = {}) {
         return get_file_metadata(path_or_repo_id, filename, options);
@@ -350,9 +372,11 @@ export class ModelRegistry {
      * @param {boolean} [options.include_processor=true] - Whether to clear processor files
      * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const result = await ModelRegistry.clear_cache('onnx-community/bert-base-uncased-ONNX');
      * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
+     * ```
      */
     static async clear_cache(modelId, options = {}) {
         return clear_cache(modelId, options);
@@ -372,9 +396,11 @@ export class ModelRegistry {
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
      * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
      *
-     * @example
+     * **Example:**
+     * ```javascript
      * const result = await ModelRegistry.clear_pipeline_cache('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
+     * ```
      */
     static async clear_pipeline_cache(task, modelId, options = {}) {
         return clear_pipeline_cache(task, modelId, options);

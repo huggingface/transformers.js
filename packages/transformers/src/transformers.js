@@ -1,13 +1,36 @@
 /**
- * @file Entry point for the Transformers.js library. Only the exports from this file
- * are available to the end user, and are grouped as follows:
+ * @file Public API of `@huggingface/transformers`. Everything re-exported from
+ * this file is considered stable — other imports are internal and may change.
  *
- * 1. [Environment variables](./env)
- * 2. [Pipelines](./pipelines)
- * 3. [Models](./models)
- * 4. [Tokenizers](./tokenizers)
- * 5. [Processors](./processors)
- * 6. [Configs](./configs)
+ * **Start here**
+ * - [`pipeline()`](./pipelines.md#module_pipelines.pipeline) — the one-call entry point for every task.
+ * - [Environment](./env.md) — `env` fields and `LogLevel` enum.
+ *
+ * **Model loading**
+ * - [Pipelines](./pipelines.md) — task-specific pipeline classes (`TextGenerationPipeline`, etc.).
+ * - [Models](./models.md) — `AutoModel*` classes (one per task).
+ * - [Tokenizers](./tokenizers.md) — `AutoTokenizer`, chat templates, `Message`.
+ * - [Processors](./processors.md) — `AutoProcessor`, `AutoImageProcessor`, `AutoFeatureExtractor`.
+ * - [Configs](./configs.md) — `AutoConfig` / `PretrainedConfig`.
+ *
+ * **Generation**
+ * - [Generation config](./generation/configuration_utils.md) — sampling and beam-search parameters.
+ * - [Generation parameters](./generation/parameters.md) — full shape of `generate()` arguments.
+ * - [Logits processors](./generation/logits_process.md) — modify next-token probabilities.
+ * - [Stopping criteria](./generation/stopping_criteria.md) — control when generation halts.
+ * - [Streamers](./generation/streamers.md) — receive tokens as they're produced.
+ *
+ * **Data types and I/O**
+ * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
+ * - [Images](./utils/image.md) — `RawImage`, `load_image()`.
+ * - [Audio](./utils/audio.md) — `RawAudio`, `load_audio()`.
+ * - [Video](./utils/video.md) — `RawVideo`, `RawVideoFrame`, `load_video()` _(experimental)_.
+ *
+ * **Utilities**
+ * - [Hub options](./utils/hub.md) — shared `from_pretrained()` option shapes.
+ * - [Maths](./utils/maths.md) — `softmax`, `cos_sim`, typed-array helpers.
+ * - [Model registry](./utils/model_registry.md) — inspect or clear the model cache.
+ * - [Random](./utils/random.md) — seedable MT19937 PRNG matching Python's `random`.
  *
  * @module transformers
  */
@@ -45,6 +68,7 @@ export { PretrainedConfig, AutoConfig } from './configs.js';
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
+export { GenerationConfig } from './generation/configuration_utils.js';
 
 export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';

@@ -466,7 +466,7 @@ export class PretrainedConfig {
     'transformers.js_config';
 
     /**
-     * Create a new PreTrainedTokenizer instance.
+     * Create a new `PretrainedConfig` from a parsed `config.json` object.
      * @param {Object} configJSON The JSON of the config.
      */
     constructor(configJSON) {
@@ -505,10 +505,14 @@ export class PretrainedConfig {
 }
 
 /**
- * Helper class which is used to instantiate pretrained configs with the `from_pretrained` function.
+ * Loads a model config from a pretrained id. Thin alias for
+ * `PretrainedConfig.from_pretrained`.
  *
- * @example
+ * ```javascript
+ * import { AutoConfig } from '@huggingface/transformers';
+ *
  * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
+ * ```
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */

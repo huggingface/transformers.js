@@ -43,8 +43,8 @@ function get_aspect_ratio_preserving_size(height, width, patch_size, max_patches
  * Convert HWC image data to patches and position IDs, then pad.
  *
  * Patchification produces the same layout as Python's:
- *   CHW.reshape(C, pH, ps, pW, ps).transpose(1, 3, 2, 4, 0).reshape(pH*pW, ps*ps*C)
- * The transpose yields (pH, pW, ps_h, ps_w, C), so within each patch the
+ *   CHW.reshape(C, pH, ps, pW, ps).permute(1, 3, 2, 4, 0).reshape(pH*pW, ps*ps*C)
+ * The permute yields (pH, pW, ps_h, ps_w, C), so within each patch the
  * flattened order is (dy, dx, c) — which is exactly HWC order.
  * This lets us read directly from HWC source data without a CHW conversion.
  *

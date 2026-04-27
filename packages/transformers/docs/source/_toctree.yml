@@ -65,8 +65,6 @@
           title: Configuration
         - local: api/generation/logits_process
           title: Logits Processors
-        - local: api/generation/logits_sampler
-          title: Logits Samplers
         - local: api/generation/stopping_criteria
           title: Stopping Criteria
         - local: api/generation/streamers
@@ -84,12 +82,12 @@
           title: Image
         - local: api/utils/audio
           title: Audio
+        - local: api/utils/video
+          title: Video
         - local: api/utils/tensor
           title: Tensor
         - local: api/utils/maths
           title: Maths
-        - local: api/utils/logger
-          title: Logger
         - local: api/utils/random
           title: Random
       title: Utilities

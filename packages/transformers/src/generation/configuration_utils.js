@@ -1,4 +1,8 @@
 /**
+ * @file Configuration for text generation.
+ *
+ * `GenerationConfig` holds the parameters that control `generate()`.
+ *
  * @module generation/configuration_utils
  */
 

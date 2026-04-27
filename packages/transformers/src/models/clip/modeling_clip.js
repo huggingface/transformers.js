@@ -8,7 +8,7 @@ export class CLIPPreTrainedModel extends PreTrainedModel {}
  * **Example:** Perform zero-shot image classification with a `CLIPModel`.
  *
  * ```javascript
- * import { AutoTokenizer, AutoProcessor, CLIPModel, RawImage } from '@huggingface/transformers';
+ * import { AutoTokenizer, AutoProcessor, CLIPModel, load_image } from '@huggingface/transformers';
  *
  * // Load tokenizer, processor, and model
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch16');
@@ -20,7 +20,7 @@ export class CLIPPreTrainedModel extends PreTrainedModel {}
  * const text_inputs = tokenizer(texts, { padding: true, truncation: true });
  *
  * // Read image and run processor
- * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
  * const image_inputs = await processor(image);
  *
  * // Run model with both text and pixel inputs
@@ -118,14 +118,14 @@ export class CLIPVisionModel extends CLIPPreTrainedModel {
  * **Example:** Compute vision embeddings with `CLIPVisionModelWithProjection`.
  *
  * ```javascript
- * import { AutoProcessor, CLIPVisionModelWithProjection, RawImage } from '@huggingface/transformers';
+ * import { AutoProcessor, CLIPVisionModelWithProjection, load_image } from '@huggingface/transformers';
  *
  * // Load processor and vision model
  * const processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
  * const vision_model = await CLIPVisionModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch16');
  *
  * // Read image and run processor
- * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
  * const image_inputs = await processor(image);
  *
  * // Compute embeddings

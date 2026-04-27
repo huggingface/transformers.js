@@ -6,7 +6,7 @@ This guide covers the core concepts and API patterns. For a full step-by-step pr
 
 ## Why use the Vercel AI SDK with Transformers.js?
 
-The `@browser-ai/transformers-js` provider builds on top of `@huggingface/transformers` to give you a standard AI SDK interface — handling Web Worker setup, message passing, progress tracking, streaming, interrupt handling, and state management, so you can use the same `streamText`, `generateText`, and `useChat` APIs you'd use with any other AI SDK provider. 
+The `@browser-ai/transformers-js` provider builds on top of `@huggingface/transformers` to give you a standard AI SDK interface — handling Web Worker setup, message passing, progress tracking, streaming, interrupt handling, and state management, so you can use the same `streamText`, `generateText`, and `useChat` APIs you'd use with any other AI SDK provider.
 Read more about this [here](https://www.browser-ai.dev/docs/ai-sdk-v6/transformers-js/why).
 
 ## Installation
@@ -15,10 +15,10 @@ Read more about this [here](https://www.browser-ai.dev/docs/ai-sdk-v6/transforme
 npm install @browser-ai/transformers-js @huggingface/transformers ai @ai-sdk/react
 ```
 
-| @browser-ai/transformers-js | AI SDK | Notes |
-|---|---|---|
-| v2.0.0+ | v6.x | Current stable |
-| v1.0.0 | v5.x | Legacy |
+| @browser-ai/transformers-js | AI SDK | Notes          |
+| --------------------------- | ------ | -------------- |
+| v2.0.0+                     | v6.x   | Current stable |
+| v1.0.0                      | v5.x   | Legacy         |
 
 ## Text generation
 
@@ -208,17 +208,18 @@ When using the `useChat` hook, you create a [custom transport](https://ai-sdk.de
 
 ```typescript
 import {
-  ChatTransport, UIMessageChunk, streamText,
-  convertToModelMessages, ChatRequestOptions,
+  ChatTransport,
+  UIMessageChunk,
+  streamText,
+  convertToModelMessages,
+  ChatRequestOptions,
 } from "ai";
 import {
   TransformersJSLanguageModel,
   TransformersUIMessage,
 } from "@browser-ai/transformers-js";
 
-export class TransformersChatTransport
-  implements ChatTransport<TransformersUIMessage>
-{
+export class TransformersChatTransport implements ChatTransport<TransformersUIMessage> {
   constructor(private readonly model: TransformersJSLanguageModel) {}
 
   async sendMessages(
@@ -250,11 +251,16 @@ Then use it in your component:
 
 ```typescript
 import { useChat } from "@ai-sdk/react";
-import { transformersJS, TransformersUIMessage } from "@browser-ai/transformers-js";
+import {
+  transformersJS,
+  TransformersUIMessage,
+} from "@browser-ai/transformers-js";
 
 const model = transformersJS("HuggingFaceTB/SmolLM2-360M-Instruct", {
   device: "webgpu",
-  worker: new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }),
+  worker: new Worker(new URL("./worker.ts", import.meta.url), {
+    type: "module",
+  }),
 });
 
 const { sendMessage, messages, stop } = useChat<TransformersUIMessage>({
@@ -268,7 +274,8 @@ If the device doesn't support in-browser inference, you can fall back to a serve
 
 ```typescript
 import {
-  transformersJS, TransformersUIMessage,
+  transformersJS,
+  TransformersUIMessage,
   doesBrowserSupportTransformersJS,
 } from "@browser-ai/transformers-js";
 

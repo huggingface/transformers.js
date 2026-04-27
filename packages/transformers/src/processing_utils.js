@@ -1,12 +1,20 @@
 /**
- * @file Processors are used to prepare inputs (e.g., text, image or audio) for a model.
+ * @file Processors turn raw inputs (images, audio, text) into the tensor
+ * shapes a model expects. Pipelines pick the right processor automatically;
+ * call one directly only when you need to preprocess without running
+ * inference.
  *
- * **Example:** Using a `WhisperProcessor` to prepare an audio input for a model.
+ * Three `Auto*` entry points cover the common cases:
+ * - `AutoProcessor` — multi-modal (tokenizer + image/audio), e.g. Whisper, CLIP.
+ * - `AutoImageProcessor` — vision-only models.
+ * - `AutoFeatureExtractor` — audio-only models.
+ *
+ * **Example:** Prepare audio for Whisper.
  * ```javascript
- * import { AutoProcessor, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, load_audio } from '@huggingface/transformers';
  *
- * const processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
- * const audio = await read_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
+ * const processor = await AutoProcessor.from_pretrained('onnx-community/whisper-tiny.en');
+ * const audio = await load_audio('https://huggingface.co/datasets/Narsil/asr_dummy/resolve/main/mlk.flac', 16000);
  * const { input_features } = await processor(audio);
  * // Tensor {
  * //   data: Float32Array(240000) [0.4752984642982483, 0.5597258806228638, 0.56434166431427, ...],
@@ -29,7 +37,8 @@ import { getModelJSON, getModelText } from './utils/hub.js';
  */
 
 /**
- * Represents a Processor that extracts features from an input.
+ * Multi-modal preprocessor that delegates to the tokenizer, image processor,
+ * and/or feature extractor required by a model.
  */
 export class Processor extends Callable {
     static classes = ['image_processor_class', 'tokenizer_class', 'feature_extractor_class'];
@@ -37,10 +46,10 @@ export class Processor extends Callable {
     static uses_chat_template_file = false;
 
     /**
-     * Creates a new Processor with the given components
-     * @param {Object} config
-     * @param {Record<string, Object>} components
-     * @param {string} chat_template
+     * Create a processor from parsed config and its component preprocessors.
+     * @param {Object} config Processor configuration.
+     * @param {Record<string, Object>} components Loaded tokenizer, image processor, and/or feature extractor.
+     * @param {string|null} chat_template Optional chat template loaded from the model repo.
      */
     constructor(config, components, chat_template) {
         super();
@@ -71,6 +80,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Delegates to the underlying tokenizer's `apply_chat_template`.
      * @param {Parameters<PreTrainedTokenizer['apply_chat_template']>[0]} messages
      * @param {Parameters<PreTrainedTokenizer['apply_chat_template']>[1]} options
      * @returns {ReturnType<PreTrainedTokenizer['apply_chat_template']>}
@@ -87,6 +97,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Decode a batch of tokenized sequences via the underlying tokenizer.
      * @param {Parameters<PreTrainedTokenizer['batch_decode']>} args
      * @returns {ReturnType<PreTrainedTokenizer['batch_decode']>}
      */
@@ -98,6 +109,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * Decode a single tokenized sequence via the underlying tokenizer.
      * @param {Parameters<PreTrainedTokenizer['decode']>} args
      * @returns {ReturnType<PreTrainedTokenizer['decode']>}
      */
@@ -136,7 +148,7 @@ export class Processor extends Callable {
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
      * @param {PretrainedProcessorOptions} options Additional options for loading the processor.
      *
-     * @returns {Promise<Processor>} A new instance of the Processor class.
+     * @returns {Promise<Processor>} A new processor instance.
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const [config, components, chat_template] = await Promise.all([

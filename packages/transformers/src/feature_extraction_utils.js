@@ -1,13 +1,17 @@
+/**
+ * @module processors
+ */
+
 import { FEATURE_EXTRACTOR_NAME } from './utils/constants.js';
 import { Callable } from './utils/generic.js';
 import { getModelJSON } from './utils/hub.js';
 
 /**
- * Base class for feature extractors.
+ * Base class for audio feature extractors.
  */
 export class FeatureExtractor extends Callable {
     /**
-     * Constructs a new FeatureExtractor instance.
+     * Create a feature extractor from a parsed `preprocessor_config.json`.
      *
      * @param {Object} config The configuration for the feature extractor.
      */
@@ -29,7 +33,7 @@ export class FeatureExtractor extends Callable {
      * - A path to a *directory* containing feature_extractor files, e.g., `./my_model_directory/`.
      * @param {import('./utils/hub.js').PretrainedOptions} options Additional options for loading the feature_extractor.
      *
-     * @returns {Promise<FeatureExtractor>} A new instance of the Feature Extractor class.
+     * @returns {Promise<FeatureExtractor>} A new feature extractor instance.
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const config = await getModelJSON(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME, true, options);
@@ -47,7 +51,7 @@ export function validate_audio_inputs(audio, feature_extractor) {
     if (!(audio instanceof Float32Array || audio instanceof Float64Array)) {
         throw new Error(
             `${feature_extractor} expects input to be a Float32Array or a Float64Array, but got ${audio?.constructor?.name ?? typeof audio} instead. ` +
-                `If using the feature extractor directly, remember to use \`read_audio(url, sampling_rate)\` to obtain the raw audio data of the file/url.`,
+                `If using the feature extractor directly, remember to use \`load_audio(url, sampling_rate)\` to obtain the raw audio data of the file/url.`,
         );
     }
 }

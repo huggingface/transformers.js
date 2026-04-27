@@ -1,8 +1,6 @@
 /**
- * @file Helper module for mathematical processing.
- *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * @file Numerical helpers — softmax, dot product, cosine similarity, and the
+ * typed-array utilities shared across the library.
  *
  * @module utils/maths
  */

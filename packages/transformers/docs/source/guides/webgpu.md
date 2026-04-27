@@ -2,20 +2,20 @@
 
 WebGPU is a new web standard for accelerated graphics and compute. The [API](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) enables web developers to use the underlying system's GPU to carry out high-performance computations directly in the browser. WebGPU is the successor to [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API) and provides significantly better performance, because it allows for more direct interaction with modern GPUs. Lastly, it supports general-purpose GPU computations, which makes it just perfect for machine learning!
 
-> [!WARNING]  
-> As of October 2024, global WebGPU support is around 70% (according to [caniuse.com](https://caniuse.com/webgpu)), meaning some users may not be able to use the API.
+> [!WARNING]
+> As of March 2026, global WebGPU support is around 85% (according to [caniuse.com](https://caniuse.com/webgpu)), meaning some users may not be able to use the API.
 >
 > If the following demos do not work in your browser, you may need to enable it using a feature flag:
 >
 > - Firefox: with the `dom.webgpu.enabled` flag (see [here](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Experimental_features#:~:text=tested%20by%20Firefox.-,WebGPU%20API,-The%20WebGPU%20API)).
-> - Safari: with the `WebGPU` feature flag (see [here](https://webkit.org/blog/14879/webgpu-now-available-for-testing-in-safari-technology-preview/)).
+> - Safari: support is version-dependent, with partial support in recent desktop Safari and support in recent iOS Safari.
 > - Older Chromium browsers (on Windows, macOS, Linux): with the `enable-unsafe-webgpu` flag (see [here](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips)).
 
-## Usage in Transformers.js v3
+## Usage
 
 Thanks to our collaboration with [ONNX Runtime Web](https://www.npmjs.com/package/onnxruntime-web), enabling WebGPU acceleration is as simple as setting `device: 'webgpu'` when loading a model. Let's see some examples!
 
-**Example:** Compute text embeddings on WebGPU ([demo](https://v2.scrimba.com/s06a2smeej))
+**Example:** Compute text embeddings on WebGPU
 
 ```js
 import { pipeline } from "@huggingface/transformers";
@@ -37,7 +37,7 @@ console.log(embeddings.tolist());
 // ]
 ```
 
-**Example:** Perform automatic speech recognition with OpenAI whisper on WebGPU ([demo](https://v2.scrimba.com/s0oi76h82g))
+**Example:** Perform automatic speech recognition with OpenAI whisper on WebGPU
 
 ```js
 import { pipeline } from "@huggingface/transformers";
@@ -57,7 +57,7 @@ console.log(output);
 // { text: ' And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.' }
 ```
 
-**Example:** Perform image classification with MobileNetV4 on WebGPU ([demo](https://v2.scrimba.com/s0fv2uab1t))
+**Example:** Perform image classification with MobileNetV4 on WebGPU
 
 ```js
 import { pipeline } from "@huggingface/transformers";

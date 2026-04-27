@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
@@ -50,7 +54,7 @@ function isChat(x) {
 /**
  * Language generation pipeline using any `ModelWithLMHead` or `ModelForCausalLM`.
  * This pipeline predicts the words that will follow a specified text prompt.
- * NOTE: For the full list of generation parameters, see [`GenerationConfig`](./utils/generation#module_utils/generation.GenerationConfig).
+ * For the full list of generation parameters, see `GenerationConfig`.
  *
  * **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
  * ```javascript

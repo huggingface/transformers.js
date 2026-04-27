@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
 
 /**

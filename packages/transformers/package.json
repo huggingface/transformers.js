@@ -28,8 +28,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
-    "readme": "python ./docs/scripts/build_readme.py",
-    "docs-api": "node ./docs/scripts/generate.js",
+    "readme": "node ./docs/scripts/build_readme.js --out ../../README.md",
+    "docs-generate": "node ./docs/scripts/generate-all.js",
     "docs-build": "doc-builder build transformers.js ./docs/source/ --not_python_module --build_dir ./docs/build/",
     "docs-preview": "doc-builder preview transformers.js ./docs/source/ --not_python_module"
   },
@@ -55,7 +55,7 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "dependencies": {
-    "@huggingface/jinja": "^0.5.6",
+    "@huggingface/jinja": "^0.5.8",
     "@huggingface/tokenizers": "^0.1.3",
     "onnxruntime-node": "1.24.3",
     "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
@@ -68,7 +68,6 @@
     "esbuild": "^0.27.2",
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
-    "jsdoc-to-markdown": "^9.1.3",
     "typescript": "5.9.3"
   },
   "files": [

@@ -1,3 +1,7 @@
+/**
+ * @module processors
+ */
+
 import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { getModelJSON } from '../../utils/hub.js';
 import { Processor } from '../../processing_utils.js';
@@ -11,33 +15,24 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
  */
 
 /**
- * Helper class which is used to instantiate pretrained processors with the `from_pretrained` function.
- * The chosen processor class is determined by the type specified in the processor config.
+ * Loads a processor from a pretrained id. Unlike `AutoImageProcessor` and
+ * `AutoFeatureExtractor`, `AutoProcessor` returns a multi-modal [`Processor`](#processor)
+ * that bundles together a tokenizer, image processor, and/or feature extractor
+ * — use it when a single model needs more than one.
  *
- * **Example:** Load a processor using `from_pretrained`.
+ * **Example:** Load a Whisper processor (tokenizer + audio feature extractor).
  * ```javascript
- * let processor = await AutoProcessor.from_pretrained('openai/whisper-tiny.en');
+ * import { AutoProcessor } from '@huggingface/transformers';
+ * const processor = await AutoProcessor.from_pretrained('onnx-community/whisper-tiny.en');
  * ```
  *
- * **Example:** Run an image through a processor.
+ * **Example:** Run an image through a CLIP processor.
  * ```javascript
- * let processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
- * let image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
- * let image_inputs = await processor(image);
- * // {
- * //   "pixel_values": {
- * //     "dims": [ 1, 3, 224, 224 ],
- * //     "type": "float32",
- * //     "data": Float32Array [ -1.558687686920166, -1.558687686920166, -1.5440893173217773, ... ],
- * //     "size": 150528
- * //   },
- * //   "original_sizes": [
- * //     [ 533, 800 ]
- * //   ],
- * //   "reshaped_input_sizes": [
- * //     [ 224, 224 ]
- * //   ]
- * // }
+ * import { AutoProcessor, load_image } from '@huggingface/transformers';
+ *
+ * const processor = await AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
+ * const { pixel_values } = await processor(image);
  * ```
  */
 export class AutoProcessor {

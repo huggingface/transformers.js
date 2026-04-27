@@ -1,4 +1,20 @@
 /**
+ * @file Streamers for surfacing generated tokens as they are produced.
+ *
+ * Pass a `TextStreamer` (or `WhisperTextStreamer` for audio transcription) via
+ * the `streamer` argument of `generate()` to receive decoded text as tokens
+ * are emitted — useful for chat UIs and incremental transcription.
+ *
+ * @example
+ * import { pipeline, TextStreamer } from '@huggingface/transformers';
+ *
+ * const generator = await pipeline('text-generation', 'onnx-community/Qwen3-0.6B-ONNX');
+ * const streamer = new TextStreamer(generator.tokenizer, {
+ *   skip_prompt: true,
+ *   callback_function: (text) => process.stdout.write(text),
+ * });
+ * await generator('Tell me a joke about JavaScript.', { max_new_tokens: 64, streamer });
+ *
  * @module generation/streamers
  */
 
@@ -15,6 +31,9 @@ const is_chinese_char = (cp) =>
     (cp >= 0xf900 && cp <= 0xfaff) ||
     (cp >= 0x2f800 && cp <= 0x2fa1f);
 
+/**
+ * Abstract base class for output streamers.
+ */
 export class BaseStreamer {
     /**
      * Function that is called by `.generate()` to push new tokens

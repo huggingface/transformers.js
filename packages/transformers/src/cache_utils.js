@@ -1,3 +1,7 @@
+/**
+ * @module models
+ */
+
 import { Tensor } from './utils/tensor.js';
 
 /**
@@ -74,6 +78,11 @@ class _DynamicCache {
 }
 
 /**
+ * Mutable cache of decoder past key/value tensors used by `generate()`.
+ *
+ * Pass a `DynamicCache` through generation options when you need to preserve
+ * cache tensors across calls or inspect them from `return_dict_in_generate`.
+ *
  * @typedef {Record<string, Tensor> & _DynamicCache} DynamicCache
  */
 
