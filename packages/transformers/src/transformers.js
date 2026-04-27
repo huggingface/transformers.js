@@ -55,6 +55,9 @@ export { random } from './utils/random.js';
 
 export { DynamicCache } from './cache_utils.js';
 
+// Device utilities
+export { deviceToExecutionProviders, getSupportedDevices } from './backends/onnx.js';
+
 // Cache and file management
 export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
