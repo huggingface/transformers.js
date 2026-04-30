@@ -2,6 +2,7 @@ import { cat, mean, Tensor, stack, std_mean } from '../../utils/tensor.js';
 import { PreTrainedModel } from '../modeling_utils.js';
 import { WhisperGenerationConfig } from './generation_whisper.js';
 import { whisper_language_to_code } from './common_whisper.js';
+import { prepareTensorForDecode } from '../../tokenization_utils.js';
 import {
     LogitsProcessorList,
     SuppressTokensAtBeginLogitsProcessor,
@@ -116,7 +117,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
     }) {
         generation_config = this._prepare_generation_config(generation_config, kwargs);
 
-        const init_tokens = kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config);
+        const init_tokens =
+            kwargs.decoder_input_ids instanceof Tensor
+                ? prepareTensorForDecode(kwargs.decoder_input_ids)
+                : (kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config));
 
         if (generation_config.return_timestamps) {
             logits_processor ??= new LogitsProcessorList();

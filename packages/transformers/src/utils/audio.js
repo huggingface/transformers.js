@@ -15,12 +15,12 @@ import { Tensor, matmul } from './tensor.js';
 import { logger } from './logger.js';
 
 /**
- * Helper function to read audio from a path/URL.
+ * Helper function to load audio from a path/URL.
  * @param {string|URL} url The path/URL to load the audio from.
  * @param {number} sampling_rate The sampling rate to use when decoding the audio.
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
-export async function read_audio(url, sampling_rate) {
+export async function load_audio(url, sampling_rate) {
     if (typeof AudioContext === 'undefined') {
         // Running in node or an environment without AudioContext
         throw Error(
@@ -73,6 +73,11 @@ export async function read_audio(url, sampling_rate) {
 
     return audio;
 }
+
+/**
+ * @deprecated Use {@link load_audio} instead.
+ */
+export const read_audio = load_audio;
 
 /**
  * Helper function to generate windows that are special cases of the generalized cosine window.

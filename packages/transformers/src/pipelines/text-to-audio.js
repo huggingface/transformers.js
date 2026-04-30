@@ -27,19 +27,16 @@ import { env } from '../env.js';
  * More denoising steps usually lead to higher quality audio but slower inference.
  * @property {number} [speed] The speed of the generated audio (if the model supports it).
  *
- * @callback TextToAudioPipelineCallbackSingle Generate speech/audio from a single text input.
- * @param {string} text The text to generate.
- * @param {TextToAudioPipelineOptions} [options] Parameters passed to the model generation/forward method.
- * @returns {Promise<RawAudio>} An object containing the generated audio and sampling rate.
- *
- * @callback TextToAudioPipelineCallbackBatch Generate speech/audio from multiple text inputs.
- * @param {string[]} texts The texts to generate.
- * @param {TextToAudioPipelineOptions} [options] Parameters passed to the model generation/forward method.
- * @returns {Promise<TextToAudioOutput>} An array of objects containing the generated audio and sampling rate.
- *
- * @typedef {TextToAudioPipelineCallbackSingle & TextToAudioPipelineCallbackBatch} TextToAudioPipelineCallback
- *
  * @typedef {TextToAudioPipelineConstructorArgs & TextToAudioPipelineCallback & Disposable} TextToAudioPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? TextToAudioOutput : RawAudio} TextToAudioPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(text: T, options?: TextToAudioPipelineOptions) => Promise<TextToAudioPipelineResult<T>>} TextToAudioPipelineCallback
  */
 
 /**

@@ -21,21 +21,16 @@ import { softmax } from '../utils/maths.js';
  * to attempt the image classification by replacing the placeholder with the candidate_labels.
  * Then likelihood is estimated by using `logits_per_image`.
  *
- * @callback ZeroShotImageClassificationPipelineCallbackSingle Assign labels to the image(s) passed as inputs.
- * @param {ImageInput} images The input images.
- * @param {string[]} candidate_labels The candidate labels for this image.
- * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
- * @returns {Promise<ZeroShotImageClassificationOutput>} An array of objects containing the predicted labels and scores.
- *
- * @callback ZeroShotImageClassificationPipelineCallbackBatch Assign labels to the image(s) passed as inputs.
- * @param {ImageInput[]} images The input images.
- * @param {string[]} candidate_labels The candidate labels for this image.
- * @param {ZeroShotImageClassificationPipelineOptions} [options] The options to use for zero-shot image classification.
- * @returns {Promise<ZeroShotImageClassificationOutput[]>} An array of objects containing the predicted labels and scores.
- *
- * @typedef {ZeroShotImageClassificationPipelineCallbackSingle & ZeroShotImageClassificationPipelineCallbackBatch} ZeroShotImageClassificationPipelineCallback
- *
  * @typedef {TextImagePipelineConstructorArgs & ZeroShotImageClassificationPipelineCallback & Disposable} ZeroShotImageClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? ZeroShotImageClassificationOutput[] : ZeroShotImageClassificationOutput} ZeroShotImageClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T, candidate_labels: string[], options?: ZeroShotImageClassificationPipelineOptions) => Promise<ZeroShotImageClassificationPipelineResult<T>>} ZeroShotImageClassificationPipelineCallback
  */
 
 /**

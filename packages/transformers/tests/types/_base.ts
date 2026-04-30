@@ -6,4 +6,7 @@ type Equal<X, Y> =
 // Throws a type error if T is not `true`
 type Expect<T extends true> = T;
 
-export type { Expect, Equal };
+// Throws a type error if T is not `false`
+type ExpectError<T extends false> = T;
+
+export type { Expect, Equal, ExpectError };

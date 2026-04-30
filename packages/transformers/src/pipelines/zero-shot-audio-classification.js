@@ -20,29 +20,16 @@ import { softmax } from '../utils/maths.js';
  * to attempt the audio classification by replacing the placeholder with the candidate_labels.
  * Then likelihood is estimated by using `logits_per_audio`.
  *
- * @callback ZeroShotAudioClassificationPipelineCallbackSingle Classify the sequence(s) given as inputs.
- * @param {AudioInput} audio The input audio file(s) to be classified. The input is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {string[]} candidate_labels The candidate labels for this audio.
- * @param {ZeroShotAudioClassificationPipelineOptions} [options] The options to use for zero-shot audio classification.
- * @returns {Promise<ZeroShotAudioClassificationOutput>} An array of objects containing the predicted labels and scores.
- *
- * @callback ZeroShotAudioClassificationPipelineCallbackBatch Classify the sequence(s) given as inputs.
- * @param {AudioInput[]} audio The input audio file(s) to be classified. The input is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {string[]} candidate_labels The candidate labels for this audio.
- * @param {ZeroShotAudioClassificationPipelineOptions} [options] The options to use for zero-shot audio classification.
- * @returns {Promise<ZeroShotAudioClassificationOutput[]>} An array of objects containing the predicted labels and scores.
- *
- * @typedef {ZeroShotAudioClassificationPipelineCallbackSingle & ZeroShotAudioClassificationPipelineCallbackBatch} ZeroShotAudioClassificationPipelineCallback
- *
  * @typedef {TextAudioPipelineConstructorArgs & ZeroShotAudioClassificationPipelineCallback & Disposable} ZeroShotAudioClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends AudioInput[] ? ZeroShotAudioClassificationOutput[] : ZeroShotAudioClassificationOutput} ZeroShotAudioClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends AudioInput | AudioInput[]>(audio: T, candidate_labels: string[], options?: ZeroShotAudioClassificationPipelineOptions) => Promise<ZeroShotAudioClassificationPipelineResult<T>>} ZeroShotAudioClassificationPipelineCallback
  */
 
 /**

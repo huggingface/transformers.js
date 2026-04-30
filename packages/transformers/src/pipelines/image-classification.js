@@ -18,19 +18,16 @@ import { softmax } from '../utils/maths.js';
  * @typedef {Object} ImageClassificationPipelineOptions Parameters specific to image classification pipelines.
  * @property {number} [top_k=1] The number of top labels that will be returned by the pipeline.
  *
- * @callback ImageClassificationPipelineCallbackSingle Assign labels to the image passed as input.
- * @param {ImageInput} images The input image to be classified.
- * @param {ImageClassificationPipelineOptions} [options] The options to use for image classification.
- * @returns {Promise<ImageClassificationOutput>} An array containing the predicted labels and scores.
- *
- * @callback ImageClassificationPipelineCallbackBatch Assign labels to the images passed as inputs.
- * @param {ImageInput[]} images The input images to be classified.
- * @param {ImageClassificationPipelineOptions} [options] The options to use for image classification.
- * @returns {Promise<ImageClassificationOutput[]>} An array where each entry contains the predictions for the corresponding input image.
- *
- * @typedef {ImageClassificationPipelineCallbackSingle & ImageClassificationPipelineCallbackBatch} ImageClassificationPipelineCallback
- *
  * @typedef {ImagePipelineConstructorArgs & ImageClassificationPipelineCallback & Disposable} ImageClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? ImageClassificationOutput[] : ImageClassificationOutput} ImageClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T, options?: ImageClassificationPipelineOptions) => Promise<ImageClassificationPipelineResult<T>>} ImageClassificationPipelineCallback
  */
 
 /**

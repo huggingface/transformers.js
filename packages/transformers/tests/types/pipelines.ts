@@ -544,22 +544,72 @@ const FLOAT32 = new Float32Array(16000);
   const classifier = await pipeline("token-classification", MODEL_ID);
   type T = Expect<Equal<typeof classifier, TokenClassificationPipeline>>;
 
-  // (a) Single input -> TokenClassificationOutput
+  // `TokenClassificationOutput` is generic over the options type. The pipeline callback infers
+  // it from the options literal at the call site, so callers don't have to pass it manually.
+  //  - omitted / "none" -> per-token shape (`entity`, `index`)
+  //  - "simple"         -> grouped shape (`entity_group`)
+
+  // (a) Single input, no options -> per-token shape: `entity` + `index` typed as required fields.
   {
     const output = await classifier(TEXT);
-    type T = Expect<Equal<typeof output, TokenClassificationOutput>>;
-    type T1 = Expect<Equal<typeof output[0]["word"], string>>;
-    type T2 = Expect<Equal<typeof output[0]["entity"], string>>;
-    type T3 = Expect<Equal<typeof output[0]["score"], number>>;
+    type T = Expect<Equal<typeof output, TokenClassificationOutput<{}>>>;
+    type T1 = Expect<Equal<typeof output[0]["entity"], string>>;
+    type T2 = Expect<Equal<typeof output[0]["index"], number>>;
+    type T3 = Expect<Equal<typeof output[0]["word"], string>>;
+    type T4 = Expect<Equal<typeof output[0]["score"], number>>;
   }
 
-  // (b) Batch input -> TokenClassificationOutput[]
+  // (b) Batch input, no options
   {
     const output = await classifier([TEXT, TEXT]);
-    type T = Expect<Equal<typeof output, TokenClassificationOutput[]>>;
-    type T1 = Expect<Equal<typeof output[0][0]["word"], string>>;
-    type T2 = Expect<Equal<typeof output[0][0]["entity"], string>>;
-    type T3 = Expect<Equal<typeof output[0][0]["score"], number>>;
+    type T = Expect<Equal<typeof output, TokenClassificationOutput<{}>[]>>;
+    type T1 = Expect<Equal<typeof output[0][0]["entity"], string>>;
+    type T2 = Expect<Equal<typeof output[0][0]["index"], number>>;
+  }
+
+  // (c) aggregation_strategy="none" -> same per-token shape.
+  {
+    const output = await classifier(TEXT, { aggregation_strategy: "none" });
+    type T1 = Expect<Equal<typeof output[0]["entity"], string>>;
+    type T2 = Expect<Equal<typeof output[0]["index"], number>>;
+  }
+
+  // (d) aggregation_strategy="simple" -> grouped shape.
+  {
+    const output = await classifier(TEXT, { aggregation_strategy: "simple" });
+    type T1 = Expect<Equal<typeof output[0]["entity_group"], string>>;
+    type T2 = Expect<Equal<typeof output[0]["word"], string>>;
+  }
+
+  // (e) Batch + aggregation_strategy="simple" -> per-element grouped shape.
+  {
+    const output = await classifier([TEXT, TEXT], { aggregation_strategy: "simple" });
+    type T1 = Expect<Equal<typeof output[0][0]["entity_group"], string>>;
+  }
+
+  // (f) Other options without aggregation_strategy -> per-token shape.
+  {
+    const output = await classifier(TEXT, { ignore_labels: ["O"] });
+    type T1 = Expect<Equal<typeof output[0]["entity"], string>>;
+    type T2 = Expect<Equal<typeof output[0]["index"], number>>;
+  }
+
+  // (g) `TokenClassificationOutput` used without a type argument is the unified union —
+  //     both narrowed call results are assignable to it.
+  {
+    const raw = await classifier(TEXT);
+    const grouped = await classifier(TEXT, { aggregation_strategy: "simple" });
+    const a: TokenClassificationOutput = raw;
+    const b: TokenClassificationOutput = grouped;
+  }
+
+  // (h) Narrowing works via the `entity_group` discriminator.
+  {
+    const output = await classifier(TEXT, { aggregation_strategy: "simple" });
+    const item = output[0];
+    if (item.entity_group !== undefined) {
+      type T1 = Expect<Equal<typeof item["entity_group"], string>>;
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
-import { AutoConfig, getCacheShapes } from '../configs.js';
+import { AutoConfig, getCacheNames } from '../configs.js';
 import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
 import { DataTypeMap } from '../utils/dtypes.js';
 
@@ -204,6 +204,7 @@ export class PreTrainedModel extends Callable {
     forward_params = ['input_ids', 'attention_mask'];
 
     _return_dict_in_generate_keys = null;
+
     /**
      * Creates a new instance of the `PreTrainedModel` class.
      * @param {import('../configs.js').PretrainedConfig} config The model configuration.
@@ -664,7 +665,7 @@ export class PreTrainedModel extends Callable {
      */
     _update_model_kwargs_for_generation({ generated_input_ids, outputs, model_inputs, is_encoder_decoder }) {
         // update past_key_values
-        model_inputs['past_key_values'] = this.getPastKeyValues(outputs, model_inputs.past_key_values);
+        model_inputs['past_key_values'] = getPastKeyValues(outputs, model_inputs.past_key_values);
 
         // update inputs for next run
         model_inputs['input_ids'] = new Tensor('int64', generated_input_ids.flat(), [generated_input_ids.length, 1]);
@@ -851,7 +852,7 @@ export class PreTrainedModel extends Callable {
         // 3. Define model inputs
         let { inputs_tensor, model_inputs, model_input_name } = this._prepare_model_inputs({
             inputs,
-            model_kwargs: kwargs,
+            model_kwargs: /** @type {Record<string, Tensor|number[]>} */ (kwargs),
         });
 
         const is_encoder_decoder = this.config.is_encoder_decoder;
@@ -966,7 +967,7 @@ export class PreTrainedModel extends Callable {
             if (generation_config.return_dict_in_generate) {
                 if (generation_config.output_attentions) {
                     // Get attentions if they are present
-                    const token_attentions = this.getAttentions(outputs);
+                    const token_attentions = getAttentions(outputs);
                     for (const key in token_attentions) {
                         if (!(key in attentions)) {
                             attentions[key] = [];
@@ -1030,11 +1031,25 @@ export class PreTrainedModel extends Callable {
             streamer.end();
         }
 
-        // Retrieve and dispose all final past key values (including encoder attentions)
-        const past_key_values = this.getPastKeyValues(outputs, model_inputs.past_key_values, true);
-
         // TODO: ensure all_input_ids is padded correctly...
         const sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
+
+        // Update past key values from the final forward pass
+        const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
+
+        // Dispose output tensors not held by the cache
+        const cachedTensors = new Set(Object.values(past_key_values));
+        for (const tensor of Object.values(outputs)) {
+            if (tensor.location === 'gpu-buffer' && !cachedTensors.has(tensor)) {
+                tensor.dispose();
+            }
+        }
+
+        // Dispose cache tensors if no one needs them
+        const keepCacheAlive = 'past_key_values' in kwargs || generation_config.return_dict_in_generate;
+        if (!keepCacheAlive) {
+            await past_key_values.dispose();
+        }
 
         if (generation_config.return_dict_in_generate) {
             return {
@@ -1046,106 +1061,8 @@ export class PreTrainedModel extends Callable {
                 // scores,
                 // logits,
             };
-        } else {
-            // Dispose all remaining tensors
-            for (const tensor of Object.values(outputs)) {
-                if (tensor.location === 'gpu-buffer') {
-                    tensor.dispose();
-                }
-            }
-            return sequences;
         }
-    }
-
-    /**
-     * Returns a DynamicCache containing past key values from the given decoder results object.
-     *
-     * @param {Object} decoderResults The decoder results object.
-     * @param {DynamicCache} pastKeyValues The previous past key values.
-     * @param {boolean} [disposeEncoderPKVs=false] Whether to dispose encoder past key values.
-     * @returns {DynamicCache} A new DynamicCache containing the updated past key values.
-     */
-    getPastKeyValues(decoderResults, pastKeyValues, disposeEncoderPKVs = false) {
-        /** @type {Record<string, Tensor>} */
-        const pkvs = Object.create(null);
-
-        for (const name in decoderResults) {
-            if (name.startsWith('present')) {
-                const newName = name
-                    // Hybrid cache architecture
-                    .replace('present_ssm', 'past_ssm') // Mamba
-                    .replace('present_conv', 'past_conv') // LFM2
-                    .replace('present_recurrent', 'past_recurrent') // Qwen3.5
-
-                    // Standard cache architecture
-                    .replace('present', 'past_key_values');
-                const is_encoder_pkv = name.includes('encoder');
-                if (is_encoder_pkv && pastKeyValues) {
-                    // Optimization introduced by optimum to reuse past key values.
-                    // So, we just replace the constant outputs (`decoderResults[name]`) with the previous past key values.
-                    // https://github.com/huggingface/optimum/blob/0bf2c05fb7e1182b52d21b703cfc95fd9e4ea3dc/optimum/onnxruntime/base.py#L677-L704
-                    pkvs[newName] = pastKeyValues[newName];
-                } else {
-                    // decoder or using first encoder PKVs
-                    pkvs[newName] = decoderResults[name];
-                }
-
-                if (pastKeyValues && (!is_encoder_pkv || disposeEncoderPKVs)) {
-                    // - Always dispose decoder PKVs
-                    // - Only dispose encoder past key values when requested (after generation)
-                    const t = pastKeyValues[newName];
-                    if (t.location === 'gpu-buffer') {
-                        t.dispose();
-                    }
-                }
-            }
-        }
-        return new DynamicCache(pkvs);
-    }
-
-    /**
-     * Returns an object containing attentions from the given model output object.
-     *
-     * @param {Object} model_output The output of the model.
-     * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
-     */
-    getAttentions(model_output) {
-        const attentions = {};
-
-        for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
-            for (const name in model_output) {
-                if (name.startsWith(attnName)) {
-                    if (!(attnName in attentions)) {
-                        attentions[attnName] = [];
-                    }
-                    attentions[attnName].push(model_output[name]);
-                }
-            }
-        }
-        return attentions;
-    }
-
-    /**
-     * Adds past key values to the decoder feeds object. If pastKeyValues is null, creates new tensors for past key values.
-     *
-     * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
-     * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
-     */
-    addPastKeyValues(decoderFeeds, pastKeyValues) {
-        if (pastKeyValues) {
-            Object.assign(decoderFeeds, pastKeyValues);
-        } else {
-            const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
-            const batch_size = (decoderFeeds[this.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
-
-            const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-            const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
-            const shapes = getCacheShapes(this.config, { batch_size });
-            for (const name in shapes) {
-                const size = shapes[name].reduce((a, b) => a * b, 1);
-                decoderFeeds[name] = new Tensor(dtype, new cls(size), shapes[name]);
-            }
-        }
+        return sequences;
     }
 
     /**
@@ -1254,6 +1171,128 @@ export async function auto_encoder_forward(self, model_inputs) {
 }
 
 /**
+ * Returns a DynamicCache containing past key values from the given decoder results object.
+ * Always updates in-place when pastKeyValues is provided; creates a new DynamicCache otherwise.
+ *
+ * @param {Object} decoderResults The decoder results object.
+ * @param {DynamicCache} pastKeyValues The previous past key values.
+ * @returns {DynamicCache} The updated past key values cache.
+ */
+export function getPastKeyValues(decoderResults, pastKeyValues) {
+    /** @type {Record<string, Tensor>} */
+    const pkvs = Object.create(null);
+
+    for (const name in decoderResults) {
+        if (name.startsWith('present')) {
+            const newName = name
+                // Hybrid cache architecture
+                .replace('present_ssm', 'past_ssm') // Mamba
+                .replace('present_conv', 'past_conv') // LFM2
+                .replace('present_recurrent', 'past_recurrent') // Qwen3.5
+
+                // Standard cache architecture
+                .replace('present', 'past_key_values');
+            const is_encoder_pkv = name.includes('encoder');
+            if (is_encoder_pkv && pastKeyValues) {
+                // Optimization introduced by optimum to reuse past key values.
+                // So, we just replace the constant outputs (`decoderResults[name]`) with the previous past key values.
+                // https://github.com/huggingface/optimum/blob/0bf2c05fb7e1182b52d21b703cfc95fd9e4ea3dc/optimum/onnxruntime/base.py#L677-L704
+                pkvs[newName] = pastKeyValues[newName];
+            } else {
+                pkvs[newName] = decoderResults[name];
+            }
+        }
+    }
+
+    if (pastKeyValues) {
+        pastKeyValues.update(pkvs);
+        return pastKeyValues;
+    }
+    return new DynamicCache(pkvs);
+}
+
+/**
+ * Returns an object containing attentions from the given model output object.
+ *
+ * @param {Object} model_output The output of the model.
+ * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
+ */
+export function getAttentions(model_output) {
+    const attentions = {};
+
+    for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
+        for (const name in model_output) {
+            if (name.startsWith(attnName)) {
+                if (!(attnName in attentions)) {
+                    attentions[attnName] = [];
+                }
+                attentions[attnName].push(model_output[name]);
+            }
+        }
+    }
+    return attentions;
+}
+
+/**
+ * Resolve symbolic dims from ONNX inputMetadata for empty-cache initialization.
+ * Each symbolic dim name is looked up in `symbols`; numeric dims pass through.
+ * Any unresolved symbolic dim defaults to 0.
+ * @param {ReadonlyArray<number|string>} metadataShape
+ * @param {Record<string, number>} symbols
+ * @returns {number[]}
+ */
+export function resolveCacheShape(metadataShape, symbols) {
+    return metadataShape.map((d) => {
+        if (typeof d === 'number') return d;
+        return symbols[d] ?? 0;
+    });
+}
+
+/**
+ * Adds past key values to the decoder feeds object. If pastKeyValues is null,
+ * creates a new DynamicCache with zero-filled tensors for each cache entry.
+ *
+ * @param {PreTrainedModel} self The model instance.
+ * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
+ * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
+ * @returns {DynamicCache} The past key values cache (existing or newly created).
+ */
+export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
+    if (pastKeyValues && Object.keys(pastKeyValues).length > 0) {
+        Object.assign(decoderFeeds, pastKeyValues);
+        return pastKeyValues;
+    }
+
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
+
+    const names = getCacheNames(self.config);
+    const num_heads = self.config?.normalized_config?.num_heads;
+    /** @type {Record<string, number>} */
+    const symbols = { batch_size };
+    if (typeof num_heads === 'number') {
+        symbols['batch_size x num_heads'] = batch_size * num_heads;
+    }
+    /** @type {Record<string, Tensor>} */
+    const entries = Object.create(null);
+    for (const meta of session.inputMetadata) {
+        if (!names.has(meta.name)) continue;
+        const shape = resolveCacheShape(meta.shape, symbols);
+        const size = shape.reduce((a, b) => a * b, 1);
+        const cls = DataTypeMap[meta.type];
+        const t = new Tensor(meta.type, new cls(size), shape);
+        decoderFeeds[meta.name] = t;
+        entries[meta.name] = t;
+    }
+    if (pastKeyValues) {
+        // Populate the (empty) user-provided cache in-place
+        pastKeyValues.update(entries);
+        return pastKeyValues;
+    }
+    return new DynamicCache(entries);
+}
+
+/**
  * Forward pass of a decoder model.
  * @param {Object} self The decoder model.
  * @param {Object} model_inputs The input data to be used for the forward pass.
@@ -1266,7 +1305,9 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
     const { past_key_values, ...new_model_inputs } = model_inputs;
 
     if (session.inputNames.includes('use_cache_branch')) {
-        new_model_inputs.use_cache_branch = boolTensor(!!past_key_values);
+        new_model_inputs.use_cache_branch = boolTensor(
+            past_key_values != null && Object.keys(past_key_values).length > 0,
+        );
     }
     if (
         session.inputNames.includes('position_ids') &&
@@ -1288,7 +1329,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
     }
 
     // Unpack the `past_key_values` object into model inputs
-    self.addPastKeyValues(new_model_inputs, past_key_values);
+    addPastKeyValues(self, new_model_inputs, past_key_values);
 
     // Select only the inputs that are needed for the current session
     const fixed = pick(new_model_inputs, session.inputNames);

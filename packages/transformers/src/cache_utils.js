@@ -29,12 +29,32 @@ class _DynamicCache {
     get_seq_length() {
         /** @type {Record<string, Tensor>} */
         const self = /** @type {any} */ (this);
+
+        if (Object.keys(self).length === 0) {
+            return 0;
+        }
+
         for (const name in self) {
             if (name.startsWith('past_key_values.')) {
                 return self[name].dims.at(-2);
             }
         }
         throw new Error('Unable to determine sequence length from the cache.');
+    }
+
+    /**
+     * Update the cache in-place with new entries, disposing replaced GPU tensors.
+     * @param {Record<string, Tensor>} newEntries The new name → Tensor mappings.
+     */
+    update(newEntries) {
+        for (const key in newEntries) {
+            const oldValue = this[key];
+            const newValue = newEntries[key];
+            if (oldValue && oldValue !== newValue && oldValue.location === 'gpu-buffer') {
+                oldValue.dispose();
+            }
+            this[key] = newValue;
+        }
     }
 
     /**
@@ -54,7 +74,7 @@ class _DynamicCache {
 }
 
 /**
- * @typedef {_DynamicCache & Record<string, Tensor>} DynamicCache
+ * @typedef {Record<string, Tensor> & _DynamicCache} DynamicCache
  */
 
 export const DynamicCache = /** @type {new (entries?: Record<string, Tensor>) => DynamicCache} */ (
