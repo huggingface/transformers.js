@@ -18,6 +18,9 @@
 export type {
     DeviceType,
     DataType,
+    TextGenerationPipeline,
+    AutoTokenizer,
+    AutoModelForCausalLM,
     ProgressInfo,
     ProgressCallback,
     InitiateProgressInfo,
@@ -147,6 +150,29 @@ export interface Tool {
 export type ToolMap = Record<string, Tool>;
 
 // ---------------------------------------------------------------------------
+// Parser strategy abstraction
+// ---------------------------------------------------------------------------
+
+export interface ParserContext {
+    modelId: string;
+    modelType?: string;
+    chatTemplate?: string;
+}
+
+export interface ParseResult {
+    thinkingText: string;
+    visibleText: string;
+    toolCalls: ToolCall[];
+}
+
+export interface ParserStrategy {
+    readonly id: string;
+    supports(context: ParserContext): boolean;
+    formatTools(tools: ToolMap): Array<Record<string, unknown>>;
+    parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult;
+}
+
+// ---------------------------------------------------------------------------
 // Tool call events (emitted during streaming and stored in step results)
 // ---------------------------------------------------------------------------
 
@@ -172,76 +198,67 @@ export interface ToolCallResult extends ToolCall {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming chunk types
+// Ordered run items (timeline entries)
 // ---------------------------------------------------------------------------
 
-/** A token or text fragment has been generated. */
-export interface TextDeltaChunk {
-    type: 'text.delta';
-    delta: string;
+/**
+ * A model thinking segment produced during a step.
+ *
+ * Multiple thinking items may appear in one step, including between tool calls.
+ */
+export interface ThinkingItem {
+    type: 'thinking';
+    /** Opaque ID for this item. */
+    id: string;
+    stepIndex: number;
+    text: string;
 }
 
 /**
- * The model has started invoking a tool.
- * Arguments are fully resolved at this point (not streamed).
+ * A user-visible assistant text segment produced during a step.
+ *
+ * Multiple text items may appear in one step.
  */
-export interface ToolStartChunk {
-    type: 'tool.start';
-    name: string;
-    args: Record<string, unknown>;
-    /** Matches ToolCall.id for correlation with the subsequent tool.result chunk. */
+export interface TextItem {
+    type: 'text';
+    /** Opaque ID for this item. */
     id: string;
+    stepIndex: number;
+    text: string;
 }
 
-/** A tool's `execute` function has returned. */
-export interface ToolResultChunk {
+/**
+ * A tool invocation emitted by the model during a step.
+ */
+export interface ToolCallItem {
+    type: 'tool.call';
+    /** Matches the corresponding `ToolResultItem.id`. */
+    id: string;
+    stepIndex: number;
+    name: string;
+    args: Record<string, unknown>;
+}
+
+/**
+ * A completed tool call during a step.
+ */
+export interface ToolResultItem {
     type: 'tool.result';
+    /** Matches the corresponding `ToolCallItem.id`. */
+    id: string;
+    stepIndex: number;
     name: string;
     output: ToolCallOutput;
-    /** Matches ToolCall.id. */
-    id: string;
     durationMs: number;
 }
 
-/** One full reasoning + (optional) tool loop step has completed. */
-export interface StepDoneChunk {
-    type: 'step.done';
-    stepIndex: number;
-    /** All tool calls made in this step. */
-    toolCalls: ToolCallResult[];
-    /** Partial text generated in this step. Empty if the step only called tools. */
-    text: string;
-    usage: StepUsage;
-}
-
 /**
- * The agent has finished — all steps done, no further tool calls.
- * Always the final chunk emitted by `agent.stream()`.
- */
-export interface DoneChunk {
-    type: 'done';
-    /** Concatenated final assistant text across all steps. */
-    text: string;
-    steps: StepResult[];
-    usage: TotalUsage;
-}
-
-/**
- * Discriminated union of all possible stream chunks.
- * Use a `switch` on `chunk.type` for full TypeScript type narrowing.
+ * Ordered timeline entry produced by an agent run.
  *
- * @example
- * for await (const chunk of agent.stream('Hello')) {
- *   switch (chunk.type) {
- *     case 'text.delta':  ui.append(chunk.delta); break;
- *     case 'tool.start':  ui.showTool(chunk.name, chunk.args); break;
- *     case 'tool.result': ui.showResult(chunk.output); break;
- *     case 'step.done':   ui.markStep(chunk.stepIndex); break;
- *     case 'done':        ui.finalize(chunk.text, chunk.usage); break;
- *   }
- * }
+ * Use this for lossless replay of model reasoning/tool execution flow:
+ * thinking -> tool.call -> tool.result -> thinking -> text -> ...
  */
-export type StreamChunk = TextDeltaChunk | ToolStartChunk | ToolResultChunk | StepDoneChunk | DoneChunk;
+export type RunItem = ThinkingItem | TextItem | ToolCallItem | ToolResultItem;
 
 // ---------------------------------------------------------------------------
 // Usage / token counts
@@ -267,18 +284,43 @@ export interface TotalUsage {
 
 export interface StepResult {
     stepIndex: number;
+    /** Ordered timeline entries generated in this step. */
+    items: RunItem[];
+    /** Aggregated thinking text for this step. */
+    thinkingText: string;
     /** Assistant text in this step. Empty if the step only made tool calls. */
     text: string;
+    /** Tool calls that completed in this step. */
     toolCalls: ToolCallResult[];
     usage: StepUsage;
 }
 
 export interface RunResult {
+    /** `false` while a streamed run is still in progress. */
+    done: boolean;
+    /** Index of the most recent step included in this snapshot. */
+    stepIndex: number;
+    /** Full ordered timeline across all completed and in-progress steps. */
+    items: RunItem[];
+    /** Concatenated thinking text across all steps. */
+    thinkingText: string;
     /** Concatenated final assistant text across all steps. */
     text: string;
     steps: StepResult[];
     usage: TotalUsage;
 }
+
+// ---------------------------------------------------------------------------
+// Streaming chunk types
+// ---------------------------------------------------------------------------
+
+/**
+ * Streaming returns progressive `RunResult` snapshots.
+ *
+ * This intentionally matches the same shape as `run()` output so consumers can
+ * share one rendering path for both streaming and non-streaming calls.
+ */
+export type StreamChunk = RunResult;
 
 // ---------------------------------------------------------------------------
 // Conversation message types
@@ -373,6 +415,12 @@ export declare class Model {
     /** `true` once `init()` has completed successfully. */
     readonly isInitialized: boolean;
 
+    /** Initialized tokenizer backing this model. */
+    readonly tokenizer: Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>;
+
+    /** Initialized causal LM backing this model. */
+    readonly model: Awaited<ReturnType<typeof AutoModelForCausalLM.from_pretrained>>;
+
     // --- Pre-init introspection (no download required) ---
 
     /** Returns `true` if all model files are already in the local cache. */
@@ -402,15 +450,6 @@ export declare class Model {
      */
     static load(config: ModelConfig, progressCallback?: ProgressCallback): Promise<Model>;
 
-    // --- Agent factory shorthand ---
-
-    /**
-     * Creates an `Agent` backed by this model.
-     * Shorthand for `new Agent({ model: this, ...options })`.
-     *
-     * @throws {Error} If the model has not been initialized.
-     */
-    agent(options: Omit<AgentConfig, 'model'>): Agent;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +487,28 @@ export interface AgentConfig {
      * Maps to `max_new_tokens` in the underlying generation config.
      */
     maxNewTokens?: number;
+
+    /**
+     * Optional sampling temperature for generation.
+     *
+     * If provided, sampling is enabled (`do_sample: true`) and this value is
+     * passed as `temperature` to the underlying generation call.
+     */
+    temperature?: number;
+
+    /**
+     * Optional parser strategy override.
+     *
+     * If omitted, the agent resolves a built-in strategy based on model config.
+     */
+    parser?: ParserStrategy;
+
+    /**
+     * Enables model-side reasoning mode for chat templates that support it.
+     *
+     * Passed through as `enable_thinking` to `tokenizer.apply_chat_template(...)`.
+     */
+    enableThinking?: boolean;
 }
 
 /**
@@ -476,11 +537,9 @@ export interface AgentConfig {
  * console.log(result.text, result.steps, result.usage);
  *
  * for await (const chunk of agent.stream('Compare with TensorFlow.js')) {
- *   switch (chunk.type) {
- *     case 'text.delta':  ui.append(chunk.delta); break;
- *     case 'tool.start':  ui.showTool(chunk.name); break;
- *     case 'tool.result': ui.showResult(chunk.output); break;
- *     case 'done':        ui.finalize(chunk.text); break;
+ *   ui.render(chunk.items);
+ *   if (chunk.done) {
+ *     ui.finalize(chunk.text);
  *   }
  * }
  */
@@ -508,9 +567,10 @@ export declare class Agent {
     run(input: string): Promise<RunResult>;
 
     /**
-     * Run the agent and stream chunks as they are produced.
-     * Yields `TextDeltaChunk`, `ToolStartChunk`, `ToolResultChunk`,
-     * `StepDoneChunk`, and finally a `DoneChunk`.
+     * Run the agent and stream progressive `RunResult` snapshots.
+     *
+     * Each yielded chunk has the exact same shape as `run()` output,
+     * with `done: false` until the final chunk (`done: true`).
      *
      * History is updated identically to `run()`.
      */

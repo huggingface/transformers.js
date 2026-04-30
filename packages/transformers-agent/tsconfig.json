@@ -15,7 +15,7 @@
     "lib": ["esnext", "webworker"],
     "baseUrl": ".",
     "paths": {
-      "@huggingface/transformers": ["../transformers/types/src/transformers"]
+      "@huggingface/transformers": ["../transformers/types/transformers"]
     }
   },
   "include": ["src/**/*"],
