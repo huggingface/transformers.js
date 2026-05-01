@@ -457,6 +457,106 @@ describe("Token type ids", () => {
   );
 });
 
+describe("Offset mapping", () => {
+  it(
+    "single string — returns [start, end) for each token",
+    async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+
+      const output = tokenizer("Hello world", {
+        return_tensor: false,
+        return_offsets_mapping: true,
+      });
+
+      // bert-base-uncased adds [CLS] and [SEP] as special tokens (empty string → [0,0])
+      expect(output.offset_mapping).toEqual([
+        [0, 0],   // [CLS]
+        [0, 5],   // "hello"
+        [6, 11],  // "world"
+        [0, 0],   // [SEP]
+      ]);
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
+
+  it(
+    "batched strings — returns an array of offset arrays",
+    async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+
+      const output = tokenizer(["Hi", "a b"], {
+        padding: true,
+        truncation: true,
+        return_tensor: false,
+        return_offsets_mapping: true,
+      });
+
+      expect(output.offset_mapping).toEqual([
+        [[0, 0], [0, 2], [0, 0], [0, 0]],  // "Hi" padded to length 4
+        [[0, 0], [0, 1], [2, 3], [0, 0]],  // "a b"
+      ]);
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
+
+  it(
+    "offset_mapping is absent when return_offsets_mapping is not set",
+    async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+      const output = tokenizer("Hello", { return_tensor: false });
+      expect(output.offset_mapping).toBeUndefined();
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
+
+  it(
+    "GPT-2 (ByteLevel BPE) — Ġ prefix bytes are stripped, offsets point into the original text",
+    async () => {
+      // GPT-2 uses the ByteLevel pre-tokenizer, which maps every non-initial
+      // word-piece to a token string starting with Ġ (U+0120).  Without the
+      // prefix-stripping fix, indexOf("Ġworld", …) returns -1 against "hello world"
+      // and every token would incorrectly get [0, 0].
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2");
+
+      const output = tokenizer("hello world", {
+        add_special_tokens: false,
+        return_tensor: false,
+        return_offsets_mapping: true,
+      });
+
+      // GPT-2 tokenises "hello world" as ["hello", "Ġworld"] (no BOS/EOS by default).
+      expect(output.offset_mapping).toEqual([
+        [0, 5],   // "hello"
+        [5, 11],  // " world" (Ġ stripped → "world", but the space shifts start to 5)
+      ]);
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
+
+  it(
+    "sentence pair — text_pair offsets are relative to the second string",
+    async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+
+      const output = tokenizer("a", {
+        text_pair: "b c",
+        return_tensor: false,
+        return_offsets_mapping: true,
+      });
+
+      expect(output.offset_mapping).toEqual([
+        [0, 0],
+        [0, 1],
+        [0, 0],
+        [0, 1],
+        [2, 3],
+        [0, 0],
+      ]);
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
+});
+
 describe("Edge cases", () => {
   it(
     "should not crash when encoding a very long string",
