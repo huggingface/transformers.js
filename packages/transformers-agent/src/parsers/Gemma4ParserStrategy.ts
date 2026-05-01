@@ -1,4 +1,4 @@
-import type { ToolCall } from '../interfaces.d.ts';
+import type { ToolCall } from '../types.ts';
 import { BaseParserStrategy } from './BaseParserStrategy';
 import type { ParseResult, ParserContext } from './types.ts';
 import { splitTopLevel } from './utils';

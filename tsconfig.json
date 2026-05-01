@@ -18,7 +18,11 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@huggingface/transformers": ["./packages/transformers/types/transformers"]
+    }
   },
   "typeAcquisition": {
     "include": ["jest"]

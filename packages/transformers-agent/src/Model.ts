@@ -1,11 +1,6 @@
 import type { DataType, DeviceType, ProgressCallback } from '@huggingface/transformers';
 import { AutoModelForCausalLM, AutoTokenizer, ModelRegistry } from '@huggingface/transformers';
-
-export interface ModelConfig {
-    modelId: string;
-    device?: DeviceType;
-    dtype?: DataType | Record<string, DataType>;
-}
+import type { ModelConfig } from './types.ts';
 
 export class Model {
     readonly modelId: string;
@@ -61,12 +56,17 @@ export class Model {
             return;
         }
 
-        this._tokenizer = await AutoTokenizer.from_pretrained(this.modelId);
-        this._model = await AutoModelForCausalLM.from_pretrained(this.modelId, {
-            device: this.device,
-            dtype: this.dtype,
-            progress_callback: progressCallback,
-        });
+        const [tokenizer, model] = await Promise.all([
+            AutoTokenizer.from_pretrained(this.modelId),
+            AutoModelForCausalLM.from_pretrained(this.modelId, {
+                device: this.device,
+                dtype: this.dtype,
+                progress_callback: progressCallback,
+            }),
+        ]);
+
+        this._tokenizer = tokenizer;
+        this._model = model;
         this._isInitialized = true;
     }
 

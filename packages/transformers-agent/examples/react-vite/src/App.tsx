@@ -2,16 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { Agent, Model } from "@huggingface/transformers-agent";
 
 type Status = "idle" | "working" | "ready" | "error";
-type StepView = {
-  stepIndex: number;
-  thinkingText: string;
-  text: string;
-  toolCalls: unknown[];
+type ToolResultView = {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  output: unknown;
+  durationMs: number;
 };
 
-type RunResultView = {
-  text?: string;
-  steps: StepView[];
+type RoundView = {
+  thinkingText: string;
+  text: string;
+  tools: ToolResultView[];
+  usage?: { totalTokens?: number };
+};
+
+type RequestResultView = {
+  done: boolean;
+  runs: RoundView[];
+  usage?: { totalTokens?: number };
 };
 
 const getWeatherTool = {
@@ -57,7 +66,7 @@ export function App() {
   const [downloadBytes, setDownloadBytes] = useState<number | null>(null);
   const [cachedBytes, setCachedBytes] = useState<number | null>(null);
   const [resultText, setResultText] = useState("");
-  const [runResult, setRunResult] = useState<RunResultView | null>(null);
+  const [runResult, setRunResult] = useState<RequestResultView | null>(null);
 
   const modelRef = useRef<Model>(new Model({ modelId }));
   const agentRef = useRef<Agent | null>(null);
@@ -130,23 +139,21 @@ export function App() {
       if (!agentRef.current) {
         agentRef.current = new Agent({
           model: modelRef.current,
-          system: "You are a concise assistant.",
+          system:
+            "You are a concise assistant. After you call a tool, always answer the question.",
           tools: {
             getWeather: getWeatherTool,
           },
-          enableThinking: true,
+          enableThinking: false,
         });
       }
-      let finalOutput:
-        | (RunResultView & { usage?: { totalTokens?: number } })
-        | null = null;
+      let finalOutput: RequestResultView | null = null;
       for await (const chunk of agentRef.current.stream(prompt)) {
-        const typedChunk = chunk as unknown as RunResultView & {
-          usage?: { totalTokens?: number };
-        };
-        console.log(typedChunk.text);
-        setResultText(typedChunk.text ?? "");
+        const typedChunk = chunk as unknown as RequestResultView;
+        const text = typedChunk.runs.map((round) => round.text).join("");
+        setResultText(text);
         setRunResult(typedChunk);
+        //console.log(typedChunk);
         finalOutput = typedChunk;
       }
 
@@ -154,10 +161,10 @@ export function App() {
         throw new Error("No output received from stream().");
       }
 
-      console.log(finalOutput);
       setStatus("ready");
+      const lastRound = finalOutput.runs[finalOutput.runs.length - 1];
       addLog(
-        `Agent stream complete. tokens=${finalOutput.usage?.totalTokens ?? 0}`,
+        `Agent stream complete. done=${String(finalOutput.done)}, rounds=${finalOutput.runs.length}, totalTokens=${finalOutput.usage?.totalTokens ?? 0}, lastRunTokens=${lastRound?.usage?.totalTokens ?? 0}`,
       );
     } catch (error) {
       setStatus("error");
@@ -240,33 +247,33 @@ export function App() {
         </section>
 
         <section className="mt-6">
-          <h2 className="text-sm font-semibold">Steps</h2>
+          <h2 className="text-sm font-semibold">Rounds</h2>
           {runResult === null ? (
             <pre className="mt-2 min-h-20 rounded-lg border border-ink/15 bg-white p-3 text-sm whitespace-pre-wrap">
-              No step data yet.
+              No round data yet.
             </pre>
           ) : (
             <div className="mt-2 space-y-3">
-              {runResult.steps.map((step) => (
+              {runResult.runs.map((round, index) => (
                 <div
-                  key={step.stepIndex}
+                  key={index}
                   className="rounded-lg border border-ink/15 bg-white p-3"
                 >
                   <div className="text-xs uppercase tracking-wide text-ink/60">
-                    Step {step.stepIndex}
+                    Round {index + 1}
                   </div>
-                  {step.thinkingText ? (
+                  {round.thinkingText ? (
                     <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                      {step.thinkingText}
+                      {round.thinkingText}
                     </pre>
                   ) : null}
-                  {step.text ? (
+                  {round.text ? (
                     <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                      {step.text}
+                      {round.text}
                     </pre>
                   ) : null}
                   <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                    {JSON.stringify(step.toolCalls, null, 2)}
+                    {JSON.stringify(round.tools, null, 2)}
                   </pre>
                 </div>
               ))}

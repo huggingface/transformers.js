@@ -1,4 +1,4 @@
-import type { ToolCall, ToolMap } from '../interfaces.d.ts';
+import type { ToolCall, ToolMap } from '../types.ts';
 import type { ParseResult, ParserContext, ParserStrategy } from './types.ts';
 import { asRecord } from './utils';
 

@@ -1,4 +1,4 @@
-import type { ToolCall, ToolMap } from '../interfaces.d.ts';
+import type { ToolCall, ToolMap } from '../types.ts';
 
 export interface ParserContext {
     modelId: string;
