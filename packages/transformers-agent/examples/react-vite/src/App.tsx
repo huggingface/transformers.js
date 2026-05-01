@@ -23,6 +23,15 @@ type RequestResultView = {
   usage?: { totalTokens?: number };
 };
 
+type ResponseView = {
+  id: number;
+  prompt: string;
+  text: string;
+  result: RequestResultView | null;
+  done: boolean;
+  error?: string;
+};
+
 const getWeatherTool = {
   description: "Get the weather in a location",
   inputSchema: {
@@ -58,29 +67,26 @@ const getWeatherTool = {
 };
 
 export function App() {
-  const [modelId, setModelId] = useState(
-    "onnx-community/granite-4.0-h-micro-ONNX",
-  );
+  const [modelId, setModelId] = useState("onnx-community/Qwen3.5-4B-ONNX-OPT");
   const [prompt, setPrompt] = useState("Whats the weather in Bern?");
   const [status, setStatus] = useState<Status>("idle");
   const [log, setLog] = useState<string[]>([]);
   const [cached, setCached] = useState<boolean | null>(null);
   const [downloadBytes, setDownloadBytes] = useState<number | null>(null);
   const [cachedBytes, setCachedBytes] = useState<number | null>(null);
-  const [resultText, setResultText] = useState("");
-  const [runResult, setRunResult] = useState<RequestResultView | null>(null);
+  const [responses, setResponses] = useState<ResponseView[]>([]);
 
   const modelRef = useRef<Model>(new Model({ modelId }));
   const agentRef = useRef<Agent | null>(null);
+  const responseIdRef = useRef(0);
 
   useEffect(() => {
-    modelRef.current = new Model({ modelId });
+    modelRef.current = new Model({ modelId, dtype: "q4" });
     agentRef.current = null;
     setCached(null);
     setDownloadBytes(null);
     setCachedBytes(null);
-    setResultText("");
-    setRunResult(null);
+    setResponses([]);
     setStatus("idle");
   }, [modelId]);
 
@@ -89,8 +95,6 @@ export function App() {
 
   const checkCache = async () => {
     setStatus("working");
-    setResultText("");
-    setRunResult(null);
     try {
       const [isCached, need, have] = await Promise.all([
         modelRef.current.isCached(),
@@ -112,8 +116,6 @@ export function App() {
 
   const initModel = async () => {
     setStatus("working");
-    setResultText("");
-    setRunResult(null);
     try {
       let progress = 0;
       await modelRef.current.init((info) => {
@@ -135,8 +137,19 @@ export function App() {
 
   const runAgent = async () => {
     setStatus("working");
-    setResultText("");
-    setRunResult(null);
+    const currentPrompt = prompt;
+    const responseId = responseIdRef.current + 1;
+    responseIdRef.current = responseId;
+    setResponses((prev) => [
+      ...prev,
+      {
+        id: responseId,
+        prompt: currentPrompt,
+        text: "",
+        result: null,
+        done: false,
+      },
+    ]);
     try {
       if (!agentRef.current) {
         agentRef.current = new Agent({
@@ -146,16 +159,26 @@ export function App() {
           tools: {
             getWeather: getWeatherTool,
           },
-          enableThinking: true,
+          enableThinking: false,
         });
       }
       let finalOutput: RequestResultView | null = null;
-      for await (const chunk of agentRef.current.stream(prompt)) {
+      for await (const chunk of agentRef.current.stream(currentPrompt)) {
         const typedChunk = chunk as unknown as RequestResultView;
         const text = typedChunk.runs.map((round) => round.text).join("");
-        setResultText(text);
-        setRunResult(typedChunk);
-        console.log(typedChunk);
+        setResponses((prev) =>
+          prev.map((response) =>
+            response.id === responseId
+              ? {
+                  ...response,
+                  text,
+                  result: typedChunk,
+                  done: typedChunk.done,
+                }
+              : response,
+          ),
+        );
+        //console.log(typedChunk);
         finalOutput = typedChunk;
       }
 
@@ -169,8 +192,16 @@ export function App() {
         `Agent stream complete. done=${String(finalOutput.done)}, rounds=${finalOutput.runs.length}, totalTokens=${finalOutput.usage?.totalTokens ?? 0}, lastRunTokens=${lastRound?.usage?.totalTokens ?? 0}`,
       );
     } catch (error) {
+      const message = errorMessage(error);
+      setResponses((prev) =>
+        prev.map((response) =>
+          response.id === responseId
+            ? { ...response, done: true, error: message }
+            : response,
+        ),
+      );
       setStatus("error");
-      addLog(errorMessage(error));
+      addLog(message);
     }
   };
 
@@ -242,41 +273,71 @@ export function App() {
         </section>
 
         <section className="mt-6">
-          <h2 className="text-sm font-semibold">Result</h2>
-          <pre className="mt-2 min-h-20 rounded-lg border border-ink/15 bg-white p-3 text-sm whitespace-pre-wrap">
-            {resultText || "No output yet."}
-          </pre>
-        </section>
-
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold">Rounds</h2>
-          {runResult === null ? (
+          <h2 className="text-sm font-semibold">Conversation</h2>
+          {responses.length === 0 ? (
             <pre className="mt-2 min-h-20 rounded-lg border border-ink/15 bg-white p-3 text-sm whitespace-pre-wrap">
-              No round data yet.
+              No messages yet.
             </pre>
           ) : (
-            <div className="mt-2 space-y-3">
-              {runResult.runs.map((round, index) => (
-                <div
-                  key={index}
-                  className="rounded-lg border border-ink/15 bg-white p-3"
-                >
-                  <div className="text-xs uppercase tracking-wide text-ink/60">
-                    Round {index + 1}
+            <div className="mt-3 space-y-6 rounded-2xl border border-ink/10 bg-ink/[0.03] p-4">
+              {responses.map((response) => (
+                <div key={response.id} className="space-y-3">
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent px-4 py-3 text-sm text-white shadow-sm">
+                      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-white/70">
+                        You
+                      </div>
+                      <div className="whitespace-pre-wrap">
+                        {response.prompt}
+                      </div>
+                    </div>
                   </div>
-                  {round.thinkingText ? (
-                    <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                      {round.thinkingText}
-                    </pre>
-                  ) : null}
-                  {round.text ? (
-                    <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                      {round.text}
-                    </pre>
-                  ) : null}
-                  <pre className="mt-2 rounded-md bg-ink/5 p-2 text-xs whitespace-pre-wrap">
-                    {JSON.stringify(round.tools, null, 2)}
-                  </pre>
+
+                  <div className="flex justify-start">
+                    <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-ink/10 bg-white px-4 py-3 text-sm shadow-sm">
+                      <div className="mb-2 flex items-center justify-between gap-3 text-xs uppercase tracking-wide text-ink/50">
+                        <span>Assistant</span>
+                        <span>{response.done ? "done" : "streaming"}</span>
+                      </div>
+                      {response.error ? (
+                        <pre className="rounded-md bg-red-50 p-2 text-xs text-red-700 whitespace-pre-wrap">
+                          {response.error}
+                        </pre>
+                      ) : null}
+                      <div className="min-h-6 whitespace-pre-wrap">
+                        {response.text || "Thinking..."}
+                      </div>
+                      {response.result === null ? null : (
+                        <div className="mt-4 space-y-2 border-t border-ink/10 pt-3">
+                          {response.result.runs.map((round, index) => (
+                            <div
+                              key={`${response.id}-${index}`}
+                              className="rounded-lg bg-ink/[0.03] p-3"
+                            >
+                              <div className="text-xs font-medium uppercase tracking-wide text-ink/50">
+                                Round {index + 1}
+                              </div>
+                              {round.thinkingText ? (
+                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap text-ink/75">
+                                  {round.thinkingText}
+                                </pre>
+                              ) : null}
+                              {round.text ? (
+                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
+                                  {round.text}
+                                </pre>
+                              ) : null}
+                              {round.tools.length > 0 ? (
+                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
+                                  {JSON.stringify(round.tools, null, 2)}
+                                </pre>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

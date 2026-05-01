@@ -271,7 +271,7 @@ export class Agent {
                 type: 'function',
                 function: {
                     name: call.name,
-                    arguments: JSON.stringify(call.args),
+                    arguments: this.parser.id === 'qwen3' ? call.args : JSON.stringify(call.args),
                 },
             }));
 
@@ -307,6 +307,7 @@ export class Agent {
         completionTokens: number;
         promptTokenCount: number;
     }> {
+        console.log('conversation', conversation);
         let completionTokens = 0;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
@@ -317,7 +318,6 @@ export class Agent {
             skip_special_tokens: false,
             callback_function: (text: string) => {
                 streamedRawText += text;
-                console.log(streamedRawText);
                 onDelta?.(text);
             },
             token_callback_function: (tokens: bigint[]) => {
@@ -339,6 +339,7 @@ export class Agent {
 
         let generationInput = input;
         let generationPromptLength = fullPromptLength;
+        const useKvCache = !this.enableThinking && this.parser.id !== 'qwen3';
 
         const output = (await model.generate({
             ...generationInput,
@@ -346,16 +347,18 @@ export class Agent {
             ...(this.temperature !== undefined
                 ? { temperature: this.temperature, do_sample: true }
                 : { do_sample: false }),
-            ...(this.enableThinking ? {} : { past_key_values: this._kvCache }),
+            ...(useKvCache ? { past_key_values: this._kvCache } : {}),
             return_dict_in_generate: true,
             streamer,
         })) as { past_key_values?: DynamicCache; sequences?: unknown };
 
-        this._kvCache = output.past_key_values ?? null;
+        this._kvCache = useKvCache ? (output.past_key_values ?? null) : null;
 
         const modelRawText =
             this.decodeGeneratedContinuation(output.sequences, generationPromptLength) ?? streamedRawText;
         const modelContent = this.sanitizeAssistantModelText(modelRawText);
+
+        console.log('modelRawText', modelRawText);
 
         return {
             role: 'assistant',
@@ -448,6 +451,7 @@ export class Agent {
                 modelId: this.model.modelId,
                 modelType: this.tryReadString(modelConfig, 'model_type'),
                 chatTemplate: this.tryReadString(this.model.tokenizer, 'chat_template'),
+                enableThinking: this.enableThinking,
             }) ?? new BaseParserStrategy()
         );
     }

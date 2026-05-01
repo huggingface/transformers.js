@@ -1,6 +1,7 @@
 import { BaseParserStrategy } from './BaseParserStrategy';
 import { Gemma4ParserStrategy } from './Gemma4ParserStrategy';
 import { GraniteParserStrategy } from './GraniteParserStrategy';
+import { Qwen3ParserStrategy } from './Qwen3ParserStrategy';
 import type { ParserContext, ParserStrategy } from './types.ts';
 
 export class ParserRegistry {
@@ -10,6 +11,7 @@ export class ParserRegistry {
         this.strategies = strategies ?? [
             new Gemma4ParserStrategy(),
             new GraniteParserStrategy(),
+            new Qwen3ParserStrategy(),
             new BaseParserStrategy(),
         ];
     }

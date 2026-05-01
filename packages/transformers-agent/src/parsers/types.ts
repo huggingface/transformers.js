@@ -4,6 +4,7 @@ export interface ParserContext {
     modelId: string;
     modelType?: string;
     chatTemplate?: string;
+    enableThinking?: boolean;
 }
 
 export interface ParseResult {
