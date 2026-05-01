@@ -72,19 +72,27 @@ export class Text2TextGenerationPipeline
         }
 
         const tokenizer = this.tokenizer;
+
+        // Allow callers to override tokenizer options (e.g. max_length, truncation side).
+        // Caller-supplied values take precedence over the pipeline defaults.
+        const { tokenizer_options: caller_tokenizer_options, ...rest_generate_kwargs } = generate_kwargs;
         const tokenizer_options = {
             padding: true,
             truncation: true,
+            ...caller_tokenizer_options,
         };
+
         let inputs;
         if (this.task === 'translation' && '_build_translation_inputs' in tokenizer) {
             // TODO: move to Translation pipeline?
             // Currently put here to avoid code duplication
             // @ts-ignore
-            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, generate_kwargs);
+            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, rest_generate_kwargs);
         } else {
             inputs = tokenizer(texts, tokenizer_options);
         }
+
+        generate_kwargs = rest_generate_kwargs;
 
         const outputTokenIds = await this.model.generate({
             ...inputs,
