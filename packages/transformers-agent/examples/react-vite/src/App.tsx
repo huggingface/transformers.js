@@ -144,7 +144,7 @@ export function App() {
           tools: {
             getWeather: getWeatherTool,
           },
-          enableThinking: false,
+          enableThinking: true,
         });
       }
       let finalOutput: RequestResultView | null = null;
@@ -153,7 +153,6 @@ export function App() {
         const text = typedChunk.runs.map((round) => round.text).join("");
         setResultText(text);
         setRunResult(typedChunk);
-        //console.log(typedChunk);
         finalOutput = typedChunk;
       }
 

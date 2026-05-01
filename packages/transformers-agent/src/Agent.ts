@@ -317,6 +317,7 @@ export class Agent {
             skip_special_tokens: false,
             callback_function: (text: string) => {
                 streamedRawText += text;
+                console.log(streamedRawText);
                 onDelta?.(text);
             },
             token_callback_function: (tokens: bigint[]) => {
@@ -345,7 +346,7 @@ export class Agent {
             ...(this.temperature !== undefined
                 ? { temperature: this.temperature, do_sample: true }
                 : { do_sample: false }),
-            past_key_values: this._kvCache,
+            ...(this.enableThinking ? {} : { past_key_values: this._kvCache }),
             return_dict_in_generate: true,
             streamer,
         })) as { past_key_values?: DynamicCache; sequences?: unknown };

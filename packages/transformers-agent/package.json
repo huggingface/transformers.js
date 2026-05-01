@@ -15,6 +15,7 @@
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "format:check": "prettier --check . --ignore-path ../../.prettierignore",
     "typegen": "tsc --build",
+    "test": "node scripts/test.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen"
   },
