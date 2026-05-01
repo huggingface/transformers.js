@@ -10,6 +10,8 @@ package-lock.json
 # Do not track build artifacts/generated files
 packages/*/dist
 packages/*/types
+packages/*/tests/types
+packages/*/tests/**/*.js
 *.tsbuildinfo
 
 # Do not track coverage reports
