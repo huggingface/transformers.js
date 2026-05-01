@@ -508,6 +508,30 @@ describe("Offset mapping", () => {
     },
     MAX_TEST_EXECUTION_TIME,
   );
+
+  it(
+    "GPT-2 (ByteLevel BPE) — Ġ prefix bytes are stripped, offsets point into the original text",
+    async () => {
+      // GPT-2 uses the ByteLevel pre-tokenizer, which maps every non-initial
+      // word-piece to a token string starting with Ġ (U+0120).  Without the
+      // prefix-stripping fix, indexOf("Ġworld", …) returns -1 against "hello world"
+      // and every token would incorrectly get [0, 0].
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2");
+
+      const output = tokenizer("hello world", {
+        add_special_tokens: false,
+        return_tensor: false,
+        return_offsets_mapping: true,
+      });
+
+      // GPT-2 tokenises "hello world" as ["hello", "Ġworld"] (no BOS/EOS by default).
+      expect(output.offset_mapping).toEqual([
+        [0, 5],   // "hello"
+        [5, 11],  // " world" (Ġ stripped → "world", but the space shifts start to 5)
+      ]);
+    },
+    MAX_TEST_EXECUTION_TIME,
+  );
 });
 
 describe("Edge cases", () => {

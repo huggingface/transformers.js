@@ -1,5 +1,4 @@
 import { AutoProcessor, get_available_devices } from "../../src/transformers.js";
-import { createInferenceSession } from "../../src/backends/onnx.js";
 import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
 import { RawImage } from "../../src/utils/image.js";

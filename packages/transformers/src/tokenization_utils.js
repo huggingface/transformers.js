@@ -110,6 +110,11 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  * The scan is tried case-sensitively first, then case-insensitively, to
  * handle uncased tokenizers that lowercase the input before tokenizing.
  *
+ * BPE/SentencePiece tokenizers prepend continuation-byte prefix characters
+ * to tokens: `Ġ` (U+0120) by GPT-2's ByteLevel pre-tokenizer and `▁` (U+2581)
+ * by SentencePiece models (LLaMA, Mistral, T5, …).  These characters are not
+ * present in the original text, so we strip them before searching.
+ *
  * @param {string[]} tokens  The token strings produced by the tokenizer.
  * @param {string}   text    The original input text.
  * @returns {[number, number][]}
@@ -120,18 +125,29 @@ function computeOffsets(tokens, text) {
     const textLower = text.toLowerCase();
     let pos = 0;
     for (const token of tokens) {
-        if (token === '') {
+        // Strip BPE/SentencePiece continuation-byte prefix characters.
+        // Ġ (U+0120) is used by GPT-2's ByteLevel pre-tokenizer.
+        // ▁ (U+2581) is used by SentencePiece (LLaMA, Mistral, T5, …).
+        const byteLevelSpacePrefix = token.startsWith('\u0120');
+        const clean = token.replace(/^[\u0120\u2581]+/, '');
+        if (clean === '') {
             offsets.push([0, 0]);
             continue;
         }
         // Try exact match first, then case-insensitive for uncased tokenizers.
-        let idx = text.indexOf(token, pos);
-        if (idx === -1) idx = textLower.indexOf(token.toLowerCase(), pos);
+        let idx = text.indexOf(clean, pos);
+        if (idx === -1) idx = textLower.indexOf(clean.toLowerCase(), pos);
         if (idx === -1) {
             offsets.push([0, 0]);
         } else {
-            offsets.push([idx, idx + token.length]);
-            pos = idx + token.length;
+            let start = idx;
+            // ByteLevel maps leading space to Ġ; HF offset spans include that space in the original text.
+            if (byteLevelSpacePrefix && idx > 0 && text[idx - 1] === ' ') {
+                start = idx - 1;
+            }
+            const end = idx + clean.length;
+            offsets.push([start, end]);
+            pos = end;
         }
     }
     return offsets;
