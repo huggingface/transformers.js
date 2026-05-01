@@ -120,44 +120,6 @@ describe("Utilities", () => {
   });
 });
 
-describe("Session creation fallback", () => {
-  it("falls back to next provider when the first one fails to load", async () => {
-    let callCount = 0;
-    const fakeSession = { config: null, inputNames: [], outputNames: [] };
-
-    // Patch InferenceSession.create on the ONNX backend via the createInferenceSession wrapper
-    // by monkey-patching globalThis[Symbol.for('onnxruntime')] is impractical in a unit test,
-    // so we verify the fallback contract at the JS level: if all providers fail, the last error is thrown.
-    const badProvider = "cuda";
-    const goodProvider = "cpu";
-
-    // Simulate: first call (cuda) throws, second call (cpu) succeeds.
-    const results = [];
-    const originalCreate = globalThis[Symbol.for('onnxruntime')]?.InferenceSession?.create;
-
-    // Since we can't easily mock ONNX in unit tests without the real runtime,
-    // we verify the fallback array-slicing logic directly.
-    const providers = [badProvider, goodProvider];
-    for (let i = 0; i < providers.length; ++i) {
-      results.push(providers.slice(i));
-    }
-    expect(results).toEqual([
-      ["cuda", "cpu"],
-      ["cpu"],
-    ]);
-  });
-
-  it("throws the last error when all providers fail", () => {
-    const providers = ["cuda", "webgpu"];
-    const errors = providers.map((p) => new Error(`${p} failed`));
-    let lastError;
-    for (let i = 0; i < providers.length; ++i) {
-      lastError = errors[i];
-    }
-    expect(lastError?.message).toBe("webgpu failed");
-  });
-});
-
 describe("Device utilities", () => {
   it("get_available_devices returns a non-empty array", () => {
     const devices = get_available_devices();

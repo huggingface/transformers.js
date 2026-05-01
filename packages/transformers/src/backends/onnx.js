@@ -297,15 +297,6 @@ async function ensureWasmLoaded() {
 
 /**
  * Create an ONNX inference session.
- *
- * When `device: 'auto'` is used, multiple execution providers may be listed in
- * priority order (e.g. `['cuda', 'webgpu', 'cpu']`). Some providers (like CUDA)
- * can fail to load even when the hardware is present because the required shared
- * libraries are missing. In that case ONNX Runtime throws instead of falling back
- * to the next provider. This function retries session creation, dropping the
- * first provider on each failure, so the user always gets the best available
- * device rather than a hard crash.
- *
  * @param {Uint8Array|string} buffer_or_path The ONNX model buffer or path.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
@@ -314,37 +305,15 @@ async function ensureWasmLoaded() {
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
     const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
-
-    const providers = session_options.executionProviders
-        ? [...session_options.executionProviders]
-        : undefined;
-
-    let lastError;
-    // Try each provider prefix in turn. On failure, drop the first provider and retry.
-    // This handles cases like CUDA shared libraries being absent on a Linux x64 machine.
-    const attempts = providers ? providers.length : 1;
-    for (let i = 0; i < attempts; ++i) {
-        const opts = {
+    const load = () =>
+        InferenceSession.create(buffer_or_path, {
+            // Set default log severity level, but allow overriding through session options
             logSeverityLevel,
             ...session_options,
-            ...(providers ? { executionProviders: providers.slice(i) } : {}),
-        };
-        if (i > 0) {
-            logger.warn(
-                `Failed to create session with "${providers[i - 1]}" provider: ${lastError?.message ?? lastError}. ` +
-                `Retrying with: [${providers.slice(i).join(', ')}].`,
-            );
-        }
-        try {
-            const load = () => InferenceSession.create(buffer_or_path, opts);
-            const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
-            session.config = session_config;
-            return session;
-        } catch (err) {
-            lastError = err;
-        }
-    }
-    throw lastError;
+        });
+    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    session.config = session_config;
+    return session;
 }
 
 /**

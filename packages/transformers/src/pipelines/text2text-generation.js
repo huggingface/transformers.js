@@ -73,8 +73,9 @@ export class Text2TextGenerationPipeline
 
         const tokenizer = this.tokenizer;
 
-        // Allow callers to override tokenizer options (e.g. max_length, truncation side).
-        // Caller-supplied values take precedence over the pipeline defaults.
+        // Callers may pass tokenizer_options as a top-level key inside generate_kwargs to
+        // control tokenization (e.g. max_length, truncation side) without touching generation
+        // parameters.  We extract it here so it never leaks into model.generate().
         const { tokenizer_options: caller_tokenizer_options, ...rest_generate_kwargs } = generate_kwargs;
         const tokenizer_options = {
             padding: true,
@@ -92,12 +93,10 @@ export class Text2TextGenerationPipeline
             inputs = tokenizer(texts, tokenizer_options);
         }
 
-        generate_kwargs = rest_generate_kwargs;
-
         const outputTokenIds = await this.model.generate({
             ...inputs,
             ...this._default_generation_config,
-            ...generate_kwargs,
+            ...rest_generate_kwargs,
         });
         return tokenizer
             .batch_decode(/** @type {Tensor} */ (outputTokenIds), {

@@ -38,6 +38,8 @@ export default () => {
           const text = "This is a test.";
           // max_length=3 forces aggressive truncation via tokenizer_options;
           // the model should still run without error and return a string result.
+          // tokenizer_options is extracted before generate() is called so it
+          // never leaks into GenerationFunctionParameters.
           const output = await pipe(text, {
             max_new_tokens: 5,
             tokenizer_options: { truncation: true, max_length: 3 },
