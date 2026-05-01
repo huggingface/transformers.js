@@ -13,7 +13,7 @@ import {
     ParserStrategy,
 } from './types';
 import { DynamicCache, TextStreamer } from '@huggingface/transformers';
-import { BaseParserStrategy, ParserRegistry } from './parsers';
+import { ParserRegistry, ParserStrategyBase } from './parsers';
 import type { Model } from './Model';
 import { ToolExecutor } from './tools/ToolExecutor';
 
@@ -452,7 +452,7 @@ export class Agent {
                 modelType: this.tryReadString(modelConfig, 'model_type'),
                 chatTemplate: this.tryReadString(this.model.tokenizer, 'chat_template'),
                 enableThinking: this.enableThinking,
-            }) ?? new BaseParserStrategy()
+            }) ?? new ParserStrategyBase()
         );
     }
 

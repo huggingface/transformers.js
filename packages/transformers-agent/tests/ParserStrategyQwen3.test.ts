@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Qwen3ParserStrategy } from "../src/parsers/Qwen3ParserStrategy";
+import { ParserStrategyQwen3 } from "../src/parsers/ParserStrategyQwen3";
 
 function parse(content: string) {
   let id = 0;
-  return new Qwen3ParserStrategy().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  return new ParserStrategyQwen3().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 function parseWithThinking(content: string) {
   let id = 0;
-  const parser = new Qwen3ParserStrategy();
+  const parser = new ParserStrategyQwen3();
   parser.supports({ modelId: "Qwen/Qwen3-8B", modelType: "qwen3_text", enableThinking: true });
   return parser.parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }

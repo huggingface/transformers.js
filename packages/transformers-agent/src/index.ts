@@ -1,6 +1,12 @@
 export { Model } from './Model';
 export { Agent } from './Agent';
-export { BaseParserStrategy, Gemma4ParserStrategy, ParserRegistry } from './parsers/index';
+export {
+    ParserRegistry,
+    ParserStrategyBase,
+    ParserStrategyGemma4,
+    ParserStrategyGranite,
+    ParserStrategyQwen3,
+} from './parsers/index';
 export type { ParseResult, ParserContext, ParserStrategy } from './parsers/index';
 export type {
     ModelConfig,

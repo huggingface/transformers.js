@@ -1,7 +1,7 @@
-import { BaseParserStrategy } from './BaseParserStrategy';
-import { Gemma4ParserStrategy } from './Gemma4ParserStrategy';
-import { GraniteParserStrategy } from './GraniteParserStrategy';
-import { Qwen3ParserStrategy } from './Qwen3ParserStrategy';
+import { ParserStrategyBase } from './ParserStrategyBase';
+import { ParserStrategyGemma4 } from './ParserStrategyGemma4';
+import { ParserStrategyGranite } from './ParserStrategyGranite';
+import { ParserStrategyQwen3 } from './ParserStrategyQwen3';
 import type { ParserContext, ParserStrategy } from './types.ts';
 
 export class ParserRegistry {
@@ -9,10 +9,10 @@ export class ParserRegistry {
 
     constructor(strategies?: ParserStrategy[]) {
         this.strategies = strategies ?? [
-            new Gemma4ParserStrategy(),
-            new GraniteParserStrategy(),
-            new Qwen3ParserStrategy(),
-            new BaseParserStrategy(),
+            new ParserStrategyGemma4(),
+            new ParserStrategyGranite(),
+            new ParserStrategyQwen3(),
+            new ParserStrategyBase(),
         ];
     }
 
@@ -27,6 +27,6 @@ export class ParserRegistry {
             }
         }
 
-        return new BaseParserStrategy();
+        return new ParserStrategyBase();
     }
 }

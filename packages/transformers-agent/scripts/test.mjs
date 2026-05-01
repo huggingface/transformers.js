@@ -12,7 +12,7 @@ const entryPoint = join(tempDir, "entry.mjs");
 try {
   await writeFile(
     entryPoint,
-    [resolve("tests/GraniteParserStrategy.test.ts"), resolve("tests/Gemma4ParserStrategy.test.ts"), resolve("tests/Qwen3ParserStrategy.test.ts")]
+    [resolve("tests/ParserStrategyGranite.test.ts"), resolve("tests/ParserStrategyGemma4.test.ts"), resolve("tests/ParserStrategyQwen3.test.ts")]
       .map((path) => `import ${JSON.stringify(path)};`)
       .join("\n"),
   );

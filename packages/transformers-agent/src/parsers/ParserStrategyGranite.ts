@@ -1,9 +1,9 @@
 import type { ToolCall } from '../types.ts';
-import { BaseParserStrategy } from './BaseParserStrategy';
+import { ParserStrategyBase } from './ParserStrategyBase';
 import type { ParseResult, ParserContext } from './types.ts';
 import { asRecord } from './utils';
 
-export class GraniteParserStrategy extends BaseParserStrategy {
+export class ParserStrategyGranite extends ParserStrategyBase {
     readonly id = 'granite';
 
     supports(context: ParserContext): boolean {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Gemma4ParserStrategy } from "../src/parsers/Gemma4ParserStrategy";
+import { ParserStrategyGemma4 } from "../src/parsers/ParserStrategyGemma4";
 
 function parse(content: string) {
   let id = 0;
-  return new Gemma4ParserStrategy().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  return new ParserStrategyGemma4().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 test("parses a completed Gemma4 tool call with quoted string arguments", () => {

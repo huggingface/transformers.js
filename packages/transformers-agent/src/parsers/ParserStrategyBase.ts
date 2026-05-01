@@ -2,7 +2,7 @@ import type { ToolCall, ToolMap } from '../types.ts';
 import type { ParseResult, ParserContext, ParserStrategy } from './types.ts';
 import { asRecord } from './utils';
 
-export class BaseParserStrategy implements ParserStrategy {
+export class ParserStrategyBase implements ParserStrategy {
     readonly id: string = 'base';
 
     supports(_context: ParserContext): boolean {

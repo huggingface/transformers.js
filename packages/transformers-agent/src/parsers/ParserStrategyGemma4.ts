@@ -1,9 +1,9 @@
 import type { ToolCall } from '../types.ts';
-import { BaseParserStrategy } from './BaseParserStrategy';
+import { ParserStrategyBase } from './ParserStrategyBase';
 import type { ParseResult, ParserContext } from './types.ts';
 import { splitTopLevel } from './utils';
 
-export class Gemma4ParserStrategy extends BaseParserStrategy {
+export class ParserStrategyGemma4 extends ParserStrategyBase {
     readonly id = 'gemma4';
 
     supports(context: ParserContext): boolean {

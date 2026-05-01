@@ -1,10 +1,10 @@
 import type { ToolCall } from '../types.ts';
-import { BaseParserStrategy } from './BaseParserStrategy';
+import { ParserStrategyBase } from './ParserStrategyBase';
 import type { ParseResult, ParserContext } from './types.ts';
 
 const IM_END_TOKEN = '<|im_end|>';
 
-export class Qwen3ParserStrategy extends BaseParserStrategy {
+export class ParserStrategyQwen3 extends ParserStrategyBase {
     readonly id = 'qwen3';
 
     private enableThinking = false;
