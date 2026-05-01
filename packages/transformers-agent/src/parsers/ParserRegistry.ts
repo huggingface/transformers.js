@@ -1,12 +1,17 @@
 import { BaseParserStrategy } from './BaseParserStrategy';
 import { Gemma4ParserStrategy } from './Gemma4ParserStrategy';
+import { GraniteParserStrategy } from './GraniteParserStrategy';
 import type { ParserContext, ParserStrategy } from './types.ts';
 
 export class ParserRegistry {
     private readonly strategies: ParserStrategy[];
 
     constructor(strategies?: ParserStrategy[]) {
-        this.strategies = strategies ?? [new Gemma4ParserStrategy(), new BaseParserStrategy()];
+        this.strategies = strategies ?? [
+            new Gemma4ParserStrategy(),
+            new GraniteParserStrategy(),
+            new BaseParserStrategy(),
+        ];
     }
 
     resolve(context: ParserContext, explicit?: ParserStrategy): ParserStrategy {

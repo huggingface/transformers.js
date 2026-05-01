@@ -1,16 +1,22 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import process from "node:process";
 import { build } from "esbuild";
 
 const tempDir = await mkdtemp(join(tmpdir(), "transformers-agent-tests-"));
 const outfile = join(tempDir, "tests.mjs");
+const entryPoint = join(tempDir, "entry.mjs");
 
 try {
+  await writeFile(
+    entryPoint,
+    [resolve("tests/GraniteParserStrategy.test.ts"), resolve("tests/Gemma4ParserStrategy.test.ts")].map((path) => `import ${JSON.stringify(path)};`).join("\n"),
+  );
+
   await build({
-    entryPoints: ["tests/Gemma4ParserStrategy.test.ts"],
+    entryPoints: [entryPoint],
     outfile,
     bundle: true,
     format: "esm",

@@ -58,7 +58,9 @@ const getWeatherTool = {
 };
 
 export function App() {
-  const [modelId, setModelId] = useState("onnx-community/gemma-4-E2B-it-ONNX");
+  const [modelId, setModelId] = useState(
+    "onnx-community/granite-4.0-h-micro-ONNX",
+  );
   const [prompt, setPrompt] = useState("Whats the weather in Bern?");
   const [status, setStatus] = useState<Status>("idle");
   const [log, setLog] = useState<string[]>([]);
@@ -153,6 +155,7 @@ export function App() {
         const text = typedChunk.runs.map((round) => round.text).join("");
         setResultText(text);
         setRunResult(typedChunk);
+        console.log(typedChunk);
         finalOutput = typedChunk;
       }
 
