@@ -118,9 +118,10 @@ export class TokenClassificationPipeline
         }
 
         const isBatched = Array.isArray(texts);
+        const textList = isBatched ? texts : [texts];
 
         // Run tokenization
-        const model_inputs = this.tokenizer(isBatched ? texts : [texts], {
+        const model_inputs = this.tokenizer(textList, {
             padding: true,
             truncation: true,
         });
@@ -136,18 +137,31 @@ export class TokenClassificationPipeline
         for (let i = 0; i < logits.dims[0]; ++i) {
             const ids = model_inputs.input_ids[i].tolist();
             const batch = logits[i];
+            const text = textList[i];
 
             const tokens = [];
+            let charOffset = 0;
             for (let j = 0; j < batch.dims[0]; ++j) {
                 const tokenData = batch[j];
                 const topScoreIndex = max(tokenData.data)[1];
 
                 const entity = id2label ? id2label[topScoreIndex] : `LABEL_${topScoreIndex}`;
-                if (ignore_labels.includes(entity)) continue;
 
                 // TODO add option to keep special tokens?
                 const word = this.tokenizer.decode([ids[j]], { skip_special_tokens: true });
                 if (word === '') continue; // Was a special token.
+
+                // Locate this token's character span in the original text by
+                // scanning forward from where the previous token ended.
+                const idx = text.indexOf(word, charOffset);
+                let start, end;
+                if (idx !== -1) {
+                    start = idx;
+                    end = idx + word.length;
+                    charOffset = end;
+                }
+
+                if (ignore_labels.includes(entity)) continue;
 
                 const scores = softmax(tokenData.data);
                 tokens.push({
@@ -155,7 +169,8 @@ export class TokenClassificationPipeline
                     score: scores[topScoreIndex],
                     index: j,
                     word,
-                    // TODO: Add support for start and end
+                    start,
+                    end,
                 });
             }
 
@@ -218,10 +233,13 @@ function groupEntities(tokens, ids, tokenizer) {
             scoreSum += tokens[i].score;
             groupIds.push(ids[tokens[i].index]);
         }
+        const charStart = tokens[start].start;
+        const charEnd = tokens[end - 1].end;
         return {
             entity_group: tag,
             score: scoreSum / (end - start),
             word: tokenizer.decode(groupIds, { skip_special_tokens: true }),
+            ...(charStart !== undefined ? { start: charStart, end: charEnd } : {}),
         };
     });
 }
