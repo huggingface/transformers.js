@@ -1,4 +1,4 @@
-import { AutoProcessor } from "../../src/transformers.js";
+import { AutoProcessor, get_available_devices } from "../../src/transformers.js";
 import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
 import { RawImage } from "../../src/utils/image.js";
@@ -116,5 +116,25 @@ describe("Utilities", () => {
       expect(resized.width).toBe(300);
       expect(resized.height).toBe(200);
     });
+  });
+});
+
+describe("Device utilities", () => {
+  it("get_available_devices returns a non-empty array", () => {
+    const devices = get_available_devices();
+    expect(Array.isArray(devices)).toBe(true);
+    expect(devices.length).toBeGreaterThan(0);
+  });
+
+  it("get_available_devices always includes a CPU-class device (cpu or wasm)", () => {
+    const devices = get_available_devices();
+    expect(devices.includes("cpu") || devices.includes("wasm")).toBe(true);
+  });
+
+  it("get_available_devices returns a fresh copy each call", () => {
+    const a = get_available_devices();
+    const b = get_available_devices();
+    expect(a).not.toBe(b); // different array instances
+    expect(a).toEqual(b);  // same contents
   });
 });
