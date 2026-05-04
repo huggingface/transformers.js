@@ -72,16 +72,23 @@ export class Text2TextGenerationPipeline
         }
 
         const tokenizer = this.tokenizer;
+
+        // Callers may pass tokenizer_options as a top-level key inside generate_kwargs to
+        // control tokenization (e.g. max_length, truncation side) without touching generation
+        // parameters.  We extract it here so it never leaks into model.generate().
+        const { tokenizer_options: caller_tokenizer_options, ...rest_generate_kwargs } = generate_kwargs;
         const tokenizer_options = {
             padding: true,
             truncation: true,
+            ...caller_tokenizer_options,
         };
+
         let inputs;
         if (this.task === 'translation' && '_build_translation_inputs' in tokenizer) {
             // TODO: move to Translation pipeline?
             // Currently put here to avoid code duplication
             // @ts-ignore
-            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, generate_kwargs);
+            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, rest_generate_kwargs);
         } else {
             inputs = tokenizer(texts, tokenizer_options);
         }
@@ -89,7 +96,7 @@ export class Text2TextGenerationPipeline
         const outputTokenIds = await this.model.generate({
             ...inputs,
             ...this._default_generation_config,
-            ...generate_kwargs,
+            ...rest_generate_kwargs,
         });
         return tokenizer
             .batch_decode(/** @type {Tensor} */ (outputTokenIds), {
