@@ -1325,7 +1325,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         // logits will be calculated. During generation, the default is 1 because only the logits of the last
         // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
         // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
-        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
+        new_model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
     }
 
     // Unpack the `past_key_values` object into model inputs

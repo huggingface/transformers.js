@@ -154,6 +154,25 @@ if (ORT_SYMBOL in globalThis) {
 const InferenceSession = ONNX.InferenceSession;
 
 /**
+ * Returns the list of devices available in the current environment, sorted by priority/performance.
+ *
+ * **Example:** Check available devices before loading a model.
+ * ```javascript
+ * import { get_available_devices } from '@huggingface/transformers';
+ *
+ * const devices = get_available_devices();
+ * // Node.js (Windows):  ['dml', 'webgpu', 'cpu']
+ * // Node.js (Linux x64): ['cuda', 'webgpu', 'cpu']
+ * // Browser (WebGPU):   ['webgpu', 'wasm']
+ * // Browser (no WebGPU): ['wasm']
+ * ```
+ * @returns {import("../utils/devices.js").DeviceType[]} The list of available devices.
+ */
+export function get_available_devices() {
+    return [...supportedDevices];
+}
+
+/**
  * Map a device to the execution providers to use for the given device.
  * @param {import("../utils/devices.js").DeviceType|"auto"|null} [device=null] (Optional) The device to run the inference on.
  * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.

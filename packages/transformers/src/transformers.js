@@ -58,6 +58,9 @@ export { DynamicCache } from './cache_utils.js';
 // Cache and file management
 export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
+// Device utilities
+export { get_available_devices } from './backends/onnx.js';
+
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
