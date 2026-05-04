@@ -3,7 +3,6 @@ import {
     BeforeToolCallHook,
     AfterToolCallHook,
     OnStepHook,
-    ToolMap,
     Message,
     RunResult,
     RequestResult,
@@ -12,6 +11,7 @@ import {
     StreamChunk,
     ParserStrategy,
 } from './types';
+import type { ToolList } from './Tool';
 import { DynamicCache, TextStreamer } from '@huggingface/transformers';
 import { ParserRegistry, ParserStrategyBase } from './parsers';
 import type { Model } from './Model';
@@ -24,7 +24,7 @@ const TOOL_FOLLOWUP_PROMPT =
 export class Agent {
     readonly model: Model;
     readonly system: string;
-    readonly tools: ToolMap;
+    readonly tools: ToolList;
     readonly maxSteps: number;
     readonly maxNewTokens: number;
     readonly temperature: number | undefined;
@@ -46,7 +46,7 @@ export class Agent {
     constructor(config: AgentConfig) {
         this.model = config.model;
         this.system = config.system;
-        this.tools = config.tools ?? {};
+        this.tools = config.tools ?? [];
         this.maxSteps = config.maxSteps ?? 10;
         this.maxNewTokens = config.maxNewTokens ?? 1024;
         this.temperature = config.temperature;

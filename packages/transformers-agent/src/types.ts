@@ -1,5 +1,6 @@
 import type { DataType, DeviceType } from '@huggingface/transformers';
 import type { Model } from './Model.ts';
+import type { ToolList } from './Tool.ts';
 
 export interface JSONSchemaObject {
     type: 'object';
@@ -40,14 +41,6 @@ export interface ToolCallOutput {
     isError?: boolean;
 }
 
-export interface Tool {
-    description: string;
-    inputSchema: JSONSchemaObject;
-    execute: (args: Record<string, unknown>) => Promise<ToolCallOutput>;
-}
-
-export type ToolMap = Record<string, Tool>;
-
 export interface ParserContext {
     modelId: string;
     modelType?: string;
@@ -69,7 +62,7 @@ export interface ParseResult {
 export interface ParserStrategy {
     readonly id: string;
     supports(context: ParserContext): boolean;
-    formatTools(tools: ToolMap): Array<Record<string, unknown>>;
+    formatTools(tools: ToolList): Array<Record<string, unknown>>;
     parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult;
 }
 
@@ -138,7 +131,7 @@ export interface ModelConfig {
 export interface AgentConfig {
     model: Model;
     system: string;
-    tools?: ToolMap;
+    tools?: ToolList;
     maxSteps?: number;
     maxNewTokens?: number;
     temperature?: number;

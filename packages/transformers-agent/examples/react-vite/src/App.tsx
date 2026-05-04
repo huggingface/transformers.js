@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Agent, Model } from "@huggingface/transformers-agent";
+import { Agent, Model, Tool } from "@huggingface/transformers-agent";
 
 type Status = "idle" | "working" | "ready" | "error";
 type ToolResultView = {
@@ -32,30 +32,24 @@ type ResponseView = {
   error?: string;
 };
 
-const getWeatherTool = {
+const getWeatherTool = new Tool<{ location: string }>({
+  name: "getWeather",
   description: "Get the weather in a location",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      location: {
-        type: "string" as const,
-        description: "The location to get the weather for",
-      },
-    },
-    required: ["location"],
+  parameters: {
+    location: Tool.string({
+      description: "The location to get the weather for",
+    }),
   },
-  execute: async (args: Record<string, unknown>) => {
-    const location =
-      typeof args.location === "string" && args.location.trim().length > 0
-        ? args.location.trim()
-        : "Unknown";
+  execute: async ({ location }) => {
+    const normalizedLocation =
+      location.trim().length > 0 ? location.trim() : "Unknown";
 
     return {
       content: [
         {
-          type: "text" as const,
+          type: "text",
           text: JSON.stringify({
-            location,
+            location: normalizedLocation,
             condition: "Sunny",
             temperatureC: 21,
             source: "mock",
@@ -64,7 +58,7 @@ const getWeatherTool = {
       ],
     };
   },
-};
+});
 
 export function App() {
   const [modelId, setModelId] = useState("onnx-community/Qwen3.5-4B-ONNX-OPT");
@@ -156,9 +150,7 @@ export function App() {
           model: modelRef.current,
           system:
             "You are a concise assistant. After you call a tool, always answer the question.",
-          tools: {
-            getWeather: getWeatherTool,
-          },
+          tools: [getWeatherTool],
           enableThinking: false,
         });
       }

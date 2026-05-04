@@ -1,4 +1,5 @@
-import type { ToolCall, ToolMap } from '../types.ts';
+import type { ToolList } from '../Tool.ts';
+import type { ToolCall } from '../types.ts';
 import type { ParseResult, ParserContext, ParserStrategy } from './types.ts';
 import { asRecord } from './utils';
 
@@ -9,11 +10,11 @@ export class ParserStrategyBase implements ParserStrategy {
         return true;
     }
 
-    formatTools(tools: ToolMap): Array<Record<string, unknown>> {
-        return Object.entries(tools).map(([name, tool]) => ({
+    formatTools(tools: ToolList): Array<Record<string, unknown>> {
+        return tools.map((tool) => ({
             type: 'function',
             function: {
-                name,
+                name: tool.name,
                 description: tool.description,
                 parameters: tool.inputSchema,
             },

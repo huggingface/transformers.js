@@ -5,14 +5,17 @@ import type {
     ToolCall,
     ToolCallOutput,
     ToolCallResult,
-    ToolMap,
 } from '../types';
+import type { ToolList } from '../Tool';
 
 export class ToolExecutor {
     private readonly beforeHooks: BeforeToolCallHook[] = [];
     private readonly afterHooks: AfterToolCallHook[] = [];
+    private readonly toolsByName: Map<string, ToolList[number]>;
 
-    constructor(private readonly tools: ToolMap) {}
+    constructor(tools: ToolList) {
+        this.toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
+    }
 
     onBeforeToolCall(hook: BeforeToolCallHook): void {
         this.beforeHooks.push(hook);
@@ -23,7 +26,7 @@ export class ToolExecutor {
     }
 
     async execute(call: ToolCall): Promise<ToolCallResult> {
-        const tool = this.tools[call.name];
+        const tool = this.toolsByName.get(call.name);
         const start = performance.now();
 
         await this.emitBeforeHooks(call);
@@ -36,7 +39,7 @@ export class ToolExecutor {
             };
         } else {
             try {
-                output = await tool.execute(call.args);
+                output = await tool.execute(call.args, undefined);
             } catch (error) {
                 output = {
                     isError: true,

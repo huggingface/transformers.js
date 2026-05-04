@@ -59,7 +59,7 @@ import { Agent } from '@huggingface/transformers-agent';
 const agent = new Agent({
   model,
   system: 'You are a helpful research assistant.',
-  tools: { searchWeb, readUrl },
+  tools: [searchWeb, readUrl],
   maxSteps: 10,
 });
 ```
@@ -106,9 +106,41 @@ Tools follow the [W3C WebMCP `ModelContextTool`](https://webmachinelearning.gith
 interface — the same shape used by `navigator.modelContext.registerTool()` in the browser.
 
 ```ts
-import type { Tool } from '@huggingface/transformers-agent';
+import { Tool } from '@huggingface/transformers-agent';
 
-const searchWeb: Tool = {
+const searchWeb = new Tool<{ query: string }>({
+  name: 'searchWeb',
+  title: 'Search web',
+  description: 'Search the web for current information.',
+  parameters: {
+    query: Tool.string({ description: 'The search query' }),
+  },
+  execute: async ({ query }) => ({
+    content: [{ type: 'text', text: await fetchSearchResults(query) }],
+  }),
+});
+
+const readUrl = new Tool<{ url: string }>({
+  name: 'readUrl',
+  title: 'Read URL',
+  description: 'Fetch the text content of a URL.',
+  parameters: {
+    url: Tool.string({ description: 'The URL to read' }),
+  },
+  execute: async ({ url }) => ({
+    content: [{ type: 'text', text: await fetch(url).then(r => r.text()) }],
+  }),
+});
+```
+
+`Tool` builds the WebMCP-compatible input schema from parameter helpers.
+
+If you already have a WebMCP tool definition, use `Tool.fromWebMCP`:
+
+```ts
+const searchWeb = Tool.fromWebMCP<{ query: string }>({
+  name: 'searchWeb',
+  title: 'Search web',
   description: 'Search the web for current information.',
   inputSchema: {
     type: 'object',
@@ -117,24 +149,37 @@ const searchWeb: Tool = {
     },
     required: ['query'],
   },
-  execute: async ({ query }) => ({
-    content: [{ type: 'text', text: await fetchSearchResults(query as string) }],
-  }),
-};
-
-const readUrl: Tool = {
-  description: 'Fetch the text content of a URL.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      url: { type: 'string', description: 'The URL to read' },
-    },
-    required: ['url'],
+  execute: async ({ query }, client) => {
+    return {
+      content: [
+        { type: 'text', text: await fetchSearchResults(query) },
+      ],
+    };
   },
-  execute: async ({ url }) => ({
-    content: [{ type: 'text', text: await fetch(url as string).then(r => r.text()) }],
-  }),
-};
+  annotations: {
+    readOnlyHint: true,
+  },
+});
+```
+
+You can also export the top-level WebMCP shape:
+
+```ts
+const webTool = searchWeb.toWebMCP();
+```
+
+The chat-template tool schema sent to the model is adapted internally from this
+shape:
+
+```ts
+{
+  type: 'function',
+  function: {
+    name: searchWeb.name,
+    description: searchWeb.description,
+    parameters: searchWeb.inputSchema,
+  },
+}
 ```
 
 Return `isError: true` to let the model handle failures gracefully:
@@ -142,7 +187,7 @@ Return `isError: true` to let the model handle failures gracefully:
 ```ts
 execute: async ({ url }) => {
   try {
-    return { content: [{ type: 'text', text: await fetch(url as string).then(r => r.text()) }] };
+    return { content: [{ type: 'text', text: await fetch(url).then(r => r.text()) }] };
   } catch (e) {
     return { content: [{ type: 'text', text: String(e) }], isError: true };
   }
@@ -194,7 +239,7 @@ await model.init((info) => {
 const agent = new Agent({
   model,
   system: 'You are a helpful assistant.',
-  tools: { searchWeb, readUrl },
+  tools: [searchWeb, readUrl],
   maxSteps: 5,
 });
 

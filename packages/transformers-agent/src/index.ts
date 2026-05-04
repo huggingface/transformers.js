@@ -1,5 +1,6 @@
 export { Model } from './Model';
 export { Agent } from './Agent';
+export { Tool } from './Tool';
 export {
     ParserRegistry,
     ParserStrategyBase,
@@ -15,10 +16,9 @@ export type {
     RequestResult,
     Usage,
     StreamChunk,
-    Tool,
-    ToolMap,
     ToolCall,
     ToolCallResult,
     ToolCallOutput,
     Message,
 } from './types';
+export type { ModelContextClient, ToolExecute, ToolParameter, ToolParameters, WebMCPTool, ToolList } from './Tool';
