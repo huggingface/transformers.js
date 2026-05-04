@@ -13,9 +13,19 @@ import { apis } from '../env.js';
 import { Tensor } from './tensor.js';
 import { saveBlob } from './io.js';
 
-// Will be empty (or not used) if running in browser or web-worker
-import sharp from 'sharp';
 import { logger } from './logger.js';
+
+// sharp is loaded dynamically so that environments where its native bindings
+// are unavailable (e.g. Bun --compile single binaries) do not crash at module
+// load time. Text-only pipelines that never process images are unaffected.
+let sharp = null;
+if (!apis.IS_WEB_ENV) {
+    try {
+        ({ default: sharp } = await import('sharp'));
+    } catch {
+        // sharp not available; image operations will throw when actually invoked
+    }
+}
 
 let createCanvasFunction;
 let ImageDataClass;
@@ -48,7 +58,8 @@ if (apis.IS_WEB_ENV) {
         return newImage;
     };
 } else {
-    throw new Error('Unable to load image processing library.');
+    // sharp not available; loadImageFunction remains null and image
+    // operations will throw with a clear message when actually invoked
 }
 
 // Defined here: https://github.com/python-pillow/Pillow/blob/a405e8406b83f8bfb8916e93971edc7407b8b1ff/src/libImaging/Imaging.h#L262-L268
@@ -175,6 +186,9 @@ export class RawImage {
 
             return new this(ctx.getImageData(0, 0, img.width, img.height).data, img.width, img.height, 4);
         } else {
+            if (!sharp) {
+                throw new Error('Unable to load image processing library. Please install the `sharp` package.');
+            }
             // Use sharp.js to read (and possible resize) the image.
             const img = sharp(await blob.arrayBuffer());
 
@@ -800,6 +814,9 @@ export class RawImage {
     toSharp() {
         if (apis.IS_WEB_ENV) {
             throw new Error('toSharp() is only supported in server-side environments.');
+        }
+        if (!sharp) {
+            throw new Error('Unable to load image processing library. Please install the `sharp` package.');
         }
 
         return sharp(this.data, {
