@@ -18,9 +18,22 @@
 
 import { env, apis, LogLevel } from '../env.js';
 
-// NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
-// In either case, we select the default export if it exists, otherwise we use the named export.
-import * as ONNX_NODE from 'onnxruntime-node';
+// onnxruntime-node is loaded dynamically so that environments where its native
+// bindings are unavailable (e.g. Bun --compile single binaries) do not crash
+// at module load time. When the load fails we fall back to onnxruntime-web
+// (WASM backend) so the library still works without patching.
+//
+// Note: we previously used a static import here, but that caused Bun --compile
+// binaries to crash before the globalThis[Symbol.for('onnxruntime')] override
+// hook could even fire. See: https://github.com/huggingface/transformers.js/issues/1672
+let ONNX_NODE = null;
+if (apis.IS_NODE_ENV) {
+    try {
+        ONNX_NODE = await import('onnxruntime-node');
+    } catch {
+        // native bindings not available; will fall back to the WASM backend below
+    }
+}
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
@@ -102,11 +115,17 @@ let defaultDevices;
 let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
+// Tracks whether the native onnxruntime-node backend is active.
+// model-loader uses this to decide whether to pass file paths (efficient for
+// the native backend) or load buffers (required by the WASM backend).
+export let _nodeOnnxActive = false;
+
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
-} else if (apis.IS_NODE_ENV) {
+} else if (apis.IS_NODE_ENV && ONNX_NODE) {
     ONNX = ONNX_NODE;
+    _nodeOnnxActive = true;
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
