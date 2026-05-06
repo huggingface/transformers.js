@@ -617,7 +617,7 @@ export class NoBadWordsLogitsProcessor extends LogitsProcessor {
 }
 
 /**
- * [`LogitsProcessor`] for classifier free guidance (CFG). The scores are split over the batch dimension,
+ * [`LogitsProcessor`] for classifier-free guidance (CFG). The scores are split over the batch dimension,
  * where the first half correspond to the conditional logits (predicted from the input prompt) and the second half
  * correspond to the unconditional logits (predicted from an empty or 'null' prompt). The processor computes a
  * weighted average across the conditional and unconditional logits, parameterised by the `guidance_scale`.
@@ -627,15 +627,15 @@ export class NoBadWordsLogitsProcessor extends LogitsProcessor {
 export class ClassifierFreeGuidanceLogitsProcessor extends LogitsProcessor {
     /**
      * Create a `ClassifierFreeGuidanceLogitsProcessor`.
-     * @param {number} guidance_scale The guidance scale for classifier free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
-     * Higher guidance scale encourages the model to generate samples that are more closely linked to the input
+     * @param {number} guidance_scale The guidance scale for classifier-free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
+     * Higher guidance scale encourages the model to generate samples that are more closely tied to the input
      * prompt, usually at the expense of poorer quality.
      */
     constructor(guidance_scale) {
         super();
         if (guidance_scale <= 1) {
             throw new Error(
-                `Require guidance scale >1 to use the classifier free guidance processor, got guidance scale ${guidance_scale}.`,
+                `Require guidance scale >1 to use the classifier-free guidance processor, got guidance scale ${guidance_scale}.`,
             );
         }
         this.guidance_scale = guidance_scale;

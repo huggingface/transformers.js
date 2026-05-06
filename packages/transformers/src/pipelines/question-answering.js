@@ -14,7 +14,7 @@ import { softmax } from '../utils/maths.js';
 
 /**
  * @typedef {Object} QuestionAnsweringOutput
- * @property {number} score The probability associated to the answer.
+ * @property {number} score The probability associated with the answer.
  * @property {number} [start] The character start index of the answer (in the tokenized version of the input).
  * @property {number} [end] The character end index of the answer (in the tokenized version of the input).
  * @property {string} answer The answer to the question.

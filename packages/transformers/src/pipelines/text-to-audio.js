@@ -142,7 +142,7 @@ export class TextToAudioPipeline
     }
 
     async _call(text_inputs, options) {
-        // If this.processor is not set, we are using a `AutoModelForTextToWaveform` model
+        // If this.processor is not set, we are using an `AutoModelForTextToWaveform` model
         if (this.processor) {
             return this._call_text_to_spectrogram(text_inputs, options);
         } else if (this.model.config.model_type === 'supertonic') {

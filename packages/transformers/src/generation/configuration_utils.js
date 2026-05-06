@@ -56,8 +56,8 @@ export class GenerationConfig {
     early_stopping = false;
 
     /**
-     * The maximum amount of time you allow the computation to run for in seconds.
-     * Generation will still finish the current pass after allocated time has been passed.
+     * The maximum time, in seconds, allowed for generation.
+     * Generation will still finish the current pass after the allocated time has passed.
      * @type {number}
      * @default null
      */
@@ -79,7 +79,7 @@ export class GenerationConfig {
     num_beams = 1;
 
     /**
-     * Number of groups to divide `num_beams` into in order to ensure diversity among different groups of beams.
+     * Number of groups to divide `num_beams` into to encourage diversity among different groups of beams.
      * See [this paper](https://huggingface.co/papers/1610.02424) for more details.
      * @type {number}
      * @default 1
@@ -109,7 +109,7 @@ export class GenerationConfig {
     temperature = 1.0;
 
     /**
-     * The number of highest probability vocabulary tokens to keep for top-k-filtering.
+     * The number of highest-probability vocabulary tokens to keep for top-k filtering.
      * @type {number}
      * @default 50
      */
@@ -217,14 +217,14 @@ export class GenerationConfig {
     renormalize_logits = false;
 
     /**
-     * Custom constraints that can be added to the generation to ensure that the output will contain the use of certain tokens as defined by `Constraint` objects, in the most sensible way possible.
+     * Custom constraints that guide generation to include certain tokens as defined by `Constraint` objects.
      * @type {Object[]}
      * @default null
      */
     constraints = null;
 
     /**
-     * The id of the token to force as the first generated token after the `decoder_start_token_id`.
+     * The ID of the token to force as the first generated token after the `decoder_start_token_id`.
      * Useful for multilingual models like mBART where the first generated token needs to be the target language token.
      * @type {number}
      * @default null
@@ -232,7 +232,7 @@ export class GenerationConfig {
     forced_bos_token_id = null;
 
     /**
-     * The id of the token to force as the last generated token when `max_length` is reached.
+     * The ID of the token to force as the last generated token when `max_length` is reached.
      * Optionally, use a list to set multiple *end-of-sequence* tokens.
      * @type {number|number[]}
      * @default null
@@ -285,8 +285,8 @@ export class GenerationConfig {
     forced_decoder_ids = null;
 
     /**
-     * The guidance scale for classifier free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
-     * Higher guidance scale encourages the model to generate samples that are more closely linked to the input
+     * The guidance scale for classifier-free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`.
+     * Higher guidance scale encourages the model to generate samples that are more closely tied to the input
      * prompt, usually at the expense of poorer quality.
      * @type {number}
      * @default null
@@ -334,14 +334,14 @@ export class GenerationConfig {
 
     // Special tokens that can be used at generation time
     /**
-     * The id of the *padding* token.
+     * The ID of the *padding* token.
      * @type {number}
      * @default null
      */
     pad_token_id = null;
 
     /**
-     * The id of the *beginning-of-sequence* token.
+     * The ID of the *beginning-of-sequence* token.
      * @type {number}
      * @default null
      */
