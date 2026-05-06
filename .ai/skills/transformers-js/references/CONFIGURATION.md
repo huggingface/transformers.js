@@ -33,7 +33,7 @@ env.cacheDir = '/path/to/cache/directory/';
 |--------|------|-------------|
 | `version` | `string` | This version of Transformers.js. |
 | `backends` | `object` | Expose environment variables of different backends, allowing users to set these variables if they want to. |
-| `logLevel` | `number` | The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR. |
+| `logLevel` | `number` | The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING. |
 | `allowRemoteModels` | `boolean` | Whether to allow loading of remote files, defaults to `true`. If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc. |
 | `remoteHost` | `string` | Host URL to load models from. Defaults to the Hugging Face Hub. |
 | `remotePathTemplate` | `string` | Path template to fill in and append to `remoteHost` when loading models. |

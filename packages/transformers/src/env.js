@@ -202,7 +202,7 @@ export const LogLevel = Object.freeze({
  * @property {string} version This version of Transformers.js.
  * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
  * allowing users to set these variables if they want to.
- * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
  * @property {string} remoteHost Host URL to load models from. Defaults to the Hugging Face Hub.
