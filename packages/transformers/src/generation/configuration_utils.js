@@ -23,7 +23,7 @@ export class GenerationConfig {
     max_length = 20;
 
     /**
-     * The maximum numbers of tokens to generate, ignoring the number of tokens in the prompt.
+     * The maximum number of tokens to generate, ignoring the number of tokens in the prompt.
      * @type {number}
      * @default null
      */
@@ -39,7 +39,7 @@ export class GenerationConfig {
     min_length = 0;
 
     /**
-     * The minimum numbers of tokens to generate, ignoring the number of tokens in the prompt.
+     * The minimum number of tokens to generate, ignoring the number of tokens in the prompt.
      * @type {number}
      * @default null
      */
@@ -167,7 +167,7 @@ export class GenerationConfig {
     repetition_penalty = 1.0;
 
     /**
-     * The paramater for encoder_repetition_penalty.
+     * The parameter for encoder_repetition_penalty.
      * An exponential penalty on sequences that are not in the original input.
      * 1.0 means no penalty.
      * @type {number}
