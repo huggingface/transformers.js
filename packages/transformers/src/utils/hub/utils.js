@@ -23,7 +23,7 @@ export function pathJoin(...parts) {
 
 /**
  * Determines whether the given string is a valid URL.
- * @param {string|URL} string The string to test for validity as an URL.
+ * @param {string|URL} string The string to test for validity as a URL.
  * @param {string[]} [protocols=null] A list of valid protocols. If specified, the protocol must be in this list.
  * @param {string[]} [validHosts=null] A list of valid hostnames. If specified, the URL's hostname must be in this list.
  * @returns {boolean} True if the string is a valid URL, false otherwise.

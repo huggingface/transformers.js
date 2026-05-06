@@ -37,7 +37,7 @@ const output = await classifier(audio);
 // ]
 ```
 
-**Example:** Perform audio classification with `Xenova/ast-finetuned-audioset-10-10-0.4593` and return top 4 results.
+**Example:** Perform audio classification with `Xenova/ast-finetuned-audioset-10-10-0.4593` and return the top 4 results.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -240,7 +240,7 @@ const output = await classifier(url);
 // ]
 ```
 
-**Example:** Classify an image and return top `n` classes.
+**Example:** Classify an image and return the top `n` classes.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -394,7 +394,7 @@ const output = await detector(url, candidate_labels);
 // ]
 ```
 
-**Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
+**Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning the top 4 matches and setting a threshold).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -550,7 +550,7 @@ const output = await classifier('I love transformers!');
 // [{ label: 'POSITIVE', score: 0.999788761138916 }]
 ```
 
-**Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
+**Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return the top 5 classes).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -598,7 +598,7 @@ const output = await classifier('My name is Sarah and I live in London');
 // ]
 ```
 
-**Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all labels).
+**Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all entity labels).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -684,7 +684,7 @@ const output = await unmasker('The goal of life is [MASK].');
 // ]
 ```
 
-**Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return top result).
+**Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 

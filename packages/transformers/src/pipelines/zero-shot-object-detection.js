@@ -21,10 +21,10 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  *
  * @typedef {Object} ZeroShotObjectDetectionPipelineOptions Parameters specific to zero-shot object detection pipelines.
  * @property {number} [threshold=0.1] The probability necessary to make a prediction.
- * @property {number} [top_k=null] The number of top predictions that will be returned by the pipeline.
+ * @property {number} [top_k=null] The number of top predictions to return.
  * If the provided number is `null` or higher than the number of predictions available, it will default
  * to the number of predictions.
- * @property {boolean} [percentage=false] Whether to return the boxes coordinates in percentage (true) or in pixels (false).
+ * @property {boolean} [percentage=false] Whether to return box coordinates as percentages (true) or pixels (false).
  *
  * @typedef {TextImagePipelineConstructorArgs & ZeroShotObjectDetectionPipelineCallback & Disposable} ZeroShotObjectDetectionPipelineType
  */
@@ -74,7 +74,7 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * // ]
  * ```
  *
- * **Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
+ * **Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning the top 4 matches and setting a threshold).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

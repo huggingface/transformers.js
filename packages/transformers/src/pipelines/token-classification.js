@@ -81,7 +81,7 @@ import { max, softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all labels).
+ * **Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all entity labels).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

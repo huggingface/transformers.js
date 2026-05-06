@@ -68,7 +68,7 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return top result).
+ * **Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

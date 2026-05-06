@@ -20,7 +20,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {AudioClassificationSingle[]} AudioClassificationOutput
  *
  * @typedef {Object} AudioClassificationPipelineOptions Parameters specific to audio classification pipelines.
- * @property {number} [top_k=5] The number of top labels that will be returned by the pipeline.
+ * @property {number} [top_k=5] The number of top labels to return.
  * If the provided number is `null` or higher than the number of labels available in the model configuration,
  * it will default to the number of labels.
  *
@@ -53,7 +53,7 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform audio classification with `Xenova/ast-finetuned-audioset-10-10-0.4593` and return top 4 results.
+ * **Example:** Perform audio classification with `Xenova/ast-finetuned-audioset-10-10-0.4593` and return the top 4 results.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

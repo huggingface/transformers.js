@@ -219,7 +219,7 @@ Once we’ve updated the `status` to "Analysing", we’re ready to perform _infe
 The second argument is an options object:
 
 - We set the `threshold` property to `0.5`. This means that we want the model to be at least 50% confident before claiming it has detected an object in the image. The lower the threshold, the more objects it'll detect (but may misidentify objects); the higher the threshold, the fewer objects it'll detect (but may miss objects in the scene).
-- We also specify `percentage: true`, which means that we want the bounding box for the objects to be returned as percentages (instead of pixels).
+- We also specify `percentage: true`, which means that bounding boxes are returned as percentages instead of pixels.
 
 If you now try to run the app and upload an image, you should see the following output logged to the console:
 

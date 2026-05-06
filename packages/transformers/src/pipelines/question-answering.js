@@ -20,7 +20,7 @@ import { softmax } from '../utils/maths.js';
  * @property {string} answer The answer to the question.
  *
  * @typedef {Object} QuestionAnsweringPipelineOptions Parameters specific to question answering pipelines.
- * @property {number} [top_k=1] The number of top answer predictions to be returned.
+ * @property {number} [top_k=1] The number of top answer predictions to return.
  *
  * @typedef {TextPipelineConstructorArgs & QuestionAnsweringPipelineCallback & Disposable} QuestionAnsweringPipelineType
  */

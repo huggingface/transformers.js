@@ -19,7 +19,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {TextClassificationSingle[]} TextClassificationOutput
  *
  * @typedef {Object} TextClassificationPipelineOptions Parameters specific to text classification pipelines.
- * @property {number|null} [top_k=1] The number of top predictions to be returned. If set to `null`, all predictions are returned.
+ * @property {number|null} [top_k=1] The number of top predictions to return. If set to `null`, all predictions are returned.
  */
 
 /**
@@ -52,7 +52,7 @@ import { softmax } from '../utils/maths.js';
  * // [{ label: 'POSITIVE', score: 0.999788761138916 }]
  * ```
  *
- * **Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
+ * **Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return the top 5 classes).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
