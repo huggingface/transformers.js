@@ -22,7 +22,7 @@ export class LogitsProcessor extends Callable {
      * Apply the processor to the input logits.
      *
      * @abstract
-     * @param {bigint[][]} input_ids The input ids.
+     * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits to process.
      * @throws {Error} Throws an error if `_call` is not implemented in the subclass.
      */
@@ -39,7 +39,7 @@ export class LogitsWarper extends Callable {
      * Apply the processor to the input logits.
      *
      * @abstract
-     * @param {bigint[][]} input_ids The input ids.
+     * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits to process.
      * @throws {Error} Throws an error if `_call` is not implemented in the subclass.
      */
@@ -176,7 +176,7 @@ export class ForcedEOSTokenLogitsProcessor extends LogitsProcessor {
     /**
      * Create a ForcedEOSTokenLogitsProcessor.
      * @param {number} max_length The maximum length of the sequence to be generated.
-     * @param {number|number[]} eos_token_id The id(s) of the *end-of-sequence* token.
+     * @param {number|number[]} eos_token_id The ID or IDs of the *end-of-sequence* token.
      */
     constructor(max_length, eos_token_id) {
         super();
@@ -187,7 +187,7 @@ export class ForcedEOSTokenLogitsProcessor extends LogitsProcessor {
     /**
      * Apply the processor to input_ids and logits.
      *
-     * @param {bigint[][]} input_ids The input ids.
+     * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits tensor.
      */
     _call(input_ids, logits) {
@@ -355,12 +355,12 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
 }
 
 /**
- * A logits processor that disallows ngrams of a certain size to be repeated.
+ * A logits processor that disallows repeated n-grams of a certain size.
  */
 export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
     /**
      * Create a NoRepeatNGramLogitsProcessor.
-     * @param {number} no_repeat_ngram_size The no-repeat-ngram size. All ngrams of this size can only occur once.
+     * @param {number} no_repeat_ngram_size The no-repeat n-gram size. All n-grams of this size can only occur once.
      */
     constructor(no_repeat_ngram_size) {
         super();
@@ -368,8 +368,8 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
     }
 
     /**
-     * Generate n-grams from a sequence of token ids.
-     * @param {bigint[]} prevInputIds List of previous input ids
+     * Generate n-grams from a sequence of token IDs.
+     * @param {bigint[]} prevInputIds List of previous input IDs.
      * @returns {Map<string, number[]>} Map of generated n-grams
      */
     getNgrams(prevInputIds) {
@@ -398,9 +398,9 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
     }
 
     /**
-     * Generate n-grams from a sequence of token ids.
+     * Generate n-grams from a sequence of token IDs.
      * @param {Map<string, number[]>} bannedNgrams Map of banned n-grams
-     * @param {bigint[]} prevInputIds List of previous input ids
+     * @param {bigint[]} prevInputIds List of previous input IDs.
      * @returns {number[]} Map of generated n-grams
      */
     getGeneratedNgrams(bannedNgrams, prevInputIds) {
@@ -411,7 +411,7 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
 
     /**
      * Calculate banned n-gram tokens
-     * @param {bigint[]} prevInputIds List of previous input ids
+     * @param {bigint[]} prevInputIds List of previous input IDs.
      * @returns {number[]} Map of generated n-grams
      */
     calcBannedNgramTokens(prevInputIds) {
@@ -427,10 +427,10 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
     }
 
     /**
-     * Apply the no-repeat-ngram processor to the logits.
+     * Apply the no-repeat n-gram processor to the logits.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
-     * @returns {Tensor} The logits with no-repeat-ngram processing.
+     * @returns {Tensor} The logits with no-repeat n-gram processing.
      */
     _call(input_ids, logits) {
         for (let i = 0; i < input_ids.length; ++i) {
@@ -458,7 +458,7 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
 export class RepetitionPenaltyLogitsProcessor extends LogitsProcessor {
     /**
      * Create a RepetitionPenaltyLogitsProcessor.
-     * @param {number} penalty The parameter for repetition penalty.
+     * @param {number} penalty Penalty applied to repeated tokens.
      * - 1.0 means no penalty. Above 1.0 penalizes previously generated tokens.
      * - Between 0.0 and 1.0 rewards previously generated tokens.
      */
@@ -497,7 +497,7 @@ export class MinLengthLogitsProcessor extends LogitsProcessor {
     /**
      * Create a MinLengthLogitsProcessor.
      * @param {number} min_length The minimum length below which the score of `eos_token_id` is set to negative infinity.
-     * @param {number|number[]} eos_token_id The ID/IDs of the end-of-sequence token.
+     * @param {number|number[]} eos_token_id The ID or IDs of the end-of-sequence token.
      */
     constructor(min_length, eos_token_id) {
         super();
@@ -534,7 +534,7 @@ export class MinNewTokensLengthLogitsProcessor extends LogitsProcessor {
      * Create a MinNewTokensLengthLogitsProcessor.
      * @param {number} prompt_length_to_skip The input tokens length.
      * @param {number} min_new_tokens The minimum *new* tokens length below which the score of `eos_token_id` is set to negative infinity.
-     * @param {number|number[]} eos_token_id The ID/IDs of the end-of-sequence token.
+     * @param {number|number[]} eos_token_id The ID or IDs of the end-of-sequence token.
      */
     constructor(prompt_length_to_skip, min_new_tokens, eos_token_id) {
         super();
@@ -570,8 +570,8 @@ export class MinNewTokensLengthLogitsProcessor extends LogitsProcessor {
 export class NoBadWordsLogitsProcessor extends LogitsProcessor {
     /**
      * Create a `NoBadWordsLogitsProcessor`.
-     * @param {number[][]} bad_words_ids List of list of token ids that are not allowed to be generated.
-     * @param {number|number[]} eos_token_id The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens.
+     * @param {number[][]} bad_words_ids List of token ID sequences that are not allowed to be generated.
+     * @param {number|number[]} eos_token_id The ID of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens.
      */
     constructor(bad_words_ids, eos_token_id) {
         super();

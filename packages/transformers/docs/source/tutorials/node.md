@@ -38,7 +38,7 @@ npm i @huggingface/transformers
 
 Next, create a new file called `app.js`, which will be the entry point for our application. Depending on whether you're using [ECMAScript modules](#ecmascript-modules-esm) or [CommonJS](#commonjs), you will need to do some things differently (see below).
 
-We'll also create a helper class called `MyClassificationPipeline` control the loading of the pipeline. It uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and uses this pipeline for all subsequent calls:
+We'll also create a helper class called `MyClassificationPipeline` to control the loading of the pipeline. It uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and uses this pipeline for all subsequent calls:
 
 ### ECMAScript modules (ESM)
 

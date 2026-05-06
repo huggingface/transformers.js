@@ -48,7 +48,7 @@ export class GenerationConfig {
     /**
      * Controls the stopping condition for beam-based methods, like beam-search. It accepts the following values:
      * - `true`, where the generation stops as soon as there are `num_beams` complete candidates;
-     * - `false`, where an heuristic is applied and the generation stops when is it very unlikely to find better candidates;
+     * - `false`, where a heuristic is applied and the generation stops when it is very unlikely to find better candidates;
      * - `"never"`, where the beam search procedure only stops when there cannot be better candidates (canonical beam search algorithm).
      * @type {boolean|"never"}
      * @default false
@@ -65,7 +65,7 @@ export class GenerationConfig {
 
     // Parameters that control the generation strategy used
     /**
-     * Whether or not to use sampling; use greedy decoding otherwise.
+     * Whether to use sampling; use greedy decoding otherwise.
      * @type {boolean}
      * @default false
      */
@@ -87,14 +87,14 @@ export class GenerationConfig {
     num_beam_groups = 1;
 
     /**
-     * The values balance the model confidence and the degeneration penalty in contrastive search decoding.
+     * The value balances model confidence and the degeneration penalty in contrastive search decoding.
      * @type {number}
      * @default null
      */
     penalty_alpha = null;
 
     /**
-     * Whether or not the model should use the past last key/values attentions (if applicable to the model) to speed up decoding.
+     * Whether the model should use the past key/value attentions (if applicable to the model) to speed up decoding.
      * @type {boolean}
      * @default true
      */
@@ -116,7 +116,7 @@ export class GenerationConfig {
     top_k = 50;
 
     /**
-     * If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to `top_p` or higher are kept for generation.
+     * If set to a float below 1, only the smallest set of most probable tokens with probabilities that add up to `top_p` or higher are kept for generation.
      * @type {number}
      * @default 1.0
      */
@@ -124,7 +124,7 @@ export class GenerationConfig {
 
     /**
      * Local typicality measures how similar the conditional probability of predicting a target token next is to the expected conditional probability of predicting a random token next, given the partial text already generated.
-     * If set to float < 1, the smallest set of the most locally typical tokens with probabilities that add up to `typical_p` or higher are kept for generation.
+     * If set to a float below 1, the smallest set of the most locally typical tokens with probabilities that add up to `typical_p` or higher are kept for generation.
      * See [this paper](https://huggingface.co/papers/2202.00666) for more details.
      * @type {number}
      * @default 1.0
@@ -132,7 +132,7 @@ export class GenerationConfig {
     typical_p = 1.0;
 
     /**
-     * If set to float strictly between 0 and 1, only tokens with a conditional probability greater than `epsilon_cutoff` will be sampled.
+     * If set to a float strictly between 0 and 1, only tokens with a conditional probability greater than `epsilon_cutoff` will be sampled.
      * In the paper, suggested values range from 3e-4 to 9e-4, depending on the size of the model.
      * See [Truncation Sampling as Language Model Desmoothing](https://huggingface.co/papers/2210.15191) for more details.
      * @type {number}
@@ -142,7 +142,7 @@ export class GenerationConfig {
 
     /**
      * Eta sampling is a hybrid of locally typical sampling and epsilon sampling.
-     * If set to float strictly between 0 and 1, a token is only considered if it is greater than either `eta_cutoff` or `sqrt(eta_cutoff) * exp(-entropy(softmax(next_token_logits)))`.
+     * If set to a float strictly between 0 and 1, a token is only considered if it is greater than either `eta_cutoff` or `sqrt(eta_cutoff) * exp(-entropy(softmax(next_token_logits)))`.
      * The latter term is intuitively the expected next token probability, scaled by `sqrt(eta_cutoff)`. In the paper, suggested values range from 3e-4 to 2e-3, depending on the size of the model.
      * See [Truncation Sampling as Language Model Desmoothing](https://huggingface.co/papers/2210.15191) for more details.
      * @type {number}
@@ -151,7 +151,7 @@ export class GenerationConfig {
     eta_cutoff = 0.0;
 
     /**
-     * This value is subtracted from a beam's score if it generates a token same as any beam from other group at a particular time.
+     * This value is subtracted from a beam's score if it generates the same token as any beam from another group at a particular time.
      * Note that `diversity_penalty` is only effective if `group beam search` is enabled.
      * @type {number}
      * @default 0.0
@@ -159,7 +159,7 @@ export class GenerationConfig {
     diversity_penalty = 0.0;
 
     /**
-     * The parameter for repetition penalty. 1.0 means no penalty.
+     * Penalty applied to repeated tokens. 1.0 means no penalty.
      * See [this paper](https://huggingface.co/papers/1909.05858) for more details.
      * @type {number}
      * @default 1.0
@@ -167,8 +167,7 @@ export class GenerationConfig {
     repetition_penalty = 1.0;
 
     /**
-     * The parameter for encoder_repetition_penalty.
-     * An exponential penalty on sequences that are not in the original input.
+     * Penalty applied to sequences that are not in the original input.
      * 1.0 means no penalty.
      * @type {number}
      * @default 1.0
@@ -185,15 +184,15 @@ export class GenerationConfig {
     length_penalty = 1.0;
 
     /**
-     * If set to int > 0, all ngrams of that size can only occur once.
+     * If set to an integer greater than 0, all n-grams of that size can only occur once.
      * @type {number}
      * @default 0
      */
     no_repeat_ngram_size = 0;
 
     /**
-     * List of token ids that are not allowed to be generated.
-     * In order to get the token ids of the words that should not appear in the generated text, use
+     * List of token IDs that are not allowed to be generated.
+     * In order to get the token IDs of the words that should not appear in the generated text, use
      * `tokenizer(bad_words, { add_prefix_space: true, add_special_tokens: false }).input_ids`.
      * @type {number[][]}
      * @default null
@@ -201,7 +200,7 @@ export class GenerationConfig {
     bad_words_ids = null;
 
     /**
-     * List of token ids that must be generated.
+     * List of token IDs that must be generated.
      * If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite to `bad_words_ids`.
      * If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), where one can allow different forms of each word.
      * @type {number[][]|number[][][]}
@@ -211,7 +210,7 @@ export class GenerationConfig {
 
     /**
      * Whether to renormalize the logits after applying all the logits processors or warpers (including the custom ones).
-     * It's highly recommended to set this flag to `true` as the search algorithms suppose the score logits are normalized but some logit processors or warpers break the normalization.
+     * It's highly recommended to set this flag to `true` because search algorithms assume the score logits are normalized, but some logit processors or warpers break the normalization.
      * @type {boolean}
      * @default false
      */
@@ -241,14 +240,14 @@ export class GenerationConfig {
     forced_eos_token_id = null;
 
     /**
-     * Whether to remove possible *nan* and *inf* outputs of the model to prevent the generation method to crash. Note that using `remove_invalid_values` can slow down generation.
+     * Whether to remove possible *nan* and *inf* outputs of the model to prevent the generation method from crashing. Note that using `remove_invalid_values` can slow down generation.
      * @type {boolean}
      */
     remove_invalid_values = false;
 
     /**
-     * This Tuple adds an exponentially increasing length penalty, after a certain amount of tokens have been generated.
-     * The tuple shall consist of: `(start_index, decay_factor)` where `start_index` indicates where penalty starts and `decay_factor` represents the factor of exponential decay.
+     * This tuple adds an exponentially increasing length penalty after a certain number of tokens have been generated.
+     * The tuple consists of: `(start_index, decay_factor)` where `start_index` indicates where the penalty starts and `decay_factor` represents the factor of exponential decay.
      * @type {[number, number]}
      * @default null
      */
@@ -278,7 +277,7 @@ export class GenerationConfig {
     begin_suppress_tokens = null;
 
     /**
-     * A list of pairs of integers which indicates a mapping from generation indices to token indices that will be forced before sampling.
+     * A list of pairs of integers that indicates a mapping from generation indices to token indices that will be forced before sampling.
      * For example, `[[1, 123]]` means the second generated token will always be a token of index 123.
      * @type {[number, number][]}
      * @default null
@@ -303,7 +302,7 @@ export class GenerationConfig {
     num_return_sequences = 1;
 
     /**
-     * Whether or not to return the attentions tensors of all attention layers.
+     * Whether to return the attentions tensors of all attention layers.
      * See `attentions` under returned tensors for more details.
      * @type {boolean}
      * @default false
@@ -311,7 +310,7 @@ export class GenerationConfig {
     output_attentions = false;
 
     /**
-     * Whether or not to return the hidden states of all layers.
+     * Whether to return the hidden states of all layers.
      * See `hidden_states` under returned tensors for more details.
      * @type {boolean}
      * @default false
@@ -319,7 +318,7 @@ export class GenerationConfig {
     output_hidden_states = false;
 
     /**
-     * Whether or not to return the prediction scores.
+     * Whether to return the prediction scores.
      * See `scores` under returned tensors for more details.
      * @type {boolean}
      * @default false
@@ -327,7 +326,7 @@ export class GenerationConfig {
     output_scores = false;
 
     /**
-     * Whether or not to return a `ModelOutput` instead of a plain tuple.
+     * Whether to return a `ModelOutput` instead of a plain tuple.
      * @type {boolean}
      * @default false
      */
@@ -358,7 +357,7 @@ export class GenerationConfig {
 
     // Generation parameters exclusive to encoder-decoder models
     /**
-     * If set to int > 0, all ngrams of that size that occur in the `encoder_input_ids` cannot occur in the `decoder_input_ids`.
+     * If set to an integer greater than 0, all n-grams of that size that occur in the `encoder_input_ids` cannot occur in the `decoder_input_ids`.
      * @type {number}
      * @default 0
      */

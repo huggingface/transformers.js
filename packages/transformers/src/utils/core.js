@@ -12,21 +12,21 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} InitiateProgressInfo
- * @property {'initiate'} status
+ * @property {'initiate'} status A file load is about to start.
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} DownloadProgressInfo
- * @property {'download'} status
+ * @property {'download'} status A file download has started.
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} ProgressStatusInfo
- * @property {'progress'} status
+ * @property {'progress'} status A file download has reported byte progress.
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  * @property {number} progress A number between 0 and 100.
@@ -48,7 +48,7 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} TotalProgressInfo
- * @property {'progress_total'} status
+ * @property {'progress_total'} status Aggregate progress across all files being loaded.
  * @property {string} name The model id or directory path.
  * @property {number} progress A number between 0 and 100.
  * @property {number} loaded The number of bytes loaded.
@@ -58,14 +58,14 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} DoneProgressInfo
- * @property {'done'} status
+ * @property {'done'} status A file has finished loading.
  * @property {string} name The model id or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} ReadyProgressInfo
- * @property {'ready'} status
+ * @property {'ready'} status The requested pipeline is ready to use.
  * @property {string} task The loaded task.
  * @property {string} model The loaded model.
  */
