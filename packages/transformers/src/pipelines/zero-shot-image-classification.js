@@ -38,10 +38,10 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Zero shot image classification pipeline. This pipeline predicts the class of
+ * Zero-shot image classification pipeline. This pipeline predicts the class of
  * an image when you provide an image and a set of `candidate_labels`.
  *
- * **Example:** Zero shot image classification w/ `Xenova/clip-vit-base-patch32`.
+ * **Example:** Zero-shot image classification with `Xenova/clip-vit-base-patch32`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

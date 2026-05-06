@@ -113,7 +113,7 @@ export class MaxLengthCriteria extends StoppingCriteria {
 export class EosTokenCriteria extends StoppingCriteria {
     /**
      *
-     * @param {number|number[]} eos_token_id The id of the *end-of-sequence* token.
+     * @param {number|number[]} eos_token_id The ID of the *end-of-sequence* token.
      * Optionally, use a list to set multiple *end-of-sequence* tokens.
      */
     constructor(eos_token_id) {

@@ -30,9 +30,9 @@ import { Tensor } from '../utils/tensor.js';
  */
 
 /**
- * Image To Text pipeline using a `AutoModelForVision2Seq`. This pipeline predicts a caption for a given image.
+ * Image-to-text pipeline using an `AutoModelForVision2Seq`. This pipeline predicts a caption for a given image.
  *
- * **Example:** Generate a caption for an image w/ `Xenova/vit-gpt2-image-captioning`.
+ * **Example:** Generate a caption for an image with `Xenova/vit-gpt2-image-captioning`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -42,7 +42,7 @@ import { Tensor } from '../utils/tensor.js';
  * // [{ generated_text: 'a cat laying on a couch with another cat' }]
  * ```
  *
- * **Example:** Optical Character Recognition (OCR) w/ `Xenova/trocr-small-handwritten`.
+ * **Example:** Optical Character Recognition (OCR) with `Xenova/trocr-small-handwritten`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

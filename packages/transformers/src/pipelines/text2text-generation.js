@@ -25,9 +25,9 @@ import { Tensor } from '../utils/tensor.js';
  */
 
 /**
- * Text2TextGenerationPipeline class for generating text using a model that performs text-to-text generation tasks.
+ * Text-to-text generation pipeline using a model that performs text-to-text generation tasks.
  *
- * **Example:** Text-to-text generation w/ `Xenova/LaMini-Flan-T5-783M`.
+ * **Example:** Text-to-text generation with `Xenova/LaMini-Flan-T5-783M`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

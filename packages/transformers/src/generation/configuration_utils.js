@@ -175,7 +175,7 @@ export class GenerationConfig {
     encoder_repetition_penalty = 1.0;
 
     /**
-     * Exponential penalty to the length that is used with beam-based generation.
+     * Exponential penalty applied to sequence length during beam-based generation.
      * It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence.
      * Since the score is the log likelihood of the sequence (i.e. negative), `length_penalty` > 0.0 promotes longer sequences, while `length_penalty` < 0.0 encourages shorter sequences.
      * @type {number}
@@ -254,23 +254,23 @@ export class GenerationConfig {
     exponential_decay_length_penalty = null;
 
     /**
-     * A list of tokens that will be suppressed at generation.
-     * The `SuppressTokens` logit processor will set their log probs to `-inf` so that they are not sampled.
+     * A list of tokens to suppress during generation.
+     * The `SuppressTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled.
      * @type {number[]}
      * @default null
      */
     suppress_tokens = null;
 
     /**
-     * A streamer that will be used to stream the generation.
+     * A streamer used to stream the generation.
      * @type {import('./streamers.js').TextStreamer}
      * @default null
      */
     streamer = null;
 
     /**
-     * A list of tokens that will be suppressed at the beginning of the generation.
-     * The `SuppressBeginTokens` logit processor will set their log probs to `-inf` so that they are not sampled.
+     * A list of tokens to suppress at the beginning of the generation.
+     * The `SuppressBeginTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled.
      * @type {number[]}
      * @default null
      */
@@ -348,7 +348,7 @@ export class GenerationConfig {
     bos_token_id = null;
 
     /**
-     * The id of the *end-of-sequence* token.
+     * The ID of the *end-of-sequence* token.
      * Optionally, use a list to set multiple *end-of-sequence* tokens.
      * @type {number|number[]}
      * @default null
@@ -364,7 +364,7 @@ export class GenerationConfig {
     encoder_no_repeat_ngram_size = 0;
 
     /**
-     * If an encoder-decoder model starts decoding with a different token than *bos*, the id of that token.
+     * If an encoder-decoder model starts decoding with a token other than *bos*, the ID of that token.
      * @type {number}
      * @default null
      */
@@ -372,8 +372,8 @@ export class GenerationConfig {
 
     // Wild card
     /**
-     * Additional generation kwargs will be forwarded to the `generate` function of the model.
-     * Kwargs that are not present in `generate`'s signature will be used in the model forward pass.
+     * Additional generation kwargs forwarded to the model's `generate` function.
+     * Kwargs that are not present in `generate`'s signature are used in the model forward pass.
      * @type {Object}
      * @default {}
      */

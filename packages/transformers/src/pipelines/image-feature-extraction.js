@@ -14,7 +14,7 @@ import { Tensor } from '../utils/tensor.js';
 
 /**
  * @typedef {Object} ImageFeatureExtractionPipelineOptions Parameters specific to image feature extraction pipelines.
- * @property {boolean} [pool=null] Whether or not to return the pooled output. If set to `false`, the model will return the raw hidden states.
+ * @property {boolean} [pool=null] Whether to return the pooled output. If set to `false`, the model will return the raw hidden states.
  *
  * @callback ImageFeatureExtractionPipelineCallback Extract the features of the input(s).
  * @param {ImagePipelineInputs} images One or several images (or one list of images) to get the features of.
@@ -26,7 +26,7 @@ import { Tensor } from '../utils/tensor.js';
 
 /**
  * Image feature extraction pipeline using no model head. This pipeline extracts the hidden
- * states from the base transformer, which can be used as features in downstream tasks.
+ * states from the base transformer for use as features in downstream tasks.
  *
  * **Example:** Perform image feature extraction with `onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX`.
  * ```javascript

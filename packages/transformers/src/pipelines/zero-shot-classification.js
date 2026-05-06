@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
  * @typedef {Object} ZeroShotClassificationPipelineOptions Parameters specific to zero-shot classification pipelines.
  * @property {string} [hypothesis_template="This example is {}."] The template used to turn each
  * candidate label into an NLI-style hypothesis. The candidate label will replace the {} placeholder.
- * @property {boolean} [multi_label=false] Whether or not multiple candidate labels can be true.
+ * @property {boolean} [multi_label=false] Whether multiple candidate labels can be true.
  * If `false`, the scores are normalized such that the sum of the label likelihoods for each sequence
  * is 1. If `true`, the labels are considered independent and probabilities are normalized for each
  * candidate by doing a softmax of the entailment score vs. the contradiction score.
@@ -44,7 +44,7 @@ import { logger } from '../utils/logger.js';
  * pipelines, but these models don't require a hardcoded number of potential classes, they
  * can be chosen at runtime. It usually means it's slower but it is **much** more flexible.
  *
- * **Example:** Zero shot classification with `Xenova/mobilebert-uncased-mnli`.
+ * **Example:** Zero-shot classification with `Xenova/mobilebert-uncased-mnli`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -59,7 +59,7 @@ import { logger } from '../utils/logger.js';
  * // }
  * ```
  *
- * **Example:** Zero shot classification with `Xenova/nli-deberta-v3-xsmall` (multi-label).
+ * **Example:** Zero-shot classification with `Xenova/nli-deberta-v3-xsmall` (multi-label).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

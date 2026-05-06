@@ -25,7 +25,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
 /**
  * Translates text from one language to another.
  *
- * **Example:** Multilingual translation w/ `Xenova/nllb-200-distilled-600M`.
+ * **Example:** Multilingual translation with `Xenova/nllb-200-distilled-600M`.
  *
  * See [here](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
  * for the full list of languages and their corresponding codes.
@@ -41,7 +41,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * // [{ translation_text: 'La vie est comme une boîte à chocolat.' }]
  * ```
  *
- * **Example:** Multilingual translation w/ `Xenova/m2m100_418M`.
+ * **Example:** Multilingual translation with `Xenova/m2m100_418M`.
  *
  * See [here](https://huggingface.co/facebook/m2m100_418M#languages-covered)
  * for the full list of languages and their corresponding codes.
@@ -57,7 +57,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  * // [{ translation_text: 'Life is like a box of chocolate.' }]
  * ```
  *
- * **Example:** Multilingual translation w/ `Xenova/mbart-large-50-many-to-many-mmt`.
+ * **Example:** Multilingual translation with `Xenova/mbart-large-50-many-to-many-mmt`.
  *
  * See [here](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
  * for the full list of languages and their corresponding codes.

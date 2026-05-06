@@ -61,7 +61,7 @@ import { logger } from '../utils/logger.js';
  * // { text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." }
  * ```
  *
- * **Example:** Transcribe English w/ timestamps.
+ * **Example:** Transcribe English with timestamps.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -77,7 +77,7 @@ import { logger } from '../utils/logger.js';
  * // }
  * ```
  *
- * **Example:** Transcribe English w/ word-level timestamps.
+ * **Example:** Transcribe English with word-level timestamps.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

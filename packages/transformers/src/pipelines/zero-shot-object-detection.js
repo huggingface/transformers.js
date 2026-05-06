@@ -42,7 +42,7 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * Zero-shot object detection pipeline. This pipeline predicts bounding boxes of
  * objects when you provide an image and a set of `candidate_labels`.
  *
- * **Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32`.
+ * **Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -74,7 +74,7 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * // ]
  * ```
  *
- * **Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
+ * **Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

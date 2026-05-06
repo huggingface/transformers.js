@@ -165,7 +165,7 @@ anywhere `generate()` is invoked directly.
 | `diversity_penalty`? | `number` | This value is subtracted from a beam's score if it generates the same token as any beam from another group at a particular time. Note that `diversity_penalty` is only effective if `group beam search` is enabled. _(default: `0.0`)_ |
 | `repetition_penalty`? | `number` | Penalty applied to repeated tokens. 1.0 means no penalty. See [this paper](https://huggingface.co/papers/1909.05858) for more details. _(default: `1.0`)_ |
 | `encoder_repetition_penalty`? | `number` | Penalty applied to sequences that are not in the original input. 1.0 means no penalty. _(default: `1.0`)_ |
-| `length_penalty`? | `number` | Exponential penalty to the length that is used with beam-based generation. It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence. Since the score is the log likelihood of the sequence (i.e. negative), `length_penalty` > 0.0 promotes longer sequences, while `length_penalty` < 0.0 encourages shorter sequences. _(default: `1.0`)_ |
+| `length_penalty`? | `number` | Exponential penalty applied to sequence length during beam-based generation. It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence. Since the score is the log likelihood of the sequence (i.e. negative), `length_penalty` > 0.0 promotes longer sequences, while `length_penalty` < 0.0 encourages shorter sequences. _(default: `1.0`)_ |
 | `no_repeat_ngram_size`? | `number` | If set to an integer greater than 0, all n-grams of that size can only occur once. _(default: `0`)_ |
 | `bad_words_ids`? | `number[][]` | List of token IDs that are not allowed to be generated. In order to get the token IDs of the words that should not appear in the generated text, use `tokenizer(bad_words, { add_prefix_space: true, add_special_tokens: false }).input_ids`. _(default: `null`)_ |
 | `force_words_ids`? | `number[][]\|number[][][]` | List of token IDs that must be generated. If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite to `bad_words_ids`. If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), where one can allow different forms of each word. _(default: `null`)_ |
@@ -175,9 +175,9 @@ anywhere `generate()` is invoked directly.
 | `forced_eos_token_id`? | `number\|number[]` | The id of the token to force as the last generated token when `max_length` is reached. Optionally, use a list to set multiple *end-of-sequence* tokens. _(default: `null`)_ |
 | `remove_invalid_values`? | `boolean` | Whether to remove possible *nan* and *inf* outputs of the model to prevent the generation method from crashing. Note that using `remove_invalid_values` can slow down generation. _(default: `false`)_ |
 | `exponential_decay_length_penalty`? | `[number, number]` | This tuple adds an exponentially increasing length penalty after a certain number of tokens have been generated. The tuple consists of: `(start_index, decay_factor)` where `start_index` indicates where the penalty starts and `decay_factor` represents the factor of exponential decay. _(default: `null`)_ |
-| `suppress_tokens`? | `number[]` | A list of tokens that will be suppressed at generation. The `SuppressTokens` logit processor will set their log probs to `-inf` so that they are not sampled. _(default: `null`)_ |
-| `streamer`? | `TextStreamer` | A streamer that will be used to stream the generation. _(default: `null`)_ |
-| `begin_suppress_tokens`? | `number[]` | A list of tokens that will be suppressed at the beginning of the generation. The `SuppressBeginTokens` logit processor will set their log probs to `-inf` so that they are not sampled. _(default: `null`)_ |
+| `suppress_tokens`? | `number[]` | A list of tokens to suppress during generation. The `SuppressTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled. _(default: `null`)_ |
+| `streamer`? | `TextStreamer` | A streamer used to stream the generation. _(default: `null`)_ |
+| `begin_suppress_tokens`? | `number[]` | A list of tokens to suppress at the beginning of the generation. The `SuppressBeginTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled. _(default: `null`)_ |
 | `forced_decoder_ids`? | `[number, number][]` | A list of pairs of integers that indicates a mapping from generation indices to token indices that will be forced before sampling. For example, `[[1, 123]]` means the second generated token will always be a token of index 123. _(default: `null`)_ |
 | `guidance_scale`? | `number` | The guidance scale for classifier free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages the model to generate samples that are more closely linked to the input prompt, usually at the expense of poorer quality. _(default: `null`)_ |
 | `num_return_sequences`? | `number` | The number of independently computed returned sequences for each element in the batch. _(default: `1`)_ |
@@ -187,10 +187,10 @@ anywhere `generate()` is invoked directly.
 | `return_dict_in_generate`? | `boolean` | Whether to return a `ModelOutput` instead of a plain tuple. _(default: `false`)_ |
 | `pad_token_id`? | `number` | The id of the *padding* token. _(default: `null`)_ |
 | `bos_token_id`? | `number` | The id of the *beginning-of-sequence* token. _(default: `null`)_ |
-| `eos_token_id`? | `number\|number[]` | The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens. _(default: `null`)_ |
+| `eos_token_id`? | `number\|number[]` | The ID of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens. _(default: `null`)_ |
 | `encoder_no_repeat_ngram_size`? | `number` | If set to an integer greater than 0, all n-grams of that size that occur in the `encoder_input_ids` cannot occur in the `decoder_input_ids`. _(default: `0`)_ |
-| `decoder_start_token_id`? | `number` | If an encoder-decoder model starts decoding with a different token than *bos*, the id of that token. _(default: `null`)_ |
-| `generation_kwargs`? | `Object` | Additional generation kwargs will be forwarded to the `generate` function of the model. Kwargs that are not present in `generate`'s signature will be used in the model forward pass. _(default: `{}`)_ |
+| `decoder_start_token_id`? | `number` | If an encoder-decoder model starts decoding with a token other than *bos*, the ID of that token. _(default: `null`)_ |
+| `generation_kwargs`? | `Object` | Additional generation kwargs forwarded to the model's `generate` function. Kwargs that are not present in `generate`'s signature are used in the model forward pass. _(default: `{}`)_ |
 <!-- @generated:end id=fields:GenerationConfig -->
 
 ### Streaming tokens as they're produced

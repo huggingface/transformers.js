@@ -206,7 +206,7 @@ export class ForcedEOSTokenLogitsProcessor extends LogitsProcessor {
 
 /**
  * A LogitsProcessor that suppresses a list of tokens throughout generation.
- * Sets their log probs to `-inf` so that they are not generated.
+ * Sets their log probabilities to `-inf` so that they are not generated.
  */
 export class SuppressTokensLogitsProcessor extends LogitsProcessor {
     /**

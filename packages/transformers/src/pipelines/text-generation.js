@@ -30,7 +30,7 @@ function isChat(x) {
  * @typedef {TextGenerationSingle[]} TextGenerationOutput
  *
  * @typedef {Object} TextGenerationSpecificParams Parameters specific to text-generation pipelines.
- * @property {boolean} [add_special_tokens] Whether or not to add special tokens when tokenizing the sequences.
+ * @property {boolean} [add_special_tokens] Whether to add special tokens when tokenizing the sequences.
  * @property {boolean} [return_full_text=true] If set to `false` only added text is returned, otherwise the full text is returned.
  * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
  * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.

@@ -56,7 +56,7 @@ const output = await classifier(audio, { top_k: 4 });
 
 **Default model:** `Xenova/clap-htsat-unfused`
 
-Zero shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio when you
+Zero-shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio when you
 provide an audio and a set of `candidate_labels`.
 
 **Example:** Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
@@ -90,7 +90,7 @@ const output = await transcriber(url);
 // { text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." }
 ```
 
-**Example:** Transcribe English w/ timestamps.
+**Example:** Transcribe English with timestamps.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -106,7 +106,7 @@ const output = await transcriber(url, { return_timestamps: true });
 // }
 ```
 
-**Example:** Transcribe English w/ word-level timestamps.
+**Example:** Transcribe English with word-level timestamps.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -199,9 +199,9 @@ const output = await synthesizer('Bonjour');
 
 **Default model:** `Xenova/vit-gpt2-image-captioning`
 
-Image To Text pipeline using a `AutoModelForVision2Seq`. This pipeline predicts a caption for a given image.
+Image-to-text pipeline using an `AutoModelForVision2Seq`. This pipeline predicts a caption for a given image.
 
-**Example:** Generate a caption for an image w/ `Xenova/vit-gpt2-image-captioning`.
+**Example:** Generate a caption for an image with `Xenova/vit-gpt2-image-captioning`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -211,7 +211,7 @@ const output = await captioner(url);
 // [{ generated_text: 'a cat laying on a couch with another cat' }]
 ```
 
-**Example:** Optical Character Recognition (OCR) w/ `Xenova/trocr-small-handwritten`.
+**Example:** Optical Character Recognition (OCR) with `Xenova/trocr-small-handwritten`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -311,10 +311,10 @@ const output = await segmenter(url);
 
 **Default model:** `Xenova/clip-vit-base-patch32`
 
-Zero shot image classification pipeline. This pipeline predicts the class of
+Zero-shot image classification pipeline. This pipeline predicts the class of
 an image when you provide an image and a set of `candidate_labels`.
 
-**Example:** Zero shot image classification w/ `Xenova/clip-vit-base-patch32`.
+**Example:** Zero-shot image classification with `Xenova/clip-vit-base-patch32`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -362,7 +362,7 @@ const output = await detector(img, { threshold: 0.9 });
 Zero-shot object detection pipeline. This pipeline predicts bounding boxes of
 objects when you provide an image and a set of `candidate_labels`.
 
-**Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32`.
+**Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -394,7 +394,7 @@ const output = await detector(url, candidate_labels);
 // ]
 ```
 
-**Example:** Zero-shot object detection w/ `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
+**Example:** Zero-shot object detection with `Xenova/owlvit-base-patch32` (returning top 4 matches and setting a threshold).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -449,9 +449,9 @@ const output = await qa_pipeline(image, question);
 
 **Default model:** `Xenova/swin2SR-classical-sr-x2-64`
 
-Image to Image pipeline using any `AutoModelForImageToImage`. This pipeline generates an image based on a previous image input.
+Image-to-image pipeline using any `AutoModelForImageToImage`. This pipeline generates an image based on a previous image input.
 
-**Example:** Super-resolution w/ `Xenova/swin2SR-classical-sr-x2-64`
+**Example:** Super-resolution with `Xenova/swin2SR-classical-sr-x2-64`
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -472,7 +472,7 @@ const output = await upscaler(url);
 
 Depth estimation pipeline using any `AutoModelForDepthEstimation`. This pipeline predicts the depth of an image.
 
-**Example:** Depth estimation w/ `onnx-community/depth-anything-v2-small`
+**Example:** Depth estimation with `onnx-community/depth-anything-v2-small`
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -500,7 +500,7 @@ const output = await depth_estimator(image);
 **Default model:** `onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX`
 
 Image feature extraction pipeline using no model head. This pipeline extracts the hidden
-states from the base transformer, which can be used as features in downstream tasks.
+states from the base transformer for use as features in downstream tasks.
 
 **Example:** Perform image feature extraction with `onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX`.
 ```javascript
@@ -541,7 +541,7 @@ const features = await image_feature_extractor(image);
 
 Text classification pipeline using any `ModelForSequenceClassification`.
 
-**Example:** Sentiment-analysis w/ `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
+**Example:** Sentiment analysis with `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -550,7 +550,7 @@ const output = await classifier('I love transformers!');
 // [{ label: 'POSITIVE', score: 0.999788761138916 }]
 ```
 
-**Example:** Multilingual sentiment-analysis w/ `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
+**Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -565,7 +565,7 @@ const output = await classifier('Le meilleur film de tous les temps.', { top_k: 
 // ]
 ```
 
-**Example:** Toxic comment classification w/ `Xenova/toxic-bert` (and return all classes).
+**Example:** Toxic comment classification with `Xenova/toxic-bert` (and return all classes).
 ```javascript
 const classifier = await pipeline('text-classification', 'Xenova/toxic-bert');
 const output = await classifier('I hate you!', { top_k: null });
@@ -699,7 +699,7 @@ const output = await unmasker('The Milky Way is a [MASK] galaxy.', { top_k: 1 })
 
 A pipeline for summarization tasks, inheriting from Text2TextGenerationPipeline.
 
-**Example:** Summarization w/ `Xenova/distilbart-cnn-6-6`.
+**Example:** Summarization with `Xenova/distilbart-cnn-6-6`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -724,7 +724,7 @@ const output = await summarizer(text, {
 
 Translates text from one language to another.
 
-**Example:** Multilingual translation w/ `Xenova/nllb-200-distilled-600M`.
+**Example:** Multilingual translation with `Xenova/nllb-200-distilled-600M`.
 
 See [here](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
 for the full list of languages and their corresponding codes.
@@ -740,7 +740,7 @@ const output = await translator('जीवन एक चॉकलेट बॉ�
 // [{ translation_text: 'La vie est comme une boîte à chocolat.' }]
 ```
 
-**Example:** Multilingual translation w/ `Xenova/m2m100_418M`.
+**Example:** Multilingual translation with `Xenova/m2m100_418M`.
 
 See [here](https://huggingface.co/facebook/m2m100_418M#languages-covered)
 for the full list of languages and their corresponding codes.
@@ -756,7 +756,7 @@ const output = await translator('生活就像一盒巧克力。', {
 // [{ translation_text: 'Life is like a box of chocolate.' }]
 ```
 
-**Example:** Multilingual translation w/ `Xenova/mbart-large-50-many-to-many-mmt`.
+**Example:** Multilingual translation with `Xenova/mbart-large-50-many-to-many-mmt`.
 
 See [here](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
 for the full list of languages and their corresponding codes.
@@ -776,9 +776,9 @@ const output = await translator('संयुक्त राष्ट्र क
 
 **Default model:** `Xenova/flan-t5-small`
 
-Text2TextGenerationPipeline class for generating text using a model that performs text-to-text generation tasks.
+Text-to-text generation pipeline using a model that performs text-to-text generation tasks.
 
-**Example:** Text-to-text generation w/ `Xenova/LaMini-Flan-T5-783M`.
+**Example:** Text-to-text generation with `Xenova/LaMini-Flan-T5-783M`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -842,7 +842,7 @@ trained on NLI (natural language inference) tasks. Equivalent of `text-classific
 pipelines, but these models don't require a hardcoded number of potential classes, they
 can be chosen at runtime. It usually means it's slower but it is **much** more flexible.
 
-**Example:** Zero shot classification with `Xenova/mobilebert-uncased-mnli`.
+**Example:** Zero-shot classification with `Xenova/mobilebert-uncased-mnli`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -857,7 +857,7 @@ const output = await classifier(text, labels);
 // }
 ```
 
-**Example:** Zero shot classification with `Xenova/nli-deberta-v3-xsmall` (multi-label).
+**Example:** Zero-shot classification with `Xenova/nli-deberta-v3-xsmall` (multi-label).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -880,7 +880,7 @@ const output = await classifier(text, labels, { multi_label: true });
 **Aliases:** `embeddings`
 
 Feature extraction pipeline using no model head. This pipeline extracts the hidden
-states from the base transformer, which can be used as features in downstream tasks.
+states from the base transformer for use as features in downstream tasks.
 
 **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` (without pooling or normalization).
 ```javascript
