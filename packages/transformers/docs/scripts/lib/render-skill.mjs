@@ -323,6 +323,8 @@ function prepareCell(text) {
   return (text || "")
     .replace(/\{@link\s+([^}\s]+)(?:\s+[^}]+)?\}/g, "$1")
     .replace(/\|/g, "\\|")
+    .replace(/:\s*\n\s*-\s+/g, ":<br />- ")
+    .replace(/\n\s*-\s+/g, "<br />- ")
     .replace(/\n+/g, " ")
     .trim();
 }
