@@ -52,9 +52,9 @@ function isChat(x) {
  */
 
 /**
- * Language generation pipeline using any `ModelWithLMHead` or `ModelForCausalLM`.
+ * Language generation pipeline using compatible causal language models.
  * This pipeline predicts the words that will follow a specified text prompt.
- * For the full list of generation parameters, see `GenerationConfig`.
+ * For all generation parameters, see `GenerationConfig`.
  *
  * **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
  * ```javascript

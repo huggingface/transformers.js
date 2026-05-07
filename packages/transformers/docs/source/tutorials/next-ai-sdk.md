@@ -30,7 +30,7 @@ npm install ai @ai-sdk/react @browser-ai/transformers-js @huggingface/transforme
 
 ## Step 2: Configure Next.js for browser inference
 
-Transformers.js uses ONNX Runtime under the hood for both browser and server-side (Node.js) inference.  In our case we only need the browser runtime so we can tell Next.js to exclude the Node.js-specific packages when bundling for the browser. Update `next.config.ts`
+Transformers.js uses ONNX Runtime under the hood for both browser and server-side (Node.js) inference. In this case, we only need the browser runtime, so we can tell Next.js to exclude Node.js-specific packages when bundling for the browser. Update `next.config.ts`:
 
 ```typescript
 import type { NextConfig } from "next";
@@ -53,7 +53,7 @@ export default nextConfig;
 
 ## Step 3: Create the Web Worker
 
-Running model inference on the main thread would block the UI. The `@browser-ai/transformers-js` package provides a ready-made worker handler that handles all the complexity for you.
+Running model inference on the main thread would block the UI. The `@browser-ai/transformers-js` package provides a ready-made worker handler for model loading, inference, streaming, and main-thread communication.
 
 Create `src/app/worker.ts`:
 
@@ -101,7 +101,7 @@ export const MODELS: ModelConfig[] = [
 
 <Tip>
 
-For tool calling, use reasoning models like Qwen3 which handle multi-step reasoning well, or fine-tuned model specifically for tool-calling capabilities. The `supportsWorker` flag controls whether the model is loaded in a Web Worker for better performance.
+For tool calling, use reasoning models like Qwen3 which handle multi-step reasoning well, or a model fine-tuned specifically for tool calling. The `supportsWorker` flag controls whether the model is loaded in a Web Worker for better performance.
 
 </Tip>
 

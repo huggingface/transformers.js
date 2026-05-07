@@ -2,7 +2,7 @@
 
 In this tutorial, you’ll build a simple web application that detects objects in images using Transformers.js! To follow along, all you need is a code editor, a browser, and a simple server (e.g., VS Code Live Server).
 
-Here's how it works: the user clicks “Upload image” and selects an image using an input dialog. After analysing the image with an object detection model, the predicted bounding boxes are overlaid on top of the image, like this:
+Here's how it works: the user clicks “Upload image” and selects an image using an input dialog. After analyzing the image with an object detection model, the predicted bounding boxes are overlaid on top of the image, like this:
 
 ![Demo](https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/js-detection-interence-zebra.png)
 
@@ -34,7 +34,7 @@ Before we start building with Transformers.js, we first need to lay the groundwo
 
 <summary>Click here to see a breakdown of this markup.</summary>
 
-We’re adding an `<input>` element with `type="file"` that accepts images. This allows the user to select an image from their local file system using a popup dialog. The default styling for this element looks quite bad, so let's add some styling. The easiest way to achieve this is to wrap the `<input>` element in a `<label>`, hide the input, and then style the label as a button.
+We’re adding an `<input>` element with `type="file"` that accepts images. This lets the user select an image from their local file system using a popup dialog. The browser's default file input is hard to style directly, so we'll wrap it in a `<label>`, hide the input, and style the label as a button.
 
 We’re also adding an empty `<div>` container for displaying the image, plus an empty `<p>` tag that we'll use to give status updates to the user while we download and run the model, since both of these operations take some time.
 
@@ -150,7 +150,7 @@ const detector = await pipeline("object-detection", "Xenova/detr-resnet-50");
 
 We’re passing two arguments into the `pipeline()` function: (1) task and (2) model.
 
-1. The first tells Transformers.js what kind of task we want to perform. In our case, that is `object-detection`, but there are many other tasks that the library supports, including `text-generation`, `sentiment-analysis`, `summarization`, or `automatic-speech-recognition`. See [here](https://huggingface.co/docs/transformers.js/pipelines#tasks) for the full list.
+1. The first tells Transformers.js what kind of task we want to perform. In our case, that is `object-detection`, but there are many other tasks that the library supports, including `text-generation`, `sentiment-analysis`, `summarization`, or `automatic-speech-recognition`. See the [task list](https://huggingface.co/docs/transformers.js/pipelines#tasks) for all supported pipelines.
 
 2. The second argument specifies which model we would like to use to solve the given task. We will use [`Xenova/detr-resnet-50`](https://huggingface.co/Xenova/detr-resnet-50), as it is a relatively small (~40MB) but powerful model for detecting objects in an image.
 
@@ -162,7 +162,7 @@ status.textContent = "Ready";
 
 ## Step 4: Create the image uploader
 
-The next step is to support uploading/selection of images. To achieve this, we will listen for "change" events from the `fileUpload` element. In the callback function, we use a `FileReader()` to read the contents of the image if one is selected (and nothing otherwise).
+The next step is to support image uploads and selection. To achieve this, we will listen for "change" events from the `fileUpload` element. In the callback function, we use a `FileReader()` to read the contents of the image if one is selected (and nothing otherwise).
 
 ```js
 fileUpload.addEventListener("change", function (e) {
@@ -197,7 +197,7 @@ We’re finally ready to start interacting with Transformers.js! Let’s uncomme
 
 ```js
 async function detect(img) {
-  status.textContent = "Analysing...";
+  status.textContent = "Analyzing...";
   const output = await detector(img.src, {
     threshold: 0.5,
     percentage: true,
@@ -210,11 +210,11 @@ async function detect(img) {
 
 <Tip>
 
-NOTE: The `detect` function needs to be asynchronous, since we’ll `await` the result of the model.
+The `detect` function needs to be asynchronous, since we’ll `await` the result of the model.
 
 </Tip>
 
-Once we’ve updated the `status` to "Analysing", we’re ready to perform _inference_, which simply means to run the model with some data. This is done via the `detector()` function that was returned from `pipeline()`. The first argument we’re passing is the image data (`img.src`).
+Once we’ve updated the `status` to "Analyzing", we’re ready to perform _inference_, which means running the model on input data. This is done via the `detector()` function that was returned from `pipeline()`. The first argument we’re passing is the image data (`img.src`).
 
 The second argument is an options object:
 

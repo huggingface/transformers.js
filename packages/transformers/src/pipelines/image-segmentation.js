@@ -45,7 +45,7 @@ const SUBTASKS_MAPPING = {
  */
 
 /**
- * Image segmentation pipeline using any `AutoModelForXXXSegmentation`.
+ * Image segmentation pipeline using compatible segmentation models.
  * This pipeline predicts masks of objects and their classes.
  *
  * **Example:** Perform image segmentation with `Xenova/detr-resnet-50-panoptic`.

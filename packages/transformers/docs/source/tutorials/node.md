@@ -7,7 +7,7 @@ We'll also show you how to use the library in both CommonJS and ECMAScript modul
 - [ECMAScript modules (ESM)](#ecmascript-modules-esm) - The official standard format
   to package JavaScript code for reuse. It's the default module system in modern
   browsers, with modules imported using `import` and exported using `export`.
-  Fortunately, starting with version 13.2.0, Node.js has stable support of ES modules.
+  Fortunately, starting with version 13.2.0, Node.js has stable support for ES modules.
 - [CommonJS](#commonjs) - The default module system in Node.js. In this system,
   modules are imported using `require()` and exported using `module.exports`.
 

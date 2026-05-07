@@ -1,5 +1,5 @@
 /**
- * @file Pipelines provide a high-level, easy to use, API for running machine learning models.
+ * @file Pipelines provide a high-level, easy-to-use API for running machine learning models.
  *
  * **Example:** Instantiate pipeline using the `pipeline` function.
  * ```javascript

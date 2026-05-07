@@ -27,20 +27,19 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.
  * @property {import('./core.js').ProgressCallback} [progress_callback=null] If specified, this function will be called during model construction, to provide the user with progress updates.
  * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:
- * - The model is a model provided by the library (loaded with the *model id* string of a pretrained model).
+ * - The model is provided by the library and loaded with the *model ID* string of a pretrained model.
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
  * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
  * @property {boolean} [local_files_only=false] Whether to only look at local files (e.g., not try downloading the model).
- * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
- * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
- * NOTE: This setting is ignored for local requests.
+ * @property {string} [revision='main'] The model revision to use. This can be a branch name, tag name, or commit ID.
+ * Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests.
  */
 
 /**
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
  * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
  * you can specify the folder name here.
- * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
+ * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). This is currently valid only for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).

@@ -200,8 +200,7 @@ export const LogLevel = Object.freeze({
  * Shape of the `env` object. Every field is mutable.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
- * allowing users to set these variables if they want to.
+ * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Exposes backend environment settings that users can override.
  * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
@@ -215,15 +214,15 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
- * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
+ * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. This must be an object that
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
  * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime.
  * Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads.
- * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to `transformers-cache`.
  * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
  * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
  * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
- * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
+ * The `experimental_` prefix indicates that the underlying browser API is not yet standardized and may change or be
  * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  */

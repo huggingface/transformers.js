@@ -27,8 +27,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * **Example:** Multilingual translation with `Xenova/nllb-200-distilled-600M`.
  *
- * See [here](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
- * for the full list of languages and their corresponding codes.
+ * See the [FLORES-200 language list](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
+ * for the available languages and their corresponding codes.
  *
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
@@ -43,8 +43,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * **Example:** Multilingual translation with `Xenova/m2m100_418M`.
  *
- * See [here](https://huggingface.co/facebook/m2m100_418M#languages-covered)
- * for the full list of languages and their corresponding codes.
+ * See the [M2M100 language list](https://huggingface.co/facebook/m2m100_418M#languages-covered)
+ * for the available languages and their corresponding codes.
  *
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
@@ -59,8 +59,8 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *
  * **Example:** Multilingual translation with `Xenova/mbart-large-50-many-to-many-mmt`.
  *
- * See [here](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
- * for the full list of languages and their corresponding codes.
+ * See the [mBART-50 language list](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
+ * for the available languages and their corresponding codes.
  *
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
@@ -70,7 +70,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  *   src_lang: 'hi_IN', // Hindi
  *   tgt_lang: 'fr_XX', // French
  * });
- * // [{ translation_text: 'Le chef des Nations affirme qu 'il n 'y a military solution in Syria.' }]
+ * // [{ translation_text: "Le chef de la mission de l 'ONU a déclaré qu 'il n' y a pas de solution militaire en Syria." }]
  * ```
  */
 export class TranslationPipeline

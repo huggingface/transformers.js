@@ -10,12 +10,12 @@ class in the [API reference](https://huggingface.co/docs/transformers.js/api/pip
 | Option | Type | Description |
 |--------|------|-------------|
 | `progress_callback`? | `ProgressCallback` | If specified, this function will be called during model construction, to provide the user with progress updates. _(default: `null`)_ |
-| `config`? | `PretrainedConfig` | Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:<br />- The model is a model provided by the library (loaded with the *model id* string of a pretrained model).<br />- The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory. _(default: `null`)_ |
+| `config`? | `PretrainedConfig` | Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:<br />- The model is provided by the library and loaded with the *model ID* string of a pretrained model.<br />- The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory. _(default: `null`)_ |
 | `cache_dir`? | `string` | Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. _(default: `null`)_ |
 | `local_files_only`? | `boolean` | Whether to only look at local files (e.g., not try downloading the model). _(default: `false`)_ |
-| `revision`? | `string` | The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git. NOTE: This setting is ignored for local requests. _(default: `'main'`)_ |
+| `revision`? | `string` | The model revision to use. This can be a branch name, tag name, or commit ID. Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests. _(default: `'main'`)_ |
 | `subfolder`? | `string` | In case the relevant files are located inside a subfolder of the model repo on huggingface.co, you can specify the folder name here. _(default: `'onnx'`)_ |
-| `model_file_name`? | `string` | If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models. _(default: `null`)_ |
+| `model_file_name`? | `string` | If specified, load the model with this name (excluding the dtype and .onnx suffixes). This is currently valid only for encoder- or decoder-only models. _(default: `null`)_ |
 | `device`? | `DeviceType\|Record<string, DeviceType>` | The device to run the model on. If not specified, the device will be chosen from the environment settings. _(default: `null`)_ |
 | `dtype`? | `DataType\|Record<string, DataType>` | The data type to use for the model. If not specified, the data type will be chosen from the environment settings. _(default: `null`)_ |
 | `use_external_data_format`? | `ExternalData\|Record<string, ExternalData>` | Whether to load the model using the external data format (used for models >= 2GB in size). _(default: `false`)_ |
@@ -42,7 +42,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 | Option | Type | Description |
 |--------|------|-------------|
 | `status` | `'initiate'` | A file load is about to start. |
-| `name` | `string` | The model id or directory path. |
+| `name` | `string` | The model ID or directory path. |
 | `file` | `string` | The name of the file. |
 
 **`DownloadProgressInfo`**
@@ -50,7 +50,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 | Option | Type | Description |
 |--------|------|-------------|
 | `status` | `'download'` | A file download has started. |
-| `name` | `string` | The model id or directory path. |
+| `name` | `string` | The model ID or directory path. |
 | `file` | `string` | The name of the file. |
 
 **`ProgressStatusInfo`**
@@ -58,7 +58,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 | Option | Type | Description |
 |--------|------|-------------|
 | `status` | `'progress'` | A file download has reported byte progress. |
-| `name` | `string` | The model id or directory path. |
+| `name` | `string` | The model ID or directory path. |
 | `file` | `string` | The name of the file. |
 | `progress` | `number` | A number between 0 and 100. |
 | `loaded` | `number` | The number of bytes loaded. |
@@ -69,7 +69,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 | Option | Type | Description |
 |--------|------|-------------|
 | `status` | `'done'` | A file has finished loading. |
-| `name` | `string` | The model id or directory path. |
+| `name` | `string` | The model ID or directory path. |
 | `file` | `string` | The name of the file. |
 
 **`ReadyProgressInfo`**
@@ -85,7 +85,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 | Option | Type | Description |
 |--------|------|-------------|
 | `status` | `'progress_total'` | Aggregate progress across all files being loaded. |
-| `name` | `string` | The model id or directory path. |
+| `name` | `string` | The model ID or directory path. |
 | `progress` | `number` | A number between 0 and 100. |
 | `loaded` | `number` | The number of bytes loaded. |
 | `total` | `number` | The total number of bytes to be loaded. |

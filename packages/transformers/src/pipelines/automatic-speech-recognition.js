@@ -49,7 +49,7 @@ import { logger } from '../utils/logger.js';
  */
 
 /**
- * Pipeline that aims at extracting spoken text contained within some audio.
+ * Automatic speech recognition pipeline for transcribing spoken text from audio.
  *
  * **Example:** Transcribe English.
  * ```javascript

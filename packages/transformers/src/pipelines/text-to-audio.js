@@ -63,7 +63,7 @@ import { env } from '../env.js';
  * await output.save('output.wav'); // You can also use `output.toBlob()` to access the audio as a Blob
  * ```
  *
- * **Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See [here](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for the full list of available languages (1107).
+ * **Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See the [MMS-TTS model list](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for available languages.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

@@ -216,7 +216,7 @@ Visit the URL shown in the terminal (e.g., [http://localhost:3000/](http://local
 
 ### (Optional) Step 4: Build and deploy
 
-To build your application, simply run:
+To build your application, run:
 
 ```bash
 npm run build

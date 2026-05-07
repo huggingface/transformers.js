@@ -56,8 +56,8 @@ const output = await classifier(audio, { top_k: 4 });
 
 **Default model:** `Xenova/clap-htsat-unfused`
 
-Zero-shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio when you
-provide an audio and a set of `candidate_labels`.
+Zero-shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio clip from
+audio and a set of `candidate_labels`.
 
 **Example:** Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
 ```javascript
@@ -65,11 +65,11 @@ import { pipeline } from '@huggingface/transformers';
 
 const classifier = await pipeline('zero-shot-audio-classification', 'Xenova/clap-htsat-unfused');
 const audio = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/dog_barking.wav';
-const candidate_labels = ['dog', 'vaccum cleaner'];
+const candidate_labels = ['dog', 'vacuum cleaner'];
 const scores = await classifier(audio, candidate_labels);
 // [
 //   { score: 0.9993992447853088, label: 'dog' },
-//   { score: 0.0006007603369653225, label: 'vaccum cleaner' }
+//   { score: 0.0006007603369653225, label: 'vacuum cleaner' }
 // ]
 ```
 
@@ -78,7 +78,7 @@ const scores = await classifier(audio, candidate_labels);
 **Default model:** `Xenova/whisper-tiny.en`
 **Aliases:** `asr`
 
-Pipeline that aims at extracting spoken text contained within some audio.
+Automatic speech recognition pipeline for transcribing spoken text from audio.
 
 **Example:** Transcribe English.
 ```javascript
@@ -181,7 +181,7 @@ const output = await synthesizer('Hello there, how are you doing?', { speaker_em
 await output.save('output.wav'); // You can also use `output.toBlob()` to access the audio as a Blob
 ```
 
-**Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See [here](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for the full list of available languages (1107).
+**Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See the [MMS-TTS model list](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for available languages.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -274,7 +274,7 @@ const output = await classifier(url, { top_k: 0 });
 
 **Default model:** `Xenova/detr-resnet-50-panoptic`
 
-Image segmentation pipeline using any `AutoModelForXXXSegmentation`.
+Image segmentation pipeline using compatible segmentation models.
 This pipeline predicts masks of objects and their classes.
 
 **Example:** Perform image segmentation with `Xenova/detr-resnet-50-panoptic`.
@@ -294,7 +294,7 @@ const output = await segmenter(url);
 
 **Default model:** `Xenova/modnet`
 
-Background removal pipeline using certain `AutoModelForXXXSegmentation`.
+Background removal pipeline using compatible image segmentation models.
 This pipeline removes the backgrounds of images.
 
 **Example:** Perform background removal with `Xenova/modnet`.
@@ -652,9 +652,9 @@ const output = await answerer(question, context);
 
 **Default model:** `onnx-community/ettin-encoder-32m-ONNX`
 
-Masked language modeling prediction pipeline using any `ModelWithLMHead`.
+Masked language modeling prediction pipeline using compatible masked language models.
 
-**Example:** Perform masked language modelling (a.k.a. "fill-mask") with `onnx-community/ettin-encoder-32m-ONNX`.
+**Example:** Perform masked language modeling (a.k.a. "fill-mask") with `onnx-community/ettin-encoder-32m-ONNX`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -669,7 +669,7 @@ const output = await unmasker('The capital of France is [MASK].');
 // ]
 ```
 
-**Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-uncased`.
+**Example:** Perform masked language modeling (a.k.a. "fill-mask") with `Xenova/bert-base-cased`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -684,7 +684,7 @@ const output = await unmasker('The goal of life is [MASK].');
 // ]
 ```
 
-**Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
+**Example:** Perform masked language modeling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -726,8 +726,8 @@ Translates text from one language to another.
 
 **Example:** Multilingual translation with `Xenova/nllb-200-distilled-600M`.
 
-See [here](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
-for the full list of languages and their corresponding codes.
+See the [FLORES-200 language list](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200)
+for the available languages and their corresponding codes.
 
 ```javascript
 import { pipeline } from '@huggingface/transformers';
@@ -742,8 +742,8 @@ const output = await translator('जीवन एक चॉकलेट बॉ�
 
 **Example:** Multilingual translation with `Xenova/m2m100_418M`.
 
-See [here](https://huggingface.co/facebook/m2m100_418M#languages-covered)
-for the full list of languages and their corresponding codes.
+See the [M2M100 language list](https://huggingface.co/facebook/m2m100_418M#languages-covered)
+for the available languages and their corresponding codes.
 
 ```javascript
 import { pipeline } from '@huggingface/transformers';
@@ -758,8 +758,8 @@ const output = await translator('生活就像一盒巧克力。', {
 
 **Example:** Multilingual translation with `Xenova/mbart-large-50-many-to-many-mmt`.
 
-See [here](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
-for the full list of languages and their corresponding codes.
+See the [mBART-50 language list](https://huggingface.co/facebook/mbart-large-50-many-to-many-mmt#languages-covered)
+for the available languages and their corresponding codes.
 
 ```javascript
 import { pipeline } from '@huggingface/transformers';
@@ -769,7 +769,7 @@ const output = await translator('संयुक्त राष्ट्र क
   src_lang: 'hi_IN', // Hindi
   tgt_lang: 'fr_XX', // French
 });
-// [{ translation_text: 'Le chef des Nations affirme qu 'il n 'y a military solution in Syria.' }]
+// [{ translation_text: "Le chef de l'ONU affirme qu'il n'y a pas de solution militaire en Syrie." }]
 ```
 
 ### `text2text-generation`
@@ -793,9 +793,9 @@ const output = await generator('how can I become more healthy?', {
 
 **Default model:** `onnx-community/Qwen3-0.6B-ONNX`
 
-Language generation pipeline using any `ModelWithLMHead` or `ModelForCausalLM`.
+Language generation pipeline using compatible causal language models.
 This pipeline predicts the words that will follow a specified text prompt.
-For the full list of generation parameters, see `GenerationConfig`.
+For all generation parameters, see `GenerationConfig`.
 
 **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
 ```javascript
@@ -838,9 +838,9 @@ console.log(output[0].generated_text.at(-1)?.content);
 **Default model:** `Xenova/distilbert-base-uncased-mnli`
 
 NLI-based zero-shot classification pipeline using a `ModelForSequenceClassification`
-trained on NLI (natural language inference) tasks. Equivalent of `text-classification`
-pipelines, but these models don't require a hardcoded number of potential classes, they
-can be chosen at runtime. It usually means it's slower but it is **much** more flexible.
+trained on NLI (natural language inference) tasks. This is similar to `text-classification`
+pipelines, but these models do not require a hardcoded set of classes. Candidate classes can
+be provided at runtime, making zero-shot classification slower but much more flexible.
 
 **Example:** Zero-shot classification with `Xenova/mobilebert-uncased-mnli`.
 ```javascript

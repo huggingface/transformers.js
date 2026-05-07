@@ -14,9 +14,9 @@ Useful links:
 - [Node.js](https://nodejs.org/en/) version 18+
 - [npm](https://www.npmjs.com/) version 9+
 
-## Step 1: Initialise the project
+## Step 1: Initialize the project
 
-For this tutorial, we will use [Vite](https://vitejs.dev/) to initialise our project. Vite is a build tool that allows us to quickly set up a React application with minimal configuration. Run the following command in your terminal:
+For this tutorial, we will use [Vite](https://vitejs.dev/) to initialize our project. Vite is a build tool that quickly sets up a React application with minimal configuration. Run the following command in your terminal:
 
 ```bash
 npm create vite@latest react-translator -- --template react
@@ -50,12 +50,12 @@ npm install @huggingface/transformers
 
 For this application, we will use the [Xenova/nllb-200-distilled-600M](https://huggingface.co/Xenova/nllb-200-distilled-600M) model, which can perform multilingual translation among 200 languages. Before we start, there are 2 things we need to take note of:
 
-1. ML inference can be quite computationally intensive, so it's better to load and run the models in a separate thread from the main (UI) thread.
-2. Since the model is quite large (>1 GB), we don't want to download it until the user clicks the "Translate" button.
+1. ML inference can be computationally intensive, so it's better to load and run the models in a separate thread from the main (UI) thread.
+2. Since the model is larger than 1 GB, we don't want to download it until the user clicks the "Translate" button.
 
 We can achieve both of these goals by using a [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) and some [React hooks](https://react.dev/reference/react).
 
-1. Create a file called `worker.js` in the `src` directory. This script will do all the heavy-lifting for us, including loading and running the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class, which uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and use this pipeline for all subsequent calls:
+1. Create a file called `worker.js` in the `src` directory. This script will load and run the translation pipeline. To ensure the model is only loaded once, we will create the `MyTranslationPipeline` class, which uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create one pipeline instance when `getInstance` is first called, and reuse it for all subsequent calls:
 
    ```javascript
    import { pipeline, TextStreamer } from "@huggingface/transformers";
@@ -83,7 +83,7 @@ We can achieve both of these goals by using a [Web Worker](https://developer.moz
      // Create a reference to the worker object.
      const worker = useRef(null);
 
-     // We use the `useEffect` hook to setup the worker as soon as the `App` component is mounted.
+     // We use the `useEffect` hook to set up the worker as soon as the `App` component is mounted.
      useEffect(() => {
        // Create the worker if it does not yet exist.
        worker.current ??= new Worker(new URL('./worker.js', import.meta.url), {
@@ -122,7 +122,7 @@ We recommend starting the development server again with `npm run dev`
 
 First, let's define our components. Create a folder called `components` in the `src` directory, and create the following files:
 
-1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/huggingface/transformers.js-examples/tree/main/react-translator/src/components/LanguageSelector.jsx).
+1. `LanguageSelector.jsx`: This component will allow the user to select the input and output languages. See the [language list](https://github.com/huggingface/transformers.js-examples/tree/main/react-translator/src/components/LanguageSelector.jsx) used by the example app.
 
    ```jsx
    const LANGUAGES = {
@@ -514,7 +514,7 @@ You can now run the application with `npm run dev` and perform multilingual tran
 
 ## (Optional) Step 5: Build and deploy
 
-To build your application, simply run `npm run build`. This will bundle your application and output the static files to the `dist` folder.
+To build your application, run `npm run build`. This will bundle your application and output the static files to the `dist` folder.
 
 For this demo, we will deploy our application as a static [Hugging Face Space](https://huggingface.co/docs/hub/spaces), but you can deploy it anywhere you like! If you haven't already, you can create a free Hugging Face account [here](https://huggingface.co/join).
 

@@ -59,7 +59,7 @@ export class Random {
      *
      * When called with a number, initializes the state deterministically from that value.
      * When called with no arguments (or `undefined`/`null`), seeds from OS entropy
-     * via `crypto.getRandomValues`, matching Python's `random.seed()` behaviour.
+     * via `crypto.getRandomValues`, matching Python's `random.seed()` behavior.
      *
      * @param {number} [n] The seed value. Omit to seed from OS entropy.
      */

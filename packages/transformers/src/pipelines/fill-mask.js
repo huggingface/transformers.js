@@ -36,9 +36,9 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Masked language modeling prediction pipeline using any `ModelWithLMHead`.
+ * Masked language modeling prediction pipeline using compatible masked language models.
  *
- * **Example:** Perform masked language modelling (a.k.a. "fill-mask") with `onnx-community/ettin-encoder-32m-ONNX`.
+ * **Example:** Perform masked language modeling (a.k.a. "fill-mask") with `onnx-community/ettin-encoder-32m-ONNX`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -53,7 +53,7 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-uncased`.
+ * **Example:** Perform masked language modeling (a.k.a. "fill-mask") with `Xenova/bert-base-cased`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -68,7 +68,7 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform masked language modelling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
+ * **Example:** Perform masked language modeling (a.k.a. "fill-mask") with `Xenova/bert-base-cased` (and return the top result).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

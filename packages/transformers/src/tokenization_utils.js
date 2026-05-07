@@ -608,7 +608,7 @@ export class PreTrainedTokenizer
      * @param {number[]|bigint[]|Tensor} token_ids List/Tensor of token IDs to decode.
      * @param {Object} [decode_args={}]
      * @param {boolean} [decode_args.skip_special_tokens=false] If true, special tokens are removed from the output string.
-     * @param {boolean} [decode_args.clean_up_tokenization_spaces=true] If true, spaces before punctuations and abbreviated forms are removed.
+     * @param {boolean} [decode_args.clean_up_tokenization_spaces=true] If true, spaces before punctuation and abbreviated forms are removed.
      *
      * @returns {string} The decoded string.
      * @throws {Error} If `token_ids` is not a non-empty array of integers.

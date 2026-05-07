@@ -4,7 +4,7 @@ Just like the [transformers Python library](https://github.com/huggingface/trans
 
 <Tip>
 
-For the full list of available tasks/pipelines, check out [this table](#available-tasks).
+For the full list of available tasks and pipelines, see [this table](#available-tasks).
 
 </Tip>
 
@@ -22,7 +22,7 @@ When running for the first time, the `pipeline` will download and cache the defa
 
 <Tip>
 
-By default, models will be downloaded from the [Hugging Face Hub](https://huggingface.co/models) and stored in [browser cache](https://developer.mozilla.org/en-US/docs/Web/API/Cache), but there are ways to specify custom models and cache locations. For more information see [here](./custom_usage).
+By default, models will be downloaded from the [Hugging Face Hub](https://huggingface.co/models) and stored in [browser cache](https://developer.mozilla.org/en-US/docs/Web/API/Cache), but there are ways to specify custom models and cache locations. For more information, see the [custom usage guide](./custom_usage).
 
 </Tip>
 
@@ -81,7 +81,7 @@ const result = await transcriber(
 
 We offer a variety of options to control how models are loaded from the Hugging Face Hub (or locally).
 By default, when running in-browser, a _quantized_ version of the model is used, which is smaller and faster,
-but usually less accurate. To override this behaviour (i.e., use the unquantized model), you can use a custom
+but usually less accurate. To override this behavior (i.e., use the unquantized model), you can use a custom
 `PretrainedOptions` object as the third parameter to the `pipeline` function:
 
 ```javascript
@@ -91,7 +91,7 @@ const pipe = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
 });
 ```
 
-Check out the section on [quantization](./guides/dtypes) to learn more.
+See the section on [quantization](./guides/dtypes) to learn more.
 
 You can also specify which revision of the model to use, by passing a `revision` parameter.
 Since the Hugging Face Hub uses a git-based versioning system, you can use any valid git revision specifier (e.g., branch name or commit hash).
@@ -106,7 +106,7 @@ const transcriber = await pipeline(
 );
 ```
 
-For the full list of options, check out the [PretrainedOptions](./api/utils/hub#module_utils/hub.PretrainedOptions) documentation.
+For the full list of options, see the [PretrainedOptions](./api/utils/hub#module_utils/hub.PretrainedOptions) documentation.
 
 ### Runtime parameters
 
@@ -134,7 +134,7 @@ const result2 = await translator(result[0].translation_text, {
 // [ { translation_text: 'I like to walk my dog.' } ]
 ```
 
-When using models that support auto-regressive generation, you can specify generation parameters like the number of new tokens, sampling methods, temperature, repetition penalty, and much more. For a full list of available parameters, see the [GenerationConfig](./api/generation/configuration_utils#module_generation/configuration_utils.GenerationConfig) class.
+When using models that support auto-regressive generation, you can specify generation parameters like the number of new tokens, sampling methods, temperature, and repetition penalty. For a full list of available parameters, see the [GenerationConfig](./api/generation/configuration_utils#module_generation/configuration_utils.GenerationConfig) class.
 
 For example, to generate a poem using `LaMini-Flan-T5-783M`, you can do:
 
@@ -230,7 +230,7 @@ This approach ensures that each recursive call reduces the problem size by half 
 </pre>
 </details>
 
-This streaming feature allows you to process the output as it is generated, rather than waiting for the entire output to be generated before processing it.
+Streaming lets you process output as it is generated, instead of waiting for the complete output before processing it.
 
 For more information on the available options for each pipeline, refer to the [API Reference](./api/pipelines).
 If you would like more control over the inference process, you can use the [`AutoModel`](./api/models), [`AutoTokenizer`](./api/tokenizers), or [`AutoProcessor`](./api/processors) classes instead.
