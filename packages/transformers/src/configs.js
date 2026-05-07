@@ -400,9 +400,9 @@ export function getCacheNames(config, options) {
         }
         return names;
     } else if (config.model_type === 'deepseek_v4') {
-        const { layer_types, num_layers } = /** @type {any} */ (config);
+        const { layer_types, num_hidden_layers } = /** @type {any} */ (config);
 
-        for (let i = 0; i < num_layers; ++i) {
+        for (let i = 0; i < num_hidden_layers; ++i) {
             names.add(`${pkv_prefix}.${i}.key`);
             names.add(`${pkv_prefix}.${i}.value`);
 
