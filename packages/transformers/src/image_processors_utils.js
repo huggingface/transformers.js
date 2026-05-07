@@ -542,7 +542,7 @@ export function post_process_instance_segmentation(outputs, threshold = 0.5, tar
 
 /**
  * @typedef {Object} ImageProcessorConfig A configuration object used to create an image processor.
- * @property {function} [progress_callback=null] If specified, this function will be called during model construction, to provide the user with progress updates.
+ * @property {function} [progress_callback=null] If specified, this function is called during model construction with progress updates.
  * @property {number[]} [image_mean] The mean values for image normalization.
  * @property {number[]} [image_std] The standard deviation values for image normalization.
  * @property {boolean} [do_rescale] Whether to rescale the image pixel values to the [0,1] range.

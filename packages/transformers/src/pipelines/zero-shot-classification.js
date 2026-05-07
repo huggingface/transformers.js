@@ -39,9 +39,9 @@ import { logger } from '../utils/logger.js';
  */
 
 /**
- * NLI-based zero-shot classification pipeline using a `ModelForSequenceClassification`
+ * NLI-based zero-shot classification pipeline using `AutoModelForSequenceClassification`
  * trained on NLI (natural language inference) tasks. This is similar to `text-classification`
- * pipelines, but these models do not require a hardcoded set of classes. Candidate classes can
+ * pipelines, but these models do not require a hard-coded set of classes. Candidate classes can
  * be provided at runtime, making zero-shot classification slower but much more flexible.
  *
  * **Example:** Zero-shot classification with `Xenova/mobilebert-uncased-mnli`.

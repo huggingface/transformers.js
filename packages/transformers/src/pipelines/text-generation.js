@@ -56,7 +56,7 @@ function isChat(x) {
  * This pipeline predicts the words that will follow a specified text prompt.
  * For all generation parameters, see `GenerationConfig`.
  *
- * **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
+ * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

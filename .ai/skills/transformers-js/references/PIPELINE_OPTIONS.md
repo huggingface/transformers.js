@@ -9,17 +9,17 @@ class in the [API reference](https://huggingface.co/docs/transformers.js/api/pip
 <!-- @generated:start id=typedef:PretrainedModelOptions -->
 | Option | Type | Description |
 |--------|------|-------------|
-| `progress_callback`? | `ProgressCallback` | If specified, this function will be called during model construction, to provide the user with progress updates. _(default: `null`)_ |
-| `config`? | `PretrainedConfig` | Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:<br />- The model is provided by the library and loaded with the *model ID* string of a pretrained model.<br />- The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory. _(default: `null`)_ |
-| `cache_dir`? | `string` | Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. _(default: `null`)_ |
+| `progress_callback`? | `ProgressCallback` | If specified, this function is called during model construction with progress updates. _(default: `null`)_ |
+| `config`? | `PretrainedConfig` | Configuration to use for the model instead of an automatically loaded configuration. Configuration can be automatically loaded when:<br />- The model is provided by the library and loaded with the *model ID* string of a pretrained model.<br />- The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory. _(default: `null`)_ |
+| `cache_dir`? | `string` | Path to a directory where downloaded model files should be cached if the standard cache should not be used. _(default: `null`)_ |
 | `local_files_only`? | `boolean` | Whether to only look at local files (e.g., not try downloading the model). _(default: `false`)_ |
 | `revision`? | `string` | The model revision to use. This can be a branch name, tag name, or commit ID. Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests. _(default: `'main'`)_ |
 | `subfolder`? | `string` | In case the relevant files are located inside a subfolder of the model repo on huggingface.co, you can specify the folder name here. _(default: `'onnx'`)_ |
-| `model_file_name`? | `string` | If specified, load the model with this name (excluding the dtype and .onnx suffixes). This is currently valid only for encoder- or decoder-only models. _(default: `null`)_ |
+| `model_file_name`? | `string` | Override the base ONNX model file name, excluding dtype and `.onnx` suffixes. This is most useful for single-session models. _(default: `null`)_ |
 | `device`? | `DeviceType\|Record<string, DeviceType>` | The device to run the model on. If not specified, the device will be chosen from the environment settings. _(default: `null`)_ |
 | `dtype`? | `DataType\|Record<string, DataType>` | The data type to use for the model. If not specified, the data type will be chosen from the environment settings. _(default: `null`)_ |
-| `use_external_data_format`? | `ExternalData\|Record<string, ExternalData>` | Whether to load the model using the external data format (used for models >= 2GB in size). _(default: `false`)_ |
-| `session_options`? | `InferenceSession.SessionOptions` | (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen. |
+| `use_external_data_format`? | `ExternalData\|Record<string, ExternalData>` | Whether to load external data files. `null` uses the model configuration; `false` disables external data; `true` uses one chunk; a number selects the chunk count. _(default: `null`)_ |
+| `session_options`? | `InferenceSession.SessionOptions` | User-specified ONNX Runtime session options. Suitable defaults are filled in when omitted. _(default: `{}`)_ |
 <!-- @generated:end id=typedef:PretrainedModelOptions -->
 
 ## Progress tracking
@@ -154,8 +154,8 @@ anywhere `generate()` is invoked directly.
 | `do_sample`? | `boolean` | Whether to use sampling; use greedy decoding otherwise. _(default: `false`)_ |
 | `num_beams`? | `number` | Number of beams for beam search. 1 means no beam search. _(default: `1`)_ |
 | `num_beam_groups`? | `number` | Number of groups to divide `num_beams` into to encourage diversity among different groups of beams. See [this paper](https://huggingface.co/papers/1610.02424) for more details. _(default: `1`)_ |
-| `penalty_alpha`? | `number` | The value balances model confidence and the degeneration penalty in contrastive search decoding. _(default: `null`)_ |
-| `use_cache`? | `boolean` | Whether the model should use the past key/value attentions (if applicable to the model) to speed up decoding. _(default: `true`)_ |
+| `penalty_alpha`? | `number` | Balance model confidence against the degeneration penalty during contrastive search decoding. _(default: `null`)_ |
+| `use_cache`? | `boolean` | Whether the model should reuse past key/value states, when supported, to speed up decoding. _(default: `true`)_ |
 | `temperature`? | `number` | The value used to modulate the next token probabilities. _(default: `1.0`)_ |
 | `top_k`? | `number` | The number of highest-probability vocabulary tokens to keep for top-k filtering. _(default: `50`)_ |
 | `top_p`? | `number` | If set to a float below 1, only the smallest set of most probable tokens with probabilities that add up to `top_p` or higher are kept for generation. _(default: `1.0`)_ |
@@ -168,7 +168,7 @@ anywhere `generate()` is invoked directly.
 | `length_penalty`? | `number` | Exponential penalty applied to sequence length during beam-based generation. It is applied as an exponent to the sequence length, which in turn is used to divide the score of the sequence. Since the score is the log likelihood of the sequence (i.e. negative), `length_penalty` > 0.0 promotes longer sequences, while `length_penalty` < 0.0 encourages shorter sequences. _(default: `1.0`)_ |
 | `no_repeat_ngram_size`? | `number` | If set to an integer greater than 0, all n-grams of that size can only occur once. _(default: `0`)_ |
 | `bad_words_ids`? | `number[][]` | List of token IDs that are not allowed to be generated. In order to get the token IDs of the words that should not appear in the generated text, use `tokenizer(bad_words, { add_prefix_space: true, add_special_tokens: false }).input_ids`. _(default: `null`)_ |
-| `force_words_ids`? | `number[][]\|number[][][]` | List of token IDs that must be generated. If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite to `bad_words_ids`. If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), where one can allow different forms of each word. _(default: `null`)_ |
+| `force_words_ids`? | `number[][]\|number[][][]` | List of token IDs that must be generated. If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite of `bad_words_ids`. If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), which allows different forms of each word. _(default: `null`)_ |
 | `renormalize_logits`? | `boolean` | Whether to renormalize the logits after applying all the logits processors or warpers (including the custom ones). It's highly recommended to set this flag to `true` because search algorithms assume the score logits are normalized, but some logit processors or warpers break the normalization. _(default: `false`)_ |
 | `constraints`? | `Object[]` | Custom constraints that guide generation to include certain tokens as defined by `Constraint` objects. _(default: `null`)_ |
 | `forced_bos_token_id`? | `number` | The ID of the token to force as the first generated token after the `decoder_start_token_id`. Useful for multilingual models like mBART where the first generated token needs to be the target language token. _(default: `null`)_ |
@@ -176,12 +176,12 @@ anywhere `generate()` is invoked directly.
 | `remove_invalid_values`? | `boolean` | Whether to remove possible *nan* and *inf* outputs of the model to prevent the generation method from crashing. Note that using `remove_invalid_values` can slow down generation. _(default: `false`)_ |
 | `exponential_decay_length_penalty`? | `[number, number]` | This tuple adds an exponentially increasing length penalty after a certain number of tokens have been generated. The tuple consists of: `(start_index, decay_factor)` where `start_index` indicates where the penalty starts and `decay_factor` represents the factor of exponential decay. _(default: `null`)_ |
 | `suppress_tokens`? | `number[]` | A list of tokens to suppress during generation. The `SuppressTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled. _(default: `null`)_ |
-| `streamer`? | `TextStreamer` | A streamer used to stream the generation. _(default: `null`)_ |
+| `streamer`? | `TextStreamer` | Streamer used to yield generated text incrementally. _(default: `null`)_ |
 | `begin_suppress_tokens`? | `number[]` | A list of tokens to suppress at the beginning of the generation. The `SuppressBeginTokens` logit processor sets their log probabilities to `-inf` so that they are not sampled. _(default: `null`)_ |
-| `forced_decoder_ids`? | `[number, number][]` | A list of pairs of integers that indicates a mapping from generation indices to token indices that will be forced before sampling. For example, `[[1, 123]]` means the second generated token will always be a token of index 123. _(default: `null`)_ |
+| `forced_decoder_ids`? | `[number, number][]` | A list of integer pairs that maps generation indices to token indices that will be forced before sampling. For example, `[[1, 123]]` means the second generated token will always be a token of index 123. _(default: `null`)_ |
 | `guidance_scale`? | `number` | The guidance scale for classifier-free guidance (CFG). CFG is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages the model to generate samples that are more closely tied to the input prompt, usually at the expense of poorer quality. _(default: `null`)_ |
 | `num_return_sequences`? | `number` | The number of independently computed returned sequences for each element in the batch. _(default: `1`)_ |
-| `output_attentions`? | `boolean` | Whether to return the attentions tensors of all attention layers. See `attentions` under returned tensors for more details. _(default: `false`)_ |
+| `output_attentions`? | `boolean` | Whether to return attention tensors from all attention layers. See `attentions` under returned tensors for more details. _(default: `false`)_ |
 | `output_hidden_states`? | `boolean` | Whether to return the hidden states of all layers. See `hidden_states` under returned tensors for more details. _(default: `false`)_ |
 | `output_scores`? | `boolean` | Whether to return the prediction scores. See `scores` under returned tensors for more details. _(default: `false`)_ |
 | `return_dict_in_generate`? | `boolean` | Whether to return a `ModelOutput` instead of a plain tuple. _(default: `false`)_ |

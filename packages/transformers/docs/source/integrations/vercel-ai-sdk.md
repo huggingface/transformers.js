@@ -288,6 +288,6 @@ const { sendMessage, messages, stop } = useChat<TransformersUIMessage>({
 
 ## Further reading
 
-- [Building a Next.js AI Chatbot](../tutorials/next-ai-sdk) &mdash; a step-by-step tutorial building a full chatbot with tool calling
+- [Building a Next.js AI Chatbot](../tutorials/next-ai-sdk): a step-by-step tutorial for building a full chatbot with tool calling
 - [`@browser-ai/transformers-js` documentation](https://www.browser-ai.dev/docs/ai-sdk-v6/transformers-js)
 - [Vercel AI SDK documentation](https://ai-sdk.dev/)

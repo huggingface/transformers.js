@@ -1,7 +1,7 @@
 /**
  * @file Tokenizers turn text into the integer ids a model understands, and
  * decode model output back into strings. Use `AutoTokenizer.from_pretrained()`
- * to load the right implementation for a model id — the class is chosen from
+ * to load the right implementation for a model ID — the class is chosen from
  * the tokenizer's `tokenizer_config.json`.
  *
  * For chat-trained models, `tokenizer.apply_chat_template()` renders an
@@ -311,9 +311,9 @@ export class PreTrainedTokenizer
     }
 
     /**
-     * Loads a pre-trained tokenizer from the given `pretrained_model_name_or_path`.
+     * Loads a pretrained tokenizer from the given `pretrained_model_name_or_path`.
      *
-     * @param {string} pretrained_model_name_or_path The path to the pre-trained tokenizer.
+     * @param {string} pretrained_model_name_or_path The path to the pretrained tokenizer.
      * @param {PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
      *
      * @throws {Error} Throws an error if the tokenizer.json or tokenizer_config.json files are not found in the `pretrained_model_name_or_path`.
@@ -702,7 +702,7 @@ export class PreTrainedTokenizer
      * ids. This method is intended for use with chat models, and will read the tokenizer's chat_template attribute to
      * determine the format and control tokens to use when converting.
      *
-     * See [here](https://huggingface.co/docs/transformers/chat_templating) for more information.
+     * See the [chat templating guide](https://huggingface.co/docs/transformers/chat_templating) for more information.
      *
      * **Example:** Applying a chat template to a conversation.
      *

@@ -142,8 +142,8 @@ export class Processor extends Callable {
      * property of the config object (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
      * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
-     * - A string, the *model id* of a pretrained processor hosted inside a model repo on huggingface.co.
-     *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
+     * - A string, the *model ID* of a pretrained processor hosted inside a model repo on huggingface.co.
+     *   Valid model IDs can be located at the root level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing processor files, e.g., `./my_model_directory/`.
      * @param {PretrainedProcessorOptions} options Additional options for loading the processor.

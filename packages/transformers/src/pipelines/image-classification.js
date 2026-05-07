@@ -20,7 +20,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {ImageClassificationSingle[]} ImageClassificationOutput
  *
  * @typedef {Object} ImageClassificationPipelineOptions Parameters specific to image classification pipelines.
- * @property {number} [top_k=1] The number of top labels to return.
+ * @property {number} [top_k=5] The number of top labels to return. Set to `0` to return all labels.
  *
  * @typedef {ImagePipelineConstructorArgs & ImageClassificationPipelineCallback & Disposable} ImageClassificationPipelineType
  */

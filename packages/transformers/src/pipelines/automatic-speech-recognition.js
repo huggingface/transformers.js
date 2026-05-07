@@ -69,9 +69,9 @@ import { logger } from '../utils/logger.js';
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
  * const output = await transcriber(url, { return_timestamps: true });
  * // {
- * //   text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+ * //   text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
  * //   chunks: [
- * //     { timestamp: [0, 8],  text: " And so my fellow Americans ask not what your country can do for you" }
+ * //     { timestamp: [0, 8],  text: " And so my fellow Americans ask not what your country can do for you" },
  * //     { timestamp: [8, 11], text: " ask what you can do for your country." }
  * //   ]
  * // }

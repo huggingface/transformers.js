@@ -89,7 +89,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  *  - `"zero-shot-audio-classification"`: will return a `ZeroShotAudioClassificationPipeline`.
  *  - `"zero-shot-image-classification"`: will return a `ZeroShotImageClassificationPipeline`.
  *  - `"zero-shot-object-detection"`: will return a `ZeroShotObjectDetectionPipeline`.
- * @param {string} [model=null] The name of the pre-trained model to use. If not specified, the default model for the task will be used.
+ * @param {string} [model=null] The name of the pretrained model to use. If not specified, the default model for the task will be used.
  * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Optional parameters for the pipeline.
  * @returns {Promise<AllTasks[T]>} A Pipeline object for the specified task.
  * @throws {Error} If an unsupported pipeline is requested.

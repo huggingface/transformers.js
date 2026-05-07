@@ -67,7 +67,7 @@ import { max, softmax } from '../utils/maths.js';
  */
 
 /**
- * Named Entity Recognition pipeline using any `ModelForTokenClassification`.
+ * Named entity recognition pipeline using `AutoModelForTokenClassification`.
  *
  * **Example:** Perform named entity recognition with `Xenova/bert-base-NER`.
  * ```javascript

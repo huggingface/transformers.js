@@ -40,7 +40,7 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Question Answering pipeline using any `ModelForQuestionAnswering`.
+ * Question answering pipeline using `AutoModelForQuestionAnswering`.
  *
  * **Example:** Run question answering with `Xenova/distilbert-base-uncased-distilled-squad`.
  * ```javascript

@@ -23,7 +23,7 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  */
 
 /**
- * A pipeline for summarization tasks, inheriting from Text2TextGenerationPipeline.
+ * Summarization pipeline using sequence-to-sequence language models.
  *
  * **Example:** Summarization with `Xenova/distilbart-cnn-6-6`.
  * ```javascript

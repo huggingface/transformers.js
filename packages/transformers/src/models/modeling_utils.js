@@ -207,7 +207,7 @@ export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
 export const MODEL_CLASS_TO_NAME_MAPPING = new Map();
 
 /**
- * A base class for pre-trained models that provides the model configuration and inference sessions.
+ * A base class for pretrained models that provides the model configuration and inference sessions.
  */
 export class PreTrainedModel extends Callable {
     main_input_name = 'input_ids';
@@ -263,8 +263,8 @@ export class PreTrainedModel extends Callable {
      * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
      * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
-     * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
-     *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
+     * - A string, the *model ID* of a pretrained model hosted inside a model repo on huggingface.co.
+     *   Valid model IDs can be located at the root level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
      * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.

@@ -98,9 +98,9 @@ const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisp
 const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
 const output = await transcriber(url, { return_timestamps: true });
 // {
-//   text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+//   text: " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
 //   chunks: [
-//     { timestamp: [0, 8],  text: " And so my fellow Americans ask not what your country can do for you" }
+//     { timestamp: [0, 8],  text: " And so my fellow Americans ask not what your country can do for you" },
 //     { timestamp: [8, 11], text: " ask what you can do for your country." }
 //   ]
 // }
@@ -539,7 +539,7 @@ const features = await image_feature_extractor(image);
 **Default model:** `Xenova/distilbert-base-uncased-finetuned-sst-2-english`
 **Aliases:** `sentiment-analysis`
 
-Text classification pipeline using any `ModelForSequenceClassification`.
+Text classification pipeline using `AutoModelForSequenceClassification`.
 
 **Example:** Sentiment analysis with `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
 ```javascript
@@ -567,6 +567,8 @@ const output = await classifier('Le meilleur film de tous les temps.', { top_k: 
 
 **Example:** Toxic comment classification with `Xenova/toxic-bert` (and return all classes).
 ```javascript
+import { pipeline } from '@huggingface/transformers';
+
 const classifier = await pipeline('text-classification', 'Xenova/toxic-bert');
 const output = await classifier('I hate you!', { top_k: null });
 // [
@@ -584,7 +586,7 @@ const output = await classifier('I hate you!', { top_k: null });
 **Default model:** `Xenova/bert-base-multilingual-cased-ner-hrl`
 **Aliases:** `ner`
 
-Named Entity Recognition pipeline using any `ModelForTokenClassification`.
+Named entity recognition pipeline using `AutoModelForTokenClassification`.
 
 **Example:** Perform named entity recognition with `Xenova/bert-base-NER`.
 ```javascript
@@ -632,7 +634,7 @@ const output = await classifier('My name is Sarah and I live in London', { aggre
 
 **Default model:** `Xenova/distilbert-base-cased-distilled-squad`
 
-Question Answering pipeline using any `ModelForQuestionAnswering`.
+Question answering pipeline using `AutoModelForQuestionAnswering`.
 
 **Example:** Run question answering with `Xenova/distilbert-base-uncased-distilled-squad`.
 ```javascript
@@ -697,7 +699,7 @@ const output = await unmasker('The Milky Way is a [MASK] galaxy.', { top_k: 1 })
 
 **Default model:** `Xenova/distilbart-cnn-6-6`
 
-A pipeline for summarization tasks, inheriting from Text2TextGenerationPipeline.
+Summarization pipeline using sequence-to-sequence language models.
 
 **Example:** Summarization with `Xenova/distilbart-cnn-6-6`.
 ```javascript
@@ -769,7 +771,7 @@ const output = await translator('संयुक्त राष्ट्र क
   src_lang: 'hi_IN', // Hindi
   tgt_lang: 'fr_XX', // French
 });
-// [{ translation_text: "Le chef de l'ONU affirme qu'il n'y a pas de solution militaire en Syrie." }]
+// [{ translation_text: "Le chef de la mission de l 'ONU a déclaré qu 'il n' y a pas de solution militaire en Syria." }]
 ```
 
 ### `text2text-generation`
@@ -797,7 +799,7 @@ Language generation pipeline using compatible causal language models.
 This pipeline predicts the words that will follow a specified text prompt.
 For all generation parameters, see `GenerationConfig`.
 
-**Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
+**Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
@@ -837,9 +839,9 @@ console.log(output[0].generated_text.at(-1)?.content);
 
 **Default model:** `Xenova/distilbert-base-uncased-mnli`
 
-NLI-based zero-shot classification pipeline using a `ModelForSequenceClassification`
+NLI-based zero-shot classification pipeline using `AutoModelForSequenceClassification`
 trained on NLI (natural language inference) tasks. This is similar to `text-classification`
-pipelines, but these models do not require a hardcoded set of classes. Candidate classes can
+pipelines, but these models do not require a hard-coded set of classes. Candidate classes can
 be provided at runtime, making zero-shot classification slower but much more flexible.
 
 **Example:** Zero-shot classification with `Xenova/mobilebert-uncased-mnli`.
@@ -914,13 +916,15 @@ const output = await extractor('This is a simple test.', { pooling: 'mean', norm
 console.log(output.tolist());
 ```
 
-**Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` models (with pooling and binary quantization).
+**Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` with pooling and binary quantization.
 ```javascript
+import { pipeline } from '@huggingface/transformers';
+
 const extractor = await pipeline('feature-extraction', 'onnx-community/all-MiniLM-L6-v2-ONNX');
 const output = await extractor('This is a simple test.', { pooling: 'mean', quantize: true, precision: 'binary' });
 // Tensor {
 //   type: 'int8',
-//   data: Int8Array [49, 108, 25, ...],
+//   data: Int8Array [49, 108, 25, ...],
 //   dims: [1, 48]
 // }
 

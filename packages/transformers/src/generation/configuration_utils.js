@@ -87,14 +87,14 @@ export class GenerationConfig {
     num_beam_groups = 1;
 
     /**
-     * The value balances model confidence and the degeneration penalty in contrastive search decoding.
+     * Balance model confidence against the degeneration penalty during contrastive search decoding.
      * @type {number}
      * @default null
      */
     penalty_alpha = null;
 
     /**
-     * Whether the model should use the past key/value attentions (if applicable to the model) to speed up decoding.
+     * Whether the model should reuse past key/value states, when supported, to speed up decoding.
      * @type {boolean}
      * @default true
      */
@@ -201,8 +201,8 @@ export class GenerationConfig {
 
     /**
      * List of token IDs that must be generated.
-     * If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite to `bad_words_ids`.
-     * If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), where one can allow different forms of each word.
+     * If given a `number[][]`, this is treated as a simple list of words that must be included, the opposite of `bad_words_ids`.
+     * If given `number[][][]`, this triggers a [disjunctive constraint](https://github.com/huggingface/transformers/issues/14081), which allows different forms of each word.
      * @type {number[][]|number[][][]}
      * @default null
      */
@@ -262,7 +262,7 @@ export class GenerationConfig {
     suppress_tokens = null;
 
     /**
-     * A streamer used to stream the generation.
+     * Streamer used to yield generated text incrementally.
      * @type {import('./streamers.js').TextStreamer}
      * @default null
      */
@@ -277,7 +277,7 @@ export class GenerationConfig {
     begin_suppress_tokens = null;
 
     /**
-     * A list of pairs of integers that indicates a mapping from generation indices to token indices that will be forced before sampling.
+     * A list of integer pairs that maps generation indices to token indices that will be forced before sampling.
      * For example, `[[1, 123]]` means the second generated token will always be a token of index 123.
      * @type {[number, number][]}
      * @default null
@@ -302,7 +302,7 @@ export class GenerationConfig {
     num_return_sequences = 1;
 
     /**
-     * Whether to return the attentions tensors of all attention layers.
+     * Whether to return attention tensors from all attention layers.
      * See `attentions` under returned tensors for more details.
      * @type {boolean}
      * @default false

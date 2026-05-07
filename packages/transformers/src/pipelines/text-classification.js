@@ -41,7 +41,7 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Text classification pipeline using any `ModelForSequenceClassification`.
+ * Text classification pipeline using `AutoModelForSequenceClassification`.
  *
  * **Example:** Sentiment analysis with `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
  * ```javascript
@@ -69,6 +69,8 @@ import { softmax } from '../utils/maths.js';
  *
  * **Example:** Toxic comment classification with `Xenova/toxic-bert` (and return all classes).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('text-classification', 'Xenova/toxic-bert');
  * const output = await classifier('I hate you!', { top_k: null });
  * // [

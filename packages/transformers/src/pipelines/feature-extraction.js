@@ -62,13 +62,15 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
  * console.log(output.tolist());
  * ```
  *
- * **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` models (with pooling and binary quantization).
+ * **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` with pooling and binary quantization.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const extractor = await pipeline('feature-extraction', 'onnx-community/all-MiniLM-L6-v2-ONNX');
  * const output = await extractor('This is a simple test.', { pooling: 'mean', quantize: true, precision: 'binary' });
  * // Tensor {
  * //   type: 'int8',
- * //   data: Int8Array [49, 108, 25, ...],
+ * //   data: Int8Array [49, 108, 25, ...],
  * //   dims: [1, 48]
  * // }
  *
