@@ -53,11 +53,11 @@ function createEncoderState(model, input_features) {
     }
 
     const padding_cls = DataTypeMap[padding_type];
-    const enc_padding_cache = new Tensor(
-        padding_type,
-        new padding_cls(PADDING_CACHE_CHANNELS * CONV1_LEFT_PAD),
-        [1, PADDING_CACHE_CHANNELS, CONV1_LEFT_PAD],
-    );
+    const enc_padding_cache = new Tensor(padding_type, new padding_cls(PADDING_CACHE_CHANNELS * CONV1_LEFT_PAD), [
+        1,
+        PADDING_CACHE_CHANNELS,
+        CONV1_LEFT_PAD,
+    ]);
 
     // Set up iterator from input_features
     const chunks_iter = input_features[Symbol.asyncIterator]?.() ?? input_features[Symbol.iterator]?.();
