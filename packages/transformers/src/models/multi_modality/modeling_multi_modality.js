@@ -1,4 +1,4 @@
-import { PreTrainedModel, decoder_forward } from '../modeling_utils.js';
+import { PreTrainedModel, decoder_forward, setNumLogitsToKeep } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
 import { RawImage } from '../../utils/image.js';
@@ -73,12 +73,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         const has_past_key_values = !!model_inputs.past_key_values;
 
-        // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
-        // avoids computing logits for the entire sequence, significantly reducing memory usage.
-        const session = this.sessions['model'];
-        if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
-            model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
-        }
+        setNumLogitsToKeep(this, model_inputs, 1n);
 
         if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
             if (has_past_key_values) {

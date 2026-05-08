@@ -1,4 +1,9 @@
-import { PreTrainedModel, cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
+import {
+    PreTrainedModel,
+    cumsum_masked_fill,
+    default_merge_input_ids_with_image_features,
+    setNumLogitsToKeep,
+} from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
@@ -285,19 +290,14 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     }
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
-        const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
-
-        // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
-        // avoids computing logits for the entire sequence, significantly reducing memory usage.
-        if (session.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
-            model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
-        }
+        setNumLogitsToKeep(this, model_inputs, 1n);
 
         // Overwritten -- in specific circumstances we don't want to forward image inputs to the model
         if (!model_inputs.attention_mask || model_inputs.position_ids) {
             return model_inputs;
         }
 
+        const session = this.sessions['decoder_model_merged'] ?? this.sessions['model'];
         if (!session.inputNames.includes('position_ids')) {
             return model_inputs;
         }
