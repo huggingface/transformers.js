@@ -973,7 +973,7 @@ export class Tensor {
  */
 function reshape(data, dimensions) {
     const totalElements = data.length;
-    const dimensionSize = dimensions.reduce((a, b) => a * b);
+    const dimensionSize = dimensions.length === 0 ? 1 : dimensions.reduce((a, b) => a * b);
 
     if (totalElements !== dimensionSize) {
         throw Error(`cannot reshape array of size ${totalElements} into shape (${dimensions})`);
