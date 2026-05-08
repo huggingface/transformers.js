@@ -556,7 +556,8 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // global pending-load map for concurrent request deduplication.
     const key = getLoadKey(path_or_repo_id, filename, fatal, options, return_path);
     const scopedLoads = getProgressCallbackLoads(options.progress_callback);
-    const pending = scopedLoads?.get(key) ?? (scopedLoads ? undefined : INFLIGHT_LOADS.get(key));
+    const loads = scopedLoads ?? INFLIGHT_LOADS;
+    const pending = loads.get(key);
     if (pending) {
         return await pending;
     }
@@ -572,27 +573,20 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         const cache = await getCache(options?.cache_dir);
         return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
     })();
+    loads.set(key, loadPromise);
 
-    const promise = loadPromise.then(
-        (result) => {
-            if (INFLIGHT_LOADS.get(key) === promise) {
-                INFLIGHT_LOADS.delete(key);
-            }
-            return result;
-        },
-        (err) => {
-            if (INFLIGHT_LOADS.get(key) === promise) {
-                INFLIGHT_LOADS.delete(key);
-            }
-            scopedLoads?.delete(key);
-            throw err;
-        },
-    );
-    if (!scopedLoads) {
-        INFLIGHT_LOADS.set(key, promise);
+    try {
+        return await loadPromise;
+    } catch (err) {
+        if (loads.get(key) === loadPromise) {
+            loads.delete(key);
+        }
+        throw err;
+    } finally {
+        if (!scopedLoads && loads.get(key) === loadPromise) {
+            loads.delete(key);
+        }
     }
-    scopedLoads?.set(key, promise);
-    return await promise;
 }
 
 /**
