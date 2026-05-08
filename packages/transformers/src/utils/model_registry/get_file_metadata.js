@@ -5,7 +5,7 @@
 import { env } from '../../env.js';
 import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
-import { isValidUrl } from '../hub/utils.js';
+import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
 import { memoizePromise } from '../memoize_promise.js';
 
@@ -51,13 +51,7 @@ async function fetch_file_head(urlOrPath) {
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
 export function get_file_metadata(path_or_repo_id, filename, options = {}) {
-    const key = JSON.stringify([
-        path_or_repo_id,
-        filename,
-        options?.revision,
-        options?.cache_dir,
-        options?.local_files_only,
-    ]);
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
     return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
 }
 
