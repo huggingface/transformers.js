@@ -8,7 +8,7 @@ import { apis, env } from '../env.js';
 import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
-import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
+import { handleError, isValidUrl, pathJoin, isValidHfModelId, makePretrainedOptionsKey, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
@@ -480,28 +480,6 @@ const INFLIGHT_LOADS = new Map();
 const PROGRESS_CALLBACK_LOADS = new WeakMap();
 
 /**
- * Builds an internal key for memoizing a resource load.
- *
- * @param {string} path_or_repo_id
- * @param {string} filename
- * @param {boolean} fatal
- * @param {PretrainedOptions} options
- * @param {boolean} return_path
- * @returns {string}
- */
-function getLoadKey(path_or_repo_id, filename, fatal, options, return_path) {
-    return JSON.stringify([
-        path_or_repo_id,
-        filename,
-        options.revision ?? 'main',
-        fatal,
-        return_path,
-        options.cache_dir ?? null,
-        options.local_files_only ?? false,
-    ]);
-}
-
-/**
  * Gets the per-progress-callback file load map, if aggregate progress
  * tracking is active. Entries are scoped to the callback and become
  * collectible with it.
@@ -554,7 +532,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // Deduplicate loads of the same file within one aggregate progress
     // callback. Loads without aggregate progress tracking still use the
     // global pending-load map for concurrent request deduplication.
-    const key = getLoadKey(path_or_repo_id, filename, fatal, options, return_path);
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
     const scopedLoads = getProgressCallbackLoads(options.progress_callback);
     const loads = scopedLoads ?? INFLIGHT_LOADS;
     const pending = loads.get(key);
