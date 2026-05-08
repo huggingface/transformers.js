@@ -559,7 +559,10 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const scopedLoads = getProgressCallbackLoads(options.progress_callback);
     const pending = scopedLoads?.get(key) ?? INFLIGHT_LOADS.get(key);
     if (pending) {
-        scopedLoads?.set(key, pending);
+        if (scopedLoads && !scopedLoads.has(key)) {
+            pending.catch(() => scopedLoads.delete(key));
+            scopedLoads.set(key, pending);
+        }
         return await pending;
     }
 
