@@ -476,29 +476,6 @@ export async function loadResourceFile(
 /** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
 
-/** @type {WeakMap<DefaultProgressCallback, Map<string, Promise<string|Uint8Array|null>>>} */
-const PROGRESS_CALLBACK_LOADS = new WeakMap();
-
-/**
- * Gets the per-progress-callback file load map, if aggregate progress
- * tracking is active. Entries are scoped to the callback and become
- * collectible with it.
- *
- * @param {import('./core.js').ProgressCallback | null | undefined} progress_callback
- * @returns {Map<string, Promise<string|Uint8Array|null>> | undefined}
- */
-function getProgressCallbackLoads(progress_callback) {
-    if (!(progress_callback instanceof DefaultProgressCallback)) {
-        return undefined;
-    }
-    let loads = PROGRESS_CALLBACK_LOADS.get(progress_callback);
-    if (!loads) {
-        loads = new Map();
-        PROGRESS_CALLBACK_LOADS.set(progress_callback, loads);
-    }
-    return loads;
-}
-
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
  * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
@@ -529,42 +506,31 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
-    // Deduplicate loads of the same file within one aggregate progress
-    // callback. Loads without aggregate progress tracking still use the
-    // global pending-load map for concurrent request deduplication.
+    // Deduplicate loads of the same file. When an aggregate progress callback
+    // is active, scope dedup to its `loads` map so concurrent and sequential
+    // sibling calls within one pipeline() share a single download (and a
+    // single `initiate` event). Otherwise fall back to the global in-flight
+    // map for concurrent dedup, with entries cleared on settle.
     const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
-    const scopedLoads = getProgressCallbackLoads(options.progress_callback);
-    const loads = scopedLoads ?? INFLIGHT_LOADS;
-    const pending = loads.get(key);
-    if (pending) {
-        return await pending;
-    }
-
-    dispatchCallback(options.progress_callback, {
-        status: 'initiate',
-        name: path_or_repo_id,
-        file: filename,
-    });
-
-    const loadPromise = (async () => {
-        /** @type {import('./cache.js').CacheInterface | null} */
-        const cache = await getCache(options?.cache_dir);
-        return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
-    })();
-    loads.set(key, loadPromise);
-
-    try {
-        return await loadPromise;
-    } catch (err) {
-        if (loads.get(key) === loadPromise) {
-            loads.delete(key);
+    const { progress_callback } = options;
+    const loads = progress_callback instanceof DefaultProgressCallback ? progress_callback.loads : INFLIGHT_LOADS;
+    let pending = loads.get(key);
+    if (!pending) {
+        dispatchCallback(progress_callback, {
+            status: 'initiate',
+            name: path_or_repo_id,
+            file: filename,
+        });
+        pending = (async () => {
+            const cache = await getCache(options?.cache_dir);
+            return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
+        })();
+        if (loads === INFLIGHT_LOADS) {
+            pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
         }
-        throw err;
-    } finally {
-        if (!scopedLoads && loads.get(key) === loadPromise) {
-            loads.delete(key);
-        }
+        loads.set(key, pending);
     }
+    return await pending;
 }
 
 /**
