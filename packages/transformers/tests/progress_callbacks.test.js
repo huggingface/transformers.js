@@ -155,11 +155,8 @@ describe("Progress Callbacks", () => {
         // Each file should be loaded exactly once: pipeline() must not double-fetch
         // tokenizer.json/tokenizer_config.json/preprocessor_config.json that the
         // tokenizer and processor would otherwise each load independently.
-        const initiateCounts = {};
-        for (const e of events.filter((x) => x.status === "initiate")) {
-          initiateCounts[e.file] = (initiateCounts[e.file] ?? 0) + 1;
-        }
-        expect(initiateCounts).toEqual(Object.fromEntries(expectedFiles.map((f) => [f, 1])));
+        const initiated = events.filter((e) => e.status === "initiate").map((e) => e.file);
+        expect(initiated.sort()).toEqual([...expectedFiles].sort());
 
         expectValidEventLifecycle(events, model_id, expectedFiles);
 

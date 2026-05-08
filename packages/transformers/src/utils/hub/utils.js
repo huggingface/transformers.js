@@ -72,9 +72,9 @@ export function isValidHfModelId(string) {
 export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
     return JSON.stringify([
         model_id,
-        options?.revision ?? 'main',
-        options?.cache_dir ?? null,
-        options?.local_files_only ?? false,
+        options.revision ?? 'main',
+        options.cache_dir ?? null,
+        options.local_files_only ?? false,
         ...parts,
     ]);
 }

@@ -521,10 +521,9 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             name: path_or_repo_id,
             file: filename,
         });
-        pending = (async () => {
-            const cache = await getCache(options?.cache_dir);
-            return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
-        })();
+        pending = getCache(options?.cache_dir).then((cache) =>
+            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache),
+        );
         if (loads === INFLIGHT_LOADS) {
             pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
         }
