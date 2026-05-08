@@ -1351,6 +1351,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {DynamicCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
+ * @param {Tensor} [params.num_logits_to_keep=null]
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
@@ -1375,6 +1376,7 @@ export async function generic_text_to_text_forward(
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Additional parameters
         ...kwargs
@@ -1452,6 +1454,7 @@ export async function generic_text_to_text_forward(
             position_ids,
             generation_config,
             logits_processor,
+            num_logits_to_keep,
         },
         true,
     );
