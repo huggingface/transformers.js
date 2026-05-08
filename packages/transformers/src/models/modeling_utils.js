@@ -1607,6 +1607,13 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
         input_ids = input_ids.map((x) => [x.at(-1)]);
     }
 
+    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
+    // avoids computing logits for the entire sequence, significantly reducing memory usage.
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
+    }
+
     return {
         ...model_inputs,
         decoder_input_ids: toI64Tensor(input_ids),
