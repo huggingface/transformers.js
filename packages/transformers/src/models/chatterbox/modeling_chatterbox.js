@@ -49,6 +49,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Speaker embeddings/features (useful for re-using pre-computed speaker data)
         audio_features = null, // float32[batch_size,sequence_length,1024]
@@ -118,6 +119,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
                 attention_mask,
                 generation_config,
                 logits_processor,
+                num_logits_to_keep,
             },
             false,
         );
