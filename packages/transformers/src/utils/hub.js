@@ -502,9 +502,9 @@ function getLoadKey(path_or_repo_id, filename, fatal, options, return_path) {
 }
 
 /**
- * Gets the per-progress-callback file load map. Unlike INFLIGHT_LOADS,
- * this can retain resolved loads for the lifetime of one aggregate progress
- * callback so repeated component loads do not replay per-file progress events.
+ * Gets the per-progress-callback file load map, if aggregate progress
+ * tracking is active. Entries are scoped to the callback and become
+ * collectible with it.
  *
  * @param {import('./core.js').ProgressCallback | null | undefined} progress_callback
  * @returns {Map<string, Promise<string|Uint8Array|null>> | undefined}
@@ -551,18 +551,13 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
-    // Deduplicate concurrent loads of the same file so progress events are
-    // only emitted by a single download. Without this, parallel callers
-    // (e.g. tokenizer + processor in pipeline()) would race on the same file
-    // and produce interleaved progress that breaks monotonic progress_total.
+    // Deduplicate loads of the same file within one aggregate progress
+    // callback. Loads without aggregate progress tracking still use the
+    // global pending-load map for concurrent request deduplication.
     const key = getLoadKey(path_or_repo_id, filename, fatal, options, return_path);
     const scopedLoads = getProgressCallbackLoads(options.progress_callback);
-    const pending = scopedLoads?.get(key) ?? INFLIGHT_LOADS.get(key);
+    const pending = scopedLoads?.get(key) ?? (scopedLoads ? undefined : INFLIGHT_LOADS.get(key));
     if (pending) {
-        if (scopedLoads && !scopedLoads.has(key)) {
-            pending.catch(() => scopedLoads.delete(key));
-            scopedLoads.set(key, pending);
-        }
         return await pending;
     }
 
@@ -572,20 +567,30 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         file: filename,
     });
 
-    /** @type {import('./cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir);
-    const promise = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
+    const loadPromise = (async () => {
+        /** @type {import('./cache.js').CacheInterface | null} */
+        const cache = await getCache(options?.cache_dir);
+        return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
+    })();
+
+    const promise = loadPromise.then(
         (result) => {
-            INFLIGHT_LOADS.delete(key);
+            if (INFLIGHT_LOADS.get(key) === promise) {
+                INFLIGHT_LOADS.delete(key);
+            }
             return result;
         },
         (err) => {
-            INFLIGHT_LOADS.delete(key);
+            if (INFLIGHT_LOADS.get(key) === promise) {
+                INFLIGHT_LOADS.delete(key);
+            }
             scopedLoads?.delete(key);
             throw err;
         },
     );
-    INFLIGHT_LOADS.set(key, promise);
+    if (!scopedLoads) {
+        INFLIGHT_LOADS.set(key, promise);
+    }
     scopedLoads?.set(key, promise);
     return await promise;
 }
