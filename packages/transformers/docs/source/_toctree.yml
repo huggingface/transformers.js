@@ -69,6 +69,8 @@
           title: Stopping Criteria
         - local: api/generation/streamers
           title: Streamers
+        - local: api/generation/cache
+          title: Cache
       title: Generation
       isExpanded: false
     - sections:

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import path from "node:path";
+
+import { buildReadme } from "./build_readme.js";
 import { generateApiDocs } from "./lib/generate-api.mjs";
 import { generateSkillDocs } from "./lib/generate-skill.mjs";
 import { loadProject } from "./lib/load.mjs";
@@ -10,6 +13,8 @@ const project = loadProject(packageRoot);
 
 generateApiDocs({ project });
 generateSkillDocs({ project });
+const readmePath = buildReadme({ project });
+console.log(`wrote ${path.relative(process.cwd(), readmePath)}`);
 
 const validation = validateGeneratedDocs();
 console.log(formatValidationResult(validation));

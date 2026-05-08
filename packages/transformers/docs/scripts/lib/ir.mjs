@@ -158,7 +158,6 @@ function ingest(entities, mod) {
       name: cls.name,
       description,
       examples,
-      skillExamples: tagsOf(cls, "skillExample").map((t) => t.task),
       members: cls.members.filter((m) => !isPrivate(m)).map(buildMember),
       callable: null,
     });
@@ -258,7 +257,6 @@ function buildCallable(fn) {
       .map((t) => ({ name: t.name, type: t.type }))
       .filter((t) => t.name),
     examples,
-    skillExamples: tagsOf(fn, "skillExample").map((t) => t.task),
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
   };
 }
@@ -274,10 +272,14 @@ function attachClassCallables(modules) {
       const source = callback ?? (callMember && hasCallableShape(callMember) ? callMember : null);
       if (!source) continue;
 
+      // Promote the `_call` / `Callback` description onto the synthesized
+      // signature so the rendered `Foo(...)` line carries prose explaining
+      // what calling the instance does. Without this the page shows only the
+      // bare signature.
       cls.callable = {
         ...normalizeCallable(source),
         name: cls.name,
-        description: "",
+        description: source.description ?? "",
         deprecated: false,
       };
     }
@@ -294,7 +296,6 @@ function normalizeCallable(callable) {
     throws: cloned.throws ?? [],
     templates: cloned.templates ?? [],
     examples: cloned.examples ?? [],
-    skillExamples: cloned.skillExamples ?? [],
   };
 }
 
@@ -314,7 +315,6 @@ function parseCallableTypedef(td) {
     throws: [],
     templates: parsed.templates,
     examples: [],
-    skillExamples: [],
     deprecated: false,
   };
 }

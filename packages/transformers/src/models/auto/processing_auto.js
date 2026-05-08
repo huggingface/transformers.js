@@ -16,7 +16,7 @@ import * as AllFeatureExtractors from '../feature_extractors.js';
 
 /**
  * Loads a processor from a pretrained id. Unlike `AutoImageProcessor` and
- * `AutoFeatureExtractor`, `AutoProcessor` returns a multi-modal [`Processor`](#processor)
+ * `AutoFeatureExtractor`, `AutoProcessor` returns a multi-modal {@link Processor}
  * that bundles together a tokenizer, image processor, and/or feature extractor
  * — use it when a single model needs more than one.
  *

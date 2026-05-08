@@ -391,10 +391,6 @@ function finalize(lines) {
   );
 }
 
-function filterPublic(items, publicNames) {
-  return publicNames ? items.filter((it) => publicNames.has(it.name)) : items;
-}
-
 function aliasesFor(taskId, tasks) {
   return [...tasks.aliases.entries()].filter(([, t]) => t === taskId).map(([a]) => a);
 }

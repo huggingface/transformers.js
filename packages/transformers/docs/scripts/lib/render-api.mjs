@@ -8,10 +8,15 @@ import path from "node:path";
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
+// Pages with at least this many top-level items get an "On this page" TOC so
+// the reader doesn't have to scroll an entire page to find a class.
+const TOC_THRESHOLD = 6;
+
 export function renderModule(mod, ir, opts = {}) {
   const publicNames = opts.publicNames ?? null;
   const ctx = {
     typedefIndex: ir.typedefIndex,
+    allModules: ir.modules,
     moduleName: mod.name,
     renderedNames: buildRenderedNameIndex(ir, publicNames),
     callableLinks: buildCallableLinkIndex(ir, publicNames),
@@ -25,6 +30,8 @@ export function renderModule(mod, ir, opts = {}) {
   out.push(`# ${mod.name}`, "");
   if (mod.description) out.push(mod.description.trim(), "");
   for (const ex of mod.examples) out.push(...renderExample(ex));
+
+  out.push(...renderTOC({ classes, functions, constants }, ctx));
 
   if (classes.length) {
     out.push("## Classes", "");
@@ -53,6 +60,29 @@ export function renderModule(mod, ir, opts = {}) {
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd() + "\n"
   );
+}
+
+// Render a one-line "On this page" TOC, but only when the page is large
+// enough to make scrolling expensive. We list classes, functions, and
+// constants — typedefs and callbacks are usually a much longer tail and
+// would dominate the TOC; readers can find them via the section heading.
+function renderTOC({ classes, functions, constants }, ctx) {
+  const total = classes.length + functions.length + constants.length;
+  if (total < TOC_THRESHOLD) return [];
+
+  const groups = [
+    ["Classes", classes, (c) => apiSymbolAnchor(ctx.moduleName, c.name)],
+    ["Functions", functions, (f) => apiSymbolAnchor(ctx.moduleName, f.name)],
+    ["Constants", constants, (c) => apiSymbolAnchor(ctx.moduleName, c.name)],
+  ];
+
+  const lines = ["## On this page", ""];
+  for (const [title, items, anchorOf] of groups) {
+    if (!items.length) continue;
+    const links = items.map((it) => `[\`${it.name}\`](#${anchorOf(it)})`).join(" · ");
+    lines.push(`**${title}** — ${links}`, "");
+  }
+  return lines;
 }
 
 function buildRenderedNameIndex(ir, publicNames) {
@@ -252,9 +282,39 @@ function renderParamNode(p, ctx, indent) {
   const type = p.type ? ` (${renderType(p.type, ctx)})` : "";
   const opt = p.optional ? " _optional_" : "";
   const def = p.defaultValue != null ? ` — defaults to \`${p.defaultValue}\`` : "";
-  const desc = p.description ? ` — ${indentContinuations(p.description.trim(), contPad)}` : "";
+  // Fall back to the referenced typedef's first-sentence description when the
+  // author didn't write one inline. Without this, parameters typed as a named
+  // typedef render as a bare `- name (Type) optional` with no prose hint.
+  const fallback = p.description ? null : typedefSummary(p.type, ctx);
+  const descText = p.description?.trim() || fallback;
+  const desc = descText ? ` — ${indentContinuations(descText, contPad)}` : "";
   const line = `${pad}- \`${simpleName(p.name)}\`${type}${opt}${def}${desc}`;
   return [line, ...p.children.flatMap((c) => renderParamNode(c, ctx, indent + 1))];
+}
+
+// Look up the named typedef for a parameter's type and return the first
+// sentence of its description, if any. Skips obvious wrappers (unions,
+// arrays, generics) to avoid misleading borrows.
+function typedefSummary(rawType, ctx) {
+  if (!rawType || !ctx.typedefIndex) return null;
+  const pretty = prettifyTypeString(rawType);
+  if (!SIMPLE_NAME.test(pretty)) return null;
+  const moduleName = ctx.typedefIndex.get(pretty);
+  if (!moduleName) return null;
+  const mod = ctx.allModules?.find?.((m) => m.name === moduleName);
+  const def = mod?.typedefs.find((t) => t.name === pretty) ?? mod?.callbacks.find((c) => c.name === pretty);
+  if (!def?.description) return null;
+  return firstSentenceShort(def.description);
+}
+
+function firstSentenceShort(text) {
+  const collapsed = text
+    .split(/\n\s*\n/, 1)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  const m = collapsed.match(/^(.+?[.!?])(?=\s|$)/);
+  const sentence = (m ? m[1] : collapsed).trim();
+  return sentence.endsWith(".") || sentence.endsWith("!") || sentence.endsWith("?") ? sentence : sentence + ".";
 }
 
 // Indent every line after the first so multi-line descriptions (including
@@ -374,7 +434,13 @@ export function renderType(raw, ctx, opts = {}) {
   const unionParts = splitTopLevel(pretty, "|")
     .map((p) => p.trim())
     .filter((p) => !/^_[A-Za-z]/.test(p));
-  if (unionParts.length > 1) return unionParts.map((p) => renderType(p, ctx)).join(" | ");
+  if (unionParts.length > 1) {
+    // Common shorthand `T | T[]` (in either order) — collapse to a single link
+    // marked as "single or array" so the reader doesn't see two identical links.
+    const collapsed = collapseSingleOrArray(unionParts, ctx);
+    if (collapsed) return collapsed;
+    return unionParts.map((p) => renderType(p, ctx)).join(" | ");
+  }
   if (unionParts.length === 1 && unionParts[0] !== pretty.trim()) return renderType(unionParts[0], ctx);
 
   // Same for intersections (`A & B`): drop internal variants before joining.
@@ -433,6 +499,26 @@ function renderArrayType(innerRaw, ctx) {
   const rendered = renderType(innerRaw, ctx);
   const code = rendered.match(/^`([^`]+)`$/);
   return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
+}
+
+// `T | T[]` (in either order) collapses to one link with a `[]?` suffix —
+// readers don't have to chase two identical-looking links to learn it accepts
+// either a single value or an array. Returns null when the union doesn't
+// match the shape. The single rendered link/text gets `[]?` appended:
+// `Foo` → `` `Foo[]?` ``, `[`Foo`](url)` → `[`Foo[]?`](url)`.
+function collapseSingleOrArray(parts, ctx) {
+  if (parts.length !== 2) return null;
+  const arrayPart = parts.find((p) => p.endsWith("[]"));
+  const singlePart = parts.find((p) => !p.endsWith("[]"));
+  if (!arrayPart || !singlePart) return null;
+  if (arrayPart.slice(0, -2).trim() !== singlePart.trim()) return null;
+  const inner = renderType(singlePart, ctx);
+  // Linked form `[`Name`](url)` — splice `[]?` into the label.
+  const linked = inner.match(/^\[`([^`]+)`\]\(([^)]+)\)$/);
+  if (linked) return `[\`${linked[1]}[]?\`](${linked[2]})`;
+  const code = inner.match(/^`([^`]+)`$/);
+  if (code) return `\`${code[1]}[]?\``;
+  return `${inner}[]?`;
 }
 
 function renderTupleType(innerRaw, ctx) {

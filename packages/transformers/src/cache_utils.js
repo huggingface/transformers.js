@@ -1,5 +1,9 @@
 /**
- * @module models
+ * @file Cache classes used by `generate()` to preserve and reuse decoder
+ * past key/value tensors across calls. Pass a `DynamicCache` through
+ * generation options when you need to persist KV state between turns.
+ *
+ * @module generation/cache
  */
 
 import { Tensor } from './utils/tensor.js';

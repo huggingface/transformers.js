@@ -4,10 +4,7 @@ import url from "node:url";
 
 import { DOCS_BASE_URL, buildApiSymbolLinks } from "./lib/api-links.mjs";
 import { loadProject } from "./lib/load.mjs";
-
-const scriptFile = url.fileURLToPath(import.meta.url);
-const docsDir = path.dirname(path.dirname(scriptFile));
-const packageRoot = path.dirname(docsDir);
+import { packageRoot } from "./lib/paths.mjs";
 
 const FILES_TO_INCLUDE = {
   intro: "./docs/snippets/0_introduction.snippet",
@@ -30,15 +27,26 @@ const CUSTOM_LINK_MAP = {
   "./guides/dtypes": `${DOCS_BASE_URL}/guides/dtypes`,
 };
 
-function main() {
-  const { out } = parseArgs(process.argv.slice(2));
-  const { ir, publicNames } = loadProject(packageRoot);
+// Default output: the repo root README. Resolved relative to packageRoot
+// (`packages/transformers`) so the path works from any cwd.
+const DEFAULT_README_OUT = "../../README.md";
+
+export function buildReadme({ project, out = DEFAULT_README_OUT } = {}) {
+  const { ir, publicNames } = project ?? loadProject(packageRoot);
   const apiLinks = buildApiSymbolLinks(ir, publicNames);
   const snippets = Object.fromEntries(Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]));
 
   snippets.customUsage = demoteHeadings(snippets.customUsage);
   const readme = fixLinks(renderTemplate(snippets), apiLinks);
-  fs.writeFileSync(path.resolve(packageRoot, out), readme, "utf8");
+  const target = path.resolve(packageRoot, out);
+  fs.writeFileSync(target, readme, "utf8");
+  return target;
+}
+
+function main() {
+  const { out } = parseArgs(process.argv.slice(2));
+  const target = buildReadme({ out });
+  console.log(`wrote ${path.relative(process.cwd(), target)}`);
 }
 
 function parseArgs(args) {
@@ -48,7 +56,7 @@ function parseArgs(args) {
   }
 
   return {
-    out: outIndex === -1 ? "README.md" : args[outIndex + 1],
+    out: outIndex === -1 ? DEFAULT_README_OUT : args[outIndex + 1],
   };
 }
 
@@ -89,7 +97,7 @@ ${customUsage}
 
 ## Supported tasks/models
 
-Here is the list of all tasks and architectures currently supported by Transformers.js. If you don't see your task/model listed here or it is not yet supported, feel free to open up a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
+Here is the list of all tasks and architectures currently supported by Transformers.js. If you don't see your task/model listed here or it is not yet supported, feel free to open a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
 
 To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)). You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
 
@@ -119,4 +127,6 @@ function fixLinks(markdown, apiLinks) {
   });
 }
 
-main();
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+  main();
+}

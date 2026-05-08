@@ -48,9 +48,12 @@ which generates:
   `packages/transformers/src/**/*.js`.
 - Generated sections in `.ai/skills/transformers-js/SKILL.md`.
 - `.ai/skills/transformers-js/references/TASKS.md`.
+- The repo-root `README.md` from `packages/transformers/docs/snippets/*.snippet`.
 
-Do not edit generated API pages or generated skill reference files by hand. Update
-the source JSDoc, docs snippets, or generator modules instead.
+Do not edit generated API pages, the generated skill reference files, or the
+root README by hand. Update the source JSDoc, docs snippets, or generator
+modules instead.
 
 The generator also validates generated API pages against `docs/source/_toctree.yml`
-and checks local Markdown links and anchors under `docs/source/`.
+and checks local Markdown links and anchors under `docs/source/`. To run only
+the validator (without regenerating), use `pnpm --filter @huggingface/transformers docs-validate`.

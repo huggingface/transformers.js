@@ -95,12 +95,6 @@ function parseTag(raw) {
       return { tag, description: rest.trim() };
     case "example":
       return { tag, body: rest };
-    case "skillExample":
-      return { tag, task: rest.trim() };
-    case "skillCategory":
-      return { tag, slug: rest.trim() };
-    case "doctest":
-      return { tag };
     default:
       return { tag, type, description: rest.trim() };
   }
