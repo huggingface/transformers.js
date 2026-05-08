@@ -5,10 +5,10 @@
  */
 
 import { apis, env } from '../env.js';
-import { dispatchCallback } from './core.js';
+import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
-import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
+import { handleError, isValidUrl, pathJoin, isValidHfModelId, makePretrainedOptionsKey, readResponse } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
@@ -473,7 +473,7 @@ export async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
-/** @type {Map<string, Promise<string|Uint8Array>>} In-flight file loads keyed by repo+filename. */
+/** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
 
 /**
@@ -506,32 +506,28 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
-    dispatchCallback(options.progress_callback, {
-        status: 'initiate',
-        name: path_or_repo_id,
-        file: filename,
-    });
-
-    // Deduplicate concurrent loads of the same file so progress events are
-    // only emitted by a single download. Without this, parallel callers
-    // (e.g. tokenizer + processor in pipeline()) would race on the same file
-    // and produce interleaved progress that breaks monotonic progress_total.
-    const key = `${path_or_repo_id}::${filename}`;
-    let pending = INFLIGHT_LOADS.get(key);
+    // Deduplicate loads of the same file. When an aggregate progress callback
+    // is active, scope dedup to its `loads` map so concurrent and sequential
+    // sibling calls within one pipeline() share a single download (and a
+    // single `initiate` event). Otherwise fall back to the global in-flight
+    // map for concurrent dedup, with entries cleared on settle.
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
+    const { progress_callback } = options;
+    const loads = progress_callback instanceof DefaultProgressCallback ? progress_callback.loads : INFLIGHT_LOADS;
+    let pending = loads.get(key);
     if (!pending) {
-        /** @type {import('./cache.js').CacheInterface | null} */
-        const cache = await getCache(options?.cache_dir);
-        pending = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
-            (result) => {
-                INFLIGHT_LOADS.delete(key);
-                return result;
-            },
-            (err) => {
-                INFLIGHT_LOADS.delete(key);
-                throw err;
-            },
+        dispatchCallback(progress_callback, {
+            status: 'initiate',
+            name: path_or_repo_id,
+            file: filename,
+        });
+        pending = getCache(options.cache_dir).then((cache) =>
+            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache),
         );
-        INFLIGHT_LOADS.set(key, pending);
+        if (loads === INFLIGHT_LOADS) {
+            pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
+        }
+        loads.set(key, pending);
     }
     return await pending;
 }

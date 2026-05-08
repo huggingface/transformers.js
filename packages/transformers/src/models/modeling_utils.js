@@ -1189,6 +1189,8 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
                 .replace('present_ssm', 'past_ssm') // Mamba
                 .replace('present_conv', 'past_conv') // LFM2
                 .replace('present_recurrent', 'past_recurrent') // Qwen3.5
+                .replace('present_compressor', 'past_compressor') // Deepseek V4
+                .replace('present_indexer', 'past_indexer') // Deepseek V4
 
                 // Standard cache architecture
                 .replace('present', 'past_key_values');

@@ -208,11 +208,12 @@ function getNormalizedConfig(config) {
             break;
         case 'youtu':
         case 'deepseek_v3':
+        case 'deepseek_v4':
         case 'glm_moe_dsa':
         case 'mistral4':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
-            mapping['dim_kv'] = 'qk_head_dim';
+            mapping['dim_kv'] = config.model_type === 'deepseek_v4' ? 'head_dim' : 'qk_head_dim';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
 
@@ -332,7 +333,7 @@ export function getCacheNames(config, options) {
     }
 
     const pkv_prefix = options?.prefix ?? 'past_key_values';
-    const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+    const cache_prefix = pkv_prefix === 'present' ? 'present' : 'past';
     /** @type {Set<string>} */
     const names = new Set();
 
@@ -343,7 +344,7 @@ export function getCacheNames(config, options) {
                 names.add(`${pkv_prefix}.${i}.key`);
                 names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'conv') {
-                names.add(`${conv_prefix}_conv.${i}`);
+                names.add(`${cache_prefix}_conv.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
@@ -356,8 +357,8 @@ export function getCacheNames(config, options) {
 
         for (let i = 0; i < num_layers; ++i) {
             if (!layer_types || layer_types[i] === 'mamba') {
-                names.add(`${conv_prefix}_conv.${i}`);
-                names.add(`${conv_prefix}_ssm.${i}`);
+                names.add(`${cache_prefix}_conv.${i}`);
+                names.add(`${cache_prefix}_ssm.${i}`);
             }
             if (!layer_types || layer_types[i] === 'attention') {
                 names.add(`${pkv_prefix}.${i}.key`);
@@ -373,13 +374,13 @@ export function getCacheNames(config, options) {
                 names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'linear_attention') {
                 if (config.model_type === 'olmo_hybrid') {
-                    names.add(`${conv_prefix}_conv.${i}.key`);
-                    names.add(`${conv_prefix}_conv.${i}.value`);
-                    names.add(`${conv_prefix}_conv.${i}.query`);
+                    names.add(`${cache_prefix}_conv.${i}.key`);
+                    names.add(`${cache_prefix}_conv.${i}.value`);
+                    names.add(`${cache_prefix}_conv.${i}.query`);
                 } else {
-                    names.add(`${conv_prefix}_conv.${i}`);
+                    names.add(`${cache_prefix}_conv.${i}`);
                 }
-                names.add(`${conv_prefix}_recurrent.${i}`);
+                names.add(`${cache_prefix}_recurrent.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
@@ -396,6 +397,27 @@ export function getCacheNames(config, options) {
         for (let i = 0; i < num_kv_layers; ++i) {
             names.add(`${pkv_prefix}.${i}.key`);
             names.add(`${pkv_prefix}.${i}.value`);
+        }
+        return names;
+    } else if (config.model_type === 'deepseek_v4') {
+        const { layer_types, num_hidden_layers } = /** @type {any} */ (config);
+
+        for (let i = 0; i < num_hidden_layers; ++i) {
+            names.add(`${pkv_prefix}.${i}.key`);
+            names.add(`${pkv_prefix}.${i}.value`);
+
+            const layer_type = layer_types[i];
+            if (layer_type === 'compressed_sparse_attention') {
+                names.add(`${cache_prefix}_compressor.${i}.kv`);
+                names.add(`${cache_prefix}_compressor.${i}.gate`);
+                names.add(`${cache_prefix}_indexer.${i}.kv`);
+                names.add(`${cache_prefix}_indexer.${i}.gate`);
+            } else if (layer_type === 'heavily_compressed_attention') {
+                names.add(`${cache_prefix}_compressor.${i}.kv`);
+                names.add(`${cache_prefix}_compressor.${i}.gate`);
+            } else if (layer_type && layer_type !== 'sliding_attention') {
+                throw new Error(`Unsupported layer type: ${layer_type}`);
+            }
         }
         return names;
     } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {

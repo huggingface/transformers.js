@@ -5,7 +5,7 @@
 import { env } from '../../env.js';
 import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
-import { isValidUrl } from '../hub/utils.js';
+import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
 import { memoizePromise } from '../memoize_promise.js';
 
@@ -51,19 +51,7 @@ async function fetch_file_head(urlOrPath) {
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
 export function get_file_metadata(path_or_repo_id, filename, options = {}) {
-    // Normalize option fields to their defaults so that callers passing explicit
-    // defaults (e.g. revision='main', cache_dir=null, local_files_only=false)
-    // share the same memoize key as callers that omit those options entirely.
-    // Without normalization, pipeline() and loadResourceFile() compute different
-    // keys for the same file, causing _get_file_metadata to run (and re-fetch)
-    // once per call site instead of being deduplicated.
-    const key = JSON.stringify([
-        path_or_repo_id,
-        filename,
-        options?.revision ?? 'main',
-        options?.cache_dir ?? null,
-        options?.local_files_only ?? false,
-    ]);
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
     return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
 }
 
