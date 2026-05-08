@@ -473,7 +473,7 @@ export async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
-/** @type {Map<string, Promise<string|Uint8Array|null>>} In-flight file loads keyed by resource identity. */
+/** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
 
 /** @type {WeakMap<DefaultProgressCallback, Map<string, Promise<string|Uint8Array|null>>>} */
@@ -502,7 +502,9 @@ function getLoadKey(path_or_repo_id, filename, fatal, options, return_path) {
 }
 
 /**
- * Gets the per-progress-callback file load map, if aggregate progress tracking is active.
+ * Gets the per-progress-callback file load map. Unlike INFLIGHT_LOADS,
+ * this can retain resolved loads for the lifetime of one aggregate progress
+ * callback so repeated component loads do not replay per-file progress events.
  *
  * @param {import('./core.js').ProgressCallback | null | undefined} progress_callback
  * @returns {Map<string, Promise<string|Uint8Array|null>> | undefined}
@@ -554,9 +556,10 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // (e.g. tokenizer + processor in pipeline()) would race on the same file
     // and produce interleaved progress that breaks monotonic progress_total.
     const key = getLoadKey(path_or_repo_id, filename, fatal, options, return_path);
-    const loadContext = getProgressCallbackLoads(options.progress_callback);
-    const pending = loadContext?.get(key) ?? INFLIGHT_LOADS.get(key);
+    const scopedLoads = getProgressCallbackLoads(options.progress_callback);
+    const pending = scopedLoads?.get(key) ?? INFLIGHT_LOADS.get(key);
     if (pending) {
+        scopedLoads?.set(key, pending);
         return await pending;
     }
 
@@ -575,12 +578,12 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         },
         (err) => {
             INFLIGHT_LOADS.delete(key);
-            loadContext?.delete(key);
+            scopedLoads?.delete(key);
             throw err;
         },
     );
     INFLIGHT_LOADS.set(key, promise);
-    loadContext?.set(key, promise);
+    scopedLoads?.set(key, promise);
     return await promise;
 }
 
