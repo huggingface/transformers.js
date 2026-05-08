@@ -5,7 +5,7 @@
  */
 
 import { apis, env } from '../env.js';
-import { dispatchCallback } from './core.js';
+import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
 import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
@@ -473,8 +473,51 @@ export async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
-/** @type {Map<string, Promise<string|Uint8Array>>} In-flight file loads keyed by repo+filename. */
+/** @type {Map<string, Promise<string|Uint8Array|null>>} In-flight file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
+
+/** @type {WeakMap<DefaultProgressCallback, Map<string, Promise<string|Uint8Array|null>>>} */
+const PROGRESS_CALLBACK_LOADS = new WeakMap();
+
+/**
+ * Builds an internal key for memoizing a resource load.
+ *
+ * @param {string} path_or_repo_id
+ * @param {string} filename
+ * @param {boolean} fatal
+ * @param {PretrainedOptions} options
+ * @param {boolean} return_path
+ * @returns {string}
+ */
+function getLoadKey(path_or_repo_id, filename, fatal, options, return_path) {
+    return JSON.stringify([
+        path_or_repo_id,
+        filename,
+        options.revision ?? 'main',
+        fatal,
+        return_path,
+        options.cache_dir ?? null,
+        options.local_files_only ?? false,
+    ]);
+}
+
+/**
+ * Gets the per-progress-callback file load map, if aggregate progress tracking is active.
+ *
+ * @param {import('./core.js').ProgressCallback | null | undefined} progress_callback
+ * @returns {Map<string, Promise<string|Uint8Array|null>> | undefined}
+ */
+function getProgressCallbackLoads(progress_callback) {
+    if (!(progress_callback instanceof DefaultProgressCallback)) {
+        return undefined;
+    }
+    let loads = PROGRESS_CALLBACK_LOADS.get(progress_callback);
+    if (!loads) {
+        loads = new Map();
+        PROGRESS_CALLBACK_LOADS.set(progress_callback, loads);
+    }
+    return loads;
+}
 
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
@@ -506,34 +549,39 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
+    // Deduplicate concurrent loads of the same file so progress events are
+    // only emitted by a single download. Without this, parallel callers
+    // (e.g. tokenizer + processor in pipeline()) would race on the same file
+    // and produce interleaved progress that breaks monotonic progress_total.
+    const key = getLoadKey(path_or_repo_id, filename, fatal, options, return_path);
+    const loadContext = getProgressCallbackLoads(options.progress_callback);
+    const pending = loadContext?.get(key) ?? INFLIGHT_LOADS.get(key);
+    if (pending) {
+        return await pending;
+    }
+
     dispatchCallback(options.progress_callback, {
         status: 'initiate',
         name: path_or_repo_id,
         file: filename,
     });
 
-    // Deduplicate concurrent loads of the same file so progress events are
-    // only emitted by a single download. Without this, parallel callers
-    // (e.g. tokenizer + processor in pipeline()) would race on the same file
-    // and produce interleaved progress that breaks monotonic progress_total.
-    const key = `${path_or_repo_id}::${filename}`;
-    let pending = INFLIGHT_LOADS.get(key);
-    if (!pending) {
-        /** @type {import('./cache.js').CacheInterface | null} */
-        const cache = await getCache(options?.cache_dir);
-        pending = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
-            (result) => {
-                INFLIGHT_LOADS.delete(key);
-                return result;
-            },
-            (err) => {
-                INFLIGHT_LOADS.delete(key);
-                throw err;
-            },
-        );
-        INFLIGHT_LOADS.set(key, pending);
-    }
-    return await pending;
+    /** @type {import('./cache.js').CacheInterface | null} */
+    const cache = await getCache(options?.cache_dir);
+    const promise = loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache).then(
+        (result) => {
+            INFLIGHT_LOADS.delete(key);
+            return result;
+        },
+        (err) => {
+            INFLIGHT_LOADS.delete(key);
+            loadContext?.delete(key);
+            throw err;
+        },
+    );
+    INFLIGHT_LOADS.set(key, promise);
+    loadContext?.set(key, promise);
+    return await promise;
 }
 
 /**
