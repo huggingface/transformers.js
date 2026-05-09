@@ -9,7 +9,7 @@ export class SiglipPreTrainedModel extends PreTrainedModel {}
  * **Example:** Perform zero-shot image classification with a `SiglipModel`.
  *
  * ```javascript
- * import { AutoTokenizer, AutoProcessor, SiglipModel, RawImage } from '@huggingface/transformers';
+ * import { AutoTokenizer, AutoProcessor, SiglipModel, load_image } from '@huggingface/transformers';
  *
  * // Load tokenizer, processor, and model
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/siglip-base-patch16-224');
@@ -21,7 +21,7 @@ export class SiglipPreTrainedModel extends PreTrainedModel {}
  * const text_inputs = tokenizer(texts, { padding: 'max_length', truncation: true });
  *
  * // Read image and run processor
- * const image = await RawImage.read('http://images.cocodataset.org/val2017/000000039769.jpg');
+ * const image = await load_image('http://images.cocodataset.org/val2017/000000039769.jpg');
  * const image_inputs = await processor(image);
  *
  * // Run model with both text and pixel inputs
@@ -91,14 +91,14 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
  * **Example:** Compute vision embeddings with `SiglipVisionModel`.
  *
  * ```javascript
- * import { AutoProcessor, SiglipVisionModel, RawImage } from '@huggingface/transformers';
+ * import { AutoProcessor, SiglipVisionModel, load_image } from '@huggingface/transformers';
  *
  * // Load processor and vision model
  * const processor = await AutoProcessor.from_pretrained('Xenova/siglip-base-patch16-224');
  * const vision_model = await SiglipVisionModel.from_pretrained('Xenova/siglip-base-patch16-224');
  *
  * // Read image and run processor
- * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/football-match.jpg');
  * const image_inputs = await processor(image);
  *
  * // Compute embeddings

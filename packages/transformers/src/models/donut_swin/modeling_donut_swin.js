@@ -8,7 +8,7 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * **Example:** Step-by-step Document Parsing.
  *
  * ```javascript
- * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, RawImage } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, load_image } from '@huggingface/transformers';
  *
  * // Choose model to use
  * const model_id = 'Xenova/donut-base-finetuned-cord-v2';
@@ -16,7 +16,7 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * // Prepare image inputs
  * const processor = await AutoProcessor.from_pretrained(model_id);
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/receipt.png';
- * const image = await RawImage.read(url);
+ * const image = await load_image(url);
  * const image_inputs = await processor(image);
  *
  * // Prepare decoder inputs
@@ -43,7 +43,7 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * **Example:** Step-by-step Document Visual Question Answering (DocVQA)
  *
  * ```javascript
- * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, RawImage } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoTokenizer, AutoModelForVision2Seq, load_image } from '@huggingface/transformers';
  *
  * // Choose model to use
  * const model_id = 'Xenova/donut-base-finetuned-docvqa';
@@ -51,7 +51,7 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * // Prepare image inputs
  * const processor = await AutoProcessor.from_pretrained(model_id);
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/invoice.png';
- * const image = await RawImage.read(url);
+ * const image = await load_image(url);
  * const image_inputs = await processor(image);
  *
  * // Prepare decoder inputs

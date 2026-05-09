@@ -28,13 +28,13 @@ export class SamPreTrainedModel extends PreTrainedModel {}
  *
  * **Example:** Perform mask generation w/ `Xenova/sam-vit-base`.
  * ```javascript
- * import { SamModel, AutoProcessor, RawImage } from '@huggingface/transformers';
+ * import { SamModel, AutoProcessor, load_image } from '@huggingface/transformers';
  *
  * const model = await SamModel.from_pretrained('Xenova/sam-vit-base');
  * const processor = await AutoProcessor.from_pretrained('Xenova/sam-vit-base');
  *
  * const img_url = 'https://huggingface.co/ybelkada/segment-anything/resolve/main/assets/car.png';
- * const raw_image = await RawImage.read(img_url);
+ * const raw_image = await load_image(img_url);
  * const input_points = [[[450, 600]]] // 2D localization of a window
  *
  * const inputs = await processor(raw_image, { input_points });

@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages } from './_base.js';
 import { RawImage } from '../utils/image.js';
 
@@ -29,7 +33,7 @@ import { interpolate_4d } from '../utils/tensor.js';
 /**
  * Depth estimation pipeline using any `AutoModelForDepthEstimation`. This pipeline predicts the depth of an image.
  *
- * **Example:** Depth estimation w/ `onnx-community/depth-anything-v2-small`
+ * **Example:** Depth estimation with `onnx-community/depth-anything-v2-small`
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

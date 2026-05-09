@@ -47,14 +47,14 @@ export class ClapTextModelWithProjection extends ClapPreTrainedModel {
  * **Example:** Compute audio embeddings with `ClapAudioModelWithProjection`.
  *
  * ```javascript
- * import { AutoProcessor, ClapAudioModelWithProjection, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, ClapAudioModelWithProjection, load_audio } from '@huggingface/transformers';
  *
  * // Load processor and audio model
  * const processor = await AutoProcessor.from_pretrained('Xenova/clap-htsat-unfused');
  * const audio_model = await ClapAudioModelWithProjection.from_pretrained('Xenova/clap-htsat-unfused');
  *
  * // Read audio and run processor
- * const audio = await read_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cat_meow.wav');
+ * const audio = await load_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cat_meow.wav');
  * const audio_inputs = await processor(audio);
  *
  * // Compute embeddings

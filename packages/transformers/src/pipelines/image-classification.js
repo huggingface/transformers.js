@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor, topk } from '../utils/tensor.js';
@@ -16,7 +20,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {ImageClassificationSingle[]} ImageClassificationOutput
  *
  * @typedef {Object} ImageClassificationPipelineOptions Parameters specific to image classification pipelines.
- * @property {number} [top_k=1] The number of top labels that will be returned by the pipeline.
+ * @property {number} [top_k=5] The number of top labels to return. Set to `0` to return all labels.
  *
  * @typedef {ImagePipelineConstructorArgs & ImageClassificationPipelineCallback & Disposable} ImageClassificationPipelineType
  */
@@ -46,7 +50,7 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Classify an image and return top `n` classes.
+ * **Example:** Classify an image and return the top `n` classes.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

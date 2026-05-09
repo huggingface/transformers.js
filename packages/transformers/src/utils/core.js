@@ -1,8 +1,9 @@
 /**
- * @file Core utility functions/classes for Transformers.js.
+ * @file Shared types that describe model loading progress.
  *
- * These are only used internally, meaning an end-user shouldn't
- * need to access anything here.
+ * `ProgressInfo` and its discriminated-union variants describe the payload
+ * passed to a `progress_callback` so callers can render download UIs, log
+ * byte counts, and react to the `ready` event.
  *
  * @module utils/core
  */
@@ -11,22 +12,22 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} InitiateProgressInfo
- * @property {'initiate'} status
- * @property {string} name The model id or directory path.
+ * @property {'initiate'} status A file load is about to start.
+ * @property {string} name The model ID or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} DownloadProgressInfo
- * @property {'download'} status
- * @property {string} name The model id or directory path.
+ * @property {'download'} status A file download has started.
+ * @property {string} name The model ID or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} ProgressStatusInfo
- * @property {'progress'} status
- * @property {string} name The model id or directory path.
+ * @property {'progress'} status A file download has reported byte progress.
+ * @property {string} name The model ID or directory path.
  * @property {string} file The name of the file.
  * @property {number} progress A number between 0 and 100.
  * @property {number} loaded The number of bytes loaded.
@@ -47,8 +48,8 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} TotalProgressInfo
- * @property {'progress_total'} status
- * @property {string} name The model id or directory path.
+ * @property {'progress_total'} status Aggregate progress across all files being loaded.
+ * @property {string} name The model ID or directory path.
  * @property {number} progress A number between 0 and 100.
  * @property {number} loaded The number of bytes loaded.
  * @property {number} total The total number of bytes to be loaded.
@@ -57,14 +58,14 @@ import { Callable } from './generic.js';
 
 /**
  * @typedef {Object} DoneProgressInfo
- * @property {'done'} status
- * @property {string} name The model id or directory path.
+ * @property {'done'} status A file has finished loading.
+ * @property {string} name The model ID or directory path.
  * @property {string} file The name of the file.
  */
 
 /**
  * @typedef {Object} ReadyProgressInfo
- * @property {'ready'} status
+ * @property {'ready'} status The requested pipeline is ready to use.
  * @property {string} task The loaded task.
  * @property {string} model The loaded model.
  */

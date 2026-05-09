@@ -7,7 +7,7 @@ We'll also show you how to use the library in both CommonJS and ECMAScript modul
 - [ECMAScript modules (ESM)](#ecmascript-modules-esm) - The official standard format
   to package JavaScript code for reuse. It's the default module system in modern
   browsers, with modules imported using `import` and exported using `export`.
-  Fortunately, starting with version 13.2.0, Node.js has stable support of ES modules.
+  Fortunately, starting with version 13.2.0, Node.js has stable support for ES modules.
 - [CommonJS](#commonjs) - The default module system in Node.js. In this system,
   modules are imported using `require()` and exported using `module.exports`.
 
@@ -19,7 +19,7 @@ Although you can always use the [Python library](https://github.com/huggingface/
 
 **Useful links:**
 
-- Source code ([ESM](https://github.com/huggingface/transformers.js/tree/main/examples/node/esm/app.js) or [CommonJS](https://github.com/huggingface/transformers.js/tree/main/examples/node/commonjs/app.js))
+- Source code ([ESM](https://github.com/huggingface/transformers.js-examples/tree/main/node-esm) or [CommonJS](https://github.com/huggingface/transformers.js-examples/tree/main/node-cjs))
 - [Documentation](https://huggingface.co/docs/transformers.js)
 
 ## Prerequisites
@@ -38,7 +38,7 @@ npm i @huggingface/transformers
 
 Next, create a new file called `app.js`, which will be the entry point for our application. Depending on whether you're using [ECMAScript modules](#ecmascript-modules-esm) or [CommonJS](#commonjs), you will need to do some things differently (see below).
 
-We'll also create a helper class called `MyClassificationPipeline` control the loading of the pipeline. It uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and uses this pipeline for all subsequent calls:
+We'll also create a helper class called `MyClassificationPipeline` to control the loading of the pipeline. It uses the [singleton pattern](https://en.wikipedia.org/wiki/Singleton_pattern) to lazily create a single instance of the pipeline when `getInstance` is first called, and uses this pipeline for all subsequent calls:
 
 ### ECMAScript modules (ESM)
 

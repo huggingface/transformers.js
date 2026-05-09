@@ -1,8 +1,9 @@
 # Building a Next.js AI Chatbot with Vercel AI SDK
 
-In this tutorial, we'll build an in-browser AI chatbot using Next.js, Transformers.js, and the Vercel AI SDK v6. The chatbot runs entirely client-side with WebGPU acceleration &mdash; and supports tool calling with human approval.
+In this tutorial, we'll build an in-browser AI chatbot using Next.js, Transformers.js, and the Vercel AI SDK v6. The chatbot runs entirely client-side with WebGPU acceleration and supports tool calling with human approval.
 
 Useful links:
+
 - [Source code](https://github.com/huggingface/transformers.js-examples/tree/main/next-vercel-ai-sdk-v6-tool-calling)
 - [`@browser-ai/transformers-js` docs](https://www.browser-ai.dev/docs/ai-sdk-v6/transformers-js)
 - [Vercel AI SDK docs](https://ai-sdk.dev/)
@@ -30,7 +31,7 @@ npm install ai @ai-sdk/react @browser-ai/transformers-js @huggingface/transforme
 
 ## Step 2: Configure Next.js for browser inference
 
-Transformers.js uses ONNX Runtime under the hood for both browser and server-side (Node.js) inference.  In our case we only need the browser runtime so we can tell Next.js to exclude the Node.js-specific packages when bundling for the browser. Update `next.config.ts`
+Transformers.js uses ONNX Runtime under the hood for both browser and server-side (Node.js) inference. In this case, we only need the browser runtime, so we can tell Next.js to exclude Node.js-specific packages when bundling for the browser. Update `next.config.ts`:
 
 ```typescript
 import type { NextConfig } from "next";
@@ -53,7 +54,7 @@ export default nextConfig;
 
 ## Step 3: Create the Web Worker
 
-Running model inference on the main thread would block the UI. The `@browser-ai/transformers-js` package provides a ready-made worker handler that handles all the complexity for you.
+Running model inference on the main thread would block the UI. The `@browser-ai/transformers-js` package provides a ready-made worker handler for model loading, inference, streaming, and main-thread communication.
 
 Create `src/app/worker.ts`:
 
@@ -66,7 +67,7 @@ self.onmessage = (msg: MessageEvent) => {
 };
 ```
 
-That's it &mdash; the handler takes care of model loading, inference, streaming, and communication with the main thread.
+That's it: the handler takes care of model loading, inference, streaming, and communication with the main thread.
 
 ## Step 4: Define the model configuration
 
@@ -101,7 +102,7 @@ export const MODELS: ModelConfig[] = [
 
 <Tip>
 
-For tool calling, use reasoning models like Qwen3 which handle multi-step reasoning well, or fine-tuned model specifically for tool-calling capabilities. The `supportsWorker` flag controls whether the model is loaded in a Web Worker for better performance.
+For tool calling, use reasoning models like Qwen3 which handle multi-step reasoning well, or a model fine-tuned specifically for tool calling. The `supportsWorker` flag controls whether the model is loaded in a Web Worker for better performance.
 
 </Tip>
 
@@ -278,6 +279,7 @@ export class TransformersChatTransport
 ```
 
 Key parts of the transport:
+
 - **Availability check**: Determines if the model needs downloading before inference.
 - **Progress streaming**: Sends download progress as custom data parts (`data-modelDownloadProgress`) that the UI can render as a progress bar.
 - **Tool support**: Passes the tools to `streamText()` so the model can call them.
@@ -408,9 +410,10 @@ export default function ChatPage() {
 ```
 
 The component renders message parts based on their `type`:
-- `text` &mdash; standard text output from the model.
-- `data-modelDownloadProgress` &mdash; custom data parts sent by the transport during model download.
-- `tool-*` &mdash; tool call parts with states like `approval-requested`, `output-available`, etc.
+
+- `text`: standard text output from the model.
+- `data-modelDownloadProgress`: custom data parts sent by the transport during model download.
+- `tool-*`: tool call parts with states like `approval-requested`, `output-available`, etc.
 
 The `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses` option tells `useChat` to automatically resume generation after the user responds to a tool approval request.
 
@@ -431,7 +434,7 @@ Try prompts like:
 
 ## Next steps
 
-- Add more models and a model selector &mdash; see the [full example source](https://github.com/huggingface/transformers.js-examples/tree/main/next-vercel-ai-sdk-v6-tool-calling) for a multi-model implementation with Zustand state management.
+- Add more models and a model selector; see the [full example source](https://github.com/huggingface/transformers.js-examples/tree/main/next-vercel-ai-sdk-v6-tool-calling) for a multi-model implementation with Zustand state management.
 - Add a browser compatibility check with `doesBrowserSupportTransformersJS()` and fall back to a server-side route if WebGPU is unavailable.
 - Explore the [Vercel AI SDK agents documentation](https://ai-sdk.dev/docs/agents/overview) for more complex agent patterns.
 - See the [Vercel AI SDK guide](../integrations/vercel-ai-sdk) for a reference of all supported features (embeddings, vision, transcription, etc.).

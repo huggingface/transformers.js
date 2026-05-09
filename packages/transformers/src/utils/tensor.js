@@ -1,8 +1,10 @@
 /**
- * @file Helper module for `Tensor` processing.
+ * @file Tensors and tensor operations.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * `Tensor` is the typed n-dimensional array used throughout the library for
+ * model inputs and outputs. The functions in this module create, transform,
+ * and combine tensors — shape manipulation, slicing, reductions, math ops,
+ * and the `.tolist()` / `.item()` escape hatches back to plain JavaScript.
  *
  * @module utils/tensor
  */
@@ -22,6 +24,17 @@ import { random } from './random.js';
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
 
+/**
+ * A typed multi-dimensional array.
+ *
+ * **Example:**
+ * ```javascript
+ * import { Tensor } from '@huggingface/transformers';
+ * const tensor = new Tensor('float32', [1, 2, 3, 4, 5, 6], [2, 3]);
+ * tensor.dims;    // [2, 3]
+ * tensor.tolist(); // [[1, 2, 3], [4, 5, 6]]
+ * ```
+ */
 export class Tensor {
     /**
      * Dimensions of the tensor.
@@ -72,7 +85,13 @@ export class Tensor {
     ort_tensor;
 
     /**
-     * Create a new Tensor or copy an existing Tensor.
+     * Create a new Tensor.
+     *
+     * Two call shapes are supported:
+     * - `new Tensor(dataType, data, dims)` — build from raw data, e.g.
+     *   `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
+     * - `new Tensor(ortTensor)` — wrap an existing `onnxruntime` tensor.
+     *
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
      */
     constructor(...args) {
@@ -136,6 +155,7 @@ export class Tensor {
      * Index into a Tensor object.
      * @param {number} index The index to access.
      * @returns {Tensor} The data at the specified index.
+     * @private
      */
     _getitem(index) {
         const [iterLength, ...iterDims] = this.dims;
@@ -148,21 +168,6 @@ export class Tensor {
         } else {
             return new Tensor(this.type, [this.data[index]], iterDims);
         }
-    }
-
-    /**
-     * @param {number|bigint} item The item to search for in the tensor
-     * @returns {number} The index of the first occurrence of item in the tensor data.
-     */
-    indexOf(item) {
-        const this_data = this.data;
-        for (let index = 0; index < this_data.length; ++index) {
-            // Note: == instead of === so we can match Ints with BigInts
-            if (this_data[index] == item) {
-                return index;
-            }
-        }
-        return -1;
     }
 
     /**
@@ -944,13 +949,6 @@ export class Tensor {
 
 /**
  * This creates a nested array of a given type and depth (see examples).
- *
- * @example
- *   NestArray<string, 1>; // string[]
- * @example
- *   NestArray<number, 2>; // number[][]
- * @example
- *   NestArray<string, 3>; // string[][][] etc.
  * @template T
  * @template {number} Depth
  * @template {never[]} [Acc=[]]
@@ -960,11 +958,13 @@ export class Tensor {
 /**
  * Reshapes a 1-dimensional array into an n-dimensional array, according to the provided dimensions.
  *
- * @example
+ * **Example:**
+ * ```javascript
  *   reshape([10                    ], [1      ]); // Type: number[]      Value: [10]
  *   reshape([1, 2, 3, 4            ], [2, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]); // Type: number[][][]  Value: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [4, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4], [5, 6], [7, 8]]
+ * ```
  * @param {T[]|DataArray} data The input array to reshape.
  * @param {DIM} dimensions The target shape/dimensions.
  * @template T

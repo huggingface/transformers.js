@@ -488,7 +488,7 @@ export class PretrainedConfig {
     'transformers.js_config';
 
     /**
-     * Create a new PreTrainedTokenizer instance.
+     * Create a new `PretrainedConfig` from a parsed `config.json` object.
      * @param {Object} configJSON The JSON of the config.
      */
     constructor(configJSON) {
@@ -497,9 +497,9 @@ export class PretrainedConfig {
     }
 
     /**
-     * Loads a pre-trained config from the given `pretrained_model_name_or_path`.
+     * Loads a pretrained config from the given `pretrained_model_name_or_path`.
      *
-     * @param {string} pretrained_model_name_or_path The path to the pre-trained config.
+     * @param {string} pretrained_model_name_or_path The path to the pretrained config.
      * @param {PretrainedOptions} options Additional options for loading the config.
      * @throws {Error} Throws an error if the config.json is not found in the `pretrained_model_name_or_path`.
      *
@@ -527,10 +527,14 @@ export class PretrainedConfig {
 }
 
 /**
- * Helper class which is used to instantiate pretrained configs with the `from_pretrained` function.
+ * Loads a model config from a pretrained id. Thin alias for
+ * `PretrainedConfig.from_pretrained`.
  *
- * @example
+ * ```javascript
+ * import { AutoConfig } from '@huggingface/transformers';
+ *
  * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
+ * ```
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */
@@ -548,7 +552,7 @@ export class AutoConfig {
  * for more information.
  * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
  * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
- * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
+ * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format] Whether to load the model using the external data format (used for models >= 2GB in size).
  */
 
 /**

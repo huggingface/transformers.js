@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor, topk } from '../utils/tensor.js';
@@ -15,7 +19,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {TextClassificationSingle[]} TextClassificationOutput
  *
  * @typedef {Object} TextClassificationPipelineOptions Parameters specific to text classification pipelines.
- * @property {number|null} [top_k=1] The number of top predictions to be returned. If set to `null`, all predictions are returned.
+ * @property {number|null} [top_k=1] The number of top predictions to return. If set to `null`, all predictions are returned.
  */
 
 /**
@@ -37,9 +41,9 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Text classification pipeline using any `ModelForSequenceClassification`.
+ * Text classification pipeline using `AutoModelForSequenceClassification`.
  *
- * **Example:** Sentiment-analysis w/ `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
+ * **Example:** Sentiment analysis with `Xenova/distilbert-base-uncased-finetuned-sst-2-english`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -48,7 +52,7 @@ import { softmax } from '../utils/maths.js';
  * // [{ label: 'POSITIVE', score: 0.999788761138916 }]
  * ```
  *
- * **Example:** Multilingual sentiment-analysis w/ `Xenova/bert-base-multilingual-uncased-sentiment` (and return top 5 classes).
+ * **Example:** Multilingual sentiment analysis with `Xenova/bert-base-multilingual-uncased-sentiment` (and return the top 5 classes).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -63,8 +67,10 @@ import { softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Toxic comment classification w/ `Xenova/toxic-bert` (and return all classes).
+ * **Example:** Toxic comment classification with `Xenova/toxic-bert` (and return all classes).
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const classifier = await pipeline('text-classification', 'Xenova/toxic-bert');
  * const output = await classifier('I hate you!', { top_k: null });
  * // [
