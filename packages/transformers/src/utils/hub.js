@@ -8,7 +8,14 @@ import { apis, env } from '../env.js';
 import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
-import { handleError, isValidUrl, pathJoin, isValidHfModelId, makePretrainedOptionsKey, readResponse } from './hub/utils.js';
+import {
+    handleError,
+    isValidUrl,
+    pathJoin,
+    isValidHfModelId,
+    makePretrainedOptionsKey,
+    readResponse,
+} from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
