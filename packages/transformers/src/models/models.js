@@ -195,5 +195,6 @@ export * from './xlm/modeling_xlm.js';
 export * from './xlm_roberta/modeling_xlm_roberta.js';
 export * from './yolos/modeling_yolos.js';
 export * from './youtu/modeling_youtu.js';
+export * from './zaya/modeling_zaya.js';
 
 export { PreTrainedModel } from './modeling_utils.js';

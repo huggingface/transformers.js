@@ -216,6 +216,13 @@ function getNormalizedConfig(config) {
             mapping['dim_kv'] = config.model_type === 'deepseek_v4' ? 'head_dim' : 'qk_head_dim';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
+        case 'zaya':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_hidden_layers';
+            mapping['hidden_size'] = 'hidden_size';
+            mapping['dim_kv'] = 'head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
 
         // Encoder-decoder models
         case 't5':
@@ -418,6 +425,16 @@ export function getCacheNames(config, options) {
             } else if (layer_type && layer_type !== 'sliding_attention') {
                 throw new Error(`Unsupported layer type: ${layer_type}`);
             }
+        }
+        return names;
+    } else if (config.model_type === 'zaya') {
+        const { num_hidden_layers, cca_time1 } = /** @type {any} */ (config);
+        const stride = cca_time1 ?? 1;
+        for (let i = 0; i < num_hidden_layers; i += stride) {
+            names.add(`${pkv_prefix}.${i}.key`);
+            names.add(`${pkv_prefix}.${i}.value`);
+            names.add(`${pkv_prefix}.${i}.conv_state`);
+            names.add(`${pkv_prefix}.${i}.shift_state`);
         }
         return names;
     } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {
