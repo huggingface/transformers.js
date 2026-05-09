@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { apiOutputDir, toctreePath } from "./paths.mjs";
 
-export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toctreePath } = {}) {
+export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toctreePath, project = null } = {}) {
   const generatedApiPages = listApiPages(outputDir);
   const linkedApiPages = readToctreeApiPages(tocPath);
   const sourceDir = path.dirname(tocPath);
@@ -12,34 +12,85 @@ export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toct
   const unlisted = difference(generatedApiPages, linkedApiPages);
   const stale = difference(linkedApiPages, generatedApiPages);
 
+  // Source-quality warnings are advisory: they surface gaps in the JSDoc
+  // (undocumented exports, malformed `@param` lines) that the renderer can't
+  // fix on its own. They don't fail validation — broken links and a stale
+  // toctree do.
+  const docWarnings = project ? collectDocWarnings(project) : [];
+
   return {
     ok: unlisted.length === 0 && stale.length === 0 && brokenLinks.length === 0,
     unlisted,
     stale,
     brokenLinks,
+    docWarnings,
   };
 }
 
 export function formatValidationResult(result) {
-  if (result.ok) return "validated docs toctree";
+  const lines = [];
 
-  const lines = ["docs validation failed"];
-  if (result.unlisted.length) {
-    lines.push("", "Generated API pages missing from _toctree.yml:");
-    for (const page of result.unlisted) lines.push(`- ${page}`);
-  }
-  if (result.stale.length) {
-    lines.push("", "API pages listed in _toctree.yml but not generated:");
-    for (const page of result.stale) lines.push(`- ${page}`);
-  }
-  if (result.brokenLinks.length) {
-    lines.push("", "Broken local markdown links:");
-    for (const link of result.brokenLinks) {
-      const anchor = link.anchor ? `#${link.anchor}` : "";
-      lines.push(`- ${link.file}: ${link.target} -> ${link.resolved}${anchor} (${link.type})`);
+  if (result.ok) {
+    lines.push("validated docs toctree");
+  } else {
+    lines.push("docs validation failed");
+    if (result.unlisted.length) {
+      lines.push("", "Generated API pages missing from _toctree.yml:");
+      for (const page of result.unlisted) lines.push(`- ${page}`);
+    }
+    if (result.stale.length) {
+      lines.push("", "API pages listed in _toctree.yml but not generated:");
+      for (const page of result.stale) lines.push(`- ${page}`);
+    }
+    if (result.brokenLinks.length) {
+      lines.push("", "Broken local markdown links:");
+      for (const link of result.brokenLinks) {
+        const anchor = link.anchor ? `#${link.anchor}` : "";
+        lines.push(`- ${link.file}: ${link.target} -> ${link.resolved}${anchor} (${link.type})`);
+      }
     }
   }
+
+  if (result.docWarnings?.length) {
+    lines.push("", `${result.docWarnings.length} doc-quality warning${result.docWarnings.length === 1 ? "" : "s"}:`);
+    for (const w of result.docWarnings) lines.push(`- ${w}`);
+  }
+
   return lines.join("\n");
+}
+
+// Walk the IR and report public exports whose JSDoc is empty (no description,
+// no params, no example) and parameters that are missing a name. These don't
+// fail the build but are worth surfacing during a normal docs-generate run.
+function collectDocWarnings({ ir, publicNames }) {
+  const warnings = [];
+  const isPublic = (name) => !publicNames || publicNames.has(name);
+
+  for (const mod of ir.modules) {
+    for (const cls of mod.classes) {
+      if (!isPublic(cls.name)) continue;
+      if (!cls.description && !cls.examples?.length) {
+        warnings.push(`${mod.name}: class \`${cls.name}\` has no description or example`);
+      }
+      for (const m of cls.members) {
+        if (m.kind !== "method") continue;
+        for (const p of m.params ?? []) {
+          if (!p.name) warnings.push(`${mod.name}: \`${cls.name}.${m.name}\` has a parameter with no name (check for malformed @param)`);
+        }
+      }
+    }
+    for (const fn of mod.functions) {
+      if (!isPublic(fn.name)) continue;
+      if (!fn.description && !fn.examples?.length) {
+        warnings.push(`${mod.name}: function \`${fn.name}\` has no description or example`);
+      }
+      for (const p of fn.params ?? []) {
+        if (!p.name) warnings.push(`${mod.name}: \`${fn.name}\` has a parameter with no name (check for malformed @param)`);
+      }
+    }
+  }
+
+  return warnings;
 }
 
 function listApiPages(outputDir) {

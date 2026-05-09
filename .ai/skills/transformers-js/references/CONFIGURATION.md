@@ -91,6 +91,13 @@ env.remoteHost = "https://cdn.example.com";
 env.useBrowserCache = true;
 ```
 
+**Browser app, no CDN, just persist downloads via the Cache API:**
+
+```javascript
+env.useBrowserCache = true; // default when Cache API is available
+// First visit downloads from the Hub; subsequent visits hit the cache.
+```
+
 ## Custom fetch (private / gated models, retries, etc.)
 
 Override `env.fetch` to inject auth headers, retry logic, or abort signals:

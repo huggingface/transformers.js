@@ -57,3 +57,26 @@ modules instead.
 The generator also validates generated API pages against `docs/source/_toctree.yml`
 and checks local Markdown links and anchors under `docs/source/`. To run only
 the validator (without regenerating), use `pnpm --filter @huggingface/transformers docs-validate`.
+
+### Workflow after touching JSDoc
+
+1. Edit the JSDoc in `packages/transformers/src/**/*.js`.
+2. Run `pnpm --filter @huggingface/transformers docs-generate` from the repo root.
+3. Inspect the diff under `packages/transformers/docs/source/api/` — that's the
+   page a human or agent will read. If the JSDoc didn't render the way you
+   expected, tweak the source, not the generated markdown.
+4. Watch for "doc-quality warnings" at the end of the generator's output —
+   these flag undocumented public exports and malformed `@param` tags.
+5. Stage the source files; the generated `api/**/*.md` files are gitignored.
+
+### What is generated vs. hand-written
+
+| Path | Generated? |
+|------|------------|
+| `packages/transformers/docs/source/api/**/*.md` | yes — gitignored |
+| `packages/transformers/docs/source/{guides,tutorials,integrations}/*.md` | hand-written |
+| `packages/transformers/docs/source/_toctree.yml` | hand-written (must list every generated API page) |
+| `.ai/skills/transformers-js/SKILL.md` | mixed — prose hand-written, blocks between `<!-- @generated:start ... -->` markers regenerated |
+| `.ai/skills/transformers-js/references/TASKS.md` | fully generated, do not edit |
+| `.ai/skills/transformers-js/references/{CONFIGURATION,PIPELINE_OPTIONS}.md` | mixed (same marker convention as SKILL.md) |
+| `README.md` | generated from `packages/transformers/docs/snippets/*.snippet` |

@@ -2,6 +2,8 @@
 // one `@module <name>` declaration — its output is `docs/api/<name>.md`.
 
 import path from "node:path";
+
+import { findTopLevel, splitTopLevel } from "./scan.mjs";
 import { callableReferenceKey, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
 
 export function buildIR(fileEntities) {
@@ -398,56 +400,6 @@ function matchingBracket(text, start, open, close) {
     }
   }
   return -1;
-}
-
-function findTopLevel(text, needle) {
-  let depth = 0;
-  let inStr = null;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
-      inStr = ch;
-    } else if ("<({[".includes(ch)) {
-      depth++;
-    } else if (">)}]".includes(ch)) {
-      depth--;
-    } else if (depth === 0 && ch === needle) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-function splitTopLevel(text, sep) {
-  const out = [];
-  let depth = 0;
-  let inStr = null;
-  let buf = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
-      buf += ch;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
-      inStr = ch;
-      buf += ch;
-    } else if ("<({[".includes(ch)) {
-      depth++;
-      buf += ch;
-    } else if (">)}]".includes(ch)) {
-      depth--;
-      buf += ch;
-    } else if (depth === 0 && ch === sep) {
-      out.push(buf);
-      buf = "";
-    } else {
-      buf += ch;
-    }
-  }
-  if (buf) out.push(buf);
-  return out.length > 1 ? out : [text];
 }
 
 function resolveCallableAliases(modules) {

@@ -6,6 +6,7 @@
 import path from "node:path";
 
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
+import { splitTopLevel } from "./scan.mjs";
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 // Pages with at least this many top-level items get an "On this page" TOC so
@@ -16,7 +17,7 @@ export function renderModule(mod, ir, opts = {}) {
   const publicNames = opts.publicNames ?? null;
   const ctx = {
     typedefIndex: ir.typedefIndex,
-    allModules: ir.modules,
+    moduleByName: new Map(ir.modules.map((m) => [m.name, m])),
     moduleName: mod.name,
     renderedNames: buildRenderedNameIndex(ir, publicNames),
     callableLinks: buildCallableLinkIndex(ir, publicNames),
@@ -301,7 +302,7 @@ function typedefSummary(rawType, ctx) {
   if (!SIMPLE_NAME.test(pretty)) return null;
   const moduleName = ctx.typedefIndex.get(pretty);
   if (!moduleName) return null;
-  const mod = ctx.allModules?.find?.((m) => m.name === moduleName);
+  const mod = ctx.moduleByName?.get(moduleName);
   const def = mod?.typedefs.find((t) => t.name === pretty) ?? mod?.callbacks.find((c) => c.name === pretty);
   if (!def?.description) return null;
   return firstSentenceShort(def.description);
@@ -577,38 +578,6 @@ function renderCallableReference(raw, ctx) {
   return linkCallable(ref.owner, ref.owner, ctx) ?? linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
 }
 
-// Split `text` on `sep`, ignoring separators inside brackets, braces, parens,
-// angle brackets, or string literals.
-function splitTopLevel(text, sep) {
-  const out = [];
-  let depth = 0;
-  let inStr = null;
-  let buf = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
-      buf += ch;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
-      inStr = ch;
-      buf += ch;
-    } else if ("<({[".includes(ch)) {
-      depth++;
-      buf += ch;
-    } else if (">)}]".includes(ch)) {
-      depth--;
-      buf += ch;
-    } else if (depth === 0 && ch === sep) {
-      out.push(buf);
-      buf = "";
-    } else {
-      buf += ch;
-    }
-  }
-  if (buf) out.push(buf);
-  return out.length > 1 ? out : [text];
-}
-
 // Strip noisy TS constructs from a type string without rewriting structure.
 // Conditional/mapped/infer types collapse to their outermost wrapper; simple
 // unions of names or long generic lists are preserved so the renderer can
@@ -631,6 +600,10 @@ export function prettifyTypeString(raw) {
     // Built-in TS utility types are meaningless shorn of their arguments — the
     // reader is better served by `unknown` than by a naked `Parameters`.
     if (outer && TS_UTILITY_NAMES.has(outer[1])) return "unknown";
+    // Generic wrappers like `Promise<...gnarly...>` need to keep the wrapper —
+    // a bare `Promise` is misleading. Replace the inner with `unknown` so the
+    // reader sees `Promise<unknown>` instead.
+    if (outer && /^[A-Za-z_$][\w$.]*</.test(s)) return `${outer[1]}<unknown>`;
     return outer ? outer[1] : "object";
   }
   return s.replace(/\s+/g, " ").trim();

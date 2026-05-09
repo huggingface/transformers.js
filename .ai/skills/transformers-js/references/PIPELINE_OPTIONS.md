@@ -142,6 +142,17 @@ Every field below can be passed as an option to a `text-generation`,
 `text2text-generation`, `translation`, or `summarization` pipeline call, or
 anywhere `generate()` is invoked directly.
 
+**Pairs of fields with overlapping meanings:**
+
+- `max_new_tokens` overrides `max_length`. Pass one, not both — `max_new_tokens`
+  is usually what you want because it doesn't depend on the prompt length.
+- `min_new_tokens` overrides `min_length` for the same reason.
+- Sampling vs. greedy: setting `do_sample: true` enables `temperature`,
+  `top_k`, `top_p`, and `typical_p`. With `do_sample: false` (the default),
+  those values are silently ignored.
+- Sampling vs. beams: `num_beams > 1` switches to beam search and `do_sample`
+  is ignored. Don't set both.
+
 <!-- @generated:start id=fields:GenerationConfig -->
 | Option | Type | Description |
 |--------|------|-------------|

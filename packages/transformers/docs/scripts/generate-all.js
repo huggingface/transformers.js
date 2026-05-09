@@ -16,6 +16,6 @@ generateSkillDocs({ project });
 const readmePath = buildReadme({ project });
 console.log(`wrote ${path.relative(process.cwd(), readmePath)}`);
 
-const validation = validateGeneratedDocs();
+const validation = validateGeneratedDocs({ project });
 console.log(formatValidationResult(validation));
 if (!validation.ok) process.exitCode = 1;

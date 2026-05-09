@@ -85,7 +85,13 @@ export class Tensor {
     ort_tensor;
 
     /**
-     * Create a new Tensor or copy an existing Tensor.
+     * Create a new Tensor.
+     *
+     * Two call shapes are supported:
+     * - `new Tensor(dataType, data, dims)` — build from raw data, e.g.
+     *   `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
+     * - `new Tensor(ortTensor)` — wrap an existing `onnxruntime` tensor.
+     *
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
      */
     constructor(...args) {

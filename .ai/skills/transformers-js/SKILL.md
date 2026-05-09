@@ -73,6 +73,26 @@ Browse models compatible with transformers.js on the Hub:
 Filter by task with the `pipeline_tag` parameter, e.g.
 <https://huggingface.co/models?library=transformers.js&pipeline_tag=text-generation>.
 
+**Before recommending a model**, confirm it actually has ONNX weights — the
+library cannot load a model without them. Two ways to check:
+
+1. Open the model page on the Hub and look for an `onnx/` directory in the
+   "Files and versions" tab.
+2. Programmatically, with `ModelRegistry.get_available_dtypes(modelId)` —
+   returns the list of dtypes shipped, or `[]` if no ONNX files exist.
+
+```javascript
+import { ModelRegistry } from "@huggingface/transformers";
+
+const dtypes = await ModelRegistry.get_available_dtypes("Xenova/some-model");
+if (dtypes.length === 0) {
+  // No ONNX files — not usable with transformers.js.
+}
+```
+
+Don't suggest a model without verifying this; the failure mode at runtime is a
+download error that's harder to diagnose than a pre-flight check.
+
 ### Quantization
 
 Most pipelines accept a `dtype` option. Smaller dtypes download and run faster
