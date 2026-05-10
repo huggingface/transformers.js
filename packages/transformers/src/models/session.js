@@ -7,7 +7,7 @@ import {
 } from '../backends/onnx.js';
 import { getCacheNames } from '../configs.js';
 import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, selectDtype } from '../utils/dtypes.js';
-import { selectDevice } from '../utils/devices.js';
+import { selectDevice, DEVICE_TYPES } from '../utils/devices.js';
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
 import { Tensor } from '../utils/tensor.js';
@@ -154,6 +154,36 @@ export async function constructSessions(pretrained_model_name_or_path, names, op
                     cache_config,
                     name,
                 );
+
+                // When device='auto', try each execution provider individually so that a failing
+                // accelerator (e.g. CUDA not installed) falls back cleanly to the next one.
+                // For any explicit device the caller already knows what they want — no fallback.
+                const isAuto =
+                    (options.device ?? options.config?.['transformers.js_config']?.device) === DEVICE_TYPES.auto;
+
+                if (isAuto) {
+                    const candidates = /** @type {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig[]} */ (
+                        session_options.executionProviders
+                    );
+                    let lastError;
+                    for (const provider of candidates) {
+                        try {
+                            const opts = { ...session_options, executionProviders: [provider] };
+                            const session = await createInferenceSession(buffer_or_path, opts, {
+                                ...session_config,
+                                device: typeof provider === 'string' ? provider : provider.name,
+                            });
+                            return [name, session];
+                        } catch (err) {
+                            logger.warn(
+                                `Failed to create session with provider "${typeof provider === 'string' ? provider : provider.name}": ${err?.message ?? err}. Trying next provider.`,
+                            );
+                            lastError = err;
+                        }
+                    }
+                    throw lastError ?? new Error('All execution providers failed to initialize.');
+                }
+
                 const session = await createInferenceSession(buffer_or_path, session_options, session_config);
                 return [name, session];
             }),
