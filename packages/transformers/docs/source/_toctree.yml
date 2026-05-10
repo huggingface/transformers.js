@@ -92,6 +92,8 @@
           title: Logger
         - local: api/utils/random
           title: Random
+        - local: api/utils/chat_parsing
+          title: Chat Parsing
       title: Utilities
       isExpanded: false
   title: API Reference
