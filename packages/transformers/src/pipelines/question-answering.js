@@ -11,8 +11,8 @@ import { softmax } from '../utils/maths.js';
 /**
  * @typedef {Object} QuestionAnsweringOutput
  * @property {number} score The probability associated to the answer.
- * @property {number} [start] The character start index of the answer (in the tokenized version of the input).
- * @property {number} [end] The character end index of the answer (in the tokenized version of the input).
+ * @property {number} start The answer start offset (character index **in `context`**; slice with `context.slice(start, end)`).
+ * @property {number} end The exclusive end offset of the answer in **`context`** (half-open `[start, end)`).
  * @property {string} answer The answer to the question.
  *
  * @typedef {Object} QuestionAnsweringPipelineOptions Parameters specific to question answering pipelines.
@@ -48,7 +48,9 @@ import { softmax } from '../utils/maths.js';
  * const output = await answerer(question, context);
  * // {
  * //   answer: "a nice puppet",
- * //   score: 0.5768911502526741
+ * //   score: 0.5768911502526741,
+ * //   start: ...,
+ * //   end: ...,
  * // }
  * ```
  */
@@ -61,6 +63,7 @@ export class QuestionAnsweringPipeline
             text_pair: context,
             padding: true,
             truncation: true,
+            return_offsets_mapping: true,
         });
         const isBatched = Array.isArray(question);
 
@@ -71,7 +74,10 @@ export class QuestionAnsweringPipeline
         // TODO: add support for `return_special_tokens_mask`
         const { all_special_ids, sep_token_id } = this.tokenizer;
 
+        const offset_mapping_batches = inputs.offset_mapping;
+        /** @type {QuestionAnsweringOutput[][]|QuestionAnsweringOutput[]} */
         const batchedResults = [];
+
         for (let j = 0; j < start_logits.dims[0]; ++j) {
             const ids = input_ids[j];
             const sepIndex = ids.findIndex(
@@ -81,26 +87,26 @@ export class QuestionAnsweringPipeline
                     x == sep_token_id,
             );
 
-            const start = start_logits[j].tolist();
-            const end = end_logits[j].tolist();
+            const start_logits_row = start_logits[j].tolist();
+            const end_logits_row = end_logits[j].tolist();
 
             // Now, we mask out values that can't be in the answer
             // NOTE: We keep the cls_token unmasked (some models use it to indicate unanswerable questions)
-            for (let i = 1; i < start.length; ++i) {
+            for (let i = 1; i < start_logits_row.length; ++i) {
                 if (
                     attention_mask[j] == 0 || // is part of padding
                     i <= sepIndex || // is before the sep_token
                     all_special_ids.findIndex((x) => x == ids[i]) !== -1 // Is a special token
                 ) {
                     // Make sure non-context indexes in the tensor cannot contribute to the softmax
-                    start[i] = -Infinity;
-                    end[i] = -Infinity;
+                    start_logits_row[i] = -Infinity;
+                    end_logits_row[i] = -Infinity;
                 }
             }
 
             // Normalize logits and spans to retrieve the answer
-            const start_scores = softmax(start).map((x, i) => [x, i]);
-            const end_scores = softmax(end).map((x, i) => [x, i]);
+            const start_scores = softmax(start_logits_row).map((x, i) => [x, i]);
+            const end_scores = softmax(end_logits_row).map((x, i) => [x, i]);
 
             // Mask CLS
             start_scores[0][0] = 0;
@@ -112,21 +118,28 @@ export class QuestionAnsweringPipeline
                 .map((x) => [x[0][1], x[1][1], x[0][0] * x[1][0]])
                 .sort((a, b) => b[2] - a[2]);
 
+            const rowOffsets = isBatched ? offset_mapping_batches[j] : offset_mapping_batches;
+
             const sampleResults = [];
             for (let k = 0; k < Math.min(options.length, top_k); ++k) {
-                const [start, end, score] = options[k];
+                const [startTok, endTok, spanScore] = options[k];
 
-                const answer_tokens = ids.slice(start, end + 1);
+                const answer_tokens = ids.slice(startTok, endTok + 1);
 
                 const answer = this.tokenizer.decode(answer_tokens, {
                     skip_special_tokens: true,
                 });
 
-                // TODO add start and end?
-                // NOTE: HF returns character index
+                /** @type {number} */
+                const startChar = rowOffsets[startTok][0];
+                /** @type {number} */
+                const endChar = rowOffsets[endTok][1];
+
                 sampleResults.push({
                     answer,
-                    score,
+                    score: spanScore,
+                    start: startChar,
+                    end: endChar,
                 });
             }
             if (top_k === 1) {

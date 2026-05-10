@@ -22,7 +22,7 @@ export default () => {
         "default (top_k=1)",
         async () => {
           const output = await pipe("a", "b c");
-          const target = { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" };
+          const target = { score: 0.11395696550607681, start: 0, end: 1, answer: "b" };
           expect(output).toBeCloseToNested(target, 5);
         },
         MAX_TEST_EXECUTION_TIME,
@@ -32,9 +32,9 @@ export default () => {
         async () => {
           const output = await pipe("a", "b c", { top_k: 3 });
           const target = [
-            { score: 0.11395696550607681, /* start: 0, end: 1, */ answer: "b" },
-            { score: 0.11300431191921234, /* start: 2, end: 3, */ answer: "c" },
-            { score: 0.10732574015855789, /* start: 0, end: 3, */ answer: "b c" },
+            { score: 0.11395696550607681, start: 0, end: 1, answer: "b" },
+            { score: 0.11300431191921234, start: 2, end: 3, answer: "c" },
+            { score: 0.10732574015855789, start: 0, end: 3, answer: "b c" },
           ];
           expect(output).toBeCloseToNested(target, 5);
         },
