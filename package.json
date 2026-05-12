@@ -26,6 +26,18 @@
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": "^7.5.5",
+      "lodash": "^4.18.0",
+      "handlebars": "^4.7.9",
+      "brace-expansion": "^2.0.3",
+      "picomatch": "^4.0.4",
+      "minimatch": "^9.0.7",
+      "markdown-it": "^14.1.1",
+      "underscore": "^1.13.8"
+    }
+  },
   "prettier": {
     "overrides": [
       {
