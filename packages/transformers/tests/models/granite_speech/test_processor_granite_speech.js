@@ -34,5 +34,26 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it(
+      "tokens and features stay aligned for boundary audio lengths",
+      async () => {
+        const boundary_lengths = [4960, 9760, 139360]; // For L = 160 * (30k + 1)
+        const { projector_window_size, projector_downsample_rate } = processor.feature_extractor.config;
+        const effective_window_size = Math.floor(projector_window_size / projector_downsample_rate);
+
+        for (const L of boundary_lengths) {
+          const audio = new Float32Array(L);
+          const { input_features } = await processor.feature_extractor(audio);
+
+          const predicted_tokens = processor._get_num_audio_features(L);
+          const time_steps = input_features.dims[1];
+          const projector_tokens = Math.ceil(time_steps / projector_window_size) * effective_window_size;
+
+          expect(projector_tokens).toEqual(predicted_tokens);
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 };
