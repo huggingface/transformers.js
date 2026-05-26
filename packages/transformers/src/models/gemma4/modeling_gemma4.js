@@ -2,6 +2,7 @@ import { Gemma3nForConditionalGeneration } from '../gemma3n/modeling_gemma3n.js'
 import { sessionRun } from '../session.js';
 
 export class Gemma4ForConditionalGeneration extends Gemma3nForConditionalGeneration {
+    /** @override */
     forward_params = [
         'input_ids',
         'attention_mask',
@@ -16,6 +17,7 @@ export class Gemma4ForConditionalGeneration extends Gemma3nForConditionalGenerat
         'past_key_values',
     ];
 
+    /** @override */
     _encode_vision(kwargs) {
         return sessionRun(this.sessions['vision_encoder'], {
             pixel_values: kwargs.pixel_values,

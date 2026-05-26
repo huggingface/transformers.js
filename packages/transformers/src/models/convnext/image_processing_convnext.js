@@ -11,6 +11,7 @@ export class ConvNextImageProcessor extends ImageProcessor {
         this.crop_pct = this.config.crop_pct ?? 224 / 256;
     }
 
+    /** @override */
     async resize(image) {
         const shortest_edge = this.size?.shortest_edge;
         if (shortest_edge === undefined) {

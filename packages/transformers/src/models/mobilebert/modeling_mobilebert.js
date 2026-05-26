@@ -9,6 +9,7 @@ export class MobileBertModel extends MobileBertPreTrainedModel {}
  */
 export class MobileBertForMaskedLM extends MobileBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -24,6 +25,7 @@ export class MobileBertForMaskedLM extends MobileBertPreTrainedModel {
  */
 export class MobileBertForSequenceClassification extends MobileBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -39,6 +41,7 @@ export class MobileBertForSequenceClassification extends MobileBertPreTrainedMod
  */
 export class MobileBertForQuestionAnswering extends MobileBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

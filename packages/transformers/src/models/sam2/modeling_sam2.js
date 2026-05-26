@@ -39,6 +39,7 @@ export class Sam2Model extends Sam2PreTrainedModel {
         return await encoder_forward(this, { pixel_values });
     }
 
+    /** @override */
     async forward(model_inputs) {
         // @ts-expect-error ts(2339)
         const { num_feature_levels } = this.config.vision_config;
@@ -83,6 +84,7 @@ export class Sam2Model extends Sam2PreTrainedModel {
     }
 
     /**
+     * @override
      * Runs the model with the provided inputs
      * @param {Object} model_inputs Model inputs
      * @returns {Promise<Sam2ImageSegmentationOutput>} Object containing segmentation outputs

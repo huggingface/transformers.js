@@ -5,6 +5,7 @@ export class ViTMSNPreTrainedModel extends PreTrainedModel {}
 export class ViTMSNModel extends ViTMSNPreTrainedModel {}
 export class ViTMSNForImageClassification extends ViTMSNPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

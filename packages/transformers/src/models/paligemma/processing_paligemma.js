@@ -12,6 +12,7 @@ function build_string_from_input(prompt, bos_token, image_seq_len, image_token, 
 export class PaliGemmaProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static image_processor_class = AutoImageProcessor;
+    /** @override */
     static uses_processor_config = false;
 
     /**
@@ -19,6 +20,7 @@ export class PaliGemmaProcessor extends Processor {
      */
 
     // `images` is required, `text` is optional
+    /** @override */
     async _call(/** @type {RawImage|RawImage[]} */ images, text = null, kwargs = {}) {
         if (!text) {
             logger.warn(

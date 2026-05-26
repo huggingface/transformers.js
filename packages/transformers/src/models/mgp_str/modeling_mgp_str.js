@@ -22,6 +22,7 @@ export class MgpstrPreTrainedModel extends PreTrainedModel {}
  */
 export class MgpstrForSceneTextRecognition extends MgpstrPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

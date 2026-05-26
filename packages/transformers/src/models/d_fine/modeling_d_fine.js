@@ -5,6 +5,7 @@ export class DFinePreTrainedModel extends PreTrainedModel {}
 export class DFineModel extends DFinePreTrainedModel {}
 export class DFineForObjectDetection extends DFinePreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

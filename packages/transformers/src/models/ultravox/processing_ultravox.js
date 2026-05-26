@@ -8,9 +8,11 @@ import { Processor } from '../../processing_utils.js';
 export class UltravoxProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
+    /** @override */
     static uses_processor_config = true;
 
     /**
+     * @override
      * @param {string} text The text input to process.
      * @param {Float32Array} audio The audio input to process.
      */

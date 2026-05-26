@@ -5,6 +5,7 @@ import { AutoTokenizer } from '../auto/tokenization_auto.js';
 export class LlavaProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static image_processor_class = AutoImageProcessor;
+    /** @override */
     static uses_processor_config = true;
 
     /**
@@ -12,6 +13,7 @@ export class LlavaProcessor extends Processor {
      */
 
     // `images` is required, `text` is optional
+    /** @override */
     async _call(/** @type {RawImage|RawImage[]} */ images, text = null, kwargs = {}) {
         const image_inputs = await this.image_processor(images, kwargs);
 

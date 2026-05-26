@@ -27,9 +27,11 @@ function chunk(audio, n_samples) {
 export class VoxtralProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
+    /** @override */
     static uses_processor_config = false;
 
     /**
+     * @override
      * @param {string} text The text input to process.
      * @param {Float32Array|Float32Array[]} audio The audio input(s) to process.
      */

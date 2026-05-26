@@ -11,6 +11,7 @@ export class Lfm2VlProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
 
     /**
+     * @override
      * @param {RawImage|RawImage[]} images
      * @param {string|string[]|null} [text]
      * @param {Record<string, any>} [kwargs]

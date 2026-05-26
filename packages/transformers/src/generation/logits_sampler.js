@@ -23,6 +23,7 @@ export class LogitsSampler extends Callable {
     }
 
     /**
+     * @override
      * Executes the sampler, using the specified logits.
      * @param {Tensor} logits
      * @returns {Promise<[bigint, number][]>}
@@ -107,6 +108,7 @@ export class LogitsSampler extends Callable {
  */
 class GreedySampler extends LogitsSampler {
     /**
+     * @override
      * Sample the maximum probability of a given logits tensor.
      * @param {Tensor} logits
      * @returns {Promise<[bigint, number][]>} An array with a single tuple, containing the index of the maximum value and a meaningless score (since this is a greedy search).
@@ -126,6 +128,7 @@ class GreedySampler extends LogitsSampler {
  */
 class MultinomialSampler extends LogitsSampler {
     /**
+     * @override
      * Sample from the logits.
      * @param {Tensor} logits
      * @returns {Promise<[bigint, number][]>}
@@ -157,6 +160,7 @@ class MultinomialSampler extends LogitsSampler {
  */
 class BeamSearchSampler extends LogitsSampler {
     /**
+     * @override
      * Sample from the logits.
      * @param {Tensor} logits
      * @returns {Promise<[bigint, number][]>}

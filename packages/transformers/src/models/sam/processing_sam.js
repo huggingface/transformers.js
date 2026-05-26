@@ -4,6 +4,7 @@ import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 export class SamProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
 
+    /** @override */
     async _call(...args) {
         return await this.image_processor(...args);
     }

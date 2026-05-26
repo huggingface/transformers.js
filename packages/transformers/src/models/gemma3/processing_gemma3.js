@@ -5,7 +5,9 @@ import { AutoTokenizer } from '../auto/tokenization_auto.js';
 export class Gemma3Processor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static image_processor_class = AutoImageProcessor;
+    /** @override */
     static uses_processor_config = true;
+    /** @override */
     static uses_chat_template_file = true;
 
     constructor(config, components, chat_template) {
@@ -21,6 +23,7 @@ export class Gemma3Processor extends Processor {
     }
 
     /**
+     * @override
      * @param {string|string[]} text
      * @param {import('../../utils/image.js').RawImage|import('../../utils/image.js').RawImage[]} [images]
      * @param {Object} [options]

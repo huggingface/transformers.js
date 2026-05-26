@@ -3,6 +3,7 @@ import { Tensor } from '../../utils/tensor.js';
 
 export class ChatterboxFeatureExtractor extends FeatureExtractor {
     /**
+     * @override
      * Asynchronously extracts input values from a given audio using the provided configuration.
      * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
      * @returns {Promise<{ input_values: Tensor; }>} The extracted input values.

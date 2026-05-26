@@ -56,6 +56,7 @@ export class VitMattePreTrainedModel extends PreTrainedModel {}
  */
 export class VitMatteForImageMatting extends VitMattePreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

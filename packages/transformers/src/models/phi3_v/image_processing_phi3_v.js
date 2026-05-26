@@ -28,7 +28,10 @@ export class Phi3VImageProcessor extends ImageProcessor {
         );
     }
 
-    /** @type {ImageProcessor['get_resize_output_image_size']} */
+    /**
+     * @override
+     * @type {ImageProcessor['get_resize_output_image_size']}
+     */
     get_resize_output_image_size(image, size) {
         const hd_num = this._num_crops;
         const [width, height] = image.size;
@@ -49,7 +52,10 @@ export class Phi3VImageProcessor extends ImageProcessor {
         return [new_w, new_h];
     }
 
-    /** @type {ImageProcessor['pad_image']} */
+    /**
+     * @override
+     * @type {ImageProcessor['pad_image']}
+     */
     pad_image(pixelData, imgDims, padSize, options = {}) {
         // Phi3V uses a custom padding strategy:
         // - Pad to a multiple of 336
@@ -72,6 +78,7 @@ export class Phi3VImageProcessor extends ImageProcessor {
         );
     }
 
+    /** @override */
     async _call(images, { num_crops = null } = {}) {
         // @ts-expect-error
         this._num_crops = num_crops ??= this.config.num_crops;

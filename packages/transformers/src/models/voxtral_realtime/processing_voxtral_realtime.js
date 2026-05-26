@@ -16,6 +16,7 @@ const STREAMING_PAD_TOKEN_ID = 32;
 export class VoxtralRealtimeProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
+    /** @override */
     static uses_processor_config = false;
 
     /** Number of mel frames in the first audio chunk. */
@@ -51,6 +52,7 @@ export class VoxtralRealtimeProcessor extends Processor {
     }
 
     /**
+     * @override
      * Process audio input for VoxtralRealtime.
      *
      * In streaming mode with `is_first_audio_chunk=true`, the audio is left-padded

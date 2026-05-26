@@ -101,6 +101,7 @@ export class CohereAsrFeatureExtractor extends ParakeetFeatureExtractor {
     }
 
     /**
+     * @override
      * Extracts features from a given audio waveform.
      * @param {Float32Array|Float64Array} audio The audio data.
      * @returns {Promise<{ input_features: import('../../utils/tensor.js').Tensor; attention_mask: import('../../utils/tensor.js').Tensor; }>}

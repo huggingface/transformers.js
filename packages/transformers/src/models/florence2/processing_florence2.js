@@ -118,6 +118,7 @@ export class Florence2Processor extends Processor {
 
     // NOTE: images and text are switched from the python version
     // `images` is required, `text` is optional
+    /** @override */
     async _call(images, text = null, kwargs = {}) {
         if (!images && !text) {
             throw new Error('Either text or images must be provided');

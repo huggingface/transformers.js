@@ -5,6 +5,7 @@ export class SqueezeBertPreTrainedModel extends PreTrainedModel {}
 export class SqueezeBertModel extends SqueezeBertPreTrainedModel {}
 export class SqueezeBertForMaskedLM extends SqueezeBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -16,6 +17,7 @@ export class SqueezeBertForMaskedLM extends SqueezeBertPreTrainedModel {
 }
 export class SqueezeBertForSequenceClassification extends SqueezeBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -27,6 +29,7 @@ export class SqueezeBertForSequenceClassification extends SqueezeBertPreTrainedM
 }
 export class SqueezeBertForQuestionAnswering extends SqueezeBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

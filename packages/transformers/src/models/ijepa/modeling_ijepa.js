@@ -5,6 +5,7 @@ export class IJepaPreTrainedModel extends PreTrainedModel {}
 export class IJepaModel extends IJepaPreTrainedModel {}
 export class IJepaForImageClassification extends IJepaPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

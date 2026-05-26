@@ -75,7 +75,10 @@ export class SiglipModel extends SiglipPreTrainedModel {}
  * ```
  */
 export class SiglipTextModel extends SiglipPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -112,7 +115,10 @@ export class SiglipTextModel extends SiglipPreTrainedModel {
  * ```
  */
 export class SiglipVisionModel extends CLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

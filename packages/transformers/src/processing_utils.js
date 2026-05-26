@@ -109,6 +109,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * @override
      * Calls the feature_extractor function with the given input.
      * @param {any} input The input to extract features from.
      * @param {...any} args Additional arguments.

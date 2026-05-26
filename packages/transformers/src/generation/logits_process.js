@@ -12,6 +12,7 @@ import { max, log_softmax } from '../utils/maths.js';
  */
 export class LogitsProcessor extends Callable {
     /**
+     * @override
      * Apply the processor to the input logits.
      *
      * @abstract
@@ -29,6 +30,7 @@ export class LogitsProcessor extends Callable {
  */
 export class LogitsWarper extends Callable {
     /**
+     * @override
      * Apply the processor to the input logits.
      *
      * @abstract
@@ -74,6 +76,7 @@ export class LogitsProcessorList extends Callable {
     }
 
     /**
+     * @override
      * Applies all logits processors in the list to a batch of logits, modifying them in-place.
      *
      * @param {bigint[][]} input_ids The input IDs for the language model.
@@ -145,6 +148,7 @@ export class ForcedBOSTokenLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply the BOS token forcing to the logits.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -178,6 +182,7 @@ export class ForcedEOSTokenLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply the processor to input_ids and logits.
      *
      * @param {bigint[][]} input_ids The input ids.
@@ -212,6 +217,7 @@ export class SuppressTokensLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Suppress the specified tokens by setting their logits to -Infinity.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -246,6 +252,7 @@ export class SuppressTokensAtBeginLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply the BOS token forcing to the logits.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -290,6 +297,7 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Modify the logits to handle timestamp tokens.
      * @param {bigint[][]} input_ids The input sequence of tokens.
      * @param {Tensor} logits The logits output by the model.
@@ -420,6 +428,7 @@ export class NoRepeatNGramLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply the no-repeat-ngram processor to the logits.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -461,6 +470,7 @@ export class RepetitionPenaltyLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply the repetition penalty to the logits.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -499,6 +509,7 @@ export class MinLengthLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply logit processor.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -537,6 +548,7 @@ export class MinNewTokensLengthLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply logit processor.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -570,6 +582,7 @@ export class NoBadWordsLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply logit processor.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -632,6 +645,7 @@ export class ClassifierFreeGuidanceLogitsProcessor extends LogitsProcessor {
     }
 
     /**
+     * @override
      * Apply logit processor.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.
@@ -685,6 +699,7 @@ export class TemperatureLogitsWarper extends LogitsWarper {
     }
 
     /**
+     * @override
      * Apply logit warper.
      * @param {bigint[][]} input_ids The input IDs.
      * @param {Tensor} logits The logits.

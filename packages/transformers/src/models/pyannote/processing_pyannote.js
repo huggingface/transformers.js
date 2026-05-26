@@ -5,6 +5,7 @@ export class PyAnnoteProcessor extends Processor {
     static feature_extractor_class = PyAnnoteFeatureExtractor;
 
     /**
+     * @override
      * Calls the feature_extractor function with the given audio input.
      * @param {any} audio The audio input to extract features from.
      * @returns {Promise<any>} A Promise that resolves with the extracted features.

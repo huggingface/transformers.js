@@ -14,6 +14,7 @@ export class UniSpeechModel extends UniSpeechPreTrainedModel {}
  */
 export class UniSpeechForCTC extends UniSpeechPreTrainedModel {
     /**
+     * @override
      * @param {Object} model_inputs
      * @param {Tensor} model_inputs.input_values Float values of input raw speech waveform.
      * @param {Tensor} model_inputs.attention_mask Mask to avoid performing convolution and attention on padding token indices. Mask values selected in [0, 1]
@@ -28,6 +29,7 @@ export class UniSpeechForCTC extends UniSpeechPreTrainedModel {
  */
 export class UniSpeechForSequenceClassification extends UniSpeechPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<SequenceClassifierOutput>} An object containing the model's output logits for sequence classification.

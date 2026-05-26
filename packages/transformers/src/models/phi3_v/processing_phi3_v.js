@@ -11,6 +11,7 @@ export class Phi3VProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
 
     /**
+     * @override
      *
      * @param {string|string[]} text
      * @param {RawImage|RawImage[]} images

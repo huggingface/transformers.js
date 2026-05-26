@@ -5,6 +5,7 @@ export class AlbertPreTrainedModel extends PreTrainedModel {}
 export class AlbertModel extends AlbertPreTrainedModel {}
 export class AlbertForSequenceClassification extends AlbertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -16,6 +17,7 @@ export class AlbertForSequenceClassification extends AlbertPreTrainedModel {
 }
 export class AlbertForQuestionAnswering extends AlbertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -27,6 +29,7 @@ export class AlbertForQuestionAnswering extends AlbertPreTrainedModel {
 }
 export class AlbertForMaskedLM extends AlbertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

@@ -10,12 +10,16 @@ export class Qwen2VLImageProcessor extends ImageProcessor {
         this.merge_size = config.merge_size;
     }
 
-    /** @type {ImageProcessor['get_resize_output_image_size']} */
+    /**
+     * @override
+     * @type {ImageProcessor['get_resize_output_image_size']}
+     */
     get_resize_output_image_size(image, size) {
         const factor = this.patch_size * this.merge_size;
         return smart_resize(image.height, image.width, factor, this.min_pixels, this.max_pixels);
     }
 
+    /** @override */
     async _call(images, ...args) {
         const { pixel_values, original_sizes, reshaped_input_sizes } = await super._call(images, ...args);
 

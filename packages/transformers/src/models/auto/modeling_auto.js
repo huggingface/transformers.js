@@ -148,6 +148,7 @@ export class AutoModel extends PretrainedMixin {
     /** @type {Map<string, Object>[]} */
     // @ts-ignore
     static MODEL_CLASS_MAPPINGS = MODEL_CLASS_TYPE_MAPPING.map((x) => x[0]);
+    /** @override */
     static BASE_IF_FAIL = true;
 }
 
@@ -159,6 +160,7 @@ export class AutoModel extends PretrainedMixin {
  * const model = await AutoModelForSequenceClassification.from_pretrained('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
  */
 export class AutoModelForSequenceClassification extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES];
 }
 
@@ -170,6 +172,7 @@ export class AutoModelForSequenceClassification extends PretrainedMixin {
  * const model = await AutoModelForTokenClassification.from_pretrained('Xenova/distilbert-base-multilingual-cased-ner-hrl');
  */
 export class AutoModelForTokenClassification extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES];
 }
 
@@ -181,6 +184,7 @@ export class AutoModelForTokenClassification extends PretrainedMixin {
  * const model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
  */
 export class AutoModelForSeq2SeqLM extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES];
 }
 
@@ -192,6 +196,7 @@ export class AutoModelForSeq2SeqLM extends PretrainedMixin {
  * const model = await AutoModelForSpeechSeq2Seq.from_pretrained('openai/whisper-tiny.en');
  */
 export class AutoModelForSpeechSeq2Seq extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES];
 }
 
@@ -203,6 +208,7 @@ export class AutoModelForSpeechSeq2Seq extends PretrainedMixin {
  * const model = await AutoModelForTextToSpectrogram.from_pretrained('microsoft/speecht5_tts');
  */
 export class AutoModelForTextToSpectrogram extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES];
 }
 
@@ -214,6 +220,7 @@ export class AutoModelForTextToSpectrogram extends PretrainedMixin {
  * const model = await AutoModelForTextToSpectrogram.from_pretrained('facebook/mms-tts-eng');
  */
 export class AutoModelForTextToWaveform extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES];
 }
 
@@ -225,6 +232,7 @@ export class AutoModelForTextToWaveform extends PretrainedMixin {
  * const model = await AutoModelForCausalLM.from_pretrained('Xenova/gpt2');
  */
 export class AutoModelForCausalLM extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_CAUSAL_LM_MAPPING_NAMES];
 }
 
@@ -236,6 +244,7 @@ export class AutoModelForCausalLM extends PretrainedMixin {
  * const model = await AutoModelForMaskedLM.from_pretrained('Xenova/bert-base-uncased');
  */
 export class AutoModelForMaskedLM extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_MASKED_LM_MAPPING_NAMES];
 }
 
@@ -247,6 +256,7 @@ export class AutoModelForMaskedLM extends PretrainedMixin {
  * const model = await AutoModelForQuestionAnswering.from_pretrained('Xenova/distilbert-base-cased-distilled-squad');
  */
 export class AutoModelForQuestionAnswering extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES];
 }
 
@@ -258,6 +268,7 @@ export class AutoModelForQuestionAnswering extends PretrainedMixin {
  * const model = await AutoModelForVision2Seq.from_pretrained('Xenova/vit-gpt2-image-captioning');
  */
 export class AutoModelForVision2Seq extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_VISION_2_SEQ_MAPPING_NAMES];
 }
 
@@ -269,6 +280,7 @@ export class AutoModelForVision2Seq extends PretrainedMixin {
  * const model = await AutoModelForImageClassification.from_pretrained('Xenova/vit-base-patch16-224');
  */
 export class AutoModelForImageClassification extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES];
 }
 
@@ -280,6 +292,7 @@ export class AutoModelForImageClassification extends PretrainedMixin {
  * const model = await AutoModelForImageSegmentation.from_pretrained('Xenova/detr-resnet-50-panoptic');
  */
 export class AutoModelForImageSegmentation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES];
 }
 
@@ -291,6 +304,7 @@ export class AutoModelForImageSegmentation extends PretrainedMixin {
  * const model = await AutoModelForSemanticSegmentation.from_pretrained('nvidia/segformer-b3-finetuned-cityscapes-1024-1024');
  */
 export class AutoModelForSemanticSegmentation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES];
 }
 
@@ -302,6 +316,7 @@ export class AutoModelForSemanticSegmentation extends PretrainedMixin {
  * const model = await AutoModelForUniversalSegmentation.from_pretrained('hf-internal-testing/tiny-random-MaskFormerForInstanceSegmentation');
  */
 export class AutoModelForUniversalSegmentation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES];
 }
 
@@ -313,10 +328,12 @@ export class AutoModelForUniversalSegmentation extends PretrainedMixin {
  * const model = await AutoModelForObjectDetection.from_pretrained('Xenova/detr-resnet-50');
  */
 export class AutoModelForObjectDetection extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_OBJECT_DETECTION_MAPPING_NAMES];
 }
 
 export class AutoModelForZeroShotObjectDetection extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_ZERO_SHOT_OBJECT_DETECTION_MAPPING_NAMES];
 }
 
@@ -328,57 +345,71 @@ export class AutoModelForZeroShotObjectDetection extends PretrainedMixin {
  * const model = await AutoModelForMaskGeneration.from_pretrained('Xenova/sam-vit-base');
  */
 export class AutoModelForMaskGeneration extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_MASK_GENERATION_MAPPING_NAMES];
 }
 
 export class AutoModelForCTC extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_CTC_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioClassification extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING_NAMES];
 }
 
 export class AutoModelForXVector extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_XVECTOR_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioFrameClassification extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES];
 }
 
 export class AutoModelForDocumentQuestionAnswering extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES];
 }
 
 export class AutoModelForImageMatting extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES];
 }
 
 export class AutoModelForImageToImage extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES];
 }
 
 export class AutoModelForDepthEstimation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForNormalEstimation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_NORMAL_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForPoseEstimation extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_POSE_ESTIMATION_MAPPING_NAMES];
 }
 
 export class AutoModelForImageFeatureExtraction extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_FEATURE_EXTRACTION_MAPPING_NAMES];
 }
 
 export class AutoModelForImageTextToText extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES];
 }
 
 export class AutoModelForAudioTextToText extends PretrainedMixin {
+    /** @override */
     static MODEL_CLASS_MAPPINGS = [MODEL_MAPPINGS.MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES];
 }

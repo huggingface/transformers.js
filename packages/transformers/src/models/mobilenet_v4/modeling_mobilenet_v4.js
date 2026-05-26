@@ -14,6 +14,7 @@ export class MobileNetV4Model extends MobileNetV4PreTrainedModel {}
  */
 export class MobileNetV4ForImageClassification extends MobileNetV4PreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

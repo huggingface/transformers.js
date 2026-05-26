@@ -508,7 +508,10 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
         return this.mergePunctuations(words, word_tokens, token_indices, prepend_punctionations, append_punctuations);
     }
 
-    /** @type {PreTrainedTokenizer['decode']} */
+    /**
+     * @override
+     * @type {PreTrainedTokenizer['decode']}
+     */
     decode(token_ids, decode_args) {
         let text;
         // @ts-ignore

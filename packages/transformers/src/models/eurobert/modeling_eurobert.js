@@ -6,6 +6,7 @@ export class EuroBertModel extends EuroBertPreTrainedModel {}
 
 export class EuroBertForMaskedLM extends EuroBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -18,6 +19,7 @@ export class EuroBertForMaskedLM extends EuroBertPreTrainedModel {
 
 export class EuroBertForSequenceClassification extends EuroBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -30,6 +32,7 @@ export class EuroBertForSequenceClassification extends EuroBertPreTrainedModel {
 
 export class EuroBertForTokenClassification extends EuroBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

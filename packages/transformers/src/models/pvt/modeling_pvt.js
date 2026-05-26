@@ -5,6 +5,7 @@ export class PvtPreTrainedModel extends PreTrainedModel {}
 export class PvtModel extends PvtPreTrainedModel {}
 export class PvtForImageClassification extends PvtPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

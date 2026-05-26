@@ -65,6 +65,7 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
     }
 
     /**
+     * @override
      * Asynchronously extracts features from a given audio using the provided configuration.
      * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
      * @returns {Promise<{ input_features: Tensor; attention_mask: Tensor; }>} A Promise resolving to an object containing the extracted input features as a Tensor.

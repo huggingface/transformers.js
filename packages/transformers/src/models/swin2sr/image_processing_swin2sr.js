@@ -1,6 +1,7 @@
 import { ImageProcessor } from '../../image_processors_utils.js';
 
 export class Swin2SRImageProcessor extends ImageProcessor {
+    /** @override */
     pad_image(pixelData, imgDims, padSize, options = {}) {
         // NOTE: In this case, `padSize` represents the size of the sliding window for the local attention.
         // In other words, the image is padded so that its width and height are multiples of `padSize`.

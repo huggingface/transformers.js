@@ -2,7 +2,9 @@ import { PreTrainedModel } from '../modeling_utils.js';
 
 export class MoonshinePreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;
+    /** @override */
     main_input_name = 'input_values';
+    /** @override */
     forward_params = ['input_values', 'decoder_input_ids', 'past_key_values'];
 }
 

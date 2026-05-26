@@ -139,7 +139,10 @@ export class MgpstrProcessor extends Processor {
             wp_preds,
         };
     }
-    /** @type {typeof Processor.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof Processor.from_pretrained}
+     */
     static async from_pretrained(...args) {
         const base = await super.from_pretrained(...args);
 
@@ -157,6 +160,7 @@ export class MgpstrProcessor extends Processor {
         return base;
     }
 
+    /** @override */
     async _call(images, text = null) {
         const result = await this.image_processor(images);
 

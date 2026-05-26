@@ -13,6 +13,7 @@ export class ConvNextV2Model extends ConvNextV2PreTrainedModel {}
  */
 export class ConvNextV2ForImageClassification extends ConvNextV2PreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

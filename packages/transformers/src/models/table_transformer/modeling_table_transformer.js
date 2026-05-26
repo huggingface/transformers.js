@@ -15,6 +15,7 @@ export class TableTransformerModel extends TableTransformerPreTrainedModel {}
  */
 export class TableTransformerForObjectDetection extends TableTransformerPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

@@ -160,5 +160,6 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
  * See [SpeechT5ForSpeechToText](./models#module_models.SpeechT5ForSpeechToText) for example usage.
  */
 export class SpeechT5HifiGan extends PreTrainedModel {
+    /** @override */
     main_input_name = 'spectrogram';
 }

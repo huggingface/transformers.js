@@ -51,7 +51,10 @@ export class CLIPModel extends CLIPPreTrainedModel {}
  * The text model from CLIP without any head or projection on top.
  */
 export class CLIPTextModel extends CLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -88,7 +91,10 @@ export class CLIPTextModel extends CLIPPreTrainedModel {
  * ```
  */
 export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -102,7 +108,10 @@ export class CLIPTextModelWithProjection extends CLIPPreTrainedModel {
  * The vision model from CLIP without any head or projection on top.
  */
 export class CLIPVisionModel extends CLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -139,7 +148,10 @@ export class CLIPVisionModel extends CLIPPreTrainedModel {
  * ```
  */
 export class CLIPVisionModelWithProjection extends CLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

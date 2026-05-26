@@ -5,6 +5,7 @@ export class RTDetrV2PreTrainedModel extends PreTrainedModel {}
 export class RTDetrV2Model extends RTDetrV2PreTrainedModel {}
 export class RTDetrV2ForObjectDetection extends RTDetrV2PreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

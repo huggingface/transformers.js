@@ -192,6 +192,7 @@ class AudioExhaustedCriteria extends StoppingCriteria {
         super();
         this._s = enc_state;
     }
+    /** @override */
     _call(input_ids) {
         const done = this._s.stream_exhausted && this._s.audio_embed_queue.length === 0;
         return input_ids.map(() => done);
@@ -199,10 +200,12 @@ class AudioExhaustedCriteria extends StoppingCriteria {
 }
 
 export class VoxtralRealtimePreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = ['input_ids', 'attention_mask', 'position_ids', 'past_key_values'];
 }
 
 export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreTrainedModel {
+    /** @override */
     async forward({ input_ids, past_key_values, ...kwargs }) {
         const current_len = input_ids.dims[1];
 
@@ -225,6 +228,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         return await sessionRun(session, fixed);
     }
 
+    /** @override */
     async generate({ input_features, stopping_criteria: userStoppingCriteria, ...kwargs }) {
         if (!input_features) {
             throw new Error('input_features (generator/iterable) must be provided');

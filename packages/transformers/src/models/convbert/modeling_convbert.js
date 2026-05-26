@@ -18,6 +18,7 @@ export class ConvBertModel extends ConvBertPreTrainedModel {}
  */
 export class ConvBertForMaskedLM extends ConvBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class ConvBertForMaskedLM extends ConvBertPreTrainedModel {
  */
 export class ConvBertForSequenceClassification extends ConvBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -49,6 +51,7 @@ export class ConvBertForSequenceClassification extends ConvBertPreTrainedModel {
  */
 export class ConvBertForTokenClassification extends ConvBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -65,6 +68,7 @@ export class ConvBertForTokenClassification extends ConvBertPreTrainedModel {
  */
 export class ConvBertForQuestionAnswering extends ConvBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

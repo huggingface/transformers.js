@@ -5,6 +5,7 @@ export class FastViTPreTrainedModel extends PreTrainedModel {}
 export class FastViTModel extends FastViTPreTrainedModel {}
 export class FastViTForImageClassification extends FastViTPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

@@ -4,6 +4,7 @@ import { ones, full } from '../../utils/tensor.js';
 export class JinaCLIPPreTrainedModel extends PreTrainedModel {}
 
 export class JinaCLIPModel extends JinaCLIPPreTrainedModel {
+    /** @override */
     async forward(model_inputs) {
         const missing_text_inputs = !model_inputs.input_ids;
         const missing_image_inputs = !model_inputs.pixel_values;
@@ -43,7 +44,10 @@ export class JinaCLIPModel extends JinaCLIPPreTrainedModel {
 }
 
 export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -54,7 +58,10 @@ export class JinaCLIPTextModel extends JinaCLIPPreTrainedModel {
 }
 
 export class JinaCLIPVisionModel extends JinaCLIPPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

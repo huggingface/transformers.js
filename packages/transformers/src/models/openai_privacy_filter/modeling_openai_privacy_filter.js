@@ -6,6 +6,7 @@ export class OpenAIPrivacyFilterModel extends OpenAIPrivacyFilterPreTrainedModel
 
 export class OpenAIPrivacyFilterForTokenClassification extends OpenAIPrivacyFilterPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

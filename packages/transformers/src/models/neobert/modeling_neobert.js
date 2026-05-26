@@ -11,6 +11,7 @@ export class NeoBertModel extends NeoBertPreTrainedModel {}
 
 export class NeoBertForMaskedLM extends NeoBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -23,6 +24,7 @@ export class NeoBertForMaskedLM extends NeoBertPreTrainedModel {
 
 export class NeoBertForSequenceClassification extends NeoBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -35,6 +37,7 @@ export class NeoBertForSequenceClassification extends NeoBertPreTrainedModel {
 
 export class NeoBertForTokenClassification extends NeoBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -47,6 +50,7 @@ export class NeoBertForTokenClassification extends NeoBertPreTrainedModel {
 
 export class NeoBertForQuestionAnswering extends NeoBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

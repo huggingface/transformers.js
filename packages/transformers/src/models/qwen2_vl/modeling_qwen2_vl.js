@@ -9,6 +9,7 @@ import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
 
 export class Qwen2VLPreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         // Text inputs
         'input_ids',
@@ -271,6 +272,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         }
     }
 
+    /** @override */
     async encode_image({ pixel_values, image_grid_thw }) {
         const features = (
             await sessionRun(this.sessions['vision_encoder'], {
@@ -289,6 +291,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         });
     }
 
+    /** @override */
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         setNumLogitsToKeep(this, model_inputs, 1n);
 

@@ -67,6 +67,7 @@ export class PyAnnoteModel extends PyAnnotePreTrainedModel {}
  */
 export class PyAnnoteForAudioFrameClassification extends PyAnnotePreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<TokenClassifierOutput>} An object containing the model's output logits for sequence classification.

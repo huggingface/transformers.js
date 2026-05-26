@@ -6,6 +6,7 @@ export class ModernBertModel extends ModernBertPreTrainedModel {}
 
 export class ModernBertForMaskedLM extends ModernBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -18,6 +19,7 @@ export class ModernBertForMaskedLM extends ModernBertPreTrainedModel {
 
 export class ModernBertForSequenceClassification extends ModernBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -30,6 +32,7 @@ export class ModernBertForSequenceClassification extends ModernBertPreTrainedMod
 
 export class ModernBertForTokenClassification extends ModernBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

@@ -14,6 +14,7 @@ export class Wav2Vec2BertModel extends Wav2Vec2BertPreTrainedModel {}
  */
 export class Wav2Vec2BertForCTC extends Wav2Vec2BertPreTrainedModel {
     /**
+     * @override
      * @param {Object} model_inputs
      * @param {Tensor} model_inputs.input_features Float values of input mel-spectrogram.
      * @param {Tensor} model_inputs.attention_mask Mask to avoid performing convolution and attention on padding token indices. Mask values selected in [0, 1]
@@ -28,6 +29,7 @@ export class Wav2Vec2BertForCTC extends Wav2Vec2BertPreTrainedModel {
  */
 export class Wav2Vec2BertForSequenceClassification extends Wav2Vec2BertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<SequenceClassifierOutput>} An object containing the model's output logits for sequence classification.

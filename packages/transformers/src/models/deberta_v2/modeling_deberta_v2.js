@@ -18,6 +18,7 @@ export class DebertaV2Model extends DebertaV2PreTrainedModel {}
  */
 export class DebertaV2ForMaskedLM extends DebertaV2PreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class DebertaV2ForMaskedLM extends DebertaV2PreTrainedModel {
  */
 export class DebertaV2ForSequenceClassification extends DebertaV2PreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -48,6 +50,7 @@ export class DebertaV2ForSequenceClassification extends DebertaV2PreTrainedModel
  */
 export class DebertaV2ForTokenClassification extends DebertaV2PreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -64,6 +67,7 @@ export class DebertaV2ForTokenClassification extends DebertaV2PreTrainedModel {
  */
 export class DebertaV2ForQuestionAnswering extends DebertaV2PreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

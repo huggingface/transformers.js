@@ -60,6 +60,7 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
     }
 
     /**
+     * @override
      * Asynchronously extracts features from a given audio using the provided configuration.
      * @param {Float32Array|Float64Array} audio The audio data as a Float32Array/Float64Array.
      * @param {Object} options Optional parameters for feature extraction.

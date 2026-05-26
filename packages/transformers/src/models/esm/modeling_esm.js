@@ -13,6 +13,7 @@ export class EsmModel extends EsmPreTrainedModel {}
  */
 export class EsmForMaskedLM extends EsmPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -28,6 +29,7 @@ export class EsmForMaskedLM extends EsmPreTrainedModel {
  */
 export class EsmForSequenceClassification extends EsmPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -44,6 +46,7 @@ export class EsmForSequenceClassification extends EsmPreTrainedModel {
  */
 export class EsmForTokenClassification extends EsmPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

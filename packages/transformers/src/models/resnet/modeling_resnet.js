@@ -16,6 +16,7 @@ export class ResNetModel extends ResNetPreTrainedModel {}
  */
 export class ResNetForImageClassification extends ResNetPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

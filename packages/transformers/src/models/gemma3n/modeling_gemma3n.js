@@ -7,6 +7,7 @@ import {
 import { sessionRun } from '../session.js';
 
 export class Gemma3nPreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         'input_ids',
         'attention_mask',
@@ -21,6 +22,7 @@ export class Gemma3nPreTrainedModel extends PreTrainedModel {
     ];
 }
 export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
+    /** @override */
     async forward({
         // Produced by the tokenizer/processor:
         input_ids = null,

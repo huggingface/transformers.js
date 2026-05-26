@@ -6,6 +6,7 @@ export class YolosPreTrainedModel extends PreTrainedModel {}
 export class YolosModel extends YolosPreTrainedModel {}
 export class YolosForObjectDetection extends YolosPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

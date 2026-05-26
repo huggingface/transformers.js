@@ -9,6 +9,7 @@ export class Qwen2VLProcessor extends Processor {
     static image_token = '<|image_pad|>';
 
     /**
+     * @override
      *
      * @param {string|string[]} text
      * @param {RawImage|RawImage[]} images

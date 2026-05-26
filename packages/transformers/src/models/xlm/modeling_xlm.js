@@ -18,6 +18,7 @@ export class XLMModel extends XLMPreTrainedModel {}
  */
 export class XLMWithLMHeadModel extends XLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class XLMWithLMHeadModel extends XLMPreTrainedModel {
  */
 export class XLMForSequenceClassification extends XLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -48,6 +50,7 @@ export class XLMForSequenceClassification extends XLMPreTrainedModel {
  */
 export class XLMForTokenClassification extends XLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -63,6 +66,7 @@ export class XLMForTokenClassification extends XLMPreTrainedModel {
  */
 export class XLMForQuestionAnswering extends XLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

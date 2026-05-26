@@ -7,6 +7,7 @@ const NO_SPACE_LANGUAGES = new Set(['ja', 'zh']);
 export class CohereAsrProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
+    /** @override */
     static uses_processor_config = true;
 
     /**
@@ -45,6 +46,7 @@ export class CohereAsrProcessor extends Processor {
     }
 
     /**
+     * @override
      * Calls the feature_extractor function with the given audio input.
      * @param {any} audio The audio input to extract features from.
      * @returns {Promise<any>}

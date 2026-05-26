@@ -3,7 +3,9 @@ import { sessionRun } from '../session.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class SnacPreTrainedModel extends PreTrainedModel {
+    /** @override */
     main_input_name = 'input_values';
+    /** @override */
     forward_params = ['input_values'];
 }
 
@@ -32,7 +34,10 @@ export class SnacModel extends SnacPreTrainedModel {
 }
 
 export class SnacEncoderModel extends SnacPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -42,7 +47,10 @@ export class SnacEncoderModel extends SnacPreTrainedModel {
     }
 }
 export class SnacDecoderModel extends SnacPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

@@ -5,6 +5,7 @@ export class HieraPreTrainedModel extends PreTrainedModel {}
 export class HieraModel extends HieraPreTrainedModel {}
 export class HieraForImageClassification extends HieraPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

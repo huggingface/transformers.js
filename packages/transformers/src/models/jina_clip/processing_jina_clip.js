@@ -6,6 +6,7 @@ export class JinaCLIPProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static image_processor_class = AutoImageProcessor;
 
+    /** @override */
     async _call(text = null, images = null, kwargs = {}) {
         if (!text && !images) {
             throw new Error('Either text or images must be provided');

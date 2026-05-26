@@ -14,6 +14,7 @@ export class XLMRobertaModel extends XLMRobertaPreTrainedModel {}
  */
 export class XLMRobertaForMaskedLM extends XLMRobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -29,6 +30,7 @@ export class XLMRobertaForMaskedLM extends XLMRobertaPreTrainedModel {
  */
 export class XLMRobertaForSequenceClassification extends XLMRobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -44,6 +46,7 @@ export class XLMRobertaForSequenceClassification extends XLMRobertaPreTrainedMod
  */
 export class XLMRobertaForTokenClassification extends XLMRobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -59,6 +62,7 @@ export class XLMRobertaForTokenClassification extends XLMRobertaPreTrainedModel 
  */
 export class XLMRobertaForQuestionAnswering extends XLMRobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

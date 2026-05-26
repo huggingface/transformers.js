@@ -5,6 +5,7 @@ export class SwinPreTrainedModel extends PreTrainedModel {}
 export class SwinModel extends SwinPreTrainedModel {}
 export class SwinForImageClassification extends SwinPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

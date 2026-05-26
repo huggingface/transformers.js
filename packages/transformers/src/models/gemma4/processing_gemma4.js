@@ -6,7 +6,9 @@ import { PROCESSOR_NAME, CHAT_TEMPLATE_NAME } from '../../utils/constants.js';
 import { getModelJSON, getModelText } from '../../utils/hub.js';
 
 export class Gemma4Processor extends Processor {
+    /** @override */
     static uses_processor_config = true;
+    /** @override */
     static uses_chat_template_file = true;
 
     constructor(config, components, chat_template) {
@@ -25,6 +27,7 @@ export class Gemma4Processor extends Processor {
         this.eoi_token = eoi_token;
     }
 
+    /** @override */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         const [config, tokenizer, chat_template] = await Promise.all([
             getModelJSON(pretrained_model_name_or_path, PROCESSOR_NAME, true, options),
@@ -65,6 +68,7 @@ export class Gemma4Processor extends Processor {
         return Math.min(t, this.audio_seq_length);
     }
 
+    /** @override */
     async _call(text, images = null, audio = null, options = {}) {
         if (typeof text === 'string') {
             text = [text];

@@ -360,6 +360,7 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
+     * @override
      * Runs the model with the provided inputs
      * @param {Object} model_inputs Object containing input tensors
      * @returns {Promise<Object>} Object containing output tensors

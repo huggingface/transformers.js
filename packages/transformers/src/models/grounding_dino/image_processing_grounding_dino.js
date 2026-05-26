@@ -9,6 +9,7 @@ import { ones } from '../../utils/tensor.js';
 
 export class GroundingDinoImageProcessor extends ImageProcessor {
     /**
+     * @override
      * Calls the feature extraction process on an array of images, preprocesses
      * each image, and concatenates the resulting features into a single Tensor.
      * @param {import('../../utils/image.js').RawImage[]} images The image(s) to extract features from.

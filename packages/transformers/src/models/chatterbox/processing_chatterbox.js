@@ -9,6 +9,7 @@ export class ChatterboxProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
 
+    /** @override */
     async _call(text, audio = null) {
         const text_features = this.tokenizer(text);
         const audio_features = audio ? await this.feature_extractor(audio) : {};

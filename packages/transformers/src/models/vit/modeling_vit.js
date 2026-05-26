@@ -5,6 +5,7 @@ export class ViTPreTrainedModel extends PreTrainedModel {}
 export class ViTModel extends ViTPreTrainedModel {}
 export class ViTForImageClassification extends ViTPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

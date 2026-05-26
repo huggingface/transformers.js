@@ -8,6 +8,7 @@ import { RawImage } from '../../utils/image.js';
 export class VLChatProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
     static tokenizer_class = AutoTokenizer;
+    /** @override */
     static uses_processor_config = true;
 
     constructor(config, components, chat_template) {
@@ -34,6 +35,7 @@ export class VLChatProcessor extends Processor {
      */
 
     /**
+     * @override
      * @param {MultimodalConversation} conversation The chat messages to process.
      * @param {Object} options Additional options for processing.
      * @param {RawImage|RawImage[]} [options.images] The images to process, if not set in the conversation.

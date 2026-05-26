@@ -25,6 +25,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
     }
 
     /**
+     * @override
      * Encodes a single text. Overriding this method is necessary since the language codes
      * must be removed before encoding with sentencepiece model.
      * @see https://github.com/huggingface/transformers/blob/12d51db243a00726a548a43cc333390ebae731e3/src/transformers/models/marian/tokenization_marian.py#L204-L213

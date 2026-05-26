@@ -76,6 +76,7 @@ export class TextStreamer extends BaseStreamer {
     }
 
     /**
+     * @override
      * Receives tokens, decodes them, and prints them to stdout as soon as they form entire words.
      * @param {bigint[][]} value
      */
@@ -136,6 +137,7 @@ export class TextStreamer extends BaseStreamer {
     }
 
     /**
+     * @override
      * Flushes any remaining cache and prints a newline to stdout.
      */
     end() {
@@ -222,6 +224,7 @@ export class WhisperTextStreamer extends TextStreamer {
     }
 
     /**
+     * @override
      * @param {bigint[][]} value
      */
     put(value) {
@@ -251,6 +254,7 @@ export class WhisperTextStreamer extends TextStreamer {
         return super.put(value);
     }
 
+    /** @override */
     end() {
         super.end();
         this.on_finalize?.();

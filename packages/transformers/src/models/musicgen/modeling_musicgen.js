@@ -51,6 +51,7 @@ export class MusicgenForCausalLM extends MusicgenPreTrainedModel {}
  */
 export class MusicgenForConditionalGeneration extends PreTrainedModel {
     // NOTE: not MusicgenPreTrainedModel
+    /** @override */
     forward_params = [
         'input_ids',
         'attention_mask',
@@ -94,6 +95,7 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
         return new Tensor(outputs.type, outputs.data.slice(0, newDataSize), [batch_size, num_codebooks, inferred]);
     }
 
+    /** @override */
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         // @ts-expect-error TS2339
         const pad_token_id = BigInt(this.config.decoder.pad_token_id);
@@ -119,6 +121,7 @@ export class MusicgenForConditionalGeneration extends PreTrainedModel {
     }
 
     /**
+     * @override
      * Generates sequences of token ids for models with a language modeling head.
      * @param {import('../../generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.

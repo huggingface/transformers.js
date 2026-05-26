@@ -5,6 +5,7 @@ export class DeiTPreTrainedModel extends PreTrainedModel {}
 export class DeiTModel extends DeiTPreTrainedModel {}
 export class DeiTForImageClassification extends DeiTPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

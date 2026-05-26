@@ -27,6 +27,7 @@ export class GlmOcrForConditionalGeneration extends Qwen2_5_VLForConditionalGene
     }
 
     /**
+     * @override
      * GlmOcr uses mm_token_type_ids-style grouping (image tokens identified by image_token_id)
      * instead of vision_start_token_id scanning used by Qwen2VL.
      * After a vision segment, position advances by max(h, w) / spatial_merge_size.

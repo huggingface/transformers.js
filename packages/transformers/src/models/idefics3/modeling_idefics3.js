@@ -4,6 +4,7 @@ import { LlavaForConditionalGeneration } from '../llava/modeling_llava.js';
  * The Idefics3 model which consists of a vision backbone and a language model.
  */
 export class Idefics3ForConditionalGeneration extends LlavaForConditionalGeneration {
+    /** @override */
     forward_params = [
         'input_ids',
         'attention_mask',

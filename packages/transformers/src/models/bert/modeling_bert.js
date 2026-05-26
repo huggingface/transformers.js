@@ -14,6 +14,7 @@ export class BertModel extends BertPreTrainedModel {}
  */
 export class BertForMaskedLM extends BertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -29,6 +30,7 @@ export class BertForMaskedLM extends BertPreTrainedModel {
  */
 export class BertForSequenceClassification extends BertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -44,6 +46,7 @@ export class BertForSequenceClassification extends BertPreTrainedModel {
  */
 export class BertForTokenClassification extends BertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -59,6 +62,7 @@ export class BertForTokenClassification extends BertPreTrainedModel {
  */
 export class BertForQuestionAnswering extends BertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

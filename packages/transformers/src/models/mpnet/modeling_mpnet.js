@@ -18,6 +18,7 @@ export class MPNetModel extends MPNetPreTrainedModel {}
  */
 export class MPNetForMaskedLM extends MPNetPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class MPNetForMaskedLM extends MPNetPreTrainedModel {
  */
 export class MPNetForSequenceClassification extends MPNetPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -48,6 +50,7 @@ export class MPNetForSequenceClassification extends MPNetPreTrainedModel {
  */
 export class MPNetForTokenClassification extends MPNetPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -63,6 +66,7 @@ export class MPNetForTokenClassification extends MPNetPreTrainedModel {
  */
 export class MPNetForQuestionAnswering extends MPNetPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

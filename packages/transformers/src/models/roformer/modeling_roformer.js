@@ -18,6 +18,7 @@ export class RoFormerModel extends RoFormerPreTrainedModel {}
  */
 export class RoFormerForMaskedLM extends RoFormerPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class RoFormerForMaskedLM extends RoFormerPreTrainedModel {
  */
 export class RoFormerForSequenceClassification extends RoFormerPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -49,6 +51,7 @@ export class RoFormerForSequenceClassification extends RoFormerPreTrainedModel {
  */
 export class RoFormerForTokenClassification extends RoFormerPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -65,6 +68,7 @@ export class RoFormerForTokenClassification extends RoFormerPreTrainedModel {
  */
 export class RoFormerForQuestionAnswering extends RoFormerPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

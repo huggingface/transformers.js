@@ -12,6 +12,7 @@ import { Callable } from '../utils/generic.js';
  */
 export class StoppingCriteria extends Callable {
     /**
+     * @override
      *
      * @param {number[][]} input_ids (`number[][]` of shape `(batch_size, sequence_length)`):
      * Indices of input sequence tokens in the vocabulary.
@@ -58,6 +59,7 @@ export class StoppingCriteriaList extends Callable {
         this.criteria.push(...items);
     }
 
+    /** @override */
     _call(input_ids, scores) {
         const is_done = new Array(input_ids.length).fill(false);
         for (const criterion of this.criteria) {
@@ -90,6 +92,7 @@ export class MaxLengthCriteria extends StoppingCriteria {
         this.max_position_embeddings = max_position_embeddings;
     }
 
+    /** @override */
     _call(input_ids) {
         return input_ids.map((ids) => ids.length >= this.max_length);
     }
@@ -116,6 +119,7 @@ export class EosTokenCriteria extends StoppingCriteria {
     }
 
     /**
+     * @override
      *
      * @param {number[][]} input_ids
      * @param {number[][]} scores
@@ -147,6 +151,7 @@ export class InterruptableStoppingCriteria extends StoppingCriteria {
         this.interrupted = false;
     }
 
+    /** @override */
     _call(input_ids, scores) {
         return new Array(input_ids.length).fill(this.interrupted);
     }

@@ -97,6 +97,7 @@ export class SamModel extends SamPreTrainedModel {
      */
 
     /**
+     * @override
      * @param {SamModelInputs} model_inputs Object containing the model inputs.
      * @returns {Promise<Object>} The output of the model.
      */
@@ -135,6 +136,7 @@ export class SamModel extends SamPreTrainedModel {
     }
 
     /**
+     * @override
      * Runs the model with the provided inputs
      * @param {Object} model_inputs Model inputs
      * @returns {Promise<SamImageSegmentationOutput>} Object containing segmentation outputs

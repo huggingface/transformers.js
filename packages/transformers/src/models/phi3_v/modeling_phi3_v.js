@@ -3,6 +3,7 @@ import { sessionRun } from '../session.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class Phi3VPreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         'input_ids',
         'inputs_embeds',
@@ -14,6 +15,7 @@ export class Phi3VPreTrainedModel extends PreTrainedModel {
     ];
 }
 export class Phi3VForCausalLM extends Phi3VPreTrainedModel {
+    /** @override */
     async forward({
         // Produced by the tokenizer/processor:
         input_ids = null,

@@ -18,6 +18,7 @@ export class CamembertModel extends CamembertPreTrainedModel {}
  */
 export class CamembertForMaskedLM extends CamembertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -33,6 +34,7 @@ export class CamembertForMaskedLM extends CamembertPreTrainedModel {
  */
 export class CamembertForSequenceClassification extends CamembertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -48,6 +50,7 @@ export class CamembertForSequenceClassification extends CamembertPreTrainedModel
  */
 export class CamembertForTokenClassification extends CamembertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -63,6 +66,7 @@ export class CamembertForTokenClassification extends CamembertPreTrainedModel {
  */
 export class CamembertForQuestionAnswering extends CamembertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

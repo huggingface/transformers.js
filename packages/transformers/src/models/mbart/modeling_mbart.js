@@ -18,6 +18,7 @@ export class MBartForConditionalGeneration extends MBartPreTrainedModel {}
  */
 export class MBartForSequenceClassification extends MBartPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

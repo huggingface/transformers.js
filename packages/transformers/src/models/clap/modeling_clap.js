@@ -31,7 +31,10 @@ export class ClapModel extends ClapPreTrainedModel {}
  * ```
  */
 export class ClapTextModelWithProjection extends ClapPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -68,7 +71,10 @@ export class ClapTextModelWithProjection extends ClapPreTrainedModel {
  * ```
  */
 export class ClapAudioModelWithProjection extends ClapPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

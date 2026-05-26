@@ -1,6 +1,7 @@
 import { PreTrainedModel } from '../modeling_utils.js';
 
 export class T5PreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         'input_ids',
         'attention_mask',

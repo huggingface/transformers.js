@@ -13,6 +13,7 @@ export class EfficientNetModel extends EfficientNetPreTrainedModel {}
  */
 export class EfficientNetForImageClassification extends EfficientNetPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

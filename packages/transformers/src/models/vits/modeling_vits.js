@@ -50,6 +50,7 @@ export class VitsPreTrainedModel extends PreTrainedModel {}
  */
 export class VitsModel extends VitsPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<VitsModelOutput>} The outputs for the VITS model.

@@ -18,6 +18,7 @@ export class BartForConditionalGeneration extends BartPretrainedModel {}
  */
 export class BartForSequenceClassification extends BartPretrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

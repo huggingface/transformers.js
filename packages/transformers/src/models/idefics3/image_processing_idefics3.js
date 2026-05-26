@@ -36,7 +36,10 @@ export class Idefics3ImageProcessor extends ImageProcessor {
         return { height, width };
     }
 
-    /** @param {RawImage|RawImage[]|RawImage[][]} images */
+    /**
+     * @override
+     * @param {RawImage|RawImage[]|RawImage[][]} images
+     */
     async _call(images, { do_image_splitting = null, return_row_col_info = false } = {}) {
         /** @type {RawImage[][]} */
         let batched_2d_images;

@@ -6,6 +6,7 @@ import { Tensor } from '../../utils/tensor.js';
 export class GraniteSpeechProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
     static feature_extractor_class = AutoFeatureExtractor;
+    /** @override */
     static uses_processor_config = true;
 
     /**
@@ -24,6 +25,7 @@ export class GraniteSpeechProcessor extends Processor {
     }
 
     /**
+     * @override
      * @param {string} text The text input to process.
      * @param {Float32Array} audio The audio input to process.
      */

@@ -9,7 +9,9 @@ export class Gemma3nProcessor extends Processor {
     static image_processor_class = AutoImageProcessor;
     static feature_extractor_class = AutoFeatureExtractor;
     static tokenizer_class = AutoTokenizer;
+    /** @override */
     static uses_processor_config = true;
+    /** @override */
     static uses_chat_template_file = true;
 
     constructor(config, components, chat_template) {
@@ -45,6 +47,7 @@ export class Gemma3nProcessor extends Processor {
     }
 
     /**
+     * @override
      *
      * @param {string|string[]} text
      * @param {RawImage|RawImage[]|RawImage[][]} images

@@ -113,6 +113,7 @@ export class Gemma4ImageProcessor extends Callable {
     }
 
     /**
+     * @override
      * @param {RawImage|RawImage[]} images
      * @returns {Promise<{ pixel_values: Tensor, image_position_ids: Tensor, num_soft_tokens_per_image: number[] }>}
      */

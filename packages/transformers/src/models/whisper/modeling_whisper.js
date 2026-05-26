@@ -15,7 +15,9 @@ import { logger } from '../../utils/logger.js';
 
 export class WhisperPreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;
+    /** @override */
     main_input_name = 'input_features';
+    /** @override */
     forward_params = [
         'input_features',
         'attention_mask',
@@ -34,6 +36,7 @@ export class WhisperModel extends WhisperPreTrainedModel {}
  * WhisperForConditionalGeneration class for generating conditional outputs from Whisper models.
  */
 export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
+    /** @override */
     _prepare_generation_config(generation_config, kwargs) {
         return /** @type {WhisperGenerationConfig} */ (
             super._prepare_generation_config(generation_config, kwargs, WhisperGenerationConfig)
@@ -98,6 +101,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
     }
 
     /**
+     * @override
      * Transcribes or translates log-mel input features to a sequence of auto-regressively generated token ids.
      * @param {import('./generation_whisper.js').WhisperGenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.

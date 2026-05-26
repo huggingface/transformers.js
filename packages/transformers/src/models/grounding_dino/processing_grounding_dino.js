@@ -31,6 +31,7 @@ export class GroundingDinoProcessor extends Processor {
      * @typedef {import('../../utils/image.js').RawImage} RawImage
      */
     /**
+     * @override
      *
      * @param {RawImage|RawImage[]|RawImage[][]} images
      * @param {string|string[]} text

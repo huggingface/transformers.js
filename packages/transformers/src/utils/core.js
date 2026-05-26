@@ -115,6 +115,7 @@ export class DefaultProgressCallback extends Callable {
     }
 
     /**
+     * @override
      * @param {ProgressInfo} info
      */
     _call(info) {

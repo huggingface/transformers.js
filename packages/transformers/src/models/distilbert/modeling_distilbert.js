@@ -14,6 +14,7 @@ export class DistilBertModel extends DistilBertPreTrainedModel {}
  */
 export class DistilBertForSequenceClassification extends DistilBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -29,6 +30,7 @@ export class DistilBertForSequenceClassification extends DistilBertPreTrainedMod
  */
 export class DistilBertForTokenClassification extends DistilBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -44,6 +46,7 @@ export class DistilBertForTokenClassification extends DistilBertPreTrainedModel 
  */
 export class DistilBertForQuestionAnswering extends DistilBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -59,6 +62,7 @@ export class DistilBertForQuestionAnswering extends DistilBertPreTrainedModel {
  */
 export class DistilBertForMaskedLM extends DistilBertPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

@@ -13,6 +13,7 @@ export class Dinov2Model extends Dinov2PreTrainedModel {}
  */
 export class Dinov2ForImageClassification extends Dinov2PreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

@@ -53,6 +53,7 @@ export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
     }
 
     /**
+     * @override
      * Extract mel spectrogram features from audio.
      * @param {Float32Array|Float64Array} audio The audio data.
      * @param {Object} [options]

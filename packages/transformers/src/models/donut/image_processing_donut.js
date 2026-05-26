@@ -1,6 +1,7 @@
 import { ImageProcessor } from '../../image_processors_utils.js';
 
 export class DonutImageProcessor extends ImageProcessor {
+    /** @override */
     pad_image(pixelData, imgDims, padSize, options = {}) {
         const [imageHeight, imageWidth, imageChannels] = imgDims;
 

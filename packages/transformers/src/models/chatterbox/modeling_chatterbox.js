@@ -6,6 +6,7 @@ const SILENCE_TOKEN = 4299n;
 const START_SPEECH_TOKEN = 6561n;
 
 export class ChatterboxPreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         'input_ids',
         'inputs_embeds',
@@ -19,8 +20,10 @@ export class ChatterboxPreTrainedModel extends PreTrainedModel {
         'speaker_features',
         'past_key_values',
     ];
+    /** @override */
     main_input_name = 'input_ids';
 
+    /** @override */
     _return_dict_in_generate_keys = ['audio_tokens', 'speaker_embeddings', 'speaker_features'];
 }
 export class ChatterboxModel extends ChatterboxPreTrainedModel {
@@ -34,6 +37,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         });
     }
 
+    /** @override */
     async forward({
         // Produced by the tokenizer/processor:
         input_ids = null,
@@ -129,6 +133,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         };
     }
 
+    /** @override */
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         if (!model_inputs.position_ids && this.sessions['embed_tokens'].inputNames.includes('position_ids')) {
             // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
@@ -160,7 +165,10 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         return decoder_prepare_inputs_for_generation(this, input_ids, model_inputs, generation_config);
     }
 
-    /** @type {PreTrainedModel['generate']} */
+    /**
+     * @override
+     * @type {PreTrainedModel['generate']}
+     */
     async generate(params) {
         const { sequences, audio_tokens, speaker_embeddings, speaker_features } = /** @type {any} */ (
             await super.generate({

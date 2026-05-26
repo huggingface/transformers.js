@@ -6,6 +6,7 @@ export class DetrPreTrainedModel extends PreTrainedModel {}
 export class DetrModel extends DetrPreTrainedModel {}
 export class DetrForObjectDetection extends DetrPreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {
@@ -15,6 +16,7 @@ export class DetrForObjectDetection extends DetrPreTrainedModel {
 
 export class DetrForSegmentation extends DetrPreTrainedModel {
     /**
+     * @override
      * Runs the model with the provided inputs
      * @param {Object} model_inputs Model inputs
      * @returns {Promise<DetrSegmentationOutput>} Object containing segmentation outputs

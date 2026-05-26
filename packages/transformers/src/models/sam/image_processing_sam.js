@@ -86,6 +86,7 @@ export class SamImageProcessor extends ImageProcessor {
         return new Tensor('int64', input_labels.flat(Infinity).map(BigInt), shape);
     }
     /**
+     * @override
      * @param {any[]} images The URL(s) of the image(s) to extract features from.
      * @param {Object} [options] Additional options for the processor.
      * @param {any} [options.input_points=null] A 3D or 4D array, representing the input points provided by the user.

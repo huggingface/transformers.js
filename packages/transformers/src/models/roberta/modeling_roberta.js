@@ -14,6 +14,7 @@ export class RobertaModel extends RobertaPreTrainedModel {}
  */
 export class RobertaForMaskedLM extends RobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -29,6 +30,7 @@ export class RobertaForMaskedLM extends RobertaPreTrainedModel {
  */
 export class RobertaForSequenceClassification extends RobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -44,6 +46,7 @@ export class RobertaForSequenceClassification extends RobertaPreTrainedModel {
  */
 export class RobertaForTokenClassification extends RobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -59,6 +62,7 @@ export class RobertaForTokenClassification extends RobertaPreTrainedModel {
  */
 export class RobertaForQuestionAnswering extends RobertaPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

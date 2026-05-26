@@ -14,6 +14,7 @@ export class VLMImageProcessor extends ImageProcessor {
         this.constant_values = this.config.background_color.map((x) => x * this.rescale_factor);
     }
 
+    /** @override */
     pad_image(pixelData, imgDims, padSize, options) {
         return super.pad_image(pixelData, imgDims, padSize, {
             constant_values: this.constant_values,

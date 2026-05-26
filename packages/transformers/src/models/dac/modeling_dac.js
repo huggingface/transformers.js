@@ -26,7 +26,9 @@ export class DacDecoderOutput extends ModelOutput {
 }
 
 export class DacPreTrainedModel extends PreTrainedModel {
+    /** @override */
     main_input_name = 'input_values';
+    /** @override */
     forward_params = ['input_values'];
 }
 
@@ -55,7 +57,10 @@ export class DacModel extends DacPreTrainedModel {
 }
 
 export class DacEncoderModel extends DacPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -65,7 +70,10 @@ export class DacEncoderModel extends DacPreTrainedModel {
     }
 }
 export class DacDecoderModel extends DacPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

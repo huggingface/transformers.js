@@ -28,6 +28,7 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
     }
 
     /**
+     * @override
      * Extract mel spectrogram features from audio, matching the Python GraniteSpeechFeatureExtractor.
      * @param {Float32Array|Float64Array} audio The audio waveform.
      * @returns {Promise<{input_features: Tensor}>}

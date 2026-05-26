@@ -20,6 +20,7 @@ export class ElectraModel extends ElectraPreTrainedModel {}
  */
 export class ElectraForMaskedLM extends ElectraPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -35,6 +36,7 @@ export class ElectraForMaskedLM extends ElectraPreTrainedModel {
  */
 export class ElectraForSequenceClassification extends ElectraPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -50,6 +52,7 @@ export class ElectraForSequenceClassification extends ElectraPreTrainedModel {
  */
 export class ElectraForTokenClassification extends ElectraPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.
@@ -66,6 +69,7 @@ export class ElectraForTokenClassification extends ElectraPreTrainedModel {
  */
 export class ElectraForQuestionAnswering extends ElectraPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      *
      * @param {Object} model_inputs The inputs to the model.

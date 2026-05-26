@@ -1036,6 +1036,7 @@ export class ImageProcessor extends Callable {
     }
 
     /**
+     * @override
      * Calls the feature extraction process on an array of images,
      * preprocesses each image, and concatenates the resulting
      * features into a single Tensor.

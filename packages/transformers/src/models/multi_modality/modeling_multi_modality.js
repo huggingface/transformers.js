@@ -6,6 +6,7 @@ import { Tensor, cat, full, full_like } from '../../utils/tensor.js';
 
 export class MultiModalityPreTrainedModel extends PreTrainedModel {}
 export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
+    /** @override */
     forward_params = [
         // prepare_inputs_embeds
         'input_ids',
@@ -29,6 +30,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         this._generation_mode = 'text';
     }
 
+    /** @override */
     async forward(model_inputs) {
         const mode = this._generation_mode ?? 'text';
 
@@ -70,6 +72,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         };
     }
 
+    /** @override */
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         const has_past_key_values = !!model_inputs.past_key_values;
 
@@ -116,6 +119,7 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     }
 
     /**
+     * @override
      * @param {import('../../generation/parameters.js').GenerationFunctionParameters} options
      */
     async generate(options) {

@@ -26,7 +26,9 @@ export class MimiDecoderOutput extends ModelOutput {
 }
 
 export class MimiPreTrainedModel extends PreTrainedModel {
+    /** @override */
     main_input_name = 'input_values';
+    /** @override */
     forward_params = ['input_values'];
 }
 
@@ -55,7 +57,10 @@ export class MimiModel extends MimiPreTrainedModel {
 }
 
 export class MimiEncoderModel extends MimiPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,
@@ -65,7 +70,10 @@ export class MimiEncoderModel extends MimiPreTrainedModel {
     }
 }
 export class MimiDecoderModel extends MimiPreTrainedModel {
-    /** @type {typeof PreTrainedModel.from_pretrained} */
+    /**
+     * @override
+     * @type {typeof PreTrainedModel.from_pretrained}
+     */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         return super.from_pretrained(pretrained_model_name_or_path, {
             ...options,

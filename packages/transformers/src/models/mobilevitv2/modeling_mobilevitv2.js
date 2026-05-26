@@ -5,6 +5,7 @@ export class MobileViTV2PreTrainedModel extends PreTrainedModel {}
 export class MobileViTV2Model extends MobileViTV2PreTrainedModel {}
 export class MobileViTV2ForImageClassification extends MobileViTV2PreTrainedModel {
     /**
+     * @override
      * @param {any} model_inputs
      */
     async _call(model_inputs) {

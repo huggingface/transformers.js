@@ -70,6 +70,7 @@ function get_image_prompt_string(
 export class Idefics3Processor extends Processor {
     static image_processor_class = AutoImageProcessor;
     static tokenizer_class = AutoTokenizer;
+    /** @override */
     static uses_processor_config = true;
 
     fake_image_token = '<fake_token_around_image>';
@@ -77,6 +78,7 @@ export class Idefics3Processor extends Processor {
     global_img_token = '<global-img>';
 
     /**
+     * @override
      *
      * @param {string|string[]} text
      * @param {RawImage|RawImage[]|RawImage[][]} images

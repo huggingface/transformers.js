@@ -2,6 +2,7 @@ import { PreTrainedModel, encoder_forward, decoder_forward } from '../modeling_u
 import { cat, ones } from '../../utils/tensor.js';
 
 export class Florence2PreTrainedModel extends PreTrainedModel {
+    /** @override */
     forward_params = [
         // Encoder inputs
         'input_ids',
@@ -16,6 +17,7 @@ export class Florence2PreTrainedModel extends PreTrainedModel {
         'decoder_attention_mask',
         'past_key_values',
     ];
+    /** @override */
     main_input_name = 'inputs_embeds';
 }
 
@@ -68,6 +70,7 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
         return { inputs_embeds, attention_mask };
     }
 
+    /** @override */
     async forward({
         input_ids,
         pixel_values,

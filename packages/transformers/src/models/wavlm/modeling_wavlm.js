@@ -56,6 +56,7 @@ export class WavLMModel extends WavLMPreTrainedModel {}
  */
 export class WavLMForCTC extends WavLMPreTrainedModel {
     /**
+     * @override
      * @param {Object} model_inputs
      * @param {Tensor} model_inputs.input_values Float values of input raw speech waveform.
      * @param {Tensor} model_inputs.attention_mask Mask to avoid performing convolution and attention on padding token indices. Mask values selected in [0, 1]
@@ -70,6 +71,7 @@ export class WavLMForCTC extends WavLMPreTrainedModel {
  */
 export class WavLMForSequenceClassification extends WavLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<SequenceClassifierOutput>} An object containing the model's output logits for sequence classification.
@@ -113,6 +115,7 @@ export class WavLMForSequenceClassification extends WavLMPreTrainedModel {
  */
 export class WavLMForXVector extends WavLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<XVectorOutput>} An object containing the model's output logits and speaker embeddings.
@@ -161,6 +164,7 @@ export class WavLMForXVector extends WavLMPreTrainedModel {
  */
 export class WavLMForAudioFrameClassification extends WavLMPreTrainedModel {
     /**
+     * @override
      * Calls the model on new inputs.
      * @param {Object} model_inputs The inputs to the model.
      * @returns {Promise<TokenClassifierOutput>} An object containing the model's output logits for sequence classification.
