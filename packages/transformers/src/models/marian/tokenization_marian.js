@@ -52,5 +52,6 @@ export class MarianTokenizer extends PreTrainedTokenizer {
             }
             return mergeArrays([language], super._encode_text(text));
         }
+        return undefined;
     }
 }

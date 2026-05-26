@@ -273,6 +273,7 @@ export function pick(o, props) {
             if (o[prop] !== undefined) {
                 return { [prop]: o[prop] };
             }
+            return undefined;
         }),
     );
 }
