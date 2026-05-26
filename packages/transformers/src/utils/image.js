@@ -404,6 +404,7 @@ export class RawImage {
 
             switch (resampleMethod) {
                 case 'box':
+                // @ts-expect-error TS7029 — intentional fallthrough: 'hamming' is unsupported, so we warn, downgrade to 'bilinear', and reuse the shared affine handler below
                 case 'hamming':
                     if (resampleMethod === 'box' || resampleMethod === 'hamming') {
                         logger.warn(
