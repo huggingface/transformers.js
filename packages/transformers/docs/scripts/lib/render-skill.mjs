@@ -14,7 +14,7 @@ const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/s
 const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
 
 export function renderSkill({ ir, tasks, publicNames, skillDir }) {
-  const ctx = { ir, tasks, publicNames: publicNames ?? null };
+  const ctx = { ir, tasks, publicNames: publicNames ?? null, errors: [] };
 
   // Rewrite fully-generated reference files.
   const refDir = path.join(skillDir, "references");
@@ -27,9 +27,11 @@ export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   for (const file of walkMarkdown(skillDir)) {
     const original = fs.readFileSync(file, "utf8");
     if (!original.includes("@generated:start")) continue;
-    const injected = injectMarkers(original, ctx);
+    const injected = injectMarkers(original, { ...ctx, file });
     if (injected !== original) fs.writeFileSync(file, injected);
   }
+
+  return { errors: ctx.errors };
 }
 
 // Skill files live outside the docs site, so relative `./foo.md#bar` links —
@@ -60,7 +62,7 @@ function injectMarkers(original, ctx) {
   return original.replace(MARKER_RE, (match, startTag, id, _body, endTag) => {
     const content = resolveMarker(id, ctx);
     if (content == null) {
-      console.warn(`skill: unknown marker id "${id}"`);
+      ctx.errors.push(`${ctx.file}: unknown marker id "${id}"`);
       return match;
     }
     return `${startTag}\n${absolutize(content).trimEnd()}\n${endTag}`;
@@ -99,11 +101,11 @@ function resolveMarker(id, ctx) {
 function renderModuleExamples(moduleName, ctx) {
   const mod = ctx.ir.modules.find((m) => m.name === moduleName);
   if (!mod) {
-    console.warn(`skill: module "${moduleName}" not found`);
+    ctx.errors.push(`module "${moduleName}" not found (examples:${moduleName})`);
     return "";
   }
   if (!mod.examples.length) {
-    console.warn(`skill: module "${moduleName}" has no example blocks`);
+    ctx.errors.push(`module "${moduleName}" has no example blocks (examples:${moduleName})`);
     return "";
   }
   const lines = [];
@@ -117,7 +119,7 @@ function renderModuleExamples(moduleName, ctx) {
 function renderFieldsTable(className, ctx) {
   const cls = findClass(ctx.ir, className);
   if (!cls) {
-    console.warn(`skill: class "${className}" not found`);
+    ctx.errors.push(`class "${className}" not found (fields:${className})`);
     return "";
   }
   const fields = cls.members.filter((m) => m.kind === "field");
@@ -130,7 +132,7 @@ function renderFieldsTable(className, ctx) {
         defaultValue: f.defaultValue,
         description: f.description,
       })),
-    ) || warnEmpty(className)
+    ) || warnEmpty(className, ctx, `fields:${className}`)
   );
 }
 
@@ -168,7 +170,7 @@ function renderTaskRecipe(taskId, info, ctx) {
 function renderTypedefTable(name, ctx) {
   const td = findTypedef(ctx.ir, name);
   if (!td) {
-    console.warn(`skill: typedef "${name}" not found`);
+    ctx.errors.push(`typedef "${name}" not found (typedef:${name})`);
     return "";
   }
 
@@ -181,15 +183,15 @@ function renderTypedefTable(name, ctx) {
       if (!table) continue;
       parts.push(`**\`${variantName}\`**`, "", table, "");
     }
-    return parts.length ? parts.join("\n").trimEnd() : warnEmpty(name);
+    return parts.length ? parts.join("\n").trimEnd() : warnEmpty(name, ctx, `typedef:${name}`);
   }
 
   const props = collectProperties(name, ctx.ir);
-  return propertiesTable(props) || warnEmpty(name);
+  return propertiesTable(props) || warnEmpty(name, ctx, `typedef:${name}`);
 }
 
-function warnEmpty(name) {
-  console.warn(`skill: typedef "${name}" has no properties to render`);
+function warnEmpty(name, ctx, marker) {
+  ctx.errors.push(`typedef "${name}" has no properties to render (${marker})`);
   return "";
 }
 
@@ -231,7 +233,7 @@ function splitUnion(type) {
 function renderClassSummary(name, ctx) {
   const cls = findClass(ctx.ir, name);
   if (!cls) {
-    console.warn(`skill: class "${name}" not found`);
+    ctx.errors.push(`class "${name}" not found (class:${name})`);
     return "";
   }
   const lines = [];

@@ -12,10 +12,15 @@ import { formatValidationResult, validateGeneratedDocs } from "./lib/validate.mj
 const project = loadProject(packageRoot);
 
 generateApiDocs({ project });
-generateSkillDocs({ project });
+const { errors: skillErrors } = generateSkillDocs({ project });
 const readmePath = buildReadme({ project });
 console.log(`wrote ${path.relative(process.cwd(), readmePath)}`);
 
 const validation = validateGeneratedDocs({ project });
 console.log(formatValidationResult(validation));
-if (!validation.ok) process.exitCode = 1;
+if (skillErrors?.length) {
+  console.log("");
+  console.log(`skill generation failed with ${skillErrors.length} error${skillErrors.length === 1 ? "" : "s"}:`);
+  for (const err of skillErrors) console.log(`- ${err}`);
+}
+if (!validation.ok || skillErrors?.length) process.exitCode = 1;

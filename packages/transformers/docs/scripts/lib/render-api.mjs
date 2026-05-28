@@ -13,6 +13,18 @@ import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_U
 // the reader doesn't have to scroll an entire page to find a class.
 const TOC_THRESHOLD = 6;
 
+// True when the module contributes any reader-visible content to its API page —
+// at least one public class/function/constant, or a renderable typedef/callback.
+// Used by `generateApiDocs` to skip writing pure-internal modules without
+// having to inspect the rendered markdown.
+export function hasRenderableContent(mod, publicNames = null) {
+  if (filterPublic(mod.classes, publicNames).length) return true;
+  if (filterPublic(mod.functions, publicNames).length) return true;
+  if (filterPublic(mod.constants, publicNames).length) return true;
+  if (mod.callbacks.length) return true;
+  return mod.typedefs.some((td) => !isInternalTypedef(td));
+}
+
 export function renderModule(mod, ir, opts = {}) {
   const publicNames = opts.publicNames ?? null;
   const ctx = {
