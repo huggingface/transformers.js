@@ -223,6 +223,13 @@ function getNormalizedConfig(config) {
             mapping['dim_kv'] = 'head_dim';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
+        case 'hrm_text':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_hidden_layers';
+            mapping['hidden_size'] = 'hidden_size';
+            mapping['dim_kv'] = 'head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
 
         // Encoder-decoder models
         case 't5':

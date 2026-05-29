@@ -182,6 +182,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['hunyuan_v1_dense', 'HunYuanDenseV1Model'],
     ['youtu', 'YoutuModel'],
     ['zaya', 'ZayaModel'],
+    ['hrm_text', 'HrmTextModel'],
 ]);
 
 export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
@@ -331,6 +332,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['hunyuan_v1_dense', 'HunYuanDenseV1ForCausalLM'],
     ['youtu', 'YoutuForCausalLM'],
     ['zaya', 'ZayaForCausalLM'],
+    ['hrm_text', 'HrmTextForCausalLM'],
 
     // Also image-text-to-text
     ['phi3_v', 'Phi3VForCausalLM'],

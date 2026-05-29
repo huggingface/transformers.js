@@ -73,6 +73,7 @@ export * from './grounding_dino/modeling_grounding_dino.js';
 export * from './groupvit/modeling_groupvit.js';
 export * from './helium/modeling_helium.js';
 export * from './hiera/modeling_hiera.js';
+export * from './hrm_text/modeling_hrm_text.js';
 export * from './hubert/modeling_hubert.js';
 export * from './hunyuan_v1_dense/modeling_hunyuan_v1_dense.js';
 export * from './idefics3/modeling_idefics3.js';
