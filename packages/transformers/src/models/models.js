@@ -96,7 +96,10 @@ export * from './metric3d/modeling_metric3d.js';
 export * from './metric3dv2/modeling_metric3dv2.js';
 export * from './mgp_str/modeling_mgp_str.js';
 export * from './mimi/modeling_mimi.js';
+export * from './ministral/modeling_ministral.js';
+export * from './ministral3/modeling_ministral3.js';
 export * from './mistral/modeling_mistral.js';
+export * from './mistral3/modeling_mistral3.js';
 export * from './mistral4/modeling_mistral4.js';
 export * from './mobilebert/modeling_mobilebert.js';
 export * from './mobilellm/modeling_mobilellm.js';
@@ -197,4 +200,16 @@ export * from './yolos/modeling_yolos.js';
 export * from './youtu/modeling_youtu.js';
 export * from './zaya/modeling_zaya.js';
 
+export {
+    BaseModelOutput,
+    CausalLMOutput,
+    CausalLMOutputWithPast,
+    ImageMattingOutput,
+    MaskedLMOutput,
+    ModelOutput,
+    QuestionAnsweringModelOutput,
+    Seq2SeqLMOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+} from './modeling_outputs.js';
 export { PreTrainedModel } from './modeling_utils.js';
