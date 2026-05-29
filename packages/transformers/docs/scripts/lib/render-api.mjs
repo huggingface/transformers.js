@@ -7,6 +7,7 @@ import path from "node:path";
 
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
 import { splitTopLevel } from "./scan.mjs";
+import { firstSentence, stripDocArtifacts } from "./text.mjs";
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 // Pages with at least this many top-level items get an "On this page" TOC so
@@ -151,9 +152,7 @@ function renderExample(ex) {
 // reads as prose rather than raw JSDoc tags — `{@link ...}` is expanded later
 // by `expandInlineLinks`.
 function cleanDescription(text) {
-  return text
-    .trim()
-    .replace(/^\[`?([A-Za-z_$][\w$.]*)`?\]\s*/, "")
+  return stripDocArtifacts(text.trim())
     .replace(/@see\s+(?=\{@link)/g, "")
     .replace(/@see\s+`?([A-Za-z_$][\w$.]*)`?/g, "`$1`");
 }
@@ -317,17 +316,7 @@ function typedefSummary(rawType, ctx) {
   const mod = ctx.moduleByName?.get(moduleName);
   const def = mod?.typedefs.find((t) => t.name === pretty) ?? mod?.callbacks.find((c) => c.name === pretty);
   if (!def?.description) return null;
-  return firstSentenceShort(def.description);
-}
-
-function firstSentenceShort(text) {
-  const collapsed = text
-    .split(/\n\s*\n/, 1)[0]
-    .replace(/\s+/g, " ")
-    .trim();
-  const m = collapsed.match(/^(.+?[.!?])(?=\s|$)/);
-  const sentence = (m ? m[1] : collapsed).trim();
-  return sentence.endsWith(".") || sentence.endsWith("!") || sentence.endsWith("?") ? sentence : sentence + ".";
+  return firstSentence(def.description);
 }
 
 // Indent every line after the first so multi-line descriptions (including

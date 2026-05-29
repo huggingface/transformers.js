@@ -24,11 +24,9 @@ export function loadProject(root) {
 }
 
 function collectJsFiles(dir) {
-  const out = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...collectJsFiles(full));
-    else if (entry.name.endsWith(".js")) out.push(full);
-  }
-  return out;
+  return fs
+    .readdirSync(dir, { recursive: true })
+    .filter((p) => p.endsWith(".js"))
+    .sort()
+    .map((p) => path.join(dir, p));
 }

@@ -10,6 +10,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { firstSentence } from "./text.mjs";
+
 const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-all.js -->";
 const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
 
@@ -45,13 +47,10 @@ function absolutize(markdown) {
 }
 
 function walkMarkdown(dir) {
-  const out = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walkMarkdown(full));
-    else if (entry.name.endsWith(".md")) out.push(full);
-  }
-  return out;
+  return fs
+    .readdirSync(dir, { recursive: true })
+    .filter((p) => p.endsWith(".md"))
+    .map((p) => path.join(dir, p));
 }
 
 // ---------- marker injection ----------
@@ -407,22 +406,3 @@ function findClass(ir, name) {
   return null;
 }
 
-// Extract the first complete sentence. A line break inside a paragraph is not
-// a sentence boundary, so we re-flow a paragraph onto one line before cutting.
-function firstSentence(text) {
-  if (!text) return "_(undocumented)_";
-  const paragraph = text
-    .split(/\n\s*\n/, 1)[0]
-    .replace(/\s+/g, " ")
-    .trim();
-  const sanitized = stripDocArtifacts(paragraph);
-  const match = sanitized.match(/^(.+?[.!?])(?=\s|$)/);
-  const sentence = (match ? match[1] : sanitized).trim();
-  return sentence.endsWith(".") || sentence.endsWith("!") || sentence.endsWith("?") ? sentence : sentence + ".";
-}
-
-// Descriptions copied from the Python library sometimes start with
-// `[`TypeName`]` (reST cross-reference syntax). Drop the leading artifact.
-function stripDocArtifacts(text) {
-  return text.replace(/^\[`?[A-Za-z_$][\w$.]*`?\]\s*/, "");
-}

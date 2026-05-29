@@ -101,14 +101,10 @@ function listApiPages(outputDir) {
 
 function listMarkdown(dir) {
   if (!fs.existsSync(dir)) return [];
-
-  const out = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listMarkdown(full));
-    else if (entry.name.endsWith(".md")) out.push(full);
-  }
-  return out;
+  return fs
+    .readdirSync(dir, { recursive: true })
+    .filter((p) => p.endsWith(".md"))
+    .map((p) => path.join(dir, p));
 }
 
 function toApiPage(outputDir, file) {

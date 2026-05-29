@@ -494,7 +494,7 @@ function findCallable(ref, callableIndex) {
 }
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
 }
 
 function tagsOf(entity, name) {
