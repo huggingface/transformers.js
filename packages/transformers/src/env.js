@@ -65,32 +65,33 @@ const IS_SERVICE_WORKER_ENV =
     typeof ServiceWorkerGlobalScope !== 'undefined' && HAS_SELF && self instanceof ServiceWorkerGlobalScope;
 
 /**
- * Check if the current environment is Safari browser.
- * Works in both browser and web worker contexts.
- * @returns {boolean} Whether the current environment is Safari.
+ * Check whether the current environment is a Safari browser older than version 26 (Safari >= 26 enables WebGPU by default).
+ * @returns {boolean} Whether the current environment is Safari older than version 26.
  */
-const isSafari = () => {
-    // Check if we're in a browser environment
+const isSafariBelow26 = () => {
     if (typeof navigator === 'undefined') {
         return false;
     }
 
     const userAgent = navigator.userAgent;
-    const vendor = navigator.vendor || '';
 
-    // Safari has "Apple" in vendor string
-    const isAppleVendor = vendor.indexOf('Apple') > -1;
-
-    // Exclude Chrome on iOS (CriOS), Firefox on iOS (FxiOS),
-    // Edge on iOS (EdgiOS), and other browsers
-    const notOtherBrowser =
+    // Safari has "Apple" in its vendor string. Exclude Chrome on iOS (CriOS),
+    // Firefox on iOS (FxiOS), Edge on iOS (EdgiOS), and other browsers.
+    const isSafari =
+        (navigator.vendor || '').indexOf('Apple') > -1 &&
         !userAgent.match(/CriOS|FxiOS|EdgiOS|OPiOS|mercury|brave/i) &&
         !userAgent.includes('Chrome') &&
         !userAgent.includes('Android');
+    if (!isSafari) {
+        return false;
+    }
 
-    return isAppleVendor && notOtherBrowser;
+    // Safari reports its version via the "Version/<major>.<minor>" token in the user agent.
+    // If the version is missing/unparseable, assume a modern Safari (i.e. not below 26).
+    const match = userAgent.match(/Version\/(\d+)/);
+    return match ? parseInt(match[1], 10) < 26 : false;
 };
-const IS_SAFARI = isSafari();
+const IS_SAFARI_BELOW_26 = isSafariBelow26();
 
 /**
  * A read-only object containing information about the APIs available in the current environment.
@@ -120,8 +121,8 @@ export const apis = Object.freeze({
     /** Whether the WebNN API is available */
     IS_WEBNN_AVAILABLE,
 
-    /** Whether we are running in a Safari browser */
-    IS_SAFARI,
+    /** Whether we are running in a Safari browser older than version 26. */
+    IS_SAFARI_BELOW_26,
 
     /** Whether the Node.js process API is available */
     IS_PROCESS_AVAILABLE,
