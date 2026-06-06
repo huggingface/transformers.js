@@ -1321,6 +1321,31 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
 }
 
 /**
+ * Sets `num_logits_to_keep` on `model_inputs` if the decoder session declares it as an input
+ * and it has not already been set.
+ *
+ * `num_logits_to_keep` specifies how many trailing prompt logits the model computes:
+ * - `0n` (or unset) computes logits for the entire sequence — used for prefill/scoring.
+ * - `1n` computes only the last token's logits — used during autoregressive generation,
+ *   since only the last prompt token's logits are needed to sample the next token. For long
+ *   sequences, computing all logits uses a lot of memory, so `1n` significantly reduces the
+ *   memory footprint.
+ * - Any other positive integer keeps the last `num_logits_to_keep` logits.
+ *
+ * @param {PreTrainedModel} self The model instance.
+ * @param {Record<string, any>} model_inputs The model inputs to mutate.
+ * @param {bigint} value The value to set (typically `1n` for generation, `0n` as a fallback).
+ * @private
+ */
+export function setNumLogitsToKeep(self, model_inputs, value) {
+    if (model_inputs.num_logits_to_keep) return;
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep')) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [value], []);
+    }
+}
+
+/**
  * Forward pass of a decoder model.
  * @param {Object} self The decoder model.
  * @param {Object} model_inputs The input data to be used for the forward pass.
@@ -1347,14 +1372,8 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         new_model_inputs.position_ids = create_position_ids(new_model_inputs, past_key_values, start_index);
     }
 
-    if (session.inputNames.includes('num_logits_to_keep') && !new_model_inputs.num_logits_to_keep) {
-        // `num_logits_to_keep` specifies the number of prompt logits to calculate during generation.
-        // If unset (or 0), all logits will be calculated. If an integer value, only last `num_logits_to_keep`
-        // logits will be calculated. During generation, the default is 1 because only the logits of the last
-        // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
-        // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
-        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
-    }
+    // Fallback for non-generation forward calls (e.g. prefill scoring): compute all logits.
+    setNumLogitsToKeep(self, new_model_inputs, 0n);
 
     // Unpack the `past_key_values` object into model inputs
     addPastKeyValues(self, new_model_inputs, past_key_values);
@@ -1379,6 +1398,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {DynamicCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
+ * @param {Tensor} [params.num_logits_to_keep=null]
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
@@ -1403,6 +1423,7 @@ export async function generic_text_to_text_forward(
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Additional parameters
         ...kwargs
@@ -1480,6 +1501,7 @@ export async function generic_text_to_text_forward(
             position_ids,
             generation_config,
             logits_processor,
+            num_logits_to_keep,
         },
         true,
     );
@@ -1578,12 +1600,7 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
     const past_length = model_inputs.past_key_values ? model_inputs.past_key_values.get_seq_length() : 0;
 
-    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
-    // avoids computing logits for the entire sequence, significantly reducing memory usage.
-    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
-    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
-        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
-    }
+    setNumLogitsToKeep(self, model_inputs, 1n);
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
@@ -1631,6 +1648,8 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
     if (model_inputs.past_key_values) {
         input_ids = input_ids.map((x) => [x.at(-1)]);
     }
+
+    setNumLogitsToKeep(self, model_inputs, 1n);
 
     return {
         ...model_inputs,
