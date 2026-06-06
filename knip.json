@@ -2,7 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "tags": ["-lintignore"],
   "ignoreBinaries": ["doc-builder", "python"],
-  "ignoreWorkspaces": ["packages/transformers-agent"],
   "workspaces": {
     ".": {
       "entry": ["scripts/*.mjs"],
