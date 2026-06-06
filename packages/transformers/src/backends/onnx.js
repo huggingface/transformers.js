@@ -349,19 +349,16 @@ if (ONNX_ENV) {
         ) {
             const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
 
-            // Safari < 26 does not support the asyncify ONNX Runtime WASM build,
-            // so we fall back to the non-asyncify build for those versions.
-            // Safari 26+ (which enables WebGPU by default) uses the standard
-            // asyncify build like all other browsers.
-            ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI_BELOW_26
-                ? {
-                      mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.mjs`,
-                      wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.wasm`,
-                  }
-                : {
-                      mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.mjs`,
-                      wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.wasm`,
-                  };
+            let wasmPathSuffix = '.asyncify'; // Default to asyncify WASM build
+            if (apis.IS_SAFARI_BELOW_26 && !apis.IS_WEBGPU_AVAILABLE) {
+                // Disable asyncify for Safari below 26 when WebGPU is not available
+                wasmPathSuffix = '';
+            }
+
+            ONNX_ENV.wasm.wasmPaths = {
+                mjs: `${wasmPathPrefix}ort-wasm-simd-threaded${wasmPathSuffix}.mjs`,
+                wasm: `${wasmPathPrefix}ort-wasm-simd-threaded${wasmPathSuffix}.wasm`,
+            };
         }
 
         // Users may wish to proxy the WASM backend to prevent the UI from freezing,
