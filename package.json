@@ -10,7 +10,8 @@
     "test": "pnpm -r test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dev": "node scripts/dev.mjs"
+    "dev": "node scripts/dev.mjs",
+    "knip": "knip"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,8 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "devDependencies": {
+    "@types/node": "^24.10.9",
+    "knip": "^6.15.0",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },

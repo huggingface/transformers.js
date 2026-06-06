@@ -103,7 +103,7 @@ const WHISPER_LANGUAGES = [
 // @ts-ignore
 export const WHISPER_LANGUAGE_MAPPING = new Map(WHISPER_LANGUAGES);
 // @ts-ignore
-export const WHISPER_TO_LANGUAGE_CODE_MAPPING = new Map([
+const WHISPER_TO_LANGUAGE_CODE_MAPPING = new Map([
     ...WHISPER_LANGUAGES.map(([k, v]) => [v, k]),
     ...[
         ['burmese', 'my'],
