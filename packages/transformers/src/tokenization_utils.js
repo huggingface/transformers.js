@@ -127,6 +127,63 @@ function truncateHelper(item, length) {
 }
 
 /**
+ * Computes character offset mapping from token strings.
+ * @param {string} text The original (unnormalized) text.
+ * @param {string[]} tokens The list of token strings from encoding.
+ * @param {Set<string>} special_tokens_set Set of special token strings.
+ * @returns {[number, number][]} Array of [start, end] character offsets.
+ */
+function computeOffsetMapping(text, tokens, special_tokens_set) {
+    const offsets = /** @type {[number, number][]} */([])
+    const textLower = text.toLowerCase();
+    let pos = 0;
+    for(const token of tokens){
+        if(special_tokens_set.has(token)){
+            offsets.push([0,0]);
+            continue;
+        }
+        let actual_text = token;
+        let preceded_by_space = false;
+        if(token.startsWith('##')){
+            // BERT WordPiece: "##ing" means this subword directly follows the previous (no space)
+            actual_text = token.slice(2);
+        }else if(token.startsWith('\u0120')){
+            // GPT-2/RoBERTa BPE: "Ġword" means there was a space before "word" in the original
+            actual_text = token.slice(1)
+            preceded_by_space = true;
+        }else if(token.startsWith('\u2581')){
+             // SentencePiece: "▁word" means word boundary (space in original)
+            actual_text = token.slice(1);
+            preceded_by_space = true;
+        }
+        if (actual_text.length === 0) {
+            offsets.push([pos, pos]);
+            continue;
+        }
+        // If this token was preceded by a space in the original, skip past spaces
+        if (preceded_by_space) {
+            while (pos < text.length && (text[pos] === ' ' || text[pos] === '\n' || text[pos] === '\t')) {
+                pos++;
+            }
+        }
+        // Search forward from pos (case-insensitive, since some tokenizers lowercase)
+        const tokenLower = actual_text.toLowerCase();
+        const idx = textLower.indexOf(tokenLower, pos);
+
+        if (idx === -1) {
+            offsets.push([0, 0]); // fallback
+        } else {
+            offsets.push([idx, idx + actual_text.length]);
+            pos = idx + actual_text.length;
+        }
+        
+    }
+    return offsets;
+    
+}
+
+
+/**
  * Returns the value of the first matching key in the tokenizer config object.
  * @param {Object} config The tokenizer config object.
  * @param {...string} keys One or more keys to search for in the tokenizer config object.
@@ -184,6 +241,7 @@ function getSpecialTokens(tokenizer) {
  * @property {TItem} input_ids List of token ids to be fed to a model.
  * @property {TItem} attention_mask List of indices specifying which tokens should be attended to by the model.
  * @property {TItem} [token_type_ids] List of token type ids to be fed to a model.
+ * @property {[number, number][][]|[number, number][]} [offset_mapping] Character offsets for each token.
  */
 
 /**
@@ -197,6 +255,7 @@ function getSpecialTokens(tokenizer) {
  * @property {number|null} [max_length=null] Maximum length of the returned list and optionally padding length.
  * @property {TReturnTensor} [return_tensor=true] Whether to return the results as Tensors or arrays.
  * @property {boolean|null} [return_token_type_ids=null] Whether to return the token type ids.
+ * @property {boolean} [return_offset_mapping=false] Whether to return character offset mappings.
  */
 
 /**
@@ -359,7 +418,7 @@ export class PreTrainedTokenizer
         text,
         options = {},
     ) {
-        const { text_pair = null, add_special_tokens = true, padding = false, return_token_type_ids = null } = options;
+        const { text_pair = null, add_special_tokens = true, padding = false, return_token_type_ids = null,return_offset_mapping = false } = options;
         let { truncation = null, max_length = null } = options;
         const return_tensor = /** @type {TReturnTensor} */ (options.return_tensor ?? true); // Different to HF
 
@@ -380,10 +439,10 @@ export class PreTrainedTokenizer
                 }
 
                 encodedTokens = text.map((t, i) =>
-                    this._encode_plus(t, { text_pair: text_pair[i], add_special_tokens, return_token_type_ids }),
+                    this._encode_plus(t, { text_pair: text_pair[i], add_special_tokens, return_token_type_ids, return_offset_mapping }),
                 );
             } else {
-                encodedTokens = text.map((x) => this._encode_plus(x, { add_special_tokens, return_token_type_ids }));
+                encodedTokens = text.map((x) => this._encode_plus(x, { add_special_tokens, return_token_type_ids, return_offset_mapping }));
             }
         } else {
             if (text === null || text === undefined) {
@@ -397,7 +456,7 @@ export class PreTrainedTokenizer
             }
 
             // For single input, we just wrap in an array, and then unwrap later.
-            encodedTokens = [this._encode_plus(text, { text_pair, add_special_tokens, return_token_type_ids })];
+            encodedTokens = [this._encode_plus(text, { text_pair, add_special_tokens, return_token_type_ids, return_offset_mapping })];
         }
         // At this point, `encodedTokens` is batched, of shape [batch_size, tokens].
         // However, array may be jagged. So, we may need pad to max_length.
@@ -444,7 +503,11 @@ export class PreTrainedTokenizer
                         padHelper(
                             encodedTokens[i],
                             max_length,
-                            (key) => (key === 'input_ids' ? this.pad_token_id : 0),
+                            (key) => {
+                                if (key === 'input_ids') return this.pad_token_id;
+                                if (key === 'offset_mapping') return [0,0];
+                                return 0;
+                            },
                             this.padding_side,
                         );
                     }
@@ -482,11 +545,18 @@ export class PreTrainedTokenizer
             const dims = [encodedTokens.length, encodedTokens[0].input_ids.length];
 
             for (const key of Object.keys(encodedTokens[0])) {
+                if (key === 'offset_mapping') continue;
                 result[key] = new Tensor(
                     'int64',
                     BigInt64Array.from(encodedTokens.flatMap((x) => x[key]).map(BigInt)),
                     dims,
                 );
+            }
+            if ('offset_mapping' in encodedTokens[0]) {
+                result.offset_mapping = encodedTokens.map((x) => x.offset_mapping);
+                if (!isBatched) {
+                    result.offset_mapping = result.offset_mapping[0];
+                }
             }
         } else {
             for (const key of Object.keys(encodedTokens[0])) {
@@ -524,11 +594,12 @@ export class PreTrainedTokenizer
      * @param {string|null} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
      * @param {boolean|null} [options.return_token_type_ids=null] Whether to return token_type_ids.
-     * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[]}} An object containing the encoded text.
+     * @param {boolean} [options.return_offset_mapping=false] Whether to return offset_mapping
+     * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[], offset_mapping?: [number,number][]}} An object containing the encoded text.
      * @private
      */
-    _encode_plus(text, { text_pair = null, add_special_tokens = true, return_token_type_ids = null } = {}) {
-        const { ids, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
+    _encode_plus(text, { text_pair = null, add_special_tokens = true, return_token_type_ids = null,return_offset_mapping = false } = {}) {
+        const { ids,tokens, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
             text_pair,
             add_special_tokens,
             return_token_type_ids: return_token_type_ids ?? this.return_token_type_ids,
@@ -537,6 +608,7 @@ export class PreTrainedTokenizer
             input_ids: ids,
             attention_mask,
             ...(token_type_ids ? { token_type_ids } : {}),
+            ...(return_offset_mapping ? {offset_mapping: computeOffsetMapping(text,tokens,new Set(this.all_special_tokens))}:{}),
         };
     }
 

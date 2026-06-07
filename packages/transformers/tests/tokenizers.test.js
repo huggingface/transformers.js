@@ -726,3 +726,110 @@ describe("Chat templates", () => {
     }
   });
 });
+
+describe("Offset mapping", () => {
+  let tokenizer;
+  beforeAll(async () => {
+    tokenizer = await AutoTokenizer.from_pretrained("Xenova/bert-base-uncased");
+  }, MAX_TOKENIZER_LOAD_TIME);
+
+  it("does not include offset_mapping in output by default", () => {
+    const output = tokenizer("Hello world", { return_tensor: false });
+    expect(output.offset_mapping).toBeUndefined();
+  });
+
+  it("returns correct offsets for a single string", () => {
+    // "Hello world": H(0)e(1)l(2)l(3)o(4) (5)w(6)o(7)r(8)l(9)d(10)
+    // Tokens: [CLS] hello world [SEP]
+    // BERT lowercases, but offsets point to positions in the original text.
+    const { offset_mapping } = tokenizer("Hello world", {
+      return_tensor: false,
+      return_offset_mapping: true,
+    });
+    expect(offset_mapping).toEqual([
+      [0, 0],   // [CLS]  — special token, no character span
+      [0, 5],   // hello  → "Hello"
+      [6, 11],  // world  → "world"
+      [0, 0],   // [SEP]  — special token
+    ]);
+  });
+
+  it("returns correct offsets for subword tokens (BERT WordPiece ## prefix)", () => {
+    // "tokenization" is the canonical WordPiece example from the BERT paper.
+    // BERT-base-uncased splits it as: token + ##ization
+    // t(0)o(1)k(2)e(3)n(4)i(5)z(6)a(7)t(8)i(9)o(10)n(11)
+    const { offset_mapping } = tokenizer("tokenization", {
+      return_tensor: false,
+      return_offset_mapping: true,
+    });
+    expect(offset_mapping).toEqual([
+      [0, 0],   // [CLS]
+      [0, 5],   // token     → "token"
+      [5, 12],  // ##ization → "ization" (continues from where "token" ended)
+      [0, 0],   // [SEP]
+    ]);
+  });
+
+  it("returns correct offsets for batched input (jagged, return_tensor=false)", () => {
+    // "a"   → [CLS] a [SEP]
+    // "b c" → [CLS] b c [SEP]
+    const { offset_mapping } = tokenizer(["a", "b c"], {
+      return_tensor: false,
+      return_offset_mapping: true,
+    });
+    expect(offset_mapping).toEqual([
+      [[0, 0], [0, 1], [0, 0]],
+      [[0, 0], [0, 1], [2, 3], [0, 0]],
+    ]);
+  });
+
+  it("pads offset_mapping with [0, 0] for padding tokens", () => {
+    // "a"   → [CLS] a [SEP]      (3 tokens, padded to 4)
+    // "b c" → [CLS] b c [SEP]   (4 tokens, no padding needed)
+    const { offset_mapping } = tokenizer(["a", "b c"], {
+      return_tensor: false,
+      padding: true,
+      return_offset_mapping: true,
+    });
+    expect(offset_mapping).toEqual([
+      [[0, 0], [0, 1], [0, 0], [0, 0]], // last [0,0] is the [PAD] token
+      [[0, 0], [0, 1], [2, 3], [0, 0]],
+    ]);
+  });
+
+  it("truncates offset_mapping to match truncated token sequence", () => {
+    // "b c" without special tokens → [b, c], truncated to max_length=1 → [b]
+    const { offset_mapping } = tokenizer("b c", {
+      return_tensor: false,
+      truncation: true,
+      max_length: 1,
+      add_special_tokens: false,
+      return_offset_mapping: true,
+    });
+    expect(offset_mapping).toEqual([[0, 1]]);
+  });
+
+  it("returns offset_mapping as a plain array even when return_tensor=true", () => {
+    // All other outputs (input_ids, attention_mask, token_type_ids) become Tensors.
+    // offset_mapping must stay a plain JS array because it contains nested [start, end] pairs
+    // that cannot be flattened into a 1D BigInt64Array.
+    const output = tokenizer(["a", "a"], {
+      padding: true,
+      truncation: true,
+      return_offset_mapping: true,
+    });
+
+    // Confirm the other fields are Tensors (they have a tolist() method).
+    expect(output.input_ids.tolist()).toEqual([
+      [101n, 1037n, 102n],
+      [101n, 1037n, 102n],
+    ]);
+
+    // offset_mapping is a plain nested array, never a Tensor.
+    expect(Array.isArray(output.offset_mapping)).toBe(true);
+    expect(output.offset_mapping).toEqual([
+      [[0, 0], [0, 1], [0, 0]], // "a" → [CLS] a [SEP]
+      [[0, 0], [0, 1], [0, 0]], // "a" → [CLS] a [SEP]
+    ]);
+  });
+});
