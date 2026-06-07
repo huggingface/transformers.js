@@ -255,7 +255,11 @@ function getSpecialTokens(tokenizer) {
  * @property {number|null} [max_length=null] Maximum length of the returned list and optionally padding length.
  * @property {TReturnTensor} [return_tensor=true] Whether to return the results as Tensors or arrays.
  * @property {boolean|null} [return_token_type_ids=null] Whether to return the token type ids.
- * @property {boolean} [return_offset_mapping=false] Whether to return character offset mappings.
+ * @property {boolean} [return_offset_mapping=false] Whether to return character-level offset mappings for each token.
+ *   Each entry is a `[start, end]` pair pointing to the token's span in the original string.
+ *   Special tokens (e.g. `[CLS]`, `[SEP]`, `[PAD]`) always map to `[0, 0]`.
+ *   Note: accuracy may be reduced for byte-level BPE tokenizers (e.g. GPT-2) with non-ASCII input,
+ *   and offsets for `text_pair` tokens are not supported.
  */
 
 /**
