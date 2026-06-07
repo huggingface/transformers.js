@@ -747,10 +747,10 @@ describe("Offset mapping", () => {
       return_offset_mapping: true,
     });
     expect(offset_mapping).toEqual([
-      [0, 0],   // [CLS]  — special token, no character span
-      [0, 5],   // hello  → "Hello"
-      [6, 11],  // world  → "world"
-      [0, 0],   // [SEP]  — special token
+      [0, 0], // [CLS]  — special token, no character span
+      [0, 5], // hello  → "Hello"
+      [6, 11], // world  → "world"
+      [0, 0], // [SEP]  — special token
     ]);
   });
 
@@ -763,10 +763,10 @@ describe("Offset mapping", () => {
       return_offset_mapping: true,
     });
     expect(offset_mapping).toEqual([
-      [0, 0],   // [CLS]
-      [0, 5],   // token     → "token"
-      [5, 12],  // ##ization → "ization" (continues from where "token" ended)
-      [0, 0],   // [SEP]
+      [0, 0], // [CLS]
+      [0, 5], // token     → "token"
+      [5, 12], // ##ization → "ization" (continues from where "token" ended)
+      [0, 0], // [SEP]
     ]);
   });
 
@@ -778,8 +778,17 @@ describe("Offset mapping", () => {
       return_offset_mapping: true,
     });
     expect(offset_mapping).toEqual([
-      [[0, 0], [0, 1], [0, 0]],
-      [[0, 0], [0, 1], [2, 3], [0, 0]],
+      [
+        [0, 0],
+        [0, 1],
+        [0, 0],
+      ],
+      [
+        [0, 0],
+        [0, 1],
+        [2, 3],
+        [0, 0],
+      ],
     ]);
   });
 
@@ -792,8 +801,18 @@ describe("Offset mapping", () => {
       return_offset_mapping: true,
     });
     expect(offset_mapping).toEqual([
-      [[0, 0], [0, 1], [0, 0], [0, 0]], // last [0,0] is the [PAD] token
-      [[0, 0], [0, 1], [2, 3], [0, 0]],
+      [
+        [0, 0],
+        [0, 1],
+        [0, 0],
+        [0, 0],
+      ], // last [0,0] is the [PAD] token
+      [
+        [0, 0],
+        [0, 1],
+        [2, 3],
+        [0, 0],
+      ],
     ]);
   });
 
@@ -828,8 +847,16 @@ describe("Offset mapping", () => {
     // offset_mapping is a plain nested array, never a Tensor.
     expect(Array.isArray(output.offset_mapping)).toBe(true);
     expect(output.offset_mapping).toEqual([
-      [[0, 0], [0, 1], [0, 0]], // "a" → [CLS] a [SEP]
-      [[0, 0], [0, 1], [0, 0]], // "a" → [CLS] a [SEP]
+      [
+        [0, 0],
+        [0, 1],
+        [0, 0],
+      ], // "a" → [CLS] a [SEP]
+      [
+        [0, 0],
+        [0, 1],
+        [0, 0],
+      ], // "a" → [CLS] a [SEP]
     ]);
   });
 });

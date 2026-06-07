@@ -134,25 +134,25 @@ function truncateHelper(item, length) {
  * @returns {[number, number][]} Array of [start, end] character offsets.
  */
 function computeOffsetMapping(text, tokens, special_tokens_set) {
-    const offsets = /** @type {[number, number][]} */([])
+    const offsets = /** @type {[number, number][]} */ ([]);
     const textLower = text.toLowerCase();
     let pos = 0;
-    for(const token of tokens){
-        if(special_tokens_set.has(token)){
-            offsets.push([0,0]);
+    for (const token of tokens) {
+        if (special_tokens_set.has(token)) {
+            offsets.push([0, 0]);
             continue;
         }
         let actual_text = token;
         let preceded_by_space = false;
-        if(token.startsWith('##')){
+        if (token.startsWith('##')) {
             // BERT WordPiece: "##ing" means this subword directly follows the previous (no space)
             actual_text = token.slice(2);
-        }else if(token.startsWith('\u0120')){
+        } else if (token.startsWith('\u0120')) {
             // GPT-2/RoBERTa BPE: "Ġword" means there was a space before "word" in the original
-            actual_text = token.slice(1)
+            actual_text = token.slice(1);
             preceded_by_space = true;
-        }else if(token.startsWith('\u2581')){
-             // SentencePiece: "▁word" means word boundary (space in original)
+        } else if (token.startsWith('\u2581')) {
+            // SentencePiece: "▁word" means word boundary (space in original)
             actual_text = token.slice(1);
             preceded_by_space = true;
         }
@@ -176,12 +176,9 @@ function computeOffsetMapping(text, tokens, special_tokens_set) {
             offsets.push([idx, idx + actual_text.length]);
             pos = idx + actual_text.length;
         }
-        
     }
     return offsets;
-    
 }
-
 
 /**
  * Returns the value of the first matching key in the tokenizer config object.
@@ -422,7 +419,13 @@ export class PreTrainedTokenizer
         text,
         options = {},
     ) {
-        const { text_pair = null, add_special_tokens = true, padding = false, return_token_type_ids = null,return_offset_mapping = false } = options;
+        const {
+            text_pair = null,
+            add_special_tokens = true,
+            padding = false,
+            return_token_type_ids = null,
+            return_offset_mapping = false,
+        } = options;
         let { truncation = null, max_length = null } = options;
         const return_tensor = /** @type {TReturnTensor} */ (options.return_tensor ?? true); // Different to HF
 
@@ -443,10 +446,17 @@ export class PreTrainedTokenizer
                 }
 
                 encodedTokens = text.map((t, i) =>
-                    this._encode_plus(t, { text_pair: text_pair[i], add_special_tokens, return_token_type_ids, return_offset_mapping }),
+                    this._encode_plus(t, {
+                        text_pair: text_pair[i],
+                        add_special_tokens,
+                        return_token_type_ids,
+                        return_offset_mapping,
+                    }),
                 );
             } else {
-                encodedTokens = text.map((x) => this._encode_plus(x, { add_special_tokens, return_token_type_ids, return_offset_mapping }));
+                encodedTokens = text.map((x) =>
+                    this._encode_plus(x, { add_special_tokens, return_token_type_ids, return_offset_mapping }),
+                );
             }
         } else {
             if (text === null || text === undefined) {
@@ -460,7 +470,14 @@ export class PreTrainedTokenizer
             }
 
             // For single input, we just wrap in an array, and then unwrap later.
-            encodedTokens = [this._encode_plus(text, { text_pair, add_special_tokens, return_token_type_ids, return_offset_mapping })];
+            encodedTokens = [
+                this._encode_plus(text, {
+                    text_pair,
+                    add_special_tokens,
+                    return_token_type_ids,
+                    return_offset_mapping,
+                }),
+            ];
         }
         // At this point, `encodedTokens` is batched, of shape [batch_size, tokens].
         // However, array may be jagged. So, we may need pad to max_length.
@@ -509,7 +526,7 @@ export class PreTrainedTokenizer
                             max_length,
                             (key) => {
                                 if (key === 'input_ids') return this.pad_token_id;
-                                if (key === 'offset_mapping') return [0,0];
+                                if (key === 'offset_mapping') return [0, 0];
                                 return 0;
                             },
                             this.padding_side,
@@ -602,8 +619,16 @@ export class PreTrainedTokenizer
      * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[], offset_mapping?: [number,number][]}} An object containing the encoded text.
      * @private
      */
-    _encode_plus(text, { text_pair = null, add_special_tokens = true, return_token_type_ids = null,return_offset_mapping = false } = {}) {
-        const { ids,tokens, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
+    _encode_plus(
+        text,
+        {
+            text_pair = null,
+            add_special_tokens = true,
+            return_token_type_ids = null,
+            return_offset_mapping = false,
+        } = {},
+    ) {
+        const { ids, tokens, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
             text_pair,
             add_special_tokens,
             return_token_type_ids: return_token_type_ids ?? this.return_token_type_ids,
@@ -612,7 +637,9 @@ export class PreTrainedTokenizer
             input_ids: ids,
             attention_mask,
             ...(token_type_ids ? { token_type_ids } : {}),
-            ...(return_offset_mapping ? {offset_mapping: computeOffsetMapping(text,tokens,new Set(this.all_special_tokens))}:{}),
+            ...(return_offset_mapping
+                ? { offset_mapping: computeOffsetMapping(text, tokens, new Set(this.all_special_tokens)) }
+                : {}),
         };
     }
 
