@@ -32,6 +32,7 @@ jobs:
           node-version: "24.10.0"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
       - run: pnpm knip
 
   build:
