@@ -29,6 +29,44 @@
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
+  "knip": {
+    "tags": [
+      "-lintignore"
+    ],
+    "ignoreBinaries": [
+      "doc-builder",
+      "python"
+    ],
+    "workspaces": {
+      ".": {
+        "entry": [
+          "scripts/*.mjs"
+        ],
+        "project": [
+          "scripts/**/*.mjs"
+        ]
+      },
+      "packages/transformers": {
+        "entry": [
+          "src/models/registry.js",
+          "tests/**/*.js",
+          "scripts/*.mjs",
+          "docs/scripts/**/*.js",
+          "docs/plugins/**/*.js"
+        ],
+        "project": [
+          "src/**/*.{js,ts}",
+          "tests/**/*.js",
+          "scripts/**/*.mjs",
+          "docs/scripts/**/*.js",
+          "docs/plugins/**/*.js",
+          "!coverage/**",
+          "!dist/**",
+          "!types/**"
+        ]
+      }
+    }
+  },
   "prettier": {
     "overrides": [
       {
