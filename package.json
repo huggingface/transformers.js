@@ -25,7 +25,7 @@
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "devDependencies": {
     "@types/node": "^24.10.9",
-    "knip": "^6.15.0",
+    "knip": "6.15.0",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
