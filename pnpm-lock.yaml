@@ -12,7 +12,7 @@ importers:
         specifier: ^24.10.9
         version: 24.10.9
       knip:
-        specifier: ^6.15.0
+        specifier: 6.15.0
         version: 6.15.0
       prettier:
         specifier: 3.8.1
