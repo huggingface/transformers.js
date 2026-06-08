@@ -252,7 +252,7 @@ function getSpecialTokens(tokenizer) {
  * @property {number|null} [max_length=null] Maximum length of the returned list and optionally padding length.
  * @property {TReturnTensor} [return_tensor=true] Whether to return the results as Tensors or arrays.
  * @property {boolean|null} [return_token_type_ids=null] Whether to return the token type ids.
- * @property {boolean} [return_offset_mapping=false] Whether to return character-level offset mappings for each token.
+ * @property {boolean} [return_offsets_mapping=false] Whether to return character-level offset mappings for each token.
  *   Each entry is a `[start, end]` pair pointing to the token's span in the original string.
  *   Special tokens (e.g. `[CLS]`, `[SEP]`, `[PAD]`) always map to `[0, 0]`.
  *   Note: accuracy may be reduced for byte-level BPE tokenizers (e.g. GPT-2) with non-ASCII input,
@@ -424,7 +424,7 @@ export class PreTrainedTokenizer
             add_special_tokens = true,
             padding = false,
             return_token_type_ids = null,
-            return_offset_mapping = false,
+            return_offsets_mapping = false,
         } = options;
         let { truncation = null, max_length = null } = options;
         const return_tensor = /** @type {TReturnTensor} */ (options.return_tensor ?? true); // Different to HF
@@ -450,12 +450,12 @@ export class PreTrainedTokenizer
                         text_pair: text_pair[i],
                         add_special_tokens,
                         return_token_type_ids,
-                        return_offset_mapping,
+                        return_offsets_mapping,
                     }),
                 );
             } else {
                 encodedTokens = text.map((x) =>
-                    this._encode_plus(x, { add_special_tokens, return_token_type_ids, return_offset_mapping }),
+                    this._encode_plus(x, { add_special_tokens, return_token_type_ids, return_offsets_mapping }),
                 );
             }
         } else {
@@ -475,7 +475,7 @@ export class PreTrainedTokenizer
                     text_pair,
                     add_special_tokens,
                     return_token_type_ids,
-                    return_offset_mapping,
+                    return_offsets_mapping,
                 }),
             ];
         }
@@ -615,7 +615,7 @@ export class PreTrainedTokenizer
      * @param {string|null} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
      * @param {boolean|null} [options.return_token_type_ids=null] Whether to return token_type_ids.
-     * @param {boolean} [options.return_offset_mapping=false] Whether to return offset_mapping
+     * @param {boolean} [options.return_offsets_mapping=false] Whether to return offset_mapping
      * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[], offset_mapping?: [number,number][]}} An object containing the encoded text.
      * @private
      */
@@ -625,7 +625,7 @@ export class PreTrainedTokenizer
             text_pair = null,
             add_special_tokens = true,
             return_token_type_ids = null,
-            return_offset_mapping = false,
+            return_offsets_mapping = false,
         } = {},
     ) {
         const { ids, tokens, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
@@ -637,7 +637,7 @@ export class PreTrainedTokenizer
             input_ids: ids,
             attention_mask,
             ...(token_type_ids ? { token_type_ids } : {}),
-            ...(return_offset_mapping
+            ...(return_offsets_mapping
                 ? { offset_mapping: computeOffsetMapping(text, tokens, new Set(this.all_special_tokens)) }
                 : {}),
         };

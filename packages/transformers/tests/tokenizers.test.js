@@ -744,7 +744,7 @@ describe("Offset mapping", () => {
     // BERT lowercases, but offsets point to positions in the original text.
     const { offset_mapping } = tokenizer("Hello world", {
       return_tensor: false,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
     expect(offset_mapping).toEqual([
       [0, 0], // [CLS]  — special token, no character span
@@ -760,7 +760,7 @@ describe("Offset mapping", () => {
     // t(0)o(1)k(2)e(3)n(4)i(5)z(6)a(7)t(8)i(9)o(10)n(11)
     const { offset_mapping } = tokenizer("tokenization", {
       return_tensor: false,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
     expect(offset_mapping).toEqual([
       [0, 0], // [CLS]
@@ -775,7 +775,7 @@ describe("Offset mapping", () => {
     // "b c" → [CLS] b c [SEP]
     const { offset_mapping } = tokenizer(["a", "b c"], {
       return_tensor: false,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
     expect(offset_mapping).toEqual([
       [
@@ -798,7 +798,7 @@ describe("Offset mapping", () => {
     const { offset_mapping } = tokenizer(["a", "b c"], {
       return_tensor: false,
       padding: true,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
     expect(offset_mapping).toEqual([
       [
@@ -823,7 +823,7 @@ describe("Offset mapping", () => {
       truncation: true,
       max_length: 1,
       add_special_tokens: false,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
     expect(offset_mapping).toEqual([[0, 1]]);
   });
@@ -835,7 +835,7 @@ describe("Offset mapping", () => {
     const output = tokenizer(["a", "a"], {
       padding: true,
       truncation: true,
-      return_offset_mapping: true,
+      return_offsets_mapping: true,
     });
 
     // Confirm the other fields are Tensors (they have a tolist() method).
