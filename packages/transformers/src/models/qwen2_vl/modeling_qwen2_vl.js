@@ -1,4 +1,9 @@
-import { PreTrainedModel, cumsum_masked_fill, default_merge_input_ids_with_image_features } from '../modeling_utils.js';
+import {
+    PreTrainedModel,
+    cumsum_masked_fill,
+    default_merge_input_ids_with_image_features,
+    setNumLogitsToKeep,
+} from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
@@ -285,6 +290,8 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     }
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        setNumLogitsToKeep(this, model_inputs, 1n);
+
         // Overwritten -- in specific circumstances we don't want to forward image inputs to the model
         if (!model_inputs.attention_mask || model_inputs.position_ids) {
             return model_inputs;

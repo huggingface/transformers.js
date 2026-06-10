@@ -59,6 +59,27 @@ export function isValidHfModelId(string) {
 }
 
 /**
+ * Builds a stable key for memoizing model/revision/cache scoped work.
+ *
+ * @param {string} model_id Model ID or local model path.
+ * @param {Object} [options] Pretrained loading options.
+ * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.cache_dir=null] Custom cache directory.
+ * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {...unknown} parts Additional key parts for the specific operation.
+ * @returns {string}
+ */
+export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
+    return JSON.stringify([
+        model_id,
+        options.revision ?? 'main',
+        options.cache_dir ?? null,
+        options.local_files_only ?? false,
+        ...parts,
+    ]);
+}
+
+/**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
  * @param {string} remoteURL The URL of the file that could not be loaded.
