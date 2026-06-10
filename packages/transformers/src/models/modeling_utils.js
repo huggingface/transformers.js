@@ -29,6 +29,7 @@ import {
     MinLengthLogitsProcessor,
     MinNewTokensLengthLogitsProcessor,
     TemperatureLogitsWarper,
+    MinPLogitsWarper,
     ClassifierFreeGuidanceLogitsProcessor,
 } from '../generation/logits_process.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
@@ -402,6 +403,14 @@ export class PreTrainedModel extends Callable {
     ) {
         const processors = new LogitsProcessorList();
 
+        // Classifier-free guidance must run FIRST so that the conditional and
+        // unconditional batches are combined back into a single batch before any
+        // other processor (e.g. repetition penalty) is applied — matching the
+        // processor ordering of the python `transformers` library.
+        if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
+            processors.push(new ClassifierFreeGuidanceLogitsProcessor(generation_config.guidance_scale));
+        }
+
         // if (generation_config.diversity_penalty !== null && generation_config.diversity_penalty > 0.0) {
         //     processors.push(new HammingDiversityLogitsProcessor(
         //         generation_config.diversity_penalty,
@@ -513,11 +522,6 @@ export class PreTrainedModel extends Callable {
         //     processors.push(new ForceTokensLogitsProcessor(generation_config.forced_decoder_ids));
         // }
 
-        // 8. prepare batched CFG externally
-        if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
-            processors.push(new ClassifierFreeGuidanceLogitsProcessor(generation_config.guidance_scale));
-        }
-
         if (generation_config.temperature === 0 && generation_config.do_sample) {
             logger.warn(
                 '`do_sample` changed to false because `temperature: 0` implies greedy sampling (always selecting the most likely token), which is incompatible with `do_sample: true`.',
@@ -536,6 +540,9 @@ export class PreTrainedModel extends Callable {
             // if (generation_config.top_p !== null && generation_config.top_p < 1.0) {
             //     processors.push(new TopPLogitsWarper(generation_config.top_p));
             // }
+            if (generation_config.min_p !== null && generation_config.min_p > 0) {
+                processors.push(new MinPLogitsWarper(generation_config.min_p));
+            }
         }
 
         if (logits_processor !== null) {

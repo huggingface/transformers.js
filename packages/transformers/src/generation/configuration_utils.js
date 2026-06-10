@@ -119,6 +119,14 @@ export class GenerationConfig {
     top_p = 1.0;
 
     /**
+     * Minimum token probability, which will be scaled by the probability of the most likely token.
+     * It must be a value between 0 and 1. Typical values are in the 0.01-0.2 range, comparably selective as setting `top_p` in the 0.99-0.8 range (use the opposite of normal `top_p` values).
+     * @type {number}
+     * @default null
+     */
+    min_p = null;
+
+    /**
      * Local typicality measures how similar the conditional probability of predicting a target token next is to the expected conditional probability of predicting a random token next, given the partial text already generated.
      * If set to float < 1, the smallest set of the most locally typical tokens with probabilities that add up to `typical_p` or higher are kept for generation.
      * See [this paper](https://huggingface.co/papers/2202.00666) for more details.
