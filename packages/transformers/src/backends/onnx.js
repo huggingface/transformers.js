@@ -286,15 +286,57 @@ async function ensureWasmLoaded() {
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
     const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
-    const load = () =>
+    const load = (executionProviders) =>
         InferenceSession.create(buffer_or_path, {
             // Set default log severity level, but allow overriding through session options
             logSeverityLevel,
             ...session_options,
+            ...(executionProviders !== undefined && { executionProviders }),
         });
-    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+
+    // When more than one execution provider has been requested (typically via
+    // `device: 'auto'`), fall back to the remaining providers if the first one
+    // fails to initialize. The common case is CUDA on Linux x64: ORT lists
+    // CUDA as a supported backend even when the CUDA shared library isn't
+    // installed on the host, so `auto` would otherwise fail hard with
+    // "Failed to load shared library" instead of falling through to CPU
+    // (see #1642). When the caller explicitly requested a single provider
+    // we don't second-guess them — the error propagates as before.
+    if (
+        !apis.IS_WEB_ENV &&
+        Array.isArray(session_options.executionProviders) &&
+        session_options.executionProviders.length > 1
+    ) {
+        let providers = session_options.executionProviders.slice();
+        let lastError;
+        while (providers.length > 0) {
+            try {
+                const session = await load(providers);
+                session.config = session_config;
+                return session;
+            } catch (error) {
+                lastError = error;
+                if (providers.length === 1) break;
+                logger.warn(
+                    `Execution provider "${providerName(providers[0])}" failed to initialize: ${error?.message ?? error}. Falling back to ${providers.slice(1).map(providerName).join(', ')}.`,
+                );
+                providers = providers.slice(1);
+            }
+        }
+        throw lastError;
+    }
+
+    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(() => load())) : load());
     session.config = session_config;
     return session;
+}
+
+/**
+ * @param {string | { name: string }} provider
+ * @returns {string}
+ */
+function providerName(provider) {
+    return typeof provider === 'string' ? provider : provider.name;
 }
 
 /**
