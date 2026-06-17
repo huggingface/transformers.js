@@ -72,23 +72,56 @@ if (call) {
 - For client-defined function tools, the agentic loop is still **manual**: the response comes back with a `function_call` output item, and you must execute it yourself, then send a *new* `responses.create()` call with a `function_call_output` item referencing the `call_id` — there's no `Agent.run()`-style loop for your own tools (only `mcp`-type remote tools are auto-executed server-side).
 - Every call is stateless from the client's perspective — there's no KV cache to preserve; `input` either takes a full message array each time or relies on the server retaining state via a `previous_response_id`, which doesn't map onto a tensor-level KV cache living in your own browser tab.
 
+## Related APIs and alignment choices
+
+`@huggingface/transformers-agent` intentionally overlaps with existing agent/tool ecosystems, but it does not mirror any one API 1:1.
+
+### AI SDK (tools + tool calling)
+
+The AI SDK offers a broad, provider-agnostic tool-calling layer with many advanced orchestration features (for example strict mode, approval flows, dynamic tools, repair hooks, and extensive step controls).
+
+That is excellent for multi-provider/cloud-first apps, but `transformers-agent` focuses on a different center of gravity:
+
+- local model lifecycle (`isCached()`, `downloadSize()`, `init()` progress)
+- direct runtime knobs (`modelId`, `device`, `dtype`)
+- cache-aware agent ergonomics for iterative on-device runs
+
+In short, AI SDK optimizes for maximum backend flexibility, while `transformers-agent` optimizes for Transformers.js local inference constraints and UX.
+
+### Chrome Prompt API
+
+Chrome's Prompt API is a browser-native session API for Gemini Nano with built-in availability checks, hardware/storage constraints, and multimodal prompting.
+
+It is a great fit when your target is specifically Chrome built-in AI, but it is not a portable Transformers.js abstraction across browser + Node.js runtimes, and it does not expose the same model/runtime controls (`modelId`/`dtype`/`device`) used in Transformers.js workflows.
+
+### Why I do not fully align 1:1
+
+I align where it helps interoperability, especially at the tool contract layer:
+
+- tools follow the W3C WebMCP `ModelContextTool` shape (compatible with `navigator.modelContext.registerTool()`)
+
+But I intentionally keep a Transformers.js-first API because on-device products are dominated by concerns that generic agent APIs do not prioritize:
+
+- download and cache UX before first run
+- deterministic local performance tuning
+- preserving KV cache validity across turns
+- runtime portability between browser and Node.js
+
 ## Goal
 
 The goal is to make running an agent with Transformers.js feel like using a product-level SDK, not like assembling an inference engine by hand.
 
-Transformers.js exposes powerful local-model controls, but building an agent still requires repeated glue code: model loading, cache checks, message formatting, tool schema and -token handling, tool execution, loop orchestration, and conversation state.
+Transformers.js exposes powerful local-model controls, but building an agent still requires repeated glue code: model loading, cache checks, message formatting, tool schema handling, tool execution, loop orchestration, and conversation state.
 
 `@huggingface/transformers-agent` should provide that missing layer:
 
 - a `Model` object that makes the local model lifecycle explicit: model id, device, dtype, cache checks, download size, progress, and initialization
 - an `Agent` object that owns the system prompt, tools, history, and KV cache so repeated turns can stay efficient
-- a tool API that is close to WebMCP and can be adapted into the function schema format expected by model chat templates
+- a tool API that can be adapted into the function schema format expected by model chat templates
 - a built-in agent loop for local tools, so callers can use `agent.run()` or `agent.stream()` instead of manually detecting tool calls and sending follow-up prompts
 - browser and Node.js support without assuming a hosted model, API key, server-side session, or remote provider
 
-The library is not trying to replace Transformers.js or hide that inference is happening locally. It should expose the local-model constraints that matter for user experience, especially download size, cache state, runtime device, dtype, and initialization progress. The goal is to make those constraints easy to build around.
-
-It is also not trying to clone one cloud API exactly. APIs like Responses are optimized for remote providers and server-retained state. This package should instead be shaped around the things a local Transformers.js app actually has: a model object in memory, a browser or Node runtime, local cache behavior, chat-template-specific tool formatting, and a KV cache that belongs to the current process.
+The library is not trying to replace Transformers.js or hide that inference is happening locally. It should expose the local-model constraints that matter for user experience and make them easy to build around.
 
 In short: make the simple path simple, keep the local controls visible, and provide enough structure that people can build useful local agents without rewriting the same orchestration loop every time.
 
