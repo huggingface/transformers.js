@@ -213,7 +213,7 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
- * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
+ * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. This must be an object that
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
