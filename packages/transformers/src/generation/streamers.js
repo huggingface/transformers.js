@@ -5,7 +5,8 @@
  * the `streamer` argument of `generate()` to receive decoded text as tokens
  * are emitted — useful for chat UIs and incremental transcription.
  *
- * @example
+ * **Example:** Stream generated text to stdout
+ * ```javascript
  * import { pipeline, TextStreamer } from '@huggingface/transformers';
  *
  * const generator = await pipeline('text-generation', 'onnx-community/Qwen3-0.6B-ONNX');
@@ -14,6 +15,7 @@
  *   callback_function: (text) => process.stdout.write(text),
  * });
  * await generator('Tell me a joke about JavaScript.', { max_new_tokens: 64, streamer });
+ * ```
  *
  * @module generation/streamers
  */
