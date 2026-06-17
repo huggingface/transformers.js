@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyGemma4 } from "../src/parsers/ParserStrategyGemma4";
+import { ParserStrategyGemma4 } from "../src";
 
 function parse(content: string) {
   let id = 0;

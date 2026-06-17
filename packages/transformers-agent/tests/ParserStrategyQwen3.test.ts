@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyQwen3 } from "../src/parsers/ParserStrategyQwen3";
+import { ParserStrategyQwen3 } from "../src";
 
 function parse(content: string) {
   let id = 0;

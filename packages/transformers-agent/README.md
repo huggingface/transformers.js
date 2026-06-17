@@ -69,21 +69,19 @@ const agent = new Agent({
 ```ts
 const result = await agent.run('What are the latest Transformers.js updates?');
 
-console.log(result.text);          // final answer
-console.log(result.steps);         // per-step tool calls and text
-console.log(result.usage);         // token counts across all steps
+console.log(result.runs.at(-1)?.text); // final answer
+console.log(result.runs);             // per-step tool calls and text
+console.log(result.usage);            // token counts across all steps
 ```
 
 ### Streaming
 
 ```ts
 for await (const chunk of agent.stream('Compare that with TensorFlow.js')) {
-  switch (chunk.type) {
-    case 'text.delta':  ui.appendText(chunk.delta);           break;
-    case 'tool.start':  ui.showTool(chunk.name, chunk.args);  break;
-    case 'tool.result': ui.showResult(chunk.output);          break;
-    case 'step.done':   ui.markStep(chunk.stepIndex);         break;
-    case 'done':        ui.finalize(chunk.text, chunk.usage); break;
+  ui.renderRuns(chunk.runs);
+
+  if (chunk.done) {
+    ui.finalize(chunk.runs, chunk.usage);
   }
 }
 ```
@@ -243,11 +241,24 @@ const agent = new Agent({
   maxSteps: 5,
 });
 
-agent.onBeforeToolCall((call) => console.log(`→ ${call.name}`, call.args));
+agent.onBeforeToolCall((call) => console.log(`-> ${call.name}`, call.args));
 
+let renderedText = '';
+let renderedRunIndex = -1;
 for await (const chunk of agent.stream('What changed in Transformers.js v4?')) {
-  if (chunk.type === 'text.delta') process.stdout.write(chunk.delta);
-  if (chunk.type === 'done') console.log('\n\nTokens used:', chunk.usage.totalTokens);
+  const latestRunIndex = chunk.runs.length - 1;
+  const latestRun = chunk.runs[latestRunIndex];
+  if (latestRunIndex !== renderedRunIndex) {
+    renderedText = '';
+    renderedRunIndex = latestRunIndex;
+  }
+
+  if (latestRun && latestRun.text.length > renderedText.length) {
+    process.stdout.write(latestRun.text.slice(renderedText.length));
+    renderedText = latestRun.text;
+  }
+
+  if (chunk.done) console.log('\n\nTokens used:', chunk.usage.totalTokens);
 }
 ```
 

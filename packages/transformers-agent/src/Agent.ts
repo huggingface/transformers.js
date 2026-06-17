@@ -307,7 +307,6 @@ export class Agent {
         completionTokens: number;
         promptTokenCount: number;
     }> {
-        console.log('conversation', conversation);
         let completionTokens = 0;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
@@ -357,8 +356,6 @@ export class Agent {
         const modelRawText =
             this.decodeGeneratedContinuation(output.sequences, generationPromptLength) ?? streamedRawText;
         const modelContent = this.sanitizeAssistantModelText(modelRawText);
-
-        console.log('modelRawText', modelRawText);
 
         return {
             role: 'assistant',

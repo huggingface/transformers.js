@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyGranite } from "../src/parsers/ParserStrategyGranite";
+import { ParserStrategyGranite } from "../src";
 
 function parse(content: string) {
   let id = 0;
