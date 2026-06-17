@@ -5,7 +5,7 @@
  */
 
 /**
- * Represents the dictionary for hash algorithms and values.
+ * Represents the dictionary for hash algorithm and value.
  */
 interface CrossOriginStorageRequestFileHandleHash {
     value: string;
@@ -13,7 +13,7 @@ interface CrossOriginStorageRequestFileHandleHash {
 }
 
 /**
- * Represents the options for requesting file handles.
+ * Represents the options for requesting a file handle.
  */
 interface CrossOriginStorageRequestFileHandleOptions {
     create?: boolean;
@@ -24,10 +24,10 @@ interface CrossOriginStorageRequestFileHandleOptions {
  * [SecureContext]
  */
 interface CrossOriginStorageManager {
-    requestFileHandles(
-        hashes: CrossOriginStorageRequestFileHandleHash[],
+    requestFileHandle(
+        hash: CrossOriginStorageRequestFileHandleHash,
         options?: CrossOriginStorageRequestFileHandleOptions,
-    ): Promise<FileSystemFileHandle[]>;
+    ): Promise<FileSystemFileHandle>;
 }
 
 /**
