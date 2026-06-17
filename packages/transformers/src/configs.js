@@ -576,7 +576,7 @@ export class AutoConfig {
  * for more information.
  * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
  * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
- * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format] Whether to load the model using the external data format (used for models >= 2GB in size).
+ * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format=null] Whether to load the model using the external data format (used for models >= 2GB in size).
  */
 
 /**
