@@ -26,20 +26,42 @@ export interface RequestResult {
 
 export type StreamChunk = RequestResult;
 
+export type MessageContent = string | MessageContentPart[];
+
+export type MessageContentPart = TextContentPart | ImageContentPart | AudioContentPart;
+
+export interface TextContentPart {
+    type: 'text';
+    text: string;
+}
+
+export interface ImageContentPart {
+    type: 'image';
+    data: string | Blob | ArrayBuffer | Uint8Array;
+    mimeType?: 'image/png' | 'image/jpeg' | 'image/webp' | string;
+}
+
+export interface AudioContentPart {
+    type: 'audio';
+    data: string | Blob | ArrayBuffer | Uint8Array;
+    mimeType?: 'audio/wav' | 'audio/mpeg' | 'audio/ogg' | string;
+}
+
 export interface SystemMessage {
     role: 'system';
-    content: string;
+    content: MessageContent;
 }
 
 export interface UserMessage {
     role: 'user';
-    content: string;
+    content: MessageContent;
 }
 
 export interface AssistantMessage {
     role: 'assistant';
-    content?: string;
-    tool_calls?: Array<{
+    content?: MessageContent;
+    thinking?: string;
+    toolCalls?: Array<{
         id: string;
         type?: 'function';
         function: {
@@ -51,9 +73,9 @@ export interface AssistantMessage {
 
 export interface ToolMessage {
     role: 'tool';
-    tool_call_id: string;
+    toolCallId: string;
     name?: string;
-    content: string;
+    content: MessageContent;
 }
 
 export type Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage;

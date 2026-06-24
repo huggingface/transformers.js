@@ -15,16 +15,25 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
 
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
-            if (message.role !== 'assistant' || !message.tool_calls || message.tool_calls.length === 0) {
+            if (message.role !== 'assistant' || !message.toolCalls || message.toolCalls.length === 0) {
                 formatted.push(this.formatMessage(message));
                 continue;
             }
 
-            const toolResponses = this.collectFollowingToolMessages(messages, i, message.tool_calls);
+            const toolResponses = this.collectFollowingToolMessages(messages, i, message.toolCalls);
+
+            if (message.thinking) {
+                formatted.push({
+                    role: 'assistant',
+                    content: this.formatRawAssistantContent(message, toolResponses),
+                });
+                i += toolResponses.length;
+                continue;
+            }
 
             formatted.push({
                 role: 'assistant',
-                tool_calls: message.tool_calls.map((call) => ({
+                tool_calls: message.toolCalls.map((call) => ({
                     function: {
                         name: call.function.name,
                         arguments: call.function.arguments,
@@ -42,10 +51,35 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
         return formatted;
     }
 
+    private formatRawAssistantContent(
+        message: Extract<Message, { role: 'assistant' }>,
+        toolResponses: ToolMessage[],
+    ): string {
+        return [
+            `<|channel>thought\n${message.thinking}<channel|>`,
+            ...this.formatRawToolCalls(message.toolCalls ?? []),
+            ...toolResponses.map((response) => this.formatRawToolResponse(response)),
+            this.stringifyMessageContent(message.content)?.trim() || '',
+        ].join('');
+    }
+
+    private formatRawToolCalls(toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['toolCalls']>): string[] {
+        return toolCalls.map(
+            (call) =>
+                `<|tool_call>call:${call.function.name}{${formatGemmaObject(call.function.arguments)}}<tool_call|>`,
+        );
+    }
+
+    private formatRawToolResponse(response: ToolMessage): string {
+        return `<|tool_response>response:${response.name ?? ''}{${formatGemmaObject(
+            normalizeGemmaToolResponse(parseToolResponse(this.stringifyMessageContent(response.content) ?? '')),
+        )}}<tool_response|>`;
+    }
+
     private collectFollowingToolMessages(
         messages: ReadonlyArray<Message>,
         assistantIndex: number,
-        toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['tool_calls']>,
+        toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['toolCalls']>,
     ): ToolMessage[] {
         const toolResponses: ToolMessage[] = [];
         for (let j = assistantIndex + 1; j < messages.length; j++) {
@@ -53,7 +87,7 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
             if (next.role !== 'tool') {
                 break;
             }
-            if (!toolCalls.some((call) => call.id === next.tool_call_id)) {
+            if (!toolCalls.some((call) => call.id === next.toolCallId)) {
                 break;
             }
             toolResponses.push(next);
@@ -70,7 +104,7 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
             };
         }
 
-        const toolResponse = parseToolResponse(response.content);
+        const toolResponse = parseToolResponse(this.stringifyMessageContent(response.content) ?? '');
         return {
             name: response.name ?? '',
             response: normalizeGemmaToolResponse(toolResponse),
@@ -265,6 +299,29 @@ function parseToolResponse(content: string): unknown {
     } catch {
         return content;
     }
+}
+
+function formatGemmaObject(value: unknown): string {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return `value:${formatGemmaValue(value)}`;
+    }
+
+    return Object.entries(value as Record<string, unknown>)
+        .map(([key, entry]) => `${key}:${formatGemmaValue(entry)}`)
+        .join(',');
+}
+
+function formatGemmaValue(value: unknown): string {
+    if (typeof value === 'string') {
+        return `<|"|>${value}<|"|>`;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    if (value === null) {
+        return 'null';
+    }
+    return `<|"|>${String(value)}<|"|>`;
 }
 
 function normalizeGemmaToolResponse(response: unknown, args: Record<string, unknown> = {}): unknown {

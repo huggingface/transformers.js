@@ -117,7 +117,7 @@ test("formats structured tool responses for Gemma4", () => {
     {
       role: "assistant",
       content: "",
-      tool_calls: [
+      toolCalls: [
         {
           id: "toolcall_1",
           type: "function",
@@ -130,7 +130,7 @@ test("formats structured tool responses for Gemma4", () => {
     },
     {
       role: "tool",
-      tool_call_id: "toolcall_1",
+      toolCallId: "toolcall_1",
       name: "get_weather",
       content: JSON.stringify({ location: "London", temperature: 20, weather: "sunny" }),
     },
@@ -163,7 +163,7 @@ test("normalizes text weather tool results for Gemma4", () => {
     {
       role: "assistant",
       content: "",
-      tool_calls: [
+      toolCalls: [
         {
           id: "toolcall_1",
           type: "function",
@@ -176,7 +176,7 @@ test("normalizes text weather tool results for Gemma4", () => {
     },
     {
       role: "tool",
-      tool_call_id: "toolcall_1",
+      toolCallId: "toolcall_1",
       name: "get_weather",
       content: "The weather in London in Sunny, 20 degrees celsius.",
     },
@@ -199,6 +199,40 @@ test("normalizes text weather tool results for Gemma4", () => {
           response: { location: "London", temperature: 20, weather: "sunny" },
         },
       ],
+    },
+  ]);
+});
+
+test("reconstructs Gemma4 thinking content", () => {
+  const adapter = new ModelAdapterGemma4();
+  const messages: Message[] = [
+    {
+      role: "assistant",
+      content: "",
+      thinking: "Use get_weather for London.",
+      toolCalls: [
+        {
+          id: "toolcall_1",
+          type: "function",
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+    },
+    {
+      role: "tool",
+      toolCallId: "toolcall_1",
+      name: "get_weather",
+      content: JSON.stringify({ location: "London", temperature: 20, weather: "sunny" }),
+    },
+  ];
+
+  assert.deepEqual(adapter.formatMessages(messages), [
+    {
+      role: "assistant",
+      content: '<|channel>thought\nUse get_weather for London.<channel|><|tool_call>call:get_weather{location:<|"|>London<|"|>}<tool_call|><|tool_response>response:get_weather{location:<|"|>London<|"|>,temperature:20,weather:<|"|>sunny<|"|>}<tool_response|>',
     },
   ]);
 });

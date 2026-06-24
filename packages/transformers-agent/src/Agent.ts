@@ -99,6 +99,7 @@ export class Agent {
         this._history.push(userMessage);
         this._modelHistory.push(userMessage);
 
+        this.assertStringMessageContent(this._modelHistory);
         let conversation = this.toModelMessages(this._modelHistory);
 
         let totalPromptTokens = 0;
@@ -177,7 +178,8 @@ export class Agent {
             const assistantMessage: Message = {
                 role: 'assistant',
                 content: parsed.visibleText,
-                tool_calls:
+                thinking: parsed.thinkingText || undefined,
+                toolCalls:
                     parsed.toolCalls.length > 0
                         ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
                         : undefined,
@@ -185,9 +187,10 @@ export class Agent {
 
             const modelAssistantMessage: Message = {
                 role: 'assistant',
-                content: assistantRaw,
-                tool_calls:
-                    !this.enableThinking && parsed.toolCalls.length > 0
+                content: parsed.visibleText,
+                thinking: parsed.thinkingText || undefined,
+                toolCalls:
+                    parsed.toolCalls.length > 0
                         ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
                         : undefined,
             };
@@ -228,6 +231,7 @@ export class Agent {
     clearHistory(): void {
         this._history = this.cloneMessages(this.initialPrompts);
         this._modelHistory = this.cloneMessages(this.initialPrompts);
+        this.assertStringMessageContent(this._modelHistory);
         this._kvCache = null;
     }
 
@@ -268,8 +272,18 @@ export class Agent {
     private cloneMessages(messages: ReadonlyArray<Message>): Message[] {
         return messages.map((message) => ({
             ...message,
-            ...(message.role === 'assistant' && message.tool_calls ? { tool_calls: [...message.tool_calls] } : {}),
+            ...(message.role === 'assistant' && message.toolCalls ? { toolCalls: [...message.toolCalls] } : {}),
         }));
+    }
+
+    private assertStringMessageContent(messages: ReadonlyArray<Message>): void {
+        for (const message of messages) {
+            if ('content' in message && message.content !== undefined && typeof message.content !== 'string') {
+                throw new Error(
+                    `Multimodal message content is not supported yet. ${message.role} messages currently require string content.`,
+                );
+            }
+        }
     }
 
     private toOpenAIToolCall(call: ToolCallResult | { id: string; name: string; args: Record<string, unknown> }) {
@@ -367,6 +381,8 @@ export class Agent {
                 : output;
         const modelRawText = this.decodeGeneratedContinuation(sequences, generationPromptLength) ?? streamedRawText;
         const modelContent = this.adapter.normalizeAssistantContent(modelRawText);
+
+        console.log({ rawInput, prompt, modelRawText, modelContent });
 
         return {
             role: 'assistant',

@@ -62,7 +62,7 @@ export class ToolExecutor {
         const content = this.toToolMessageContent(result.output.content);
         return {
             role: 'tool',
-            tool_call_id: result.id,
+            toolCallId: result.id,
             name: result.name,
             content,
         };

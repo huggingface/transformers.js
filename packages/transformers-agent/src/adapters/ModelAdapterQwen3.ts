@@ -16,14 +16,14 @@ export class ModelAdapterQwen3 extends ModelAdapterBase {
 
     formatMessages(messages: ReadonlyArray<Message>): Array<Record<string, unknown>> {
         return messages.map((message) => {
-            if (message.role !== 'assistant' || !message.tool_calls) {
+            if (message.role !== 'assistant' || !message.toolCalls) {
                 return this.formatMessage(message);
             }
 
             return {
                 role: 'assistant',
-                content: message.content,
-                tool_calls: message.tool_calls.map((call) => ({
+                content: this.stringifyMessageContent(message.content),
+                tool_calls: message.toolCalls.map((call) => ({
                     id: call.id,
                     type: 'function',
                     function: {

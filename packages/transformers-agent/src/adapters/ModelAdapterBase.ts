@@ -54,7 +54,7 @@ export class ModelAdapterBase implements ModelAdapter {
 
     protected formatMessage(message: Message): Record<string, unknown> {
         if (message.role === 'assistant') {
-            const toolCalls = message.tool_calls?.map((call) => ({
+            const toolCalls = message.toolCalls?.map((call) => ({
                 id: call.id,
                 type: 'function',
                 function: {
@@ -65,7 +65,7 @@ export class ModelAdapterBase implements ModelAdapter {
 
             return {
                 role: 'assistant',
-                content: message.content,
+                content: this.stringifyMessageContent(message.content),
                 ...(toolCalls ? { tool_calls: toolCalls } : {}),
             };
         }
@@ -73,16 +73,23 @@ export class ModelAdapterBase implements ModelAdapter {
         if (message.role === 'tool') {
             return {
                 role: 'tool',
-                content: message.content,
-                tool_call_id: message.tool_call_id,
+                content: this.stringifyMessageContent(message.content),
+                tool_call_id: message.toolCallId,
                 name: message.name,
             };
         }
 
         return {
             role: message.role,
-            content: message.content,
+            content: this.stringifyMessageContent(message.content),
         };
+    }
+
+    protected stringifyMessageContent(content: Message['content']): string | undefined {
+        if (content === undefined || typeof content === 'string') {
+            return content;
+        }
+        throw new Error('Multimodal message content is not supported by the current model adapter yet.');
     }
 
     protected toToolResultResponse(result: ToolCallResult): unknown {
