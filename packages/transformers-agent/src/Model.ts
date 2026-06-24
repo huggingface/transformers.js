@@ -1,6 +1,6 @@
 import type { DataType, DeviceType, ProgressCallback } from '@huggingface/transformers';
 import { AutoModelForCausalLM, AutoTokenizer, ModelRegistry } from '@huggingface/transformers';
-import type { ModelConfig } from './types.ts';
+import type { ModelConfig } from './types';
 
 export class Model {
     readonly modelId: string;

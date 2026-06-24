@@ -1,21 +1,46 @@
-import type { ToolCall } from '../types.ts';
-import { ParserStrategyBase } from './ParserStrategyBase';
-import type { ParseResult, ParserContext } from './types.ts';
+import type { Message, ToolCall } from '../types';
+import { ModelAdapterBase } from './ModelAdapterBase';
+import type { ModelAdapterContext, ParseResult } from './types';
 
 const IM_END_TOKEN = '<|im_end|>';
 
-export class ParserStrategyQwen3 extends ParserStrategyBase {
+export class ModelAdapterQwen3 extends ModelAdapterBase {
     readonly id = 'qwen3';
 
     private enableThinking = false;
 
-    supports(context: ParserContext): boolean {
+    supports(context: ModelAdapterContext): boolean {
         this.enableThinking = context.enableThinking === true;
         return context.modelType?.startsWith('qwen3_') === true || /qwen3/i.test(context.modelId);
     }
 
+    formatMessages(messages: ReadonlyArray<Message>): Array<Record<string, unknown>> {
+        return messages.map((message) => {
+            if (message.role !== 'assistant' || !message.tool_calls) {
+                return this.formatMessage(message);
+            }
+
+            return {
+                role: 'assistant',
+                content: message.content,
+                tool_calls: message.tool_calls.map((call) => ({
+                    id: call.id,
+                    type: 'function',
+                    function: {
+                        name: call.function.name,
+                        arguments: call.function.arguments,
+                    },
+                })),
+            };
+        });
+    }
+
+    normalizeAssistantContent(content: string): string {
+        return content.replaceAll(IM_END_TOKEN, '').trim();
+    }
+
     parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult {
-        const normalized = content.replaceAll(IM_END_TOKEN, '');
+        const normalized = this.normalizeAssistantContent(content);
         const { thinkingText, remainingText } = extractThinking(normalized, this.enableThinking);
         const toolCalls = parseQwenToolCalls(remainingText, nextId);
         const visibleText = stripQwenToolCalls(remainingText).trim();
@@ -25,6 +50,10 @@ export class ParserStrategyQwen3 extends ParserStrategyBase {
             visibleText,
             toolCalls,
         };
+    }
+
+    useKvCache(_enableThinking: boolean): boolean {
+        return false;
     }
 }
 

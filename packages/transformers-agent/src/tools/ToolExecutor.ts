@@ -62,7 +62,7 @@ export class ToolExecutor {
         const content = this.toToolMessageContent(result.output.content);
         return {
             role: 'tool',
-            toolCallId: result.id,
+            tool_call_id: result.id,
             name: result.name,
             content,
         };
@@ -71,6 +71,9 @@ export class ToolExecutor {
     private toToolMessageContent(content: ToolCallOutput['content']): string {
         if (content.length === 1 && content[0].type === 'text') {
             return content[0].text;
+        }
+        if (content.length === 1 && content[0].type === 'structured') {
+            return JSON.stringify(content[0].data);
         }
         return JSON.stringify(content);
     }

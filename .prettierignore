@@ -5,7 +5,7 @@
 
 # Build outputs & caches
 **/dist
-**/types
+packages/*/types
 **/node_modules
 **/coverage
 **/.cache
@@ -14,4 +14,3 @@
 
 # Lock files
 pnpm-lock.yaml
-

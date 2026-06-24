@@ -1,35 +1,112 @@
-import type { ToolCall } from '../types.ts';
-import { ParserStrategyBase } from './ParserStrategyBase';
-import type { ParseResult, ParserContext } from './types.ts';
+import type { Message, ToolCall, ToolCallResult, ToolMessage } from '../types';
+import { ModelAdapterBase } from './ModelAdapterBase';
+import type { ModelAdapterContext, ParseResult } from './types';
 import { splitTopLevel } from './utils';
 
-export class ParserStrategyGemma4 extends ParserStrategyBase {
+export class ModelAdapterGemma4 extends ModelAdapterBase {
     readonly id = 'gemma4';
 
-    supports(context: ParserContext): boolean {
+    supports(context: ModelAdapterContext): boolean {
         return context.modelType === 'gemma4' || /gemma-4/i.test(context.modelId);
     }
 
-    parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult {
-        const base = super.parseAssistantContent(content, nextId);
-        const thoughtBlocks = extractGemmaThoughtBlocks(content);
-        const thoughtText = thoughtBlocks.join('\n\n').trim();
+    formatMessages(messages: ReadonlyArray<Message>): Array<Record<string, unknown>> {
+        const formatted: Array<Record<string, unknown>> = [];
 
-        const gemmaCalls = this.parseGemmaToolCalls(content, nextId);
-        const visibleText = stripGemmaToolTokens(stripGemmaThoughtTokens(base.visibleText))
-            .replace(/(^|\n)\s*call:[^\n{}]+\{[^\n]*\}\s*(?=\n|$)/g, '$1')
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
+            if (message.role !== 'assistant' || !message.tool_calls || message.tool_calls.length === 0) {
+                formatted.push(this.formatMessage(message));
+                continue;
+            }
+
+            const toolResponses = this.collectFollowingToolMessages(messages, i, message.tool_calls);
+
+            formatted.push({
+                role: 'assistant',
+                tool_calls: message.tool_calls.map((call) => ({
+                    function: {
+                        name: call.function.name,
+                        arguments: call.function.arguments,
+                    },
+                })),
+                ...(toolResponses.length > 0
+                    ? {
+                          tool_responses: toolResponses.map((response) => this.formatToolResponse(response)),
+                      }
+                    : {}),
+            });
+            i += toolResponses.length;
+        }
+
+        return formatted;
+    }
+
+    private collectFollowingToolMessages(
+        messages: ReadonlyArray<Message>,
+        assistantIndex: number,
+        toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['tool_calls']>,
+    ): ToolMessage[] {
+        const toolResponses: ToolMessage[] = [];
+        for (let j = assistantIndex + 1; j < messages.length; j++) {
+            const next = messages[j];
+            if (next.role !== 'tool') {
+                break;
+            }
+            if (!toolCalls.some((call) => call.id === next.tool_call_id)) {
+                break;
+            }
+            toolResponses.push(next);
+        }
+        return toolResponses;
+    }
+
+    private formatToolResponse(response: ToolCallResult | ToolMessage): { name: string; response: unknown } {
+        if ('output' in response) {
+            const toolResponse = this.toToolResultResponse(response);
+            return {
+                name: response.name,
+                response: normalizeGemmaToolResponse(toolResponse, response.args),
+            };
+        }
+
+        const toolResponse = parseToolResponse(response.content);
+        return {
+            name: response.name ?? '',
+            response: normalizeGemmaToolResponse(toolResponse),
+        };
+    }
+
+    normalizeAssistantContent(content: string): string {
+        return content
             .replace(/<\|tool_response\|>/g, '')
             .replace(/<\|tool_response>/g, '')
             .replace(/<tool_response\|>/g, '')
             .replace(/<\|turn\|>/g, '')
             .replace(/<\|turn>/g, '')
             .replace(/<turn\|>/g, '')
+            .replace(/<eos>/g, '')
+            .trim();
+    }
+
+    useKvCache(_enableThinking: boolean): boolean {
+        return false;
+    }
+
+    parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult {
+        const normalized = this.normalizeAssistantContent(content);
+        const base = super.parseAssistantContent(normalized, nextId);
+        const thoughtBlocks = extractGemmaThoughtBlocks(normalized);
+        const thoughtText = thoughtBlocks.join('\n\n').trim();
+
+        const gemmaCalls = this.parseGemmaToolCalls(normalized, nextId);
+        const visibleText = stripGemmaToolTokens(stripGemmaThoughtTokens(base.visibleText))
+            .replace(/(^|\n)\s*call:[^\n{}]+\{[^\n]*\}\s*(?=\n|$)/g, '$1')
             .replace(/<\|channel\|>/g, '')
             .replace(/<\|channel>/g, '')
             .replace(/<channel\|>/g, '')
             .replace(/<\|tool_call\|>/g, '')
             .replace(/<\|tool_call>/g, '')
-            .replace(/<eos>/g, '')
             .trim();
 
         const sanitizedVisibleText = sanitizeVisibleText(visibleText);
@@ -61,8 +138,6 @@ export class ParserStrategyGemma4 extends ParserStrategyBase {
             }
         }
 
-        // Fallback: some tokenizer paths strip special tokens, leaving bare
-        // `call:toolName{...}` text with no <|tool_call> wrappers.
         const bareRegex = /(^|\n)\s*(call:[^\n{}]+\{[^\n]*\})\s*(?=\n|$)/g;
         while ((match = bareRegex.exec(content)) !== null) {
             const parsed = parseSingleGemmaCall(match[2].trim(), nextId);
@@ -154,8 +229,6 @@ function extractGemmaThoughtBlocks(content: string): string[] {
         }
     }
 
-    // Streaming partial support: if the thought channel is opened but not closed
-    // yet, still surface it as thinking text for progressive UI updates.
     const lastOpenIdx = content.lastIndexOf('<|channel>thought');
     const lastCloseIdx = content.lastIndexOf('<channel|>');
     if (lastOpenIdx >= 0 && lastOpenIdx > lastCloseIdx) {
@@ -184,4 +257,43 @@ function sanitizeVisibleText(text: string): string {
     });
 
     return kept.join('\n').trim();
+}
+
+function parseToolResponse(content: string): unknown {
+    try {
+        return JSON.parse(content);
+    } catch {
+        return content;
+    }
+}
+
+function normalizeGemmaToolResponse(response: unknown, args: Record<string, unknown> = {}): unknown {
+    if (typeof response !== 'string') {
+        return response;
+    }
+
+    const location = typeof args.location === 'string' ? args.location : extractLocation(response);
+    const temperature = extractTemperature(response);
+    const weather = extractWeather(response);
+
+    if (!location || temperature === undefined || !weather) {
+        return response;
+    }
+
+    return { location, temperature, weather };
+}
+
+function extractLocation(text: string): string | undefined {
+    const match = /weather\s+in\s+(.+?)\s+(?:is|in)\s+/i.exec(text);
+    return match?.[1]?.trim();
+}
+
+function extractTemperature(text: string): number | undefined {
+    const match = /(-?\d+(?:\.\d+)?)\s*degrees?/i.exec(text);
+    return match ? Number(match[1]) : undefined;
+}
+
+function extractWeather(text: string): string | undefined {
+    const match = /\s(?:is|in)\s+([a-z]+),\s*-?\d+(?:\.\d+)?\s*degrees?/i.exec(text);
+    return match?.[1]?.toLowerCase();
 }

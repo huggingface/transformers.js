@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyQwen3 } from "../src";
+import { ModelAdapterQwen3 } from "../src/adapters/ModelAdapterQwen3";
 
 function parse(content: string) {
   let id = 0;
-  return new ParserStrategyQwen3().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  return new ModelAdapterQwen3().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 function parseWithThinking(content: string) {
   let id = 0;
-  const parser = new ParserStrategyQwen3();
-  parser.supports({ modelId: "Qwen/Qwen3-8B", modelType: "qwen3_text", enableThinking: true });
-  return parser.parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  const adapter = new ModelAdapterQwen3();
+  adapter.supports({ modelId: "Qwen/Qwen3-8B", modelType: "qwen3_text", enableThinking: true });
+  return adapter.parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 test("parses Qwen3 tool calls with thinking text", () => {

@@ -1,4 +1,4 @@
-import {
+import type {
     AgentConfig,
     BeforeToolCallHook,
     AfterToolCallHook,
@@ -9,34 +9,30 @@ import {
     ToolCallResult,
     Usage,
     StreamChunk,
-    ParserStrategy,
+    ModelAdapter,
 } from './types';
 import type { ToolList } from './Tool';
 import { DynamicCache, TextStreamer } from '@huggingface/transformers';
-import { ParserRegistry, ParserStrategyBase } from './parsers';
+import { ModelAdapterBase, ModelAdapterRegistry } from './adapters';
 import type { Model } from './Model';
 import { ToolExecutor } from './tools/ToolExecutor';
 
-const ASSISTANT_CONTROL_TOKEN_REGEX = /<eos>|<\|tool_response\|>|<\|tool_response>|<tool_response\|>/g;
-const TOOL_FOLLOWUP_PROMPT =
-    "Use the tool response to answer the user's last request. Do not call tools again unless required.";
-
 export class Agent {
     readonly model: Model;
-    readonly system: string;
+    readonly initialPrompts: ReadonlyArray<Message>;
     readonly tools: ToolList;
     readonly maxSteps: number;
     readonly maxNewTokens: number;
     readonly temperature: number | undefined;
     readonly enableThinking: boolean;
-    readonly parser: NonNullable<ParserStrategy>;
+    readonly adapter: ModelAdapter;
 
     private readonly stepHooks: OnStepHook[] = [];
     private readonly toolExecutor: ToolExecutor;
     private _history: Message[] = [];
     private _modelHistory: Message[] = [];
     private itemIdCounter = 0;
-    private readonly parserRegistry = new ParserRegistry();
+    private readonly adapterRegistry = new ModelAdapterRegistry();
     private _kvCache: DynamicCache | null = null;
 
     get history(): ReadonlyArray<Message> {
@@ -45,14 +41,15 @@ export class Agent {
 
     constructor(config: AgentConfig) {
         this.model = config.model;
-        this.system = config.system;
+        this.initialPrompts = this.cloneMessages(config.initialPrompts ?? []);
         this.tools = config.tools ?? [];
         this.maxSteps = config.maxSteps ?? 10;
         this.maxNewTokens = config.maxNewTokens ?? 1024;
         this.temperature = config.temperature;
         this.enableThinking = config.enableThinking ?? false;
-        this.parser = config.parser ?? this.resolveParser();
+        this.adapter = config.adapter ?? this.resolveAdapter();
         this.toolExecutor = new ToolExecutor(this.tools);
+        this.clearHistory();
     }
 
     async run(input: string): Promise<RequestResult> {
@@ -102,7 +99,7 @@ export class Agent {
         this._history.push(userMessage);
         this._modelHistory.push(userMessage);
 
-        const conversation = this.toModelMessages(this._modelHistory);
+        let conversation = this.toModelMessages(this._modelHistory);
 
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
@@ -141,9 +138,8 @@ export class Agent {
                 const delta = previewQueue.shift();
                 if (delta) {
                     previewRaw += delta;
-                    const previewParsed = this.parser.parseAssistantContent(
-                        this.sanitizeAssistantModelText(previewRaw),
-                        (prefix) => this.nextItemId(prefix),
+                    const previewParsed = this.adapter.parseAssistantContent(previewRaw, (prefix) =>
+                        this.nextItemId(prefix),
                     );
 
                     const current = this.createRunResult({
@@ -168,36 +164,43 @@ export class Agent {
                 throw generationError;
             }
 
-            const parsed = this.parser.parseAssistantContent(assistantRaw, (prefix) => this.nextItemId(prefix));
+            const parsed = this.adapter.parseAssistantContent(assistantRaw, (prefix) => this.nextItemId(prefix));
             totalPromptTokens += promptTokens;
             totalCompletionTokens += completionTokens;
-
-            const assistantMessage: Message = {
-                role: 'assistant',
-                content: parsed.visibleText,
-                toolCalls: parsed.toolCalls.length > 0 ? parsed.toolCalls : undefined,
-            };
-
-            const modelAssistantMessage: Message = {
-                role: 'assistant',
-                content: assistantRaw,
-                toolCalls: !this.enableThinking && parsed.toolCalls.length > 0 ? parsed.toolCalls : undefined,
-            };
-
-            if (parsed.visibleText.length > 0 || parsed.toolCalls.length > 0) {
-                this._history.push(assistantMessage);
-                this._modelHistory.push(modelAssistantMessage);
-                conversation.push(this.toModelMessage(modelAssistantMessage));
-            }
 
             const executedTools: ToolCallResult[] = [];
             for (const call of parsed.toolCalls) {
                 const result = await this.toolExecutor.execute(call);
                 executedTools.push(result);
+            }
+
+            const assistantMessage: Message = {
+                role: 'assistant',
+                content: parsed.visibleText,
+                tool_calls:
+                    parsed.toolCalls.length > 0
+                        ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
+                        : undefined,
+            };
+
+            const modelAssistantMessage: Message = {
+                role: 'assistant',
+                content: assistantRaw,
+                tool_calls:
+                    !this.enableThinking && parsed.toolCalls.length > 0
+                        ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
+                        : undefined,
+            };
+
+            if (parsed.visibleText.length > 0 || parsed.toolCalls.length > 0) {
+                this._history.push(assistantMessage);
+                this._modelHistory.push(modelAssistantMessage);
+            }
+
+            for (const result of executedTools) {
                 const toolMessage = this.toolExecutor.createToolMessage(result);
                 this._history.push(toolMessage);
                 this._modelHistory.push(toolMessage);
-                conversation.push(this.toModelMessage(toolMessage));
             }
 
             const done = executedTools.length === 0;
@@ -216,17 +219,15 @@ export class Agent {
                 return;
             }
 
-            const followupMessage: Message = { role: 'user', content: TOOL_FOLLOWUP_PROMPT };
-            this._modelHistory.push(followupMessage);
-            conversation.push(this.toModelMessage(followupMessage));
+            conversation = this.toModelMessages(this._modelHistory);
         }
 
         onUpdate({ done: true, runs: [...results], usage: this.makeUsage(totalPromptTokens, totalCompletionTokens) });
     }
 
     clearHistory(): void {
-        this._history = [];
-        this._modelHistory = [];
+        this._history = this.cloneMessages(this.initialPrompts);
+        this._modelHistory = this.cloneMessages(this.initialPrompts);
         this._kvCache = null;
     }
 
@@ -261,39 +262,24 @@ export class Agent {
     }
 
     private toModelMessages(history: ReadonlyArray<Message>): Array<Record<string, unknown>> {
-        return [{ role: 'system', content: this.system }, ...history.map((message) => this.toModelMessage(message))];
+        return this.adapter.formatMessages(history);
     }
 
-    private toModelMessage(message: Message): Record<string, unknown> {
-        if (message.role === 'assistant') {
-            const toolCalls = message.toolCalls?.map((call) => ({
-                id: call.id,
-                type: 'function',
-                function: {
-                    name: call.name,
-                    arguments: this.parser.id === 'qwen3' ? call.args : JSON.stringify(call.args),
-                },
-            }));
+    private cloneMessages(messages: ReadonlyArray<Message>): Message[] {
+        return messages.map((message) => ({
+            ...message,
+            ...(message.role === 'assistant' && message.tool_calls ? { tool_calls: [...message.tool_calls] } : {}),
+        }));
+    }
 
-            return {
-                role: 'assistant',
-                content: message.content,
-                ...(toolCalls ? { tool_calls: toolCalls } : {}),
-            };
-        }
-
-        if (message.role === 'tool') {
-            return {
-                role: 'tool',
-                content: message.content,
-                tool_call_id: message.toolCallId,
-                name: message.name,
-            };
-        }
-
+    private toOpenAIToolCall(call: ToolCallResult | { id: string; name: string; args: Record<string, unknown> }) {
         return {
-            role: message.role,
-            content: message.content,
+            id: call.id,
+            type: 'function' as const,
+            function: {
+                name: call.name,
+                arguments: call.args,
+            },
         };
     }
 
@@ -324,38 +310,63 @@ export class Agent {
             },
         });
 
-        const input = tokenizer.apply_chat_template(
+        const rawInput = tokenizer.apply_chat_template(
             conversation as never,
             {
-                tools: this.parser.formatTools(this.tools),
+                tools: this.adapter.formatTools(this.tools),
                 add_generation_prompt: true,
-                return_dict: true,
+                tokenize: false,
                 enable_thinking: this.enableThinking,
             } as never,
         );
+        const prompt = this.adapter.preparePromptForGeneration(String(rawInput));
+        const input = (
+            tokenizer as unknown as (
+                text: string[],
+                options: Record<string, unknown>,
+            ) => {
+                input_ids?: { dims?: number[]; size?: number };
+            }
+        )([prompt], {
+            add_special_tokens: false,
+            padding: true,
+            truncation: true,
+            return_tensor: true,
+            return_dict: true,
+        });
 
         const fullPromptLength = input.input_ids?.dims?.[1] ?? 0;
 
         let generationInput = input;
         let generationPromptLength = fullPromptLength;
-        const useKvCache = !this.enableThinking && this.parser.id !== 'qwen3';
+        const useKvCache = this.adapter.useKvCache(this.enableThinking);
 
-        const output = (await model.generate({
+        const generationOptions = {
             ...generationInput,
             max_new_tokens: this.maxNewTokens,
             ...(this.temperature !== undefined
                 ? { temperature: this.temperature, do_sample: true }
                 : { do_sample: false }),
             ...(useKvCache ? { past_key_values: this._kvCache } : {}),
-            return_dict_in_generate: true,
             streamer,
-        })) as { past_key_values?: DynamicCache; sequences?: unknown };
+            ...(useKvCache ? { return_dict_in_generate: true } : {}),
+        };
 
-        this._kvCache = useKvCache ? (output.past_key_values ?? null) : null;
+        const output = (await model.generate(generationOptions)) as
+            | { past_key_values?: DynamicCache; sequences?: unknown }
+            | unknown;
 
-        const modelRawText =
-            this.decodeGeneratedContinuation(output.sequences, generationPromptLength) ?? streamedRawText;
-        const modelContent = this.sanitizeAssistantModelText(modelRawText);
+        this._kvCache =
+            useKvCache && typeof output === 'object' && output !== null
+                ? ((output as { past_key_values?: DynamicCache }).past_key_values ?? null)
+                : null;
+
+        const sequences =
+            typeof output === 'object' && output !== null && 'sequences' in output
+                ? (output as { sequences?: unknown }).sequences
+                : output;
+        const modelRawText = this.decodeGeneratedContinuation(sequences, generationPromptLength) ?? streamedRawText;
+        const modelContent = this.adapter.normalizeAssistantContent(modelRawText);
 
         return {
             role: 'assistant',
@@ -403,22 +414,33 @@ export class Agent {
         return decode.call(this.model.tokenizer, Array.from(generated.data), { skip_special_tokens: false });
     }
 
-    private sanitizeAssistantModelText(text: string): string {
-        return text.replace(ASSISTANT_CONTROL_TOKEN_REGEX, '').trim();
-    }
-
     private estimatePromptTokens(conversation: Array<Record<string, unknown>>): number {
         try {
             const rendered = this.model.tokenizer.apply_chat_template(
                 conversation as never,
                 {
-                    return_dict: true,
+                    tokenize: false,
                     add_generation_prompt: true,
-                    tools: this.parser.formatTools(this.tools),
+                    tools: this.adapter.formatTools(this.tools),
                     enable_thinking: this.enableThinking,
                 } as never,
             );
-            const ids = (rendered as { input_ids?: { size?: number; dims?: number[] } }).input_ids;
+            const prompt = this.adapter.preparePromptForGeneration(String(rendered));
+            const tokenized = (
+                this.model.tokenizer as unknown as (
+                    text: string[],
+                    options: Record<string, unknown>,
+                ) => {
+                    input_ids?: { dims?: number[]; size?: number };
+                }
+            )([prompt], {
+                add_special_tokens: false,
+                padding: true,
+                truncation: true,
+                return_tensor: true,
+                return_dict: true,
+            });
+            const ids = tokenized.input_ids;
             if (!ids) return 0;
             if (typeof ids.size === 'number') return ids.size;
             if (Array.isArray(ids.dims) && ids.dims.length > 1) return ids.dims[0] * ids.dims[1];
@@ -441,17 +463,13 @@ export class Agent {
         return `${prefix}_${this.itemIdCounter}`;
     }
 
-    private resolveParser(): NonNullable<AgentConfig['parser']> {
-        const modelConfig = this.readModelConfig();
-        return (
-            this.parserRegistry.resolve({
-                modelId: this.model.modelId,
-                modelType: this.tryReadString(modelConfig, 'model_type'),
-                chatTemplate: this.tryReadString(this.model.tokenizer, 'chat_template'),
-                enableThinking: this.enableThinking,
-            }) ?? new ParserStrategyBase()
-        );
-    }
+    private resolveAdapter = (): ModelAdapter =>
+        this.adapterRegistry.resolve({
+            modelId: this.model.modelId,
+            modelType: this.tryReadString(this.readModelConfig(), 'model_type'),
+            chatTemplate: this.tryReadString(this.model.tokenizer, 'chat_template'),
+            enableThinking: this.enableThinking,
+        }) ?? new ModelAdapterBase();
 
     private readModelConfig(): Record<string, unknown> {
         const modelUnknown = this.model.model as unknown as Record<string, unknown>;

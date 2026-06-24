@@ -1,17 +1,21 @@
-import type { ToolCall } from '../types.ts';
-import { ParserStrategyBase } from './ParserStrategyBase';
-import type { ParseResult, ParserContext } from './types.ts';
+import type { ToolCall } from '../types';
+import { ModelAdapterBase } from './ModelAdapterBase';
+import type { ModelAdapterContext, ParseResult } from './types';
 import { asRecord } from './utils';
 
-export class ParserStrategyGranite extends ParserStrategyBase {
+export class ModelAdapterGranite extends ModelAdapterBase {
     readonly id = 'granite';
 
-    supports(context: ParserContext): boolean {
+    supports(context: ModelAdapterContext): boolean {
         return context.modelType === 'granite' || /granite/i.test(context.modelId);
     }
 
+    normalizeAssistantContent(content: string): string {
+        return content.replace(/<\|end_of_text\|>/g, '').trim();
+    }
+
     parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult {
-        const normalized = content.replace(/<\|end_of_text\|>/g, '');
+        const normalized = this.normalizeAssistantContent(content);
         const toolCalls = parseGraniteToolCalls(normalized, nextId);
         const base = super.parseAssistantContent(stripGraniteToolCalls(normalized), nextId);
 

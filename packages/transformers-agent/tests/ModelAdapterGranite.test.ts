@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyGranite } from "../src";
+import { ModelAdapterGranite } from "../src/adapters/ModelAdapterGranite";
 
 function parse(content: string) {
   let id = 0;
-  return new ParserStrategyGranite().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  return new ModelAdapterGranite().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 test("parses Granite-style JSON tool calls", () => {

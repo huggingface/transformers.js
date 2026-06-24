@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParserStrategyGemma4 } from "../src";
+import { ModelAdapterGemma4 } from "../src/adapters/ModelAdapterGemma4";
+import type { Message } from "../src/types";
 
 function parse(content: string) {
   let id = 0;
-  return new ParserStrategyGemma4().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
+  return new ModelAdapterGemma4().parseAssistantContent(content, (prefix) => `${prefix}_${++id}`);
 }
 
 test("parses a completed Gemma4 tool call with quoted string arguments", () => {
@@ -106,6 +107,98 @@ test("separates thought blocks from visible text and tool calls", () => {
       id: "toolcall_1",
       name: "getWeather",
       args: { location: "Bern" },
+    },
+  ]);
+});
+
+test("formats structured tool responses for Gemma4", () => {
+  const adapter = new ModelAdapterGemma4();
+  const messages: Message[] = [
+    {
+      role: "assistant",
+      content: "",
+      tool_calls: [
+        {
+          id: "toolcall_1",
+          type: "function",
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+    },
+    {
+      role: "tool",
+      tool_call_id: "toolcall_1",
+      name: "get_weather",
+      content: JSON.stringify({ location: "London", temperature: 20, weather: "sunny" }),
+    },
+  ];
+
+  assert.deepEqual(adapter.formatMessages(messages), [
+    {
+      role: "assistant",
+      tool_calls: [
+        {
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+      tool_responses: [
+        {
+          name: "get_weather",
+          response: { location: "London", temperature: 20, weather: "sunny" },
+        },
+      ],
+    },
+  ]);
+});
+
+test("normalizes text weather tool results for Gemma4", () => {
+  const adapter = new ModelAdapterGemma4();
+  const messages: Message[] = [
+    {
+      role: "assistant",
+      content: "",
+      tool_calls: [
+        {
+          id: "toolcall_1",
+          type: "function",
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+    },
+    {
+      role: "tool",
+      tool_call_id: "toolcall_1",
+      name: "get_weather",
+      content: "The weather in London in Sunny, 20 degrees celsius.",
+    },
+  ];
+
+  assert.deepEqual(adapter.formatMessages(messages), [
+    {
+      role: "assistant",
+      tool_calls: [
+        {
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+      tool_responses: [
+        {
+          name: "get_weather",
+          response: { location: "London", temperature: 20, weather: "sunny" },
+        },
+      ],
     },
   ]);
 });

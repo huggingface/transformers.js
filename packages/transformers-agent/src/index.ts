@@ -2,13 +2,13 @@ export { Model } from './Model';
 export { Agent } from './Agent';
 export { Tool } from './Tool';
 export {
-    ParserRegistry,
-    ParserStrategyBase,
-    ParserStrategyGemma4,
-    ParserStrategyGranite,
-    ParserStrategyQwen3,
-} from './parsers/index';
-export type { ParseResult, ParserContext, ParserStrategy } from './parsers/index';
+    ModelAdapterRegistry,
+    ModelAdapterBase,
+    ModelAdapterGemma4,
+    ModelAdapterGranite,
+    ModelAdapterQwen3,
+} from './adapters/index';
+export type { ParseResult, ModelAdapterContext, ModelAdapter } from './adapters/index';
 export type {
     ModelConfig,
     AgentConfig,

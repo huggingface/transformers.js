@@ -116,7 +116,8 @@ Transformers.js exposes powerful local-model controls, but building an agent sti
 `@huggingface/transformers-agent` should provide that missing layer:
 
 - a `Model` object that makes the local model lifecycle explicit: model id, device, dtype, cache checks, download size, progress, and initialization
-- an `Agent` object that owns the system prompt, tools, history, and KV cache so repeated turns can stay efficient
+- an `Agent` object that owns the initial prompts, tools, history, and KV cache so repeated turns can stay efficient
+- model adapters that isolate model-specific chat-template formats, tool-call syntax, special tokens, and cache behavior
 - a tool API that can be adapted into the function schema format expected by model chat templates
 - a built-in agent loop for local tools, so callers can use `agent.run()` or `agent.stream()` instead of manually detecting tool calls and sending follow-up prompts
 - browser and Node.js support without assuming a hosted model, API key, server-side session, or remote provider
@@ -140,7 +141,7 @@ await model.init(console.log);
 
 const agent = new Agent({
   model,
-  system: "You are a helpful research assistant.",
+  initialPrompts: [{ role: "system", content: "You are a helpful research assistant." }],
 });
 
 const response = await agent.run("Who are you?");
@@ -159,7 +160,7 @@ await model.init(console.log);
 
 const agent = new Agent({
   model,
-  system: "You are a helpful research assistant.",
+  initialPrompts: [{ role: "system", content: "You are a helpful research assistant." }],
 });
 
 for await (const chunk of agent.stream("Who are you?")) {
@@ -205,7 +206,7 @@ const getWeatherTool = new Tool<{ location: string; unit: string }>({
 
 const agent = new Agent({
   model,
-  system: "You are a helpful AI assistant.",
+  initialPrompts: [{ role: "system", content: "You are a helpful AI assistant." }],
   tools: [getWeatherTool],
 });
 

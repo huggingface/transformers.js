@@ -49,8 +49,8 @@ const model = await Model.load(
 
 ## Agent
 
-The agent owns the system prompt, tools, and conversation history. All three are
-fixed at construction time so the KV cache stays valid across turns — only the
+The agent owns the initial prompts, tools, and conversation history. All three are
+fixed at construction time so the KV cache stays valid across turns; only the
 user input changes per call.
 
 ```ts
@@ -58,11 +58,16 @@ import { Agent } from '@huggingface/transformers-agent';
 
 const agent = new Agent({
   model,
-  system: 'You are a helpful research assistant.',
+  initialPrompts: [{ role: 'system', content: 'You are a helpful research assistant.' }],
   tools: [searchWeb, readUrl],
   maxSteps: 10,
 });
 ```
+
+Model-specific details such as chat-template message structure, special tokens,
+thinking text, tool-call syntax, and KV-cache behavior are handled by
+`ModelAdapter` implementations. See `src/adapters/README.md` if you need to add
+support for a new model family.
 
 ### Non-streaming
 
