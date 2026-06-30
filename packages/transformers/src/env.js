@@ -257,7 +257,10 @@ export const env = {
     },
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
-    remoteHost: 'https://huggingface.co/',
+    remoteHost:
+        typeof process !== 'undefined'
+            ? (process.env?.HF_ENDPOINT ?? 'https://huggingface.co/')
+            : 'https://huggingface.co/',
     remotePathTemplate: '{model}/resolve/{revision}/',
 
     allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
