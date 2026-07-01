@@ -813,7 +813,7 @@ function encodeWAV(chunks, rate) {
     /* data chunk length */
     view.setUint32(40, totalLength * 4, true);
 
-    return new Blob([buffer, ...chunks.map((chunk) => /** @type {ArrayBuffer} */ (chunk.buffer))], {
+    return new Blob([buffer, ...chunks.map((c) => new Uint8Array(c.buffer, c.byteOffset, c.byteLength))], {
         type: 'audio/wav',
     });
 }
