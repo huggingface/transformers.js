@@ -62,9 +62,11 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {Record<string, string>} [extraHeaders] Additional request headers to merge
+ * on top of the default fetch headers (e.g. `Range`/`If-Range` for resuming a download).
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
+export async function getFile(urlOrPath, extraHeaders = undefined) {
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL
@@ -74,9 +76,13 @@ export async function getFile(urlOrPath) {
                 : urlOrPath,
         );
     } else {
-        return env.fetch(urlOrPath, {
-            headers: getFetchHeaders(urlOrPath),
-        });
+        const headers = getFetchHeaders(urlOrPath);
+        if (extraHeaders) {
+            for (const [key, value] of Object.entries(extraHeaders)) {
+                headers.set(key, value);
+            }
+        }
+        return env.fetch(urlOrPath, { headers });
     }
 }
 
@@ -330,10 +336,28 @@ export async function loadResourceFile(
                 );
             }
 
-            // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            // File not found locally, so we try to download it from the remote server.
+            //
+            // Resume an interrupted download when the Node file cache still holds a
+            // partial for this key. This only applies to the streaming path
+            // (`IS_NODE_ENV && return_path`), where the body is written straight to
+            // disk; on the buffered path a 206 would yield only the trailing bytes.
+            // `Range` asks the CDN to continue from the last byte we have; `If-Range`
+            // makes the server fall back to a full 200 if the file changed upstream.
+            let resumeHeaders;
+            if (apis.IS_NODE_ENV && return_path && cache && typeof cache.getResumeInfo === 'function') {
+                const resume = await cache.getResumeInfo(proposedCacheKey);
+                if (resume && resume.size > 0) {
+                    resumeHeaders = { Range: `bytes=${resume.size}-` };
+                    if (resume.etag) {
+                        resumeHeaders['If-Range'] = resume.etag;
+                    }
+                }
+            }
+            response = await getFile(remoteURL, resumeHeaders);
 
-            if (response.status !== 200) {
+            // 200 (full download) and 206 (resumed partial) are both success.
+            if (response.status !== 200 && response.status !== 206) {
                 return handleError(response.status, remoteURL, fatal);
             }
 
@@ -346,7 +370,7 @@ export async function loadResourceFile(
             cache && // 1. A caching system is available
             typeof Response !== 'undefined' && // 2. `Response` is defined (i.e., we are in a browser-like environment)
             response instanceof Response && // 3. result is a `Response` object (i.e., not a `FileResponse`)
-            response.status === 200; // 4. request was successful (status code 200)
+            (response.status === 200 || response.status === 206); // 4. request was successful (200 full, or 206 resumed)
     }
 
     // Start downloading

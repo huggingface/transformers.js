@@ -11,6 +11,9 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * Adds a response to the cache.
  * @property {(request: string) => Promise<boolean>} [delete]
  * Deletes a request from the cache. Returns true if deleted, false otherwise.
+ * @property {(request: string) => Promise<{size: number, etag: string|null, total: number}|undefined>} [getResumeInfo]
+ * Optional. Reports a resumable partial download for a request (size on disk, its etag, and expected total),
+ * enabling the caller to continue an interrupted download via an HTTP `Range` request.
  */
 
 /**
