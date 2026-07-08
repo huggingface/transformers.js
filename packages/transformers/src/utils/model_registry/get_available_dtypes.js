@@ -40,10 +40,10 @@ export async function get_available_dtypes(modelId, options = {}) {
         cache_dir = null,
         local_files_only = false,
     } = options;
-    const sessionEnv = options.sessionEnv ?? options.env ?? {};
+    const sessionEnv = options.env ?? {};
 
     let config = providedConfig;
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, sessionEnv });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, env: sessionEnv });
 
     const subfolder = 'onnx';
 
@@ -55,7 +55,7 @@ export async function get_available_dtypes(modelId, options = {}) {
     const baseNames = Object.values(sessions);
 
     // For each dtype, check if all session files exist
-    const metadataOptions = { revision, cache_dir, local_files_only, sessionEnv };
+    const metadataOptions = { revision, cache_dir, local_files_only, env: sessionEnv };
 
     // Probe all (dtype, baseName) combinations in parallel
     const probeResults = await Promise.all(

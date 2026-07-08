@@ -1,4 +1,5 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { buildResourcePaths, getFetchHeaders } from "../../src/utils/hub.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -6,6 +7,29 @@ import fs from "node:fs";
 // TODO: Set cache folder to a temp directory
 
 describe("Hub", () => {
+  describe("Session env", () => {
+    it("should use scoped resource path options", () => {
+      const paths = buildResourcePaths("org/model", "config.json", {
+        revision: "refs/pr/1",
+        localModelPath: "/scoped-models/",
+        remoteHost: "https://models.example.com/",
+        remotePathTemplate: "{model}/at/{revision}/",
+      });
+
+      expect(paths.localPath).toBe("/scoped-models/org/model/config.json");
+      expect(paths.remoteURL).toBe("https://models.example.com/org/model/at/refs%2Fpr%2F1/config.json");
+    });
+
+    it("should use scoped Hugging Face token for request headers", () => {
+      const headers = getFetchHeaders("https://huggingface.co/org/model/resolve/main/config.json", {
+        version: "test-version",
+        hfToken: "scoped-token",
+      });
+
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+  });
+
   describe("Loading models", () => {
     it(
       "should load a model from the local cache",

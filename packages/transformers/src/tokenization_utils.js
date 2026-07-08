@@ -319,7 +319,7 @@ export class PreTrainedTokenizer
             cache_dir,
             local_files_only,
             revision,
-            sessionEnv,
+            env: sessionEnv,
         });
 
         // @ts-ignore

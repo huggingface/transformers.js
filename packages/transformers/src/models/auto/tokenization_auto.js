@@ -55,7 +55,7 @@ export class AutoTokenizer {
             cache_dir,
             local_files_only,
             revision,
-            sessionEnv,
+            env: sessionEnv,
         });
 
         // Some tokenizers are saved with the "Fast" suffix, so we remove that if present.

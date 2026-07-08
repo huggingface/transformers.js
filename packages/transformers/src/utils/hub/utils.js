@@ -101,7 +101,7 @@ export function isValidHfModelId(string) {
  * @returns {string}
  */
 export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     return JSON.stringify([
         model_id,
         options.revision ?? 'main',

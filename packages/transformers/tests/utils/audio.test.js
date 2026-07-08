@@ -1,4 +1,5 @@
-import { RawAudio, spectrogram, window_function, mel_filter_bank } from "../../src/utils/audio.js";
+import { jest } from "@jest/globals";
+import { load_audio, RawAudio, spectrogram, window_function, mel_filter_bank } from "../../src/utils/audio.js";
 import { init } from "../init.js";
 
 init();
@@ -67,6 +68,44 @@ function identityMelFilters(numBins) {
 }
 
 describe("Audio utilities", () => {
+  describe("Session env", () => {
+    let originalAudioContext;
+
+    beforeEach(() => {
+      originalAudioContext = globalThis.AudioContext;
+      globalThis.AudioContext = class {
+        sampleRate;
+
+        constructor({ sampleRate }) {
+          this.sampleRate = sampleRate;
+        }
+
+        async decodeAudioData() {
+          return {
+            numberOfChannels: 1,
+            length: 2,
+            getChannelData: () => new Float32Array([0.25, 0.5]),
+          };
+        }
+      };
+    });
+
+    afterEach(() => {
+      globalThis.AudioContext = originalAudioContext;
+    });
+
+    it("should use scoped fetch when loading an audio URL", async () => {
+      const fetch = jest.fn(async () => ({
+        arrayBuffer: async () => new ArrayBuffer(8),
+      }));
+
+      const audio = await load_audio("https://example.com/audio.wav", 16000, { fetch });
+
+      expect(fetch).toHaveBeenCalledWith("https://example.com/audio.wav", expect.any(Object));
+      expect(audio).toEqual(new Float32Array([0.25, 0.5]));
+    });
+  });
+
   describe("RawAudio", () => {
     it("should create RawAudio from a single Float32Array", () => {
       const sampling_rate = 16000;

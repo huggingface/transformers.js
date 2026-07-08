@@ -32,7 +32,7 @@ export async function get_files(modelId, options = {}) {
         include_tokenizer = true,
         include_processor = true,
     } = options;
-    const sessionEnv = options.sessionEnv ?? options.env ?? {};
+    const sessionEnv = options.env ?? {};
     const files = await get_model_files(modelId, {
         config,
         cache_dir,
@@ -41,7 +41,7 @@ export async function get_files(modelId, options = {}) {
         dtype,
         device,
         model_file_name,
-        sessionEnv,
+        env: sessionEnv,
     });
 
     if (include_tokenizer) {

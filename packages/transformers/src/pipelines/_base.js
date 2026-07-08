@@ -94,6 +94,12 @@ export function get_bounding_box(box, asInteger) {
  * Refer to this class for methods shared across different pipelines.
  */
 export class Pipeline extends Callable {
+    /** @type {Partial<import('../env.js').TransformersEnvironmentSession>} */
+    sessionEnv;
+
+    /** @type {import('../env.js').TransformersEnvironment} */
+    env;
+
     /**
      * Create a new Pipeline.
      * @param {Object} options An object containing the following properties:
@@ -124,6 +130,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
  * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelTokenizerConstructorArgs} TextPipelineConstructorArgs An object used to instantiate a text-based pipeline.
@@ -134,6 +141,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
  * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelProcessorConstructorArgs} AudioPipelineConstructorArgs An object used to instantiate an audio-based pipeline.
@@ -146,6 +154,7 @@ export class Pipeline extends Callable {
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
  * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextAudioPipelineConstructorArgs An object used to instantiate a text- and audio-based pipeline.

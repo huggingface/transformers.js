@@ -87,7 +87,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {import('./devices.js').DeviceType|Record<string, import('./devices.js').DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import('./dtypes.js').DataType|Record<string, import('./dtypes.js').DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
- * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen. Deprecated for Transformers.js environment settings: use `options.env`. Runtime-specific ONNX session options remain supported.
+ * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
  */
 
 /**
@@ -535,7 +535,7 @@ const INFLIGHT_LOADS = new Map();
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     const revision = options.revision ?? 'main';
     const cacheDir = options.cache_dir ?? null;
     const localFilesOnly = options.local_files_only ?? false;
@@ -561,7 +561,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         cache_dir: cacheDir,
         local_files_only: localFilesOnly,
         revision,
-        sessionEnv: options.sessionEnv ?? options.env,
+        env: options.env,
     };
 
     if (!env.allowLocalModels) {

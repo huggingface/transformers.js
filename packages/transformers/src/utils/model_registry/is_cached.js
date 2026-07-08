@@ -26,7 +26,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  */
 async function check_files_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     const pathOptions = {
         cache_dir: options.cache_dir ?? null,
         revision: options.revision ?? 'main',
@@ -63,7 +63,7 @@ async function check_files_cache(modelId, files, options = {}) {
 async function is_file_cached(modelId, filename, options = {}) {
     const cache = await getCache(options?.cache_dir);
     if (!cache) return false;
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     const pathOptions = {
         cache_dir: options.cache_dir ?? null,
         revision: options.revision ?? 'main',

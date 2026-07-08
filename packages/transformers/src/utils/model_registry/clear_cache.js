@@ -36,7 +36,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  */
 async function clear_files_from_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     const pathOptions = {
         cache_dir: options.cache_dir ?? null,
         revision: options.revision ?? 'main',

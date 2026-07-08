@@ -154,19 +154,26 @@ describe("get_available_dtypes", () => {
     expect(dtypes).not.toContain("fp16");
   });
 
-  it("should pass revision and cache_dir to get_file_metadata", async () => {
+  it("should pass session env to get_file_metadata", async () => {
     setupExistingFiles("onnx/model.onnx");
+
+    const fetch = jest.fn();
+    const env = {
+      remoteHost: "https://models.example.com/",
+      allowRemoteModels: false,
+      fetch,
+      hfToken: "test-token",
+    };
 
     await get_available_dtypes("test/model", {
       config: ENCODER_ONLY_CONFIG,
       revision: "v2",
-      cache_dir: "/tmp/cache",
+      env,
     });
 
-    // Verify that metadata calls received the correct options
     for (const call of mockGetFileMetadata.mock.calls) {
       expect(call[0]).toBe("test/model");
-      expect(call[2]).toMatchObject({ revision: "v2", cache_dir: "/tmp/cache" });
+      expect(call[2]).toMatchObject({ revision: "v2", env });
     }
   });
 

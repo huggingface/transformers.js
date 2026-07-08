@@ -143,7 +143,7 @@ export async function pipeline(
         device,
         dtype,
         model_file_name,
-        sessionEnv,
+        env: sessionEnv,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
@@ -152,7 +152,7 @@ export async function pipeline(
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(
             expected_files.map(async (file) =>
-                get_file_metadata(model, file, { cache_dir, local_files_only, revision, sessionEnv }),
+                get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
             ),
         );
         metadata.forEach((m, i) => {

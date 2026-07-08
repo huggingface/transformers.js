@@ -56,7 +56,7 @@ export function get_file_metadata(path_or_repo_id, filename, options = {}) {
 }
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+    const env = resolveEnv(options.env);
     const fetchOptions = {
         useFS: env.useFS,
         fetch: env.fetch,

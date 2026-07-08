@@ -554,7 +554,7 @@ export class PretrainedConfig {
                 cache_dir,
                 local_files_only,
                 revision,
-                sessionEnv,
+                env: sessionEnv,
             }));
         return new this(data);
     }
