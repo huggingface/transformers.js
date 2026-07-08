@@ -19,6 +19,7 @@ import { logger } from './utils/logger.js';
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
 import { AutoProcessor } from './models/auto/processing_auto.js';
 import { AutoConfig } from './configs.js';
+import { getSessionEnv } from './env.js';
 
 import {
     SUPPORTED_TASKS,
@@ -109,8 +110,11 @@ export async function pipeline(
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
+        env = {},
     } = {},
 ) {
+    const sessionEnv = getSessionEnv(env);
+
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -132,15 +136,25 @@ export async function pipeline(
 
     // Determine which files the model needs
     const expected_files = await get_pipeline_files(task, model, {
+        config,
+        cache_dir,
+        local_files_only,
+        revision,
         device,
         dtype,
+        model_file_name,
+        env: sessionEnv,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+        const metadata = await Promise.all(
+            expected_files.map(async (file) =>
+                get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
+            ),
+        );
         metadata.forEach((m, i) => {
             if (m.exists) {
                 files_loading[expected_files[i]] = {
@@ -165,6 +179,7 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
+        env: sessionEnv,
     };
 
     // Determine which components to load based on the expected files
@@ -196,7 +211,7 @@ export async function pipeline(
         modelPromise,
     ]);
 
-    const results = { task, model: model_loaded };
+    const results = { task, model: model_loaded, env: sessionEnv };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
 

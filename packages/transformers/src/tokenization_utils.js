@@ -26,7 +26,7 @@ import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
-    const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
+    const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path, options);
     return await Promise.all(
         tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
     );
@@ -302,7 +302,14 @@ export class PreTrainedTokenizer
      */
     static async from_pretrained(
         pretrained_model_name_or_path,
-        { progress_callback = null, config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+        {
+            progress_callback = null,
+            config = null,
+            cache_dir = null,
+            local_files_only = false,
+            revision = 'main',
+            env = {},
+        } = {},
     ) {
         const info = await loadTokenizer(pretrained_model_name_or_path, {
             progress_callback,
@@ -310,6 +317,7 @@ export class PreTrainedTokenizer
             cache_dir,
             local_files_only,
             revision,
+            env,
         });
 
         // @ts-ignore

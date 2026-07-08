@@ -1,5 +1,35 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
+import { getSessionEnv } from '../../env.js';
 import { logger } from '../logger.js';
+
+const FETCH_IDS = new WeakMap();
+const HF_TOKEN_IDS = new Map();
+let NEXT_FETCH_ID = 0;
+let NEXT_HF_TOKEN_ID = 0;
+
+function getFetchId(fetch) {
+    if (typeof fetch !== 'function') {
+        return null;
+    }
+    let id = FETCH_IDS.get(fetch);
+    if (id === undefined) {
+        id = ++NEXT_FETCH_ID;
+        FETCH_IDS.set(fetch, id);
+    }
+    return id;
+}
+
+function getHfTokenId(hfToken) {
+    if (!hfToken) {
+        return null;
+    }
+    let id = HF_TOKEN_IDS.get(hfToken);
+    if (id === undefined) {
+        id = ++NEXT_HF_TOKEN_ID;
+        HF_TOKEN_IDS.set(hfToken, id);
+    }
+    return id;
+}
 
 /**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
@@ -66,15 +96,24 @@ export function isValidHfModelId(string) {
  * @param {string} [options.revision='main'] Model revision.
  * @param {string|null} [options.cache_dir=null] Custom cache directory.
  * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @param {...unknown} parts Additional key parts for the specific operation.
  * @returns {string}
  */
 export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
+    const sessionEnv = getSessionEnv(options.env);
     return JSON.stringify([
         model_id,
         options.revision ?? 'main',
         options.cache_dir ?? null,
         options.local_files_only ?? false,
+        sessionEnv.allowRemoteModels,
+        sessionEnv.remoteHost,
+        sessionEnv.remotePathTemplate,
+        sessionEnv.allowLocalModels,
+        sessionEnv.localModelPath,
+        getFetchId(sessionEnv.fetch),
+        getHfTokenId(sessionEnv.hfToken),
         ...parts,
     ]);
 }

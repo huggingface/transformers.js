@@ -4,7 +4,7 @@
  * @module utils/hub
  */
 
-import { apis, env } from '../env.js';
+import { apis, getSessionEnv } from '../env.js';
 import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
@@ -36,8 +36,9 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:
  * - The model is a model provided by the library (loaded with the *model id* string of a pretrained model).
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
- * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
- * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model).
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env={}] Session-scopable environment overrides.
+ * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. Deprecated: use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.
+ * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model). Deprecated: use `options.env.allowRemoteModels=false` for session-scoped remote loading control.
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
@@ -51,7 +52,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
- * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
+ * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen. Deprecated for Transformers.js environment settings: use `options.env`. Runtime-specific ONNX session options remain supported.
  */
 
 /**
@@ -62,10 +63,12 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
-    if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
+export async function getFile(urlOrPath, options = {}) {
+    const sessionEnv = getSessionEnv(options.env);
+    if (sessionEnv.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL
                 ? urlOrPath.protocol === 'file:'
@@ -74,8 +77,8 @@ export async function getFile(urlOrPath) {
                 : urlOrPath,
         );
     } else {
-        return env.fetch(urlOrPath, {
-            headers: getFetchHeaders(urlOrPath),
+        return sessionEnv.fetch(urlOrPath, {
+            headers: getFetchHeaders(urlOrPath, options),
         });
     }
 }
@@ -86,25 +89,23 @@ export async function getFile(urlOrPath) {
  * In browser environments, returns minimal headers for security.
  *
  * @param {URL|string} urlOrPath The URL or path being fetched.
+ * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Headers} A Headers object with appropriate headers for the request.
  */
-export function getFetchHeaders(urlOrPath) {
+export function getFetchHeaders(urlOrPath, options = {}) {
+    const sessionEnv = getSessionEnv(options.env);
     const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
     const headers = new Headers();
 
     if (isNode) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
-        const version = env.version;
+        const version = sessionEnv.version;
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
-            // If an access token is present in the environment variables,
-            // we add it to the request headers.
-            // NOTE: We keep `HF_ACCESS_TOKEN` for backwards compatibility (as a fallback).
-            const token = process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN;
-            if (token) {
-                headers.set('Authorization', `Bearer ${token}`);
+            if (sessionEnv.hfToken) {
+                headers.set('Authorization', `Bearer ${sessionEnv.hfToken}`);
             }
         }
     } else {
@@ -130,14 +131,15 @@ export function getFetchHeaders(urlOrPath) {
  * An object containing all the paths and URLs for the resource.
  */
 export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+    const sessionEnv = getSessionEnv(options.env);
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
     const validModelId = isValidHfModelId(path_or_repo_id);
-    const localPath = validModelId ? pathJoin(env.localModelPath, requestURL) : requestURL;
+    const localPath = validModelId ? pathJoin(sessionEnv.localModelPath, requestURL) : requestURL;
     const remoteURL = pathJoin(
-        env.remoteHost,
-        env.remotePathTemplate
+        sessionEnv.remoteHost,
+        sessionEnv.remotePathTemplate
             .replaceAll('{model}', path_or_repo_id)
             .replaceAll('{revision}', encodeURIComponent(revision)),
         filename,
@@ -257,6 +259,7 @@ export async function loadResourceFile(
     return_path = false,
     cache = null,
 ) {
+    const sessionEnv = getSessionEnv(options.env);
     const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
         filename,
@@ -282,13 +285,13 @@ export async function loadResourceFile(
     } else {
         // Caching not available, or file is not cached, so we perform the request
 
-        if (env.allowLocalModels) {
+        if (sessionEnv.allowLocalModels) {
             // Accessing local models is enabled, so we try to get the file locally.
             // If request is a valid HTTP URL, we skip the local file check. Otherwise, we try to get the file locally.
             const isURL = isValidUrl(requestURL, ['http:', 'https:']);
             if (!isURL) {
                 try {
-                    response = await getFile(localPath);
+                    response = await getFile(localPath, options);
                     cacheKey = localPath; // Update the cache key to be the local path
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
@@ -297,7 +300,7 @@ export async function loadResourceFile(
                 }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
-            } else if (!env.allowRemoteModels) {
+            } else if (!sessionEnv.allowRemoteModels) {
                 throw new Error(
                     `\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${requestURL}.`,
                 );
@@ -310,7 +313,7 @@ export async function loadResourceFile(
             // - the path is a valid HTTP url (`response === undefined`)
             // - the path is not a valid HTTP url and the file is not present on the file system or local server (`response.status === 404`)
 
-            if (options.local_files_only || !env.allowRemoteModels) {
+            if (options.local_files_only || !sessionEnv.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
                     throw Error(
@@ -331,7 +334,7 @@ export async function loadResourceFile(
             }
 
             // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            response = await getFile(remoteURL, options);
 
             if (response.status !== 200) {
                 return handleError(response.status, remoteURL, fatal);
@@ -499,14 +502,15 @@ const INFLIGHT_LOADS = new Map();
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
-    if (!env.allowLocalModels) {
+    const sessionEnv = getSessionEnv(options.env);
+    if (!sessionEnv.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
         if (options.local_files_only) {
             throw Error(
                 'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
             );
-        } else if (!env.allowRemoteModels) {
+        } else if (!sessionEnv.allowRemoteModels) {
             throw Error(
                 'Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.',
             );

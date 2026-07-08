@@ -13,7 +13,7 @@
  */
 
 // Environment variables
-export { env, LogLevel } from './env.js';
+export { env, getSessionEnv, LogLevel } from './env.js';
 
 // Pipelines
 export * from './pipelines.js';

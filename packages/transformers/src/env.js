@@ -161,6 +161,7 @@ if (RUNNING_LOCALLY) {
 
 // Only used for environments with access to file system
 const DEFAULT_CACHE_DIR = RUNNING_LOCALLY ? path.join(dirname__, '/.cache/') : null;
+const DEFAULT_REMOTE_HOST = globalThis.process?.env?.HF_ENDPOINT ?? 'https://huggingface.co/';
 
 // Set local model path, based on available APIs
 const DEFAULT_LOCAL_MODEL_PATH = '/models/';
@@ -168,6 +169,7 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
 
 // Ensure default fetch is called with the correct receiver in browser environments.
 const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
+const DEFAULT_HF_TOKEN = globalThis.process?.env?.HF_TOKEN ?? globalThis.process?.env?.HF_ACCESS_TOKEN;
 
 /**
  * Log levels for controlling output verbosity.
@@ -202,12 +204,9 @@ export const LogLevel = Object.freeze({
 });
 
 /**
- * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
- * @typedef {Object} TransformersEnvironment
- * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
- * allowing users to set these variables if they want to.
- * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
+ * Session-scopable variables that describe the model, task, or resource-loading contract that one pipeline or library must control without affecting others
+ *
+ * @typedef {Object} TransformersEnvironmentSession
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
  * @property {string} remoteHost Host URL to load models from. Defaults to the Hugging Face Hub.
@@ -215,6 +214,18 @@ export const LogLevel = Object.freeze({
  * @property {boolean} allowLocalModels Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise.
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. Defaults to `/models/`.
+ * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
+ * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
+ */
+
+/**
+ * Global variables that describe runtime facts, backend singleton state, or application-owned infrastructure shared across models
+ *
+ * @typedef {Object} TransformersEnvironmentGlobal
+ * @property {string} version This version of Transformers.js.
+ * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
+ * allowing users to set these variables if they want to.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
@@ -230,7 +241,12 @@ export const LogLevel = Object.freeze({
  * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
  * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
  * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
- * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
+ */
+
+/**
+ * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
+ *
+ * @typedef {TransformersEnvironmentGlobal & TransformersEnvironmentSession} TransformersEnvironment
  */
 
 let logLevel = LogLevel.WARNING; // Default log level
@@ -257,7 +273,7 @@ export const env = {
     },
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
-    remoteHost: 'https://huggingface.co/',
+    remoteHost: DEFAULT_REMOTE_HOST,
     remotePathTemplate: '{model}/resolve/{revision}/',
 
     allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
@@ -280,9 +296,23 @@ export const env = {
 
     /////////////////// Custom fetch /////////////////////
     fetch: DEFAULT_FETCH,
+    hfToken: DEFAULT_HF_TOKEN,
 
     //////////////////////////////////////////////////////
 };
+
+/**
+ * Create a session environment by applying session-scopable overrides to the global environment defaults.
+ *
+ * @param {Partial<TransformersEnvironmentSession>} sessionEnv Session-scopable environment overrides.
+ * @returns {TransformersEnvironment}
+ */
+export function getSessionEnv(sessionEnv = {}) {
+    return {
+        ...env,
+        ...sessionEnv,
+    };
+}
 
 /**
  * @param {Object} obj
