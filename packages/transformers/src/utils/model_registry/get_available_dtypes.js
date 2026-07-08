@@ -32,18 +32,17 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8'])
  */
-export async function get_available_dtypes(
-    modelId,
-    {
-        config = null,
+export async function get_available_dtypes(modelId, options = {}) {
+    const {
+        config: providedConfig = null,
         model_file_name = null,
         revision = 'main',
         cache_dir = null,
         local_files_only = false,
-        env: publicEnv = {},
-        sessionEnv = publicEnv,
-    } = {},
-) {
+    } = options;
+    const sessionEnv = options.sessionEnv ?? options.env ?? {};
+
+    let config = providedConfig;
     config = await get_config(modelId, { config, cache_dir, local_files_only, revision, sessionEnv });
 
     const subfolder = 'onnx';

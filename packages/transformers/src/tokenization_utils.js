@@ -308,8 +308,7 @@ export class PreTrainedTokenizer
             cache_dir = null,
             local_files_only = false,
             revision = 'main',
-            env: publicEnv = {},
-            sessionEnv = publicEnv,
+            env: sessionEnv = {},
         } = {},
     ) {
         const info = await loadTokenizer(pretrained_model_name_or_path, {

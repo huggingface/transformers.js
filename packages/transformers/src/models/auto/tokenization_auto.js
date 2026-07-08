@@ -46,8 +46,7 @@ export class AutoTokenizer {
             cache_dir = null,
             local_files_only = false,
             revision = 'main',
-            env: publicEnv = {},
-            sessionEnv = publicEnv,
+            env: sessionEnv = {},
         } = {},
     ) {
         const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {

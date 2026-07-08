@@ -537,8 +537,7 @@ export class PretrainedConfig {
             cache_dir = null,
             local_files_only = false,
             revision = 'main',
-            env: publicEnv = {},
-            sessionEnv = publicEnv,
+            env: sessionEnv = {},
         } = {},
     ) {
         if (config && !(config instanceof PretrainedConfig)) {

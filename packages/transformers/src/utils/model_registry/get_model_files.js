@@ -28,17 +28,9 @@ import { resolve_model_type } from './resolve_model_type.js';
  * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @returns {Promise<PretrainedConfig>}
  */
-export function get_config(
-    modelId,
-    {
-        config = null,
-        cache_dir = null,
-        local_files_only = false,
-        revision = 'main',
-        env: publicEnv = {},
-        sessionEnv = publicEnv,
-    } = {},
-) {
+export function get_config(modelId, options = {}) {
+    const { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = options;
+    const sessionEnv = options.sessionEnv ?? options.env ?? {};
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
@@ -69,20 +61,19 @@ export function get_config(
  * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
-export async function get_model_files(
-    modelId,
-    {
-        config = null,
+export async function get_model_files(modelId, options = {}) {
+    const {
+        config: providedConfig = null,
         cache_dir = null,
         local_files_only = false,
         revision = 'main',
         dtype: overrideDtype = null,
         device: overrideDevice = null,
         model_file_name = null,
-        env: publicEnv = {},
-        sessionEnv = publicEnv,
-    } = {},
-) {
+    } = options;
+    const sessionEnv = options.sessionEnv ?? options.env ?? {};
+
+    let config = providedConfig;
     config = await get_config(modelId, { config, cache_dir, local_files_only, revision, sessionEnv });
 
     const files = [

@@ -31,9 +31,8 @@ export async function get_files(modelId, options = {}) {
         model_file_name = null,
         include_tokenizer = true,
         include_processor = true,
-        env: publicEnv = {},
-        sessionEnv = publicEnv,
     } = options;
+    const sessionEnv = options.sessionEnv ?? options.env ?? {};
     const files = await get_model_files(modelId, {
         config,
         cache_dir,

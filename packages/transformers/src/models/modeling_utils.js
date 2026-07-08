@@ -275,8 +275,7 @@ export class PreTrainedModel extends Callable {
             dtype = null,
             use_external_data_format = null,
             session_options = {},
-            env: publicEnv = {},
-            sessionEnv = publicEnv,
+            env: sessionEnv = {},
         } = {},
     ) {
         const options = {
@@ -296,7 +295,14 @@ export class PreTrainedModel extends Callable {
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
 
-        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
+        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, {
+            progress_callback,
+            config,
+            cache_dir,
+            local_files_only,
+            revision,
+            env: sessionEnv,
+        });
 
         const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
 

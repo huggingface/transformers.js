@@ -90,8 +90,7 @@ class PretrainedMixin {
             dtype = null,
             use_external_data_format = null,
             session_options = {},
-            env: publicEnv = {},
-            sessionEnv = publicEnv,
+            env: sessionEnv = {},
         } = {},
     ) {
         const options = {
@@ -106,7 +105,7 @@ class PretrainedMixin {
             dtype,
             use_external_data_format,
             session_options,
-            sessionEnv,
+            env: sessionEnv,
         };
         options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
