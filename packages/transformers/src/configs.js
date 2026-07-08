@@ -28,6 +28,7 @@
 
 import { pick } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
+import { logger } from './utils/logger.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedOptions
@@ -540,6 +541,17 @@ export class PretrainedConfig {
             env: sessionEnv = {},
         } = {},
     ) {
+        if (cache_dir !== null) {
+            logger.warn(
+                '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
+            );
+        }
+        if (local_files_only) {
+            logger.warn(
+                '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
+            );
+        }
+
         if (config && !(config instanceof PretrainedConfig)) {
             config = new PretrainedConfig(config);
         }

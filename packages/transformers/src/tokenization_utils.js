@@ -26,6 +26,17 @@ import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
+    if (options.cache_dir !== null && options.cache_dir !== undefined) {
+        logger.warn(
+            '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
+        );
+    }
+    if (options.local_files_only) {
+        logger.warn(
+            '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
+        );
+    }
+
     const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path, options);
     return await Promise.all(
         tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
