@@ -187,7 +187,7 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
-        sessionEnv,
+        env: sessionEnv,
     };
 
     // Determine which components to load based on the expected files
