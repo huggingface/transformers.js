@@ -46,7 +46,8 @@ export class AutoTokenizer {
             cache_dir = null,
             local_files_only = false,
             revision = 'main',
-            env = {},
+            env: publicEnv = {},
+            sessionEnv = publicEnv,
         } = {},
     ) {
         const [tokenizerJSON, tokenizerConfig] = await loadTokenizer(pretrained_model_name_or_path, {
@@ -55,7 +56,7 @@ export class AutoTokenizer {
             cache_dir,
             local_files_only,
             revision,
-            env,
+            sessionEnv,
         });
 
         // Some tokenizers are saved with the "Fast" suffix, so we remove that if present.

@@ -30,16 +30,23 @@ import { resolve_model_type } from './resolve_model_type.js';
  */
 export function get_config(
     modelId,
-    { config = null, cache_dir = null, local_files_only = false, revision = 'main', env = {} } = {},
+    {
+        config = null,
+        cache_dir = null,
+        local_files_only = false,
+        revision = 'main',
+        env: publicEnv = {},
+        sessionEnv = publicEnv,
+    } = {},
 ) {
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
-        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, env });
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, sessionEnv });
     }
-    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision, env });
+    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision, sessionEnv });
     return memoizePromise(key, () =>
-        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, env }),
+        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, sessionEnv }),
     );
 }
 
@@ -72,10 +79,11 @@ export async function get_model_files(
         dtype: overrideDtype = null,
         device: overrideDevice = null,
         model_file_name = null,
-        env = {},
+        env: publicEnv = {},
+        sessionEnv = publicEnv,
     } = {},
 ) {
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, env });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, sessionEnv });
 
     const files = [
         // Add config.json (always loaded)

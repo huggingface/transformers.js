@@ -1,5 +1,5 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
-import { getSessionEnv } from '../../env.js';
+import { resolveEnv } from '../../env.js';
 import { logger } from '../logger.js';
 
 const FETCH_IDS = new WeakMap();
@@ -101,19 +101,19 @@ export function isValidHfModelId(string) {
  * @returns {string}
  */
 export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     return JSON.stringify([
         model_id,
         options.revision ?? 'main',
         options.cache_dir ?? null,
         options.local_files_only ?? false,
-        sessionEnv.allowRemoteModels,
-        sessionEnv.remoteHost,
-        sessionEnv.remotePathTemplate,
-        sessionEnv.allowLocalModels,
-        sessionEnv.localModelPath,
-        getFetchId(sessionEnv.fetch),
-        getHfTokenId(sessionEnv.hfToken),
+        env.allowRemoteModels,
+        env.remoteHost,
+        env.remotePathTemplate,
+        env.allowLocalModels,
+        env.localModelPath,
+        getFetchId(env.fetch),
+        getHfTokenId(env.hfToken),
         ...parts,
     ]);
 }

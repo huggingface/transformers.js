@@ -2,7 +2,7 @@
  * @file File metadata utilities for cache-aware operations
  */
 
-import { getSessionEnv } from '../../env.js';
+import { resolveEnv } from '../../env.js';
 import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
@@ -28,7 +28,7 @@ import { memoizePromise } from '../memoize_promise.js';
  * @private
  */
 async function fetch_file_head(urlOrPath, options = {}) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     // Range requests only make sense for HTTP URLs
     if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
         return null;
@@ -36,7 +36,7 @@ async function fetch_file_head(urlOrPath, options = {}) {
 
     const headers = getFetchHeaders(urlOrPath, options);
     headers.set('Range', 'bytes=0-0');
-    return sessionEnv.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
+    return env.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
 }
 
 /**
@@ -57,7 +57,7 @@ export function get_file_metadata(path_or_repo_id, filename, options = {}) {
 }
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
@@ -81,7 +81,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     }
 
     // Check local file system
-    if (sessionEnv.allowLocalModels) {
+    if (env.allowLocalModels) {
         const isURL = isValidUrl(localPath, ['http:', 'https:']);
         if (!isURL) {
             try {
@@ -104,7 +104,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     }
 
     // Check remote if allowed - use Range request for efficiency
-    if (sessionEnv.allowRemoteModels && !options.local_files_only && validModelId) {
+    if (env.allowRemoteModels && !options.local_files_only && validModelId) {
         try {
             // Make a Range request to get metadata without downloading full content
             const rangeResponse = await fetch_file_head(remoteURL, options);

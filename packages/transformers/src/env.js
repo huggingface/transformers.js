@@ -307,7 +307,7 @@ export const env = {
  * @param {Partial<TransformersEnvironmentSession>} sessionEnv Session-scopable environment overrides.
  * @returns {TransformersEnvironment}
  */
-export function getSessionEnv(sessionEnv = {}) {
+export function resolveEnv(sessionEnv = {}) {
     return {
         ...env,
         ...sessionEnv,

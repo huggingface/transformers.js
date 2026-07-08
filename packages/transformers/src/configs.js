@@ -537,7 +537,8 @@ export class PretrainedConfig {
             cache_dir = null,
             local_files_only = false,
             revision = 'main',
-            env = {},
+            env: publicEnv = {},
+            sessionEnv = publicEnv,
         } = {},
     ) {
         if (config && !(config instanceof PretrainedConfig)) {
@@ -552,7 +553,7 @@ export class PretrainedConfig {
                 cache_dir,
                 local_files_only,
                 revision,
-                env,
+                sessionEnv,
             }));
         return new this(data);
     }

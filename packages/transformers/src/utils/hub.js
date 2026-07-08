@@ -4,7 +4,7 @@
  * @module utils/hub
  */
 
-import { apis, getSessionEnv } from '../env.js';
+import { apis, resolveEnv } from '../env.js';
 import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
@@ -67,8 +67,8 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
 export async function getFile(urlOrPath, options = {}) {
-    const sessionEnv = getSessionEnv(options.env);
-    if (sessionEnv.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
+    const env = resolveEnv(options.sessionEnv ?? options.env);
+    if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL
                 ? urlOrPath.protocol === 'file:'
@@ -77,7 +77,7 @@ export async function getFile(urlOrPath, options = {}) {
                 : urlOrPath,
         );
     } else {
-        return sessionEnv.fetch(urlOrPath, {
+        return env.fetch(urlOrPath, {
             headers: getFetchHeaders(urlOrPath, options),
         });
     }
@@ -93,19 +93,19 @@ export async function getFile(urlOrPath, options = {}) {
  * @returns {Headers} A Headers object with appropriate headers for the request.
  */
 export function getFetchHeaders(urlOrPath, options = {}) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
     const headers = new Headers();
 
     if (isNode) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
-        const version = sessionEnv.version;
+        const version = env.version;
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
-            if (sessionEnv.hfToken) {
-                headers.set('Authorization', `Bearer ${sessionEnv.hfToken}`);
+            if (env.hfToken) {
+                headers.set('Authorization', `Bearer ${env.hfToken}`);
             }
         }
     } else {
@@ -131,15 +131,15 @@ export function getFetchHeaders(urlOrPath, options = {}) {
  * An object containing all the paths and URLs for the resource.
  */
 export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
     const validModelId = isValidHfModelId(path_or_repo_id);
-    const localPath = validModelId ? pathJoin(sessionEnv.localModelPath, requestURL) : requestURL;
+    const localPath = validModelId ? pathJoin(env.localModelPath, requestURL) : requestURL;
     const remoteURL = pathJoin(
-        sessionEnv.remoteHost,
-        sessionEnv.remotePathTemplate
+        env.remoteHost,
+        env.remotePathTemplate
             .replaceAll('{model}', path_or_repo_id)
             .replaceAll('{revision}', encodeURIComponent(revision)),
         filename,
@@ -259,7 +259,7 @@ export async function loadResourceFile(
     return_path = false,
     cache = null,
 ) {
-    const sessionEnv = getSessionEnv(options.env);
+    const env = resolveEnv(options.sessionEnv ?? options.env);
     const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
         filename,
@@ -285,7 +285,7 @@ export async function loadResourceFile(
     } else {
         // Caching not available, or file is not cached, so we perform the request
 
-        if (sessionEnv.allowLocalModels) {
+        if (env.allowLocalModels) {
             // Accessing local models is enabled, so we try to get the file locally.
             // If request is a valid HTTP URL, we skip the local file check. Otherwise, we try to get the file locally.
             const isURL = isValidUrl(requestURL, ['http:', 'https:']);
@@ -300,7 +300,7 @@ export async function loadResourceFile(
                 }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
-            } else if (!sessionEnv.allowRemoteModels) {
+            } else if (!env.allowRemoteModels) {
                 throw new Error(
                     `\`env.allowRemoteModels=false\`, but attempted to load a remote file from: ${requestURL}.`,
                 );
@@ -313,7 +313,7 @@ export async function loadResourceFile(
             // - the path is a valid HTTP url (`response === undefined`)
             // - the path is not a valid HTTP url and the file is not present on the file system or local server (`response.status === 404`)
 
-            if (options.local_files_only || !sessionEnv.allowRemoteModels) {
+            if (options.local_files_only || !env.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
                     throw Error(
@@ -502,15 +502,15 @@ const INFLIGHT_LOADS = new Map();
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
-    const sessionEnv = getSessionEnv(options.env);
-    if (!sessionEnv.allowLocalModels) {
+    const env = resolveEnv(options.sessionEnv ?? options.env);
+    if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
         if (options.local_files_only) {
             throw Error(
                 'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
             );
-        } else if (!sessionEnv.allowRemoteModels) {
+        } else if (!env.allowRemoteModels) {
             throw Error(
                 'Invalid configuration detected: both local and remote models are disabled. Fix by setting `env.allowLocalModels` or `env.allowRemoteModels` to `true`.',
             );

@@ -193,7 +193,10 @@ export class TextToAudioPipeline
         // Load vocoder, if not provided
         if (!this.vocoder) {
             logger.info('No vocoder specified, using default HifiGan vocoder.');
-            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32', env: this.env });
+            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, {
+                dtype: 'fp32',
+                sessionEnv: this.sessionEnv,
+            });
         }
 
         // Run tokenization

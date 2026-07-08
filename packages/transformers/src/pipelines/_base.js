@@ -1,7 +1,7 @@
 import { PreTrainedTokenizer } from '../tokenization_utils.js';
 import { PreTrainedModel } from '../models/modeling_utils.js';
 import { Processor } from '../processing_utils.js';
-import { getSessionEnv } from '../env.js';
+import { resolveEnv } from '../env.js';
 
 import { Callable } from '../utils/generic.js';
 
@@ -99,15 +99,16 @@ export class Pipeline extends Callable {
      * @param {PreTrainedModel} [options.model] The model used by the pipeline.
      * @param {PreTrainedTokenizer} [options.tokenizer=null] The tokenizer used by the pipeline (if any).
      * @param {Processor} [options.processor=null] The processor used by the pipeline (if any).
-     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
+     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.sessionEnv={}] Session-scopable environment overrides.
      */
-    constructor({ task, model, tokenizer = null, processor = null, env = {} }) {
+    constructor({ task, model, tokenizer = null, processor = null, sessionEnv = {} }) {
         super();
         this.task = task;
         this.model = model;
         this.tokenizer = tokenizer;
         this.processor = processor;
-        this.env = getSessionEnv(env);
+        this.sessionEnv = sessionEnv;
+        this.env = resolveEnv(sessionEnv);
     }
 
     /** @type {DisposeType} */

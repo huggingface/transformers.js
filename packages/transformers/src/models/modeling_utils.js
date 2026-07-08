@@ -275,7 +275,8 @@ export class PreTrainedModel extends Callable {
             dtype = null,
             use_external_data_format = null,
             session_options = {},
-            env = {},
+            env: publicEnv = {},
+            sessionEnv = publicEnv,
         } = {},
     ) {
         const options = {
@@ -290,7 +291,7 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
-            env,
+            sessionEnv,
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -325,7 +326,7 @@ export class PreTrainedModel extends Callable {
                     cache_dir,
                     local_files_only,
                     revision,
-                    env,
+                    sessionEnv,
                 });
 
                 const metadata = await Promise.all(

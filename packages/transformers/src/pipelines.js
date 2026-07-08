@@ -19,7 +19,6 @@ import { logger } from './utils/logger.js';
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
 import { AutoProcessor } from './models/auto/processing_auto.js';
 import { AutoConfig } from './configs.js';
-import { getSessionEnv } from './env.js';
 
 import {
     SUPPORTED_TASKS,
@@ -110,11 +109,9 @@ export async function pipeline(
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
-        env = {},
+        env: sessionEnv = {},
     } = {},
 ) {
-    const sessionEnv = getSessionEnv(env);
-
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -143,7 +140,7 @@ export async function pipeline(
         device,
         dtype,
         model_file_name,
-        env: sessionEnv,
+        sessionEnv,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
@@ -152,7 +149,7 @@ export async function pipeline(
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(
             expected_files.map(async (file) =>
-                get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
+                get_file_metadata(model, file, { cache_dir, local_files_only, revision, sessionEnv }),
             ),
         );
         metadata.forEach((m, i) => {
@@ -179,7 +176,7 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
-        env: sessionEnv,
+        sessionEnv,
     };
 
     // Determine which components to load based on the expected files
@@ -211,7 +208,7 @@ export async function pipeline(
         modelPromise,
     ]);
 
-    const results = { task, model: model_loaded, env: sessionEnv };
+    const results = { task, model: model_loaded, sessionEnv };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
 
