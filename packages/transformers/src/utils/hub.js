@@ -653,3 +653,23 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
 
     return JSON.parse(text);
 }
+
+/**
+ * Emits deprecation warnings for legacy resource-loading options that should be
+ * represented by environment configuration instead.
+ *
+ * @param {string|null|undefined} cache_dir Custom cache directory option.
+ * @param {boolean} local_files_only Whether loading is restricted to local files.
+ */
+export function maybeAddDeprecatedEnvWarning(cache_dir, local_files_only) {
+    if (cache_dir !== null && cache_dir !== undefined) {
+        logger.warn(
+            '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
+        );
+    }
+    if (local_files_only) {
+        logger.warn(
+            '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
+        );
+    }
+}

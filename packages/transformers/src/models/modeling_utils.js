@@ -15,7 +15,7 @@ export function registerTaskMappings(mappings) {
     MODEL_MAPPING_NAMES = mappings;
 }
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
-import { getModelJSON } from '../utils/hub.js';
+import { getModelJSON, maybeAddDeprecatedEnvWarning } from '../utils/hub.js';
 import { Seq2SeqLMOutput } from './modeling_outputs.js';
 import {
     LogitsProcessorList,
@@ -278,16 +278,7 @@ export class PreTrainedModel extends Callable {
             env: sessionEnv = {},
         } = {},
     ) {
-        if (cache_dir !== null) {
-            logger.warn(
-                '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
-            );
-        }
-        if (local_files_only) {
-            logger.warn(
-                '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
-            );
-        }
+        maybeAddDeprecatedEnvWarning(cache_dir, local_files_only);
 
         const options = {
             progress_callback,

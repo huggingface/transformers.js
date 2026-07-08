@@ -51,6 +51,7 @@ import {
 } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
+import { maybeAddDeprecatedEnvWarning } from './utils/hub.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
@@ -112,16 +113,7 @@ export async function pipeline(
         env: sessionEnv = {},
     } = {},
 ) {
-    if (cache_dir !== null) {
-        logger.warn(
-            '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
-        );
-    }
-    if (local_files_only) {
-        logger.warn(
-            '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
-        );
-    }
+    maybeAddDeprecatedEnvWarning(cache_dir, local_files_only);
 
     // Apply aliases
     // @ts-ignore
