@@ -8,6 +8,7 @@
  */
 
 import { getFile } from './hub.js';
+import { resolveEnv } from '../env.js';
 import { FFT, max } from './maths.js';
 import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
@@ -30,7 +31,15 @@ export async function load_audio(url, sampling_rate) {
         );
     }
 
-    const response = await (await getFile(url)).arrayBuffer();
+    const env = resolveEnv();
+    const response = await (
+        await getFile(url, {
+            useFS: env.useFS,
+            fetch: env.fetch,
+            version: env.version,
+            hfToken: env.hfToken,
+        })
+    ).arrayBuffer();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
     if (typeof sampling_rate === 'undefined') {
         logger.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`);

@@ -27,16 +27,15 @@ import { memoizePromise } from '../memoize_promise.js';
  * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if not supported.
  * @private
  */
-async function fetch_file_head(urlOrPath, options = {}) {
-    const env = resolveEnv(options.sessionEnv ?? options.env);
+async function fetch_file_head(urlOrPath, fetchOptions) {
     // Range requests only make sense for HTTP URLs
     if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
         return null;
     }
 
-    const headers = getFetchHeaders(urlOrPath, options);
+    const headers = getFetchHeaders(urlOrPath, fetchOptions);
     headers.set('Range', 'bytes=0-0');
-    return env.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
+    return fetchOptions.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
 }
 
 /**
@@ -58,12 +57,25 @@ export function get_file_metadata(path_or_repo_id, filename, options = {}) {
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
     const env = resolveEnv(options.sessionEnv ?? options.env);
+    const fetchOptions = {
+        useFS: env.useFS,
+        fetch: env.fetch,
+        version: env.version,
+        hfToken: env.hfToken,
+    };
+    const pathOptions = {
+        cache_dir: options.cache_dir ?? null,
+        revision: options.revision ?? 'main',
+        localModelPath: env.localModelPath,
+        remoteHost: env.remoteHost,
+        remotePathTemplate: env.remotePathTemplate,
+    };
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
         filename,
-        options,
+        pathOptions,
         cache,
     );
 
@@ -85,7 +97,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
         const isURL = isValidUrl(localPath, ['http:', 'https:']);
         if (!isURL) {
             try {
-                const response = await getFile(localPath, options);
+                const response = await getFile(localPath, fetchOptions);
                 if (typeof response !== 'string' && response.status !== 404) {
                     const size = response.headers.get('content-length');
                     const contentType = response.headers.get('content-type');
@@ -107,7 +119,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     if (env.allowRemoteModels && !options.local_files_only && validModelId) {
         try {
             // Make a Range request to get metadata without downloading full content
-            const rangeResponse = await fetch_file_head(remoteURL, options);
+            const rangeResponse = await fetch_file_head(remoteURL, fetchOptions);
 
             if (rangeResponse && rangeResponse.status >= 200 && rangeResponse.status < 300) {
                 let size;

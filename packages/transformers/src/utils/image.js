@@ -9,7 +9,7 @@
 
 import { isNullishDimension } from './core.js';
 import { getFile } from './hub.js';
-import { apis } from '../env.js';
+import { apis, resolveEnv } from '../env.js';
 import { Tensor } from './tensor.js';
 import { saveBlob } from './io.js';
 
@@ -150,7 +150,13 @@ export class RawImage {
      * @returns {Promise<RawImage>} The image object.
      */
     static async fromURL(url) {
-        const response = await getFile(url);
+        const env = resolveEnv();
+        const response = await getFile(url, {
+            useFS: env.useFS,
+            fetch: env.fetch,
+            version: env.version,
+            hfToken: env.hfToken,
+        });
         if (response.status !== 200) {
             throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);
         }
