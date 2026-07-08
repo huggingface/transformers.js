@@ -17,6 +17,15 @@ interface CrossOriginStorageRequestFileHandleHash {
  */
 interface CrossOriginStorageRequestFileHandleOptions {
     create?: boolean;
+    /**
+     * Restricts (or opens up) which origins may later read the stored file.
+     * `'*'` makes the resource available to all origins; an array of origin
+     * strings restricts it to that set; omitting the field keeps the
+     * default (same-site only). Visibility can be upgraded but never
+     * downgraded.
+     * @see https://github.com/WICG/cross-origin-storage#example-restricting-resources-to-specific-origins
+     */
+    origins?: '*' | string[];
 }
 
 /**
