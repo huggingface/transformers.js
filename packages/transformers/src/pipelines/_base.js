@@ -16,15 +16,16 @@ import { RawImage } from '../utils/image.js';
 /**
  * Prepare images for further tasks.
  * @param {ImagePipelineInputs} images images to prepare.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<RawImage[]>} returns processed images.
  */
-export async function prepareImages(images) {
+export async function prepareImages(images, sessionEnv = {}) {
     if (!Array.isArray(images)) {
         images = [images];
     }
 
     // Possibly convert any non-images to images
-    return await Promise.all(images.map((x) => RawImage.read(x)));
+    return await Promise.all(images.map((x) => RawImage.read(x, sessionEnv)));
 }
 
 /**
@@ -36,9 +37,10 @@ export async function prepareImages(images) {
  * Prepare audios for further tasks.
  * @param {AudioPipelineInputs} audios audios to prepare.
  * @param {number} sampling_rate sampling rate of the audios.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<Float32Array[]>} The preprocessed audio data.
  */
-export async function prepareAudios(audios, sampling_rate) {
+export async function prepareAudios(audios, sampling_rate, sessionEnv = {}) {
     if (!Array.isArray(audios)) {
         audios = [audios];
     }
@@ -46,7 +48,7 @@ export async function prepareAudios(audios, sampling_rate) {
     return await Promise.all(
         audios.map((x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                return read_audio(x, sampling_rate);
+                return read_audio(x, sampling_rate, sessionEnv);
             } else if (x instanceof Float64Array) {
                 return new Float32Array(x);
             }

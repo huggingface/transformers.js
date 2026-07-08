@@ -78,7 +78,7 @@ export class ImageSegmentationPipeline
             throw Error('Image segmentation pipeline currently only supports a batch size of 1.');
         }
 
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(images, this.sessionEnv);
         const imageSizes = preparedImages.map((x) => [x.height, x.width]);
 
         const inputs = await this.processor(preparedImages);
