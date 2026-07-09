@@ -6,6 +6,8 @@ import { Callable } from '../utils/generic.js';
 import { Tensor } from '../utils/tensor.js';
 
 import { max, log_softmax } from '../utils/maths.js';
+import { loadLLGuidanceRuntime } from './grammar/llguidance.js';
+import { getLLGuidanceTokenizer } from './grammar/tokenizer_bridge.js';
 
 /**
  * Abstract base class for all logit processors that can be applied during generation.
@@ -21,6 +23,25 @@ export class LogitsProcessor extends Callable {
      */
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
+    }
+
+    /**
+     * Optional hook called after a token has been selected by the sampler.
+     *
+     * @param {number} token_id The sampled token ID.
+     * @param {number} batch_idx The batch index that sampled the token.
+     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
+     */
+    onTokenSampled(token_id, batch_idx, input_ids) {}
+
+    /**
+     * Optional hook for processors that can terminate generation.
+     *
+     * @param {bigint[][]} input_ids The input IDs.
+     * @returns {boolean[]|null}
+     */
+    shouldStop(input_ids) {
+        return null;
     }
 }
 
@@ -38,6 +59,25 @@ export class LogitsWarper extends Callable {
      */
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
+    }
+
+    /**
+     * Optional hook called after a token has been selected by the sampler.
+     *
+     * @param {number} token_id The sampled token ID.
+     * @param {number} batch_idx The batch index that sampled the token.
+     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
+     */
+    onTokenSampled(token_id, batch_idx, input_ids) {}
+
+    /**
+     * Optional hook for processors that can terminate generation.
+     *
+     * @param {bigint[][]} input_ids The input IDs.
+     * @returns {boolean[]|null}
+     */
+    shouldStop(input_ids) {
+        return null;
     }
 }
 
@@ -88,8 +128,197 @@ export class LogitsProcessorList extends Callable {
         return toReturn;
     }
 
+    /**
+     * Calls post-sampling hooks on processors that need to update state after token selection.
+     *
+     * @param {number} token_id The sampled token ID.
+     * @param {number} batch_idx The batch index that sampled the token.
+     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
+     */
+    onTokenSampled(token_id, batch_idx, input_ids) {
+        for (const processor of this.processors) {
+            processor.onTokenSampled?.(token_id, batch_idx, input_ids);
+        }
+    }
+
+    /**
+     * Calls stopping hooks on processors that can terminate generation.
+     *
+     * @param {bigint[][]} input_ids The input IDs.
+     * @returns {boolean[]|null}
+     */
+    shouldStop(input_ids) {
+        let stop = null;
+        for (const processor of this.processors) {
+            const processorStop = processor.shouldStop?.(input_ids);
+            if (!processorStop) {
+                continue;
+            }
+            stop ??= new Array(input_ids.length).fill(false);
+            for (let i = 0; i < stop.length; ++i) {
+                stop[i] ||= processorStop[i];
+            }
+        }
+        return stop;
+    }
+
     [Symbol.iterator]() {
         return this.processors.values();
+    }
+}
+
+function validateResponseFormat(response_format) {
+    if (!response_format || typeof response_format !== 'object') {
+        throw new Error('`response_format` must be an object.');
+    }
+
+    if (response_format.type === 'json_object') {
+        return;
+    }
+
+    if (response_format.type === 'json_schema') {
+        if (!response_format.json_schema || typeof response_format.json_schema !== 'object') {
+            throw new Error('`response_format.json_schema` must be an object for type "json_schema".');
+        }
+        return;
+    }
+
+    throw new Error('Unsupported `response_format.type`. Expected "json_object" or "json_schema".');
+}
+
+function callRuntimeMethod(object, camelCaseName, snakeCaseName, ...args) {
+    const method = object[camelCaseName] ?? object[snakeCaseName];
+    if (typeof method !== 'function') {
+        throw new Error(`Invalid llguidance runtime object: missing ${camelCaseName}/${snakeCaseName}.`);
+    }
+    return method.call(object, ...args);
+}
+
+function isAllowed(mask, token_id, vocab_size) {
+    if (mask.length >= vocab_size) {
+        return Boolean(mask[token_id]);
+    }
+
+    return Boolean(mask[token_id >> 5] & (1 << (token_id & 31)));
+}
+
+function isComputeAfterStopError(error) {
+    return error instanceof Error && error.message.includes('compute_mask() called after stop');
+}
+
+/**
+ * Logits processor backed by llguidance for JSON-constrained generation.
+ */
+export class SchemaConstrainedLogitsProcessor extends LogitsProcessor {
+    /**
+     * @param {Object} interpreter A llguidance interpreter/constraint instance.
+     * @param {number|null} eos_token_id The EOS token ID to force when the grammar stops.
+     */
+    constructor(interpreter, eos_token_id = null) {
+        super();
+        this.interpreter = interpreter;
+        this.eos_token_id = eos_token_id;
+        this.completed = false;
+    }
+
+    /**
+     * Creates a constrained logits processor from an OpenAI-compatible response_format object.
+     *
+     * @param {Object} response_format The requested response format.
+     * @param {import('../tokenization_utils.js').PreTrainedTokenizer} tokenizer The tokenizer used for generation.
+     * @param {Object|null} runtime Optional llguidance runtime override.
+     * @returns {Promise<SchemaConstrainedLogitsProcessor>}
+     */
+    static async fromResponseFormat(response_format, tokenizer, runtime = null, eos_token_id = null) {
+        validateResponseFormat(response_format);
+
+        const llguidance = await loadLLGuidanceRuntime(runtime);
+        const llguidanceTokenizer = llguidance.acceptsTokenizerObjects
+            ? tokenizer
+            : await getLLGuidanceTokenizer(tokenizer, llguidance);
+        const interpreter = await llguidance.createInterpreter({
+            tokenizer: llguidanceTokenizer,
+            response_format,
+        });
+
+        return new SchemaConstrainedLogitsProcessor(interpreter, eos_token_id ?? tokenizer.eos_token_id);
+    }
+
+    /**
+     * @param {Tensor} logits The logits to process.
+     */
+    forceEOS(logits) {
+        if (!Number.isInteger(this.eos_token_id)) {
+            throw new Error('`response_format` reached a stop state, but no EOS token is available to end generation.');
+        }
+
+        logits.data.fill(-Infinity);
+        logits.data[this.eos_token_id] = 0;
+        return logits;
+    }
+
+    /**
+     * @param {bigint[][]} input_ids The input IDs.
+     * @returns {boolean[]}
+     */
+    shouldStop(input_ids) {
+        return new Array(input_ids.length).fill(this.completed);
+    }
+
+    /**
+     * @param {bigint[][]} input_ids The input ids.
+     * @param {Tensor} logits The logits to process.
+     * @returns {Tensor}
+     */
+    _call(input_ids, logits) {
+        if (logits.dims.at(0) !== 1) {
+            throw new Error('`response_format` currently supports batch_size=1 only.');
+        }
+
+        if (this.completed) {
+            return logits;
+        }
+
+        let result;
+        try {
+            result = callRuntimeMethod(this.interpreter, 'computeMask', 'compute_mask');
+        } catch (error) {
+            if (!isComputeAfterStopError(error)) {
+                throw error;
+            }
+            this.completed = true;
+            return logits;
+        }
+
+        if (result.stop) {
+            this.completed = true;
+            return logits;
+        }
+
+        const mask = result.mask ?? result;
+        const vocab_size = logits.dims.at(-1);
+
+        for (let i = 0; i < vocab_size; ++i) {
+            if (!isAllowed(mask, i, vocab_size)) {
+                logits.data[i] = -Infinity;
+            }
+        }
+
+        return logits;
+    }
+
+    /**
+     * @param {number} token_id The sampled token ID.
+     */
+    onTokenSampled(token_id) {
+        if (this.completed || token_id === this.eos_token_id) {
+            return;
+        }
+
+        const result = callRuntimeMethod(this.interpreter, 'commitToken', 'commit_token', token_id);
+        if (result?.stop) {
+            this.completed = true;
+        }
     }
 }
 

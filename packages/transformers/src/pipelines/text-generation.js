@@ -2,6 +2,7 @@ import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 import { pick } from '../utils/core.js';
+import { LogitsProcessorList, SchemaConstrainedLogitsProcessor } from '../generation/logits_process.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -11,6 +12,17 @@ import { pick } from '../utils/core.js';
 
 function isChat(x) {
     return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+}
+
+function trimToJSONPrefix(text) {
+    for (let i = text.length; i > 0; --i) {
+        const prefix = text.slice(0, i).trimEnd();
+        try {
+            JSON.parse(prefix);
+            return prefix;
+        } catch {}
+    }
+    return text;
 }
 
 /**
@@ -31,6 +43,7 @@ function isChat(x) {
  * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
  * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.
  * @property {string|null} [chat_template=null] A specific chat template (or template name) to apply.
+ * @property {Object|null} [response_format=null] OpenAI-compatible structured output constraint.
  * @property {Object} [tokenizer_encode_kwargs] Additional keyword arguments to pass along to the encoding step of the tokenizer.
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
@@ -108,6 +121,7 @@ export class TextGenerationPipeline
             tools,
             documents,
             chat_template,
+            response_format,
             tokenizer_encode_kwargs,
             ...generation_kwargs
         } = generate_kwargs;
@@ -171,13 +185,51 @@ export class TextGenerationPipeline
             ...tokenizer_kwargs,
         });
 
-        const outputTokenIds = /** @type {Tensor} */ (
+        let response_format_eos_token_ids = null;
+        if (response_format) {
+            if (isBatched) {
+                throw new Error('`response_format` currently supports batch_size=1 only.');
+            }
+
+            const eos_token_id = generation_kwargs.eos_token_id ?? this.model.generation_config?.eos_token_id;
+            response_format_eos_token_ids = [
+                ...(Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id]),
+                this.tokenizer.eos_token_id,
+            ].filter(Number.isInteger);
+            const processor = await SchemaConstrainedLogitsProcessor.fromResponseFormat(
+                response_format,
+                this.tokenizer,
+                null,
+                response_format_eos_token_ids[0] ?? null,
+            );
+            generation_kwargs.logits_processor ??= new LogitsProcessorList();
+            generation_kwargs.logits_processor.push(processor);
+        }
+
+        let outputTokenIds = /** @type {Tensor} */ (
             await this.model.generate({
                 ...text_inputs,
                 ...this._default_generation_config,
                 ...generation_kwargs,
             })
         );
+
+        if (response_format_eos_token_ids) {
+            let numTrailingStopTokens = 0;
+            for (let i = outputTokenIds.data.length - 1; i >= 0; --i) {
+                if (!response_format_eos_token_ids.includes(Number(outputTokenIds.data[i]))) {
+                    break;
+                }
+                ++numTrailingStopTokens;
+            }
+
+            if (numTrailingStopTokens > 0) {
+                outputTokenIds = new Tensor(outputTokenIds.type, outputTokenIds.data.slice(0, -numTrailingStopTokens), [
+                    outputTokenIds.dims[0],
+                    outputTokenIds.dims[1] - numTrailingStopTokens,
+                ]);
+            }
+        }
 
         const decoded = this.tokenizer.batch_decode(outputTokenIds, {
             skip_special_tokens: true,
@@ -200,6 +252,9 @@ export class TextGenerationPipeline
             if (promptLengths) {
                 // Trim the decoded text to only include the generated part
                 decoded[i] = decoded[i].slice(promptLengths[textIndex]);
+            }
+            if (response_format) {
+                decoded[i] = trimToJSONPrefix(decoded[i]);
             }
             toReturn[textIndex].push(
                 /** @type {TextGenerationSingle} */ ({

@@ -11,6 +11,7 @@ import {
   // Other
   TextStreamer,
   DynamicCache,
+  LogitsProcessor,
   random,
   full,
 } from "../../src/transformers.js";
@@ -204,6 +205,43 @@ describe("Generation parameters", () => {
         expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
         expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
         expect(outputs_seed123.tolist()).toEqual(expected_seed123);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "calls logits processor post-sample hook",
+      async () => {
+        class RecordingLogitsProcessor extends LogitsProcessor {
+          sampled = [];
+
+          _call(input_ids, logits) {
+            return logits;
+          }
+
+          onTokenSampled(token_id, batch_idx, input_ids) {
+            this.sampled.push({
+              token_id,
+              batch_idx,
+              last_token_id: input_ids[batch_idx].at(-1),
+            });
+          }
+        }
+
+        const processor = new RecordingLogitsProcessor();
+        const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
+          max_new_tokens: 3,
+          logits_processor: [processor],
+        });
+
+        const generated_tokens = outputs.tolist()[0].slice(-3).map(Number);
+        expect(processor.sampled).toEqual(
+          generated_tokens.map((token_id) => ({
+            token_id,
+            batch_idx: 0,
+            last_token_id: BigInt(token_id),
+          })),
+        );
       },
       MAX_TEST_EXECUTION_TIME,
     );
