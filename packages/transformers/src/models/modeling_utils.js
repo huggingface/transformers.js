@@ -539,11 +539,7 @@ export class PreTrainedModel extends Callable {
         }
 
         if (logits_processor !== null) {
-            if (typeof logits_processor[Symbol.iterator] === 'function') {
-                processors.extend(logits_processor);
-            } else {
-                processors.push(logits_processor);
-            }
+            processors.extend(logits_processor);
         }
 
         // `LogitNormalization` should always be the last logit processor, when present
@@ -993,10 +989,6 @@ export class PreTrainedModel extends Callable {
             const logits = outputs.logits.slice(null, -1, null).to('float32');
 
             const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
-            const processor_stop_before_sample = prepared_logits_processor.shouldStop(all_input_ids);
-            if (processor_stop_before_sample?.every((x) => x)) {
-                break;
-            }
 
             /** @type {[bigint][]} */
             const generated_input_ids = [];
@@ -1011,25 +1003,24 @@ export class PreTrainedModel extends Callable {
                     // TODO: If branching, use previous beam as a starting point
                     // update generated ids, model inputs, and length for next step
                     scores[batch_idx] += logProb;
-                    all_input_ids[batch_idx].push(bigint);
-                    prepared_logits_processor.onTokenSampled(Number(newTokenId), batch_idx, all_input_ids);
                     generated_input_ids.push([bigint]);
 
                     // TODO: Support beam search
                     break;
                 }
             }
+            for (let batch_idx = 0; batch_idx < generated_input_ids.length; ++batch_idx) {
+                all_input_ids[batch_idx].push(generated_input_ids[batch_idx][0]);
+            }
+            prepared_logits_processor.onTokensSampled(
+                generated_input_ids.map(([token_id]) => Number(token_id)),
+                all_input_ids,
+            );
             if (streamer) {
                 streamer.put(generated_input_ids);
             }
 
             const stop = prepared_stopping_criteria(all_input_ids);
-            const processor_stop = prepared_logits_processor.shouldStop(all_input_ids);
-            if (processor_stop) {
-                for (let i = 0; i < stop.length; ++i) {
-                    stop[i] ||= processor_stop[i];
-                }
-            }
             if (stop.every((x) => x)) {
                 break;
             }

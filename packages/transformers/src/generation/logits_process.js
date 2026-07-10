@@ -22,25 +22,6 @@ export class LogitsProcessor extends Callable {
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
     }
-
-    /**
-     * Optional hook called after a token has been selected by the sampler.
-     *
-     * @param {number} token_id The sampled token ID.
-     * @param {number} batch_idx The batch index that sampled the token.
-     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
-     */
-    onTokenSampled(token_id, batch_idx, input_ids) {}
-
-    /**
-     * Optional hook for processors that can terminate generation.
-     *
-     * @param {bigint[][]} input_ids The input IDs.
-     * @returns {boolean[]|null}
-     */
-    shouldStop(input_ids) {
-        return null;
-    }
 }
 
 /**
@@ -57,25 +38,6 @@ export class LogitsWarper extends Callable {
      */
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
-    }
-
-    /**
-     * Optional hook called after a token has been selected by the sampler.
-     *
-     * @param {number} token_id The sampled token ID.
-     * @param {number} batch_idx The batch index that sampled the token.
-     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
-     */
-    onTokenSampled(token_id, batch_idx, input_ids) {}
-
-    /**
-     * Optional hook for processors that can terminate generation.
-     *
-     * @param {bigint[][]} input_ids The input IDs.
-     * @returns {boolean[]|null}
-     */
-    shouldStop(input_ids) {
-        return null;
     }
 }
 
@@ -127,37 +89,16 @@ export class LogitsProcessorList extends Callable {
     }
 
     /**
-     * Calls post-sampling hooks on processors that need to update state after token selection.
+     * Calls Transformers.js-specific post-sampling hooks on processors that need to update state after token selection.
+     * The hook observes the full batch after the current generation step has been appended.
      *
-     * @param {number} token_id The sampled token ID.
-     * @param {number} batch_idx The batch index that sampled the token.
-     * @param {bigint[][]} input_ids The input IDs after appending the sampled token.
+     * @param {number[]} token_ids The sampled token IDs for the current generation step.
+     * @param {bigint[][]} input_ids The input IDs after appending the sampled tokens.
      */
-    onTokenSampled(token_id, batch_idx, input_ids) {
+    onTokensSampled(token_ids, input_ids) {
         for (const processor of this.processors) {
-            processor.onTokenSampled?.(token_id, batch_idx, input_ids);
+            processor.onTokensSampled?.(token_ids, input_ids);
         }
-    }
-
-    /**
-     * Calls stopping hooks on processors that can terminate generation.
-     *
-     * @param {bigint[][]} input_ids The input IDs.
-     * @returns {boolean[]|null}
-     */
-    shouldStop(input_ids) {
-        let stop = null;
-        for (const processor of this.processors) {
-            const processorStop = processor.shouldStop?.(input_ids);
-            if (!processorStop) {
-                continue;
-            }
-            stop ??= new Array(input_ids.length).fill(false);
-            for (let i = 0; i < stop.length; ++i) {
-                stop[i] ||= processorStop[i];
-            }
-        }
-        return stop;
     }
 
     [Symbol.iterator]() {

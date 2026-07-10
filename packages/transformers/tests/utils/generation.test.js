@@ -12,6 +12,8 @@ import {
   TextStreamer,
   DynamicCache,
   LogitsProcessor,
+  LogitsProcessorList,
+  StoppingCriteria,
   random,
   full,
 } from "../../src/transformers.js";
@@ -210,65 +212,64 @@ describe("Generation parameters", () => {
     );
 
     it(
-      "calls logits processor post-sample hook",
+      "calls logits processor post-sample hook after full batch step",
       async () => {
         class RecordingLogitsProcessor extends LogitsProcessor {
-          sampled = [];
+          snapshots = [];
 
           _call(input_ids, logits) {
             return logits;
           }
 
-          onTokenSampled(token_id, batch_idx, input_ids) {
-            this.sampled.push({
-              token_id,
-              batch_idx,
-              last_token_id: input_ids[batch_idx].at(-1),
+          onTokensSampled(token_ids, input_ids) {
+            this.snapshots.push({
+              token_ids,
+              lengths: input_ids.map((ids) => ids.length),
             });
           }
         }
 
         const processor = new RecordingLogitsProcessor();
-        const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
-          max_new_tokens: 3,
-          logits_processor: processor,
+        const logits_processor = new LogitsProcessorList();
+        logits_processor.push(processor);
+
+        const outputs = await generate(model, tokenizer, [DUMMY_TEXT, DUMMY_TEXT], {
+          max_new_tokens: 2,
+          logits_processor,
         });
 
-        const generated_tokens = outputs.tolist()[0].slice(-3).map(Number);
-        expect(processor.sampled).toEqual(
-          generated_tokens.map((token_id) => ({
-            token_id,
-            batch_idx: 0,
-            last_token_id: BigInt(token_id),
-          })),
-        );
+        const generated_tokens = outputs.tolist().map((tokens) => tokens.slice(-2).map(Number));
+        expect(processor.snapshots).toEqual([
+          {
+            token_ids: generated_tokens.map((tokens) => tokens[0]),
+            lengths: [3, 3],
+          },
+          {
+            token_ids: generated_tokens.map((tokens) => tokens[1]),
+            lengths: [4, 4],
+          },
+        ]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
 
     it(
-      "supports logits processor stopping hook",
+      "supports custom stopping criteria",
       async () => {
-        class StopAfterTokenLogitsProcessor extends LogitsProcessor {
-          stopped = false;
-
-          _call(input_ids, logits) {
-            return logits;
+        class StopAfterLengthCriteria extends StoppingCriteria {
+          constructor(max_length) {
+            super();
+            this.max_length = max_length;
           }
 
-          onTokenSampled() {
-            this.stopped = true;
-          }
-
-          shouldStop(input_ids) {
-            return new Array(input_ids.length).fill(this.stopped);
+          _call(input_ids) {
+            return input_ids.map((ids) => ids.length >= this.max_length);
           }
         }
 
-        const processor = new StopAfterTokenLogitsProcessor();
         const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
           max_new_tokens: 5,
-          logits_processor: processor,
+          stopping_criteria: new StopAfterLengthCriteria(3),
         });
 
         // BOS + DUMMY_TEXT + exactly one generated token
