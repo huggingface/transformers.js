@@ -52,6 +52,8 @@ export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 export { random } from './utils/random.js';
+export { logger } from './utils/logger.js';
+export { loadWasmBinary, loadWasmFactory } from './backends/utils/cacheWasm.js';
 
 export { DynamicCache } from './cache_utils.js';
 

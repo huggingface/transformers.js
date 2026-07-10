@@ -35,6 +35,12 @@ describe("LlguidanceConstraint", () => {
     expect(Array.from(logits.data)).toEqual([1, -Infinity, 3, -Infinity, 5, -Infinity, 7, -Infinity]);
   });
 
+  it("passes explicit llguidance load options", async () => {
+    await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" }, { useWasmCache: false, wasmUrl: "custom.wasm" });
+
+    expect(loadBundledLLGuidance).toHaveBeenCalledWith({ wasmUrl: "custom.wasm" });
+  });
+
   it("commits sampled tokens and stops when llguidance stops", async () => {
     computeMask.mockReturnValue({ mask: [true, true], vocabSize: 2 });
     commitToken.mockReturnValueOnce(undefined).mockReturnValueOnce({ stop: true });

@@ -1,7 +1,26 @@
-import { LogitsProcessor, LogitsProcessorList, StoppingCriteria, type Tensor } from '@huggingface/transformers';
-import { type LLGuidanceResponseFormat, loadBundledLLGuidance } from 'llguidance';
+import {
+    LogitsProcessor,
+    LogitsProcessorList,
+    StoppingCriteria,
+    env,
+    loadWasmBinary,
+    loadWasmFactory,
+    logger,
+    type Tensor,
+} from '@huggingface/transformers';
+import { type LLGuidanceResponseFormat, type LoadBundledLLGuidanceOptions, loadBundledLLGuidance } from 'llguidance';
 
 export type ResponseFormat = LLGuidanceResponseFormat;
+
+export type LlguidanceLoadOptions = LoadBundledLLGuidanceOptions & {
+    /** Whether to pre-load and cache llguidance WASM assets. Defaults to env.useWasmCache. */
+    useWasmCache?: boolean;
+};
+
+const LLGUIDANCE_VERSION = '0.1.7';
+const LLGUIDANCE_WASM_BASE = `https://cdn.jsdelivr.net/npm/llguidance@${LLGUIDANCE_VERSION}/wasm/`;
+const DEFAULT_LLGUIDANCE_WASM_URL = `${LLGUIDANCE_WASM_BASE}llguidance_wasm_bg.wasm`;
+const DEFAULT_LLGUIDANCE_WASM_FACTORY_URL = `${LLGUIDANCE_WASM_BASE}llguidance_wasm.js`;
 
 type GuidanceMask = Uint32Array | Uint8Array | boolean[] | number[];
 
@@ -28,18 +47,22 @@ type LlguidanceState = {
 };
 
 export class LlguidanceConstraint {
-    static async fromResponseFormat(tokenizer: unknown, response_format: ResponseFormat) {
-        console.log('[LlguidanceConstraint] loading llguidance', {
+    static async fromResponseFormat(
+        tokenizer: unknown,
+        response_format: ResponseFormat,
+        loadOptions: LlguidanceLoadOptions = {},
+    ) {
+        logger.debug('[LlguidanceConstraint] loading llguidance', {
             response_format,
         });
 
-        const runtime = await loadBundledLLGuidance();
+        const runtime = await loadLLGuidance(loadOptions);
         const interpreter = runtime.createInterpreter({
             tokenizer,
             response_format,
         }) as GuidanceInterpreter;
 
-        console.log('[LlguidanceConstraint] interpreter created');
+        logger.debug('[LlguidanceConstraint] interpreter created');
 
         const state: LlguidanceState = {
             completed: false,
@@ -57,6 +80,75 @@ export class LlguidanceConstraint {
     }
 }
 
+async function loadLLGuidance(loadOptions: LlguidanceLoadOptions) {
+    const { useWasmCache = env.useWasmCache, ...options } = loadOptions;
+    if (!useWasmCache || isNodeLikeRuntime() || options.wasmFactory) {
+        return loadBundledLLGuidance(options);
+    }
+
+    const wasmSource = options.wasm ?? options.wasmUrl ?? DEFAULT_LLGUIDANCE_WASM_URL;
+    const wasmFactorySource = options.wasmFactoryUrl ?? DEFAULT_LLGUIDANCE_WASM_FACTORY_URL;
+    const cachedOptions = { ...options };
+
+    const [wasm, wasmFactoryUrl] = await Promise.all([
+        loadCacheableWasm(wasmSource),
+        loadCacheableWasmFactory(wasmFactorySource),
+    ]);
+
+    if (wasm) {
+        cachedOptions.wasm = wasm;
+        delete cachedOptions.wasmUrl;
+    }
+
+    if (wasm && wasmFactoryUrl) {
+        cachedOptions.wasmFactoryUrl = wasmFactoryUrl;
+    }
+
+    return loadBundledLLGuidance(cachedOptions);
+}
+
+async function loadCacheableWasm(source: LoadBundledLLGuidanceOptions['wasm']) {
+    const url = toCacheableURL(source);
+    if (!url) return null;
+
+    try {
+        return await loadWasmBinary(url);
+    } catch (error) {
+        logger.warn('Failed to pre-load llguidance WASM binary:', error);
+        return null;
+    }
+}
+
+async function loadCacheableWasmFactory(source: LoadBundledLLGuidanceOptions['wasmFactoryUrl']) {
+    const url = toCacheableURL(source);
+    if (!url) return null;
+
+    try {
+        return await loadWasmFactory(url);
+    } catch (error) {
+        logger.warn('Failed to pre-load llguidance WASM factory:', error);
+        return null;
+    }
+}
+
+function toCacheableURL(source: unknown) {
+    if (typeof source === 'string') {
+        return isBlobURL(source) ? null : new URL(source, globalThis.location?.href).href;
+    }
+    if (source instanceof URL) {
+        return isBlobURL(source.href) ? null : source.href;
+    }
+    return null;
+}
+
+function isBlobURL(url: string) {
+    return url.startsWith('blob:');
+}
+
+function isNodeLikeRuntime() {
+    return typeof process !== 'undefined' && Boolean(process.versions?.node);
+}
+
 class LlguidanceLogitsProcessor extends LogitsProcessor {
     private state: LlguidanceState;
 
@@ -67,7 +159,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
     _call(_inputIds: bigint[][], logits: Tensor) {
         if (this.state.completed) {
-            console.log('[LlguidanceLogitsProcessor] skip completed', {
+            logger.debug('[LlguidanceLogitsProcessor] skip completed', {
                 step: this.state.step,
             });
             return logits;
@@ -75,7 +167,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
         this.state.step++;
         const vocabSize = logits.dims.at(-1);
-        console.log('[LlguidanceLogitsProcessor] compute mask', {
+        logger.debug('[LlguidanceLogitsProcessor] compute mask', {
             step: this.state.step,
             logitsDims: logits.dims,
             vocabSize,
@@ -89,20 +181,20 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
                 throw error;
             }
             this.state.completed = true;
-            console.log('[LlguidanceLogitsProcessor] compute after stop', {
+            logger.debug('[LlguidanceLogitsProcessor] compute after stop', {
                 step: this.state.step,
             });
             return logits;
         }
 
-        console.log('[LlguidanceLogitsProcessor] mask result', {
+        logger.debug('[LlguidanceLogitsProcessor] mask result', {
             step: this.state.step,
             result: summarizeMaskResult(result, vocabSize),
         });
 
         if ('stop' in result && result.stop) {
             this.state.completed = true;
-            console.log('[LlguidanceLogitsProcessor] stopped by mask', {
+            logger.debug('[LlguidanceLogitsProcessor] stopped by mask', {
                 step: this.state.step,
             });
             return logits;
@@ -110,7 +202,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
         if ('mask' in result) {
             const applied = applyMask(logits, result.mask, result.vocabSize ?? vocabSize);
-            console.log('[LlguidanceLogitsProcessor] mask applied', {
+            logger.debug('[LlguidanceLogitsProcessor] mask applied', {
                 step: this.state.step,
                 ...applied,
             });
@@ -120,7 +212,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
     }
 
     onTokenSampled(tokenId: number, batchIdx: number, inputIds: bigint[][]) {
-        console.log('[LlguidanceLogitsProcessor] token sampled', {
+        logger.debug('[LlguidanceLogitsProcessor] token sampled', {
             step: this.state.step,
             tokenId,
             batchIdx,
@@ -131,7 +223,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
         if (this.state.completed) return;
 
         const result = this.state.interpreter.commitToken(tokenId);
-        console.log('[LlguidanceLogitsProcessor] token committed', {
+        logger.debug('[LlguidanceLogitsProcessor] token committed', {
             step: this.state.step,
             tokenId,
             result,
@@ -139,7 +231,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
         if (result?.stop) {
             this.state.completed = true;
-            console.log('[LlguidanceLogitsProcessor] stopped by commit', {
+            logger.debug('[LlguidanceLogitsProcessor] stopped by commit', {
                 step: this.state.step,
                 tokenId,
             });
@@ -147,7 +239,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
     }
 
     onTokensSampled(tokenIds: number[], inputIds: bigint[][]) {
-        console.log('[LlguidanceLogitsProcessor] tokens sampled', {
+        logger.debug('[LlguidanceLogitsProcessor] tokens sampled', {
             step: this.state.step,
             tokenIds,
             inputLengths: inputIds.map((ids) => ids.length),
@@ -170,7 +262,7 @@ class LlguidanceStoppingCriteria extends StoppingCriteria {
 
     _call(inputIds: ArrayLike<unknown>[]) {
         const result = new Array(inputIds.length).fill(this.state.completed);
-        console.log('[LlguidanceStoppingCriteria] call', {
+        logger.debug('[LlguidanceStoppingCriteria] call', {
             step: this.state.step,
             completed: this.state.completed,
             result,
