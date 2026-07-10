@@ -231,7 +231,7 @@ describe("Generation parameters", () => {
         const processor = new RecordingLogitsProcessor();
         const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
           max_new_tokens: 3,
-          logits_processor: [processor],
+          logits_processor: processor,
         });
 
         const generated_tokens = outputs.tolist()[0].slice(-3).map(Number);
@@ -242,6 +242,37 @@ describe("Generation parameters", () => {
             last_token_id: BigInt(token_id),
           })),
         );
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "supports logits processor stopping hook",
+      async () => {
+        class StopAfterTokenLogitsProcessor extends LogitsProcessor {
+          stopped = false;
+
+          _call(input_ids, logits) {
+            return logits;
+          }
+
+          onTokenSampled() {
+            this.stopped = true;
+          }
+
+          shouldStop(input_ids) {
+            return new Array(input_ids.length).fill(this.stopped);
+          }
+        }
+
+        const processor = new StopAfterTokenLogitsProcessor();
+        const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
+          max_new_tokens: 5,
+          logits_processor: processor,
+        });
+
+        // BOS + DUMMY_TEXT + exactly one generated token
+        expect(outputs.dims.at(-1)).toEqual(3);
       },
       MAX_TEST_EXECUTION_TIME,
     );

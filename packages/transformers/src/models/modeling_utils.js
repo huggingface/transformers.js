@@ -539,7 +539,11 @@ export class PreTrainedModel extends Callable {
         }
 
         if (logits_processor !== null) {
-            processors.extend(logits_processor);
+            if (typeof logits_processor[Symbol.iterator] === 'function') {
+                processors.extend(logits_processor);
+            } else {
+                processors.push(logits_processor);
+            }
         }
 
         // `LogitNormalization` should always be the last logit processor, when present
