@@ -1,5 +1,4 @@
 import { type Tensor } from '@huggingface/transformers';
-
 import { type GuidanceMask, type GuidanceMaskResult } from './types';
 
 export function summarizeMaskResult(result: GuidanceMaskResult, vocabSize?: number) {
