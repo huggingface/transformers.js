@@ -6,7 +6,7 @@ This guide covers the core concepts and API patterns. For a full step-by-step pr
 
 ## Why use the Vercel AI SDK with Transformers.js?
 
-The `@browser-ai/transformers-js` provider builds on top of `@huggingface/transformers` to give you a standard AI SDK interface — handling Web Worker setup, message passing, progress tracking, streaming, interrupt handling, and state management, so you can use the same `streamText`, `generateText`, and `useChat` APIs you'd use with any other AI SDK provider. 
+The `@browser-ai/transformers-js` provider builds on top of `@huggingface/transformers` to give you a standard AI SDK interface — handling Web Worker setup, message passing, progress tracking, streaming, interrupt handling, and state management, so you can use the same `streamText`, `generateText`, and `useChat` APIs you'd use with any other AI SDK provider.
 Read more about this [here](https://www.browser-ai.dev/docs/ai-sdk-v6/transformers-js/why).
 
 ## Installation

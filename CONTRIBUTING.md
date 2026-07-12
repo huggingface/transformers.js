@@ -267,16 +267,16 @@ Follow the steps below to start contributing:
    the pull request.
 
 ### Pull request checklist
-☐ The pull request title should summarize your contribution.  
+☐ The pull request title should summarize your contribution.
 ☐ If your pull request addresses an issue, please mention the issue number in the pull
 request description to make sure they are linked (and people viewing the issue know you
-are working on it).  
+are working on it).
 ☐ To indicate a work in progress please prefix the title with `[WIP]`. These are
-useful to avoid duplicated work, and to differentiate it from PRs ready to be merged.  
-☐ Make sure existing tests pass (`pnpm test`).  
-☐ Make sure the build completes successfully (`pnpm build`).  
-☐ Make sure your code is [formatted properly with Prettier](#code-formatting) (`pnpm format:check`).  
-☐ If adding a new feature, also add tests for it.  
+useful to avoid duplicated work, and to differentiate it from PRs ready to be merged.
+☐ Make sure existing tests pass (`pnpm test`).
+☐ Make sure the build completes successfully (`pnpm build`).
+☐ Make sure your code is [formatted properly with Prettier](#code-formatting) (`pnpm format:check`).
+☐ If adding a new feature, also add tests for it.
 ☐ If your changes affect user-facing functionality, update the relevant documentation.
 
 ### Tests

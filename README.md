@@ -2,7 +2,7 @@
 
 <p align="center">
     <br/>
-    <picture> 
+    <picture>
         <source media="(prefers-color-scheme: dark)" srcset="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/transformersjs-dark.svg" width="500" style="max-width: 100%;">
         <source media="(prefers-color-scheme: light)" srcset="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/transformersjs-light.svg" width="500" style="max-width: 100%;">
         <img alt="transformers.js javascript library logo" src="https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/transformersjs-light.svg" width="500" style="max-width: 100%;">
@@ -31,7 +31,7 @@ Transformers.js is designed to be functionally equivalent to Hugging Face's [tra
   - 🗣️ **Audio**: automatic speech recognition, audio classification, and text-to-speech.
   - 🐙 **Multimodal**: embeddings, zero-shot audio classification, zero-shot image classification, and zero-shot object detection.
 
-Transformers.js uses [ONNX Runtime](https://onnxruntime.ai/) to run models in the browser. The best part about it, is that you can easily [convert](#convert-your-models-to-onnx) your pretrained PyTorch, TensorFlow, or JAX models to ONNX using [🤗 Optimum](https://github.com/huggingface/optimum#onnx--onnx-runtime). 
+Transformers.js uses [ONNX Runtime](https://onnxruntime.ai/) to run models in the browser. The best part about it, is that you can easily [convert](#convert-your-models-to-onnx) your pretrained PyTorch, TensorFlow, or JAX models to ONNX using [🤗 Optimum](https://github.com/huggingface/optimum#onnx--onnx-runtime).
 
 For more information, check out the full [documentation](https://huggingface.co/docs/transformers.js).
 
