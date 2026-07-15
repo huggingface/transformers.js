@@ -201,6 +201,18 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
         return;
     }
 
+    if (
+        typeof Cache !== 'undefined' &&
+        cache instanceof Cache &&
+        isValidUrl(cacheKey) &&
+        !isValidUrl(cacheKey, ['http:', 'https:'])
+    ) {
+        // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
+        // responses for other schemes (e.g., files bundled within a browser extension).
+        // Relative keys are not skipped, since the Cache API resolves them against the page URL.
+        return;
+    }
+
     if (!result) {
         // We haven't yet read the response body, so we need to do so now.
         // Ensure progress updates include consistent metadata.
