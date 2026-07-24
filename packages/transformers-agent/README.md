@@ -1,268 +1,157 @@
 # @huggingface/transformers-agent
 
-Run local AI agents in the browser and Node.js, powered by [Transformers.js](https://github.com/huggingface/transformers.js).
+Run local language models in the browser and Node.js with a Prompt-API-inspired session interface powered by [Transformers.js](https://github.com/huggingface/transformers.js).
 
 ```bash
 npm install @huggingface/transformers-agent
 ```
 
----
-
 ## Model
 
 ```ts
-import { Model } from '@huggingface/transformers-agent';
+import { Model } from "@huggingface/transformers-agent";
 
-const model = new Model({
-  modelId: 'onnx-community/gemma-4-E2B-it-ONNX',
-  device: 'webgpu',
-  dtype: 'q4f16',
-});
-```
-
-Check cache state before downloading:
-
-```ts
-const cached = await model.isCached();
-const size   = await model.downloadSize(); // bytes not yet cached
-
-if (!cached) {
-  const ok = await ui.confirm(`Download ${formatBytes(size)}?`);
-  if (!ok) return;
-}
-
-await model.init((info) => {
-  if (info.status === 'progress_total') ui.setProgress(info.progress);
-});
-```
-
-Or use the static shorthand when you don't need pre-init introspection:
-
-```ts
 const model = await Model.load(
-  { modelId: 'onnx-community/gemma-4-E2B-it-ONNX', device: 'webgpu', dtype: 'q4f16' },
-  (info) => (info.status === 'progress_total') && console.log(info),
+  {
+    modelId: "onnx-community/gemma-4-E2B-it-ONNX",
+    device: "webgpu",
+    dtype: "q4f16",
+  },
+  (info) => info.status === "progress_total" && console.log(info.progress),
 );
 ```
 
----
+Use `new Model(config)` with `isCached()`, `downloadSize()`, `cachedSize()`, and `init()` when the application needs to manage download consent and progress separately.
 
 ## Agent
 
-The agent owns the initial prompts, tools, and conversation history. All three are
-fixed at construction time so the KV cache stays valid across turns; only the
-user input changes per call.
+An `Agent` owns a serializable message history and the model's session state. Each call to `prompt()` performs exactly one model turn.
 
 ```ts
-import { Agent } from '@huggingface/transformers-agent';
+import { Agent } from "@huggingface/transformers-agent";
 
 const agent = new Agent({
   model,
-  initialPrompts: [{ role: 'system', content: 'You are a helpful research assistant.' }],
-  tools: [searchWeb, readUrl],
-  maxSteps: 10,
+  initialPrompts: [
+    { role: "system", content: "You are a helpful research assistant." },
+  ],
+  enableThinking: true,
 });
+
+const result = await agent.prompt("Who are you?");
+
+console.log(result.response);
+console.log(result.thinking);
+console.log(result.toolCalls);
+console.log(result.usage);
 ```
 
-Model-specific details such as chat-template message structure, special tokens,
-thinking text, tool-call syntax, and KV-cache behavior are handled by
-`ModelAdapter` implementations. See `src/adapters/README.md` if you need to add
-support for a new model family.
-
-### Non-streaming
-
-```ts
-const result = await agent.run('What are the latest Transformers.js updates?');
-
-console.log(result.runs.at(-1)?.text); // final answer
-console.log(result.runs);             // per-step tool calls and text
-console.log(result.usage);            // token counts across all steps
-```
+`response` is model-visible answer text. `thinking` is parsed separately from the model's reasoning channel. The SDK does not combine the two.
 
 ### Streaming
 
+`promptStreaming()` yields cumulative snapshots for one model turn:
+
 ```ts
-for await (const chunk of agent.stream('Compare that with TensorFlow.js')) {
-  ui.renderRuns(chunk.runs);
+for await (const chunk of agent.promptStreaming("Explain WebGPU briefly.")) {
+  renderThinking(chunk.thinking);
+  renderResponse(chunk.response);
 
   if (chunk.done) {
-    ui.finalize(chunk.runs, chunk.usage);
+    console.log(chunk.toolCalls, chunk.usage);
   }
 }
 ```
 
-### History and cache
+### History
 
-The agent appends messages automatically. Call `clearHistory()` to start a fresh
-conversation (this also invalidates the KV cache):
+String prompts are appended as user messages. Message arrays can contain system, user, or assistant messages and are also appended before generation.
 
 ```ts
-console.log(agent.history); // ReadonlyArray<Message>
+console.log(agent.history);
 agent.clearHistory();
 ```
 
----
+The message shape follows Chromium's Prompt API direction: content is either a string or typed text, image, audio, tool-call, and tool-response parts. Model adapters currently support text and tool content; unsupported multimodal content fails explicitly.
 
-## Tools
+## Open-Loop Tools
 
-Tools follow the [W3C WebMCP `ModelContextTool`](https://webmachinelearning.github.io/webmcp/)
-interface — the same shape used by `navigator.modelContext.registerTool()` in the browser.
-
-```ts
-import { Tool } from '@huggingface/transformers-agent';
-
-const searchWeb = new Tool<{ query: string }>({
-  name: 'searchWeb',
-  title: 'Search web',
-  description: 'Search the web for current information.',
-  parameters: {
-    query: Tool.string({ description: 'The search query' }),
-  },
-  execute: async ({ query }) => ({
-    content: [{ type: 'text', text: await fetchSearchResults(query) }],
-  }),
-});
-
-const readUrl = new Tool<{ url: string }>({
-  name: 'readUrl',
-  title: 'Read URL',
-  description: 'Fetch the text content of a URL.',
-  parameters: {
-    url: Tool.string({ description: 'The URL to read' }),
-  },
-  execute: async ({ url }) => ({
-    content: [{ type: 'text', text: await fetch(url).then(r => r.text()) }],
-  }),
-});
-```
-
-`Tool` builds the WebMCP-compatible input schema from parameter helpers.
-
-If you already have a WebMCP tool definition, use `Tool.fromWebMCP`:
+`Tool` combines the declaration sent to the model with a typed application-owned `execute` function. `Agent` reads only the declaration fields: it never calls `execute` and never starts a follow-up model turn automatically.
 
 ```ts
-const searchWeb = Tool.fromWebMCP<{ query: string }>({
-  name: 'searchWeb',
-  title: 'Search web',
-  description: 'Search the web for current information.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'The search query' },
+import { Agent, Tool } from "@huggingface/transformers-agent";
+
+const getWeatherTool = new Tool<{ location: string }>({
+  name: "get_weather",
+  description: "Get current weather for a location.",
+  parameters: {
+    location: Tool.string({ description: "City name" }),
+  },
+  execute: async ({ location }) => [
+    {
+      type: "object",
+      value: await getWeather(location),
     },
-    required: ['query'],
-  },
-  execute: async ({ query }, client) => {
-    return {
-      content: [
-        { type: 'text', text: await fetchSearchResults(query) },
-      ],
-    };
-  },
-  annotations: {
-    readOnlyHint: true,
-  },
-});
-```
-
-You can also export the top-level WebMCP shape:
-
-```ts
-const webTool = searchWeb.toWebMCP();
-```
-
-The chat-template tool schema sent to the model is adapted internally from this
-shape:
-
-```ts
-{
-  type: 'function',
-  function: {
-    name: searchWeb.name,
-    description: searchWeb.description,
-    parameters: searchWeb.inputSchema,
-  },
-}
-```
-
-Return `isError: true` to let the model handle failures gracefully:
-
-```ts
-execute: async ({ url }) => {
-  try {
-    return { content: [{ type: 'text', text: await fetch(url).then(r => r.text()) }] };
-  } catch (e) {
-    return { content: [{ type: 'text', text: String(e) }], isError: true };
-  }
-},
-```
-
----
-
-## Lifecycle hooks
-
-Hooks are registered after construction and support chaining. They have no effect
-on the KV cache or generation.
-
-```ts
-agent
-  .onBeforeToolCall((call) => {
-    logger.info('tool call', call.name, call.args);
-  })
-  .onAfterToolCall((call, output, durationMs) => {
-    metrics.record(call.name, durationMs);
-  })
-  .onStep((step) => {
-    // fires after each agentic loop iteration inside run() or stream()
-    ui.showProgress(`Step done, ${step.tools.length} tool(s) used`);
-  });
-```
-
----
-
-## Full example
-
-```ts
-import { Model, Agent } from '@huggingface/transformers-agent';
-
-const model = new Model({
-  modelId: 'onnx-community/gemma-4-E2B-it-ONNX',
-  device: 'webgpu',
-  dtype: 'q4f16',
-});
-
-if (!await model.isCached()) {
-  await confirmDownload(await model.downloadSize());
-}
-
-await model.init((info) => {
-  if (info.status === 'progress_total') progressBar.update(info.progress);
+  ],
 });
 
 const agent = new Agent({
   model,
-  system: 'You are a helpful assistant.',
-  tools: [searchWeb, readUrl],
-  maxSteps: 5,
+  tools: [getWeatherTool],
+  initialPrompts: [{ role: "system", content: "You are a concise assistant." }],
+  enableThinking: true,
 });
 
-agent.onBeforeToolCall((call) => console.log(`-> ${call.name}`, call.args));
+const first = await agent.prompt("What's the weather in London?");
+const call = first.toolCalls[0];
 
-let renderedText = '';
-let renderedRunIndex = -1;
-for await (const chunk of agent.stream('What changed in Transformers.js v4?')) {
-  const latestRunIndex = chunk.runs.length - 1;
-  const latestRun = chunk.runs[latestRunIndex];
-  if (latestRunIndex !== renderedRunIndex) {
-    renderedText = '';
-    renderedRunIndex = latestRunIndex;
-  }
+if (call?.name === "get_weather") {
+  // prompt() returned the call without executing it. The application chooses
+  // whether and when to invoke the previously declared tool.
+  const result = await getWeatherTool.execute(
+    call.arguments as { location: string },
+  );
 
-  if (latestRun && latestRun.text.length > renderedText.length) {
-    process.stdout.write(latestRun.text.slice(renderedText.length));
-    renderedText = latestRun.text;
-  }
+  const final = await agent.prompt([
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool-response",
+          value: {
+            callID: call.callID,
+            name: call.name,
+            result,
+          },
+        },
+      ],
+    },
+  ]);
 
-  if (chunk.done) console.log('\n\nTokens used:', chunk.usage.totalTokens);
+  console.log(final.response);
 }
 ```
+
+Failed executions use the same application-managed flow:
+
+```ts
+await agent.prompt([
+  {
+    role: "user",
+    content: [
+      {
+        type: "tool-response",
+        value: {
+          callID: call.callID,
+          name: call.name,
+          errorMessage: "Weather service unavailable",
+        },
+      },
+    ],
+  },
+]);
+```
+
+A tool-response message must contain only tool-response parts. The SDK validates its `callID` and name against an unresolved tool call in session history before prompting the model.
+
+This open loop keeps tool execution inspectable, makes every request one prompt and one response, and leaves approval, retries, parallelism, and multi-turn orchestration in application code.

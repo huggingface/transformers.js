@@ -12,13 +12,16 @@ export type { ParseResult, ModelAdapterContext, ModelAdapter } from './adapters/
 export type {
     ModelConfig,
     AgentConfig,
-    RunResult,
-    RequestResult,
+    Prompt,
+    PromptResult,
     Usage,
     StreamChunk,
     ToolCall,
-    ToolCallResult,
-    ToolCallOutput,
+    ToolResponse,
+    ToolSuccess,
+    ToolError,
+    ToolResultContent,
     Message,
+    MessageContent,
 } from './types';
-export type { ModelContextClient, ToolExecute, ToolParameter, ToolParameters, WebMCPTool, ToolList } from './Tool';
+export type { ToolDeclaration, ToolExecute, ToolParameter, ToolParameters, ToolOptions, ToolList } from './Tool';

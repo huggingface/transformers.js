@@ -1,6 +1,6 @@
-import type { Message, ToolCall, ToolCallResult, ToolMessage } from '../types';
+import type { Message, ToolResponse } from '../types';
 import { ModelAdapterBase } from './ModelAdapterBase';
-import type { ModelAdapterContext, ParseResult } from './types';
+import type { ModelAdapterContext, ParseResult, ParsedToolCall } from './types';
 import { splitTopLevel } from './utils';
 
 export class ModelAdapterGemma4 extends ModelAdapterBase {
@@ -15,100 +15,88 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
 
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
-            if (message.role !== 'assistant' || !message.toolCalls || message.toolCalls.length === 0) {
-                formatted.push(this.formatMessage(message));
+            const thinking = (message as Message & { thinking?: string }).thinking;
+            const toolCalls = this.getToolCalls(message);
+            if (message.role !== 'assistant' || toolCalls.length === 0) {
+                formatted.push(...this.formatMessage(message));
                 continue;
             }
 
-            const toolResponses = this.collectFollowingToolMessages(messages, i, message.toolCalls);
+            const { responses: toolResponses, consumedMessages } = this.collectFollowingToolResponses(
+                messages,
+                i,
+                toolCalls,
+            );
+            const text = this.stringifyTextContent(message.content);
 
-            if (message.thinking) {
+            if (thinking) {
                 formatted.push({
                     role: 'assistant',
-                    content: this.formatRawAssistantContent(message, toolResponses),
+                    content: [
+                        `<|channel>thought\n${thinking}<channel|>`,
+                        ...toolCalls.map(
+                            (call) => `<|tool_call>call:${call.name}{${formatGemmaObject(call.arguments)}}<tool_call|>`,
+                        ),
+                        ...toolResponses.map(
+                            (response) =>
+                                `<|tool_response>response:${response.name}{${formatGemmaObject(
+                                    normalizeGemmaToolResponse(this.toolResponseValue(response)),
+                                )}}<tool_response|>`,
+                        ),
+                        text ?? '',
+                    ].join(''),
                 });
-                i += toolResponses.length;
+                i += consumedMessages;
                 continue;
             }
 
             formatted.push({
                 role: 'assistant',
-                tool_calls: message.toolCalls.map((call) => ({
+                ...(text !== undefined ? { content: text } : {}),
+                tool_calls: toolCalls.map((call) => ({
                     function: {
-                        name: call.function.name,
-                        arguments: call.function.arguments,
+                        name: call.name,
+                        arguments: call.arguments,
                     },
                 })),
                 ...(toolResponses.length > 0
                     ? {
-                          tool_responses: toolResponses.map((response) => this.formatToolResponse(response)),
+                          tool_responses: toolResponses.map((response) => ({
+                              name: response.name,
+                              response: normalizeGemmaToolResponse(this.toolResponseValue(response)),
+                          })),
                       }
                     : {}),
             });
-            i += toolResponses.length;
+            i += consumedMessages;
         }
 
         return formatted;
     }
 
-    private formatRawAssistantContent(
-        message: Extract<Message, { role: 'assistant' }>,
-        toolResponses: ToolMessage[],
-    ): string {
-        return [
-            `<|channel>thought\n${message.thinking}<channel|>`,
-            ...this.formatRawToolCalls(message.toolCalls ?? []),
-            ...toolResponses.map((response) => this.formatRawToolResponse(response)),
-            this.stringifyMessageContent(message.content)?.trim() || '',
-        ].join('');
-    }
-
-    private formatRawToolCalls(toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['toolCalls']>): string[] {
-        return toolCalls.map(
-            (call) =>
-                `<|tool_call>call:${call.function.name}{${formatGemmaObject(call.function.arguments)}}<tool_call|>`,
-        );
-    }
-
-    private formatRawToolResponse(response: ToolMessage): string {
-        return `<|tool_response>response:${response.name ?? ''}{${formatGemmaObject(
-            normalizeGemmaToolResponse(parseToolResponse(this.stringifyMessageContent(response.content) ?? '')),
-        )}}<tool_response|>`;
-    }
-
-    private collectFollowingToolMessages(
+    private collectFollowingToolResponses(
         messages: ReadonlyArray<Message>,
         assistantIndex: number,
-        toolCalls: NonNullable<Extract<Message, { role: 'assistant' }>['toolCalls']>,
-    ): ToolMessage[] {
-        const toolResponses: ToolMessage[] = [];
+        toolCalls: ReturnType<ModelAdapterGemma4['getToolCalls']>,
+    ): { responses: ToolResponse[]; consumedMessages: number } {
+        const responses: ToolResponse[] = [];
+        let consumedMessages = 0;
         for (let j = assistantIndex + 1; j < messages.length; j++) {
             const next = messages[j];
-            if (next.role !== 'tool') {
+            const nextResponses = this.getToolResponses(next);
+            if (
+                nextResponses.length === 0 ||
+                (Array.isArray(next.content) && nextResponses.length !== next.content.length)
+            ) {
                 break;
             }
-            if (!toolCalls.some((call) => call.id === next.toolCallId)) {
+            if (!nextResponses.every((response) => toolCalls.some((call) => call.callID === response.callID))) {
                 break;
             }
-            toolResponses.push(next);
+            responses.push(...nextResponses);
+            consumedMessages += 1;
         }
-        return toolResponses;
-    }
-
-    private formatToolResponse(response: ToolCallResult | ToolMessage): { name: string; response: unknown } {
-        if ('output' in response) {
-            const toolResponse = this.toToolResultResponse(response);
-            return {
-                name: response.name,
-                response: normalizeGemmaToolResponse(toolResponse, response.args),
-            };
-        }
-
-        const toolResponse = parseToolResponse(this.stringifyMessageContent(response.content) ?? '');
-        return {
-            name: response.name ?? '',
-            response: normalizeGemmaToolResponse(toolResponse),
-        };
+        return { responses, consumedMessages };
     }
 
     normalizeAssistantContent(content: string): string {
@@ -121,10 +109,6 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
             .replace(/<turn\|>/g, '')
             .replace(/<eos>/g, '')
             .trim();
-    }
-
-    useKvCache(_enableThinking: boolean): boolean {
-        return false;
     }
 
     parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult {
@@ -160,8 +144,8 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
         };
     }
 
-    private parseGemmaToolCalls(content: string, nextId: (prefix: string) => string): ToolCall[] {
-        const toolCalls: ToolCall[] = [];
+    private parseGemmaToolCalls(content: string, nextId: (prefix: string) => string): ParsedToolCall[] {
+        const toolCalls: ParsedToolCall[] = [];
         const regex = /<\|tool_call>([\s\S]*?)<tool_call\|>/g;
         let match: RegExpExecArray | null;
 
@@ -184,7 +168,7 @@ export class ModelAdapterGemma4 extends ModelAdapterBase {
     }
 }
 
-function parseSingleGemmaCall(raw: string, nextId: (prefix: string) => string): ToolCall | null {
+function parseSingleGemmaCall(raw: string, nextId: (prefix: string) => string): ParsedToolCall | null {
     if (!raw.startsWith('call:')) {
         return null;
     }
@@ -293,34 +277,21 @@ function sanitizeVisibleText(text: string): string {
     return kept.join('\n').trim();
 }
 
-function parseToolResponse(content: string): unknown {
-    try {
-        return JSON.parse(content);
-    } catch {
-        return content;
-    }
-}
-
 function formatGemmaObject(value: unknown): string {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return `value:${formatGemmaValue(value)}`;
     }
-
     return Object.entries(value as Record<string, unknown>)
         .map(([key, entry]) => `${key}:${formatGemmaValue(entry)}`)
         .join(',');
 }
 
 function formatGemmaValue(value: unknown): string {
-    if (typeof value === 'string') {
-        return `<|"|>${value}<|"|>`;
-    }
-    if (typeof value === 'number' || typeof value === 'boolean') {
-        return String(value);
-    }
-    if (value === null) {
-        return 'null';
-    }
+    if (typeof value === 'string') return `<|"|>${value}<|"|>`;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return `[${value.map((item) => formatGemmaValue(item)).join(',')}]`;
+    if (typeof value === 'object') return `{${formatGemmaObject(value)}}`;
     return `<|"|>${String(value)}<|"|>`;
 }
 

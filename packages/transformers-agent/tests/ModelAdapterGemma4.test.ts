@@ -116,12 +116,11 @@ test("formats structured tool responses for Gemma4", () => {
   const messages: Message[] = [
     {
       role: "assistant",
-      content: "",
-      toolCalls: [
+      content: [
         {
-          id: "toolcall_1",
-          type: "function",
-          function: {
+          type: "tool-call",
+          value: {
+            callID: "toolcall_1",
             name: "get_weather",
             arguments: { location: "London" },
           },
@@ -129,10 +128,17 @@ test("formats structured tool responses for Gemma4", () => {
       ],
     },
     {
-      role: "tool",
-      toolCallId: "toolcall_1",
-      name: "get_weather",
-      content: JSON.stringify({ location: "London", temperature: 20, weather: "sunny" }),
+      role: "user",
+      content: [
+        {
+          type: "tool-response",
+          value: {
+            callID: "toolcall_1",
+            name: "get_weather",
+            result: [{ type: "object", value: { location: "London", temperature: 20, weather: "sunny" } }],
+          },
+        },
+      ],
     },
   ];
 
@@ -162,12 +168,11 @@ test("normalizes text weather tool results for Gemma4", () => {
   const messages: Message[] = [
     {
       role: "assistant",
-      content: "",
-      toolCalls: [
+      content: [
         {
-          id: "toolcall_1",
-          type: "function",
-          function: {
+          type: "tool-call",
+          value: {
+            callID: "toolcall_1",
             name: "get_weather",
             arguments: { location: "London" },
           },
@@ -175,10 +180,17 @@ test("normalizes text weather tool results for Gemma4", () => {
       ],
     },
     {
-      role: "tool",
-      toolCallId: "toolcall_1",
-      name: "get_weather",
-      content: "The weather in London in Sunny, 20 degrees celsius.",
+      role: "user",
+      content: [
+        {
+          type: "tool-response",
+          value: {
+            callID: "toolcall_1",
+            name: "get_weather",
+            result: [{ type: "text", value: "The weather in London in Sunny, 20 degrees celsius." }],
+          },
+        },
+      ],
     },
   ];
 
@@ -203,18 +215,16 @@ test("normalizes text weather tool results for Gemma4", () => {
   ]);
 });
 
-test("reconstructs Gemma4 thinking content", () => {
+test("formats failed tool responses for Gemma4", () => {
   const adapter = new ModelAdapterGemma4();
   const messages: Message[] = [
     {
       role: "assistant",
-      content: "",
-      thinking: "Use get_weather for London.",
-      toolCalls: [
+      content: [
         {
-          id: "toolcall_1",
-          type: "function",
-          function: {
+          type: "tool-call",
+          value: {
+            callID: "toolcall_1",
             name: "get_weather",
             arguments: { location: "London" },
           },
@@ -222,17 +232,37 @@ test("reconstructs Gemma4 thinking content", () => {
       ],
     },
     {
-      role: "tool",
-      toolCallId: "toolcall_1",
-      name: "get_weather",
-      content: JSON.stringify({ location: "London", temperature: 20, weather: "sunny" }),
+      role: "user",
+      content: [
+        {
+          type: "tool-response",
+          value: {
+            callID: "toolcall_1",
+            name: "get_weather",
+            errorMessage: "Weather service unavailable",
+          },
+        },
+      ],
     },
   ];
 
   assert.deepEqual(adapter.formatMessages(messages), [
     {
       role: "assistant",
-      content: '<|channel>thought\nUse get_weather for London.<channel|><|tool_call>call:get_weather{location:<|"|>London<|"|>}<tool_call|><|tool_response>response:get_weather{location:<|"|>London<|"|>,temperature:20,weather:<|"|>sunny<|"|>}<tool_response|>',
+      tool_calls: [
+        {
+          function: {
+            name: "get_weather",
+            arguments: { location: "London" },
+          },
+        },
+      ],
+      tool_responses: [
+        {
+          name: "get_weather",
+          response: { error: "Weather service unavailable" },
+        },
+      ],
     },
   ]);
 });

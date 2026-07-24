@@ -1,6 +1,6 @@
-import type { Message, ToolCall } from '../types';
+import type { Message } from '../types';
 import { ModelAdapterBase } from './ModelAdapterBase';
-import type { ModelAdapterContext, ParseResult } from './types';
+import type { ModelAdapterContext, ParseResult, ParsedToolCall } from './types';
 
 const IM_END_TOKEN = '<|im_end|>';
 
@@ -15,24 +15,29 @@ export class ModelAdapterQwen3 extends ModelAdapterBase {
     }
 
     formatMessages(messages: ReadonlyArray<Message>): Array<Record<string, unknown>> {
-        return messages.map((message) => {
-            if (message.role !== 'assistant' || !message.toolCalls) {
-                return this.formatMessage(message);
-            }
+        return messages
+            .map((message) => {
+                const toolCalls = this.getToolCalls(message);
+                if (message.role !== 'assistant' || toolCalls.length === 0) {
+                    return this.formatMessage(message);
+                }
 
-            return {
-                role: 'assistant',
-                content: this.stringifyMessageContent(message.content),
-                tool_calls: message.toolCalls.map((call) => ({
-                    id: call.id,
-                    type: 'function',
-                    function: {
-                        name: call.function.name,
-                        arguments: call.function.arguments,
+                return [
+                    {
+                        role: 'assistant',
+                        content: this.stringifyTextContent(message.content),
+                        tool_calls: toolCalls.map((call) => ({
+                            id: call.callID,
+                            type: 'function',
+                            function: {
+                                name: call.name,
+                                arguments: call.arguments,
+                            },
+                        })),
                     },
-                })),
-            };
-        });
+                ];
+            })
+            .flat();
     }
 
     normalizeAssistantContent(content: string): string {
@@ -50,10 +55,6 @@ export class ModelAdapterQwen3 extends ModelAdapterBase {
             visibleText,
             toolCalls,
         };
-    }
-
-    useKvCache(_enableThinking: boolean): boolean {
-        return false;
     }
 }
 
@@ -74,8 +75,8 @@ function extractThinking(content: string, enableThinking = false): { thinkingTex
     return { thinkingText: rawThinking, remainingText };
 }
 
-function parseQwenToolCalls(content: string, nextId: (prefix: string) => string): ToolCall[] {
-    const toolCalls: ToolCall[] = [];
+function parseQwenToolCalls(content: string, nextId: (prefix: string) => string): ParsedToolCall[] {
+    const toolCalls: ParsedToolCall[] = [];
     const toolCallRegex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
     let toolCallMatch: RegExpExecArray | null;
 

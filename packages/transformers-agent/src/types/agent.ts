@@ -1,9 +1,9 @@
 import type { Model } from '../Model';
-import type { ModelAdapter } from '../adapters/types';
+import type { ModelAdapter } from '../adapters';
 import type { ToolList } from '../Tool';
-import type { ToolCall, ToolCallOutput, ToolCallResult } from './tools';
+import type { ToolCall, ToolResponse } from './tools';
 
-export type { ModelAdapter, ModelAdapterContext, ParseResult } from '../adapters/types';
+export type { ModelAdapter, ModelAdapterContext, ParseResult, ParsedToolCall } from '../adapters/types';
 
 export interface Usage {
     promptTokens: number;
@@ -11,84 +11,54 @@ export interface Usage {
     totalTokens: number;
 }
 
-export interface RunResult {
-    thinkingText: string;
-    text: string;
-    tools: ToolCallResult[];
+export interface PromptResult {
+    response: string;
+    thinking: string;
+    toolCalls: ToolCall[];
     usage: Usage;
 }
 
-export interface RequestResult {
+export interface StreamChunk extends PromptResult {
     done: boolean;
-    runs: RunResult[];
-    usage: Usage;
 }
 
-export type StreamChunk = RequestResult;
+export type Prompt = string | Message[];
 
-export type MessageContent = string | MessageContentPart[];
+export type MessageContent = TextContent | ImageContent | AudioContent | ToolCallContent | ToolResponseContent;
 
-export type MessageContentPart = TextContentPart | ImageContentPart | AudioContentPart;
-
-export interface TextContentPart {
+export interface TextContent {
     type: 'text';
-    text: string;
+    value: string;
 }
 
-export interface ImageContentPart {
+export interface ImageContent {
     type: 'image';
-    data: string | Blob | ArrayBuffer | Uint8Array;
-    mimeType?: 'image/png' | 'image/jpeg' | 'image/webp' | string;
+    value: string | Blob | ArrayBuffer | Uint8Array;
 }
 
-export interface AudioContentPart {
+export interface AudioContent {
     type: 'audio';
-    data: string | Blob | ArrayBuffer | Uint8Array;
-    mimeType?: 'audio/wav' | 'audio/mpeg' | 'audio/ogg' | string;
+    value: string | ArrayBuffer | Uint8Array;
 }
 
-export interface SystemMessage {
-    role: 'system';
-    content: MessageContent;
+export interface ToolCallContent {
+    type: 'tool-call';
+    value: ToolCall;
 }
 
-export interface UserMessage {
-    role: 'user';
-    content: MessageContent;
+export interface ToolResponseContent {
+    type: 'tool-response';
+    value: ToolResponse;
 }
 
-export interface AssistantMessage {
-    role: 'assistant';
-    content?: MessageContent;
-    thinking?: string;
-    toolCalls?: Array<{
-        id: string;
-        type?: 'function';
-        function: {
-            name: string;
-            arguments: Record<string, unknown>;
-        };
-    }>;
+export interface Message {
+    role: 'system' | 'user' | 'assistant';
+    content: string | MessageContent[];
 }
-
-export interface ToolMessage {
-    role: 'tool';
-    toolCallId: string;
-    name?: string;
-    content: MessageContent;
-}
-
-export type Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage;
-
-export type BeforeToolCallHook = (call: ToolCall) => void | Promise<void>;
-export type AfterToolCallHook = (call: ToolCall, output: ToolCallOutput, durationMs: number) => void | Promise<void>;
-export type OnStepHook = (step: RunResult) => void | Promise<void>;
-export type Unsubscribe = () => void;
 
 export interface AgentConfig {
     model: Model;
     tools?: ToolList;
-    maxSteps?: number;
     maxNewTokens?: number;
     temperature?: number;
     enableThinking?: boolean;

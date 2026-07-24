@@ -1,12 +1,9 @@
-import type { JSONSchemaObject, JSONSchemaProperty, ToolCallOutput } from './types';
+import type { JSONSchemaObject, JSONSchemaProperty, ToolResultContent } from './types';
 
-type Awaitable<T> = T | Promise<T>;
 type ParameterKey<TParams> = Extract<keyof TParams, string>;
-export type ModelContextClient = Record<string, unknown> | undefined;
-export type ToolExecute<TParams extends Record<string, unknown>> = (
-    args: TParams,
-    client: ModelContextClient,
-) => Awaitable<ToolCallOutput>;
+type Awaitable<T> = T | Promise<T>;
+
+export type ToolExecute<TParams extends Record<string, unknown>> = (args: TParams) => Awaitable<ToolResultContent[]>;
 
 export type ToolParameter<TValue = unknown> = JSONSchemaProperty & {
     readonly __type?: TValue;
@@ -17,64 +14,33 @@ export type ToolParameters<TParams extends Record<string, unknown>> = Partial<{
     [K in ParameterKey<TParams>]: ToolParameter<Exclude<TParams[K], undefined>>;
 }>;
 
-export interface WebMCPTool<TParams extends Record<string, unknown> = Record<string, unknown>> {
-    name: string;
-    title: string;
-    description: string;
-    inputSchema: JSONSchemaObject;
-    execute: ToolExecute<TParams>;
-    annotations?: Record<string, unknown>;
-}
-
 export interface ToolOptions<TParams extends Record<string, unknown>> {
     name: string;
-    title?: string;
     description: string;
     inputSchema?: JSONSchemaObject;
     parameters?: ToolParameters<TParams>;
     required?: ParameterKey<TParams>[];
     additionalProperties?: boolean;
     execute: ToolExecute<TParams>;
-    annotations?: Record<string, unknown>;
 }
 
-export class Tool<TParams extends Record<string, unknown> = Record<string, unknown>> {
+export interface ToolDeclaration {
+    name: string;
+    description: string;
+    inputSchema: JSONSchemaObject;
+}
+
+export class Tool<TParams extends Record<string, unknown> = Record<string, unknown>> implements ToolDeclaration {
     readonly name: string;
-    readonly title: string;
     readonly description: string;
     readonly inputSchema: JSONSchemaObject;
     readonly execute: ToolExecute<TParams>;
-    readonly annotations: Record<string, unknown> | undefined;
 
     constructor(options: ToolOptions<TParams>) {
         this.name = options.name;
-        this.title = options.title ?? options.name;
         this.description = options.description;
         this.inputSchema = options.inputSchema ?? Tool.createInputSchema(options);
         this.execute = options.execute;
-        this.annotations = options.annotations;
-    }
-
-    static fromWebMCP<TParams extends Record<string, unknown>>(definition: WebMCPTool<TParams>): Tool<TParams> {
-        return new Tool<TParams>({
-            name: definition.name,
-            title: definition.title,
-            description: definition.description,
-            inputSchema: definition.inputSchema,
-            execute: definition.execute,
-            annotations: definition.annotations,
-        });
-    }
-
-    toWebMCP(): WebMCPTool<TParams> {
-        return {
-            name: this.name,
-            title: this.title,
-            description: this.description,
-            inputSchema: this.inputSchema,
-            execute: this.execute,
-            ...(this.annotations ? { annotations: this.annotations } : {}),
-        };
     }
 
     static string(options: Omit<Extract<JSONSchemaProperty, { type: 'string' }>, 'type'> = {}): ToolParameter<string> {
@@ -165,4 +131,4 @@ export class Tool<TParams extends Record<string, unknown> = Record<string, unkno
     }
 }
 
-export type ToolList = Tool<any>[];
+export type ToolList = ToolDeclaration[];

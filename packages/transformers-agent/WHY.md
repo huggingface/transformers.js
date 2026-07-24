@@ -13,63 +13,64 @@ My original idea was to create a Transformers.js implementation of the [Response
 https://huggingface.co/docs/inference-providers/en/guides/responses-api
 
 ```typescript
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 const client = new OpenAI({
-    baseURL: 'https://router.huggingface.co/v1',
-    apiKey: process.env.HF_TOKEN,
+  baseURL: "https://router.huggingface.co/v1",
+  apiKey: process.env.HF_TOKEN,
 });
 
 const tools = [
-    {
-        type: 'function',
-        name: 'get_weather',
-        description: 'Get the current weather for a location',
-        parameters: {
-            type: 'object',
-            properties: { location: { type: 'string', description: 'City name' } },
-            required: ['location'],
-        },
+  {
+    type: "function",
+    name: "get_weather",
+    description: "Get the current weather for a location",
+    parameters: {
+      type: "object",
+      properties: { location: { type: "string", description: "City name" } },
+      required: ["location"],
     },
+  },
 ];
 
 async function getWeather({ location }) {
-    return { temperature: 18, condition: 'cloudy' };
+  return { temperature: 18, condition: "cloudy" };
 }
 
 const response = await client.responses.create({
-    model: 'moonshotai/Kimi-K2-Instruct-0905:groq',
-    input: "What's the weather in Geneva?",
-    tools,
-    tool_choice: 'auto',
+  model: "moonshotai/Kimi-K2-Instruct-0905:groq",
+  input: "What's the weather in Geneva?",
+  tools,
+  tool_choice: "auto",
 });
 
-const call = response.output.find((item) => item.type === 'function_call');
+const call = response.output.find((item) => item.type === "function_call");
 
 if (call) {
-    const args = JSON.parse(call.arguments);
-    const result = await getWeather(args);
+  const args = JSON.parse(call.arguments);
+  const result = await getWeather(args);
 
-    // Manual loop: send a fresh request with the tool result appended
-    const final = await client.responses.create({
-        model: 'moonshotai/Kimi-K2-Instruct-0905:groq',
-        previous_response_id: response.id,
-        input: [
-            {
-                type: 'function_call_output',
-                call_id: call.call_id,
-                output: JSON.stringify(result),
-            },
-        ],
-    });
+  // Manual loop: send a fresh request with the tool result appended
+  const final = await client.responses.create({
+    model: "moonshotai/Kimi-K2-Instruct-0905:groq",
+    previous_response_id: response.id,
+    input: [
+      {
+        type: "function_call_output",
+        call_id: call.call_id,
+        output: JSON.stringify(result),
+      },
+    ],
+  });
 
-    console.log(final.output_text);
+  console.log(final.output_text);
 }
 ```
 
 **Why it doesn't fit:**
-- `new OpenAI({ baseURL: "https://router.huggingface.co/v1", apiKey })` is built around routing a request to a *remote* provider (GPT, Gemini, etc.) — there's no concept of a local model object, device selection (`webgpu`/`wasm`), or a download/cache lifecycle. `model` is just a string id passed over the wire.
-- For client-defined function tools, the agentic loop is still **manual**: the response comes back with a `function_call` output item, and you must execute it yourself, then send a *new* `responses.create()` call with a `function_call_output` item referencing the `call_id` — there's no `Agent.run()`-style loop for your own tools (only `mcp`-type remote tools are auto-executed server-side).
+
+- `new OpenAI({ baseURL: "https://router.huggingface.co/v1", apiKey })` is built around routing a request to a _remote_ provider (GPT, Gemini, etc.) — there's no concept of a local model object, device selection (`webgpu`/`wasm`), or a download/cache lifecycle. `model` is just a string id passed over the wire.
+- Client-defined tools use an open loop: the response returns a function call, the application executes it, and a new request supplies the result.
 - Every call is stateless from the client's perspective — there's no KV cache to preserve; `input` either takes a full message array each time or relies on the server retaining state via a `previous_response_id`, which doesn't map onto a tensor-level KV cache living in your own browser tab.
 
 ## Related APIs and alignment choices
@@ -98,28 +99,28 @@ It is a great fit when your target is specifically Chrome built-in AI, but it is
 
 I align where it helps interoperability, especially at the tool contract layer:
 
-- tools follow the W3C WebMCP `ModelContextTool` shape (compatible with `navigator.modelContext.registerTool()`)
+- messages and tool declarations follow the direction of Chromium's Prompt API prototype
 
 But I intentionally keep a Transformers.js-first API because on-device products are dominated by concerns that generic agent APIs do not prioritize:
 
 - download and cache UX before first run
 - deterministic local performance tuning
-- preserving KV cache validity across turns
+- preserving serializable session history across turns
 - runtime portability between browser and Node.js
 
 ## Goal
 
 The goal is to make running an agent with Transformers.js feel like using a product-level SDK, not like assembling an inference engine by hand.
 
-Transformers.js exposes powerful local-model controls, but building an agent still requires repeated glue code: model loading, cache checks, message formatting, tool schema handling, tool execution, loop orchestration, and conversation state.
+Transformers.js exposes powerful local-model controls, but building an agent still requires repeated glue code: model loading, cache checks, message formatting, tool schema handling, output parsing, and conversation state.
 
 `@huggingface/transformers-agent` should provide that missing layer:
 
 - a `Model` object that makes the local model lifecycle explicit: model id, device, dtype, cache checks, download size, progress, and initialization
-- an `Agent` object that owns the initial prompts, tools, history, and KV cache so repeated turns can stay efficient
+- an `Agent` object that owns the initial prompts, tools, and serializable history across repeated turns
 - model adapters that isolate model-specific chat-template formats, tool-call syntax, special tokens, and cache behavior
 - a tool API that can be adapted into the function schema format expected by model chat templates
-- a built-in agent loop for local tools, so callers can use `agent.run()` or `agent.stream()` instead of manually detecting tool calls and sending follow-up prompts
+- an open-loop tool API where each `prompt()` is one model turn and applications own execution, approval, and follow-up prompts
 - browser and Node.js support without assuming a hosted model, API key, server-side session, or remote provider
 
 The library is not trying to replace Transformers.js or hide that inference is happening locally. It should expose the local-model constraints that matter for user experience and make them easy to build around.
@@ -141,10 +142,12 @@ await model.init(console.log);
 
 const agent = new Agent({
   model,
-  initialPrompts: [{ role: "system", content: "You are a helpful research assistant." }],
+  initialPrompts: [
+    { role: "system", content: "You are a helpful research assistant." },
+  ],
 });
 
-const response = await agent.run("Who are you?");
+const response = await agent.prompt("Who are you?");
 ```
 
 ### Streaming
@@ -160,15 +163,18 @@ await model.init(console.log);
 
 const agent = new Agent({
   model,
-  initialPrompts: [{ role: "system", content: "You are a helpful research assistant." }],
+  initialPrompts: [
+    { role: "system", content: "You are a helpful research assistant." },
+  ],
 });
 
-for await (const chunk of agent.stream("Who are you?")) {
-  console.log(chunk.runs.at(-1).text);
+for await (const chunk of agent.promptStreaming("Who are you?")) {
+  console.log(chunk.response, chunk.thinking);
 }
 ```
 
 ### Tools
+
 ```typescript
 const model = new Model({
   modelId: "onnx-community/gemma-4-E2B-it-ONNX",
@@ -180,7 +186,6 @@ await model.init(console.log);
 
 const getWeatherTool = new Tool<{ location: string; unit: string }>({
   name: "get_weather",
-  title: "Get weather",
   description: "Get current weather information for a location",
   parameters: {
     location: Tool.string({
@@ -192,24 +197,22 @@ const getWeatherTool = new Tool<{ location: string; unit: string }>({
     }),
   },
   required: ["location"],
-  execute: async ({ location, unit }) => {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `The weather in ${location} in Sunny, 20 degrees ${unit ?? "celsius"}.`,
-        },
-      ],
-    };
-  },
+  execute: async ({ location, unit }) => [
+    {
+      type: "text",
+      value: `The weather in ${location} is Sunny, 20 degrees ${unit ?? "celsius"}.`,
+    },
+  ],
 });
 
 const agent = new Agent({
   model,
-  initialPrompts: [{ role: "system", content: "You are a helpful AI assistant." }],
+  initialPrompts: [
+    { role: "system", content: "You are a helpful AI assistant." },
+  ],
   tools: [getWeatherTool],
 });
 
-const result = await agent.run("Whats the weather in London?");
-console.log(result.runs.at(-1).text);
+const result = await agent.prompt("Whats the weather in London?");
+console.log(result.toolCalls);
 ```

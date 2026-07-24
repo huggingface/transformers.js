@@ -1,75 +1,77 @@
-import type {
-    AgentConfig,
-    BeforeToolCallHook,
-    AfterToolCallHook,
-    OnStepHook,
-    Message,
-    RunResult,
-    RequestResult,
-    ToolCallResult,
-    Usage,
-    StreamChunk,
-    ModelAdapter,
-} from './types';
-import type { ToolList } from './Tool';
-import { DynamicCache, TextStreamer } from '@huggingface/transformers';
+import { TextStreamer } from '@huggingface/transformers';
 import { ModelAdapterBase, ModelAdapterRegistry } from './adapters';
 import type { Model } from './Model';
-import { ToolExecutor } from './tools/ToolExecutor';
+import type { ToolList } from './Tool';
+import type {
+    AgentConfig,
+    Message,
+    MessageContent,
+    ModelAdapter,
+    Prompt,
+    PromptResult,
+    StreamChunk,
+    ToolCall,
+    Usage,
+} from './types';
+
+type ModelMessage = Message & { thinking?: string };
 
 export class Agent {
     readonly model: Model;
-    readonly initialPrompts: ReadonlyArray<Message>;
     readonly tools: ToolList;
-    readonly maxSteps: number;
     readonly maxNewTokens: number;
     readonly temperature: number | undefined;
     readonly enableThinking: boolean;
     readonly adapter: ModelAdapter;
 
-    private readonly stepHooks: OnStepHook[] = [];
-    private readonly toolExecutor: ToolExecutor;
     private _history: Message[] = [];
-    private _modelHistory: Message[] = [];
+    private _modelHistory: ModelMessage[] = [];
+    private readonly _initialPrompts: Message[];
     private itemIdCounter = 0;
+    private promptActive = false;
     private readonly adapterRegistry = new ModelAdapterRegistry();
-    private _kvCache: DynamicCache | null = null;
 
     get history(): ReadonlyArray<Message> {
-        return this._history;
+        return this.cloneMessages(this._history);
+    }
+
+    get initialPrompts(): ReadonlyArray<Message> {
+        return this.cloneMessages(this._initialPrompts);
     }
 
     constructor(config: AgentConfig) {
         this.model = config.model;
-        this.initialPrompts = this.cloneMessages(config.initialPrompts ?? []);
+        this._initialPrompts = this.cloneMessages(config.initialPrompts ?? []);
         this.tools = config.tools ?? [];
-        this.maxSteps = config.maxSteps ?? 10;
         this.maxNewTokens = config.maxNewTokens ?? 1024;
         this.temperature = config.temperature;
         this.enableThinking = config.enableThinking ?? false;
         this.adapter = config.adapter ?? this.resolveAdapter();
-        this.toolExecutor = new ToolExecutor(this.tools);
         this.clearHistory();
     }
 
-    async run(input: string): Promise<RequestResult> {
-        let last: RequestResult = { done: true, runs: [], usage: this.makeUsage(0, 0) };
-        await this.runAgentLoop(input, (snapshot) => {
-            last = snapshot;
+    async prompt(input: Prompt): Promise<PromptResult> {
+        let result: PromptResult | undefined;
+        await this.generateTurn(input, (chunk) => {
+            if (chunk.done) {
+                result = this.toPromptResult(chunk);
+            }
         });
-        return last;
+
+        if (!result) {
+            throw new Error('The model did not produce a result.');
+        }
+        return result;
     }
 
-    async *stream(input: string): AsyncIterable<StreamChunk> {
+    async *promptStreaming(input: Prompt): AsyncIterable<StreamChunk> {
         const queue: StreamChunk[] = [];
         let done = false;
-        let loopError: unknown;
+        let generationError: unknown;
 
-        const loopPromise = this.runAgentLoop(input, (snapshot) => {
-            queue.push(snapshot);
-        })
+        const generation = this.generateTurn(input, (chunk) => queue.push(chunk))
             .catch((error) => {
-                loopError = error;
+                generationError = error;
             })
             .finally(() => {
                 done = true;
@@ -79,239 +81,160 @@ export class Agent {
             const chunk = queue.shift();
             if (chunk) {
                 yield chunk;
-                continue;
-            }
-            await this.delay(0);
-        }
-
-        await loopPromise;
-        if (loopError !== undefined) {
-            throw loopError;
-        }
-    }
-
-    private async runAgentLoop(input: string, onUpdate: (snapshot: RequestResult) => void): Promise<void> {
-        if (!this.model.isInitialized) {
-            throw new Error('Model is not initialized. Call model.init() before creating an Agent run.');
-        }
-
-        const userMessage: Message = { role: 'user', content: input };
-        this._history.push(userMessage);
-        this._modelHistory.push(userMessage);
-
-        this.assertStringMessageContent(this._modelHistory);
-        let conversation = this.toModelMessages(this._modelHistory);
-
-        let totalPromptTokens = 0;
-        let totalCompletionTokens = 0;
-        const results: RunResult[] = [];
-
-        for (let stepIndex = 0; stepIndex < this.maxSteps; stepIndex++) {
-            const promptTokens = this.estimatePromptTokens(conversation);
-            let assistantRaw = '';
-            let completionTokens = 0;
-            let generationDone = false;
-            let generationError: unknown;
-
-            let previewRaw = '';
-            const previewQueue: string[] = [];
-
-            // restart generation with a streaming callback bound to preview queue
-            generationDone = false;
-            generationError = undefined;
-            assistantRaw = '';
-            completionTokens = 0;
-            void (async () => {
-                try {
-                    const assistant = await this.generateAssistantMessage(conversation, (delta) => {
-                        previewQueue.push(delta);
-                    });
-                    assistantRaw = assistant.modelContent;
-                    completionTokens = assistant.completionTokens;
-                } catch (error) {
-                    generationError = error;
-                } finally {
-                    generationDone = true;
-                }
-            })();
-
-            while (true) {
-                const delta = previewQueue.shift();
-                if (delta) {
-                    previewRaw += delta;
-                    const previewParsed = this.adapter.parseAssistantContent(previewRaw, (prefix) =>
-                        this.nextItemId(prefix),
-                    );
-
-                    const current = this.createRunResult({
-                        thinkingText: previewParsed.thinkingText,
-                        text: previewParsed.visibleText,
-                        tools: [],
-                        usage: this.makeUsage(0, 0),
-                    });
-                    onUpdate({
-                        done: false,
-                        runs: [...results, current],
-                        usage: this.makeUsage(totalPromptTokens, totalCompletionTokens),
-                    });
-                    continue;
-                }
-
-                if (generationDone) break;
+            } else {
                 await this.delay(0);
             }
-
-            if (generationError !== undefined) {
-                throw generationError;
-            }
-
-            const parsed = this.adapter.parseAssistantContent(assistantRaw, (prefix) => this.nextItemId(prefix));
-            totalPromptTokens += promptTokens;
-            totalCompletionTokens += completionTokens;
-
-            const executedTools: ToolCallResult[] = [];
-            for (const call of parsed.toolCalls) {
-                const result = await this.toolExecutor.execute(call);
-                executedTools.push(result);
-            }
-
-            const assistantMessage: Message = {
-                role: 'assistant',
-                content: parsed.visibleText,
-                thinking: parsed.thinkingText || undefined,
-                toolCalls:
-                    parsed.toolCalls.length > 0
-                        ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
-                        : undefined,
-            };
-
-            const modelAssistantMessage: Message = {
-                role: 'assistant',
-                content: parsed.visibleText,
-                thinking: parsed.thinkingText || undefined,
-                toolCalls:
-                    parsed.toolCalls.length > 0
-                        ? parsed.toolCalls.map((call) => this.toOpenAIToolCall(call))
-                        : undefined,
-            };
-
-            if (parsed.visibleText.length > 0 || parsed.toolCalls.length > 0) {
-                this._history.push(assistantMessage);
-                this._modelHistory.push(modelAssistantMessage);
-            }
-
-            for (const result of executedTools) {
-                const toolMessage = this.toolExecutor.createToolMessage(result);
-                this._history.push(toolMessage);
-                this._modelHistory.push(toolMessage);
-            }
-
-            const done = executedTools.length === 0;
-            const runResult = this.createRunResult({
-                thinkingText: parsed.thinkingText,
-                text: parsed.visibleText,
-                tools: executedTools,
-                usage: this.makeUsage(promptTokens, completionTokens),
-            });
-            results.push(runResult);
-
-            await this.emitStepHooks(runResult);
-            onUpdate({ done, runs: [...results], usage: this.makeUsage(totalPromptTokens, totalCompletionTokens) });
-
-            if (done) {
-                return;
-            }
-
-            conversation = this.toModelMessages(this._modelHistory);
         }
 
-        onUpdate({ done: true, runs: [...results], usage: this.makeUsage(totalPromptTokens, totalCompletionTokens) });
+        await generation;
+        if (generationError !== undefined) {
+            throw generationError;
+        }
     }
 
     clearHistory(): void {
-        this._history = this.cloneMessages(this.initialPrompts);
-        this._modelHistory = this.cloneMessages(this.initialPrompts);
-        this.assertStringMessageContent(this._modelHistory);
-        this._kvCache = null;
+        if (this.promptActive) {
+            throw new Error('Cannot clear history while a prompt is running.');
+        }
+        this._history = this.cloneMessages(this._initialPrompts);
+        this.validateHistory(this._history);
+        this._modelHistory = this.cloneMessages(this._initialPrompts);
     }
 
-    onBeforeToolCall(hook: BeforeToolCallHook): this {
-        this.toolExecutor.onBeforeToolCall(hook);
-        return this;
-    }
+    private async generateTurn(input: Prompt, onUpdate: (chunk: StreamChunk) => void): Promise<void> {
+        if (this.promptActive) {
+            throw new Error('Only one prompt can run at a time for an Agent.');
+        }
+        if (!this.model.isInitialized) {
+            throw new Error('Model is not initialized. Call model.init() before prompting an Agent.');
+        }
 
-    onAfterToolCall(hook: AfterToolCallHook): this {
-        this.toolExecutor.onAfterToolCall(hook);
-        return this;
-    }
+        this.promptActive = true;
+        const historyLength = this._history.length;
+        const modelHistoryLength = this._modelHistory.length;
+        try {
+            this.appendPrompt(input);
+            const conversation = this.adapter.formatMessages(this._modelHistory);
+            let previewRaw = '';
 
-    onStep(hook: OnStepHook): this {
-        this.stepHooks.push(hook);
-        return this;
-    }
+            const generated = await this.generateAssistantMessage(conversation, (delta) => {
+                previewRaw += delta;
+                const parsed = this.adapter.parseAssistantContent(previewRaw, this.createPreviewIdFactory());
+                onUpdate({
+                    done: false,
+                    response: parsed.visibleText,
+                    thinking: parsed.thinkingText,
+                    toolCalls: parsed.toolCalls.map((call) => this.toPublicToolCall(call)),
+                    usage: this.makeUsage(0, 0),
+                });
+            });
 
-    private async emitStepHooks(step: RunResult): Promise<void> {
-        for (const hook of this.stepHooks) {
-            await hook(step);
+            const parsed = this.adapter.parseAssistantContent(generated.modelContent, (prefix) =>
+                this.nextItemId(prefix),
+            );
+            const toolCalls = parsed.toolCalls.map((call) => this.toPublicToolCall(call));
+            const result: StreamChunk = {
+                done: true,
+                response: parsed.visibleText,
+                thinking: parsed.thinkingText,
+                toolCalls,
+                usage: this.makeUsage(generated.promptTokens, generated.completionTokens),
+            };
+
+            if (result.response || result.toolCalls.length > 0) {
+                const assistantMessage = this.createAssistantMessage(result.response, result.toolCalls);
+                this.validateHistory([...this._history, assistantMessage]);
+                this._history.push(assistantMessage);
+                this._modelHistory.push({
+                    ...this.cloneMessage(assistantMessage),
+                    thinking: result.thinking || undefined,
+                });
+            }
+            onUpdate(result);
+        } catch (error) {
+            this._history.length = historyLength;
+            this._modelHistory.length = modelHistoryLength;
+            throw error;
+        } finally {
+            this.promptActive = false;
         }
     }
 
-    private createRunResult(snapshot: RunResult): RunResult {
-        return {
-            thinkingText: snapshot.thinkingText,
-            text: snapshot.text,
-            tools: [...snapshot.tools],
-            usage: { ...snapshot.usage },
-        };
+    private appendPrompt(input: Prompt): void {
+        if (typeof input === 'string') {
+            const message: Message = { role: 'user', content: input };
+            this._history.push(message);
+            this._modelHistory.push(this.cloneMessage(message));
+            return;
+        }
+        const messages = this.cloneMessages(input);
+        this.validateHistory([...this._history, ...messages]);
+        this._history.push(...messages);
+        this._modelHistory.push(...this.cloneMessages(messages));
     }
 
-    private toModelMessages(history: ReadonlyArray<Message>): Array<Record<string, unknown>> {
-        return this.adapter.formatMessages(history);
+    private createAssistantMessage(response: string, toolCalls: ToolCall[]): Message {
+        if (toolCalls.length === 0) {
+            return { role: 'assistant', content: response };
+        }
+
+        const content: MessageContent[] = [
+            ...(response ? [{ type: 'text' as const, value: response }] : []),
+            ...toolCalls.map((call) => ({
+                type: 'tool-call' as const,
+                value: { ...call, arguments: this.cloneSerializable(call.arguments) },
+            })),
+        ];
+        return { role: 'assistant', content };
     }
 
     private cloneMessages(messages: ReadonlyArray<Message>): Message[] {
-        return messages.map((message) => ({
-            ...message,
-            ...(message.role === 'assistant' && message.toolCalls ? { toolCalls: [...message.toolCalls] } : {}),
-        }));
+        return messages.map((message) => this.cloneMessage(message));
     }
 
-    private assertStringMessageContent(messages: ReadonlyArray<Message>): void {
-        for (const message of messages) {
-            if ('content' in message && message.content !== undefined && typeof message.content !== 'string') {
-                throw new Error(
-                    `Multimodal message content is not supported yet. ${message.role} messages currently require string content.`,
-                );
-            }
-        }
-    }
-
-    private toOpenAIToolCall(call: ToolCallResult | { id: string; name: string; args: Record<string, unknown> }) {
+    private cloneMessage(message: Message): Message {
         return {
-            id: call.id,
-            type: 'function' as const,
-            function: {
-                name: call.name,
-                arguments: call.args,
-            },
+            ...message,
+            content: Array.isArray(message.content)
+                ? message.content.map((part) => this.cloneContentPart(part))
+                : message.content,
+        };
+    }
+
+    private cloneContentPart(part: MessageContent): MessageContent {
+        if (part.type === 'tool-call') {
+            return { ...part, value: { ...part.value, arguments: this.cloneSerializable(part.value.arguments) } };
+        }
+        if (part.type === 'tool-response') {
+            return { ...part, value: this.cloneSerializable(part.value) };
+        }
+        return part.type === 'text' ? { ...part } : this.cloneSerializable(part);
+    }
+
+    private toPublicToolCall(call: { id: string; name: string; args: Record<string, unknown> }): ToolCall {
+        return { callID: call.id, name: call.name, arguments: this.cloneSerializable(call.args) };
+    }
+
+    private toPromptResult(chunk: StreamChunk): PromptResult {
+        return {
+            response: chunk.response,
+            thinking: chunk.thinking,
+            toolCalls: chunk.toolCalls.map((call) => ({
+                ...call,
+                arguments: this.cloneSerializable(call.arguments),
+            })),
+            usage: { ...chunk.usage },
         };
     }
 
     private async generateAssistantMessage(
         conversation: Array<Record<string, unknown>>,
         onDelta?: (text: string) => void,
-    ): Promise<{
-        role: 'assistant';
-        content: string;
-        modelContent: string;
-        completionTokens: number;
-        promptTokenCount: number;
-    }> {
+    ): Promise<{ modelContent: string; completionTokens: number; promptTokens: number }> {
         let completionTokens = 0;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
         const model = this.model.model;
-
         const streamer = new TextStreamer(tokenizer, {
             skip_prompt: true,
             skip_special_tokens: false,
@@ -338,9 +261,7 @@ export class Agent {
             tokenizer as unknown as (
                 text: string[],
                 options: Record<string, unknown>,
-            ) => {
-                input_ids?: { dims?: number[]; size?: number };
-            }
+            ) => { input_ids?: { dims?: number[]; size?: number } }
         )([prompt], {
             add_special_tokens: false,
             padding: true,
@@ -348,135 +269,99 @@ export class Agent {
             return_tensor: true,
             return_dict: true,
         });
-
-        const fullPromptLength = input.input_ids?.dims?.[1] ?? 0;
-
-        let generationInput = input;
-        let generationPromptLength = fullPromptLength;
-        const useKvCache = this.adapter.useKvCache(this.enableThinking);
-
-        const generationOptions = {
-            ...generationInput,
+        const promptTokens = input.input_ids?.dims?.[1] ?? input.input_ids?.size ?? 0;
+        const output = (await model.generate({
+            ...input,
             max_new_tokens: this.maxNewTokens,
             ...(this.temperature !== undefined
                 ? { temperature: this.temperature, do_sample: true }
                 : { do_sample: false }),
-            ...(useKvCache ? { past_key_values: this._kvCache } : {}),
             streamer,
-            ...(useKvCache ? { return_dict_in_generate: true } : {}),
-        };
-
-        const output = (await model.generate(generationOptions)) as
-            | { past_key_values?: DynamicCache; sequences?: unknown }
-            | unknown;
-
-        this._kvCache =
-            useKvCache && typeof output === 'object' && output !== null
-                ? ((output as { past_key_values?: DynamicCache }).past_key_values ?? null)
-                : null;
-
+        })) as { sequences?: unknown } | unknown;
         const sequences =
             typeof output === 'object' && output !== null && 'sequences' in output
                 ? (output as { sequences?: unknown }).sequences
                 : output;
-        const modelRawText = this.decodeGeneratedContinuation(sequences, generationPromptLength) ?? streamedRawText;
-        const modelContent = this.adapter.normalizeAssistantContent(modelRawText);
-
-        console.log({ rawInput, prompt, modelRawText, modelContent });
-
+        const modelRawText = this.decodeGeneratedContinuation(sequences, promptTokens) ?? streamedRawText;
         return {
-            role: 'assistant',
-            content: modelContent,
-            modelContent,
+            modelContent: this.adapter.normalizeAssistantContent(modelRawText),
             completionTokens,
-            promptTokenCount: fullPromptLength,
+            promptTokens,
         };
     }
 
     private decodeGeneratedContinuation(sequences: unknown, promptLength: number): string | null {
-        if (!sequences || typeof sequences !== 'object') {
-            return null;
-        }
-
+        if (!sequences || typeof sequences !== 'object') return null;
         const tensor = sequences as {
             dims?: number[];
             slice?: (...slices: (number | [number | null, number | null] | null)[]) => {
                 data?: ArrayLike<bigint | number>;
             };
         };
-        if (!Array.isArray(tensor.dims) || tensor.dims.length < 2 || typeof tensor.slice !== 'function') {
-            return null;
-        }
-
-        const sequenceLength = tensor.dims[1] ?? 0;
-        if (sequenceLength <= promptLength) {
-            return '';
-        }
-
+        if (!Array.isArray(tensor.dims) || tensor.dims.length < 2 || typeof tensor.slice !== 'function') return null;
+        if ((tensor.dims[1] ?? 0) <= promptLength) return '';
         const generated = tensor.slice(0, [promptLength, null]);
-        if (!generated.data) {
-            return null;
-        }
-
+        if (!generated.data) return null;
         const decode = (
-            this.model.tokenizer as {
-                decode?: (tokens: Array<bigint | number>, options?: unknown) => string;
-            }
+            this.model.tokenizer as { decode?: (tokens: Array<bigint | number>, options?: unknown) => string }
         ).decode;
-        if (typeof decode !== 'function') {
-            return null;
-        }
-
+        if (typeof decode !== 'function') return null;
         return decode.call(this.model.tokenizer, Array.from(generated.data), { skip_special_tokens: false });
     }
 
-    private estimatePromptTokens(conversation: Array<Record<string, unknown>>): number {
-        try {
-            const rendered = this.model.tokenizer.apply_chat_template(
-                conversation as never,
-                {
-                    tokenize: false,
-                    add_generation_prompt: true,
-                    tools: this.adapter.formatTools(this.tools),
-                    enable_thinking: this.enableThinking,
-                } as never,
+    private createPreviewIdFactory(): (prefix: string) => string {
+        let offset = 0;
+        return (prefix) => `${prefix}_${this.itemIdCounter + ++offset}`;
+    }
+
+    private validateHistory(messages: ReadonlyArray<Message>): void {
+        const calls = new Map<string, { name: string; resolved: boolean }>();
+        for (const message of messages) {
+            if (typeof message.content === 'string') continue;
+            const hasTextOrMedia = message.content.some(
+                (part) => part.type === 'text' || part.type === 'image' || part.type === 'audio',
             );
-            const prompt = this.adapter.preparePromptForGeneration(String(rendered));
-            const tokenized = (
-                this.model.tokenizer as unknown as (
-                    text: string[],
-                    options: Record<string, unknown>,
-                ) => {
-                    input_ids?: { dims?: number[]; size?: number };
+            const toolCalls = message.content.filter((part) => part.type === 'tool-call');
+            const toolResponses = message.content.filter((part) => part.type === 'tool-response');
+
+            if (toolCalls.length > 0 && message.role !== 'assistant') {
+                throw new Error('Tool calls are only valid in assistant messages.');
+            }
+            if (toolResponses.length > 0 && message.role !== 'user') {
+                throw new Error('Tool responses are only valid in user messages.');
+            }
+            if (toolResponses.length > 0 && hasTextOrMedia) {
+                throw new Error('Tool responses cannot be mixed with text, image, or audio content in one message.');
+            }
+
+            for (const part of toolCalls) {
+                if (calls.has(part.value.callID)) {
+                    throw new Error(`Duplicate tool call ID: ${part.value.callID}`);
                 }
-            )([prompt], {
-                add_special_tokens: false,
-                padding: true,
-                truncation: true,
-                return_tensor: true,
-                return_dict: true,
-            });
-            const ids = tokenized.input_ids;
-            if (!ids) return 0;
-            if (typeof ids.size === 'number') return ids.size;
-            if (Array.isArray(ids.dims) && ids.dims.length > 1) return ids.dims[0] * ids.dims[1];
-            return 0;
-        } catch {
-            return 0;
+                calls.set(part.value.callID, { name: part.value.name, resolved: false });
+            }
+            for (const part of toolResponses) {
+                const call = calls.get(part.value.callID);
+                if (!call) throw new Error(`Unknown tool call ID: ${part.value.callID}`);
+                if (call.resolved) throw new Error(`Tool call already has a response: ${part.value.callID}`);
+                if (call.name !== part.value.name) {
+                    throw new Error(`Tool response name does not match call ${part.value.callID}.`);
+                }
+                call.resolved = true;
+            }
         }
     }
 
+    private cloneSerializable<T>(value: T): T {
+        return structuredClone(value);
+    }
+
     private makeUsage(promptTokens: number, completionTokens: number): Usage {
-        return {
-            promptTokens,
-            completionTokens,
-            totalTokens: promptTokens + completionTokens,
-        };
+        return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
     }
 
     private nextItemId(prefix: string): string {
-        this.itemIdCounter += 1;
-        return `${prefix}_${this.itemIdCounter}`;
+        return `${prefix}_${++this.itemIdCounter}`;
     }
 
     private resolveAdapter = (): ModelAdapter =>
@@ -488,25 +373,19 @@ export class Agent {
         }) ?? new ModelAdapterBase();
 
     private readModelConfig(): Record<string, unknown> {
-        const modelUnknown = this.model.model as unknown as Record<string, unknown>;
-        const cfg = modelUnknown?.config;
-        if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
-            return {};
-        }
-        return cfg as Record<string, unknown>;
+        const config = (this.model.model as unknown as Record<string, unknown>)?.config;
+        return config && typeof config === 'object' && !Array.isArray(config)
+            ? (config as Record<string, unknown>)
+            : {};
     }
 
-    private tryReadString(obj: unknown, key: string): string | undefined {
-        if (!obj || typeof obj !== 'object') {
-            return undefined;
-        }
-        const value = (obj as Record<string, unknown>)[key];
-        return typeof value === 'string' ? value : undefined;
+    private tryReadString(value: unknown, key: string): string | undefined {
+        if (!value || typeof value !== 'object') return undefined;
+        const field = (value as Record<string, unknown>)[key];
+        return typeof field === 'string' ? field : undefined;
     }
 
     private async delay(ms: number): Promise<void> {
-        await new Promise((resolve) => {
-            setTimeout(resolve, ms);
-        });
+        await new Promise((resolve) => setTimeout(resolve, ms));
     }
 }

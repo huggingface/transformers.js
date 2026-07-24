@@ -2,24 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { Agent, Model, Tool } from "@huggingface/transformers-agent";
 
 type Status = "idle" | "working" | "ready" | "error";
-type ToolResultView = {
-  id: string;
+type ToolCallView = {
+  callID: string;
   name: string;
-  args: Record<string, unknown>;
-  output: unknown;
-  durationMs: number;
+  arguments: Record<string, unknown>;
 };
 
-type RoundView = {
-  thinkingText: string;
-  text: string;
-  tools: ToolResultView[];
-  usage?: { totalTokens?: number };
-};
-
-type RequestResultView = {
+type PromptChunkView = {
   done: boolean;
-  runs: RoundView[];
+  thinking: string;
+  response: string;
+  toolCalls: ToolCallView[];
   usage?: { totalTokens?: number };
 };
 
@@ -27,7 +20,7 @@ type ResponseView = {
   id: number;
   prompt: string;
   text: string;
-  result: RequestResultView | null;
+  result: PromptChunkView | null;
   done: boolean;
   error?: string;
 };
@@ -40,24 +33,17 @@ const getWeatherTool = new Tool<{ location: string }>({
       description: "The location to get the weather for",
     }),
   },
-  execute: async ({ location }) => {
-    const normalizedLocation =
-      location.trim().length > 0 ? location.trim() : "Unknown";
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            location: normalizedLocation,
-            condition: "Sunny",
-            temperatureC: 21,
-            source: "mock",
-          }),
-        },
-      ],
-    };
-  },
+  execute: async ({ location }) => [
+    {
+      type: "object",
+      value: {
+        location,
+        condition: "Sunny",
+        temperatureC: 21,
+        source: "mock",
+      },
+    },
+  ],
 });
 
 export function App() {
@@ -148,22 +134,28 @@ export function App() {
       if (!agentRef.current) {
         agentRef.current = new Agent({
           model: modelRef.current,
-          system:
-            "You are a concise assistant. After you call a tool, always answer the question.",
+          initialPrompts: [
+            {
+              role: "system",
+              content:
+                "You are a concise assistant. Return a tool call when current weather is needed.",
+            },
+          ],
           tools: [getWeatherTool],
           enableThinking: false,
         });
       }
-      let finalOutput: RequestResultView | null = null;
-      for await (const chunk of agentRef.current.stream(currentPrompt)) {
-        const typedChunk = chunk as unknown as RequestResultView;
-        const text = typedChunk.runs.map((round) => round.text).join("");
+      let finalOutput: PromptChunkView | null = null;
+      for await (const chunk of agentRef.current.promptStreaming(
+        currentPrompt,
+      )) {
+        const typedChunk = chunk as unknown as PromptChunkView;
         setResponses((prev) =>
           prev.map((response) =>
             response.id === responseId
               ? {
                   ...response,
-                  text,
+                  text: typedChunk.response,
                   result: typedChunk,
                   done: typedChunk.done,
                 }
@@ -175,13 +167,12 @@ export function App() {
       }
 
       if (!finalOutput) {
-        throw new Error("No output received from stream().");
+        throw new Error("No output received from promptStreaming().");
       }
 
       setStatus("ready");
-      const lastRound = finalOutput.runs[finalOutput.runs.length - 1];
       addLog(
-        `Agent stream complete. done=${String(finalOutput.done)}, rounds=${finalOutput.runs.length}, totalTokens=${finalOutput.usage?.totalTokens ?? 0}, lastRunTokens=${lastRound?.usage?.totalTokens ?? 0}`,
+        `Prompt complete. toolCalls=${finalOutput.toolCalls.length}, totalTokens=${finalOutput.usage?.totalTokens ?? 0}`,
       );
     } catch (error) {
       const message = errorMessage(error);
@@ -301,31 +292,27 @@ export function App() {
                       </div>
                       {response.result === null ? null : (
                         <div className="mt-4 space-y-2 border-t border-ink/10 pt-3">
-                          {response.result.runs.map((round, index) => (
-                            <div
-                              key={`${response.id}-${index}`}
-                              className="rounded-lg bg-ink/[0.03] p-3"
-                            >
-                              <div className="text-xs font-medium uppercase tracking-wide text-ink/50">
-                                Round {index + 1}
-                              </div>
-                              {round.thinkingText ? (
-                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap text-ink/75">
-                                  {round.thinkingText}
-                                </pre>
-                              ) : null}
-                              {round.text ? (
-                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
-                                  {round.text}
-                                </pre>
-                              ) : null}
-                              {round.tools.length > 0 ? (
-                                <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
-                                  {JSON.stringify(round.tools, null, 2)}
-                                </pre>
-                              ) : null}
-                            </div>
-                          ))}
+                          <div className="rounded-lg bg-ink/[0.03] p-3">
+                            {response.result.thinking ? (
+                              <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap text-ink/75">
+                                {response.result.thinking}
+                              </pre>
+                            ) : null}
+                            {response.result.response ? (
+                              <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
+                                {response.result.response}
+                              </pre>
+                            ) : null}
+                            {response.result.toolCalls.length > 0 ? (
+                              <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
+                                {JSON.stringify(
+                                  response.result.toolCalls,
+                                  null,
+                                  2,
+                                )}
+                              </pre>
+                            ) : null}
+                          </div>
                         </div>
                       )}
                     </div>

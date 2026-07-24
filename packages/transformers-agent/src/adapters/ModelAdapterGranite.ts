@@ -1,6 +1,5 @@
-import type { ToolCall } from '../types';
 import { ModelAdapterBase } from './ModelAdapterBase';
-import type { ModelAdapterContext, ParseResult } from './types';
+import type { ModelAdapterContext, ParseResult, ParsedToolCall } from './types';
 import { asRecord } from './utils';
 
 export class ModelAdapterGranite extends ModelAdapterBase {
@@ -48,8 +47,8 @@ function stripGraniteToolCalls(content: string): string {
     return withoutClosedCalls;
 }
 
-function parseGraniteToolCalls(content: string, nextId: (prefix: string) => string): ToolCall[] {
-    const toolCalls: ToolCall[] = [];
+function parseGraniteToolCalls(content: string, nextId: (prefix: string) => string): ParsedToolCall[] {
+    const toolCalls: ParsedToolCall[] = [];
     const regex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
     let match: RegExpExecArray | null;
 

@@ -20,6 +20,5 @@ Then open the local Vite URL shown in your terminal.
 - `Model.downloadSize()`
 - `Model.cachedSize()`
 - `Model.init(progressCallback)`
-- `Model.agent(...)` + `agent.run(...)`
-
-If `Agent.run()` is not fully implemented yet, the UI will display the thrown error in the log so you can still validate model lifecycle behavior.
+- `new Agent(...)` + `agent.promptStreaming(...)`
+- open-loop tool calls returned to the application

@@ -8,11 +8,19 @@ import { build } from "esbuild";
 const tempDir = await mkdtemp(join(tmpdir(), "transformers-agent-tests-"));
 const outfile = join(tempDir, "tests.mjs");
 const entryPoint = join(tempDir, "entry.mjs");
+const transformersStub = join(tempDir, "transformers-stub.mjs");
 
 try {
+  await writeFile(transformersStub, "export class DynamicCache {}\nexport class TextStreamer { constructor() {} }\n");
   await writeFile(
     entryPoint,
-    [resolve("tests/ModelAdapterGranite.test.ts"), resolve("tests/ModelAdapterGemma4.test.ts"), resolve("tests/ModelAdapterQwen3.test.ts")]
+    [
+      resolve("tests/Agent.test.ts"),
+      resolve("tests/ModelAdapterBase.test.ts"),
+      resolve("tests/ModelAdapterGranite.test.ts"),
+      resolve("tests/ModelAdapterGemma4.test.ts"),
+      resolve("tests/ModelAdapterQwen3.test.ts"),
+    ]
       .map((path) => `import ${JSON.stringify(path)};`)
       .join("\n"),
   );
@@ -25,6 +33,7 @@ try {
     platform: "node",
     target: "node20",
     external: ["node:*"],
+    alias: { "@huggingface/transformers": transformersStub },
     logLevel: "silent",
   });
 

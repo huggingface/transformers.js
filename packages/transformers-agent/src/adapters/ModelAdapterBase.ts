@@ -1,6 +1,6 @@
 import type { ToolList } from '../Tool';
-import type { Message, ToolCall, ToolCallResult } from '../types';
-import type { ModelAdapter, ModelAdapterContext, ParseResult } from './types';
+import type { Message, MessageContent, ToolResponse } from '../types';
+import type { ModelAdapter, ModelAdapterContext, ParseResult, ParsedToolCall } from './types';
 import { asRecord } from './utils';
 
 export class ModelAdapterBase implements ModelAdapter {
@@ -22,7 +22,7 @@ export class ModelAdapterBase implements ModelAdapter {
     }
 
     formatMessages(messages: ReadonlyArray<Message>): Array<Record<string, unknown>> {
-        return messages.map((message) => this.formatMessage(message));
+        return messages.flatMap((message) => this.formatMessage(message));
     }
 
     preparePromptForGeneration(prompt: string): string {
@@ -40,84 +40,121 @@ export class ModelAdapterBase implements ModelAdapter {
             .map((match) => match[1].trim())
             .filter(Boolean)
             .join('\n\n');
-
-        const withoutThinking = normalized.replace(/<think>[\s\S]*?<\/think>/g, '');
+        let withoutThinking = normalized.replace(/<think>[\s\S]*?<\/think>/g, '');
+        let partialThinking = '';
+        const openThinkingIndex = withoutThinking.lastIndexOf('<think>');
+        if (openThinkingIndex >= 0) {
+            partialThinking = withoutThinking.slice(openThinkingIndex + '<think>'.length).trim();
+            withoutThinking = withoutThinking.slice(0, openThinkingIndex);
+        }
         const toolCalls = this.parseToolCallsFromTaggedJson(withoutThinking, nextId);
-        const visibleText = withoutThinking.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
-
-        return { thinkingText, visibleText, toolCalls };
-    }
-
-    useKvCache(enableThinking: boolean): boolean {
-        return !enableThinking;
-    }
-
-    protected formatMessage(message: Message): Record<string, unknown> {
-        if (message.role === 'assistant') {
-            const toolCalls = message.toolCalls?.map((call) => ({
-                id: call.id,
-                type: 'function',
-                function: {
-                    name: call.function.name,
-                    arguments: JSON.stringify(call.function.arguments),
-                },
-            }));
-
-            return {
-                role: 'assistant',
-                content: this.stringifyMessageContent(message.content),
-                ...(toolCalls ? { tool_calls: toolCalls } : {}),
-            };
-        }
-
-        if (message.role === 'tool') {
-            return {
-                role: 'tool',
-                content: this.stringifyMessageContent(message.content),
-                tool_call_id: message.toolCallId,
-                name: message.name,
-            };
-        }
-
+        const visibleText = stripToolCalls(withoutThinking).trim();
         return {
-            role: message.role,
-            content: this.stringifyMessageContent(message.content),
+            thinkingText: [thinkingText, partialThinking].filter(Boolean).join('\n\n'),
+            visibleText,
+            toolCalls,
         };
     }
 
-    protected stringifyMessageContent(content: Message['content']): string | undefined {
-        if (content === undefined || typeof content === 'string') {
-            return content;
+    protected formatMessage(message: Message): Array<Record<string, unknown>> {
+        const toolCalls = this.getToolCalls(message);
+        const toolResponses = this.getToolResponses(message);
+        const text = this.stringifyTextContent(message.content);
+        const formatted: Array<Record<string, unknown>> = [];
+
+        if (message.role === 'assistant' && (text !== undefined || toolCalls.length > 0)) {
+            formatted.push({
+                role: 'assistant',
+                content: text,
+                ...(toolCalls.length > 0
+                    ? {
+                          tool_calls: toolCalls.map((call) => ({
+                              id: call.callID,
+                              type: 'function',
+                              function: { name: call.name, arguments: JSON.stringify(call.arguments) },
+                          })),
+                      }
+                    : {}),
+            });
+        } else if (text !== undefined) {
+            formatted.push({ role: message.role, content: text });
         }
-        throw new Error('Multimodal message content is not supported by the current model adapter yet.');
+
+        for (const response of toolResponses) {
+            formatted.push({
+                role: 'tool',
+                content: this.stringifyToolResponse(response),
+                tool_call_id: response.callID,
+                name: response.name,
+            });
+        }
+        return formatted;
     }
 
-    protected toToolResultResponse(result: ToolCallResult): unknown {
-        const content = result.output.content;
-        if (content.length === 1 && content[0].type === 'structured') {
-            return content[0].data;
-        }
-        if (content.length === 1 && content[0].type === 'text') {
-            return content[0].text;
-        }
-        return content;
+    protected getToolCalls(message: Message) {
+        return typeof message.content === 'string'
+            ? []
+            : message.content.filter((part) => part.type === 'tool-call').map((part) => part.value);
     }
 
-    private parseToolCallsFromTaggedJson(text: string, nextId: (prefix: string) => string): ToolCall[] {
-        const toolCalls: ToolCall[] = [];
+    protected getToolResponses(message: Message): ToolResponse[] {
+        return typeof message.content === 'string'
+            ? []
+            : message.content.filter((part) => part.type === 'tool-response').map((part) => part.value);
+    }
+
+    protected stringifyTextContent(content: Message['content']): string | undefined {
+        if (typeof content === 'string') return content;
+        const text: string[] = [];
+        for (const part of content) {
+            if (part.type === 'text') {
+                text.push(part.value);
+            } else if (part.type === 'image' || part.type === 'audio') {
+                throw new Error('Multimodal message content is not supported by the current model adapter yet.');
+            }
+        }
+        return text.length > 0 ? text.join('') : undefined;
+    }
+
+    protected stringifyToolResponse(response: ToolResponse): string {
+        if ('errorMessage' in response) return response.errorMessage;
+        this.assertSupportedToolResult(response);
+        if (response.result.length === 1) {
+            const item = response.result[0];
+            if (item.type === 'text') return item.value;
+            if (item.type === 'object') return JSON.stringify(item.value);
+        }
+        return JSON.stringify(response.result);
+    }
+
+    protected toolResponseValue(response: ToolResponse): unknown {
+        if ('errorMessage' in response) return { error: response.errorMessage };
+        this.assertSupportedToolResult(response);
+        if (response.result.length === 1) return response.result[0].value;
+        return response.result.map((item) => item.value);
+    }
+
+    private assertSupportedToolResult(response: Extract<ToolResponse, { result: unknown }>): void {
+        for (const item of response.result) {
+            if (item.type === 'image' || item.type === 'audio') {
+                throw new Error('Multimodal tool responses are not supported by the current model adapter yet.');
+            }
+            if (item.type === 'object' && JSON.stringify(item.value) === undefined) {
+                throw new Error('Object tool responses must be JSON-serializable.');
+            }
+        }
+    }
+
+    private parseToolCallsFromTaggedJson(text: string, nextId: (prefix: string) => string): ParsedToolCall[] {
+        const toolCalls: ParsedToolCall[] = [];
         const regex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
         let match: RegExpExecArray | null;
-
         while ((match = regex.exec(text)) !== null) {
             const raw = match[1].trim();
-            if (!raw) {
-                continue;
-            }
+            if (!raw) continue;
             try {
                 const parsed = JSON.parse(raw) as { name?: unknown; args?: unknown; id?: unknown };
-                if (typeof parsed.name !== 'string') {
-                    continue;
-                }
+                if (typeof parsed.name !== 'string') continue;
                 toolCalls.push({
                     id: typeof parsed.id === 'string' ? parsed.id : nextId('toolcall'),
                     name: parsed.name,
@@ -127,7 +164,18 @@ export class ModelAdapterBase implements ModelAdapter {
                 continue;
             }
         }
-
         return toolCalls;
     }
+}
+
+function stripToolCalls(content: string): string {
+    const withoutClosedCalls = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '');
+    const openCallIndex = withoutClosedCalls.lastIndexOf('<tool_call>');
+    if (openCallIndex >= 0) return withoutClosedCalls.slice(0, openCallIndex);
+    const marker = '<tool_call>';
+    for (let length = marker.length - 1; length > 0; length--) {
+        const partial = marker.slice(0, length);
+        if (withoutClosedCalls.endsWith(partial)) return withoutClosedCalls.slice(0, -partial.length);
+    }
+    return withoutClosedCalls;
 }

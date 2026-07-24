@@ -14,36 +14,28 @@ export type JSONSchemaProperty =
     | { type: 'array'; description?: string; items?: JSONSchemaProperty }
     | { type: 'object'; description?: string; properties?: Record<string, JSONSchemaProperty>; required?: string[] };
 
-export interface TextContent {
-    type: 'text';
-    text: string;
-}
-
-export interface ImageContent {
-    type: 'image';
-    data: string;
-    mimeType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
-}
-
-export interface StructuredContent {
-    type: 'structured';
-    data: Record<string, unknown>;
-}
-
-export type ContentBlock = TextContent | ImageContent | StructuredContent;
-
-export interface ToolCallOutput {
-    content: ContentBlock[];
-    isError?: boolean;
-}
-
 export interface ToolCall {
+    callID: string;
     name: string;
-    args: Record<string, unknown>;
-    id: string;
+    arguments: Record<string, unknown>;
 }
 
-export interface ToolCallResult extends ToolCall {
-    output: ToolCallOutput;
-    durationMs: number;
+export type ToolResultContent =
+    | { type: 'text'; value: string }
+    | { type: 'image'; value: string | Blob | ArrayBuffer | Uint8Array }
+    | { type: 'audio'; value: string | ArrayBuffer | Uint8Array }
+    | { type: 'object'; value: unknown };
+
+export interface ToolSuccess {
+    callID: string;
+    name: string;
+    result: ToolResultContent[];
 }
+
+export interface ToolError {
+    callID: string;
+    name: string;
+    errorMessage: string;
+}
+
+export type ToolResponse = ToolSuccess | ToolError;

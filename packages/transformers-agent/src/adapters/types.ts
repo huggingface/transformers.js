@@ -1,5 +1,5 @@
 import type { ToolList } from '../Tool';
-import type { ToolCall, Message } from '../types';
+import type { Message } from '../types';
 
 export interface ModelAdapterContext {
     modelId: string;
@@ -11,7 +11,13 @@ export interface ModelAdapterContext {
 export interface ParseResult {
     thinkingText: string;
     visibleText: string;
-    toolCalls: ToolCall[];
+    toolCalls: ParsedToolCall[];
+}
+
+export interface ParsedToolCall {
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
 }
 
 export interface ModelAdapter {
@@ -22,5 +28,4 @@ export interface ModelAdapter {
     preparePromptForGeneration(prompt: string): string;
     normalizeAssistantContent(content: string): string;
     parseAssistantContent(content: string, nextId: (prefix: string) => string): ParseResult;
-    useKvCache(enableThinking: boolean): boolean;
 }
