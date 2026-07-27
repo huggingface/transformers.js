@@ -1,6 +1,7 @@
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
+import { pick } from '../utils/core.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -27,6 +28,9 @@ function isChat(x) {
  * @typedef {Object} TextGenerationSpecificParams Parameters specific to text-generation pipelines.
  * @property {boolean} [add_special_tokens] Whether or not to add special tokens when tokenizing the sequences.
  * @property {boolean} [return_full_text=true] If set to `false` only added text is returned, otherwise the full text is returned.
+ * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
+ * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.
+ * @property {string|null} [chat_template=null] A specific chat template (or template name) to apply.
  * @property {Object} [tokenizer_encode_kwargs] Additional keyword arguments to pass along to the encoding step of the tokenizer.
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
@@ -98,16 +102,24 @@ export class TextGenerationPipeline
      * @param {Partial<TextGenerationConfig>} generate_kwargs
      */
     async _call(texts, generate_kwargs = {}) {
+        const {
+            add_special_tokens: add_special_tokens_arg,
+            return_full_text: return_full_text_arg,
+            tools,
+            documents,
+            chat_template,
+            tokenizer_encode_kwargs,
+            ...generation_kwargs
+        } = generate_kwargs;
+
         let isBatched = false;
         let isChatInput = false;
 
         // By default, do not add special tokens, unless the tokenizer specifies otherwise
         let add_special_tokens =
-            generate_kwargs.add_special_tokens ??
-            (this.tokenizer.add_bos_token || this.tokenizer.add_eos_token) ??
-            false;
+            add_special_tokens_arg ?? (this.tokenizer.add_bos_token || this.tokenizer.add_eos_token) ?? false;
 
-        let tokenizer_kwargs = generate_kwargs.tokenizer_encode_kwargs;
+        let tokenizer_kwargs = tokenizer_encode_kwargs;
 
         // Normalize inputs
         /** @type {string[]} */
@@ -128,17 +140,18 @@ export class TextGenerationPipeline
             isChatInput = true;
 
             // If the input is a chat, we need to apply the chat template
+            const chat_template_kwargs = {
+                tokenize: false,
+                add_generation_prompt: true,
+                ...pick({ tools, documents, chat_template }, ['tools', 'documents', 'chat_template']),
+                ...tokenizer_kwargs,
+            };
+
             inputs = /** @type {string[]} */ (
                 /** @type {Chat[]} */ (texts).map(
                     (x) =>
                         /** @type {string} */ (
-                            /** @type {unknown} */ (
-                                this.tokenizer.apply_chat_template(x, {
-                                    tokenize: false,
-                                    add_generation_prompt: true,
-                                    ...tokenizer_kwargs,
-                                })
-                            )
+                            /** @type {unknown} */ (this.tokenizer.apply_chat_template(x, chat_template_kwargs))
                         ),
                 )
             );
@@ -148,7 +161,7 @@ export class TextGenerationPipeline
         }
 
         // By default, return full text
-        const return_full_text = isChatInput ? false : (generate_kwargs.return_full_text ?? true);
+        const return_full_text = isChatInput ? false : (return_full_text_arg ?? true);
 
         this.tokenizer.padding_side = 'left';
         const text_inputs = this.tokenizer(inputs, {
@@ -162,7 +175,7 @@ export class TextGenerationPipeline
             await this.model.generate({
                 ...text_inputs,
                 ...this._default_generation_config,
-                ...generate_kwargs,
+                ...generation_kwargs,
             })
         );
 

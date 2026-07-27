@@ -38,6 +38,7 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // TODO: needed?
         ...kwargs
@@ -84,6 +85,7 @@ export class Gemma3nForConditionalGeneration extends Gemma3nPreTrainedModel {
                 position_ids,
                 generation_config,
                 logits_processor,
+                num_logits_to_keep,
             },
             true,
         );

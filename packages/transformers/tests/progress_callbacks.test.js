@@ -150,7 +150,15 @@ describe("Progress Callbacks", () => {
       async () => {
         const { events, dispose } = await collectEvents((cb) => pipeline("automatic-speech-recognition", model_id, { ...DEFAULT_MODEL_OPTIONS, progress_callback: cb }));
 
-        expectValidEventLifecycle(events, model_id, ["config.json", "onnx/encoder_model.onnx", "onnx/decoder_model_merged.onnx", "generation_config.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"]);
+        const expectedFiles = ["config.json", "onnx/encoder_model.onnx", "onnx/decoder_model_merged.onnx", "generation_config.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"];
+
+        // Each file should be loaded exactly once: pipeline() must not double-fetch
+        // tokenizer.json/tokenizer_config.json/preprocessor_config.json that the
+        // tokenizer and processor would otherwise each load independently.
+        const initiated = events.filter((e) => e.status === "initiate").map((e) => e.file);
+        expect(initiated.sort()).toEqual([...expectedFiles].sort());
+
+        expectValidEventLifecycle(events, model_id, expectedFiles);
 
         await dispose();
       },

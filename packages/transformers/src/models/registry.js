@@ -97,6 +97,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['mgp-str', 'MgpstrForSceneTextRecognition'],
 
     ['style_text_to_speech_2', 'StyleTextToSpeech2Model'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterModel'],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
@@ -171,6 +172,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['ernie4_5', 'Ernie4_5ForCausalLM'],
     ['starcoder2', 'Starcoder2Model'],
     ['deepseek_v3', 'DeepseekV3Model'],
+    ['deepseek_v4', 'DeepseekV4Model'],
     ['falcon', 'FalconModel'],
     ['falcon_h1', 'FalconH1Model'],
     ['nemotron_h', 'NemotronHModel'],
@@ -179,6 +181,8 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['modernbert-decoder', 'ModernBertDecoderModel'],
     ['hunyuan_v1_dense', 'HunYuanDenseV1Model'],
     ['youtu', 'YoutuModel'],
+    ['zaya', 'ZayaModel'],
+    ['hrm_text', 'HrmTextModel'],
 ]);
 
 export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
@@ -238,6 +242,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['roberta', 'RobertaForTokenClassification'],
     ['xlm', 'XLMForTokenClassification'],
     ['xlm-roberta', 'XLMRobertaForTokenClassification'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterForTokenClassification'],
 ]);
 
 export const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
@@ -316,6 +321,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['ernie4_5', 'Ernie4_5ForCausalLM'],
     ['starcoder2', 'Starcoder2ForCausalLM'],
     ['deepseek_v3', 'DeepseekV3ForCausalLM'],
+    ['deepseek_v4', 'DeepseekV4ForCausalLM'],
     ['falcon', 'FalconForCausalLM'],
     ['falcon_h1', 'FalconH1ForCausalLM'],
     ['nemotron_h', 'NemotronHForCausalLM'],
@@ -325,6 +331,8 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['modernbert-decoder', 'ModernBertDecoderForCausalLM'],
     ['hunyuan_v1_dense', 'HunYuanDenseV1ForCausalLM'],
     ['youtu', 'YoutuForCausalLM'],
+    ['zaya', 'ZayaForCausalLM'],
+    ['hrm_text', 'HrmTextForCausalLM'],
 
     // Also image-text-to-text
     ['phi3_v', 'Phi3VForCausalLM'],

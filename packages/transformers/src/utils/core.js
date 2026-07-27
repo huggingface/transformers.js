@@ -110,6 +110,8 @@ export class DefaultProgressCallback extends Callable {
         super();
         this.callback = callback;
         this.files_loading = files_loading;
+        /** @type {Map<string, Promise<string|Uint8Array|null>>} Pending and completed file loads, used to deduplicate work within a single pipeline() call. */
+        this.loads = new Map();
     }
 
     /**

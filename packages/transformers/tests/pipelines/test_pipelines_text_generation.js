@@ -1,4 +1,5 @@
 import { pipeline, TextGenerationPipeline, DynamicCache } from "../../src/transformers.js";
+import { jest } from "@jest/globals";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -85,6 +86,38 @@ export default () => {
         async () => {
           const output = await pipe([chat_input], { max_new_tokens: 3 });
           expect(output).toEqual([chat_target]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "chat input forwards top-level tools",
+        async () => {
+          const tools = [
+            {
+              name: "get_weather",
+              description: "Get the weather in a city",
+              parameter_definitions: {
+                location: {
+                  description: "City and country",
+                  type: "str",
+                  required: true,
+                },
+              },
+            },
+          ];
+
+          const spy = jest.spyOn(pipe.tokenizer, "apply_chat_template");
+          await pipe(chat_input, {
+            max_new_tokens: 3,
+            do_sample: false,
+            tools,
+          });
+
+          const [, options] = spy.mock.calls.at(-1);
+          expect(options.tools).toEqual(tools);
+          expect(options.add_generation_prompt).toBe(true);
+          spy.mockRestore();
         },
         MAX_TEST_EXECUTION_TIME,
       );

@@ -38,7 +38,7 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
         const { n_fft, hop_length, n_mels } = this.config.melspec_kwargs;
 
         // Truncate to even number of frames for pair-stacking
-        const num_frames = 1 + Math.floor((audio.length - 1) / hop_length);
+        const num_frames = Math.floor(audio.length / hop_length) + 1;
         const max_num_frames = num_frames - (num_frames % 2);
 
         const mel = await spectrogram(audio, this.window, n_fft, hop_length, {

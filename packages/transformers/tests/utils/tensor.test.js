@@ -369,6 +369,11 @@ describe("Tensor operations", () => {
   });
 
   describe("tolist", () => {
+    it("should work with scalar tensors", () => {
+      const t1 = new Tensor("float32", [42], []);
+      const arr = t1.tolist();
+      expect(arr).toBe(42);
+    });
     it("should return nested arrays for a 2D tensor", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
       const arr = t1.tolist();

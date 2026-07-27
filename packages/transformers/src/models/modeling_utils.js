@@ -1,6 +1,6 @@
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
-import { AutoConfig, getCacheShapes } from '../configs.js';
+import { AutoConfig, getCacheNames } from '../configs.js';
 import { Tensor, full_like, cat, zeros_like, ones_like, ones } from '../utils/tensor.js';
 import { DataTypeMap } from '../utils/dtypes.js';
 
@@ -1189,6 +1189,8 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
                 .replace('present_ssm', 'past_ssm') // Mamba
                 .replace('present_conv', 'past_conv') // LFM2
                 .replace('present_recurrent', 'past_recurrent') // Qwen3.5
+                .replace('present_compressor', 'past_compressor') // Deepseek V4
+                .replace('present_indexer', 'past_indexer') // Deepseek V4
 
                 // Standard cache architecture
                 .replace('present', 'past_key_values');
@@ -1234,6 +1236,21 @@ export function getAttentions(model_output) {
 }
 
 /**
+ * Resolve symbolic dims from ONNX inputMetadata for empty-cache initialization.
+ * Each symbolic dim name is looked up in `symbols`; numeric dims pass through.
+ * Any unresolved symbolic dim defaults to 0.
+ * @param {ReadonlyArray<number|string>} metadataShape
+ * @param {Record<string, number>} symbols
+ * @returns {number[]}
+ */
+export function resolveCacheShape(metadataShape, symbols) {
+    return metadataShape.map((d) => {
+        if (typeof d === 'number') return d;
+        return symbols[d] ?? 0;
+    });
+}
+
+/**
  * Adds past key values to the decoder feeds object. If pastKeyValues is null,
  * creates a new DynamicCache with zero-filled tensors for each cache entry.
  *
@@ -1251,16 +1268,23 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
     const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
     const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
 
-    const dtype = session?.config?.kv_cache_dtype ?? 'float32';
-    const cls = dtype === 'float16' ? DataTypeMap.float16 : DataTypeMap.float32;
-    const shapes = getCacheShapes(self.config, { batch_size });
+    const names = getCacheNames(self.config);
+    const num_heads = self.config?.normalized_config?.num_heads;
+    /** @type {Record<string, number>} */
+    const symbols = { batch_size };
+    if (typeof num_heads === 'number') {
+        symbols['batch_size x num_heads'] = batch_size * num_heads;
+    }
     /** @type {Record<string, Tensor>} */
     const entries = Object.create(null);
-    for (const name in shapes) {
-        const size = shapes[name].reduce((a, b) => a * b, 1);
-        const t = new Tensor(dtype, new cls(size), shapes[name]);
-        decoderFeeds[name] = t;
-        entries[name] = t;
+    for (const meta of session.inputMetadata) {
+        if (!names.has(meta.name)) continue;
+        const shape = resolveCacheShape(meta.shape, symbols);
+        const size = shape.reduce((a, b) => a * b, 1);
+        const cls = DataTypeMap[meta.type];
+        const t = new Tensor(meta.type, new cls(size), shape);
+        decoderFeeds[meta.name] = t;
+        entries[meta.name] = t;
     }
     if (pastKeyValues) {
         // Populate the (empty) user-provided cache in-place
@@ -1268,6 +1292,31 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
         return pastKeyValues;
     }
     return new DynamicCache(entries);
+}
+
+/**
+ * Sets `num_logits_to_keep` on `model_inputs` if the decoder session declares it as an input
+ * and it has not already been set.
+ *
+ * `num_logits_to_keep` specifies how many trailing prompt logits the model computes:
+ * - `0n` (or unset) computes logits for the entire sequence — used for prefill/scoring.
+ * - `1n` computes only the last token's logits — used during autoregressive generation,
+ *   since only the last prompt token's logits are needed to sample the next token. For long
+ *   sequences, computing all logits uses a lot of memory, so `1n` significantly reduces the
+ *   memory footprint.
+ * - Any other positive integer keeps the last `num_logits_to_keep` logits.
+ *
+ * @param {PreTrainedModel} self The model instance.
+ * @param {Record<string, any>} model_inputs The model inputs to mutate.
+ * @param {bigint} value The value to set (typically `1n` for generation, `0n` as a fallback).
+ * @private
+ */
+export function setNumLogitsToKeep(self, model_inputs, value) {
+    if (model_inputs.num_logits_to_keep) return;
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep')) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [value], []);
+    }
 }
 
 /**
@@ -1297,14 +1346,8 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         new_model_inputs.position_ids = create_position_ids(new_model_inputs, past_key_values, start_index);
     }
 
-    if (session.inputNames.includes('num_logits_to_keep') && !new_model_inputs.num_logits_to_keep) {
-        // `num_logits_to_keep` specifies the number of prompt logits to calculate during generation.
-        // If unset (or 0), all logits will be calculated. If an integer value, only last `num_logits_to_keep`
-        // logits will be calculated. During generation, the default is 1 because only the logits of the last
-        // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
-        // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
-        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
-    }
+    // Fallback for non-generation forward calls (e.g. prefill scoring): compute all logits.
+    setNumLogitsToKeep(self, new_model_inputs, 0n);
 
     // Unpack the `past_key_values` object into model inputs
     addPastKeyValues(self, new_model_inputs, past_key_values);
@@ -1329,6 +1372,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {DynamicCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
+ * @param {Tensor} [params.num_logits_to_keep=null]
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
@@ -1353,6 +1397,7 @@ export async function generic_text_to_text_forward(
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Additional parameters
         ...kwargs
@@ -1430,6 +1475,7 @@ export async function generic_text_to_text_forward(
             position_ids,
             generation_config,
             logits_processor,
+            num_logits_to_keep,
         },
         true,
     );
@@ -1528,12 +1574,7 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
     const past_length = model_inputs.past_key_values ? model_inputs.past_key_values.get_seq_length() : 0;
 
-    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
-    // avoids computing logits for the entire sequence, significantly reducing memory usage.
-    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
-    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
-        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
-    }
+    setNumLogitsToKeep(self, model_inputs, 1n);
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
@@ -1581,6 +1622,8 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
     if (model_inputs.past_key_values) {
         input_ids = input_ids.map((x) => [x.at(-1)]);
     }
+
+    setNumLogitsToKeep(self, model_inputs, 1n);
 
     return {
         ...model_inputs,

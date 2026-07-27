@@ -33,8 +33,8 @@ importers:
         specifier: 1.24.3
         version: 1.24.3(react-native@0.85.2(@babel/core@7.28.6)(react@19.2.5))(react@19.2.5)
       onnxruntime-web:
-        specifier: 1.26.0-dev.20260410-5e55544225
-        version: 1.26.0-dev.20260410-5e55544225
+        specifier: 1.26.0-dev.20260416-b7804b056c
+        version: 1.26.0-dev.20260416-b7804b056c
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -3119,8 +3119,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  onnxruntime-web@1.26.0-dev.20260410-5e55544225:
-    resolution: {integrity: sha512-hHd9n8DzIfGSAjM4Dvslesc8i6h9HEEcl8qt7X3LfhUxMgls6FBJ32j2xrDtJjKJFEehFeJmyB/pvad1I8KS8w==}
+  onnxruntime-web@1.26.0-dev.20260416-b7804b056c:
+    resolution: {integrity: sha512-MD6Ss4GSpQBo6zqoJzyT9LRbKYs7x/JVN23FT24EcEvlqF4VuzPOeH6X38orZPKHQDbprn7K+SBpu0/mj2CQiw==}
 
   open@7.4.2:
     resolution: {integrity: sha512-MVHddDVweXZF3awtlAS+6pgKLlm/JgxZ90+/NBurBoQctVOOB/zDdVjcyPzQ+0laDGbsWgrRkflI65sQeOgT9Q==}
@@ -7600,7 +7600,7 @@ snapshots:
       react: 19.2.5
       react-native: 0.85.2(@babel/core@7.28.6)(react@19.2.5)
 
-  onnxruntime-web@1.26.0-dev.20260410-5e55544225:
+  onnxruntime-web@1.26.0-dev.20260416-b7804b056c:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
