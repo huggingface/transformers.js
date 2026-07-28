@@ -8,6 +8,7 @@ import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } fro
 import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
 import { memoizePromise } from '../memoize_promise.js';
+import { getModelId } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -51,6 +52,7 @@ async function fetch_file_head(urlOrPath) {
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
 export function get_file_metadata(path_or_repo_id, filename, options = {}) {
+    path_or_repo_id = getModelId(path_or_repo_id);
     const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
     return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
 }

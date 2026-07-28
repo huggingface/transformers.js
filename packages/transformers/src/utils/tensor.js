@@ -9,8 +9,6 @@
 
 import { interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
 
-import { Tensor as ONNXTensor, isONNXTensor } from '../backends/onnx.js';
-
 import { TensorOpRegistry } from '../ops/registry.js';
 
 import { DataTypeMap } from './dtypes.js';
@@ -28,13 +26,10 @@ export class Tensor {
      * @type {number[]}
      */
     get dims() {
-        // @ts-ignore
-        return this.ort_tensor.dims;
+        return this._storage.dims;
     }
     set dims(value) {
-        // FIXME: ONNXTensor declares dims as readonly so one needs to use the constructor() if dims change.
-        // @ts-ignore
-        this.ort_tensor.dims = value;
+        this._storage.dims = value;
     }
 
     /**
@@ -42,7 +37,7 @@ export class Tensor {
      * @type {DataType}
      */
     get type() {
-        return this.ort_tensor.type;
+        return this._storage.type;
     }
 
     /**
@@ -50,7 +45,7 @@ export class Tensor {
      * @type {DataArray}
      */
     get data() {
-        return this.ort_tensor.data;
+        return this._storage.data;
     }
 
     /**
@@ -58,7 +53,7 @@ export class Tensor {
      * @type {number}
      */
     get size() {
-        return this.ort_tensor.size;
+        return this._storage.size;
     }
 
     /**
@@ -66,27 +61,36 @@ export class Tensor {
      * @type {string}
      */
     get location() {
-        return this.ort_tensor.location;
+        return this._storage.location;
     }
 
-    ort_tensor;
+    _storage;
 
     /**
      * Create a new Tensor or copy an existing Tensor.
-     * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
+     * @param {[DataType, DataArray, number[]]} args
      */
     constructor(...args) {
-        if (isONNXTensor(args[0])) {
-            this.ort_tensor = /** @type {ONNXTensor} */ (args[0]);
-        } else {
-            // Create new tensor
-            this.ort_tensor = new ONNXTensor(
-                /** @type {DataType} */ (args[0]),
-                // @ts-expect-error ts(2769) Type 'number' is not assignable to type 'bigint'.
-                /** @type {Exclude<import('./maths.js').AnyTypedArray, Uint8ClampedArray>} */ (args[1]),
-                args[2],
-            );
+        const [type, inputData, dims] = args;
+        let data = inputData;
+        if (Array.isArray(data) && type !== 'string') {
+            const Constructor = /** @type {any} */ (DataTypeMap[type]);
+            if (type === 'int64' || type === 'uint64') {
+                data = Constructor.from(data, (value) => BigInt(value));
+            } else {
+                data = Constructor.from(data);
+            }
         }
+        this._storage = {
+            backend: 'cpu',
+            handle: null,
+            type,
+            data,
+            dims,
+            size: dims.reduce((product, dimension) => product * dimension, 1),
+            location: 'cpu',
+            dispose() {},
+        };
 
         return new Proxy(this, {
             get: (obj, key) => {
@@ -110,8 +114,33 @@ export class Tensor {
     }
 
     dispose() {
-        this.ort_tensor.dispose();
-        // this.ort_tensor = undefined;
+        this._storage.dispose?.();
+    }
+
+    /**
+     * Construct a Tensor around provider-owned storage.
+     * @param {Object} storage
+     * @returns {Tensor}
+     * @internal
+     */
+    static fromBackendStorage(storage) {
+        const tensor = Object.create(Tensor.prototype);
+        tensor._storage = storage;
+        return new Proxy(tensor, {
+            get: (obj, key) => {
+                if (typeof key === 'string') {
+                    const index = Number(key);
+                    if (Number.isInteger(index)) return obj._getitem(index);
+                }
+                return obj[key];
+            },
+            set: (obj, key, value) => (obj[key] = value),
+        });
+    }
+
+    /** @internal */
+    getBackendStorage() {
+        return this._storage;
     }
 
     /**

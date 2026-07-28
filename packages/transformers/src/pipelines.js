@@ -51,6 +51,8 @@ import {
 } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
+import { getModelId, isInferenceBackend, loadInferenceModel } from './backends/inference.js';
+import { getModelJSON } from './utils/hub.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
@@ -89,7 +91,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  *  - `"zero-shot-audio-classification"`: will return a `ZeroShotAudioClassificationPipeline`.
  *  - `"zero-shot-image-classification"`: will return a `ZeroShotImageClassificationPipeline`.
  *  - `"zero-shot-object-detection"`: will return a `ZeroShotObjectDetectionPipeline`.
- * @param {string} [model=null] The name of the pre-trained model to use. If not specified, the default model for the task will be used.
+ * @param {string|import('./backends/inference.js').InferenceBackend} [model=null] The model ID or custom inference backend to use. If not specified, the default model for the task will be used.
  * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Optional parameters for the pipeline.
  * @returns {Promise<AllTasks[T]>} A Pipeline object for the specified task.
  * @throws {Error} If an unsupported pipeline is requested.
@@ -105,10 +107,12 @@ export async function pipeline(
         revision = 'main',
         device = null,
         dtype = null,
-        subfolder = 'onnx',
+        subfolder = null,
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
+        signal = undefined,
+        artifactProvider = undefined,
     } = {},
 ) {
     // Apply aliases
@@ -130,17 +134,22 @@ export async function pipeline(
         }
     }
 
+    const customBackend = isInferenceBackend(model) && typeof model.constructSessions !== 'function';
+    const modelId = getModelId(model);
+
     // Determine which files the model needs
-    const expected_files = await get_pipeline_files(task, model, {
+    const expected_files = await get_pipeline_files(task, modelId, {
         device,
         dtype,
+        config,
+        include_model: !customBackend,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(modelId, file)));
         metadata.forEach((m, i) => {
             if (m.exists) {
                 files_loading[expected_files[i]] = {
@@ -165,6 +174,9 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
+        generation_config: null,
+        signal,
+        artifactProvider,
     };
 
     // Determine which components to load based on the expected files
@@ -174,8 +186,22 @@ export async function pipeline(
     // Resolve the correct model class (needs config when multiple candidates exist)
     const modelClasses = pipelineInfo.model;
     let modelPromise;
-    if (Array.isArray(modelClasses)) {
-        const resolvedConfig = config ?? (await AutoConfig.from_pretrained(model, pretrainedOptions));
+    if (customBackend) {
+        pretrainedOptions.config = config ?? (await AutoConfig.from_pretrained(modelId, pretrainedOptions));
+        if (task === 'text-generation') {
+            pretrainedOptions.generation_config = await getModelJSON(
+                modelId,
+                'generation_config.json',
+                false,
+                pretrainedOptions,
+            );
+        }
+        modelPromise = loadInferenceModel(/** @type {import('./backends/inference.js').InferenceBackend} */ (model), {
+            ...pretrainedOptions,
+            task,
+        });
+    } else if (Array.isArray(modelClasses)) {
+        const resolvedConfig = config ?? (await AutoConfig.from_pretrained(modelId, pretrainedOptions));
         const { model_type } = resolvedConfig;
         const matchedClass = modelClasses.find((cls) => cls.supports(model_type));
         if (!matchedClass) {
@@ -184,15 +210,15 @@ export async function pipeline(
                     `None of the candidate model classes support this type.`,
             );
         }
-        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig });
+        modelPromise = matchedClass.from_pretrained(modelId, { ...pretrainedOptions, config: resolvedConfig });
     } else {
-        modelPromise = modelClasses.from_pretrained(model, pretrainedOptions);
+        modelPromise = modelClasses.from_pretrained(modelId, pretrainedOptions);
     }
 
     // Load all components in parallel
     const [tokenizer, processor, model_loaded] = await Promise.all([
-        hasTokenizer ? AutoTokenizer.from_pretrained(model, pretrainedOptions) : null,
-        hasProcessor ? AutoProcessor.from_pretrained(model, pretrainedOptions) : null,
+        hasTokenizer ? AutoTokenizer.from_pretrained(modelId, pretrainedOptions) : null,
+        hasProcessor ? AutoProcessor.from_pretrained(modelId, pretrainedOptions) : null,
         modelPromise,
     ]);
 
@@ -203,7 +229,7 @@ export async function pipeline(
     dispatchCallback(progress_callback, {
         status: 'ready',
         task: task,
-        model: model,
+        model: modelId,
     });
 
     const pipelineClass = pipelineInfo.pipeline;

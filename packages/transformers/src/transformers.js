@@ -45,6 +45,7 @@ export { PretrainedConfig, AutoConfig } from './configs.js';
 export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
+export { GenerationController, createGenerationController } from './generation/controller.js';
 
 export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';
@@ -58,6 +59,10 @@ export { DynamicCache } from './cache_utils.js';
 // Cache and file management
 export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
+// Inference backends
+export { getModelId, isInferenceBackend } from './backends/inference.js';
+export { OnnxInferenceProvider } from './backends/default.js';
+
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
@@ -68,4 +73,10 @@ export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
+ * @typedef {import('./generation/runtime.js').GenerationCapabilitiesV1} GenerationCapabilitiesV1
+ * @typedef {import('./generation/runtime.js').AutoregressiveSessionV1} AutoregressiveSessionV1
+ * @typedef {import('./generation/runtime.js').LogitsLeaseV1} LogitsLeaseV1
+ * @typedef {import('./backends/artifacts.js').InferenceArtifactProvider} InferenceArtifactProvider
+ * @typedef {import('./backends/artifacts.js').RandomAccessByteSource} RandomAccessByteSource
+ * @typedef {import('./backends/artifacts.js').ArtifactProgressEvent} ArtifactProgressEvent
  */

@@ -12,7 +12,6 @@ export const BUILD_TARGETS = [
       suffix: ".js",
       format: "esm",
       ignoreModules: WEB_IGNORE_MODULES,
-      usePostBuild: true,
     },
   },
   {
@@ -23,7 +22,6 @@ export const BUILD_TARGETS = [
       format: "esm",
       ignoreModules: WEB_IGNORE_MODULES,
       externalModules: WEB_EXTERNAL_MODULES,
-      usePostBuild: false,
     },
   },
   {
@@ -34,7 +32,6 @@ export const BUILD_TARGETS = [
       format: "esm",
       ignoreModules: NODE_IGNORE_MODULES,
       externalModules: NODE_EXTERNAL_MODULES,
-      usePostBuild: false,
     },
   },
   {
@@ -45,7 +42,6 @@ export const BUILD_TARGETS = [
       format: "cjs",
       ignoreModules: NODE_IGNORE_MODULES,
       externalModules: NODE_EXTERNAL_MODULES,
-      usePostBuild: false,
     },
   },
 ];

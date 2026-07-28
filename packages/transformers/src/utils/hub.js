@@ -19,6 +19,7 @@ import {
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
+import { getModelId } from '../backends/inference.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
@@ -39,19 +40,21 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
  * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model).
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
+ * @property {AbortSignal} [signal] Signal used to cancel backend-owned model loading.
+ * @property {import('../backends/artifacts.js').InferenceArtifactProvider} [artifactProvider] Optional random-access artifact provider supplied to custom inference backends.
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
  */
 
 /**
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
- * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
+ * @property {string} [subfolder=null] In case the provider artifacts are located inside a subfolder of the model repo on huggingface.co,
  * you can specify the folder name here.
  * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
- * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
+ * @property {Object} [session_options] Compatibility options passed to providers that use session-based inference.
  */
 
 /**
@@ -130,6 +133,7 @@ export function getFetchHeaders(urlOrPath) {
  * An object containing all the paths and URLs for the resource.
  */
 export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+    path_or_repo_id = getModelId(path_or_repo_id);
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -499,6 +503,7 @@ const INFLIGHT_LOADS = new Map();
  * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
 export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
+    path_or_repo_id = getModelId(path_or_repo_id);
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 

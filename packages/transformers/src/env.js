@@ -205,7 +205,7 @@ export const LogLevel = Object.freeze({
  * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
  * @typedef {Object} TransformersEnvironment
  * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
+ * @property {Record<string, Object & { setLogLevel?: (logLevel: number) => void }>} backends Expose environment variables of different inference providers,
  * allowing users to set these variables if they want to.
  * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
@@ -240,10 +240,7 @@ export const env = {
 
     /////////////////// Backends settings ///////////////////
     // NOTE: These will be populated later by the backends themselves.
-    backends: {
-        // onnxruntime-web/onnxruntime-node
-        onnx: {},
-    },
+    backends: {},
 
     /////////////////// Logging settings ///////////////////
     get logLevel() {
@@ -252,8 +249,9 @@ export const env = {
     set logLevel(level) {
         logLevel = level;
 
-        // invoke hook to set ONNX Runtime log level when Transformers.js log level changes
-        env.backends.onnx?.setLogLevel?.(level);
+        for (const backend of Object.values(env.backends)) {
+            backend.setLogLevel?.(level);
+        }
     },
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,

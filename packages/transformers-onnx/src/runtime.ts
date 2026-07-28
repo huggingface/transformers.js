@@ -16,16 +16,25 @@
  * @module backends/onnx
  */
 
-import { env, apis, LogLevel } from '../env.js';
+import { getOnnxProviderHost } from './host.js';
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
-import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
-import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
-import { logger } from '../utils/logger.js';
+import { loadWasmBinary, loadWasmFactory } from './wasm-cache.js';
 export { Tensor } from 'onnxruntime-common';
+
+const { env, apis, logger } = getOnnxProviderHost();
+const LogLevel = { DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, NONE: 50 };
+
+function isBlobURL(url: string): boolean {
+    return url.startsWith('blob:');
+}
+
+function toAbsoluteURL(url: string): string {
+    return new URL(url, globalThis.location?.href ?? 'file:///').href;
+}
 
 /**
  * @typedef {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig} ONNXExecutionProviders
@@ -228,7 +237,7 @@ async function ensureWasmLoaded() {
     wasmLoadPromise = (async () => {
         // At this point, we know wasmPaths is an object (not a string) because
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
-        const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
+        const urls = /** @type {{ wasm: string, mjs: string }} */ ONNX_ENV.wasm.wasmPaths;
 
         // Load both in parallel; the .mjs blob URL is only kept if wasmBinary succeeded.
         // ORT only sets locateFile when wasmBinary is provided (onnxruntime PR https://github.com/microsoft/onnxruntime/pull/27411), which

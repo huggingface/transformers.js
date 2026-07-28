@@ -33,7 +33,7 @@ import {
 } from '../generation/logits_process.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
 import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
-import { LogitsSampler } from '../generation/logits_sampler.js';
+import { GenerationController } from '../generation/controller.js';
 import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
@@ -41,6 +41,8 @@ import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
+import { getModelId, isInferenceBackend, loadInferenceModel } from '../backends/inference.js';
+import { OnnxInferenceProvider } from '../backends/default.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -252,16 +254,41 @@ export class PreTrainedModel extends Callable {
      * The model class to instantiate is selected based on the `model_type` property of the config object
      * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
-     * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
+     * @param {string|import('../backends/inference.js').InferenceBackend} pretrained_model_name_or_path The model backend, name, or path. A string selects the ONNX backend. It can be:
      * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
      * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
      *
-     * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
+     * @returns {Promise<PreTrainedModel>} A loaded model.
      */
-    static async from_pretrained(
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        if (typeof pretrained_model_name_or_path === 'string') {
+            return OnnxInferenceProvider.from_modelId(pretrained_model_name_or_path).load({
+                ...options,
+                modelClass: this,
+            });
+        }
+        if (typeof pretrained_model_name_or_path?.constructSessions === 'function') {
+            return /** @type {any} */ (pretrained_model_name_or_path.load({ ...options, modelClass: this }));
+        }
+        if (isInferenceBackend(pretrained_model_name_or_path)) {
+            const modelId = getModelId(pretrained_model_name_or_path);
+            const resolvedOptions = { ...options };
+            resolvedOptions.config =
+                resolvedOptions.config ?? (await AutoConfig.from_pretrained(modelId, resolvedOptions));
+            // Custom models are duck-typed to the same runtime contract as PreTrainedModel.
+            const model = /** @type {any} */ (await loadInferenceModel(pretrained_model_name_or_path, resolvedOptions));
+            if (typeof model.createAutoregressiveSession === 'function' && model.generation_config == null) {
+                model.generation_config = await getModelJSON(modelId, 'generation_config.json', false, resolvedOptions);
+            }
+            return model;
+        }
+        throw new TypeError('Unsupported pretrained model source.');
+    }
+
+    static async _from_pretrained(
         pretrained_model_name_or_path,
         {
             progress_callback = null,
@@ -270,11 +297,14 @@ export class PreTrainedModel extends Callable {
             local_files_only = false,
             revision = 'main',
             model_file_name = null,
-            subfolder = 'onnx',
+            subfolder = null,
             device = null,
             dtype = null,
             use_external_data_format = null,
             session_options = {},
+            signal = undefined,
+            artifactProvider = undefined,
+            inferenceProvider = undefined,
         } = {},
     ) {
         const options = {
@@ -289,6 +319,9 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            signal,
+            artifactProvider,
+            inferenceProvider,
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -347,9 +380,7 @@ export class PreTrainedModel extends Callable {
         }
 
         const sessions = typeConfig.sessions(config, options, textOnly);
-        const promises = [
-            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
-        ];
+        const promises = [constructSessions(sessions, options, typeConfig.cache_sessions)];
         if (typeConfig.optional_configs) {
             promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
         }
@@ -926,113 +957,53 @@ export class PreTrainedModel extends Callable {
         //     eos_token_ids = [eos_token_ids];
         // }
 
-        const numInputs = model_inputs[model_input_name].dims.at(0);
-
-        // TODO:
-        // done is a list of booleans to keep track of which inputs are done
-        // const done = new Array(numInputs).fill(false);
-        // For efficiency purposes, we remove completed rows from model_inputs
-        // when the beam is complete, and we keep track of the row index
-        // const rowIndexToBatchIndex = new Map();
-
-        const sampler = LogitsSampler.getSampler(generation_config);
-
-        // TODO make > numInputs
-        const scores = new Array(numInputs).fill(0);
-        /** @type {bigint[][]} */
-        const all_input_ids = input_ids.tolist();
-        if (streamer) {
-            streamer.put(all_input_ids);
-        }
-        // const all_generated_input_ids = Array.from({ length: numInputs }, () => []);
-
-        // NOTE: For now, we don't support spawning new beams
-        // TODO: when we do, we simply copy past key values and accumulate into single large tensor
-
-        ////////////////////////////////////////////////////
-        // Generic search which handles 4 generation modes:
-        // - GenerationMode.GREEDY_SEARCH
-        // - GenerationMode.SAMPLE
-        // - GenerationMode.BEAM_SEARCH
-        // - GenerationMode.BEAM_SAMPLE
-        ////////////////////////////////////////////////////
-        let outputs;
         let attentions = {};
         let return_dict_items = {};
-        while (true) {
-            // prepare model inputs
-            model_inputs = this.prepare_inputs_for_generation(all_input_ids, model_inputs, generation_config);
-            outputs = await this.forward(model_inputs);
-
-            if (generation_config.return_dict_in_generate) {
+        const controller = new GenerationController({
+            inputIds: input_ids,
+            generationConfig: generation_config,
+            logitsProcessor: prepared_logits_processor,
+            stoppingCriteria: prepared_stopping_criteria,
+            streamer,
+            collectOutputs: (stepOutputs) => {
+                if (!generation_config.return_dict_in_generate) return;
                 if (generation_config.output_attentions) {
-                    // Get attentions if they are present
-                    const token_attentions = getAttentions(outputs);
+                    const token_attentions = getAttentions(stepOutputs);
                     for (const key in token_attentions) {
-                        if (!(key in attentions)) {
-                            attentions[key] = [];
-                        }
-                        attentions[key].push(token_attentions[key]);
+                        (attentions[key] ??= []).push(token_attentions[key]);
                     }
                 } else if (this._return_dict_in_generate_keys) {
-                    Object.assign(return_dict_items, pick(outputs, this._return_dict_in_generate_keys));
+                    Object.assign(return_dict_items, pick(stepOutputs, this._return_dict_in_generate_keys));
                 }
+            },
+        });
+
+        if (controller.allDone) return controller.finalize();
+
+        let outputs;
+        try {
+            while (!controller.allDone) {
+                // prepare model inputs
+                model_inputs = this.prepare_inputs_for_generation(
+                    controller.sequences,
+                    model_inputs,
+                    generation_config,
+                );
+                outputs = await this.forward(model_inputs);
+                const step = await controller.step({ logits: outputs.logits, outputs });
+                if (step.allDone) break;
+
+                model_inputs = this._update_model_kwargs_for_generation({
+                    generated_input_ids: step.generatedInputIds,
+                    outputs,
+                    model_inputs,
+                    is_encoder_decoder,
+                });
             }
-
-            // Logits are of the form [batch_size, out_seq_length, vocab_size]
-            // In most cases, this will be [batch_size, 1, vocab_size]
-            // So, we select the last token's logits:
-            // (equivalent to `logits = outputs.logits[:, -1, :]`)
-            // The `.to('float32')` is necessary for models with float16 logits,
-            // and is a no-op for float32 logits.
-            // TODO: Support float16 sampling in the sampler directly
-            const logits = outputs.logits.slice(null, -1, null).to('float32');
-
-            const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
-
-            /** @type {[bigint][]} */
-            const generated_input_ids = [];
-            // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
-            // Loop over each batch
-            for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
-                const logs = next_tokens_scores[batch_idx];
-
-                const sampledTokens = await sampler(logs);
-                for (const [newTokenId, logProb] of sampledTokens) {
-                    const bigint = BigInt(newTokenId);
-                    // TODO: If branching, use previous beam as a starting point
-                    // update generated ids, model inputs, and length for next step
-                    scores[batch_idx] += logProb;
-                    all_input_ids[batch_idx].push(bigint);
-                    generated_input_ids.push([bigint]);
-
-                    // TODO: Support beam search
-                    break;
-                }
-            }
-            if (streamer) {
-                streamer.put(generated_input_ids);
-            }
-
-            const stop = prepared_stopping_criteria(all_input_ids);
-            if (stop.every((x) => x)) {
-                break;
-            }
-
-            model_inputs = this._update_model_kwargs_for_generation({
-                generated_input_ids,
-                outputs,
-                model_inputs,
-                is_encoder_decoder,
-            });
+        } catch (error) {
+            controller.abort(error);
+            throw error;
         }
-
-        if (streamer) {
-            streamer.end();
-        }
-
-        // TODO: ensure all_input_ids is padded correctly...
-        const sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
 
         // Update past key values from the final forward pass
         const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
@@ -1052,17 +1023,16 @@ export class PreTrainedModel extends Callable {
         }
 
         if (generation_config.return_dict_in_generate) {
-            return {
-                sequences,
+            return controller.finalize({
                 past_key_values,
                 ...attentions,
                 ...return_dict_items,
                 // TODO:
                 // scores,
                 // logits,
-            };
+            });
         }
-        return sequences;
+        return controller.finalize();
     }
 
     /**

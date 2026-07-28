@@ -1,11 +1,9 @@
-import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
-import { selectDevice } from '../devices.js';
-import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
 import { getSessionsConfig } from '../../models/session_config.js';
 import { AutoConfig } from '../../configs.js';
 import { makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
+import { OnnxInferenceProvider } from '../../backends/default.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -63,53 +61,14 @@ export async function get_model_files(
 ) {
     config = await get_config(modelId, { config });
 
-    const files = [
-        // Add config.json (always loaded)
-        'config.json',
-    ];
-    const custom_config = config['transformers.js_config'] ?? {};
-
-    const use_external_data_format = custom_config.use_external_data_format;
-    const subfolder = 'onnx'; // Always 'onnx' as per the default in from_pretrained
-
-    const rawDevice = overrideDevice ?? custom_config.device;
-    let dtype = overrideDtype ?? custom_config.dtype;
-
     // Infer model type from config
     const modelType = resolve_model_type(config);
-
-    const add_model_file = (fileName, baseName = null) => {
-        baseName = baseName ?? fileName;
-        const selectedDevice = selectDevice(rawDevice, fileName);
-        const selectedDtype = selectDtype(dtype, fileName, selectedDevice);
-
-        const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype] ?? '';
-        const fullName = `${baseName}${suffix}.onnx`;
-        const fullPath = subfolder ? `${subfolder}/${fullName}` : fullName;
-        files.push(fullPath);
-
-        // Check for external data files
-        const num_chunks = resolveExternalDataFormat(use_external_data_format, fullName, fileName);
-        for (const dataFileName of getExternalDataChunkNames(fullName, num_chunks)) {
-            const dataFilePath = subfolder ? `${subfolder}/${dataFileName}` : dataFileName;
-            files.push(dataFilePath);
-        }
-    };
-
-    // Get session configuration from the shared source of truth
     const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
-
-    // Add model files based on sessions
-    for (const [sessionKey, baseName] of Object.entries(sessions)) {
-        add_model_file(sessionKey, baseName);
-    }
-
-    // Add optional config files
-    if (optional_configs) {
-        for (const configFile of Object.values(optional_configs)) {
-            files.push(configFile);
-        }
-    }
-
-    return files;
+    return OnnxInferenceProvider.listModelArtifacts({
+        sessions,
+        optionalConfigs: optional_configs,
+        config,
+        dtype: overrideDtype,
+        device: overrideDevice,
+    });
 }
