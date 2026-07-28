@@ -3,7 +3,7 @@ import { AutoConfig } from '../../configs.js';
 import { makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { OnnxInferenceProvider } from '../../backends/default.js';
+import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -53,18 +53,32 @@ export function get_config(
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
  * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix).
+ * @param {string|null} [options.cache_dir=null] Custom cache directory.
+ * @param {boolean} [options.local_files_only=false] Never hit the network if true.
+ * @param {string} [options.revision='main'] Model revision.
+ * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(
     modelId,
-    { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
+    {
+        config = null,
+        dtype: overrideDtype = null,
+        device: overrideDevice = null,
+        model_file_name = null,
+        cache_dir = null,
+        local_files_only = false,
+        revision = 'main',
+        inferenceProvider = null,
+    } = {},
 ) {
-    config = await get_config(modelId, { config });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
 
     // Infer model type from config
     const modelType = resolve_model_type(config);
     const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
-    return OnnxInferenceProvider.listModelArtifacts({
+    const provider = await getModelRegistryInferenceProvider(inferenceProvider);
+    return provider.listModelArtifacts({
         sessions,
         optionalConfigs: optional_configs,
         config,

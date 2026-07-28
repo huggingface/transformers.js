@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 
-import { getModelId, isInferenceBackend, loadInferenceModel, normalizeInferenceModel } from "../src/backends/inference.js";
-import { OnnxInferenceProvider } from "../src/backends/default.js";
+import { getModelId, isInferenceBackend, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
+import { OnnxInferenceProvider } from "@huggingface/transformers-onnx";
 import { AutoModel } from "../src/models/auto/modeling_auto.js";
 import { PreTrainedModel } from "../src/models/modeling_utils.js";
 import { buildResourcePaths } from "../src/utils/hub.js";
@@ -52,6 +52,33 @@ describe("inference backends", () => {
 
     expect(load).toHaveBeenCalledWith({ config, dtype: "q4f16", modelId: "test/model" });
     expect(model.config).toBe(config);
+  });
+
+  it("rejects malformed artifact providers before backend loading", async () => {
+    const backend = { modelId: "test/model", load: jest.fn() };
+
+    await expect(loadInferenceModel(backend, { artifactProvider: { readJson() {} } })).rejects.toThrow("must implement `readJson()` and `openByteSource()`");
+    expect(backend.load).not.toHaveBeenCalled();
+  });
+
+  it("uses declared task and loaded execution capabilities for setup validation", async () => {
+    const backend = {
+      modelId: "test/model",
+      capabilities: { devices: ["webgpu"], dtypes: ["auto"], tasks: ["text-generation"] },
+      load() {},
+    };
+    expect(() => validateInferenceBackendTask(backend, "feature-extraction")).toThrow('does not support the "feature-extraction" task');
+    expect(() => validateInferenceBackendTask(backend, "text-generation")).not.toThrow();
+    expect(() =>
+      validateInferenceModelTask(
+        {
+          capabilities: { forward: { version: 1 } },
+          async forward() {},
+          async dispose() {},
+        },
+        "text-generation",
+      ),
+    ).toThrow("does not support causal text generation");
   });
 
   it("normalizes absent custom device and dtype options", async () => {

@@ -1,4 +1,5 @@
 import { createInferenceSession, runInferenceSession, isONNXProxy, Tensor as OrtTensor } from './runtime.js';
+import type { Tensor as OrtTensorType } from 'onnxruntime-common';
 import { getOnnxProviderHost } from './host.js';
 
 /**
@@ -15,7 +16,7 @@ import { getOnnxProviderHost } from './host.js';
 const wrap = async (session_bytes: number[], session_options: any, names: string | string[]) => {
     const session = await createInferenceSession(new Uint8Array(session_bytes), session_options, {});
 
-    return /** @type {any} */ async (inputs: Record<string, any>) => {
+    return async (inputs: Record<string, any>) => {
         const proxied = isONNXProxy();
         const ortFeed = Object.fromEntries(
             Object.entries(inputs).map(([key, value]) => {
@@ -26,7 +27,7 @@ const wrap = async (session_bytes: number[], session_options: any, names: string
                     storage?.backend === 'onnx' ? storage.handle : new OrtTensor(input.type, input.data, input.dims),
                 ];
             }),
-        );
+        ) as Record<string, OrtTensorType>;
         const outputs = await runInferenceSession(session, ortFeed);
         if (Array.isArray(names)) {
             return names.map((name) => wrapTensor(outputs[name]));

@@ -141,6 +141,21 @@ describe("Generation parameters", () => {
     );
 
     it(
+      "max_new_tokens=0 with return_dict_in_generate",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          max_new_tokens: 0,
+          return_dict_in_generate: true,
+        });
+        expect(outputs.sequences.tolist()).toEqual(inputs.input_ids.tolist());
+        expect(outputs.past_key_values).toBeInstanceOf(DynamicCache);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "min_length",
       async () => {
         const MIN_LENGTH = 4;

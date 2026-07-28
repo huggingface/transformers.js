@@ -18,22 +18,72 @@
  * @module backends/inference
  */
 
-import { installGenerationRuntime } from '../generation/runtime.js';
+import { getCausalGenerationCapabilities, installGenerationRuntime } from '../generation/runtime.js';
+import { validateInferenceArtifactProvider } from './artifacts.js';
+
+/**
+ * @typedef {Object} ForwardCapabilitiesV1
+ * @property {1} version
+ */
+
+/**
+ * Execution capabilities of a loaded inference model. Capability families without a versioned
+ * Transformers.js integration remain opaque until their task-specific session contract is defined.
+ *
+ * @typedef {Object} InferenceModelCapabilities
+ * @property {ForwardCapabilitiesV1} [forward]
+ * @property {import('../generation/runtime.js').CausalGenerationCapabilitiesV1} [causalGeneration]
+ * @property {Readonly<Record<string, unknown>>} [encoderDecoderGeneration]
+ * @property {Readonly<Record<string, unknown>>} [diffusion]
+ * @property {Readonly<Record<string, unknown>>} [audioGeneration]
+ */
+
+/**
+ * Advisory capabilities available before a curated backend is loaded.
+ * `load()` remains authoritative for device and dtype validation.
+ *
+ * @typedef {Object} StaticBackendCapabilities
+ * @property {ReadonlyArray<string>} devices
+ * @property {ReadonlyArray<string>} dtypes
+ * @property {ReadonlyArray<string>} tasks
+ */
+
+/**
+ * @typedef {import('../utils/hub.js').PretrainedModelOptions & {
+ *   modelId: string,
+ *   task?: string,
+ *   config?: import('../configs.js').PretrainedConfig,
+ *   modelClass?: Function,
+ *   generation_config?: Record<string, unknown>,
+ * }} InferenceBackendLoadOptions
+ */
+
+/**
+ * @typedef {import('../utils/hub.js').PretrainedModelOptions & {
+ *   task?: string,
+ *   config?: import('../configs.js').PretrainedConfig,
+ *   modelClass?: Function,
+ *   generation_config?: Record<string, unknown>,
+ * }} InferenceModelLoadOptions
+ */
 
 /**
  * @typedef {Object} InferenceModel
  * @property {(inputs: Record<string, import('../utils/tensor.js').Tensor>) => Promise<Record<string, import('../utils/tensor.js').Tensor>>} [forward]
- * @property {(options: Object) => Promise<import('../utils/tensor.js').Tensor|Object>} [generate]
- * @property {import('../generation/runtime.js').GenerationCapabilitiesV1} [generationCapabilities]
- * @property {(options: Object) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession]
- * @property {Object} [config]
+ * @property {(options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor|Record<string, unknown>>} [generate]
+ * @property {InferenceModelCapabilities} [capabilities]
+ * @property {import('../generation/runtime.js').GenerationCapabilitiesV1} [generationCapabilities] Deprecated flat causal-generation capabilities.
+ * @property {(options: import('../generation/runtime.js').AutoregressiveSessionOptionsV1) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession]
+ * @property {import('../configs.js').PretrainedConfig} [config]
  * @property {() => Promise<unknown>|unknown} dispose
  */
 
 /**
  * @typedef {Object} InferenceBackend
  * @property {string} modelId Model ID or local path used for shared config, tokenizer, and processor assets.
- * @property {(options: any) => Promise<InferenceModel|Function>} load
+ * @property {string} [providerType] Provider family identifier used for provider-specific host initialization.
+ * @property {StaticBackendCapabilities} [capabilities]
+ * @property {(options: InferenceBackendLoadOptions) => Promise<InferenceModel|Function>} load
  * @property {(names: Record<string, string>, options: Object, cacheSessions?: Object) => Promise<Record<string, Object>>} [constructSessions]
  */
 
@@ -67,6 +117,40 @@ export function getModelId(model) {
 }
 
 /**
+ * Reject a task excluded by authoritative static backend metadata.
+ *
+ * @param {InferenceBackend} backend
+ * @param {string} task
+ */
+export function validateInferenceBackendTask(backend, task) {
+    const tasks = backend.capabilities?.tasks;
+    if (!tasks) return;
+    const canonicalTask = task.split('_', 1)[0];
+    if (!tasks.includes(task) && !tasks.includes(canonicalTask)) {
+        throw new Error(`Inference backend "${backend.modelId}" does not support the "${task}" task.`);
+    }
+}
+
+/**
+ * Validate the loaded execution capability required by an integrated task.
+ *
+ * @param {InferenceModel|Function} model
+ * @param {string} task
+ */
+export function validateInferenceModelTask(model, task) {
+    const implementation = /** @type {any} */ (model);
+    if (!implementation.capabilities) return;
+    if (task === 'text-generation') {
+        if (
+            !getCausalGenerationCapabilities(implementation) ||
+            typeof implementation.createAutoregressiveSession !== 'function'
+        ) {
+            throw new Error('The loaded inference model does not support causal text generation.');
+        }
+    }
+}
+
+/**
  * Make a plain model with `forward()` callable, matching the model contract used by pipelines.
  *
  * @param {InferenceModel|Function} model
@@ -79,6 +163,14 @@ export function normalizeInferenceModel(model) {
     }
     if (typeof implementation.dispose !== 'function') {
         throw new TypeError('Inference backend models must implement `dispose()`.');
+    }
+    if (
+        implementation.capabilities?.causalGeneration &&
+        typeof implementation.createAutoregressiveSession !== 'function'
+    ) {
+        throw new TypeError(
+            'Models declaring `capabilities.causalGeneration` must implement `createAutoregressiveSession(options)`.',
+        );
     }
     if (typeof model === 'function') return model;
     if (
@@ -115,13 +207,14 @@ export function normalizeInferenceModel(model) {
  * Load and normalize a custom inference model.
  *
  * @param {InferenceBackend} backend
- * @param {Object} options
+ * @param {InferenceModelLoadOptions} options
  * @returns {Promise<InferenceModel|Function>}
  */
 export async function loadInferenceModel(backend, options) {
     const loadOptions = { ...options, modelId: backend.modelId };
     if (loadOptions.device === null) loadOptions.device = undefined;
     if (loadOptions.dtype === null) loadOptions.dtype = undefined;
+    validateInferenceArtifactProvider(loadOptions.artifactProvider);
     const model = /** @type {any} */ (
         installGenerationRuntime(normalizeInferenceModel(await backend.load(loadOptions)))
     );

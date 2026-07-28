@@ -15,6 +15,8 @@ import { DataTypeMap } from './dtypes.js';
 
 import { random } from './random.js';
 
+const NOOP_DISPOSE = () => {};
+
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
@@ -81,15 +83,19 @@ export class Tensor {
                 data = Constructor.from(data);
             }
         }
+        const size = dims.reduce((product, dimension) => product * dimension, 1);
+        if (data.length !== size) {
+            throw new RangeError(`Tensor data length (${data.length}) does not match shape [${dims}] (${size}).`);
+        }
         this._storage = {
             backend: 'cpu',
             handle: null,
             type,
             data,
             dims,
-            size: dims.reduce((product, dimension) => product * dimension, 1),
+            size,
             location: 'cpu',
-            dispose() {},
+            dispose: NOOP_DISPOSE,
         };
 
         return new Proxy(this, {

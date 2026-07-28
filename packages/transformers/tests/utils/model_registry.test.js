@@ -55,6 +55,21 @@ describe("get_available_dtypes", () => {
     mockGetFileMetadata.mockReset();
   });
 
+  it("uses an explicitly supplied inference provider", async () => {
+    const inferenceProvider = {
+      getAvailableDtypes: jest.fn(async () => ["native"]),
+      listModelArtifacts() {
+        return [];
+      },
+      filterModelArtifacts(files) {
+        return files;
+      },
+    };
+
+    await expect(get_available_dtypes("test/model", { config: ENCODER_ONLY_CONFIG, inferenceProvider })).resolves.toEqual(["native"]);
+    expect(inferenceProvider.getAvailableDtypes).toHaveBeenCalledWith(expect.objectContaining({ modelId: "test/model" }));
+  });
+
   it("should detect fp32 and q4 for an encoder-only model", async () => {
     setupExistingFiles(
       "onnx/model.onnx", // fp32

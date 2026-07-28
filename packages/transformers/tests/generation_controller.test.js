@@ -77,6 +77,29 @@ describe("GenerationController", () => {
     expect(streamer.put).toHaveBeenCalledWith([[1n, 2n]]);
     expect(streamer.end).toHaveBeenCalledTimes(1);
   });
+
+  it("processes classifier-free guidance before validating the output batch", async () => {
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { max_new_tokens: 1, guidance_scale: 3 });
+    const logits = new Tensor(
+      "float32",
+      [
+        0,
+        5,
+        0,
+        0, // conditional
+        0,
+        0,
+        1,
+        0, // unconditional
+      ],
+      [2, 4],
+    );
+
+    const step = await controller.step(logits);
+
+    expect(step.nextTokenIds.tolist()).toEqual([[1n]]);
+    expect(step.allDone).toBe(true);
+  });
 });
 
 describe("custom autoregressive sessions", () => {
@@ -134,8 +157,6 @@ describe("custom autoregressive sessions", () => {
       version: 1,
       batchSize: 1,
       maxSequenceLength: 3,
-      prefill: jest.fn(),
-      decode: jest.fn(),
       async *generateWithPlan(_inputs, plan) {
         try {
           expect(plan.sampler).toEqual({ op: "argmax" });
@@ -153,14 +174,16 @@ describe("custom autoregressive sessions", () => {
       modelId: "test/fast-controller-model",
       load: jest.fn(async () => ({
         generation_config: {},
-        generationCapabilities: {
-          sessionVersion: 1,
-          maxBatchSize: 1,
-          cpuModes: ["greedy"],
-          planModes: ["greedy"],
-          cpuLogits: false,
-          declarativePlans: ["argmax"],
-          tokenPipeline: { defaultDepth: 4, maxDepth: 4 },
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: [],
+            planModes: ["greedy"],
+            cpuLogits: false,
+            declarativePlans: ["argmax"],
+            tokenPipeline: { defaultDepth: 4, maxDepth: 4 },
+          },
         },
         createAutoregressiveSession: jest.fn(async () => session),
         async forward(inputs) {
@@ -176,10 +199,92 @@ describe("custom autoregressive sessions", () => {
     const output = await model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 2 });
 
     expect(output.tolist()).toEqual([[1n, 2n, 3n]]);
-    expect(session.prefill).not.toHaveBeenCalled();
-    expect(session.decode).not.toHaveBeenCalled();
     expect(iteratorClosed).toHaveBeenCalledTimes(1);
     expect(session.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a plan session that omits generateWithPlan", async () => {
+    const session = {
+      version: 1,
+      batchSize: 1,
+      maxSequenceLength: 2,
+      dispose: jest.fn(async () => {}),
+    };
+    const backend = {
+      modelId: "test/malformed-plan-model",
+      load: jest.fn(async () => ({
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: [],
+            planModes: ["greedy"],
+            cpuLogits: false,
+            declarativePlans: ["argmax"],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+          },
+        },
+        createAutoregressiveSession: jest.fn(async () => session),
+        async dispose() {},
+      })),
+    };
+    const model = await AutoModel.from_pretrained(backend, {
+      config: { model_type: "custom", is_encoder_decoder: false },
+    });
+
+    await expect(model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 1 })).rejects.toThrow("must implement `generateWithPlan()`");
+    expect(session.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("enforces advertised active-session limits", async () => {
+    let releasePlan;
+    const planGate = new Promise((resolve) => {
+      releasePlan = resolve;
+    });
+    let markStarted;
+    const started = new Promise((resolve) => {
+      markStarted = resolve;
+    });
+    const createAutoregressiveSession = jest.fn(async () => ({
+      version: 1,
+      batchSize: 1,
+      maxSequenceLength: 2,
+      async *generateWithPlan() {
+        markStarted();
+        await planGate;
+        yield { tokenIds: new Uint32Array([2]) };
+      },
+      async dispose() {},
+    }));
+    const backend = {
+      modelId: "test/single-session-model",
+      load: jest.fn(async () => ({
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: [],
+            planModes: ["greedy"],
+            cpuLogits: false,
+            declarativePlans: ["argmax"],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+            sessionConcurrency: { maxActiveSessions: 1, concurrentOperationsPerSession: 1 },
+          },
+        },
+        createAutoregressiveSession,
+        async dispose() {},
+      })),
+    };
+    const model = await AutoModel.from_pretrained(backend, {
+      config: { model_type: "custom", is_encoder_decoder: false, eos_token_id: 2 },
+    });
+    const first = model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 1 });
+    await started;
+
+    await expect(model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 1 })).rejects.toThrow("at most 1 active autoregressive session");
+    releasePlan();
+    await expect(first).resolves.toEqual(expect.any(Tensor));
+    expect(createAutoregressiveSession).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unsupported batches before creating a runtime session", async () => {
@@ -210,5 +315,69 @@ describe("custom autoregressive sessions", () => {
 
     await expect(model.generate({ input_ids: int64Tensor([[1], [2]]), max_new_tokens: 1 })).rejects.toThrow("supports batch size 1");
     expect(createAutoregressiveSession).not.toHaveBeenCalled();
+  });
+
+  it("reports when a request is unsupported by the CPU mode", async () => {
+    const createAutoregressiveSession = jest.fn();
+    const backend = {
+      modelId: "test/plan-only-score-model",
+      load: jest.fn(async () => ({
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: [],
+            planModes: ["greedy"],
+            cpuLogits: true,
+            declarativePlans: ["argmax"],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+          },
+        },
+        createAutoregressiveSession,
+        async dispose() {},
+      })),
+    };
+    const model = await AutoModel.from_pretrained(backend, {
+      config: { model_type: "custom", is_encoder_decoder: false },
+    });
+
+    await expect(model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 1, output_scores: true })).rejects.toThrow("does not support greedy generation through its CPU logits path");
+    expect(createAutoregressiveSession).not.toHaveBeenCalled();
+  });
+
+  it("releases malformed logits leases", async () => {
+    const release = jest.fn();
+    const session = {
+      version: 1,
+      batchSize: 1,
+      maxSequenceLength: 2,
+      prefill: jest.fn(async () => ({ version: 0, release })),
+      decode: jest.fn(),
+      dispose: jest.fn(async () => {}),
+    };
+    const backend = {
+      modelId: "test/malformed-lease-model",
+      load: jest.fn(async () => ({
+        generation_config: {},
+        generationCapabilities: {
+          sessionVersion: 1,
+          maxBatchSize: 1,
+          cpuModes: ["greedy"],
+          planModes: [],
+          cpuLogits: true,
+          declarativePlans: [],
+          tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+        },
+        createAutoregressiveSession: jest.fn(async () => session),
+        async dispose() {},
+      })),
+    };
+    const model = await AutoModel.from_pretrained(backend, {
+      config: { model_type: "custom", is_encoder_decoder: false },
+    });
+
+    await expect(model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 1 })).rejects.toThrow("unsupported logits lease");
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(session.dispose).toHaveBeenCalledTimes(1);
   });
 });

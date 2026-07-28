@@ -181,28 +181,30 @@ export class ModelRegistry {
      * Get tokenizer files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {Object} [options] - Hub metadata options
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
      * @example
      * const files = await ModelRegistry.get_tokenizer_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['tokenizer.json', 'tokenizer_config.json']
      */
-    static async get_tokenizer_files(modelId) {
-        return get_tokenizer_files(modelId);
+    static async get_tokenizer_files(modelId, options = {}) {
+        return get_tokenizer_files(modelId, options);
     }
 
     /**
      * Get processor files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {Object} [options] - Hub metadata options
      * @returns {Promise<string[]>} Array of processor file paths
      *
      * @example
      * const files = await ModelRegistry.get_processor_files('onnx-community/vit-base-patch16-224-ONNX');
      * console.log(files); // ['preprocessor_config.json']
      */
-    static async get_processor_files(modelId) {
-        return get_processor_files(modelId);
+    static async get_processor_files(modelId, options = {}) {
+        return get_processor_files(modelId, options);
     }
 
     /**

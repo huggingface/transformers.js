@@ -2,16 +2,12 @@ import { getSessionsConfig } from '../../models/session_config.js';
 import { get_file_metadata } from './get_file_metadata.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { OnnxInferenceProvider } from '../../backends/default.js';
+import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
  */
 
-/**
- * The dtypes to probe for availability (excludes 'auto' which is not a concrete dtype).
- * @type {string[]}
- */
 /**
  * Detects which quantization levels (dtypes) are available for a model
  * by checking which ONNX files exist on the hub or locally.
@@ -27,18 +23,27 @@ import { OnnxInferenceProvider } from '../../backends/default.js';
  * @param {string} [options.revision='main'] Model revision
  * @param {string} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Only check local files
+ * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider
  * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8'])
  */
 export async function get_available_dtypes(
     modelId,
-    { config = null, model_file_name = null, revision = 'main', cache_dir = null, local_files_only = false } = {},
+    {
+        config = null,
+        model_file_name = null,
+        revision = 'main',
+        cache_dir = null,
+        local_files_only = false,
+        inferenceProvider = null,
+    } = {},
 ) {
     config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
 
     const modelType = resolve_model_type(config);
     const { sessions } = getSessionsConfig(modelType, config, { model_file_name });
     const metadataOptions = { revision, cache_dir, local_files_only };
-    return OnnxInferenceProvider.getAvailableDtypes({
+    const provider = await getModelRegistryInferenceProvider(inferenceProvider);
+    return provider.getAvailableDtypes({
         modelId,
         sessions,
         getFileMetadata: get_file_metadata,

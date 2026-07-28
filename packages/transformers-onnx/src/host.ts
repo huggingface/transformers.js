@@ -9,37 +9,74 @@ export interface BackendTensorStorage {
     dispose(): void;
 }
 
-export interface OnnxProviderHost {
-    readonly env: any;
-    readonly apis: any;
-    readonly logger: any;
-    getModelFile(modelId: string, file: string, fatal: boolean, options: any, returnPath?: boolean): Promise<any>;
-    getCacheNames(config: any, options: any): Set<string>;
-    createBackendTensor(storage: BackendTensorStorage): any;
-    getBackendTensorStorage(tensor: any): BackendTensorStorage | null;
-    getCache?(): Promise<any>;
+export interface OnnxProviderEnvironment {
+    backends: Record<string, unknown>;
+    logLevel?: number;
+    useWasmCache?: boolean;
+    fetch: typeof globalThis.fetch;
 }
 
-let configuredHost: OnnxProviderHost | null = null;
+export interface OnnxProviderApis {
+    readonly IS_NODE_ENV: boolean;
+    readonly IS_WEB_ENV: boolean;
+    readonly IS_WEBGPU_AVAILABLE: boolean;
+    readonly IS_WEBNN_AVAILABLE: boolean;
+    readonly IS_DENO_WEB_RUNTIME: boolean;
+    readonly IS_SAFARI_BELOW_26: boolean;
+    readonly IS_SERVICE_WORKER_ENV: boolean;
+    readonly IS_CHROME_AVAILABLE: boolean;
+}
 
-const fallbackEnvironment: any = {
+export interface OnnxProviderLogger {
+    info(...data: unknown[]): void;
+    warn(...data: unknown[]): void;
+    error(...data: unknown[]): void;
+}
+
+export interface OnnxProviderCache {
+    match(request: string): Promise<Response | string | { arrayBuffer(): Promise<ArrayBuffer> } | undefined>;
+    put(request: string, response: Response): Promise<void>;
+}
+
+export interface OnnxProviderHost {
+    readonly env: OnnxProviderEnvironment;
+    readonly apis: OnnxProviderApis;
+    readonly logger: OnnxProviderLogger;
+    getModelFile(
+        modelId: string,
+        file: string,
+        fatal: boolean,
+        options: Record<string, unknown>,
+        returnPath?: boolean,
+    ): Promise<string | Uint8Array>;
+    getCacheNames(config: unknown, options: unknown): Set<string>;
+    createBackendTensor(storage: BackendTensorStorage): unknown;
+    getBackendTensorStorage(tensor: unknown): BackendTensorStorage | null;
+    getCache?(): Promise<OnnxProviderCache | null>;
+    readonly maxExternalDataChunks: number;
+}
+
+const ONNX_HOST_SYMBOL = Symbol.for('transformers.js.onnxProviderHost');
+let configuredHost: OnnxProviderHost | null =
+    ((globalThis as any)[ONNX_HOST_SYMBOL] as OnnxProviderHost | undefined) ?? null;
+
+const fallbackEnvironment: OnnxProviderEnvironment = {
     backends: { onnx: {} },
     logLevel: 30,
     useWasmCache: typeof caches !== 'undefined',
-    fetch: (...args: any[]) => (globalThis.fetch as any)(...args),
+    fetch: (...args) => globalThis.fetch(...args),
 };
 
 const environment = new Proxy(fallbackEnvironment, {
     get(target, property) {
-        return (configuredHost?.env ?? target)[property];
+        return Reflect.get(configuredHost?.env ?? target, property);
     },
     set(target, property, value) {
-        (configuredHost?.env ?? target)[property] = value;
-        return true;
+        return Reflect.set(configuredHost?.env ?? target, property, value);
     },
 });
 
-const apis = {
+const fallbackApis = {
     IS_NODE_ENV: typeof process !== 'undefined' && process?.release?.name === 'node',
     IS_WEB_ENV: typeof window !== 'undefined' || typeof self !== 'undefined',
     IS_WEBGPU_AVAILABLE: typeof navigator !== 'undefined' && !!navigator.gpu,
@@ -51,9 +88,15 @@ const apis = {
     IS_CHROME_AVAILABLE: 'chrome' in globalThis,
 };
 
+const apis = new Proxy(fallbackApis, {
+    get(target, property) {
+        return Reflect.get(configuredHost?.apis ?? target, property);
+    },
+});
+
 const logger = new Proxy(console, {
     get(target, property) {
-        return (configuredHost?.logger ?? target)[property];
+        return Reflect.get(configuredHost?.logger ?? target, property);
     },
 });
 
@@ -73,10 +116,14 @@ const fallbackHost: OnnxProviderHost = {
     getBackendTensorStorage() {
         return null;
     },
+    maxExternalDataChunks: 100,
 };
 
 export function configureOnnxProviderHost(host: OnnxProviderHost): void {
-    if (fallbackEnvironment.backends.onnx) {
+    // Direct package imports initialize ORT against the fallback environment, so migrate those
+    // settings when a host arrives later. A symbol-registered host was already configured before
+    // module evaluation and contains the authoritative ORT environment.
+    if (configuredHost === null && fallbackEnvironment.backends.onnx) {
         host.env.backends.onnx = fallbackEnvironment.backends.onnx;
     }
     configuredHost = host;

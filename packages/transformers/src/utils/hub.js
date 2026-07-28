@@ -65,9 +65,11 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {AbortSignal} [signal] Signal used to cancel an HTTP request.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
+export async function getFile(urlOrPath, signal = undefined) {
+    throwIfAborted(signal);
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL
@@ -79,6 +81,7 @@ export async function getFile(urlOrPath) {
     } else {
         return env.fetch(urlOrPath, {
             headers: getFetchHeaders(urlOrPath),
+            signal,
         });
     }
 }
@@ -261,6 +264,7 @@ export async function loadResourceFile(
     return_path = false,
     cache = null,
 ) {
+    throwIfAborted(options.signal);
     const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
         filename,
@@ -279,6 +283,7 @@ export async function loadResourceFile(
 
     // Check cache
     response = await checkCachedResource(cache, localPath, proposedCacheKey);
+    throwIfAborted(options.signal);
 
     const cacheHit = response !== undefined;
     if (cacheHit) {
@@ -292,7 +297,7 @@ export async function loadResourceFile(
             const isURL = isValidUrl(requestURL, ['http:', 'https:']);
             if (!isURL) {
                 try {
-                    response = await getFile(localPath);
+                    response = await getFile(localPath, options.signal);
                     cacheKey = localPath; // Update the cache key to be the local path
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
@@ -335,7 +340,7 @@ export async function loadResourceFile(
             }
 
             // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            response = await getFile(remoteURL, options.signal);
 
             if (response.status !== 200) {
                 return handleError(response.status, remoteURL, fatal);
@@ -425,6 +430,7 @@ export async function loadResourceFile(
                 );
             }
         }
+        throwIfAborted(options.signal);
         result = buffer;
     }
 
@@ -482,6 +488,12 @@ export async function loadResourceFile(
     }
 
     throw new Error('Unable to get model file path or buffer.');
+}
+
+function throwIfAborted(signal) {
+    if (!signal?.aborted) return;
+    if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
+    throw signal.reason ?? new Error('Model loading aborted.');
 }
 
 /** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */

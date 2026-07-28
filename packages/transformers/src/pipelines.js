@@ -51,7 +51,14 @@ import {
 } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
-import { getModelId, isInferenceBackend, loadInferenceModel } from './backends/inference.js';
+import {
+    getModelId,
+    isInferenceBackend,
+    loadInferenceModel,
+    validateInferenceBackendTask,
+    validateInferenceModelTask,
+} from './backends/inference.js';
+import { validateInferenceArtifactProvider } from './backends/artifacts.js';
 import { getModelJSON } from './utils/hub.js';
 
 /**
@@ -136,12 +143,20 @@ export async function pipeline(
 
     const customBackend = isInferenceBackend(model) && typeof model.constructSessions !== 'function';
     const modelId = getModelId(model);
+    validateInferenceArtifactProvider(artifactProvider);
+    if (customBackend) {
+        validateInferenceBackendTask(/** @type {import('./backends/inference.js').InferenceBackend} */ (model), task);
+    }
 
     // Determine which files the model needs
     const expected_files = await get_pipeline_files(task, modelId, {
         device,
         dtype,
         config,
+        cache_dir,
+        local_files_only,
+        revision,
+        model_file_name,
         include_model: !customBackend,
     });
 
@@ -149,7 +164,11 @@ export async function pipeline(
     let files_loading = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(modelId, file)));
+        const metadata = await Promise.all(
+            expected_files.map(async (file) =>
+                get_file_metadata(modelId, file, { cache_dir, local_files_only, revision }),
+            ),
+        );
         metadata.forEach((m, i) => {
             if (m.exists) {
                 files_loading[expected_files[i]] = {
@@ -215,12 +234,27 @@ export async function pipeline(
         modelPromise = modelClasses.from_pretrained(modelId, pretrainedOptions);
     }
 
-    // Load all components in parallel
-    const [tokenizer, processor, model_loaded] = await Promise.all([
-        hasTokenizer ? AutoTokenizer.from_pretrained(modelId, pretrainedOptions) : null,
-        hasProcessor ? AutoProcessor.from_pretrained(modelId, pretrainedOptions) : null,
-        modelPromise,
-    ]);
+    let tokenizer;
+    let processor;
+    let model_loaded;
+    try {
+        // Load all components in parallel.
+        [tokenizer, processor, model_loaded] = await Promise.all([
+            hasTokenizer ? AutoTokenizer.from_pretrained(modelId, pretrainedOptions) : null,
+            hasProcessor ? AutoProcessor.from_pretrained(modelId, pretrainedOptions) : null,
+            modelPromise,
+        ]);
+        if (customBackend) {
+            validateInferenceModelTask(model_loaded, task);
+        }
+    } catch (error) {
+        // A parallel tokenizer/processor failure may race with a successful GPU model load.
+        const loadedModel = model_loaded ?? (await modelPromise.catch(() => null));
+        try {
+            await loadedModel?.dispose?.();
+        } catch {}
+        throw error;
+    }
 
     const results = { task, model: model_loaded };
     if (tokenizer) results.tokenizer = tokenizer;

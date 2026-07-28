@@ -3,7 +3,7 @@ import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
 import { getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
-import { OnnxInferenceProvider } from '../../backends/default.js';
+import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
 
 /**
  * Get all files needed for a specific pipeline task.
@@ -17,6 +17,10 @@ import { OnnxInferenceProvider } from '../../backends/default.js';
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
  * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+ * @param {string|null} [options.cache_dir=null] - Custom cache directory
+ * @param {boolean} [options.local_files_only=false] - Never hit the network if true
+ * @param {string} [options.revision='main'] - Model revision
+ * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] - Artifact metadata provider
  * @param {boolean} [options.include_model=true] - Whether to include built-in ONNX model files
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported
@@ -49,13 +53,14 @@ export async function get_pipeline_files(task, modelId, options = {}) {
 
     // When loading multimodal models via the text-generation pipeline,
     // only load the sessions needed for text generation (embed_tokens, decoder_model_merged)
-    if (task === 'text-generation') {
+    if (task === 'text-generation' && options.include_model !== false) {
         const config = await get_config(modelId, options);
         const modelType = resolve_model_type(config);
         const textOnlySessions = getTextOnlySessions(modelType);
 
         if (textOnlySessions) {
-            return OnnxInferenceProvider.filterModelArtifacts(files, textOnlySessions);
+            const provider = await getModelRegistryInferenceProvider(options.inferenceProvider ?? null);
+            return provider.filterModelArtifacts(files, textOnlySessions);
         }
     }
 

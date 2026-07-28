@@ -91,10 +91,6 @@ async function isWebGpuFp16Supported(): Promise<boolean> {
  * ONNX Runtime adapter used for string model IDs.
  */
 export class OnnxInferenceProvider {
-    /**
-     * @param {string} modelId
-     * @param {typeof import('../../models/modeling_utils.js').PreTrainedModel} [modelClass]
-     */
     static from_modelId(modelId: string): OnnxInferenceProvider {
         return new OnnxInferenceProvider(modelId);
     }
@@ -163,12 +159,9 @@ export class OnnxInferenceProvider {
         this.modelClass = modelClass;
     }
 
-    /**
-     * Load a Transformers.js model class with this backend.
-     *
-     * @param {import('../../utils/hub.js').PretrainedModelOptions} options
-     */
+    /** Load a Transformers.js model class with this backend. */
     async load(options: any) {
+        throwIfAborted(options.signal);
         const modelClass = options.modelClass ?? this.modelClass;
         if (!modelClass) {
             throw new Error('OnnxInferenceProvider requires a Transformers.js model class before it can load a model.');
@@ -183,14 +176,11 @@ export class OnnxInferenceProvider {
         cache_config = false,
         session_name: string | undefined = undefined,
     ) {
+        throwIfAborted(options.signal);
         let custom_config = options.config?.['transformers.js_config'] ?? {};
-        const selectedDevice = /** @type {import('../../utils/devices.js').DeviceType} */ selectDevice(
-            options.device ?? custom_config.device,
-            fileName,
-            {
-                warn: (msg) => logger.info(msg),
-            },
-        );
+        const selectedDevice = selectDevice(options.device ?? custom_config.device, fileName, {
+            warn: (msg: string) => logger.info(msg),
+        });
         const executionProviders = deviceToExecutionProviders(selectedDevice);
 
         const device_config = custom_config.device_config ?? {};
@@ -200,7 +190,7 @@ export class OnnxInferenceProvider {
 
         const selectedDtype = selectDtype(options.dtype ?? custom_config.dtype, fileName, selectedDevice, {
             configDtype: custom_config.dtype,
-            warn: (msg) => logger.info(msg),
+            warn: (msg: string) => logger.info(msg),
         });
         if (!Object.hasOwn(DEFAULT_DTYPE_SUFFIX_MAPPING, selectedDtype)) {
             throw new Error(`Invalid dtype: ${selectedDtype}. Should be one of: ${Object.keys(DATA_TYPES).join(', ')}`);
@@ -238,6 +228,7 @@ export class OnnxInferenceProvider {
             use_external_data_format,
             session_options,
         );
+        throwIfAborted(options.signal);
         if (externalData.length > 0 && (!apis.IS_NODE_ENV || externalData.some((data) => typeof data !== 'string'))) {
             session_options.externalData = externalData;
         }
@@ -245,47 +236,61 @@ export class OnnxInferenceProvider {
         if (cache_config && selectedDevice === 'webgpu') {
             const names = getOnnxProviderHost().getCacheNames(options.config, { prefix: 'present', session_name });
             if (names.size > 0 && !isONNXProxy()) {
-                const preferredOutputLocation = {};
+                const preferredOutputLocation: Record<string, string> = {};
                 for (const key of names) preferredOutputLocation[key] = 'gpu-buffer';
                 session_options.preferredOutputLocation = preferredOutputLocation;
             }
         }
 
+        const buffer_or_path = await bufferOrPathPromise;
+        throwIfAborted(options.signal);
         return {
-            buffer_or_path: await bufferOrPathPromise,
+            buffer_or_path,
             session_options,
             session_config: { dtype: selectedDtype, device: selectedDevice },
         };
     }
 
     async constructSessions(names: Record<string, string>, options: any, cache_sessions: any = undefined) {
-        return Object.fromEntries(
-            await Promise.all(
-                Object.keys(names).map(async (name) => {
-                    const sessionInfo = await this.getSession(
-                        names[name],
-                        options,
-                        cache_sessions?.[name] ?? false,
-                        name,
-                    );
-                    const ortSession = await createInferenceSession(
-                        sessionInfo.buffer_or_path,
-                        sessionInfo.session_options,
-                        sessionInfo.session_config,
-                    );
-                    const session = {
-                        inputNames: ortSession.inputNames,
-                        outputNames: ortSession.outputNames,
-                        inputMetadata: ortSession.inputMetadata,
-                        outputMetadata: ortSession.outputMetadata,
-                        config: (ortSession as any).config,
-                        run: (inputs: any) => this.run(ortSession, inputs),
-                        release: () => ortSession.release(),
-                    };
-                    return [name, session];
-                }),
-            ),
-        );
+        const tasks = Object.keys(names).map(async (name) => {
+            const sessionInfo = await this.getSession(names[name], options, cache_sessions?.[name] ?? false, name);
+            const ortSession = await createInferenceSession(
+                sessionInfo.buffer_or_path,
+                sessionInfo.session_options,
+                sessionInfo.session_config,
+            );
+            try {
+                throwIfAborted(options.signal);
+            } catch (error) {
+                await ortSession.release();
+                throw error;
+            }
+            return [
+                name,
+                {
+                    inputNames: ortSession.inputNames,
+                    outputNames: ortSession.outputNames,
+                    inputMetadata: ortSession.inputMetadata,
+                    outputMetadata: ortSession.outputMetadata,
+                    config: (ortSession as any).config,
+                    run: (inputs: any) => this.run(ortSession, inputs),
+                    release: () => ortSession.release(),
+                },
+            ] as const;
+        });
+        const results = await Promise.allSettled(tasks);
+        const sessions = results
+            .filter(
+                (result): result is PromiseFulfilledResult<Awaited<(typeof tasks)[number]>> =>
+                    result.status === 'fulfilled',
+            )
+            .map((result) => result.value);
+        const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+        if (failure) {
+            await Promise.allSettled(sessions.map(([, session]) => session.release()));
+            throw failure.reason;
+        }
+        return Object.fromEntries(sessions);
     }
 
     async run(session: any, inputs: Record<string, any>) {
@@ -335,10 +340,10 @@ function replaceTensors(value: any): any {
                     return tensor.type;
                 },
                 get dims() {
-                    return tensor.dims;
+                    return tensor.dims as number[];
                 },
                 set dims(value) {
-                    tensor.dims = value;
+                    (tensor as unknown as { dims: number[] }).dims = value;
                 },
                 get data() {
                     return tensor.data;
@@ -403,6 +408,12 @@ function externalDataChunkNames(fullName: string, count: number): string[] {
     return Array.from({ length: count }, (_, index) => `${fullName}_data${index === 0 ? '' : `_${index}`}`);
 }
 
+function throwIfAborted(signal: AbortSignal | undefined): void {
+    if (!signal?.aborted) return;
+    if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
+    throw signal.reason ?? new Error('Model loading aborted.');
+}
+
 async function getModelDataFiles(
     modelId: string,
     fileName: string,
@@ -418,8 +429,12 @@ async function getModelDataFiles(
     } else if (externalConfig) {
         count = +externalConfig;
     }
-    if (count > 1024)
-        throw new Error(`The number of external data chunks (${count}) exceeds the maximum allowed value (1024).`);
+    const maxChunks = getOnnxProviderHost().maxExternalDataChunks;
+    if (count > maxChunks) {
+        throw new Error(
+            `The number of external data chunks (${count}) exceeds the maximum allowed value (${maxChunks}).`,
+        );
+    }
 
     if (count > 0) {
         const subfolder = options.subfolder ?? 'onnx';

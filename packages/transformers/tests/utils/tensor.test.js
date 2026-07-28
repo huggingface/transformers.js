@@ -4,6 +4,10 @@ import { init } from "../init.js";
 init();
 
 describe("Tensor operations", () => {
+  it("rejects data that does not match the declared shape", () => {
+    expect(() => new Tensor("float32", [1, 2, 3], [2, 2])).toThrow("does not match shape [2,2] (4)");
+  });
+
   describe("cat", () => {
     it("should concatenate on dim=0", () => {
       const t1 = new Tensor("float32", [1, 2, 3], [1, 3]);

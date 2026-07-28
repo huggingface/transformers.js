@@ -42,7 +42,7 @@ import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
 import { getModelId, isInferenceBackend, loadInferenceModel } from '../backends/inference.js';
-import { OnnxInferenceProvider } from '../backends/default.js';
+import { getDefaultInferenceProvider, getOnnxProviderModule } from '../backends/default.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -265,13 +265,17 @@ export class PreTrainedModel extends Callable {
      */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         if (typeof pretrained_model_name_or_path === 'string') {
-            return OnnxInferenceProvider.from_modelId(pretrained_model_name_or_path).load({
+            const provider = await getDefaultInferenceProvider(pretrained_model_name_or_path);
+            return provider.load({
                 ...options,
                 modelClass: this,
             });
         }
         if (typeof pretrained_model_name_or_path?.constructSessions === 'function') {
-            return /** @type {any} */ (pretrained_model_name_or_path.load({ ...options, modelClass: this }));
+            if (pretrained_model_name_or_path.providerType === 'onnx') {
+                await getOnnxProviderModule();
+            }
+            return /** @type {any} */ (pretrained_model_name_or_path).load({ ...options, modelClass: this });
         }
         if (isInferenceBackend(pretrained_model_name_or_path)) {
             const modelId = getModelId(pretrained_model_name_or_path);
@@ -978,7 +982,11 @@ export class PreTrainedModel extends Callable {
             },
         });
 
-        if (controller.allDone) return controller.finalize();
+        if (controller.allDone) {
+            return generation_config.return_dict_in_generate
+                ? controller.finalize({ past_key_values: kwargs.past_key_values ?? new DynamicCache() })
+                : controller.finalize();
+        }
 
         let outputs;
         try {

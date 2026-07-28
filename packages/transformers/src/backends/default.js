@@ -1,14 +1,13 @@
-import { OnnxInferenceProvider, OnnxTensorOpRegistry, configureOnnxProviderHost } from '@huggingface/transformers-onnx';
-
 import { env, apis } from '../env.js';
 import { logger } from '../utils/logger.js';
-import { getModelFile } from '../utils/hub.js';
+import { getModelFile, MAX_EXTERNAL_DATA_CHUNKS } from '../utils/hub.js';
 import { getCacheNames } from '../configs.js';
 import { Tensor } from '../utils/tensor.js';
 import { TensorOpRegistry } from '../ops/registry.js';
 import { getCache } from '../utils/cache.js';
 
-configureOnnxProviderHost({
+const ONNX_HOST_SYMBOL = Symbol.for('transformers.js.onnxProviderHost');
+const host = {
     env,
     apis,
     logger,
@@ -17,8 +16,24 @@ configureOnnxProviderHost({
     createBackendTensor: (storage) => Tensor.fromBackendStorage(storage),
     getBackendTensorStorage: (tensor) => tensor?.getBackendStorage?.() ?? null,
     getCache,
-});
+    maxExternalDataChunks: MAX_EXTERNAL_DATA_CHUNKS,
+};
 
-TensorOpRegistry.register(OnnxTensorOpRegistry);
+let modulePromise;
 
-export { OnnxInferenceProvider };
+export function getOnnxProviderModule() {
+    if (!modulePromise) {
+        globalThis[ONNX_HOST_SYMBOL] = host;
+        modulePromise = import('@huggingface/transformers-onnx').then((module) => {
+            module.configureOnnxProviderHost(host);
+            TensorOpRegistry.register(module.OnnxTensorOpRegistry);
+            return module;
+        });
+    }
+    return modulePromise;
+}
+
+export async function getDefaultInferenceProvider(modelId) {
+    const { OnnxInferenceProvider } = await getOnnxProviderModule();
+    return OnnxInferenceProvider.from_modelId(modelId);
+}

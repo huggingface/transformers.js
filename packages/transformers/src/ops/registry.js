@@ -36,7 +36,8 @@ export class TensorOpRegistry {
 
 async function getOperation(name) {
     if (!implementation) {
-        await import('../backends/default.js');
+        const { getOnnxProviderModule } = await import('../backends/default.js');
+        await getOnnxProviderModule();
     }
     if (!implementation) {
         throw new Error(`Tensor operation "${name}" requires an installed inference provider.`);

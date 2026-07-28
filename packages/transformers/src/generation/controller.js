@@ -225,11 +225,12 @@ export class GenerationController {
         } else {
             throw new Error(`Generation logits must have rank 2 or 3, received rank ${logitsInput.dims.length}.`);
         }
-        if (logits.dims[0] !== this.batchSize) {
-            throw new Error(`Generation logits batch size ${logits.dims[0]} does not match ${this.batchSize}.`);
-        }
-
         const processed = this.logitsProcessor(this.sequences, logits);
+        if (processed.dims[0] !== this.batchSize) {
+            throw new Error(
+                `Processed generation logits batch size ${processed.dims[0]} does not match ${this.batchSize}.`,
+            );
+        }
         const tokenIds = new Uint32Array(this.batchSize);
         const tokenScores = new Float64Array(this.batchSize);
         for (let batchIndex = 0; batchIndex < this.batchSize; ++batchIndex) {
@@ -282,6 +283,7 @@ export class GenerationController {
         if (!capabilities?.declarativePlans?.includes('argmax')) return null;
         if (!capabilities?.planModes?.includes('greedy')) return null;
         if (this.generationConfig.do_sample || this.generationConfig.num_beams > 1) return null;
+        if (this.generationConfig.output_scores) return null;
         if (this.logitsProcessor.processors.length !== 0) return null;
         return {
             version: 1,

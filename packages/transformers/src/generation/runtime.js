@@ -2,39 +2,120 @@ import { Tensor } from '../utils/tensor.js';
 import { createGenerationController } from './controller.js';
 
 /**
- * @typedef {Object} GenerationCapabilitiesV1
+ * @typedef {Object} SessionConcurrencyCapabilities
+ * @property {number} maxActiveSessions
+ * @property {1} concurrentOperationsPerSession
+ */
+
+/**
+ * @typedef {Object} CausalGenerationCapabilitiesV1
  * @property {1} sessionVersion
  * @property {number} maxBatchSize
- * @property {string[]} cpuModes
- * @property {string[]} planModes
+ * @property {ReadonlyArray<import('./controller.js').GenerationMode>} cpuModes
+ * @property {ReadonlyArray<import('./controller.js').GenerationMode>} planModes
  * @property {boolean} cpuLogits
- * @property {string[]} declarativePlans
- * @property {{defaultDepth: number, maxDepth: number}} tokenPipeline
- * @property {boolean} customJavaScriptStoppingCriteria
- * @property {false} cacheReorder
- * @property {false} cacheExpand
+ * @property {ReadonlyArray<'argmax'>} declarativePlans
+ * @property {{readonly defaultDepth: number, readonly maxDepth: number}} tokenPipeline
+ * @property {boolean} [customJavaScriptStoppingCriteria]
+ * @property {false} [cacheReorder]
+ * @property {false} [cacheExpand]
+ * @property {SessionConcurrencyCapabilities} [sessionConcurrency]
  */
+
+/** @typedef {CausalGenerationCapabilitiesV1} GenerationCapabilitiesV1 */
 
 /**
  * @typedef {Object} LogitsLeaseV1
  * @property {1} version
  * @property {'float32'} dtype
- * @property {[number, number]} shape
+ * @property {readonly [number, number]} shape
  * @property {() => Promise<Float32Array>} read
- * @property {(plan: Object) => Promise<{tokenIds: Uint32Array, processedScores?: Float32Array}>} [select]
+ * @property {(plan: RuntimeGenerationPlanV1) => Promise<RuntimeTokenDecisionV1>} [select]
  * @property {() => void} release
  */
 
 /**
- * @typedef {Object} AutoregressiveSessionV1
+ * @typedef {Object} RuntimeTokenBatchV1
+ * @property {Uint32Array} data
+ * @property {readonly [number, number]} shape
+ */
+
+/**
+ * @typedef {Object} RuntimeAttentionMaskV1
+ * @property {Uint8Array} data
+ * @property {readonly [number, number]} shape
+ */
+
+/**
+ * @typedef {Object} AutoregressivePrefillInputsV1
+ * @property {RuntimeTokenBatchV1} inputIds
+ * @property {RuntimeAttentionMaskV1} [attentionMask]
+ * @property {AbortSignal} [signal]
+ */
+
+/**
+ * @typedef {Object} AutoregressiveDecodeInputsV1
+ * @property {RuntimeTokenBatchV1} tokenIds
+ * @property {AbortSignal} [signal]
+ */
+
+/**
+ * @typedef {Object} RuntimeGenerationPlanV1
+ * @property {1} version
+ * @property {ReadonlyArray<never>} processors
+ * @property {{readonly op: 'argmax'}} sampler
+ * @property {number} maxNewTokens
+ * @property {number} [pipelineDepth]
+ */
+
+/**
+ * @typedef {Object} RuntimeTokenDecisionV1
+ * @property {Uint32Array} tokenIds
+ * @property {Float32Array} [processedScores]
+ * @property {Float64Array} [scores]
+ */
+
+/**
+ * @typedef {Object} AutoregressiveSessionOptionsV1
+ * @property {number} batchSize
+ * @property {number} maxSequenceLength
+ * @property {AbortSignal} [signal]
+ */
+
+/**
+ * @typedef {Object} PlanAutoregressiveSessionV1
  * @property {1} version
  * @property {number} batchSize
  * @property {number} maxSequenceLength
- * @property {(inputs: Object) => Promise<LogitsLeaseV1>} prefill
- * @property {(inputs: Object) => Promise<LogitsLeaseV1>} decode
- * @property {(inputs: Object, plan: Object) => AsyncIterable<{tokenIds: Uint32Array, processedScores?: Float32Array}>} [generateWithPlan]
+ * @property {(inputs: AutoregressivePrefillInputsV1, plan: RuntimeGenerationPlanV1) => AsyncIterable<RuntimeTokenDecisionV1>} generateWithPlan
  * @property {() => Promise<void>} dispose
  */
+
+/**
+ * @typedef {Object} PullAutoregressiveSessionV1
+ * @property {1} version
+ * @property {number} batchSize
+ * @property {number} maxSequenceLength
+ * @property {(inputs: AutoregressivePrefillInputsV1) => Promise<LogitsLeaseV1>} prefill
+ * @property {(inputs: AutoregressiveDecodeInputsV1) => Promise<LogitsLeaseV1>} decode
+ * @property {(inputs: AutoregressivePrefillInputsV1, plan: RuntimeGenerationPlanV1) => AsyncIterable<RuntimeTokenDecisionV1>} [generateWithPlan]
+ * @property {() => Promise<void>} dispose
+ */
+
+/** @typedef {PlanAutoregressiveSessionV1|PullAutoregressiveSessionV1} AutoregressiveSessionV1 */
+
+/** @type {WeakMap<Object, number>} */
+const activeSessionCounts = new WeakMap();
+
+/**
+ * Resolve the causal-generation capability while accepting the original flat V1 field.
+ *
+ * @param {Object|Function} model
+ * @returns {CausalGenerationCapabilitiesV1|undefined}
+ */
+export function getCausalGenerationCapabilities(model) {
+    return model?.capabilities?.causalGeneration ?? model?.generationCapabilities;
+}
 
 /**
  * Install the Transformers.js-owned public generation method on a custom model.
@@ -67,7 +148,7 @@ export async function generateWithAutoregressiveSession(model, options) {
     const controller = createGenerationController(model, input_ids, options);
     if (controller.allDone) return controller.finalize();
 
-    const capabilities = model.generationCapabilities;
+    const capabilities = getCausalGenerationCapabilities(model);
     try {
         validateCapabilities(capabilities, controller, attention_mask);
         throwIfAborted(signal);
@@ -76,10 +157,24 @@ export async function generateWithAutoregressiveSession(model, options) {
         throw error;
     }
     const plan = controller.compileRuntimePlan(capabilities);
+    const mode = controller.generationConfig.do_sample ? 'multinomial' : 'greedy';
     if (!plan && !capabilities.cpuLogits) {
         const error = new Error(
             'This generation request requires CPU-visible logits, but the runtime does not support them.',
         );
+        controller.abort(error);
+        throw error;
+    }
+    if (!plan && !capabilities.cpuModes.includes(mode)) {
+        const error = new Error(`Runtime does not support ${mode} generation through its CPU logits path.`);
+        controller.abort(error);
+        throw error;
+    }
+
+    let releaseSessionSlot;
+    try {
+        releaseSessionSlot = acquireSessionSlot(model, capabilities);
+    } catch (error) {
         controller.abort(error);
         throw error;
     }
@@ -94,15 +189,16 @@ export async function generateWithAutoregressiveSession(model, options) {
             maxSequenceLength: controller.maxSequenceLength,
             signal,
         });
-        validateSession(session, controller);
+        validateSession(session, controller, plan !== null);
 
         const prefillInputs = {
             inputIds: tensorToTokenBatch(input_ids),
             attentionMask: attention_mask ? tensorToAttentionMask(attention_mask) : undefined,
             signal,
         };
-        if (plan && typeof session.generateWithPlan === 'function') {
-            const decisions = session.generateWithPlan(prefillInputs, plan)[Symbol.asyncIterator]();
+        if (plan) {
+            const planSession = /** @type {PlanAutoregressiveSessionV1} */ (session);
+            const decisions = planSession.generateWithPlan(prefillInputs, plan)[Symbol.asyncIterator]();
             try {
                 while (true) {
                     const item = await decisions.next();
@@ -125,26 +221,29 @@ export async function generateWithAutoregressiveSession(model, options) {
             );
         }
 
-        lease = await session.prefill(prefillInputs);
+        const pullSession = /** @type {PullAutoregressiveSessionV1} */ (session);
+        lease = await pullSession.prefill(prefillInputs);
         while (!controller.allDone) {
             throwIfAborted(signal);
             const currentLease = lease;
             lease = null;
-            validateLease(currentLease, controller.batchSize);
-
             let values;
             try {
+                validateLease(currentLease, controller.batchSize);
                 values = await currentLease.read();
             } finally {
-                currentLease.release();
+                currentLease?.release?.();
             }
             if (!(values instanceof Float32Array)) {
                 throw new TypeError('Logits lease `read()` must return a Float32Array.');
             }
+            if (values.length !== currentLease.shape[0] * currentLease.shape[1]) {
+                throw new Error('Logits lease data length does not match its declared shape.');
+            }
 
-            const step = await controller.step(new Tensor('float32', values, currentLease.shape));
+            const step = await controller.step(new Tensor('float32', values, [...currentLease.shape]));
             if (step.allDone) break;
-            lease = await session.decode({
+            lease = await pullSession.decode({
                 tokenIds: tensorToTokenBatch(step.nextTokenIds),
                 signal,
             });
@@ -154,14 +253,39 @@ export async function generateWithAutoregressiveSession(model, options) {
         controller.abort(error);
         throw error;
     } finally {
-        lease?.release();
-        await session?.dispose();
+        try {
+            lease?.release();
+        } finally {
+            try {
+                await session?.dispose();
+            } finally {
+                releaseSessionSlot();
+            }
+        }
     }
 }
 
 function validateCapabilities(capabilities, controller, attentionMask) {
     if (!capabilities || capabilities.sessionVersion !== 1) {
         throw new Error('Custom generation models must declare generation capabilities with `sessionVersion: 1`.');
+    }
+    if (!Number.isInteger(capabilities.maxBatchSize) || capabilities.maxBatchSize < 1) {
+        throw new Error('Runtime must declare a positive integer `maxBatchSize`.');
+    }
+    if (!Array.isArray(capabilities.cpuModes) || !Array.isArray(capabilities.planModes)) {
+        throw new Error('Runtime must declare `cpuModes` and `planModes` arrays.');
+    }
+    if (typeof capabilities.cpuLogits !== 'boolean') {
+        throw new Error('Runtime must declare whether CPU-visible logits are supported.');
+    }
+    if (!capabilities.cpuLogits && capabilities.cpuModes.length > 0) {
+        throw new Error('Runtime cannot declare CPU generation modes when `cpuLogits` is false.');
+    }
+    if (!Array.isArray(capabilities.declarativePlans)) {
+        throw new Error('Runtime must declare a `declarativePlans` array.');
+    }
+    if (capabilities.planModes.includes('greedy') && !capabilities.declarativePlans.includes('argmax')) {
+        throw new Error('Runtime greedy plan mode requires the `argmax` declarative plan.');
     }
     if (controller.batchSize > capabilities.maxBatchSize) {
         throw new Error(
@@ -190,17 +314,26 @@ function validateCapabilities(capabilities, controller, attentionMask) {
     }
     const tokenPipeline = capabilities.tokenPipeline;
     if (
-        tokenPipeline &&
-        (!Number.isInteger(tokenPipeline.defaultDepth) ||
-            !Number.isInteger(tokenPipeline.maxDepth) ||
-            tokenPipeline.defaultDepth < 1 ||
-            tokenPipeline.defaultDepth > tokenPipeline.maxDepth)
+        !tokenPipeline ||
+        !Number.isInteger(tokenPipeline.defaultDepth) ||
+        !Number.isInteger(tokenPipeline.maxDepth) ||
+        tokenPipeline.defaultDepth < 1 ||
+        tokenPipeline.defaultDepth > tokenPipeline.maxDepth
     ) {
         throw new Error('Runtime declared an invalid token pipeline depth.');
     }
+    const concurrency = capabilities.sessionConcurrency;
+    if (
+        concurrency &&
+        (!Number.isInteger(concurrency.maxActiveSessions) ||
+            concurrency.maxActiveSessions < 1 ||
+            concurrency.concurrentOperationsPerSession !== 1)
+    ) {
+        throw new Error('Runtime declared invalid session concurrency capabilities.');
+    }
 }
 
-function validateSession(session, controller) {
+function validateSession(session, controller, usePlan) {
     if (!session || session.version !== 1) throw new Error('Runtime returned an unsupported autoregressive session.');
     if (session.batchSize !== controller.batchSize) {
         throw new Error(`Runtime session batch size ${session.batchSize} does not match ${controller.batchSize}.`);
@@ -211,6 +344,12 @@ function validateSession(session, controller) {
         );
     }
     if (typeof session.dispose !== 'function') throw new Error('Autoregressive sessions must implement `dispose()`.');
+    if (usePlan && typeof session.generateWithPlan !== 'function') {
+        throw new Error('Plan autoregressive sessions must implement `generateWithPlan()`.');
+    }
+    if (!usePlan && (typeof session.prefill !== 'function' || typeof session.decode !== 'function')) {
+        throw new Error('Pull autoregressive sessions must implement `prefill()` and `decode()`.');
+    }
 }
 
 function validateLease(lease, batchSize) {
@@ -258,4 +397,22 @@ function throwIfAborted(signal) {
     if (!signal?.aborted) return;
     if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
     throw signal.reason ?? new Error('Generation aborted.');
+}
+
+function acquireSessionSlot(model, capabilities) {
+    const limit = capabilities.sessionConcurrency?.maxActiveSessions;
+    if (limit === undefined) return () => {};
+    const active = activeSessionCounts.get(model) ?? 0;
+    if (active >= limit) {
+        throw new Error(`Runtime supports at most ${limit} active autoregressive session${limit === 1 ? '' : 's'}.`);
+    }
+    activeSessionCounts.set(model, active + 1);
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        const remaining = (activeSessionCounts.get(model) ?? 1) - 1;
+        if (remaining > 0) activeSessionCounts.set(model, remaining);
+        else activeSessionCounts.delete(model);
+    };
 }

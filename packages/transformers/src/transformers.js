@@ -61,7 +61,6 @@ export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
 // Inference backends
 export { getModelId, isInferenceBackend } from './backends/inference.js';
-export { OnnxInferenceProvider } from './backends/default.js';
 
 // Expose common types used across the library for developers to access
 /**
@@ -73,8 +72,25 @@ export { OnnxInferenceProvider } from './backends/default.js';
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
+ * @typedef {import('./backends/inference.js').InferenceBackend} InferenceBackend
+ * @typedef {import('./backends/inference.js').InferenceBackendLoadOptions} InferenceBackendLoadOptions
+ * @typedef {import('./backends/inference.js').InferenceModel} InferenceModel
+ * @typedef {import('./backends/inference.js').InferenceModelCapabilities} InferenceModelCapabilities
+ * @typedef {import('./backends/inference.js').StaticBackendCapabilities} StaticBackendCapabilities
+ * @typedef {import('./backends/inference.js').ForwardCapabilitiesV1} ForwardCapabilitiesV1
+ * @typedef {import('./generation/runtime.js').CausalGenerationCapabilitiesV1} CausalGenerationCapabilitiesV1
  * @typedef {import('./generation/runtime.js').GenerationCapabilitiesV1} GenerationCapabilitiesV1
  * @typedef {import('./generation/runtime.js').AutoregressiveSessionV1} AutoregressiveSessionV1
+ * @typedef {import('./generation/runtime.js').PlanAutoregressiveSessionV1} PlanAutoregressiveSessionV1
+ * @typedef {import('./generation/runtime.js').PullAutoregressiveSessionV1} PullAutoregressiveSessionV1
+ * @typedef {import('./generation/runtime.js').SessionConcurrencyCapabilities} SessionConcurrencyCapabilities
+ * @typedef {import('./generation/runtime.js').AutoregressiveSessionOptionsV1} AutoregressiveSessionOptionsV1
+ * @typedef {import('./generation/runtime.js').AutoregressivePrefillInputsV1} AutoregressivePrefillInputsV1
+ * @typedef {import('./generation/runtime.js').AutoregressiveDecodeInputsV1} AutoregressiveDecodeInputsV1
+ * @typedef {import('./generation/runtime.js').RuntimeGenerationPlanV1} RuntimeGenerationPlanV1
+ * @typedef {import('./generation/runtime.js').RuntimeTokenDecisionV1} RuntimeTokenDecisionV1
+ * @typedef {import('./generation/runtime.js').RuntimeTokenBatchV1} RuntimeTokenBatchV1
+ * @typedef {import('./generation/runtime.js').RuntimeAttentionMaskV1} RuntimeAttentionMaskV1
  * @typedef {import('./generation/runtime.js').LogitsLeaseV1} LogitsLeaseV1
  * @typedef {import('./backends/artifacts.js').InferenceArtifactProvider} InferenceArtifactProvider
  * @typedef {import('./backends/artifacts.js').RandomAccessByteSource} RandomAccessByteSource
