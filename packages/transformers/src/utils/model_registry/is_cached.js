@@ -26,14 +26,11 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 async function check_files_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
 
-    if (!cache) {
-        const fileStatuses = files.map((filename) => ({ file: filename, cached: false }));
-        // No cache available, all files considered not cached
-        return { allCached: false, files: fileStatuses };
-    }
-
     const fileStatuses = await Promise.all(
         files.map(async (filename) => {
+            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, options);
+            if (backendMetadata) return { file: filename, cached: backendMetadata.fromCache === true };
+            if (!cache) return { file: filename, cached: false };
             const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
             const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
             return { file: filename, cached: !!cached };
@@ -52,6 +49,8 @@ async function check_files_cache(modelId, files, options = {}) {
  * @returns {Promise<boolean>}
  */
 async function is_file_cached(modelId, filename, options = {}) {
+    const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, options);
+    if (backendMetadata) return backendMetadata.fromCache === true;
     const cache = await getCache(options?.cache_dir);
     if (!cache) return false;
     const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);

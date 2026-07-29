@@ -11,6 +11,7 @@ await import("../../src/models/registry.js");
 
 // Dynamic import after mock setup (required for ESM)
 const { get_available_dtypes } = await import("../../src/utils/model_registry/get_available_dtypes.js");
+const { ModelRegistry } = await import("../../src/utils/model_registry/ModelRegistry.js");
 
 // A minimal config that mimics a BERT-like encoder-only model
 const ENCODER_ONLY_CONFIG = {
@@ -194,5 +195,66 @@ describe("get_available_dtypes", () => {
     for (const dtype of dtypes) {
       expect(validDtypes).toContain(dtype);
     }
+  });
+});
+
+describe("custom inference backend artifacts", () => {
+  beforeEach(() => {
+    mockGetFileMetadata.mockReset();
+  });
+
+  it("composes backend-owned and tokenizer files for a pipeline", async () => {
+    setupExistingFiles("tokenizer_config.json");
+    const listModelArtifacts = jest.fn(() => ["config.json", "model.safetensors"]);
+    const backend = {
+      modelId: "test/custom-model",
+      load() {},
+      listModelArtifacts,
+    };
+
+    await expect(
+      ModelRegistry.get_pipeline_files("text-generation", backend, {
+        config: DECODER_ONLY_CONFIG,
+        device: "webgpu",
+        dtype: "auto",
+      }),
+    ).resolves.toEqual(["config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json"]);
+    expect(listModelArtifacts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "test/custom-model",
+        task: "text-generation",
+        device: "webgpu",
+        dtype: "auto",
+      }),
+    );
+  });
+
+  it("uses backend-owned cache metadata and deletion hooks", async () => {
+    const deleteModelArtifact = jest.fn(async () => true);
+    const backend = {
+      modelId: "test/cached-custom-model",
+      load() {},
+      listModelArtifacts: jest.fn(() => ["config.json", "model.bin"]),
+      getModelArtifactMetadata: jest.fn(async (file) => ({ size: 10, fromCache: file === "model.bin" })),
+      deleteModelArtifact,
+    };
+    const options = {
+      config: ENCODER_ONLY_CONFIG,
+      include_tokenizer: false,
+      include_processor: false,
+    };
+
+    await expect(ModelRegistry.is_cached_files(backend, options)).resolves.toEqual({
+      allCached: false,
+      files: [
+        { file: "config.json", cached: false },
+        { file: "model.bin", cached: true },
+      ],
+    });
+    await expect(ModelRegistry.clear_cache(backend, options)).resolves.toMatchObject({
+      filesDeleted: 1,
+      filesCached: 1,
+    });
+    expect(deleteModelArtifact).toHaveBeenCalledWith("model.bin", expect.objectContaining({ inferenceBackend: backend }));
   });
 });

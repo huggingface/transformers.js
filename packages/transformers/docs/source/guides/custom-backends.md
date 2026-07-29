@@ -67,6 +67,8 @@ Transformers.js owns generation policy, stopping, callbacks, streaming, and fina
 - `sessionConcurrency.maxActiveSessions` is enforced fail-fast. Callers that want queueing must serialize generation themselves.
 - Abort signals are forwarded through loading and session creation. Backends must release partially created resources before propagating cancellation.
 
+Protocol V1 does not export runtime KV state. With `return_dict_in_generate: true`, custom sessions return an empty `DynamicCache` for result-shape compatibility and dispose their runtime-owned cache with the session.
+
 ## Artifact providers
 
 An `InferenceArtifactProvider` can supply JSON and random-access byte sources. Byte ranges are half-open (`[begin, end)`), independent reads may complete out of order, and returned arrays must be owned by the caller. `close()` is idempotent, rejects new reads, and waits for existing reads without implicitly aborting them.

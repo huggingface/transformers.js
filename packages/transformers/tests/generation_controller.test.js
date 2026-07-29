@@ -78,6 +78,32 @@ describe("GenerationController", () => {
     expect(streamer.end).toHaveBeenCalledTimes(1);
   });
 
+  it.each([2, 1])("generates one legacy token when max_length is at or below the prompt (%i)", async (max_length) => {
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1, 2]]), { max_length });
+
+    expect(controller.allDone).toBe(false);
+    expect(controller.maxSequenceLength).toBe(3);
+    expect(controller.compileRuntimePlan({ declarativePlans: ["argmax"], planModes: ["greedy"], tokenPipeline: { defaultDepth: 1 } })).toMatchObject({ maxNewTokens: 1 });
+
+    const step = await controller.step(new Tensor("float32", [0, 0, 4], [1, 3]));
+    expect(step.allDone).toBe(true);
+    expect(controller.finalize().tolist()).toEqual([[1n, 2n, 2n]]);
+  });
+
+  it("preserves abort reasons without signaling successful stream completion", async () => {
+    const reason = new Error("generation failed");
+    const streamer = { put: jest.fn(), end: jest.fn(), abort: jest.fn() };
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { max_new_tokens: 1, streamer });
+
+    controller.abort(reason);
+
+    expect(controller.abortReason).toBe(reason);
+    expect(streamer.abort).toHaveBeenCalledWith(reason);
+    expect(streamer.end).not.toHaveBeenCalled();
+    await expect(controller.step(new Tensor("float32", [0, 1], [1, 2]))).rejects.toBe(reason);
+    expect(() => controller.finalize()).toThrow(reason);
+  });
+
   it("processes classifier-free guidance before validating the output batch", async () => {
     const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { max_new_tokens: 1, guidance_scale: 3 });
     const logits = new Tensor(
@@ -139,7 +165,7 @@ describe("custom autoregressive sessions", () => {
     });
 
     const output = await model.generate({
-      input_ids: int64Tensor([[1]]),
+      inputs: int64Tensor([[1]]),
       attention_mask: int64Tensor([[1]]),
       max_new_tokens: 2,
     });
@@ -196,9 +222,10 @@ describe("custom autoregressive sessions", () => {
       config: { model_type: "custom", is_encoder_decoder: false, eos_token_id: 3 },
     });
 
-    const output = await model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 2 });
+    const output = await model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 2, return_dict_in_generate: true });
 
-    expect(output.tolist()).toEqual([[1n, 2n, 3n]]);
+    expect(output.sequences.tolist()).toEqual([[1n, 2n, 3n]]);
+    expect(output.past_key_values).toBeDefined();
     expect(iteratorClosed).toHaveBeenCalledTimes(1);
     expect(session.dispose).toHaveBeenCalledTimes(1);
   });
@@ -314,6 +341,20 @@ describe("custom autoregressive sessions", () => {
     });
 
     await expect(model.generate({ input_ids: int64Tensor([[1], [2]]), max_new_tokens: 1 })).rejects.toThrow("supports batch size 1");
+    expect(createAutoregressiveSession).not.toHaveBeenCalled();
+  });
+
+  it("validates zero-token requests without creating a runtime session", async () => {
+    const createAutoregressiveSession = jest.fn();
+    const backend = {
+      modelId: "test/zero-token-model",
+      load: jest.fn(async () => ({ createAutoregressiveSession, async dispose() {} })),
+    };
+    const model = await AutoModel.from_pretrained(backend, {
+      config: { model_type: "custom", is_encoder_decoder: false },
+    });
+
+    await expect(model.generate({ input_ids: int64Tensor([[1]]), max_new_tokens: 0 })).rejects.toThrow("must declare generation capabilities");
     expect(createAutoregressiveSession).not.toHaveBeenCalled();
   });
 

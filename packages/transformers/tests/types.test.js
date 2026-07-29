@@ -75,6 +75,7 @@ describe("TypeScript compilation succeeds", () => {
       import type {
         CausalGenerationCapabilitiesV1,
         InferenceBackend,
+        InferenceBackendChatTemplate,
         InferenceModel,
         LogitsLeaseV1,
         PlanAutoregressiveSessionV1,
@@ -117,6 +118,7 @@ describe("TypeScript compilation succeeds", () => {
 
       const backend: InferenceBackend = {
         modelId: "test/model",
+        chatTemplate: { modelId: "test/templates", file: "chat.jinja" },
         capabilities: staticCapabilities,
         async load(_options) {
           const model: InferenceModel = {
@@ -130,6 +132,8 @@ describe("TypeScript compilation succeeds", () => {
 
       void backend;
       void lease;
+      const inlineTemplate = { content: "{{ messages }}" } as const satisfies InferenceBackendChatTemplate;
+      void inlineTemplate;
     `);
     if (diagnostics.length > 0) {
       throw new Error(formatDiagnostics(diagnostics));

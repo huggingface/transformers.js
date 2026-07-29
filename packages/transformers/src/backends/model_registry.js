@@ -4,9 +4,9 @@ import { getOnnxProviderModule } from './default.js';
  * Provider operations used by model-file discovery.
  *
  * @typedef {Object} ModelRegistryInferenceProvider
- * @property {(options: Object) => string[]} listModelArtifacts
- * @property {(options: Object) => Promise<string[]>} getAvailableDtypes
- * @property {(files: string[], sessions: Record<string, string>) => string[]} filterModelArtifacts
+ * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} listModelArtifacts
+ * @property {(options: Object) => Promise<string[]>} [getAvailableDtypes]
+ * @property {(files: string[], sessions: Record<string, string>) => string[]} [filterModelArtifacts]
  */
 
 /**
@@ -16,7 +16,9 @@ import { getOnnxProviderModule } from './default.js';
  * @returns {Promise<ModelRegistryInferenceProvider>}
  */
 export async function getModelRegistryInferenceProvider(provider = null) {
-    if (provider) return provider;
+    if (typeof provider?.listModelArtifacts === 'function') return provider;
+    const providerClass = /** @type {any} */ (provider?.constructor);
+    if (typeof providerClass?.listModelArtifacts === 'function') return providerClass;
     const { OnnxInferenceProvider } = await getOnnxProviderModule();
     return OnnxInferenceProvider;
 }

@@ -145,11 +145,22 @@ export function createStoppingCriteriaList(generationConfig, modelConfig, userCr
 }
 
 /**
+ * Resolve a `max_new_tokens` limit before constructing processors and stopping criteria.
+ *
+ * @param {GenerationConfig} generationConfig
+ * @param {number} inputLength
+ */
+export function prepareGenerationLength(generationConfig, inputLength) {
+    if (generationConfig.max_new_tokens !== null) {
+        generationConfig.max_length = inputLength + generationConfig.max_new_tokens;
+    }
+    return generationConfig;
+}
+
+/**
  * Stateful, inference-runtime-neutral generation policy.
  */
 export class GenerationController {
-    version = 1;
-
     /**
      * @param {Object} options
      * @param {Tensor} options.inputIds
@@ -180,18 +191,13 @@ export class GenerationController {
         this.inputLength = inputIds.dims[1];
         /** @type {bigint[][]} */
         this.sequences = inputIds.tolist();
-        this.scores = new Array(this.batchSize).fill(0);
         this.done = new Array(this.batchSize).fill(false);
         this.terminal = false;
         this.finalized = false;
         this.aborted = false;
+        this.abortReason = undefined;
 
-        if (generationConfig.max_new_tokens !== null) {
-            generationConfig.max_length = this.inputLength + generationConfig.max_new_tokens;
-        }
-        this.terminal =
-            generationConfig.max_new_tokens === 0 ||
-            (generationConfig.max_length !== null && this.inputLength >= generationConfig.max_length);
+        this.terminal = generationConfig.max_new_tokens === 0;
         if (this.terminal) this.done.fill(true);
         this.sampler = LogitsSampler.getSampler(generationConfig);
         if (streamer) streamer.put(this.sequences.map((tokens) => [...tokens]));
@@ -202,7 +208,8 @@ export class GenerationController {
     }
 
     get maxSequenceLength() {
-        return this.generationConfig.max_length;
+        if (this.generationConfig.max_new_tokens === 0) return this.inputLength;
+        return Math.max(this.generationConfig.max_length ?? 0, this.inputLength + 1);
     }
 
     /**
@@ -232,20 +239,18 @@ export class GenerationController {
             );
         }
         const tokenIds = new Uint32Array(this.batchSize);
-        const tokenScores = new Float64Array(this.batchSize);
         for (let batchIndex = 0; batchIndex < this.batchSize; ++batchIndex) {
             const sampled = await this.sampler(processed[batchIndex]);
-            const [tokenId, score] = sampled[0];
+            const [tokenId] = sampled[0];
             tokenIds[batchIndex] = Number(tokenId);
-            tokenScores[batchIndex] = score;
         }
-        return this.commit({ tokenIds, scores: tokenScores });
+        return this.commit({ tokenIds });
     }
 
     /**
      * Commit tokens selected by an approved runtime generation plan.
      *
-     * @param {{tokenIds: Uint32Array, processedScores?: Float32Array, scores?: Float64Array}} decision
+     * @param {{tokenIds: Uint32Array, processedScores?: Float32Array}} decision
      */
     commit(decision) {
         this.#assertActive();
@@ -257,7 +262,6 @@ export class GenerationController {
         for (let index = 0; index < this.batchSize; ++index) {
             const tokenId = BigInt(decision.tokenIds[index]);
             this.sequences[index].push(tokenId);
-            this.scores[index] += decision.scores?.[index] ?? 0;
             generatedInputIds.push([tokenId]);
         }
         if (this.streamer) this.streamer.put(generatedInputIds);
@@ -268,7 +272,6 @@ export class GenerationController {
         return {
             nextTokenIds,
             generatedInputIds,
-            done: [...this.done],
             allDone: this.terminal,
         };
     }
@@ -298,7 +301,7 @@ export class GenerationController {
      * @param {Object} [extra]
      */
     finalize(extra = {}) {
-        if (this.aborted) throw new Error('Cannot finalize an aborted generation controller.');
+        if (this.aborted) throw this.abortReason;
         if (this.finalized) throw new Error('Generation controller has already been finalized.');
         if (!this.terminal) throw new Error('Cannot finalize generation before all sequences are done.');
         this.finalized = true;
@@ -309,15 +312,16 @@ export class GenerationController {
         return this.generationConfig.return_dict_in_generate ? { sequences, ...extra } : sequences;
     }
 
-    abort(_reason = undefined) {
+    abort(reason = undefined) {
         if (this.finalized || this.aborted) return;
         this.aborted = true;
         this.terminal = true;
-        if (this.streamer) this.streamer.end();
+        this.abortReason = reason ?? new Error('Generation controller has been aborted.');
+        this.streamer?.abort?.(this.abortReason);
     }
 
     #assertActive() {
-        if (this.aborted) throw new Error('Generation controller has been aborted.');
+        if (this.aborted) throw this.abortReason;
         if (this.finalized) throw new Error('Generation controller has already been finalized.');
         if (this.terminal) throw new Error('Generation controller is already complete.');
     }
@@ -345,9 +349,7 @@ export function createGenerationController(model, inputIds, options, collectOutp
         generationConfig: generation_config,
         kwargs,
     });
-    if (generationConfig.max_new_tokens !== null) {
-        generationConfig.max_length = inputIds.dims.at(-1) + generationConfig.max_new_tokens;
-    }
+    prepareGenerationLength(generationConfig, inputIds.dims.at(-1));
     return new GenerationController({
         inputIds,
         generationConfig,

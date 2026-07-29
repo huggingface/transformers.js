@@ -55,6 +55,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  *   config?: import('../configs.js').PretrainedConfig,
  *   modelClass?: Function,
  *   generation_config?: Record<string, unknown>,
+ *   artifactMetadata?: Record<string, {size?: number, fromCache?: boolean}>,
  * }} InferenceBackendLoadOptions
  */
 
@@ -64,6 +65,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  *   config?: import('../configs.js').PretrainedConfig,
  *   modelClass?: Function,
  *   generation_config?: Record<string, unknown>,
+ *   artifactMetadata?: Record<string, {size?: number, fromCache?: boolean}>,
  * }} InferenceModelLoadOptions
  */
 
@@ -79,10 +81,24 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  */
 
 /**
+ * A backend-provided default chat template. File sources default to the backend model ID and
+ * `chat_template.jinja`; inline content is never fetched or cached.
+ *
+ * @typedef {
+ *   | {content: string, modelId?: never, file?: never}
+ *   | {content?: never, modelId?: string, file?: string}
+ * } InferenceBackendChatTemplate
+ */
+
+/**
  * @typedef {Object} InferenceBackend
  * @property {string} modelId Model ID or local path used for shared config, tokenizer, and processor assets.
+ * @property {InferenceBackendChatTemplate} [chatTemplate] Default chat template installed on a pipeline tokenizer.
  * @property {string} [providerType] Provider family identifier used for provider-specific host initialization.
  * @property {StaticBackendCapabilities} [capabilities]
+ * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
+ * @property {(file: string, options: Object) => Promise<{size?: number, fromCache?: boolean}|null>} [getModelArtifactMetadata] Returns backend-owned cache metadata for an artifact.
+ * @property {(file: string, options: Object) => Promise<boolean>} [deleteModelArtifact] Deletes an artifact from backend-owned cache storage.
  * @property {(options: InferenceBackendLoadOptions) => Promise<InferenceModel|Function>} load
  * @property {(names: Record<string, string>, options: Object, cacheSessions?: Object) => Promise<Record<string, Object>>} [constructSessions]
  */

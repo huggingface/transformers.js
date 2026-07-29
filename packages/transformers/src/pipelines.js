@@ -59,7 +59,8 @@ import {
     validateInferenceModelTask,
 } from './backends/inference.js';
 import { validateInferenceArtifactProvider } from './backends/artifacts.js';
-import { getModelJSON } from './utils/hub.js';
+import { getModelJSON, getModelText } from './utils/hub.js';
+import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
@@ -69,6 +70,36 @@ import { getModelJSON } from './utils/hub.js';
  * @typedef {{[K in AliasType]: InstanceType<typeof SUPPORTED_TASKS[TASK_ALIASES[K]]["pipeline"]>}} AliasTasks A mapping from pipeline aliases to their corresponding pipeline classes.
  * @typedef {SupportedTasks & AliasTasks} AllTasks A mapping from all pipeline names and aliases to their corresponding pipeline classes.
  */
+
+/**
+ * Resolve a custom backend's default chat template without moving rendering policy into the backend.
+ *
+ * @param {import('./backends/inference.js').InferenceBackend} backend
+ * @param {import('./utils/hub.js').PretrainedModelOptions} options
+ * @returns {Promise<string>|null}
+ */
+export function loadInferenceBackendChatTemplate(backend, options) {
+    const source = backend.chatTemplate;
+    if (source == null) return null;
+    if (typeof source !== 'object') {
+        throw new TypeError('Inference backend `chatTemplate` must be an object.');
+    }
+    if (Object.hasOwn(source, 'content')) {
+        if (typeof source.content !== 'string' || Object.hasOwn(source, 'modelId') || Object.hasOwn(source, 'file')) {
+            throw new TypeError(
+                'Inference backend `chatTemplate.content` must be a string and cannot be combined with `modelId` or `file`.',
+            );
+        }
+        return Promise.resolve(source.content);
+    }
+    if (source.modelId !== undefined && typeof source.modelId !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.modelId` must be a string.');
+    }
+    if (source.file !== undefined && typeof source.file !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.file` must be a string.');
+    }
+    return getModelText(source.modelId ?? backend.modelId, source.file ?? CHAT_TEMPLATE_NAME, true, options);
+}
 
 /**
  * Utility factory method to build a `Pipeline` object.
@@ -142,6 +173,10 @@ export async function pipeline(
     }
 
     const customBackend = isInferenceBackend(model) && typeof model.constructSessions !== 'function';
+    const customRegistryProvider =
+        customBackend && typeof (/** @type {any} */ (model).listModelArtifacts) === 'function'
+            ? /** @type {import('./backends/model_registry.js').ModelRegistryInferenceProvider} */ (model)
+            : null;
     const modelId = getModelId(model);
     validateInferenceArtifactProvider(artifactProvider);
     if (customBackend) {
@@ -157,22 +192,31 @@ export async function pipeline(
         local_files_only,
         revision,
         model_file_name,
-        include_model: !customBackend,
+        inferenceProvider: customRegistryProvider,
+        include_model: !customBackend || customRegistryProvider !== null,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
+    /** @type {Record<string, {size?: number, fromCache?: boolean}>} */
+    const artifactMetadata = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
         const metadata = await Promise.all(
             expected_files.map(async (file) =>
-                get_file_metadata(modelId, file, { cache_dir, local_files_only, revision }),
+                get_file_metadata(customBackend ? model : modelId, file, {
+                    cache_dir,
+                    local_files_only,
+                    revision,
+                    signal,
+                }),
             ),
         );
         metadata.forEach((m, i) => {
             if (m.exists) {
+                artifactMetadata[expected_files[i]] = { size: m.size, fromCache: m.fromCache };
                 files_loading[expected_files[i]] = {
-                    loaded: 0,
+                    loaded: m.fromCache ? (m.size ?? 0) : 0,
                     total: m.size ?? 0,
                 };
             }
@@ -196,6 +240,7 @@ export async function pipeline(
         generation_config: null,
         signal,
         artifactProvider,
+        artifactMetadata,
     };
 
     // Determine which components to load based on the expected files
@@ -237,13 +282,21 @@ export async function pipeline(
     let tokenizer;
     let processor;
     let model_loaded;
+    let chat_template;
     try {
         // Load all components in parallel.
-        [tokenizer, processor, model_loaded] = await Promise.all([
+        [tokenizer, processor, model_loaded, chat_template] = await Promise.all([
             hasTokenizer ? AutoTokenizer.from_pretrained(modelId, pretrainedOptions) : null,
             hasProcessor ? AutoProcessor.from_pretrained(modelId, pretrainedOptions) : null,
             modelPromise,
+            customBackend && hasTokenizer
+                ? loadInferenceBackendChatTemplate(
+                      /** @type {import('./backends/inference.js').InferenceBackend} */ (model),
+                      pretrainedOptions,
+                  )
+                : null,
         ]);
+        if (tokenizer && chat_template != null) tokenizer.chat_template = chat_template;
         if (customBackend) {
             validateInferenceModelTask(model_loaded, task);
         }

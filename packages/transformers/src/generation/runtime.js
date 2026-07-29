@@ -1,4 +1,6 @@
 import { Tensor } from '../utils/tensor.js';
+import { DynamicCache } from '../cache_utils.js';
+import { throwIfAborted } from '../utils/core.js';
 import { createGenerationController } from './controller.js';
 
 /**
@@ -16,9 +18,6 @@ import { createGenerationController } from './controller.js';
  * @property {boolean} cpuLogits
  * @property {ReadonlyArray<'argmax'>} declarativePlans
  * @property {{readonly defaultDepth: number, readonly maxDepth: number}} tokenPipeline
- * @property {boolean} [customJavaScriptStoppingCriteria]
- * @property {false} [cacheReorder]
- * @property {false} [cacheExpand]
  * @property {SessionConcurrencyCapabilities} [sessionConcurrency]
  */
 
@@ -30,7 +29,6 @@ import { createGenerationController } from './controller.js';
  * @property {'float32'} dtype
  * @property {readonly [number, number]} shape
  * @property {() => Promise<Float32Array>} read
- * @property {(plan: RuntimeGenerationPlanV1) => Promise<RuntimeTokenDecisionV1>} [select]
  * @property {() => void} release
  */
 
@@ -72,7 +70,6 @@ import { createGenerationController } from './controller.js';
  * @typedef {Object} RuntimeTokenDecisionV1
  * @property {Uint32Array} tokenIds
  * @property {Float32Array} [processedScores]
- * @property {Float64Array} [scores]
  */
 
 /**
@@ -137,16 +134,23 @@ export function installGenerationRuntime(model) {
  * @param {Object} options
  */
 export async function generateWithAutoregressiveSession(model, options) {
-    const { input_ids, attention_mask = null, signal = undefined } = options;
-    if (!(input_ids instanceof Tensor)) {
-        throw new TypeError('Custom autoregressive generation requires an `input_ids` Tensor.');
+    const { inputs = null, input_ids = null, attention_mask = null, signal = undefined } = options;
+    if (inputs !== null && input_ids !== null) {
+        throw new TypeError('Custom autoregressive generation accepts either `inputs` or `input_ids`, but not both.');
+    }
+    const resolvedInputIds = input_ids ?? inputs;
+    if (!(resolvedInputIds instanceof Tensor)) {
+        throw new TypeError('Custom autoregressive generation requires an `inputs` or `input_ids` Tensor.');
     }
     if (model.config?.is_encoder_decoder) {
         throw new Error('Autoregressive session protocol version 1 only supports decoder-only models.');
     }
 
-    const controller = createGenerationController(model, input_ids, options);
-    if (controller.allDone) return controller.finalize();
+    const controller = createGenerationController(model, resolvedInputIds, options);
+    const finalize = () =>
+        controller.finalize(
+            controller.generationConfig.return_dict_in_generate ? { past_key_values: new DynamicCache() } : {},
+        );
 
     const capabilities = getCausalGenerationCapabilities(model);
     try {
@@ -156,6 +160,7 @@ export async function generateWithAutoregressiveSession(model, options) {
         controller.abort(error);
         throw error;
     }
+    if (controller.allDone) return finalize();
     const plan = controller.compileRuntimePlan(capabilities);
     const mode = controller.generationConfig.do_sample ? 'multinomial' : 'greedy';
     if (!plan && !capabilities.cpuLogits) {
@@ -192,7 +197,7 @@ export async function generateWithAutoregressiveSession(model, options) {
         validateSession(session, controller, plan !== null);
 
         const prefillInputs = {
-            inputIds: tensorToTokenBatch(input_ids),
+            inputIds: tensorToTokenBatch(resolvedInputIds),
             attentionMask: attention_mask ? tensorToAttentionMask(attention_mask) : undefined,
             signal,
         };
@@ -212,13 +217,7 @@ export async function generateWithAutoregressiveSession(model, options) {
             if (!controller.allDone) {
                 throw new Error('Autoregressive runtime ended its generation plan before generation completed.');
             }
-            return controller.finalize();
-        }
-
-        if (!capabilities.cpuLogits) {
-            throw new Error(
-                'This generation request requires CPU-visible logits, but the runtime does not support them.',
-            );
+            return finalize();
         }
 
         const pullSession = /** @type {PullAutoregressiveSessionV1} */ (session);
@@ -248,13 +247,13 @@ export async function generateWithAutoregressiveSession(model, options) {
                 signal,
             });
         }
-        return controller.finalize();
+        return finalize();
     } catch (error) {
         controller.abort(error);
         throw error;
     } finally {
         try {
-            lease?.release();
+            lease?.release?.();
         } finally {
             try {
                 await session?.dispose();
@@ -391,12 +390,6 @@ function tensorToAttentionMask(tensor) {
 
 function isAllOnes(tensor) {
     return Array.from(tensor.data).every((value) => Number(value) === 1);
-}
-
-function throwIfAborted(signal) {
-    if (!signal?.aborted) return;
-    if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
-    throw signal.reason ?? new Error('Generation aborted.');
 }
 
 function acquireSessionSlot(model, capabilities) {

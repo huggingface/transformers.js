@@ -24,11 +24,17 @@ let modulePromise;
 export function getOnnxProviderModule() {
     if (!modulePromise) {
         globalThis[ONNX_HOST_SYMBOL] = host;
-        modulePromise = import('@huggingface/transformers-onnx').then((module) => {
-            module.configureOnnxProviderHost(host);
-            TensorOpRegistry.register(module.OnnxTensorOpRegistry);
-            return module;
-        });
+        const pending = import('@huggingface/transformers-onnx')
+            .then((module) => {
+                module.configureOnnxProviderHost(host);
+                TensorOpRegistry.register(module.OnnxTensorOpRegistry);
+                return module;
+            })
+            .catch((error) => {
+                if (modulePromise === pending) modulePromise = undefined;
+                throw error;
+            });
+        modulePromise = pending;
     }
     return modulePromise;
 }

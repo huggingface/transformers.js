@@ -7,8 +7,9 @@ import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
-import { memoizePromise } from '../memoize_promise.js';
+import { throwIfAborted } from '../core.js';
 import { getModelId } from '../../backends/inference.js';
+import { isInferenceBackend } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -46,19 +47,37 @@ async function fetch_file_head(urlOrPath, signal = undefined) {
  * Uses Range requests for remote files to be efficient.
  * Can also be used as a lightweight file existence check by checking the `.exists` property.
  *
- * @param {string} path_or_repo_id This can be either:
+ * @param {string|import('../../backends/inference.js').InferenceBackend} path_or_repo_id This can be either:
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to check.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
-export function get_file_metadata(path_or_repo_id, filename, options = {}) {
+const INFLIGHT_METADATA = new Map();
+const BACKEND_INFLIGHT_METADATA = new WeakMap();
+
+export async function get_file_metadata(path_or_repo_id, filename, options = {}) {
     throwIfAborted(options.signal);
+    const backend = isInferenceBackend(path_or_repo_id) ? path_or_repo_id : null;
     path_or_repo_id = getModelId(path_or_repo_id);
-    if (options.signal) return _get_file_metadata(path_or_repo_id, filename, options);
+    const load = async () => {
+        const backendMetadata = await backend?.getModelArtifactMetadata?.(filename, options);
+        throwIfAborted(options.signal);
+        if (backendMetadata) return { exists: true, ...backendMetadata };
+        return _get_file_metadata(path_or_repo_id, filename, options);
+    };
+
+    if (options.signal) return load();
     const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
-    return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
+    const inflight = backend ? (BACKEND_INFLIGHT_METADATA.get(backend) ?? new Map()) : INFLIGHT_METADATA;
+    if (backend && !BACKEND_INFLIGHT_METADATA.has(backend)) BACKEND_INFLIGHT_METADATA.set(backend, inflight);
+    let pending = inflight.get(key);
+    if (!pending) {
+        pending = load().finally(() => inflight.delete(key));
+        inflight.set(key, pending);
+    }
+    return pending;
 }
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
@@ -163,10 +182,4 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     }
 
     return { exists: false, fromCache: false };
-}
-
-function throwIfAborted(signal) {
-    if (!signal?.aborted) return;
-    if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
-    throw signal.reason ?? new Error('Metadata loading aborted.');
 }

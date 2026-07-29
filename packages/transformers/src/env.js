@@ -239,8 +239,14 @@ export const env = {
     version: VERSION,
 
     /////////////////// Backends settings ///////////////////
-    // NOTE: These will be populated later by the backends themselves.
-    backends: {},
+    // ONNX settings are available before the lazy provider loads so existing configuration code
+    // can set wasmPaths, numThreads, proxy, and WebGPU options immediately after importing.
+    backends: {
+        onnx: {
+            wasm: {},
+            webgpu: {},
+        },
+    },
 
     /////////////////// Logging settings ///////////////////
     get logLevel() {

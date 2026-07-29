@@ -124,7 +124,14 @@ export function configureOnnxProviderHost(host: OnnxProviderHost): void {
     // settings when a host arrives later. A symbol-registered host was already configured before
     // module evaluation and contains the authoritative ORT environment.
     if (configuredHost === null && fallbackEnvironment.backends.onnx) {
-        host.env.backends.onnx = fallbackEnvironment.backends.onnx;
+        const target = (host.env.backends.onnx ?? {}) as Record<string, any>;
+        const source = fallbackEnvironment.backends.onnx as Record<string, any>;
+        const targetWasm = target.wasm;
+        const targetWebgpu = target.webgpu;
+        Object.assign(target, source);
+        target.wasm = Object.assign(source.wasm ?? {}, targetWasm ?? {});
+        target.webgpu = Object.assign(source.webgpu ?? {}, targetWebgpu ?? {});
+        host.env.backends.onnx = target;
     }
     configuredHost = host;
 }

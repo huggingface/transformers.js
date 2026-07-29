@@ -60,9 +60,6 @@ importers:
       onnxruntime-common:
         specifier: 1.24.3
         version: 1.24.3
-      onnxruntime-node:
-        specifier: 1.24.3
-        version: 1.24.3
       onnxruntime-web:
         specifier: 1.26.0-dev.20260416-b7804b056c
         version: 1.26.0-dev.20260416-b7804b056c
@@ -79,6 +76,9 @@ importers:
       jest:
         specifier: ^30.2.0
         version: 30.2.0(@types/node@24.10.9)
+      onnxruntime-node:
+        specifier: 1.24.3
+        version: 1.24.3
       typescript:
         specifier: 5.9.3
         version: 5.9.3

@@ -18,6 +18,8 @@
 
 import { getOnnxProviderHost } from './host.js';
 
+declare const __ONNX_MODULE_URL__: string;
+
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
@@ -34,7 +36,7 @@ function isBlobURL(url: string): boolean {
 }
 
 function toAbsoluteURL(url: string): string {
-    return new URL(url, globalThis.location?.href ?? 'file:///').href;
+    return new URL(url, globalThis.location?.href ?? __ONNX_MODULE_URL__).href;
 }
 
 type ExecutionProvider = OrtInferenceSession.ExecutionProviderConfig;
@@ -288,9 +290,11 @@ export async function createInferenceSession(
             logSeverityLevel,
             ...session_options,
         };
-        return typeof buffer_or_path === 'string'
-            ? InferenceSession.create(buffer_or_path, options)
-            : InferenceSession.create(buffer_or_path, options);
+        const create = InferenceSession.create as (
+            model: Uint8Array | string,
+            options: OrtInferenceSession.SessionOptions,
+        ) => Promise<OrtInferenceSession>;
+        return create(buffer_or_path, options);
     };
     const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     const configuredSession = session as OrtInferenceSession & { config: Record<string, unknown> };
@@ -338,7 +342,17 @@ export function isONNXProxy() {
 }
 
 if (ONNX_ENV) {
+    const configured = (env.backends.onnx ??= {}) as Record<string, any>;
+    const configuredWasm = configured.wasm;
+    const configuredWebgpu = configured.webgpu;
+    for (const [key, value] of Object.entries(configured)) {
+        if (key !== 'wasm' && key !== 'webgpu' && key !== 'setLogLevel') {
+            (ONNX_ENV as any)[key] = value;
+        }
+    }
+
     if (ONNX_ENV.wasm) {
+        Object.assign(ONNX_ENV.wasm, configuredWasm ?? {});
         // Initialize wasm backend with suitable default settings.
 
         // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
@@ -365,11 +379,12 @@ if (ONNX_ENV) {
 
         // Users may wish to proxy the WASM backend to prevent the UI from freezing,
         // However, this is not necessary when using WebGPU, so we default to false.
-        ONNX_ENV.wasm.proxy = false;
+        ONNX_ENV.wasm.proxy ??= false;
     }
 
     if (ONNX_ENV.webgpu) {
-        ONNX_ENV.webgpu.powerPreference = 'high-performance';
+        Object.assign(ONNX_ENV.webgpu, configuredWebgpu ?? {});
+        ONNX_ENV.webgpu.powerPreference ??= 'high-performance';
     }
 
     /**
@@ -386,8 +401,8 @@ if (ONNX_ENV) {
     setLogLevel(env.logLevel ?? LogLevel.WARNING);
 
     // Expose ONNX environment variables to `env.backends.onnx`
-    env.backends.onnx = {
-        ...ONNX_ENV,
-        setLogLevel,
-    };
+    Object.assign(configured, ONNX_ENV, { setLogLevel });
+    configured.wasm = ONNX_ENV.wasm;
+    configured.webgpu = ONNX_ENV.webgpu;
+    env.backends.onnx = configured;
 }

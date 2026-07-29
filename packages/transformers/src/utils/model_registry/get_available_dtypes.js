@@ -43,6 +43,9 @@ export async function get_available_dtypes(
     const { sessions } = getSessionsConfig(modelType, config, { model_file_name });
     const metadataOptions = { revision, cache_dir, local_files_only };
     const provider = await getModelRegistryInferenceProvider(inferenceProvider);
+    if (!provider.getAvailableDtypes) {
+        throw new Error('The inference backend does not support dtype discovery.');
+    }
     return provider.getAvailableDtypes({
         modelId,
         sessions,

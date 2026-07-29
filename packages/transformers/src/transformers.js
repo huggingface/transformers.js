@@ -73,6 +73,7 @@ export { getModelId, isInferenceBackend } from './backends/inference.js';
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
  * @typedef {import('./backends/inference.js').InferenceBackend} InferenceBackend
+ * @typedef {import('./backends/inference.js').InferenceBackendChatTemplate} InferenceBackendChatTemplate
  * @typedef {import('./backends/inference.js').InferenceBackendLoadOptions} InferenceBackendLoadOptions
  * @typedef {import('./backends/inference.js').InferenceModel} InferenceModel
  * @typedef {import('./backends/inference.js').InferenceModelCapabilities} InferenceModelCapabilities

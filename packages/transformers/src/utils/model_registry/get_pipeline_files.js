@@ -47,6 +47,7 @@ export async function get_pipeline_files(task, modelId, options = {}) {
 
     const files = await get_files(modelId, {
         ...options,
+        task,
         include_tokenizer,
         include_processor,
     });
@@ -60,7 +61,9 @@ export async function get_pipeline_files(task, modelId, options = {}) {
 
         if (textOnlySessions) {
             const provider = await getModelRegistryInferenceProvider(options.inferenceProvider ?? null);
-            return provider.filterModelArtifacts(files, textOnlySessions);
+            if (provider.filterModelArtifacts) {
+                return provider.filterModelArtifacts(files, textOnlySessions);
+            }
         }
     }
 

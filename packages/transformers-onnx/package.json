@@ -37,14 +37,22 @@
   },
   "dependencies": {
     "onnxruntime-common": "1.24.3",
-    "onnxruntime-node": "1.24.3",
     "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c"
+  },
+  "peerDependencies": {
+    "onnxruntime-node": "1.24.3"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@webgpu/types": "^0.1.69",
     "esbuild": "^0.27.2",
     "jest": "^30.2.0",
+    "onnxruntime-node": "1.24.3",
     "typescript": "5.9.3"
   },
   "files": [

@@ -56,6 +56,7 @@ export function get_config(
  * @param {string|null} [options.cache_dir=null] Custom cache directory.
  * @param {boolean} [options.local_files_only=false] Never hit the network if true.
  * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.task=null] Pipeline task requesting the artifacts.
  * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
@@ -69,6 +70,7 @@ export async function get_model_files(
         cache_dir = null,
         local_files_only = false,
         revision = 'main',
+        task = null,
         inferenceProvider = null,
     } = {},
 ) {
@@ -78,11 +80,15 @@ export async function get_model_files(
     const modelType = resolve_model_type(config);
     const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
     const provider = await getModelRegistryInferenceProvider(inferenceProvider);
-    return provider.listModelArtifacts({
-        sessions,
-        optionalConfigs: optional_configs,
-        config,
-        dtype: overrideDtype,
-        device: overrideDevice,
-    });
+    return [
+        ...(await provider.listModelArtifacts({
+            modelId,
+            task,
+            sessions,
+            optionalConfigs: optional_configs,
+            config,
+            dtype: overrideDtype,
+            device: overrideDevice,
+        })),
+    ];
 }

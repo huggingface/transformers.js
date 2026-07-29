@@ -5,6 +5,8 @@ import { OnnxInferenceProvider } from "@huggingface/transformers-onnx";
 import { AutoModel } from "../src/models/auto/modeling_auto.js";
 import { PreTrainedModel } from "../src/models/modeling_utils.js";
 import { buildResourcePaths } from "../src/utils/hub.js";
+import { loadInferenceBackendChatTemplate } from "../src/pipelines.js";
+import { DefaultProgressCallback } from "../src/utils/core.js";
 
 describe("inference backends", () => {
   it("recognizes object and class backends", () => {
@@ -107,18 +109,32 @@ describe("inference backends", () => {
     const backend = {
       modelId: "test/model",
       load: jest.fn(async () => loaded),
+      listModelArtifacts: jest.fn(() => ["model.bin"]),
+      getModelArtifactMetadata: jest.fn(async () => ({ size: 10, fromCache: true })),
     };
     const signal = new AbortController().signal;
     const artifactProvider = { readJson() {}, openByteSource() {} };
+    const progress_callback = jest.fn();
 
     const model = await AutoModel.from_pretrained(backend, {
       config: { model_type: "custom" },
       device: "webgpu",
       signal,
       artifactProvider,
+      progress_callback,
     });
 
-    expect(backend.load).toHaveBeenCalledWith(expect.objectContaining({ modelId: "test/model", device: "webgpu", signal, artifactProvider }));
+    expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith("model.bin", expect.objectContaining({ signal }));
+    expect(backend.load).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "test/model",
+        device: "webgpu",
+        signal,
+        artifactProvider,
+        artifactMetadata: { "model.bin": { size: 10, fromCache: true } },
+        progress_callback: expect.any(DefaultProgressCallback),
+      }),
+    );
     await expect(model({ value: 1 })).resolves.toEqual({ value: 1 });
   });
 
@@ -149,5 +165,11 @@ describe("inference backends", () => {
 
     expect(paths.requestURL).toBe("test/model/tokenizer.json");
     expect(paths.remoteURL).toContain("/test/model/resolve/main/tokenizer.json");
+  });
+
+  it("resolves and validates inline backend chat templates", async () => {
+    await expect(loadInferenceBackendChatTemplate({ modelId: "test/model", load() {}, chatTemplate: { content: "{{ messages }}" } }, {})).resolves.toBe("{{ messages }}");
+    expect(loadInferenceBackendChatTemplate({ modelId: "test/model", load() {} }, {})).toBeNull();
+    expect(() => loadInferenceBackendChatTemplate({ modelId: "test/model", load() {}, chatTemplate: { content: "inline", file: "chat.jinja" } }, {})).toThrow("cannot be combined");
   });
 });
