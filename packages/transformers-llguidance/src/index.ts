@@ -1,2 +1,2 @@
 export { LlguidanceConstraint } from './LlguidanceConstraint';
-export type { LlguidanceLoadOptions, ResponseFormat } from './LlguidanceConstraint';
+export type { LlguidanceLoadOptions, LlguidanceStats, ResponseFormat } from './LlguidanceConstraint';

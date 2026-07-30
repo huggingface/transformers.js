@@ -67,8 +67,8 @@ describe("llguidance WASM loading", () => {
 
     await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
 
-    expect(loadWasmBinary).toHaveBeenCalledWith("https://cdn.jsdelivr.net/npm/llguidance@0.1.7/wasm/llguidance_wasm_bg.wasm");
-    expect(loadWasmFactory).toHaveBeenCalledWith("https://cdn.jsdelivr.net/npm/llguidance@0.1.7/wasm/llguidance_wasm.js");
+    expect(loadWasmBinary).toHaveBeenCalledWith("https://cdn.jsdelivr.net/npm/llguidance@0.1.8/wasm/llguidance_wasm_bg.wasm");
+    expect(loadWasmFactory).toHaveBeenCalledWith("https://cdn.jsdelivr.net/npm/llguidance@0.1.8/wasm/llguidance_wasm.js");
     expect(loadBundledLLGuidance).toHaveBeenCalledWith({
       wasm,
       wasmFactoryUrl: "blob:factory-url",

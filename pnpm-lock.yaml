@@ -61,8 +61,8 @@ importers:
   packages/transformers-llguidance:
     dependencies:
       llguidance:
-        specifier: ^0.1.7
-        version: 0.1.7
+        specifier: ^0.1.8
+        version: 0.1.8
     devDependencies:
       '@huggingface/transformers':
         specifier: workspace:*
@@ -1585,8 +1585,8 @@ packages:
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
 
-  llguidance@0.1.7:
-    resolution: {integrity: sha512-r55h3hDmkq313cFlqbKyx4IebqpreyrrnMJip7IR+ocwPGm7O6ZoDVCIAEg2wd6k7pQ5wWyuSzV9rSefqKVs6Q==}
+  llguidance@0.1.8:
+    resolution: {integrity: sha512-n44NMtq2ChgUGkcy6G7o8TUp90kyK2TergBDZ2nvxUN87vtkmCm/WxEWG0hl3Pav1BhqxybKAR6DP+9oib0Law==}
 
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
@@ -3750,7 +3750,7 @@ snapshots:
     dependencies:
       uc.micro: 2.1.0
 
-  llguidance@0.1.7: {}
+  llguidance@0.1.8: {}
 
   locate-path@5.0.0:
     dependencies:
