@@ -1,45 +1,49 @@
 import { type Tensor } from '@huggingface/transformers';
-import { type GuidanceMask, type GuidanceMaskResult } from './types';
+import type { LLGuidanceMaskResult } from 'llguidance';
 
 type LogitsData = Float32Array | Float64Array | number[];
 
-export function summarizeMaskResult(result: GuidanceMaskResult, vocabSize?: number) {
-    if ('stop' in result && result.stop) {
-        return { stop: true };
-    }
-
+export function summarizeMaskResult(result: LLGuidanceMaskResult):
+    | { stop: true; reason: 'accepted' | 'dead_end' }
+    | {
+          maskLength: number;
+          vocabSize: number;
+          allowed: number;
+          sampleAllowedTokenIds: number[];
+      } {
     if (!('mask' in result)) {
-        return result;
+        return { stop: true, reason: result.reason };
     }
 
     return {
         maskLength: result.mask.length,
-        vocabSize: result.vocabSize ?? vocabSize,
-        allowed: countAllowed(result.mask, result.vocabSize ?? vocabSize),
-        sampleAllowedTokenIds: sampleAllowedTokenIds(result.mask, result.vocabSize ?? vocabSize),
+        vocabSize: result.vocabSize,
+        allowed: countAllowed(result.mask, result.vocabSize),
+        sampleAllowedTokenIds: sampleAllowedTokenIds(result.mask, result.vocabSize),
     };
 }
 
-export function applyMask(logits: Tensor, mask: GuidanceMask, vocabSize?: number, includeSummary = false) {
-    if (!vocabSize) {
-        return includeSummary ? { vocabSize, batchSize: 0, masked: 0, allowed: undefined } : undefined;
+export function applyMask(logits: Tensor, mask: Uint32Array, vocabSize: number, includeSummary = false) {
+    if (!Number.isInteger(vocabSize) || vocabSize <= 0) {
+        throw new Error(`llguidance returned an invalid vocabulary size: ${vocabSize}.`);
     }
 
     const data = logits.data as LogitsData;
-    const stride = (logits.dims?.at?.(-1) as number) || vocabSize;
-    const bound = Math.min(vocabSize, stride);
-    const batchSize = Math.max(1, Math.floor(data.length / stride));
-    const packed = mask.length < vocabSize;
+    const stride = logits.dims.at(-1);
+    if (stride === undefined || !Number.isInteger(stride) || stride <= 0) {
+        throw new Error('LlguidanceConstraint requires logits with a vocabulary dimension.');
+    }
+    if (vocabSize > stride) {
+        throw new Error(`llguidance vocabulary size ${vocabSize} exceeds logits vocabulary size ${stride}.`);
+    }
+    if (mask.length < Math.ceil(vocabSize / 32)) {
+        throw new Error(`llguidance returned a mask that is too short for vocabulary size ${vocabSize}.`);
+    }
 
+    const batchSize = Math.floor(data.length / stride);
     for (let batch = 0; batch < batchSize; ++batch) {
         const offset = batch * stride;
-        if (packed) {
-            applyPackedMask(data, mask, offset, bound);
-        } else {
-            for (let tokenId = 0; tokenId < bound; ++tokenId) {
-                if (!mask[tokenId]) data[offset + tokenId] = -Infinity;
-            }
-        }
+        applyPackedMask(data, mask, offset, vocabSize);
         if (stride > vocabSize) {
             // Logits padded beyond the grammar vocab can never be committed.
             data.fill(-Infinity, offset + vocabSize, offset + stride);
@@ -48,33 +52,40 @@ export function applyMask(logits: Tensor, mask: GuidanceMask, vocabSize?: number
 
     if (!includeSummary) return undefined;
 
-    const allowed = countAllowed(mask, vocabSize) ?? 0;
+    const allowed = countAllowed(mask, vocabSize);
     return { vocabSize, batchSize, masked: (vocabSize - allowed) * batchSize, allowed };
 }
 
-// Forces a single token by banning everything else, e.g. for fast-forward splices.
-export function forceToken(logits: Tensor, tokenId: number, vocabSize?: number) {
-    if (!vocabSize) return;
-
+export function forceTokens(logits: Tensor, tokenIds: number[]) {
     const data = logits.data as LogitsData;
-    const stride = (logits.dims?.at?.(-1) as number) || vocabSize;
-    const batchSize = Math.max(1, Math.floor(data.length / stride));
+    const vocabSize = logits.dims.at(-1);
+    if (vocabSize === undefined || !Number.isInteger(vocabSize) || vocabSize <= 0) {
+        throw new Error('LlguidanceConstraint requires logits with a vocabulary dimension.');
+    }
+    if (tokenIds.length === 0) {
+        throw new Error('LlguidanceConstraint cannot stop on acceptance because the tokenizer has no EOS token ID.');
+    }
 
-    for (let batch = 0; batch < batchSize; ++batch) {
-        const offset = batch * stride;
-        const kept = data[offset + tokenId];
-        data.fill(-Infinity, offset, offset + stride);
-        data[offset + tokenId] = Number.isFinite(kept) ? kept : 0;
+    const kept = tokenIds.map((tokenId) => {
+        if (!Number.isInteger(tokenId) || tokenId < 0 || tokenId >= vocabSize) {
+            throw new Error(`Tokenizer EOS token ID ${tokenId} is outside logits vocabulary size ${vocabSize}.`);
+        }
+        return data[tokenId];
+    });
+
+    data.fill(-Infinity);
+    for (let i = 0; i < tokenIds.length; ++i) {
+        data[tokenIds[i]] = Number.isFinite(kept[i]) ? kept[i] : 0;
     }
 }
 
 // Hot path: runs once per generated token over the whole vocab. Grammar masks
-// are skewed — most 32-token words are either fully allowed (skip) or fully
-// banned (memset) — so per-bit work only happens on the few mixed words.
-function applyPackedMask(data: LogitsData, mask: GuidanceMask, offset: number, vocabSize: number) {
+// are skewed: most 32-token words are either fully allowed (skip) or fully
+// banned (memset), so per-bit work only happens on the few mixed words.
+function applyPackedMask(data: LogitsData, mask: Uint32Array, offset: number, vocabSize: number) {
     const numWords = vocabSize >>> 5;
     for (let word = 0; word < numWords; ++word) {
-        const bits = (mask[word] as number) | 0;
+        const bits = mask[word] | 0;
         if (bits === -1) continue;
         const base = offset + (word << 5);
         if (bits === 0) {
@@ -87,35 +98,28 @@ function applyPackedMask(data: LogitsData, mask: GuidanceMask, offset: number, v
     }
 
     for (let tokenId = numWords << 5; tokenId < vocabSize; ++tokenId) {
-        if (!((mask[tokenId >>> 5] as number) & (1 << (tokenId & 31)))) {
+        if (!(mask[tokenId >>> 5] & (1 << (tokenId & 31)))) {
             data[offset + tokenId] = -Infinity;
         }
     }
 }
 
-function countAllowed(mask: GuidanceMask, vocabSize?: number) {
-    if (!vocabSize) return undefined;
-
+function countAllowed(mask: Uint32Array, vocabSize: number) {
     let allowed = 0;
     for (let tokenId = 0; tokenId < vocabSize; ++tokenId) {
-        if (isAllowed(mask, tokenId, vocabSize)) allowed++;
+        if (isAllowed(mask, tokenId)) allowed++;
     }
     return allowed;
 }
 
-function sampleAllowedTokenIds(mask: GuidanceMask, vocabSize?: number) {
-    if (!vocabSize) return [];
-
+function sampleAllowedTokenIds(mask: Uint32Array, vocabSize: number) {
     const tokenIds: number[] = [];
     for (let tokenId = 0; tokenId < vocabSize && tokenIds.length < 25; ++tokenId) {
-        if (isAllowed(mask, tokenId, vocabSize)) tokenIds.push(tokenId);
+        if (isAllowed(mask, tokenId)) tokenIds.push(tokenId);
     }
     return tokenIds;
 }
 
-function isAllowed(mask: GuidanceMask, tokenId: number, vocabSize: number) {
-    if (mask.length >= vocabSize) {
-        return Boolean(mask[tokenId]);
-    }
-    return Boolean(Number(mask[tokenId >> 5]) & (1 << (tokenId & 31)));
+function isAllowed(mask: Uint32Array, tokenId: number) {
+    return Boolean(mask[tokenId >> 5] & (1 << (tokenId & 31)));
 }

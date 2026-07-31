@@ -4,11 +4,12 @@ import { Tensor } from "@huggingface/transformers";
 const computeMask = jest.fn();
 const computeMaskInto = jest.fn();
 const commitToken = jest.fn();
-let supportsComputeMaskInto = false;
+const disposeInterpreter = jest.fn();
 const createInterpreter = jest.fn(() => ({
   computeMask,
-  ...(supportsComputeMaskInto ? { computeMaskInto } : {}),
+  computeMaskInto,
   commitToken,
+  dispose: disposeInterpreter,
 }));
 const loadBundledLLGuidance = jest.fn(async () => ({ createInterpreter }));
 
@@ -22,112 +23,145 @@ describe("LlguidanceConstraint", () => {
   beforeEach(() => {
     computeMask.mockReset();
     computeMaskInto.mockReset();
-    supportsComputeMaskInto = false;
     commitToken.mockReset();
+    disposeInterpreter.mockReset();
     createInterpreter.mockClear();
     loadBundledLLGuidance.mockClear();
-  });
 
-  // Verifies the core integration path: llguidance creates an interpreter and its mask is applied across batches.
-  it("loads llguidance and applies masks", async () => {
-    computeMask.mockReturnValue({ mask: [true, false, true, false], vocabSize: 4 });
-
-    const tokenizer = { name: "tokenizer" };
-    const response_format = { type: "json_schema", json_schema: { type: "object" } };
-    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat(tokenizer, response_format);
-    const logits = new Tensor("float32", new Float32Array([1, 2, 3, 4, 5, 6, 7, 8]), [2, 4]);
-
-    logits_processor([[0n], [0n]], logits);
-
-    expect(loadBundledLLGuidance).toHaveBeenCalledTimes(1);
-    expect(loadBundledLLGuidance).toHaveBeenCalledWith();
-    expect(createInterpreter).toHaveBeenCalledWith({ tokenizer, response_format });
-    expect(Array.from(logits.data)).toEqual([1, -Infinity, 3, -Infinity, 5, -Infinity, 7, -Infinity]);
-  });
-
-  it("reuses a packed mask buffer when the runtime supports computeMaskInto", async () => {
-    supportsComputeMaskInto = true;
     computeMaskInto.mockImplementation((target) => {
       target[0] = 0b0101;
       return { mask: target, vocabSize: 4 };
     });
+    commitToken.mockReturnValue({ stop: false, backtrack: 0, ffTokens: [] });
+  });
 
+  it("loads llguidance and applies a packed mask", async () => {
+    const tokenizer = { name: "tokenizer" };
+    const response_format = { type: "json_schema", json_schema: { type: "object" } };
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat(tokenizer, response_format);
+    const logits = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
+
+    logits_processor([[0n]], logits);
+
+    expect(loadBundledLLGuidance).toHaveBeenCalledTimes(1);
+    expect(createInterpreter).toHaveBeenCalledWith({ tokenizer, response_format });
+    expect(Array.from(logits.data)).toEqual([1, -Infinity, 3, -Infinity]);
+  });
+
+  it("reuses the packed mask buffer", async () => {
     const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
     const first = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
     const second = new Tensor("float32", new Float32Array([5, 6, 7, 8]), [1, 4]);
+
     logits_processor([[0n]], first);
     logits_processor([[0n]], second);
 
     expect(computeMask).not.toHaveBeenCalled();
     expect(computeMaskInto).toHaveBeenCalledTimes(2);
     expect(computeMaskInto.mock.calls[0][0]).toBe(computeMaskInto.mock.calls[1][0]);
-    expect(Array.from(second.data)).toEqual([5, -Infinity, 7, -Infinity]);
   });
 
-  // Confirms sampled tokens are committed back to llguidance so stopping criteria can end generation.
-  it("commits sampled tokens and stops when llguidance stops", async () => {
-    computeMask.mockReturnValue({ mask: [true, true], vocabSize: 2 });
-    commitToken.mockReturnValueOnce(undefined).mockReturnValueOnce({ stop: true });
+  it("rejects batched generation before computing a mask", async () => {
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const logits = new Tensor("float32", new Float32Array(8), [2, 4]);
 
-    const { logits_processor, stopping_criteria } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    expect(() => logits_processor([[0n], [0n]], logits)).toThrow("currently supports batch size 1");
+    expect(computeMaskInto).not.toHaveBeenCalled();
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits one sampled token and stops on acceptance", async () => {
+    commitToken.mockReturnValue({ stop: true, backtrack: 0, ffTokens: [] });
+    const { logits_processor, stopping_criteria, stats } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
 
     expect(stopping_criteria([[0n]])).toEqual([false]);
+    logits_processor.onTokensSampled([1], [[0n, 1n]]);
 
-    logits_processor.onTokensSampled(
-      [0, 1],
-      [
-        [0n, 0n],
-        [0n, 1n],
-      ],
-    );
-
-    expect(commitToken).toHaveBeenCalledWith(0);
     expect(commitToken).toHaveBeenCalledWith(1);
-    expect(
-      stopping_criteria([
-        [0n, 0n],
-        [0n, 1n],
-      ]),
-    ).toEqual([true, true]);
+    expect(stopping_criteria([[0n, 1n]])).toEqual([true]);
+    expect(stats.stopReason).toBe("accepted");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
   });
 
-  // Covers llguidance's compact bitset mask format, not just boolean arrays.
-  it("applies packed uint32 masks", async () => {
-    computeMask.mockReturnValue({ mask: new Uint32Array([0b0101]), vocabSize: 4 });
-
+  it("throws when llguidance requests backtracking", async () => {
+    commitToken.mockReturnValue({ stop: false, backtrack: 1, ffTokens: [] });
     const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
-    const logits = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
 
-    logits_processor([[0n]], logits);
-
-    expect(Array.from(logits.data)).toEqual([1, -Infinity, 3, -Infinity]);
+    expect(() => logits_processor.onTokensSampled([1], [[0n, 1n]])).toThrow("requested backtracking by 1 token");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
   });
 
-  // Ensures a stop response from computeMask marks the shared state complete without committing more tokens.
-  it("stops generation when computeMask returns stop", async () => {
-    computeMask.mockReturnValue({ stop: true });
+  it("records and throws on a dead end", async () => {
+    computeMaskInto.mockReturnValue({ stop: true, reason: "dead_end" });
+    const { logits_processor, stats } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const logits = new Tensor("float32", new Float32Array(4), [1, 4]);
 
-    const { logits_processor, stopping_criteria } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
-    const logits = new Tensor("float32", new Float32Array([1, 2]), [1, 2]);
+    expect(() => logits_processor([[0n]], logits)).toThrow("reached a dead end");
+    expect(stats.stopReason).toBe("dead_end");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops and disposes when computeMask reports acceptance", async () => {
+    computeMaskInto.mockReturnValue({ stop: true, reason: "accepted" });
+    const { logits_processor, stopping_criteria, stats } = await LlguidanceConstraint.fromResponseFormat({ eos_token_id: 1 }, { type: "json_object" });
+    const logits = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
 
     logits_processor([[0n]], logits);
     logits_processor.onTokensSampled([0], [[0n]]);
 
-    expect(Array.from(logits.data)).toEqual([1, 2]);
+    expect(Array.from(logits.data)).toEqual([-Infinity, 2, -Infinity, -Infinity]);
     expect(commitToken).not.toHaveBeenCalled();
     expect(stopping_criteria([[0n]])).toEqual([true]);
+    expect(stats.stopReason).toBe("accepted");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
   });
 
-  // Keeps unexpected interpreter failures visible instead of swallowing real bugs.
-  it("rethrows unexpected computeMask errors", async () => {
+  it("fails closed on mask acceptance when the tokenizer has no EOS token ID", async () => {
+    computeMaskInto.mockReturnValue({ stop: true, reason: "accepted" });
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const logits = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
+
+    expect(() => logits_processor([[0n]], logits)).toThrow("tokenizer has no EOS token ID");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when logits have no vocabulary dimension", async () => {
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const logits = { dims: [], data: new Float32Array(4) };
+
+    expect(() => logits_processor([[0n]], logits)).toThrow("requires logits with a vocabulary dimension");
+    expect(computeMaskInto).not.toHaveBeenCalled();
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when mask vocabulary metadata is invalid", async () => {
+    computeMaskInto.mockReturnValue({ mask: new Uint32Array([0b0101]), vocabSize: undefined });
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const logits = new Tensor("float32", new Float32Array(4), [1, 4]);
+
+    expect(() => logits_processor([[0n]], logits)).toThrow("invalid vocabulary size");
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes idempotent disposal", async () => {
+    const { dispose, logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+
+    dispose();
+    dispose();
+
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
+    expect(() => logits_processor.onTokensSampled([1], [[0n, 1n]])).toThrow("has been disposed");
+  });
+
+  it("disposes and rethrows interpreter errors", async () => {
     const error = new Error("unexpected");
-    computeMask.mockImplementation(() => {
+    computeMaskInto.mockImplementation(() => {
       throw error;
     });
-
     const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
-    const logits = new Tensor("float32", new Float32Array([1, 2]), [1, 2]);
+    const logits = new Tensor("float32", new Float32Array(4), [1, 4]);
 
     expect(() => logits_processor([[0n]], logits)).toThrow(error);
+    expect(disposeInterpreter).toHaveBeenCalledTimes(1);
   });
 });

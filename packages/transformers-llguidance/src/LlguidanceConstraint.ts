@@ -6,15 +6,15 @@ import {
     logger,
     type Tensor,
 } from '@huggingface/transformers';
-import { loadBundledLLGuidance, type JSONSchema, type LLGuidanceTokenizerSource } from 'llguidance';
-
-import { applyMask, forceToken, summarizeMaskResult } from './utils/mask';
 import {
-    type GuidanceInterpreter,
-    type GuidanceMaskResult,
-    type LlguidanceState,
-    type LlguidanceStats,
-} from './utils/types';
+    loadBundledLLGuidance,
+    type JSONSchema,
+    type LLGuidanceMaskResult,
+    type LLGuidanceTokenizerSource,
+} from 'llguidance';
+
+import { applyMask, forceTokens, summarizeMaskResult } from './utils/mask';
+import { type LlguidanceState, type LlguidanceStats } from './utils/types';
 
 export type ResponseFormat =
     | { type: 'json_object' }
@@ -29,15 +29,18 @@ export class LlguidanceConstraint {
         });
 
         const runtime = await loadBundledLLGuidance();
+        const eosTokenIds = getEosTokenIds(tokenizer);
         const interpreter = runtime.createInterpreter({
             tokenizer,
             response_format,
-        }) as GuidanceInterpreter;
+        });
 
         logger.debug('[LlguidanceConstraint] interpreter created');
 
         const state: LlguidanceState = {
             completed: false,
+            disposed: false,
+            eosTokenIds,
             interpreter,
             step: 0,
             stats: {
@@ -58,6 +61,7 @@ export class LlguidanceConstraint {
             logits_processor,
             stopping_criteria: new LlguidanceStoppingCriteria(state),
             stats: state.stats,
+            dispose: () => disposeState(state),
         };
     }
 }
@@ -71,6 +75,8 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
     }
 
     _call(_inputIds: bigint[][], logits: Tensor) {
+        assertSingleSequence(_inputIds.length, this.state);
+
         if (this.state.completed) {
             if (isDebugEnabled()) {
                 logger.debug('[LlguidanceLogitsProcessor] skip completed', {
@@ -79,10 +85,16 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
             }
             return logits;
         }
+        if (this.state.disposed) {
+            throw new Error('LlguidanceConstraint has been disposed.');
+        }
 
         this.state.step++;
         this.state.stats.steps = this.state.step;
         const vocabSize = logits.dims.at(-1);
+        if (vocabSize === undefined || !Number.isInteger(vocabSize) || vocabSize <= 0) {
+            throw failState(this.state, 'LlguidanceConstraint requires logits with a vocabulary dimension.');
+        }
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceLogitsProcessor] compute mask', {
                 step: this.state.step,
@@ -91,14 +103,17 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
             });
         }
 
-        let result: GuidanceMaskResult;
+        let result: LLGuidanceMaskResult;
         const maskStart = performance.now();
-        const maskWords = vocabSize === undefined ? undefined : Math.ceil(vocabSize / 32);
-        if (this.state.interpreter.computeMaskInto && maskWords !== undefined) {
-            this.state.maskBuffer ??= new Uint32Array(maskWords);
+        const maskWords = Math.ceil(vocabSize / 32);
+        if (this.state.maskBuffer?.length !== maskWords) {
+            this.state.maskBuffer = new Uint32Array(maskWords);
+        }
+        try {
             result = this.state.interpreter.computeMaskInto(this.state.maskBuffer);
-        } else {
-            result = this.state.interpreter.computeMask();
+        } catch (error) {
+            disposeState(this.state);
+            throw error;
         }
         this.state.stats.computeMaskMs += performance.now() - maskStart;
         const maskInstrumentation = this.state.interpreter.maskInstrumentation?.();
@@ -111,12 +126,23 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceLogitsProcessor] mask result', {
                 step: this.state.step,
-                result: summarizeMaskResult(result, vocabSize),
+                result: summarizeMaskResult(result),
             });
         }
 
         if ('stop' in result && result.stop) {
+            this.state.stats.stopReason = result.reason;
+            if (result.reason === 'dead_end') {
+                throw failState(this.state, 'llguidance reached a dead end before satisfying the constraint.');
+            }
             this.state.completed = true;
+            try {
+                forceTokens(logits, this.state.eosTokenIds);
+            } catch (error) {
+                disposeState(this.state);
+                throw error;
+            }
+            disposeState(this.state);
             if (isDebugEnabled()) {
                 logger.debug('[LlguidanceLogitsProcessor] stopped by mask', {
                     step: this.state.step,
@@ -125,30 +151,21 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
             return logits;
         }
 
-        if ('ffTokens' in result && result.ffTokens?.length) {
-            // Fast-forward splice: the grammar forces the next token, so ban
-            // everything else instead of letting the model sample unconstrained.
-            forceToken(logits, result.ffTokens[0], vocabSize);
-            if (isDebugEnabled()) {
-                logger.debug('[LlguidanceLogitsProcessor] forced splice token', {
-                    step: this.state.step,
-                    ffTokens: Array.from(result.ffTokens),
-                    backtrack: 'backtrack' in result ? result.backtrack : undefined,
-                });
-            }
-            return logits;
-        }
-
         if ('mask' in result) {
             const applyStart = performance.now();
-            if (isDebugEnabled()) {
-                const applied = applyMask(logits, result.mask, result.vocabSize ?? vocabSize, true);
-                logger.debug('[LlguidanceLogitsProcessor] mask applied', {
-                    step: this.state.step,
-                    ...applied,
-                });
-            } else {
-                applyMask(logits, result.mask, result.vocabSize ?? vocabSize);
+            try {
+                if (isDebugEnabled()) {
+                    const applied = applyMask(logits, result.mask, result.vocabSize, true);
+                    logger.debug('[LlguidanceLogitsProcessor] mask applied', {
+                        step: this.state.step,
+                        ...applied,
+                    });
+                } else {
+                    applyMask(logits, result.mask, result.vocabSize);
+                }
+            } catch (error) {
+                disposeState(this.state);
+                throw error;
             }
             this.state.stats.applyMaskMs += performance.now() - applyStart;
         }
@@ -168,9 +185,18 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
         }
 
         if (this.state.completed) return;
+        if (this.state.disposed) {
+            throw new Error('LlguidanceConstraint has been disposed.');
+        }
 
         const commitStart = performance.now();
-        const result = this.state.interpreter.commitToken(tokenId);
+        let result;
+        try {
+            result = this.state.interpreter.commitToken(tokenId);
+        } catch (error) {
+            disposeState(this.state);
+            throw error;
+        }
         this.state.stats.commitTokenMs += performance.now() - commitStart;
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceLogitsProcessor] token committed', {
@@ -180,8 +206,17 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
             });
         }
 
-        if (result?.stop) {
+        if (result.backtrack > 0) {
+            throw failState(
+                this.state,
+                `llguidance requested backtracking by ${result.backtrack} token(s), which Transformers.js does not support.`,
+            );
+        }
+
+        if (result.stop) {
             this.state.completed = true;
+            this.state.stats.stopReason = 'accepted';
+            disposeState(this.state);
             if (isDebugEnabled()) {
                 logger.debug('[LlguidanceLogitsProcessor] stopped by commit', {
                     step: this.state.step,
@@ -192,6 +227,8 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
     }
 
     onTokensSampled(tokenIds: number[], inputIds: bigint[][]) {
+        assertSingleSequence(tokenIds.length, this.state);
+        assertSingleSequence(inputIds.length, this.state);
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceLogitsProcessor] tokens sampled', {
                 step: this.state.step,
@@ -201,9 +238,7 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
             });
         }
 
-        for (let batchIdx = 0; batchIdx < tokenIds.length; ++batchIdx) {
-            this.onTokenSampled(tokenIds[batchIdx], batchIdx, inputIds);
-        }
+        this.onTokenSampled(tokenIds[0], 0, inputIds);
     }
 }
 
@@ -216,6 +251,7 @@ class LlguidanceStoppingCriteria extends StoppingCriteria {
     }
 
     _call(inputIds: ArrayLike<unknown>[]) {
+        assertSingleSequence(inputIds.length, this.state);
         const result = new Array(inputIds.length).fill(this.state.completed);
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceStoppingCriteria] call', {
@@ -231,5 +267,49 @@ class LlguidanceStoppingCriteria extends StoppingCriteria {
 
 function isDebugEnabled() {
     // Keep compatibility with Transformers.js releases that predate the LogLevel export.
-    return env.logLevel <= 10;
+    return env.logLevel <= DEBUG_LOG_LEVEL;
+}
+
+const DEBUG_LOG_LEVEL = 10;
+
+function assertSingleSequence(batchSize: number, state: LlguidanceState) {
+    if (batchSize !== 1) {
+        throw failState(state, `LlguidanceConstraint currently supports batch size 1; received ${batchSize}.`);
+    }
+}
+
+function failState(state: LlguidanceState, message: string) {
+    disposeState(state);
+    return new Error(message);
+}
+
+function disposeState(state: LlguidanceState) {
+    if (state.disposed) return;
+    state.disposed = true;
+    state.maskBuffer = undefined;
+    state.interpreter.dispose();
+}
+
+function getEosTokenIds(tokenizer: LLGuidanceTokenizerSource) {
+    const source = tokenizer as Record<string, unknown>;
+    const values = [
+        source.eos_token_id,
+        source.eosTokenId,
+        source.eos_token_ids,
+        source.eosTokenIds,
+        source.eos_token,
+        source.eos_tokens,
+    ];
+
+    if (typeof source.eosToken === 'function') {
+        values.push(source.eosToken.call(tokenizer));
+    }
+
+    return [
+        ...new Set(
+            values
+                .flat()
+                .filter((value): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0),
+        ),
+    ];
 }
