@@ -29,6 +29,9 @@ const TEST_IMAGES = Object.freeze({
 
 const TEST_AUDIOS = {
   mlk: BASE_URL + "mlk.npy",
+  whisper_1: BASE_URL + "whisper-test-audio_1.pcm",
+  whisper_2: BASE_URL + "whisper-test-audio_2.pcm",
+  whisper_3: BASE_URL + "whisper-test-audio_3.pcm",
 };
 
 /** @type {Map<string, RawImage>} */
@@ -51,7 +54,7 @@ const load_audio = async (url) => {
     return cached;
   }
   const buffer = await (await fetch(url)).arrayBuffer();
-  const audio = Float32Array.from(new Float64Array(buffer));
+  const audio = url.endsWith(".npy") ? Float32Array.from(new Float64Array(buffer)) : new Float32Array(buffer);
   AUDIO_CACHE.set(url, audio);
   return audio;
 };

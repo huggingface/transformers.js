@@ -22,21 +22,16 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * to the number of predictions.
  * @property {boolean} [percentage=false] Whether to return the boxes coordinates in percentage (true) or in pixels (false).
  *
- * @callback ZeroShotObjectDetectionPipelineCallbackSingle Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
- * @param {ImageInput} images The input images.
- * @param {string[]} candidate_labels What the model should recognize in the image.
- * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
- * @returns {Promise<ZeroShotObjectDetectionOutput>} An array of objects containing the predicted labels, scores, and bounding boxes.
- *
- * @callback ZeroShotObjectDetectionPipelineCallbackBatch Detect objects (bounding boxes & classes) in the image(s) passed as inputs.
- * @param {ImageInput[]} images The input images.
- * @param {string[]} candidate_labels What the model should recognize in the image.
- * @param {ZeroShotObjectDetectionPipelineOptions} [options] The options to use for zero-shot object detection.
- * @returns {Promise<ZeroShotObjectDetectionOutput[]>} An array of objects containing the predicted labels, scores, and bounding boxes.
- *
- * @typedef {ZeroShotObjectDetectionPipelineCallbackSingle & ZeroShotObjectDetectionPipelineCallbackBatch} ZeroShotObjectDetectionPipelineCallback
- *
  * @typedef {TextImagePipelineConstructorArgs & ZeroShotObjectDetectionPipelineCallback & Disposable} ZeroShotObjectDetectionPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? ZeroShotObjectDetectionOutput[] : ZeroShotObjectDetectionOutput} ZeroShotObjectDetectionPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T, candidate_labels: string[], options?: ZeroShotObjectDetectionPipelineOptions) => Promise<ZeroShotObjectDetectionPipelineResult<T>>} ZeroShotObjectDetectionPipelineCallback
  */
 
 /**

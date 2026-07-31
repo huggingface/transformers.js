@@ -16,13 +16,15 @@
  * @module backends/onnx
  */
 
-import { env, apis } from '../env.js';
+import { env, apis, LogLevel } from '../env.js';
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
-import { isBlobURL, loadWasmBinary, loadWasmFactory, toAbsoluteURL } from './utils/cacheWasm.js';
+import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
+import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
+import { logger } from '../utils/logger.js';
 export { Tensor } from 'onnxruntime-common';
 
 /**
@@ -46,9 +48,48 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     'webnn-cpu': { name: 'webnn', deviceType: 'cpu' }, // WebNN CPU
 });
 
-/** @type {Array<'verbose' | 'info' | 'warning' | 'error' | 'fatal'>} */
-const LOG_LEVELS = ['verbose', 'info', 'warning', 'error', 'fatal'];
-const DEFAULT_LOG_LEVEL = 4; // 'fatal';
+/**
+ * Converts any LogLevel value to ONNX Runtime's numeric severity level (0-4).
+ * This handles both standard LogLevel values (10, 20, 30, 40, 50) and custom intermediate values.
+ *
+ * @param {number} logLevel - The LogLevel value to convert
+ * @returns {number} ONNX Runtime severity level (0-4)
+ */
+function getOnnxLogSeverityLevel(logLevel) {
+    // ONNX Runtime's log severity levels are defined as follows:
+    // (0) ORT_LOGGING_LEVEL_VERBOSE: Print all log messages.
+    // (1) ORT_LOGGING_LEVEL_INFO: Print info and higher level log messages.
+    // (2) ORT_LOGGING_LEVEL_WARNING: Print warning and higher level log messages.
+    // (3) ORT_LOGGING_LEVEL_ERROR: Print error log messages.
+    // (4) ORT_LOGGING_LEVEL_FATAL: Print only fatal log messages.
+    //
+    // In practice, ONNX Runtime's logging is extremely verbose (especially on session creation).
+    // For this reason, we map multiple LogLevel values to the same ONNX severity level to avoid
+    // overwhelming users with logs.
+    if (logLevel <= LogLevel.DEBUG) {
+        return 0; // ORT_LOGGING_LEVEL_VERBOSE
+    } else if (logLevel <= LogLevel.INFO) {
+        return 2; // ORT_LOGGING_LEVEL_WARNING
+    } else if (logLevel <= LogLevel.WARNING) {
+        return 3; // ORT_LOGGING_LEVEL_ERROR
+    } else if (logLevel <= LogLevel.ERROR) {
+        return 3; // ORT_LOGGING_LEVEL_ERROR
+    } else {
+        return 4; // ORT_LOGGING_LEVEL_FATAL
+    }
+}
+
+/**
+ * Maps ONNX Runtime numeric severity levels to string log levels.
+ * @type {Record<0 | 1 | 2 | 3 | 4, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
+ */
+const ONNX_LOG_LEVEL_NAMES = {
+    0: 'verbose',
+    1: 'info',
+    2: 'warning',
+    3: 'error',
+    4: 'fatal',
+};
 
 /**
  * The list of supported devices, sorted by priority/performance.
@@ -136,8 +177,6 @@ export function deviceToExecutionProviders(device = null) {
     throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevices.join(', ')}.`);
 }
 
-const IS_WEB_ENV = apis.IS_BROWSER_ENV || apis.IS_WEBWORKER_ENV;
-
 /**
  * Currently, Transformers.js doesn't support simultaneous loading of sessions in WASM/WebGPU.
  * For this reason, we need to chain the loading calls.
@@ -164,14 +203,23 @@ async function ensureWasmLoaded() {
         return wasmLoadPromise;
     }
 
+    // Check if we should load the WASM binary
     const shouldUseWasmCache =
         env.useWasmCache &&
         typeof ONNX_ENV?.wasm?.wasmPaths === 'object' &&
         ONNX_ENV?.wasm?.wasmPaths?.wasm &&
         ONNX_ENV?.wasm?.wasmPaths?.mjs;
 
-    // Check if we should load the WASM binary
     if (!shouldUseWasmCache) {
+        // In Deno's web runtime, the WASM factory must be loaded via blob URL so that Node.js detection
+        // can be patched out (see loadWasmFactory). Without caching, the factory is imported directly
+        // from its URL and Deno would crash trying to use Node.js APIs. useWasmCache defaults to true
+        // in this environment, so this only happens if the user explicitly disables it.
+        if (apis.IS_DENO_WEB_RUNTIME) {
+            throw new Error(
+                "env.useWasmCache=false is not supported in Deno's web runtime. Remove the useWasmCache override.",
+            );
+        }
         wasmLoadPromise = Promise.resolve();
         return wasmLoadPromise;
     }
@@ -182,7 +230,10 @@ async function ensureWasmLoaded() {
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
         const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
 
-        // Load and cache both the WASM binary and factory
+        // Load both in parallel; the .mjs blob URL is only kept if wasmBinary succeeded.
+        // ORT only sets locateFile when wasmBinary is provided (onnxruntime PR https://github.com/microsoft/onnxruntime/pull/27411), which
+        // prevents new URL(fileName, import.meta.url) from failing inside a blob URL factory.
+        let wasmBinaryLoaded = false;
         await Promise.all([
             // Load and cache the WASM binary
             urls.wasm && !isBlobURL(urls.wasm)
@@ -191,14 +242,15 @@ async function ensureWasmLoaded() {
                           const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
                           if (wasmBinary) {
                               ONNX_ENV.wasm.wasmBinary = wasmBinary;
+                              wasmBinaryLoaded = true;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM binary:', err);
+                          logger.warn('Failed to pre-load WASM binary:', err);
                       }
                   })()
                 : Promise.resolve(),
 
-            // Load and cache the WASM factory
+            // Load and cache the WASM factory as a blob URL
             urls.mjs && !isBlobURL(urls.mjs)
                 ? (async () => {
                       try {
@@ -208,11 +260,17 @@ async function ensureWasmLoaded() {
                               ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
                           }
                       } catch (err) {
-                          console.warn('Failed to pre-load WASM factory:', err);
+                          logger.warn('Failed to pre-load WASM factory:', err);
                       }
                   })()
                 : Promise.resolve(),
         ]);
+
+        // If wasmBinary failed to load, revert wasmPaths.mjs to the original URL (factory can only be loaded from blob if ONNX_ENV.wasm.wasmBinary is set. @see ORT PR #27411)
+        if (!wasmBinaryLoaded) {
+            // @ts-ignore
+            ONNX_ENV.wasm.wasmPaths.mjs = urls.mjs;
+        }
     })();
 
     return wasmLoadPromise;
@@ -227,13 +285,14 @@ async function ensureWasmLoaded() {
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
     await ensureWasmLoaded();
+    const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
     const load = () =>
         InferenceSession.create(buffer_or_path, {
-            // Set default log level, but allow overriding through session options
-            logSeverityLevel: DEFAULT_LOG_LEVEL,
+            // Set default log severity level, but allow overriding through session options
+            logSeverityLevel,
             ...session_options,
         });
-    const session = await (IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
     session.config = session_config;
     return session;
 }
@@ -253,8 +312,7 @@ let webInferenceChain = Promise.resolve();
  */
 export async function runInferenceSession(session, ortFeed) {
     const run = () => session.run(ortFeed);
-    const output = await (IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run());
-    return output;
+    return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
 }
 
 /**
@@ -265,42 +323,8 @@ export async function runInferenceSession(session, ortFeed) {
 export function isONNXTensor(x) {
     return x instanceof ONNX.Tensor;
 }
-
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
-ONNX_ENV.logLevel = LOG_LEVELS[DEFAULT_LOG_LEVEL];
-if (ONNX_ENV?.wasm) {
-    // Initialize wasm backend with suitable default settings.
-
-    // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
-    // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
-    if (
-        // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
-        !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
-        ONNX_ENV.versions?.web &&
-        !ONNX_ENV.wasm.wasmPaths
-    ) {
-        const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
-
-        ONNX_ENV.wasm.wasmPaths = apis.IS_SAFARI
-            ? {
-                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.mjs`,
-                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.wasm`,
-              }
-            : {
-                  mjs: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.mjs`,
-                  wasm: `${wasmPathPrefix}ort-wasm-simd-threaded.asyncify.wasm`,
-              };
-    }
-
-    // Users may wish to proxy the WASM backend to prevent the UI from freezing,
-    // However, this is not necessary when using WebGPU, so we default to false.
-    ONNX_ENV.wasm.proxy = false;
-}
-
-if (ONNX_ENV?.webgpu) {
-    ONNX_ENV.webgpu.powerPreference = 'high-performance';
-}
 
 /**
  * Check if ONNX's WASM backend is being proxied.
@@ -311,5 +335,57 @@ export function isONNXProxy() {
     return ONNX_ENV?.wasm?.proxy;
 }
 
-// Expose ONNX environment variables to `env.backends.onnx`
-env.backends.onnx = ONNX_ENV;
+if (ONNX_ENV) {
+    if (ONNX_ENV.wasm) {
+        // Initialize wasm backend with suitable default settings.
+
+        // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
+        // By default, we only do this if we are not in a service worker and the wasmPaths are not already set.
+        if (
+            // @ts-ignore Cannot find name 'ServiceWorkerGlobalScope'.ts(2304)
+            !(typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWorkerGlobalScope) &&
+            ONNX_ENV.versions?.web &&
+            !ONNX_ENV.wasm.wasmPaths
+        ) {
+            const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
+
+            let wasmPathSuffix = '.asyncify'; // Default to asyncify WASM build
+            if (apis.IS_SAFARI_BELOW_26 && !apis.IS_WEBGPU_AVAILABLE) {
+                // Disable asyncify for Safari below 26 when WebGPU is not available
+                wasmPathSuffix = '';
+            }
+
+            ONNX_ENV.wasm.wasmPaths = {
+                mjs: `${wasmPathPrefix}ort-wasm-simd-threaded${wasmPathSuffix}.mjs`,
+                wasm: `${wasmPathPrefix}ort-wasm-simd-threaded${wasmPathSuffix}.wasm`,
+            };
+        }
+
+        // Users may wish to proxy the WASM backend to prevent the UI from freezing,
+        // However, this is not necessary when using WebGPU, so we default to false.
+        ONNX_ENV.wasm.proxy = false;
+    }
+
+    if (ONNX_ENV.webgpu) {
+        ONNX_ENV.webgpu.powerPreference = 'high-performance';
+    }
+
+    /**
+     * A function to map Transformers.js log levels to ONNX Runtime log severity
+     * levels, and set the log level environment variable in ONNX Runtime.
+     * @param {number} logLevel The log level to set.
+     */
+    function setLogLevel(logLevel) {
+        const severityLevel = getOnnxLogSeverityLevel(logLevel);
+        ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[severityLevel];
+    }
+
+    // Set the initial log level to be the default Transformers.js log level.
+    setLogLevel(env.logLevel ?? LogLevel.WARNING);
+
+    // Expose ONNX environment variables to `env.backends.onnx`
+    env.backends.onnx = {
+        ...ONNX_ENV,
+        setLogLevel,
+    };
+}

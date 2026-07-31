@@ -1,4 +1,4 @@
-import { Qwen2VLProcessor, Qwen2VLForConditionalGeneration, RawImage } from "../../../src/transformers.js";
+import { Qwen2VLProcessor, Qwen2VLForConditionalGeneration, Qwen2VLForCausalLM, AutoTokenizer, RawImage } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -79,6 +79,37 @@ export default () => {
 
         const new_tokens = generate_ids.slice(null, [inputs.input_ids.dims.at(-1), null]);
         expect(new_tokens.tolist()).toEqual([[24284n, 35302n, 60575n, 38679n, 113390n, 115118n, 137596n, 38241n, 96726n, 142301n]]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Qwen2VLForCausalLM", () => {
+    const model_id = "hf-internal-testing/tiny-random-Qwen2VLForConditionalGeneration";
+
+    /** @type {Qwen2VLForCausalLM} */
+    let model;
+    /** @type {AutoTokenizer} */
+    let tokenizer;
+    beforeAll(async () => {
+      model = await Qwen2VLForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "batch_size=1",
+      async () => {
+        const inputs = tokenizer("hello");
+        const outputs = await model.generate({
+          ...inputs,
+          max_length: 10,
+          do_sample: false,
+        });
+        expect(outputs.tolist()).toEqual([[14990n, 150610n, 22618n, 127483n, 72112n, 121460n, 58034n, 122233n, 18625n, 63632n]]);
       },
       MAX_TEST_EXECUTION_TIME,
     );

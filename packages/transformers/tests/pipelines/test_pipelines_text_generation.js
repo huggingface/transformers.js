@@ -1,4 +1,5 @@
-import { pipeline, TextGenerationPipeline } from "../../src/transformers.js";
+import { pipeline, TextGenerationPipeline, DynamicCache } from "../../src/transformers.js";
+import { jest } from "@jest/globals";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -88,6 +89,38 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "chat input forwards top-level tools",
+        async () => {
+          const tools = [
+            {
+              name: "get_weather",
+              description: "Get the weather in a city",
+              parameter_definitions: {
+                location: {
+                  description: "City and country",
+                  type: "str",
+                  required: true,
+                },
+              },
+            },
+          ];
+
+          const spy = jest.spyOn(pipe.tokenizer, "apply_chat_template");
+          await pipe(chat_input, {
+            max_new_tokens: 3,
+            do_sample: false,
+            tools,
+          });
+
+          const [, options] = spy.mock.calls.at(-1);
+          expect(options.tools).toEqual(tools);
+          expect(options.add_generation_prompt).toBe(true);
+          spy.mockRestore();
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1
@@ -101,6 +134,181 @@ export default () => {
     //         expect(output).toEqual(target);
     //     }, MAX_TEST_EXECUTION_TIME);
     // });
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text Generation (Qwen3_5 VL model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Qwen3_5ForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "\u0e1e\u0e22\u0e32\u0e1a\u0e32\u0e25Composition directives" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text Generation (Gemma3 model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Gemma3ForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "hellohellohello" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "chat input (single)",
+      async () => {
+        const output = await pipe([{ role: "user", content: "hello" }], { max_new_tokens: 3, do_sample: false });
+        expect(output).toEqual([
+          {
+            generated_text: [
+              { role: "user", content: "hello" },
+              { role: "assistant", content: "\n\n\n" },
+            ],
+          },
+        ]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text Generation (LFM2 model, DynamicCache PKV)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Lfm2ForCausalLM";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it(
+      "multi-turn with past_key_values matches without",
+      async () => {
+        const generate_kwargs = { max_new_tokens: 8, do_sample: false };
+        const past_key_values = new DynamicCache();
+
+        const messages = [{ role: "user", content: "What is the capital of France?" }];
+
+        // Turn 1
+        {
+          const with_pkv = await pipe(messages, { ...generate_kwargs, past_key_values });
+          const without_pkv = await pipe(messages, generate_kwargs);
+          expect(with_pkv[0].generated_text.at(-1).content).toEqual(without_pkv[0].generated_text.at(-1).content);
+          expect(past_key_values.get_seq_length()).toBeGreaterThan(0);
+          messages.push(with_pkv[0].generated_text.at(-1));
+        }
+
+        // Turn 2
+        {
+          messages.push({ role: "user", content: "What about Germany?" });
+          const with_pkv = await pipe(messages, { ...generate_kwargs, past_key_values });
+          const without_pkv = await pipe(messages, generate_kwargs);
+          expect(with_pkv[0].generated_text.at(-1).content).toEqual(without_pkv[0].generated_text.at(-1).content);
+          messages.push(with_pkv[0].generated_text.at(-1));
+        }
+
+        // Turn 3
+        {
+          messages.push({ role: "user", content: "And Spain?" });
+          const with_pkv = await pipe(messages, { ...generate_kwargs, past_key_values });
+          const without_pkv = await pipe(messages, generate_kwargs);
+          expect(with_pkv[0].generated_text.at(-1).content).toEqual(without_pkv[0].generated_text.at(-1).content);
+        }
+
+        await past_key_values.dispose();
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text Generation (Gemma3n model, text-only)", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Gemma3nForConditionalGeneration";
+
+    /** @type {TextGenerationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TextGenerationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TextGenerationPipeline);
+    });
+
+    it("should load only embed_tokens and decoder_model_merged when the model is a image-text-to-text model", async () => {
+      const sessions = pipe.model.sessions;
+      expect(sessions).toHaveProperty("embed_tokens");
+      expect(sessions).toHaveProperty("decoder_model_merged");
+      expect(sessions).not.toHaveProperty("vision_encoder");
+    });
+
+    it(
+      "text input (single)",
+      async () => {
+        const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
+        expect(output).toEqual([{ generated_text: "<unused1821>\u0443\u0440\u0430corporate" }]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
 
     afterAll(async () => {
       await pipe?.dispose();

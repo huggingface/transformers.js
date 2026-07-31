@@ -18,19 +18,16 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  * @property {number} [threshold=0.9] The threshold used to filter boxes by score.
  * @property {boolean} [percentage=false] Whether to return the boxes coordinates in percentage (true) or in pixels (false).
  *
- * @callback ObjectDetectionPipelineCallbackSingle Detect objects (bounding boxes & classes) in the image passed as input.
- * @param {ImageInput} images The input image.
- * @param {ObjectDetectionPipelineOptions} [options] The options to use for object detection.
- * @returns {Promise<ObjectDetectionOutput>} A list of detected objects.
- *
- * @callback ObjectDetectionPipelineCallbackBatch Detect objects (bounding boxes & classes) in the images passed as inputs.
- * @param {ImageInput[]} images The input images.
- * @param {ObjectDetectionPipelineOptions} [options] The options to use for object detection.
- * @returns {Promise<ObjectDetectionOutput[]>} A list where each entry contains the detections for the corresponding input image.
- *
- * @typedef {ObjectDetectionPipelineCallbackSingle & ObjectDetectionPipelineCallbackBatch} ObjectDetectionPipelineCallback
- *
  * @typedef {ImagePipelineConstructorArgs & ObjectDetectionPipelineCallback & Disposable} ObjectDetectionPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? ObjectDetectionOutput[] : ObjectDetectionOutput} ObjectDetectionPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T, options?: ObjectDetectionPipelineOptions) => Promise<ObjectDetectionPipelineResult<T>>} ObjectDetectionPipelineCallback
  */
 
 /**

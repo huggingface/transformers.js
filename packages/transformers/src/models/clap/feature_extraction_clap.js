@@ -1,6 +1,7 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { random } from '../../utils/random.js';
 
 export class ClapFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -58,7 +59,7 @@ export class ClapFeatureExtractor extends FeatureExtractor {
         if (diff > 0) {
             if (truncation === 'rand_trunc') {
                 longer = true;
-                const idx = Math.floor(Math.random() * (diff + 1));
+                const idx = Math.floor(random.random() * (diff + 1));
                 waveform = waveform.subarray(idx, idx + max_length);
 
                 input_mel = await this._extract_fbank_features(

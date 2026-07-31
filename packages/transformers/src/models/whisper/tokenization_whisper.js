@@ -8,6 +8,13 @@ import { mergeArrays } from '../../utils/core.js';
 const PUNCTUATION_REGEX = '\\p{P}\\u0021-\\u002F\\u003A-\\u0040\\u005B-\\u0060\\u007B-\\u007E';
 const PUNCTUATION_ONLY_REGEX = new RegExp(`^[${PUNCTUATION_REGEX}]+$`, 'gu');
 
+/**
+ * Small tolerance (in seconds) for timestamp ordering in chunk overlap matching.
+ * DTW can produce slightly different timestamps for the same word across overlapping
+ * chunks, so we allow a small tolerance to avoid rejecting valid token matches.
+ */
+const TIMESTAMP_MERGE_TOLERANCE = 0.1;
+
 export class WhisperTokenizer extends PreTrainedTokenizer {
     get timestamp_begin() {
         return this._tokenizer.token_to_id('<|notimestamps|>') + 1;
@@ -199,6 +206,19 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                                     resolved_token_timestamps,
                                     last_language,
                                 );
+
+                                // Cap word end timestamps to the chunk's end timestamp,
+                                // but only if it wouldn't create an inverted range (end < start)
+                                if (chunk.words.length > 0 && chunk.timestamp[1] !== null) {
+                                    for (const word of chunk.words) {
+                                        if (
+                                            word.timestamp[1] > chunk.timestamp[1] &&
+                                            chunk.timestamp[1] >= word.timestamp[0]
+                                        ) {
+                                            word.timestamp[1] = chunk.timestamp[1];
+                                        }
+                                    }
+                                }
                             }
 
                             chunks.push(chunk);
@@ -329,6 +349,7 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
         // MUST be those subsequences in order.
         // If token_timestamp_sequences is provided, will split those sequences in
         // exactly the same way.
+
         let leftSequence = sequences[0];
         let leftLength = leftSequence.length;
         let totalSequence = [];
@@ -390,12 +411,14 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
                 let matches;
                 if (use_token_timestamp_sequences) {
                     // Get length of longest subsequence of tokens that match
-                    // and have timestamps that are in order
+                    // and have timestamps that are in order.
+                    // Use a small tolerance since DTW can produce slightly different
+                    // timestamps for the same word across overlapping chunks.
                     matches = left.filter(
                         (elem, idx) =>
                             elem === right[idx] &&
-                            left_token_timestamp_sequence[leftStart + idx] <=
-                                token_timestamp_sequences[i][rightStart + idx],
+                            left_token_timestamp_sequence[leftStart + idx][0] - TIMESTAMP_MERGE_TOLERANCE <=
+                                token_timestamp_sequences[i][rightStart + idx][0],
                     ).length;
                 } else {
                     matches = left.filter((elem, idx) => elem === right[idx]).length;
@@ -411,7 +434,16 @@ export class WhisperTokenizer extends PreTrainedTokenizer {
             }
             const [leftStart, leftStop, rightStart, rightStop] = maxIndices;
             const leftMid = Math.floor((leftStop + leftStart) / 2);
-            const rightMid = Math.floor((rightStop + rightStart) / 2);
+            let rightMid = Math.floor((rightStop + rightStart) / 2);
+
+            // When no overlap is found and we have timestamps, skip right-side tokens
+            // that precede the left's last timestamp to avoid backwards-jumping timestamps.
+            if (use_token_timestamp_sequences && max === 0.0 && leftLength > 0) {
+                const lastLeftTs = left_token_timestamp_sequence[leftLength - 1][0];
+                const idx = token_timestamp_sequences[i].findIndex((ts) => ts[0] >= lastLeftTs);
+                rightMid = idx === -1 ? rightSequence.length : idx;
+            }
+
             totalSequence.push(...leftSequence.slice(0, leftMid));
             leftSequence = rightSequence.slice(rightMid);
             leftLength = leftSequence.length;

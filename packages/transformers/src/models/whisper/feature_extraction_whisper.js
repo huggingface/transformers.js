@@ -1,7 +1,7 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
-import { max } from '../../utils/maths.js';
+import { logger } from '../../utils/logger.js';
 
 export class WhisperFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -27,7 +27,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
      * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
     async _extract_fbank_features(waveform) {
-        const features = await spectrogram(
+        return await spectrogram(
             waveform,
             this.window, // window
             this.config.n_fft, // frame_length
@@ -35,7 +35,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
             {
                 power: 2.0,
                 mel_filters: this.config.mel_filters,
-                log_mel: 'log10',
+                log_mel: 'log10_max_norm',
 
                 // Custom
                 max_num_frames: Math.min(
@@ -44,15 +44,6 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
                 ),
             },
         );
-
-        const data = features.data;
-        const maxValue = max(/** @type {Float32Array} */ (data))[0];
-
-        for (let i = 0; i < data.length; ++i) {
-            data[i] = (Math.max(data[i], maxValue - 8.0) + 4.0) / 4.0;
-        }
-
-        return features;
     }
 
     /**
@@ -67,7 +58,7 @@ export class WhisperFeatureExtractor extends FeatureExtractor {
         const length = max_length ?? this.config.n_samples;
         if (audio.length > length) {
             if (audio.length > this.config.n_samples) {
-                console.warn(
+                logger.warn(
                     'Attempting to extract features for audio longer than 30 seconds. ' +
                         'If using a pipeline to extract transcript from a long audio clip, ' +
                         'remember to specify `chunk_length_s` and/or `stride_length_s`.',

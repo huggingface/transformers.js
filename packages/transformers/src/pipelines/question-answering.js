@@ -18,33 +18,21 @@ import { softmax } from '../utils/maths.js';
  * @typedef {Object} QuestionAnsweringPipelineOptions Parameters specific to question answering pipelines.
  * @property {number} [top_k=1] The number of top answer predictions to be returned.
  *
- * @callback QuestionAnsweringPipelineCallbackSingleTop1 Answer the question given as input by using the context.
- * @param {string} question The question.
- * @param {string} context The context.
- * @param {{top_k: 1} | {} | undefined} [options] The options to use for question answering.
- * @returns {Promise<QuestionAnsweringOutput>} The answer.
- *
- * @callback QuestionAnsweringPipelineCallbackSingleTopK Answer the question given as input by using the context.
- * @param {string} question The question.
- * @param {string} context The context.
- * @param {{top_k: number}} [options] The options to use for question answering.
- * @returns {Promise<QuestionAnsweringOutput[]>} The answers.
- *
- * @callback QuestionAnsweringPipelineCallbackBatchTop1 Answer the questions given as inputs by using the contexts.
- * @param {string[]} question The questions.
- * @param {string[]} context The contexts.
- * @param {{top_k: 1} | {} | undefined} [options] The options to use for question answering.
- * @returns {Promise<QuestionAnsweringOutput[]>} The answers.
- *
- * @callback QuestionAnsweringPipelineCallbackBatchTopK Answer the questions given as inputs by using the contexts.
- * @param {string[]} question The questions.
- * @param {string[]} context The contexts.
- * @param {{top_k: number}} [options] The options to use for question answering.
- * @returns {Promise<QuestionAnsweringOutput[][]>} The answers.
- *
- * @typedef {QuestionAnsweringPipelineCallbackSingleTop1 & QuestionAnsweringPipelineCallbackSingleTopK & QuestionAnsweringPipelineCallbackBatchTop1 & QuestionAnsweringPipelineCallbackBatchTopK} QuestionAnsweringPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & QuestionAnsweringPipelineCallback & Disposable} QuestionAnsweringPipelineType
+ */
+
+/**
+ * @template O
+ * @typedef {O extends { top_k: infer K } ? (1 extends K ? false : true) : false} QuestionAnsweringIsTopK
+ */
+
+/**
+ * @template Q, O
+ * @typedef {Q extends string[] ? (QuestionAnsweringIsTopK<O> extends true ? QuestionAnsweringOutput[][] : QuestionAnsweringOutput[]) : (QuestionAnsweringIsTopK<O> extends true ? QuestionAnsweringOutput[] : QuestionAnsweringOutput)} QuestionAnsweringPipelineResult
+ */
+
+/**
+ * @typedef {<Q extends string | string[], const O extends { top_k?: number } = {}>(question: Q, context: Q, options?: O) => Promise<QuestionAnsweringPipelineResult<Q, O>>} QuestionAnsweringPipelineCallback
  */
 
 /**

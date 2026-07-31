@@ -11,19 +11,16 @@ import { RawImage } from '../utils/image.js';
 /**
  * @typedef {Object} BackgroundRemovalPipelineOptions Parameters specific to background removal pipelines.
  *
- * @callback BackgroundRemovalPipelineCallbackSingle Remove the background from the image passed as input.
- * @param {ImageInput} images The input image.
- * @param {BackgroundRemovalPipelineOptions} [options] The options to use for background removal.
- * @returns {Promise<RawImage>} The image with the background removed.
- *
- * @callback BackgroundRemovalPipelineCallbackBatch Remove the background from the images passed as inputs.
- * @param {ImageInput[]} images The input images.
- * @param {BackgroundRemovalPipelineOptions} [options] The options to use for background removal.
- * @returns {Promise<RawImage[]>} The images with the background removed.
- *
- * @typedef {BackgroundRemovalPipelineCallbackSingle & BackgroundRemovalPipelineCallbackBatch} BackgroundRemovalPipelineCallback
- *
  * @typedef {ImagePipelineConstructorArgs & BackgroundRemovalPipelineCallback & Disposable} BackgroundRemovalPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? RawImage[] : RawImage} BackgroundRemovalPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T, options?: BackgroundRemovalPipelineOptions) => Promise<BackgroundRemovalPipelineResult<T>>} BackgroundRemovalPipelineCallback
  */
 
 /**

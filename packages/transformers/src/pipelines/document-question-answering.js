@@ -16,7 +16,7 @@ import { Tensor } from '../utils/tensor.js';
  * @callback DocumentQuestionAnsweringPipelineCallback Answer the question given as input by using the document.
  * @param {ImageInput|ImageInput[]} image The image of the document to use.
  * @param {string} question A question to ask of the document.
- * @param {Partial<import('../generation/configuration_utils.js').GenerationConfig>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {Partial<import('../generation/parameters.js').GenerationFunctionParameters>} [options] Additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<DocumentQuestionAnsweringOutput>} An object (or array of objects) containing the answer(s).
  *
  * @typedef {TextImagePipelineConstructorArgs & DocumentQuestionAnsweringPipelineCallback & Disposable} DocumentQuestionAnsweringPipelineType
@@ -43,6 +43,9 @@ export class DocumentQuestionAnsweringPipeline
         Pipeline
     )
 {
+    _default_generation_config = {
+        max_new_tokens: 256,
+    };
     async _call(image, question, generate_kwargs = {}) {
         if (Array.isArray(image)) {
             if (image.length !== 1) {
@@ -69,6 +72,8 @@ export class DocumentQuestionAnsweringPipeline
             // @ts-expect-error Ts2339
             max_length: this.model.config.decoder.max_position_embeddings,
             decoder_input_ids,
+
+            ...this._default_generation_config,
             ...generate_kwargs,
         });
 

@@ -14,7 +14,7 @@ export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
 
         return default_merge_input_ids_with_image_features({
             // @ts-ignore
-            image_token_id: this.config.image_token_index,
+            image_token_id: this.config.image_token_index ?? this.config.image_token_id,
             ...kwargs,
             image_features: reshaped_image_hidden_states,
         });

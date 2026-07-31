@@ -21,19 +21,22 @@
  * Custom logits processors that complement the default logits processors built from arguments and
  * generation config. If a logit processor is passed that is already created with the arguments or a
  * generation config an error is thrown. This feature is intended for advanced users.
- * @property {import('./stopping_criteria.js').StoppingCriteriaList} [stopping_criteria=null] (`StoppingCriteriaList`, *optional*):
+ * @property {import('./stopping_criteria.js').StoppingCriteria|import('./stopping_criteria.js').StoppingCriteria[]|import('./stopping_criteria.js').StoppingCriteriaList} [stopping_criteria=null] (`StoppingCriteriaList`, *optional*):
  * Custom stopping criteria that complements the default stopping criteria built from arguments and a
  * generation config. If a stopping criteria is passed that is already created with the arguments or a
  * generation config an error is thrown. This feature is intended for advanced users.
  * @property {import('./streamers.js').BaseStreamer} [streamer=null] (`BaseStreamer`, *optional*):
  * Streamer object that will be used to stream the generated sequences. Generated tokens are passed
  * through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
- * @property {number[]} [decoder_input_ids=null] (`number[]`, *optional*):
+ * @property {number[]|import('../utils/tensor.js').Tensor} [decoder_input_ids=null] (`number[]` or `Tensor`, *optional*):
  * If the model is an encoder-decoder model, this argument is used to pass the `decoder_input_ids`.
+ * @property {import('../cache_utils.js').DynamicCache | null} [past_key_values=null] (`DynamicCache`, *optional*):
+ * A cache object that stores previously computed key/value states. When provided, the model will
+ * use these cached states to avoid recomputing them, significantly speeding up sequential generation.
  */
 
 /**
- * @typedef {GenerationFunctionParametersBase & Partial<import('./configuration_utils.js').GenerationConfig> & Record<string, any>} GenerationFunctionParameters
+ * @typedef {GenerationFunctionParametersBase & Partial<import('./configuration_utils.js').GenerationConfig> & {[key: string]: unknown}} GenerationFunctionParameters
  */
 
 export {}; // Ensure this file is treated as a module

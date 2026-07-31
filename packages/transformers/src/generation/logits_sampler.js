@@ -6,6 +6,7 @@ import { Callable } from '../utils/generic.js';
 import { Tensor, topk } from '../utils/tensor.js';
 
 import { max, softmax } from '../utils/maths.js';
+import { _weightedIndex } from '../utils/random.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
 
 /**
@@ -64,24 +65,11 @@ export class LogitsSampler extends Callable {
 
     /**
      * Selects an item randomly based on the specified probabilities.
-     * @param {import("../transformers.js").DataArray} probabilities An array of probabilities to use for selection.
+     * @param {Float32Array} probabilities An array of probabilities to use for selection.
      * @returns {number} The index of the selected item.
      */
     randomSelect(probabilities) {
-        // Return index of chosen item
-        let sumProbabilities = 0;
-        for (let i = 0; i < probabilities.length; ++i) {
-            sumProbabilities += probabilities[i];
-        }
-
-        let r = Math.random() * sumProbabilities;
-        for (let i = 0; i < probabilities.length; ++i) {
-            r -= probabilities[i];
-            if (r <= 0) {
-                return i;
-            }
-        }
-        return 0; // return first (most probable) as a fallback
+        return _weightedIndex(probabilities);
     }
 
     /**

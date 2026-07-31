@@ -19,20 +19,16 @@ import { softmax } from '../utils/maths.js';
  * @typedef {Object} FillMaskPipelineOptions Parameters specific to fill mask pipelines.
  * @property {number} [top_k=5] When passed, overrides the number of predictions to return.
  *
- * @callback FillMaskPipelineCallbackSingle Fill the masked token in the text given as input.
- * @param {string} texts The text with masked tokens.
- * @param {FillMaskPipelineOptions} [options] The options to use for masked language modelling.
- * @returns {Promise<FillMaskOutput>} An array of objects containing the score, predicted token, predicted token string,
- * and the sequence with the predicted token filled in.
- *
- * @callback FillMaskPipelineCallbackBatch Fill the masked token in the texts given as inputs.
- * @param {string[]} texts A list of texts with masked tokens.
- * @param {FillMaskPipelineOptions} [options] The options to use for masked language modelling.
- * @returns {Promise<FillMaskOutput[]>} An array where each entry corresponds to the predictions for an input text.
- *
- * @typedef {FillMaskPipelineCallbackSingle & FillMaskPipelineCallbackBatch} FillMaskPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & FillMaskPipelineCallback & Disposable} FillMaskPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? FillMaskOutput[] : FillMaskOutput} FillMaskPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(texts: T, options?: FillMaskPipelineOptions) => Promise<FillMaskPipelineResult<T>>} FillMaskPipelineCallback
  */
 
 /**

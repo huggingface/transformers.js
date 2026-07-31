@@ -13,7 +13,7 @@
  */
 
 // Environment variables
-export { env } from './env.js';
+export { env, LogLevel } from './env.js';
 
 // Pipelines
 export * from './pipelines.js';
@@ -46,17 +46,26 @@ export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
 
-export { read_audio, RawAudio } from './utils/audio.js';
+export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';
 export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
+export { random } from './utils/random.js';
+
+export { DynamicCache } from './cache_utils.js';
+
+// Cache and file management
+export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
 // Expose common types used across the library for developers to access
 /**
  * @typedef {import('./utils/hub.js').PretrainedModelOptions} PretrainedModelOptions
  * @typedef {import('./processing_utils.js').PretrainedProcessorOptions} PretrainedProcessorOptions
+ * @typedef {import('./tokenization_utils.js').Message} Message
  * @typedef {import('./tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
+ * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
+ * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
  */

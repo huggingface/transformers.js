@@ -766,5 +766,103 @@ export const CUSTOM_TESTS = () => {
       },
       MAX_EXECUTION_TIME,
     );
+
+    it(
+      "should not produce backwards timestamps when merging overlapping chunks (1/2)",
+      async () => {
+        // Regression test: DTW can produce slightly different timestamps for the
+        // same word across overlapping chunks. Without tolerance in the timestamp
+        // comparison, findLongestCommonSequence fails to find the overlap and
+        // produces duplicate content with backwards-jumping timestamps.
+        // Data captured from whisper-large-v3-turbo on a 60s audio clip.
+        const tokenizer = await WhisperTokenizer.from_pretrained("onnx-community/whisper-large-v3-turbo_timestamped");
+
+        const model_outputs = [
+          {
+            stride: [30, 0, 5],
+            tokens: [50365n, 492n, 362n, 2135n, 2848n, 722n, 13n, 50681n, 50681n, 7451n, 11n, 1045n, 11n, 732n, 11n, 472n, 13n, 50845n, 50845n, 509n, 434n, 257n, 25197n, 11n, 5041n, 13n, 51581n, 51588n, 2053n, 11n, 19967n, 654n, 11n, 321n, 362n, 281n, 1524n, 527n, 30640n, 13n, 51706n, 51731n, 509n, 362n, 428n, 34145n, 293n, 286n, 445n, 528n, 281n, 312n, 3476n, 294n, 1901n, 13n, 51864n, 50257n],
+            token_timestamps: [0, 2.56, 5.14, 5.44, 5.76, 6.22, 6.52, 6.52, 6.82, 7.18, 7.4, 7.78, 8.12, 8.6, 9.1, 9.54, 10.04, 10.92, 23.16, 23.2, 23.38, 23.54, 23.96, 24.1, 24.24, 24.4, 24.48, 24.48, 24.66, 24.92, 25.06, 25.22, 25.36, 25.44, 25.64, 25.78, 26.08, 26.28, 26.82, 27.04, 27.32, 27.32, 27.44, 27.58, 27.7, 28.18, 28.36, 28.44, 28.58, 28.74, 28.82, 28.96, 29.44, 29.62, 29.88, 29.98, 29.98, 29.98],
+          },
+          {
+            stride: [30, 5, 5],
+            tokens: [50525n, 509n, 434n, 257n, 25197n, 11n, 5041n, 13n, 50585n, 50585n, 2053n, 11n, 19967n, 654n, 11n, 321n, 362n, 281n, 1524n, 527n, 30640n, 13n, 50725n, 50725n, 509n, 362n, 428n, 34145n, 293n, 286n, 445n, 528n, 281n, 312n, 3476n, 294n, 1901n, 13n, 50875n, 50875n, 1545n, 500n, 380n, 291n, 445n, 9796n, 300n, 291n, 434n, 37853n, 484n, 538n, 452n, 7881n, 1011n, 30n, 51090n, 51090n, 286n, 478n, 406n, 37853n, 484n, 538n, 485n, 467n, 311n, 485n, 51175n, 51245n, 2798n, 11n, 2489n, 13n, 286n, 478n, 37853n, 484n, 13n, 51335n, 51335n, 286n, 478n, 1419n, 36911n, 300n, 286n, 478n, 885n, 33091n, 538n, 613n, 7410n, 30468n, 34258n, 485n, 51485n, 51485n, 876n, 11n, 2035n, 11n, 5041n, 13n, 51545n, 51580n, 492n, 434n, 1096n, 13n, 51630n, 50257n],
+            token_timestamps: [0, 3.3, 3.4, 3.52, 3.94, 4.08, 4.24, 4.38, 4.52, 4.52, 4.68, 4.9, 5.04, 5.22, 5.34, 5.44, 5.64, 5.78, 6.08, 6.28, 6.82, 7.12, 7.32, 7.32, 7.44, 7.58, 7.7, 8.18, 8.36, 8.44, 8.58, 8.74, 8.82, 8.94, 9.44, 9.62, 9.94, 10.18, 10.42, 10.42, 10.82, 10.98, 11.08, 11.18, 11.4, 11.78, 11.98, 12.14, 12.24, 12.92, 13.1, 13.3, 13.5, 13.96, 14.3, 14.44, 14.58, 14.58, 14.82, 14.9, 15.02, 15.26, 15.44, 15.64, 15.76, 15.84, 15.96, 16.28, 16.88, 17.52, 17.86, 18, 18.26, 18.5, 18.72, 18.8, 19.08, 19.36, 19.46, 19.46, 19.46, 19.5, 19.56, 19.7, 20.1, 20.26, 20.32, 20.38, 20.5, 20.82, 20.98, 21.1, 21.46, 22.02, 22.38, 22.4, 22.42, 22.42, 22.42, 22.42, 22.9, 23.12, 23.3, 23.64, 23.78, 24.22, 24.44, 24.54, 24.88, 25.12, 26.34, 26.34],
+          },
+          {
+            stride: [20, 5, 0],
+            tokens: [50365n, 300n, 286n, 478n, 885n, 33091n, 538n, 341n, 7410n, 30468n, 32019n, 13n, 50465n, 50465n, 876n, 11n, 2035n, 11n, 321n, 434n, 1096n, 13n, 50565n, 50565n, 492n, 434n, 1096n, 13n, 50665n, 50865n, 29601n, 311n, 4675n, 5451n, 1232n, 293n, 9376n, 13n, 51065n, 51265n, 876n, 11n, 572n, 13n, 51365n, 50257n],
+            token_timestamps: [0, 0.24, 0.36, 0.36, 0.52, 0.82, 0.98, 1.12, 1.46, 2, 2.36, 2.5, 2.5, 2.5, 2.52, 2.52, 2.84, 2.9, 3.28, 3.3, 3.3, 3.64, 4.32, 4.32, 4.42, 4.52, 4.86, 5.14, 7.56, 9.98, 10.44, 10.56, 10.96, 11.44, 11.64, 12.58, 13.56, 13.78, 15.44, 16.54, 20.3, 20.32, 20.44, 21.02, 21.3, 21.3],
+          },
+        ];
+
+        const decoded = tokenizer._decode_asr(model_outputs, {
+          return_timestamps: "word",
+          time_precision: 0.02,
+          force_full_sequences: false,
+        });
+
+        const [, { chunks }] = decoded;
+
+        // Verify timestamps are monotonically non-decreasing
+        for (let i = 1; i < chunks.length; ++i) {
+          const prev = chunks[i - 1].timestamp;
+          const curr = chunks[i].timestamp;
+          expect(curr[0]).toBeGreaterThanOrEqual(prev[0]);
+        }
+
+        // Verify no duplicate content from failed overlap merging
+        // (the "We're done." at ~44-45s should appear only once, not twice)
+        const doneCount = chunks.filter((c) => c.text.trim() === "done." || c.text.trim() === "We're done.").length;
+        expect(doneCount).toBeLessThanOrEqual(3); // "done." appears naturally a few times in the script
+      },
+      MAX_EXECUTION_TIME,
+    );
+
+    it(
+      "should not produce backwards timestamps when merging overlapping chunks (2/2)",
+      async () => {
+        // Regression test: when findLongestCommonSequence finds no matching tokens
+        // between overlapping chunks (e.g., due to different casing like "We're" vs
+        // "we're"), the default behavior concatenated both sequences, producing
+        // backwards-jumping timestamps. The fix skips right-side tokens that
+        // temporally precede the left sequence's end.
+        // Data captured from whisper-large-v3-turbo (fp16) on a 60s audio clip.
+        const tokenizer = await WhisperTokenizer.from_pretrained("onnx-community/whisper-large-v3-turbo_timestamped");
+
+        const model_outputs = [
+          {
+            stride: [30, 0, 5],
+            tokens: [50365n, 492n, 362n, 2135n, 2848n, 722n, 13n, 7451n, 11n, 1045n, 11n, 732n, 11n, 472n, 13n, 50845n, 50845n, 509n, 434n, 257n, 25197n, 11n, 5041n, 13n, 51581n, 51588n, 2053n, 11n, 19967n, 654n, 11n, 321n, 362n, 281n, 1524n, 527n, 30640n, 13n, 51706n, 51731n, 509n, 362n, 428n, 34145n, 293n, 286n, 445n, 528n, 281n, 312n, 3476n, 294n, 1901n, 13n, 51864n, 50257n],
+            token_timestamps: [0, 2.54, 5.14, 5.44, 5.76, 6.22, 6.52, 7.2, 7.4, 7.78, 8.12, 8.58, 9.1, 9.54, 10, 10.96, 23.16, 23.2, 23.38, 23.54, 23.94, 24.1, 24.24, 24.4, 24.48, 24.48, 24.66, 24.92, 25.06, 25.22, 25.36, 25.44, 25.64, 25.78, 26.08, 26.28, 26.82, 27.1, 27.32, 27.32, 27.42, 27.58, 27.7, 28.18, 28.36, 28.44, 28.58, 28.74, 28.82, 28.94, 29.44, 29.62, 29.88, 29.94, 29.98, 29.98],
+          },
+          {
+            stride: [30, 5, 5],
+            tokens: [50365n, 509n, 434n, 257n, 25197n, 11n, 5041n, 13n, 50580n, 50580n, 2053n, 11n, 19967n, 654n, 11n, 321n, 362n, 281n, 1524n, 527n, 30640n, 13n, 50706n, 50727n, 509n, 362n, 428n, 34145n, 11n, 293n, 286n, 445n, 528n, 281n, 312n, 3476n, 294n, 1901n, 13n, 50866n, 50886n, 1545n, 500n, 380n, 291n, 445n, 9796n, 300n, 291n, 434n, 37853n, 484n, 538n, 452n, 7881n, 1011n, 30n, 51081n, 51093n, 286n, 478n, 406n, 37853n, 484n, 538n, 309n, 13n, 51158n, 51228n, 1057n, 558n, 11n, 2489n, 13n, 51283n, 51294n, 286n, 478n, 37853n, 484n, 13n, 51335n, 51338n, 286n, 478n, 1419n, 36911n, 300n, 286n, 478n, 885n, 33091n, 538n, 613n, 7410n, 30468n, 34258n, 13n, 51486n, 51486n, 876n, 11n, 2035n, 11n, 5041n, 13n, 51535n, 51575n, 492n, 434n, 1096n, 13n, 51614n, 50257n],
+            token_timestamps: [0, 3.24, 3.38, 3.54, 3.94, 4.06, 4.26, 4.4, 4.52, 4.52, 4.64, 4.88, 5.04, 5.22, 5.34, 5.44, 5.64, 5.78, 6.08, 6.28, 6.82, 7.1, 7.32, 7.32, 7.44, 7.58, 7.7, 8.18, 8.34, 8.36, 8.44, 8.58, 8.74, 8.82, 8.94, 9.44, 9.62, 9.94, 10.14, 10.38, 10.42, 10.82, 10.98, 11.08, 11.18, 11.4, 11.78, 11.98, 12.14, 12.22, 12.92, 13.1, 13.3, 13.48, 13.96, 14.28, 14.44, 14.54, 14.54, 14.8, 14.9, 15.02, 15.24, 15.44, 15.64, 15.8, 16.02, 16.26, 17.48, 17.72, 17.9, 18.02, 18.28, 18.48, 18.5, 18.62, 18.72, 18.78, 19.06, 19.36, 19.46, 19.46, 19.46, 19.5, 19.56, 19.7, 20.1, 20.26, 20.32, 20.36, 20.52, 20.82, 20.98, 21.1, 21.44, 22.02, 22.38, 22.38, 22.4, 22.4, 22.42, 22.42, 22.84, 23.1, 23.32, 23.58, 23.72, 24.22, 24.44, 24.52, 24.88, 25.14, 25.66, 25.66],
+          },
+          {
+            stride: [20, 5, 0],
+            tokens: [50365n, 300n, 286n, 478n, 885n, 33091n, 538n, 341n, 7410n, 30468n, 32019n, 13n, 50465n, 50465n, 876n, 11n, 2035n, 11n, 321n, 434n, 1096n, 13n, 50565n, 50765n, 29601n, 311n, 4675n, 5451n, 1232n, 293n, 9376n, 13n, 50965n, 51165n, 876n, 11n, 572n, 13n, 51365n, 50257n],
+            token_timestamps: [0, 0.24, 0.34, 0.34, 0.52, 0.82, 0.98, 1.1, 1.44, 2, 2.36, 2.5, 2.5, 2.5, 2.52, 2.52, 2.72, 3.12, 3.3, 3.3, 3.3, 3.64, 5.5, 6.88, 10.34, 10.56, 10.96, 11.44, 11.64, 12.6, 13.54, 13.78, 15.44, 16.36, 20.3, 20.32, 20.44, 20.5, 20.68, 20.68],
+          },
+        ];
+
+        const decoded = tokenizer._decode_asr(model_outputs, {
+          return_timestamps: "word",
+          time_precision: 0.02,
+          force_full_sequences: false,
+        });
+
+        const [, { chunks }] = decoded;
+
+        // Verify timestamps are monotonically non-decreasing
+        for (let i = 1; i < chunks.length; ++i) {
+          const prev = chunks[i - 1].timestamp;
+          const curr = chunks[i].timestamp;
+          expect(curr[0]).toBeGreaterThanOrEqual(prev[0]);
+        }
+      },
+      MAX_EXECUTION_TIME,
+    );
   });
 };

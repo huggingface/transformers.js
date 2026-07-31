@@ -20,23 +20,16 @@ import { softmax } from '../utils/maths.js';
  * If the provided number is `null` or higher than the number of labels available in the model configuration,
  * it will default to the number of labels.
  *
- * @callback AudioClassificationPipelineCallbackSingle Classify a single audio input.
- * @param {AudioInput} audio The input audio file(s) to be classified. The input is either:
- * - `string` or `URL` that is the filename/URL of the audio file, the file will be read at the processor's sampling rate
- * to get the waveform using the [`AudioContext`](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext) API.
- * If `AudioContext` is not available, you should pass the raw waveform in as a Float32Array of shape `(n, )`.
- * - `Float32Array` or `Float64Array` of shape `(n, )`, representing the raw audio at the correct sampling rate (no further check will be done).
- * @param {AudioClassificationPipelineOptions} [options] The options to use for audio classification.
- * @returns {Promise<AudioClassificationOutput>} An array containing the predicted labels and scores.
- *
- * @callback AudioClassificationPipelineCallbackBatch Classify multiple audio inputs.
- * @param {AudioInput[]} audio The audio inputs to be classified.
- * @param {AudioClassificationPipelineOptions} [options] The options to use for audio classification.
- * @returns {Promise<AudioClassificationOutput[]>} An array of prediction arrays corresponding to each input.
- *
- * @typedef {AudioClassificationPipelineCallbackSingle & AudioClassificationPipelineCallbackBatch} AudioClassificationPipelineCallback
- *
  * @typedef {AudioPipelineConstructorArgs & AudioClassificationPipelineCallback & Disposable} AudioClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends AudioInput[] ? AudioClassificationOutput[] : AudioClassificationOutput} AudioClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends AudioInput | AudioInput[]>(audio: T, options?: AudioClassificationPipelineOptions) => Promise<AudioClassificationPipelineResult<T>>} AudioClassificationPipelineCallback
  */
 
 /**

@@ -41,10 +41,15 @@ export const DATA_TYPES = Object.freeze({
     uint8: 'uint8',
     q4: 'q4',
     bnb4: 'bnb4',
-    q4f16: 'q4f16', // fp16 model with int4 block weight quantization
+    q4f16: 'q4f16', // fp16 model with 4-bit block weight quantization
+    q2: 'q2',
+    q2f16: 'q2f16', // fp16 model with 2-bit block weight quantization
+    q1: 'q1',
+    q1f16: 'q1f16', // fp16 model with 1-bit block weight quantization
 });
 /** @typedef {keyof typeof DATA_TYPES} DataType */
 
+export const DEFAULT_DEVICE_DTYPE = DATA_TYPES.fp32;
 export const DEFAULT_DEVICE_DTYPE_MAPPING = Object.freeze({
     // NOTE: If not specified, will default to fp32
     [DEVICE_TYPES.wasm]: DATA_TYPES.q8,
@@ -58,9 +63,67 @@ export const DEFAULT_DTYPE_SUFFIX_MAPPING = Object.freeze({
     [DATA_TYPES.uint8]: '_uint8',
     [DATA_TYPES.q8]: '_quantized',
     [DATA_TYPES.q4]: '_q4',
+    [DATA_TYPES.q2]: '_q2',
+    [DATA_TYPES.q1]: '_q1',
     [DATA_TYPES.q4f16]: '_q4f16',
+    [DATA_TYPES.q2f16]: '_q2f16',
+    [DATA_TYPES.q1f16]: '_q1f16',
     [DATA_TYPES.bnb4]: '_bnb4',
 });
+
+/**
+ * Resolves a dtype configuration value to a concrete dtype string.
+ * Handles string, per-file object, and "auto" forms with device-based fallback.
+ * @param {DataType|Record<string, DataType>|null|undefined} dtype The dtype config value.
+ * @param {string} fileName The model file name to look up if dtype is an object.
+ * @param {string} selectedDevice The resolved device string for fallback.
+ * @param {Object} [options]
+ * @param {DataType|Record<string, DataType>|null} [options.configDtype=null] Config dtype used as fallback when dtype is "auto" (supports device_config overlay in session.js).
+ * @param {(message: string) => void} [options.warn] Optional callback invoked when dtype is a per-file object but fileName is not found.
+ * @returns {DataType} The resolved dtype string.
+ */
+export function selectDtype(dtype, fileName, selectedDevice, { configDtype = null, warn } = {}) {
+    /** @type {string|null|undefined} */
+    let resolved;
+    let needsWarn = false;
+    if (dtype && typeof dtype !== 'string') {
+        if (dtype.hasOwnProperty(fileName)) {
+            resolved = dtype[fileName];
+        } else {
+            resolved = null;
+            needsWarn = true;
+        }
+    } else {
+        resolved = /** @type {string|null|undefined} */ (dtype);
+    }
+
+    /** @type {DataType} */
+    let result;
+
+    // Handle 'auto': try configDtype fallback
+    if (resolved === DATA_TYPES.auto) {
+        if (configDtype) {
+            const fallback = typeof configDtype === 'string' ? configDtype : configDtype?.[fileName];
+            if (fallback && fallback !== DATA_TYPES.auto && DATA_TYPES.hasOwnProperty(fallback)) {
+                return /** @type {DataType} */ (fallback);
+            }
+        }
+        result = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DEFAULT_DEVICE_DTYPE;
+    } else if (resolved && DATA_TYPES.hasOwnProperty(resolved)) {
+        // Valid known dtype
+        result = /** @type {DataType} */ (resolved);
+    } else {
+        // Fallback to device default
+        result = DEFAULT_DEVICE_DTYPE_MAPPING[selectedDevice] ?? DEFAULT_DEVICE_DTYPE;
+    }
+
+    if (needsWarn && warn) {
+        warn(
+            `dtype not specified for "${fileName}". Using the default dtype (${result}) for this device (${selectedDevice}).`,
+        );
+    }
+    return result;
+}
 
 export const DataTypeMap = Object.freeze({
     float32: Float32Array,

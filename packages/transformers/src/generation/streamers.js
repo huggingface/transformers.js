@@ -70,6 +70,9 @@ export class TextStreamer extends BaseStreamer {
         this.token_cache = [];
         this.print_len = 0;
         this.next_tokens_are_prompt = true;
+
+        // Track special token IDs for special handling during streaming.
+        this.special_ids = new Set(this.tokenizer.all_special_ids.map(BigInt));
     }
 
     /**
@@ -89,6 +92,24 @@ export class TextStreamer extends BaseStreamer {
 
         const tokens = value[0];
         this.token_callback_function?.(tokens);
+
+        // Handle special tokens: flush any existing text, then print or skip them
+        if (tokens.length === 1 && this.special_ids.has(tokens[0])) {
+            if (this.decode_kwargs.skip_special_tokens) return;
+
+            // Flush any existing cached text first
+            if (this.token_cache.length > 0) {
+                const text = this.tokenizer.decode(this.token_cache, this.decode_kwargs);
+                const printable_text = text.slice(this.print_len);
+                this.on_finalized_text(printable_text, false);
+                this.token_cache = [];
+                this.print_len = 0;
+            }
+            // Print the special token immediately
+            const special_text = this.tokenizer.decode(tokens, this.decode_kwargs);
+            this.on_finalized_text(special_text, false);
+            return;
+        }
 
         // Add the new token to the cache and decodes the entire thing.
         this.token_cache = mergeArrays(this.token_cache, tokens);

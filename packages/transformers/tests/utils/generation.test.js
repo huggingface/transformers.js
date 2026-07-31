@@ -3,19 +3,16 @@ import {
   AutoModelForSeq2SeqLM,
   AutoModelForCausalLM,
   LlamaForCausalLM,
-  LlavaForConditionalGeneration,
 
   // Tokenizers
   AutoTokenizer,
   LlamaTokenizer,
 
-  // Processors
-  AutoProcessor,
-  Processor,
-
   // Other
   TextStreamer,
-  RawImage,
+  DynamicCache,
+  random,
+  full,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -177,6 +174,40 @@ describe("Generation parameters", () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it(
+      "do_sample (seeded)",
+      async () => {
+        // Seed 42: deterministic sampling
+        random.seed(42);
+        const outputs_seed42_a = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        // Re-seed 42: must reproduce the same output
+        random.seed(42);
+        const outputs_seed42_b = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        // Seed 123: different seed → different output
+        random.seed(123);
+        const outputs_seed123 = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 10,
+        });
+
+        const expected_seed42 = [[1n, 22172n, 28220n, 5345n, 27342n, 14352n, 24712n, 19249n, 24075n, 19934n, 8678n, 30868n]];
+        const expected_seed123 = [[1n, 22172n, 10131n, 867n, 12403n, 24755n, 16382n, 21742n, 24662n, 19120n, 22952n, 945n]];
+
+        expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
+        expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
+        expect(outputs_seed123.tolist()).toEqual(expected_seed123);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
@@ -184,18 +215,30 @@ describe("Generation parameters", () => {
 });
 
 describe("Streamers", () => {
-  describe("decoder-only", () => {
+  describe("decoder-only (Llama)", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
     let model, tokenizer;
+    let DUMMY_TOKEN_STREAM;
     beforeAll(async () => {
       model = await AutoModelForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       tokenizer = await AutoTokenizer.from_pretrained(model_id);
+
+      DUMMY_TOKEN_STREAM = [
+        [12199n], // regular token ("hello")
+        [12199n], // regular token ("hello")
+        [22172n], // regular token (" hello")
+        [12199n], // regular token ("hello")
+        [13n], // regular token ("\n")
+        [12199n], // regular token ("hello")
+        [BigInt(tokenizer.bos_token_id)], // special token (BOS)
+        [12199n], // regular token ("hello")
+      ];
     }, MAX_MODEL_LOAD_TIME);
 
     it(
       "batch_size=1",
       async () => {
-        const target_chunks = ["hello", "erdingsdelete ", "melytabular ", "Stadiumoba ", "alcune ", "drug"];
+        const target_chunks = ["hello", /* Always flush after prompt. */ "erdingsdelete ", "melytabular ", "Stadiumoba ", "alcune ", "drug"];
         const chunks = [];
         const callback_function = (text) => {
           chunks.push(text);
@@ -214,9 +257,212 @@ describe("Streamers", () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it("special tokens are flushed immediately", async () => {
+      const chunks = [];
+      const callback_function = (text) => chunks.push(text);
+
+      const streamer = new TextStreamer(tokenizer, { callback_function, skip_special_tokens: false });
+      for (const tokens of DUMMY_TOKEN_STREAM) {
+        streamer.put([tokens]);
+      }
+      streamer.end();
+
+      expect(chunks).toEqual(["hello", /* Always flush after prompt. */ "hello ", "hellohello\n", "hello", "<s>", "hello"]);
+    });
+
+    it("special tokens are skipped with skip_special_tokens: true", async () => {
+      const chunks = [];
+      const callback_function = (text) => chunks.push(text);
+
+      const streamer = new TextStreamer(tokenizer, { callback_function, skip_special_tokens: true });
+      for (const tokens of DUMMY_TOKEN_STREAM) {
+        streamer.put([tokens]);
+      }
+      streamer.end();
+
+      expect(chunks).toEqual(["hello", /* Always flush after prompt. */ "hello ", "hellohello\n", "hellohello"]);
+    });
+
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("decoder-only (GPT-OSS)", () => {
+    const model_id = "onnx-community/gpt-oss-20b-ONNX";
+    let tokenizer;
+    let TOKEN_STREAM;
+    beforeAll(async () => {
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+
+      TOKEN_STREAM = [
+        // Prompt tokens:
+        [200006n, 17360n, 200008n, 3575n, 553n, 17554n, 162016n, 11n, 261n, 4410n, 6439n, 2359n, 22203n, 656n, 7788n, 17527n, 558n, 87447n, 100594n, 25n, 220n, 1323n, 19n, 12n, 3218n, 198n, 6576n, 3521n, 25n, 220n, 1323n, 21n, 12n, 3286n, 12n, 702n, 279n, 30377n, 289n, 25n, 14093n, 279n, 2n, 13888n, 18403n, 25n, 8450n, 11n, 49159n, 11n, 1721n, 13n, 21030n, 2804n, 413n, 7360n, 395n, 1753n, 3176n, 13n, 200007n, 200006n, 77944n, 200008n, 2n, 68406n, 279n, 3575n, 553n, 261n, 10297n, 29186n, 13n, 200007n, 200006n, 1428n, 200008n, 10930n, 668n, 261n, 41339n, 1078n, 19121n, 25392n, 13n, 200007n, 200006n, 173781n],
+
+        // Generated tokens:
+
+        // <|channel|>analysis<|message|>
+        [200005n],
+        [35644n],
+        [200008n],
+
+        // We need to write a poem about Machine Learning. Should be creative, maybe with some technical references but poetic. Let's produce a nice poem.
+        [2167n],
+        [1309n],
+        [316n],
+        [5067n],
+        [261n],
+        [41339n],
+        [1078n],
+        [19121n],
+        [25392n],
+        [13n],
+        [18057n],
+        [413n],
+        [12879n],
+        [11n],
+        [10112n],
+        [483n],
+        [1236n],
+        [11814n],
+        [25382n],
+        [889n],
+        [114824n],
+        [13n],
+        [41021n],
+        [10635n],
+        [261n],
+        [7403n],
+        [41339n],
+        [13n],
+
+        // <|end|><|start|>assistant<|channel|>final<|message|>
+        [200007n],
+        [200006n],
+        [173781n],
+        [200005n],
+        [17196n],
+        [200008n],
+
+        // **When the Machine Learns to Dream**
+        //
+        // In a quiet room of humming silicon,
+        // Where electrons trace their silent paths,
+        // A
+        [410n],
+        [5958n],
+        [290n],
+        [19121n],
+        [103596n],
+        [6097n],
+        [316n],
+        [24243n],
+        [91587n],
+        [637n],
+        [261n],
+        [15095n],
+        [3435n],
+        [328n],
+        [147045n],
+        [68837n],
+        [11n],
+        [4066n],
+        [11977n],
+        [100085n],
+        [21523n],
+        [1043n],
+        [37716n],
+        [23373n],
+        [11n],
+        [4066n],
+        [32n],
+      ];
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("special tokens are flushed immediately", async () => {
+      const chunks = [];
+      const callback_function = (text) => chunks.push(text);
+
+      const streamer = new TextStreamer(tokenizer, { callback_function, skip_special_tokens: false });
+      for (const tokens of TOKEN_STREAM) {
+        streamer.put([tokens]);
+      }
+      streamer.end();
+
+      const TARGET = [
+        // Prompt
+        "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2026-02-10\n\nReasoning: medium\n\n# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|><|start|>developer<|message|># Instructions\n\nYou are a helpful assistant.<|end|><|start|>user<|message|>Write me a poem about Machine Learning.<|end|><|start|>assistant",
+
+        // Generated tokens
+        "<|channel|>",
+        "analysis",
+        "<|message|>",
+        "We ",
+        "need ",
+        "to ",
+        "write ",
+        "a ",
+        "poem ",
+        "about ",
+        "Machine ",
+        "Learning. ",
+        "Should ",
+        "be ",
+        "creative, ",
+        "maybe ",
+        "with ",
+        "some ",
+        "technical ",
+        "references ",
+        "but ",
+        "poetic. ",
+        "Let's ",
+        "produce ",
+        "a ",
+        "nice ",
+        "poem.",
+        "<|end|>",
+        "<|start|>",
+        "assistant",
+        "<|channel|>",
+        "final",
+        "<|message|>",
+        "**When ",
+        "the ",
+        "Machine ",
+        "Learns ",
+        "to ",
+        "Dream**\n\n",
+        "In ",
+        "a ",
+        "quiet ",
+        "room ",
+        "of ",
+        "humming ",
+        "silicon,  \n",
+        "Where ",
+        "electrons ",
+        "trace ",
+        "their ",
+        "silent ",
+        "paths,  \n",
+        "A",
+      ];
+      expect(chunks).toEqual(TARGET);
+    });
+  });
+});
+
+describe("Dynamic Cache", () => {
+  it("should update and get sequence length correctly", () => {
+    const cache = new DynamicCache();
+    expect(cache.get_seq_length()).toEqual(0);
+
+    cache.update({
+      "past_key_values.0.key": full([1, 2, 16, 32], 0.0),
+      "past_key_values.0.value": full([1, 2, 16, 32], 0.0),
+    });
+    expect(cache.get_seq_length()).toEqual(16);
   });
 });
 

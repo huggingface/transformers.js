@@ -1,5 +1,5 @@
 import { RawImage } from './image.js';
-import { apis } from '../env.js';
+import { env, apis } from '../env.js';
 
 export class RawVideoFrame {
     /**
@@ -79,7 +79,7 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
 
     if (video.seekable.start(0) === video.seekable.end(0)) {
         // Fallback: Download entire video if not seekable
-        const response = await fetch(video.src);
+        const response = await env.fetch(video.src);
         const blob = await response.blob();
         video.src = URL.createObjectURL(blob);
         await new Promise((resolve) => (video.onloadedmetadata = resolve));

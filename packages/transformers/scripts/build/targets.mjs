@@ -12,7 +12,6 @@ export const BUILD_TARGETS = [
       suffix: ".js",
       format: "esm",
       ignoreModules: WEB_IGNORE_MODULES,
-      externalModules: WEB_EXTERNAL_MODULES,
       usePostBuild: true,
     },
   },

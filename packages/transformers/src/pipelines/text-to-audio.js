@@ -2,8 +2,10 @@ import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 import { RawAudio } from '../utils/audio.js';
+import { logger } from '../utils/logger.js';
 
 import { AutoModel } from '../models/auto/modeling_auto.js';
+import { env } from '../env.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -25,19 +27,16 @@ import { AutoModel } from '../models/auto/modeling_auto.js';
  * More denoising steps usually lead to higher quality audio but slower inference.
  * @property {number} [speed] The speed of the generated audio (if the model supports it).
  *
- * @callback TextToAudioPipelineCallbackSingle Generate speech/audio from a single text input.
- * @param {string} text The text to generate.
- * @param {TextToAudioPipelineOptions} [options] Parameters passed to the model generation/forward method.
- * @returns {Promise<RawAudio>} An object containing the generated audio and sampling rate.
- *
- * @callback TextToAudioPipelineCallbackBatch Generate speech/audio from multiple text inputs.
- * @param {string[]} texts The texts to generate.
- * @param {TextToAudioPipelineOptions} [options] Parameters passed to the model generation/forward method.
- * @returns {Promise<TextToAudioOutput>} An array of objects containing the generated audio and sampling rate.
- *
- * @typedef {TextToAudioPipelineCallbackSingle & TextToAudioPipelineCallbackBatch} TextToAudioPipelineCallback
- *
  * @typedef {TextToAudioPipelineConstructorArgs & TextToAudioPipelineCallback & Disposable} TextToAudioPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? TextToAudioOutput : RawAudio} TextToAudioPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(text: T, options?: TextToAudioPipelineOptions) => Promise<TextToAudioPipelineResult<T>>} TextToAudioPipelineCallback
  */
 
 /**
@@ -92,7 +91,7 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(await (await fetch(speaker_embeddings)).arrayBuffer());
+            speaker_embeddings = new Float32Array(await (await env.fetch(speaker_embeddings)).arrayBuffer());
         }
 
         if (speaker_embeddings instanceof Float32Array) {
@@ -194,7 +193,7 @@ export class TextToAudioPipeline
     async _call_text_to_spectrogram(text_inputs, { speaker_embeddings }) {
         // Load vocoder, if not provided
         if (!this.vocoder) {
-            console.log('No vocoder specified, using default HifiGan vocoder.');
+            logger.info('No vocoder specified, using default HifiGan vocoder.');
             this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
         }
 

@@ -1,6 +1,7 @@
 import { Pipeline } from './_base.js';
 
 import { softmax } from '../utils/maths.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -21,23 +22,16 @@ import { softmax } from '../utils/maths.js';
  * is 1. If `true`, the labels are considered independent and probabilities are normalized for each
  * candidate by doing a softmax of the entailment score vs. the contradiction score.
  *
- * @callback ZeroShotClassificationPipelineCallbackSingle Classify the sequence(s) given as inputs.
- * @param {string} texts The sequence(s) to classify, will be truncated if the model input is too large.
- * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
- * Can be a single label, a string of comma-separated labels, or a list of labels.
- * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
- * @returns {Promise<ZeroShotClassificationOutput>} An array or object containing the predicted labels and scores.
- *
- * @callback ZeroShotClassificationPipelineCallbackBatch Classify the sequence(s) given as inputs.
- * @param {string[]} texts The sequence(s) to classify, will be truncated if the model input is too large.
- * @param {string|string[]} candidate_labels The set of possible class labels to classify each sequence into.
- * Can be a single label, a string of comma-separated labels, or a list of labels.
- * @param {ZeroShotClassificationPipelineOptions} [options] The options to use for zero-shot classification.
- * @returns {Promise<ZeroShotClassificationOutput[]>} An array or object containing the predicted labels and scores.
- *
- * @typedef {ZeroShotClassificationPipelineCallbackSingle & ZeroShotClassificationPipelineCallbackBatch} ZeroShotClassificationPipelineCallback
- *
  * @typedef {TextPipelineConstructorArgs & ZeroShotClassificationPipelineCallback & Disposable} ZeroShotClassificationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends string[] ? ZeroShotClassificationOutput[] : ZeroShotClassificationOutput} ZeroShotClassificationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends string | string[]>(texts: T, candidate_labels: string | string[], options?: ZeroShotClassificationPipelineOptions) => Promise<ZeroShotClassificationPipelineResult<T>>} ZeroShotClassificationPipelineCallback
  */
 
 /**
@@ -93,13 +87,13 @@ export class ZeroShotClassificationPipeline
 
         this.entailment_id = this.label2id['entailment'];
         if (this.entailment_id === undefined) {
-            console.warn("Could not find 'entailment' in label2id mapping. Using 2 as entailment_id.");
+            logger.warn("Could not find 'entailment' in label2id mapping. Using 2 as entailment_id.");
             this.entailment_id = 2;
         }
 
         this.contradiction_id = this.label2id['contradiction'] ?? this.label2id['not_entailment'];
         if (this.contradiction_id === undefined) {
-            console.warn("Could not find 'contradiction' in label2id mapping. Using 0 as contradiction_id.");
+            logger.warn("Could not find 'contradiction' in label2id mapping. Using 0 as contradiction_id.");
             this.contradiction_id = 0;
         }
     }

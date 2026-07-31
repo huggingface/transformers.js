@@ -1,4 +1,4 @@
-import { PreTrainedModel, encoder_forward, boolTensor } from '../modeling_utils.js';
+import { PreTrainedModel, encoder_forward, boolTensor, addPastKeyValues, getPastKeyValues } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { Tensor, cat } from '../../utils/tensor.js';
 
@@ -127,9 +127,9 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
                 encoder_hidden_states: encoder_outputs,
             };
 
-            this.addPastKeyValues(decoderFeeds, past_key_values);
+            addPastKeyValues(this, decoderFeeds, past_key_values);
             decoder_outputs = await sessionRun(this.sessions['decoder_model_merged'], decoderFeeds);
-            past_key_values = this.getPastKeyValues(decoder_outputs, past_key_values);
+            past_key_values = getPastKeyValues(decoder_outputs, past_key_values);
 
             const { prob, spectrum } = decoder_outputs;
             spectrogramParts.push(spectrum);

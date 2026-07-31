@@ -8,17 +8,16 @@ import { RawImage } from '../utils/image.js';
  */
 
 /**
- * @callback ImageToImagePipelineCallbackSingle Transform the image passed as input.
- * @param {ImageInput} images The image to transform.
- * @returns {Promise<RawImage>} The transformed image.
- *
- * @callback ImageToImagePipelineCallbackBatch Transform the images passed as inputs.
- * @param {ImageInput[]} images The images to transform.
- * @returns {Promise<RawImage[]>} The transformed images.
- *
- * @typedef {ImageToImagePipelineCallbackSingle & ImageToImagePipelineCallbackBatch} ImageToImagePipelineCallback
- *
  * @typedef {ImagePipelineConstructorArgs & ImageToImagePipelineCallback & Disposable} ImageToImagePipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? RawImage[] : RawImage} ImageToImagePipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T) => Promise<ImageToImagePipelineResult<T>>} ImageToImagePipelineCallback
  */
 
 /**

@@ -1,12 +1,16 @@
 import { apis, env } from '../env.js';
-import { FileCache } from './hub/files.js';
+import { FileCache } from './cache/FileCache.js';
+import { logger } from './logger.js';
+import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 
 /**
  * @typedef {Object} CacheInterface
- * @property {(request: string) => Promise<Response|import('./hub/files.js').FileResponse|undefined|string>} match
+ * @property {(request: string) => Promise<Response|import('./hub/FileResponse.js').FileResponse|undefined|string>} match
  * Checks if a request is in the cache and returns the cached response if found.
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
+ * @property {(request: string) => Promise<boolean>} [delete]
+ * Deletes a request from the cache. Returns true if deleted, false otherwise.
  */
 
 /**
@@ -35,6 +39,10 @@ export async function getCache(file_cache_dir = null) {
         cache = env.customCache;
     }
 
+    if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
+        cache = new CrossOriginStorage();
+    }
+
     if (!cache && env.useBrowserCache) {
         if (typeof caches === 'undefined') {
             throw Error('Browser cache is not available in this environment.');
@@ -47,7 +55,7 @@ export async function getCache(file_cache_dir = null) {
             // So, instead of crashing, we just ignore the error and continue without using the cache.
             cache = await caches.open(env.cacheKey);
         } catch (e) {
-            console.warn('An error occurred while opening the browser cache:', e);
+            logger.warn('An error occurred while opening the browser cache:', e);
         }
     }
 
@@ -67,7 +75,7 @@ export async function getCache(file_cache_dir = null) {
  * Searches the cache for any of the provided names and returns the first match found.
  * @param {CacheInterface} cache The cache to search
  * @param {...string} names The names of the items to search for
- * @returns {Promise<import('./hub/files.js').FileResponse|Response|undefined|string>} The item from the cache, or undefined if not found.
+ * @returns {Promise<import('./hub/FileResponse.js').FileResponse|Response|undefined|string>} The item from the cache, or undefined if not found.
  */
 export async function tryCache(cache, ...names) {
     for (let name of names) {

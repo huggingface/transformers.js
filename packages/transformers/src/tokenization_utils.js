@@ -12,6 +12,8 @@ import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
+import { logger } from './utils/logger.js';
+import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -24,11 +26,10 @@ import { Tensor } from './utils/tensor.js';
  * @returns {Promise<any[]>} A promise that resolves with information about the loaded tokenizer.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
-    const info = await Promise.all([
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer.json', true, options),
-        getModelJSON(pretrained_model_name_or_path, 'tokenizer_config.json', true, options),
-    ]);
-    return info;
+    const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
+    return await Promise.all(
+        tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
+    );
 }
 
 /**
@@ -65,9 +66,29 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
 ];
 
 /**
+ * @typedef {{ type: 'text', text: string, [key: string]: any }} TextContent
+ * @property {'text'} type The type of content (must be 'text').
+ * @property {string} text The text content.
+ */
+
+/**
+ * @typedef {{ type: 'image', image?: string | import('./utils/image.js').RawImage, [key: string]: any }} ImageContent
+ * @property {'image'} type The type of content (must be 'image').
+ * @property {string | import('./utils/image.js').RawImage} [image] Optional URL or instance of the image.
+ *
+ * Note: This works for SmolVLM. Qwen2VL and Idefics3 have different implementations.
+ */
+
+/**
+ * @typedef {TextContent | ImageContent | { type: string & {}, [key: string]: any }} MessageContent
+ * Base type for message content. This is a discriminated union that can be extended with additional content types.
+ * Example: `@typedef {TextContent | ImageContent | AudioContent} MessageContent`
+ */
+
+/**
  * @typedef {Object} Message
- * @property {string} role The role of the message (e.g., "user" or "assistant" or "system").
- * @property {string} content The content of the message.
+ * @property {'user' | 'assistant' | 'system' | (string & {})} role The role of the message.
+ * @property {string | MessageContent[]} content The content of the message. Can be a simple string or an array of content objects.
  */
 
 /**
@@ -146,7 +167,72 @@ function getSpecialTokens(tokenizer) {
     return special;
 }
 
-export class PreTrainedTokenizer extends Callable {
+/**
+ * @template {string|string[]} TText
+ * @typedef {TText extends string ? number[] : number[][]} BatchEncodingArrayItem
+ */
+
+/**
+ * @template {string|string[]} TText
+ * @template {boolean} [TReturnTensor=true]
+ * @typedef {TReturnTensor extends true ? Tensor : BatchEncodingArrayItem<TText>} BatchEncodingItem
+ */
+
+/**
+ * @template TItem
+ * @typedef {Object} BatchEncoding
+ * @property {TItem} input_ids List of token ids to be fed to a model.
+ * @property {TItem} attention_mask List of indices specifying which tokens should be attended to by the model.
+ * @property {TItem} [token_type_ids] List of token type ids to be fed to a model.
+ */
+
+/**
+ * @template {string|string[]} TText
+ * @template {boolean} [TReturnTensor=true]
+ * @typedef {Object} TokenizerCallOptions
+ * @property {TText extends string ? string|null : string[]|null} [text_pair=null] Optional second sequence to be encoded. If set, must be the same type as text.
+ * @property {boolean|'max_length'} [padding=false] Whether to pad the input sequences.
+ * @property {boolean} [add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
+ * @property {boolean|null} [truncation=null] Whether to truncate the input sequences.
+ * @property {number|null} [max_length=null] Maximum length of the returned list and optionally padding length.
+ * @property {TReturnTensor} [return_tensor=true] Whether to return the results as Tensors or arrays.
+ * @property {boolean|null} [return_token_type_ids=null] Whether to return the token type ids.
+ */
+
+/**
+ * @typedef {<TText extends string | string[], TReturnTensor extends boolean = true>(text: TText, options?: TokenizerCallOptions<TText, TReturnTensor>) => BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} PreTrainedTokenizerCallback
+ */
+
+/**
+ * @template {boolean} [TTokenize=true]
+ * @template {boolean} [TReturnTensor=true]
+ * @template {boolean} [TReturnDict=true]
+ * @typedef {Object} ApplyChatTemplateOptions
+ * @property {string|null} [chat_template=null] A Jinja template to use for this conversion.
+ * @property {Object[]|null} [tools=null] A list of tools (callable functions) that will be accessible to the model.
+ * @property {Record<string, string>[]|null} [documents=null] Documents that will be accessible to the model.
+ * @property {boolean} [add_generation_prompt=false] Whether to end the prompt with the token(s) that indicate the start of an assistant message.
+ * @property {TTokenize} [tokenize=true] Whether to tokenize the output. If false, the output will be a string.
+ * @property {boolean} [padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
+ * @property {boolean} [truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
+ * @property {number|null} [max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
+ * @property {TReturnTensor} [return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
+ * @property {TReturnDict} [return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
+ * @property {Object} [tokenizer_kwargs={}] Additional options to pass to the tokenizer.
+ */
+
+/**
+ * @template {boolean} [TTokenize=true]
+ * @template {boolean} [TReturnTensor=true]
+ * @template {boolean} [TReturnDict=true]
+ * @typedef {TTokenize extends false ? string : TReturnDict extends false ? BatchEncodingItem<string, TReturnTensor> : BatchEncoding<BatchEncodingItem<string, TReturnTensor>>} ApplyChatTemplateReturn
+ */
+
+export class PreTrainedTokenizer
+    extends /** @type {new (tokenizerJSON: Object, tokenizerConfig: Object) => PreTrainedTokenizerCallback} */ (
+        Callable
+    )
+{
     return_token_type_ids = false;
 
     padding_side = 'right';
@@ -261,42 +347,22 @@ export class PreTrainedTokenizer extends Callable {
     }
 
     /**
-     * @typedef {number[]|number[][]|Tensor} BatchEncodingItem
-     *
-     * @typedef {Object} BatchEncoding Holds the output of the tokenizer's call function.
-     * @property {BatchEncodingItem} input_ids List of token ids to be fed to a model.
-     * @property {BatchEncodingItem} attention_mask List of indices specifying which tokens should be attended to by the model.
-     * @property {BatchEncodingItem} [token_type_ids] List of token type ids to be fed to a model.
-     */
-
-    /**
      * Encode/tokenize the given text(s).
-     * @param {string|string[]} text The text to tokenize.
-     * @param {Object} options An optional object containing the following properties:
-     * @param {string|string[]} [options.text_pair=null] Optional second sequence to be encoded. If set, must be the same type as text.
-     * @param {boolean|'max_length'} [options.padding=false] Whether to pad the input sequences.
-     * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
-     * @param {boolean} [options.truncation=null] Whether to truncate the input sequences.
-     * @param {number} [options.max_length=null] Maximum length of the returned list and optionally padding length.
-     * @param {boolean} [options.return_tensor=true] Whether to return the results as Tensors or arrays.
-     * @param {boolean} [options.return_token_type_ids=null] Whether to return the token type ids.
-     * @returns {BatchEncoding} Object to be passed to the model.
+     * @template {string|string[]} TText
+     * @template {boolean} [TReturnTensor=true]
+     * @param {TText} text The text to tokenize.
+     * @param {TokenizerCallOptions<TText, TReturnTensor>} [options] Additional tokenization options.
+     * @returns {BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} Object to be passed to the model.
      */
     _call(
         // Required positional arguments
         text,
-
-        // Optional keyword arguments
-        {
-            text_pair = null,
-            add_special_tokens = true,
-            padding = false,
-            truncation = null,
-            max_length = null,
-            return_tensor = true, // Different to HF
-            return_token_type_ids = null,
-        } = {},
+        options = {},
     ) {
+        const { text_pair = null, add_special_tokens = true, padding = false, return_token_type_ids = null } = options;
+        let { truncation = null, max_length = null } = options;
+        const return_tensor = /** @type {TReturnTensor} */ (options.return_tensor ?? true); // Different to HF
+
         const isBatched = Array.isArray(text);
 
         let encodedTokens;
@@ -339,13 +405,13 @@ export class PreTrainedTokenizer extends Callable {
             max_length = this.model_max_length;
         } else if (truncation === null) {
             if (padding === true) {
-                console.warn(
+                logger.warn(
                     '`max_length` is ignored when `padding: true` and there is no truncation strategy. ' +
                         "To pad to max length, use `padding: 'max_length'`.",
                 );
                 max_length = this.model_max_length;
             } else if (padding === false) {
-                console.warn(
+                logger.warn(
                     'Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation: true` to explicitly truncate examples to max length.',
                 );
                 truncation = true;
@@ -436,7 +502,7 @@ export class PreTrainedTokenizer extends Callable {
             }
         }
 
-        return /** @type {BatchEncoding} */ (result);
+        return /** @type {BatchEncoding<BatchEncodingItem<TText, TReturnTensor>>} */ (result);
     }
 
     /**
@@ -455,9 +521,9 @@ export class PreTrainedTokenizer extends Callable {
      *
      * @param {string} text The text to encode.
      * @param {Object} options An optional object containing the following properties:
-     * @param {string} [options.text_pair=null] The optional second text to encode.
+     * @param {string|null} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
-     * @param {boolean} [options.return_token_type_ids=null] Whether to return token_type_ids.
+     * @param {boolean|null} [options.return_token_type_ids=null] Whether to return token_type_ids.
      * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[]}} An object containing the encoded text.
      * @private
      */
@@ -478,7 +544,7 @@ export class PreTrainedTokenizer extends Callable {
      * Converts a string into a sequence of tokens.
      * @param {string} text The sequence to be encoded.
      * @param {Object} options An optional object containing the following properties:
-     * @param {string} [options.pair] A second sequence to be encoded with the first.
+     * @param {string|null} [options.pair] A second sequence to be encoded with the first.
      * @param {boolean} [options.add_special_tokens=false] Whether or not to add the special tokens associated with the corresponding model.
      * @returns {string[]} The list of tokens.
      */
@@ -491,9 +557,9 @@ export class PreTrainedTokenizer extends Callable {
      *
      * @param {string} text The text to encode.
      * @param {Object} options An optional object containing the following properties:
-     * @param {string} [options.text_pair=null] The optional second text to encode.
+     * @param {string|null} [options.text_pair=null] The optional second text to encode.
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
-     * @param {boolean} [options.return_token_type_ids=null] Whether to return token_type_ids.
+     * @param {boolean|null} [options.return_token_type_ids=null] Whether to return token_type_ids.
      * @returns {number[]} An array of token IDs representing the encoded text(s).
      */
     encode(text, { text_pair = null, add_special_tokens = true, return_token_type_ids = null } = {}) {
@@ -545,7 +611,7 @@ export class PreTrainedTokenizer extends Callable {
      * @param {number[]|bigint[]} token_ids List of token ids to decode
      * @param {Object} decode_args Optional arguments for decoding
      * @param {boolean} [decode_args.skip_special_tokens=false] Whether to skip special tokens during decoding
-     * @param {boolean} [decode_args.clean_up_tokenization_spaces=null] Whether to clean up tokenization spaces during decoding.
+     * @param {boolean|null} [decode_args.clean_up_tokenization_spaces=null] Whether to clean up tokenization spaces during decoding.
      * If null, the value is set to `this.decoder.cleanup` if it exists, falling back to `this.clean_up_tokenization_spaces` if it exists, falling back to `true`.
      * @returns {string} The decoded string
      */
@@ -562,7 +628,7 @@ export class PreTrainedTokenizer extends Callable {
      * template for better generation tracking.
      *
      * @param {Object} options An optional object containing the following properties:
-     * @param {string} [options.chat_template=null]
+     * @param {string|null} [options.chat_template=null]
      * A Jinja template or the name of a template to use for this conversion.
      * It is usually not necessary to pass anything to this argument,
      * as the model's template will be used by default.
@@ -641,8 +707,11 @@ export class PreTrainedTokenizer extends Callable {
      *
      * @param {Message[]} conversation A list of message objects with `"role"` and `"content"` keys,
      * representing the chat history so far.
-     * @param {Object} options An optional object containing the following properties:
-     * @param {string} [options.chat_template=null] A Jinja template to use for this conversion. If
+     * @template {boolean} [TTokenize=true]
+     * @template {boolean} [TReturnTensor=true]
+     * @template {boolean} [TReturnDict=true]
+     * @param {Object} [options] An optional object containing the following properties:
+     * @param {string|null} [options.chat_template=null] A Jinja template to use for this conversion. If
      * this is not passed, the model's chat template will be used instead.
      * @param {Object[]} [options.tools=null]
      * A list of tools (callable functions) that will be accessible to the model. If the template does not
@@ -660,33 +729,34 @@ export class PreTrainedTokenizer extends Callable {
      * the start of an assistant message. This is useful when you want to generate a response from the model.
      * Note that this argument will be passed to the chat template, and so it must be supported in the
      * template for this argument to have any effect.
-     * @param {boolean} [options.tokenize=true] Whether to tokenize the output. If false, the output will be a string.
+     * @param {TTokenize} [options.tokenize=true] Whether to tokenize the output. If false, the output will be a string.
      * @param {boolean} [options.padding=false] Whether to pad sequences to the maximum length. Has no effect if tokenize is false.
      * @param {boolean} [options.truncation=false] Whether to truncate sequences to the maximum length. Has no effect if tokenize is false.
-     * @param {number} [options.max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
+     * @param {number|null} [options.max_length=null] Maximum length (in tokens) to use for padding or truncation. Has no effect if tokenize is false.
      * If not specified, the tokenizer's `max_length` attribute will be used as a default.
-     * @param {boolean} [options.return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
-     * @param {boolean} [options.return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
+     * @param {TReturnTensor} [options.return_tensor=true] Whether to return the output as a Tensor or an Array. Has no effect if tokenize is false.
+     * @param {TReturnDict} [options.return_dict=true] Whether to return a dictionary with named outputs. Has no effect if tokenize is false.
      * @param {Object} [options.tokenizer_kwargs={}] Additional options to pass to the tokenizer.
-     * @returns {string | Tensor | number[]| number[][]|BatchEncoding} The tokenized output.
+     * @returns {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} The tokenized output.
      */
     apply_chat_template(
         conversation,
-        {
+        options = /** @type {ApplyChatTemplateOptions<TTokenize, TReturnTensor, TReturnDict>} */ ({}),
+    ) {
+        let {
             tools = null,
             documents = null,
             chat_template = null,
             add_generation_prompt = false,
-            tokenize = true,
+            tokenize = /** @type {TTokenize} */ (true),
             padding = false,
             truncation = false,
             max_length = null,
-            return_tensor = true,
-            return_dict = true,
+            return_tensor = /** @type {TReturnTensor} */ (true),
+            return_dict = /** @type {TReturnDict} */ (true),
             tokenizer_kwargs = {},
             ...kwargs
-        } = {},
-    ) {
+        } = options;
         chat_template = this.get_chat_template({ chat_template, tools });
 
         if (typeof chat_template !== 'string') {
@@ -727,10 +797,12 @@ export class PreTrainedTokenizer extends Callable {
                 return_tensor,
                 ...tokenizer_kwargs,
             });
-            return return_dict ? out : out.input_ids;
+            return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (
+                return_dict ? out : out.input_ids
+            );
         }
 
-        return rendered;
+        return /** @type {ApplyChatTemplateReturn<TTokenize, TReturnTensor, TReturnDict>} */ (rendered);
     }
 }
 

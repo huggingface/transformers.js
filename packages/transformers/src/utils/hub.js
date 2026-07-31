@@ -5,10 +5,20 @@
  */
 
 import { apis, env } from '../env.js';
-import { dispatchCallback } from './core.js';
-import { FileResponse, FileCache } from './hub/files.js';
-import { handleError, isValidUrl, pathJoin, isValidHfModelId, readResponse } from './hub/utils.js';
+import { DefaultProgressCallback, dispatchCallback } from './core.js';
+import { FileResponse } from './hub/FileResponse.js';
+import { FileCache } from './cache/FileCache.js';
+import {
+    handleError,
+    isValidUrl,
+    pathJoin,
+    isValidHfModelId,
+    makePretrainedOptionsKey,
+    readResponse,
+} from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
+import { get_file_metadata } from './model_registry/get_file_metadata.js';
+import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
@@ -37,7 +47,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
  * @property {string} [subfolder='onnx'] In case the relevant files are located inside a subfolder of the model repo on huggingface.co,
  * you can specify the folder name here.
- * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the .onnx suffix). Currently only valid for encoder- or decoder-only models.
+ * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
@@ -63,14 +73,30 @@ export async function getFile(urlOrPath) {
                     : urlOrPath.toString()
                 : urlOrPath,
         );
-    } else if (typeof process !== 'undefined' && process?.release?.name === 'node') {
+    } else {
+        return env.fetch(urlOrPath, {
+            headers: getFetchHeaders(urlOrPath),
+        });
+    }
+}
+
+/**
+ * Generates appropriate HTTP headers for fetching resources.
+ * In Node.js environments, adds User-Agent and Authorization headers when applicable.
+ * In browser environments, returns minimal headers for security.
+ *
+ * @param {URL|string} urlOrPath The URL or path being fetched.
+ * @returns {Headers} A Headers object with appropriate headers for the request.
+ */
+export function getFetchHeaders(urlOrPath) {
+    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
+    const headers = new Headers();
+
+    if (isNode) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         const version = env.version;
-
-        const headers = new Headers();
         headers.set('User-Agent', `transformers.js/${version}; is_ci/${IS_CI};`);
 
-        // Check whether we are making a request to the Hugging Face Hub.
         const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
         if (isHFURL) {
             // If an access token is present in the environment variables,
@@ -81,13 +107,13 @@ export async function getFile(urlOrPath) {
                 headers.set('Authorization', `Bearer ${token}`);
             }
         }
-        return fetch(urlOrPath, { headers });
     } else {
         // Running in a browser-environment, so we use default headers
         // NOTE: We do not allow passing authorization headers in the browser,
         // since this would require exposing the token to the client.
-        return fetch(urlOrPath);
     }
+
+    return headers;
 }
 
 /**
@@ -103,7 +129,7 @@ export async function getFile(urlOrPath) {
  * @returns {{ requestURL: string, localPath: string, remoteURL: string, proposedCacheKey: string, validModelId: boolean }}
  * An object containing all the paths and URLs for the resource.
  */
-function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
+export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     const revision = options.revision ?? 'main';
     const requestURL = pathJoin(path_or_repo_id, filename);
 
@@ -142,7 +168,7 @@ function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = nul
  * @param {import('./cache.js').CacheInterface | null} cache The cache instance to check.
  * @param {string} localPath The local path to try first.
  * @param {string} proposedCacheKey The proposed cache key to try second.
- * @returns {Promise<Response|import('./hub/files.js').FileResponse|undefined|string>}
+ * @returns {Promise<Response|import('./hub/FileResponse.js').FileResponse|undefined|string>}
  * The cached response if found, undefined otherwise.
  */
 export async function checkCachedResource(cache, localPath, proposedCacheKey) {
@@ -164,7 +190,7 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
  * @param {string} filename The name of the file to cache.
  * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
  * @param {string} cacheKey The cache key to use.
- * @param {Response|import('./hub/files.js').FileResponse} response The response to cache.
+ * @param {Response|import('./hub/FileResponse.js').FileResponse} response The response to cache.
  * @param {Uint8Array} [result] The result buffer if already read.
  * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
@@ -190,17 +216,20 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
         await cache.put(cacheKey, /** @type {Response} */ (response), wrapped_progress);
     } else if (typeof response !== 'string') {
         // NOTE: We use `new Response(buffer, ...)` instead of `response.clone()` to handle LFS files
+        // Explicitly set content-length from the buffer size, since the browser Cache API may strip it.
+        const headers = new Headers(response.headers);
+        headers.set('content-length', result.byteLength.toString());
         await cache
             .put(
                 cacheKey,
                 new Response(/** @type {any} */ (result), {
-                    headers: response.headers,
+                    headers,
                 }),
             )
             .catch((err) => {
                 // Do not crash if unable to add to cache (e.g., QuotaExceededError).
                 // Rather, log a warning and proceed with execution.
-                console.warn(`Unable to add response to browser cache: ${err}.`);
+                logger.warn(`Unable to add response to browser cache: ${err}.`);
             });
     }
 }
@@ -241,14 +270,16 @@ export async function loadResourceFile(
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
-    /** @type {Response|import('./hub/files.js').FileResponse|undefined|string} */
+    /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined|string} */
     let response;
 
     // Check cache
     response = await checkCachedResource(cache, localPath, proposedCacheKey);
 
     const cacheHit = response !== undefined;
-    if (!cacheHit) {
+    if (cacheHit) {
+        cacheKey = proposedCacheKey;
+    } else {
         // Caching not available, or file is not cached, so we perform the request
 
         if (env.allowLocalModels) {
@@ -262,7 +293,7 @@ export async function loadResourceFile(
                 } catch (e) {
                     // Something went wrong while trying to get the file locally.
                     // NOTE: error handling is done in the next step (since `response` will be undefined)
-                    console.warn(`Unable to load from local path "${localPath}": "${e}"`);
+                    logger.warn(`Unable to load from local path "${localPath}": "${e}"`);
                 }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
@@ -326,7 +357,11 @@ export async function loadResourceFile(
     });
 
     let result;
-    if (!(apis.IS_NODE_ENV && return_path)) {
+    if (apis.IS_NODE_ENV && return_path) {
+        // In Node.js with return_path, we skip the buffer read (ONNX runtime
+        // loads from disk directly). A completion progress event is emitted
+        // after the caching block below to ensure progress_total reaches 100%.
+    } else {
         /** @type {Uint8Array} */
         let buffer;
 
@@ -354,14 +389,36 @@ export async function loadResourceFile(
                     total: buffer.length,
                 });
             } else {
-                buffer = await readResponse(response, (data) => {
-                    dispatchCallback(options.progress_callback, {
-                        status: 'progress',
-                        name: path_or_repo_id,
-                        file: filename,
-                        ...data,
-                    });
-                });
+                // Get expected file size from response headers or metadata
+                // This helps with progress tracking when content-length is missing
+                let expectedSize;
+                const contentLength = response.headers.get('content-length');
+                if (contentLength) {
+                    expectedSize = parseInt(contentLength, 10);
+                } else {
+                    // Try to get size from metadata (useful when content-length is missing during download)
+                    try {
+                        const metadata = await get_file_metadata(path_or_repo_id, filename, options);
+                        if (metadata.size) {
+                            expectedSize = metadata.size;
+                        }
+                    } catch (e) {
+                        // Ignore metadata fetch errors
+                    }
+                }
+
+                buffer = await readResponse(
+                    response,
+                    (data) => {
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            ...data,
+                        });
+                    },
+                    expectedSize,
+                );
             }
         }
         result = buffer;
@@ -375,6 +432,22 @@ export async function loadResourceFile(
         typeof response !== 'string'
     ) {
         await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+    }
+
+    // In Node.js with return_path, the buffer read is skipped so no progress
+    // events are emitted during loading. Emit a final completion event so
+    // that aggregate progress_total tracking reaches 100%. This is placed
+    // after storeCachedResource so it doesn't conflict with caching progress.
+    if (apis.IS_NODE_ENV && return_path && options.progress_callback && typeof response !== 'string') {
+        const size = parseInt(response.headers.get('content-length'), 10) || 0;
+        dispatchCallback(options.progress_callback, {
+            status: 'progress',
+            name: path_or_repo_id,
+            file: filename,
+            progress: 100,
+            loaded: size,
+            total: size,
+        });
     }
 
     dispatchCallback(options.progress_callback, {
@@ -407,6 +480,9 @@ export async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
+/** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
+const INFLIGHT_LOADS = new Map();
+
 /**
  * Retrieves a file from either a remote URL using the Fetch API or from the local file system using the FileSystem API.
  * If the filesystem is available and `env.useCache = true`, the file will be downloaded and cached.
@@ -437,15 +513,30 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         }
     }
 
-    dispatchCallback(options.progress_callback, {
-        status: 'initiate',
-        name: path_or_repo_id,
-        file: filename,
-    });
-
-    /** @type {import('./cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir);
-    return await loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache);
+    // Deduplicate loads of the same file. When an aggregate progress callback
+    // is active, scope dedup to its `loads` map so concurrent and sequential
+    // sibling calls within one pipeline() share a single download (and a
+    // single `initiate` event). Otherwise fall back to the global in-flight
+    // map for concurrent dedup, with entries cleared on settle.
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
+    const { progress_callback } = options;
+    const loads = progress_callback instanceof DefaultProgressCallback ? progress_callback.loads : INFLIGHT_LOADS;
+    let pending = loads.get(key);
+    if (!pending) {
+        dispatchCallback(progress_callback, {
+            status: 'initiate',
+            name: path_or_repo_id,
+            file: filename,
+        });
+        pending = getCache(options.cache_dir).then((cache) =>
+            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache),
+        );
+        if (loads === INFLIGHT_LOADS) {
+            pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
+        }
+        loads.set(key, pending);
+    }
+    return await pending;
 }
 
 /**

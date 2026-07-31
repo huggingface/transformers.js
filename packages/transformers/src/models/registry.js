@@ -11,6 +11,7 @@ import * as ALL_MODEL_FILES from './models.js';
 
 const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['bert', 'BertModel'],
+    ['eurobert', 'EuroBertModel'],
     ['neobert', 'NeoBertModel'],
     ['modernbert', 'ModernBertModel'],
     ['nomic_bert', 'NomicBertModel'],
@@ -96,6 +97,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['mgp-str', 'MgpstrForSceneTextRecognition'],
 
     ['style_text_to_speech_2', 'StyleTextToSpeech2Model'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterModel'],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
@@ -106,6 +108,7 @@ const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
     ['mbart', 'MBartModel'],
     ['marian', 'MarianModel'],
     ['whisper', 'WhisperModel'],
+    ['cohere_asr', 'CohereAsrModel'],
     ['m2m_100', 'M2M100Model'],
     ['blenderbot', 'BlenderbotModel'],
     ['blenderbot-small', 'BlenderbotSmallModel'],
@@ -131,39 +134,55 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['apertus', 'ApertusModel'],
     ['nanochat', 'NanoChatModel'],
     ['arcee', 'ArceeModel'],
+    ['afmoe', 'AfmoeModel'],
     ['lfm2', 'Lfm2Model'],
+    ['lfm2_moe', 'Lfm2MoeModel'],
     ['smollm3', 'SmolLM3Model'],
     ['exaone', 'ExaoneModel'],
     ['olmo', 'OlmoModel'],
     ['olmo2', 'Olmo2Model'],
     ['olmo3', 'Olmo3Model'],
+    ['olmo_hybrid', 'OlmoHybridModel'],
     ['mobilellm', 'MobileLLMModel'],
     ['granite', 'GraniteModel'],
     ['granitemoehybrid', 'GraniteMoeHybridModel'],
     ['cohere', 'CohereModel'],
+    ['cohere2', 'Cohere2Model'],
     ['gemma', 'GemmaModel'],
     ['gemma2', 'Gemma2Model'],
     ['vaultgemma', 'VaultGemmaModel'],
     ['gemma3_text', 'Gemma3Model'],
     ['helium', 'HeliumModel'],
     ['glm', 'GlmModel'],
+    ['glm_moe_dsa', 'GlmMoeDsaModel'],
     ['openelm', 'OpenELMModel'],
     ['qwen2', 'Qwen2Model'],
+    ['qwen2_moe', 'Qwen2MoeModel'],
     ['qwen3', 'Qwen3Model'],
+    ['qwen3_moe', 'Qwen3MoeModel'],
+    ['qwen3_next', 'Qwen3NextModel'],
     ['phi', 'PhiModel'],
     ['phi3', 'Phi3Model'],
     ['mpt', 'MptModel'],
     ['opt', 'OPTModel'],
     ['mistral', 'MistralModel'],
+    ['mistral4', 'Mistral4Model'],
     ['ministral', 'MinistralModel'],
     ['ministral3', 'Ministral3Model'],
-    ['ernie4_5', 'Ernie4_5_Model'],
+    ['ernie4_5', 'Ernie4_5ForCausalLM'],
     ['starcoder2', 'Starcoder2Model'],
+    ['deepseek_v3', 'DeepseekV3Model'],
+    ['deepseek_v4', 'DeepseekV4Model'],
     ['falcon', 'FalconModel'],
     ['falcon_h1', 'FalconH1Model'],
+    ['nemotron_h', 'NemotronHModel'],
+    ['solar_open', 'SolarOpenModel'],
     ['stablelm', 'StableLmModel'],
     ['modernbert-decoder', 'ModernBertDecoderModel'],
     ['hunyuan_v1_dense', 'HunYuanDenseV1Model'],
+    ['youtu', 'YoutuModel'],
+    ['zaya', 'ZayaModel'],
+    ['hrm_text', 'HrmTextModel'],
 ]);
 
 export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
@@ -171,6 +190,7 @@ export const MODEL_FOR_SPEECH_SEQ_2_SEQ_MAPPING_NAMES = new Map([
     ['whisper', 'WhisperForConditionalGeneration'],
     ['lite-whisper', 'LiteWhisperForConditionalGeneration'],
     ['moonshine', 'MoonshineForConditionalGeneration'],
+    ['cohere_asr', 'CohereAsrForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_TEXT_TO_SPECTROGRAM_MAPPING_NAMES = new Map([['speecht5', 'SpeechT5ForTextToSpeech']]);
@@ -183,6 +203,7 @@ const MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['bert', 'BertForSequenceClassification'],
+    ['eurobert', 'EuroBertForSequenceClassification'],
     ['neobert', 'NeoBertForSequenceClassification'],
     ['modernbert', 'ModernBertForSequenceClassification'],
     ['roformer', 'RoFormerForSequenceClassification'],
@@ -206,6 +227,7 @@ const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
 
 const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['bert', 'BertForTokenClassification'],
+    ['eurobert', 'EuroBertForTokenClassification'],
     ['neobert', 'NeoBertForTokenClassification'],
     ['modernbert', 'ModernBertForTokenClassification'],
     ['roformer', 'RoFormerForTokenClassification'],
@@ -220,6 +242,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['roberta', 'RobertaForTokenClassification'],
     ['xlm', 'XLMForTokenClassification'],
     ['xlm-roberta', 'XLMRobertaForTokenClassification'],
+    ['openai_privacy_filter', 'OpenAIPrivacyFilterForTokenClassification'],
 ]);
 
 export const MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES = new Map([
@@ -249,41 +272,67 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['apertus', 'ApertusForCausalLM'],
     ['llama4_text', 'Llama4ForCausalLM'],
     ['arcee', 'ArceeForCausalLM'],
+    ['afmoe', 'AfmoeForCausalLM'],
     ['lfm2', 'Lfm2ForCausalLM'],
+    ['lfm2_moe', 'Lfm2MoeForCausalLM'],
     ['smollm3', 'SmolLM3ForCausalLM'],
     ['exaone', 'ExaoneForCausalLM'],
     ['olmo', 'OlmoForCausalLM'],
     ['olmo2', 'Olmo2ForCausalLM'],
     ['olmo3', 'Olmo3ForCausalLM'],
+    ['olmo_hybrid', 'OlmoHybridForCausalLM'],
     ['mobilellm', 'MobileLLMForCausalLM'],
     ['granite', 'GraniteForCausalLM'],
     ['granitemoehybrid', 'GraniteMoeHybridForCausalLM'],
     ['cohere', 'CohereForCausalLM'],
+    ['cohere2', 'Cohere2ForCausalLM'],
     ['gemma', 'GemmaForCausalLM'],
     ['gemma2', 'Gemma2ForCausalLM'],
     ['vaultgemma', 'VaultGemmaForCausalLM'],
     ['gemma3_text', 'Gemma3ForCausalLM'],
+    ['gemma3', 'Gemma3ForCausalLM'],
     ['helium', 'HeliumForCausalLM'],
     ['glm', 'GlmForCausalLM'],
+    ['glm_moe_dsa', 'GlmMoeDsaForCausalLM'],
     ['openelm', 'OpenELMForCausalLM'],
     ['qwen2', 'Qwen2ForCausalLM'],
+    ['qwen2_moe', 'Qwen2MoeForCausalLM'],
     ['qwen3', 'Qwen3ForCausalLM'],
+    ['qwen3_moe', 'Qwen3MoeForCausalLM'],
+    ['qwen3_next', 'Qwen3NextForCausalLM'],
+    ['qwen2_vl', 'Qwen2VLForCausalLM'],
+    ['qwen2_5_vl', 'Qwen2_5_VLForCausalLM'],
+    ['qwen3_vl', 'Qwen3VLForCausalLM'],
+    ['qwen3_vl_moe', 'Qwen3VLMoeForCausalLM'],
+    ['qwen3_5', 'Qwen3_5ForCausalLM'],
+    ['qwen3_5_text', 'Qwen3_5ForCausalLM'],
+    ['qwen3_5_moe', 'Qwen3_5MoeForCausalLM'],
+    ['gemma3n', 'Gemma3nForCausalLM'],
+    ['gemma4', 'Gemma4ForCausalLM'],
     ['phi', 'PhiForCausalLM'],
     ['phi3', 'Phi3ForCausalLM'],
     ['mpt', 'MptForCausalLM'],
     ['opt', 'OPTForCausalLM'],
     ['mbart', 'MBartForCausalLM'],
     ['mistral', 'MistralForCausalLM'],
+    ['mistral4', 'Mistral4ForCausalLM'],
     ['ministral', 'MinistralForCausalLM'],
     ['ministral3', 'Ministral3ForCausalLM'],
-    ['ernie4_5', 'Ernie4_5_ForCausalLM'],
+    ['ernie4_5', 'Ernie4_5ForCausalLM'],
     ['starcoder2', 'Starcoder2ForCausalLM'],
+    ['deepseek_v3', 'DeepseekV3ForCausalLM'],
+    ['deepseek_v4', 'DeepseekV4ForCausalLM'],
     ['falcon', 'FalconForCausalLM'],
     ['falcon_h1', 'FalconH1ForCausalLM'],
+    ['nemotron_h', 'NemotronHForCausalLM'],
     ['trocr', 'TrOCRForCausalLM'],
+    ['solar_open', 'SolarOpenForCausalLM'],
     ['stablelm', 'StableLmForCausalLM'],
     ['modernbert-decoder', 'ModernBertDecoderForCausalLM'],
     ['hunyuan_v1_dense', 'HunYuanDenseV1ForCausalLM'],
+    ['youtu', 'YoutuForCausalLM'],
+    ['zaya', 'ZayaForCausalLM'],
+    ['hrm_text', 'HrmTextForCausalLM'],
 
     // Also image-text-to-text
     ['phi3_v', 'Phi3VForCausalLM'],
@@ -293,6 +342,7 @@ const MODEL_FOR_MULTIMODALITY_MAPPING_NAMES = new Map([['multi_modality', 'Multi
 
 const MODEL_FOR_MASKED_LM_MAPPING_NAMES = new Map([
     ['bert', 'BertForMaskedLM'],
+    ['eurobert', 'EuroBertForMaskedLM'],
     ['neobert', 'NeoBertForMaskedLM'],
     ['modernbert', 'ModernBertForMaskedLM'],
     ['roformer', 'RoFormerForMaskedLM'],
@@ -342,18 +392,30 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['llava_onevision', 'LlavaOnevisionForConditionalGeneration'],
     ['moondream1', 'Moondream1ForConditionalGeneration'],
     ['florence2', 'Florence2ForConditionalGeneration'],
-    ['qwen2-vl', 'Qwen2VLForConditionalGeneration'],
+    ['qwen2_vl', 'Qwen2VLForConditionalGeneration'],
+    ['qwen2_5_vl', 'Qwen2_5_VLForConditionalGeneration'],
+    ['qwen3_vl', 'Qwen3VLForConditionalGeneration'],
+    ['qwen3_vl_moe', 'Qwen3VLMoeForConditionalGeneration'],
+    ['qwen3_5', 'Qwen3_5ForConditionalGeneration'],
+    ['qwen3_5_moe', 'Qwen3_5MoeForConditionalGeneration'],
+    ['lfm2_vl', 'Lfm2VlForConditionalGeneration'],
     ['idefics3', 'Idefics3ForConditionalGeneration'],
     ['smolvlm', 'SmolVLMForConditionalGeneration'],
     ['paligemma', 'PaliGemmaForConditionalGeneration'],
     ['llava_qwen2', 'LlavaQwen2ForCausalLM'],
+    ['gemma3', 'Gemma3ForConditionalGeneration'],
     ['gemma3n', 'Gemma3nForConditionalGeneration'],
+    ['gemma4', 'Gemma4ForConditionalGeneration'],
     ['mistral3', 'Mistral3ForConditionalGeneration'],
+    ['lighton_ocr', 'LightOnOcrForConditionalGeneration'],
+    ['glm_ocr', 'GlmOcrForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_AUDIO_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
+    ['granite_speech', 'GraniteSpeechForConditionalGeneration'],
     ['ultravox', 'UltravoxModel'],
     ['voxtral', 'VoxtralForConditionalGeneration'],
+    ['voxtral_realtime', 'VoxtralRealtimeForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_DOCUMENT_QUESTION_ANSWERING_MAPPING_NAMES = new Map([
@@ -469,6 +531,7 @@ const MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING_NAMES = new Map([
 const MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = new Map([['swin2sr', 'Swin2SRForImageSuperResolution']]);
 
 const MODEL_FOR_DEPTH_ESTIMATION_MAPPING_NAMES = new Map([
+    ['chmv2', 'CHMv2ForDepthEstimation'],
     ['dpt', 'DPTForDepthEstimation'],
     ['depth_anything', 'DepthAnythingForDepthEstimation'],
     ['glpn', 'GLPNForDepthEstimation'],
@@ -494,7 +557,7 @@ export const MODEL_CLASS_TYPE_MAPPING = [
     // MODEL_MAPPING_NAMES:
     [MODEL_MAPPING_NAMES_ENCODER_ONLY, MODEL_TYPES.EncoderOnly],
     [MODEL_MAPPING_NAMES_ENCODER_DECODER, MODEL_TYPES.EncoderDecoder],
-    [MODEL_MAPPING_NAMES_DECODER_ONLY, MODEL_TYPES.DecoderOnly],
+    [MODEL_MAPPING_NAMES_DECODER_ONLY, MODEL_TYPES.DecoderOnlyWithoutHead],
     [MODEL_MAPPING_NAMES_AUTO_ENCODER, MODEL_TYPES.AutoEncoder],
 
     [MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES, MODEL_TYPES.EncoderOnly],
@@ -566,8 +629,19 @@ const CUSTOM_MAPPING = [
         ALL_MODEL_FILES.Gemma3nForConditionalGeneration,
         MODEL_TYPES.ImageAudioTextToText,
     ],
+    [
+        'Gemma4ForConditionalGeneration',
+        ALL_MODEL_FILES.Gemma4ForConditionalGeneration,
+        MODEL_TYPES.ImageAudioTextToText,
+    ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
+
+    [
+        'VoxtralRealtimeForConditionalGeneration',
+        ALL_MODEL_FILES.VoxtralRealtimeForConditionalGeneration,
+        MODEL_TYPES.VoxtralRealtime,
+    ],
 ];
 for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_TYPE_MAPPING.set(name, type);
@@ -575,17 +649,18 @@ for (const [name, model, type] of CUSTOM_MAPPING) {
     MODEL_NAME_TO_CLASS_MAPPING.set(name, model);
 }
 
-export const CUSTOM_ARCHITECTURES = new Map([
+export const CUSTOM_ARCHITECTURES_MAPPING = new Map([
     ['modnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['birefnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['isnet', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
     ['ben', MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES],
 ]);
-for (const [name, mapping] of CUSTOM_ARCHITECTURES.entries()) {
+for (const [name, mapping] of CUSTOM_ARCHITECTURES_MAPPING.entries()) {
     mapping.set(name, 'PreTrainedModel');
     MODEL_TYPE_MAPPING.set(name, MODEL_TYPES.EncoderOnly);
     MODEL_NAME_TO_CLASS_MAPPING.set(name, PreTrainedModel);
 }
+export const CUSTOM_ARCHITECTURES = new Set(CUSTOM_ARCHITECTURES_MAPPING.keys());
 
 // Default mappings
 MODEL_TYPE_MAPPING.set('PreTrainedModel', MODEL_TYPES.EncoderOnly);

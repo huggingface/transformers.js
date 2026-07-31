@@ -8,6 +8,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "outDir": "types",
+    "rootDir": "src",
     "strict": false,
     "skipLibCheck": true,
     "declaration": true,

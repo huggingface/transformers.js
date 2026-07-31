@@ -18,17 +18,17 @@ importers:
   packages/transformers:
     dependencies:
       '@huggingface/jinja':
-        specifier: ^0.5.4
-        version: 0.5.4
+        specifier: ^0.5.6
+        version: 0.5.6
       '@huggingface/tokenizers':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.1.3
+        version: 0.1.3
       onnxruntime-node:
-        specifier: 1.25.0-dev.20260125-727db0d3dc
-        version: 1.25.0-dev.20260125-727db0d3dc
+        specifier: 1.24.3
+        version: 1.24.3
       onnxruntime-web:
-        specifier: 1.25.0-dev.20260125-727db0d3dc
-        version: 1.25.0-dev.20260125-727db0d3dc
+        specifier: 1.26.0-dev.20260416-b7804b056c
+        version: 1.26.0-dev.20260416-b7804b056c
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -417,12 +417,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@huggingface/jinja@0.5.4':
-    resolution: {integrity: sha512-VoQJywjpjy2D88Oj0BTHRuS8JCbUgoOg5t1UGgbtGh2fRia9Dx/k6Wf8FqrEWIvWK9fAkfJeeLB9fcSpCNPCpw==}
+  '@huggingface/jinja@0.5.6':
+    resolution: {integrity: sha512-MyMWyLnjqo+KRJYSH7oWNbsOn5onuIvfXYPcc0WOGxU0eHUV7oAYUoQTl2BMdu7ml+ea/bu11UM+EshbeHwtIA==}
     engines: {node: '>=18'}
 
-  '@huggingface/tokenizers@0.1.0':
-    resolution: {integrity: sha512-gnOWcxTCyHG6ZHWbMay0H7bQTF6Xw5dqKg9juTy037gaGqNbZilEyE8/8VSAHBhvWFJKTFujetn8XbD+d2pzQQ==}
+  '@huggingface/tokenizers@0.1.3':
+    resolution: {integrity: sha512-8rF/RRT10u+kn7YuUbUg0OF30K8rjTc78aHpxT+qJ1uWSqxT1MHi8+9ltwYfkFYJzT/oS+qw3JVfHtNMGAdqyA==}
 
   '@img/colour@1.0.0':
     resolution: {integrity: sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw==}
@@ -1725,12 +1725,15 @@ packages:
   onnxruntime-common@1.24.0-dev.20251116-b39e144322:
     resolution: {integrity: sha512-BOoomdHYmNRL5r4iQ4bMvsl2t0/hzVQ3OM3PHD0gxeXu1PmggqBv3puZicEUVOA3AtHHYmqZtjMj9FOfGrATTw==}
 
-  onnxruntime-node@1.25.0-dev.20260125-727db0d3dc:
-    resolution: {integrity: sha512-xgor91kp0ZwC4Tj9daTlFg005t5Rf6OiY0YRBcT0o/94q2n1HfbjRjqZPfJ/OzkykP/523z+HkQZIy0d5lLgvQ==}
+  onnxruntime-common@1.24.3:
+    resolution: {integrity: sha512-GeuPZO6U/LBJXvwdaqHbuUmoXiEdeCjWi/EG7Y1HNnDwJYuk6WUbNXpF6luSUY8yASul3cmUlLGrCCL1ZgVXqA==}
+
+  onnxruntime-node@1.24.3:
+    resolution: {integrity: sha512-JH7+czbc8ALA819vlTgcV+Q214/+VjGeBHDjX81+ZCD0PCVCIFGFNtT0V4sXG/1JXypKPgScQcB3ij/hk3YnTg==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.25.0-dev.20260125-727db0d3dc:
-    resolution: {integrity: sha512-020j8KmRppP6o9CMvcjxaBJMXTXd0Ix8y6/AQCwJojKq8Y4SROl8NtXUZk71FR4OMU6cYzIfQ2f2U5A3UshVzA==}
+  onnxruntime-web@1.26.0-dev.20260416-b7804b056c:
+    resolution: {integrity: sha512-MD6Ss4GSpQBo6zqoJzyT9LRbKYs7x/JVN23FT24EcEvlqF4VuzPOeH6X38orZPKHQDbprn7K+SBpu0/mj2CQiw==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -2396,9 +2399,9 @@ snapshots:
   '@esbuild/win32-x64@0.27.2':
     optional: true
 
-  '@huggingface/jinja@0.5.4': {}
+  '@huggingface/jinja@0.5.6': {}
 
-  '@huggingface/tokenizers@0.1.0': {}
+  '@huggingface/tokenizers@0.1.3': {}
 
   '@img/colour@1.0.0': {}
 
@@ -3898,13 +3901,15 @@ snapshots:
 
   onnxruntime-common@1.24.0-dev.20251116-b39e144322: {}
 
-  onnxruntime-node@1.25.0-dev.20260125-727db0d3dc:
+  onnxruntime-common@1.24.3: {}
+
+  onnxruntime-node@1.24.3:
     dependencies:
       adm-zip: 0.5.16
       global-agent: 3.0.0
-      onnxruntime-common: 1.24.0-dev.20251116-b39e144322
+      onnxruntime-common: 1.24.3
 
-  onnxruntime-web@1.25.0-dev.20260125-727db0d3dc:
+  onnxruntime-web@1.26.0-dev.20260416-b7804b056c:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9

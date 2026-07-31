@@ -7,3 +7,6 @@ onlyBuiltDependencies:
   - protobufjs
   - sharp
   - unrs-resolver
+
+publicHoistPattern:
+  - onnxruntime-common

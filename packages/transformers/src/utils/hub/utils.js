@@ -1,4 +1,5 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
+import { logger } from '../logger.js';
 
 /**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
@@ -58,6 +59,27 @@ export function isValidHfModelId(string) {
 }
 
 /**
+ * Builds a stable key for memoizing model/revision/cache scoped work.
+ *
+ * @param {string} model_id Model ID or local model path.
+ * @param {Object} [options] Pretrained loading options.
+ * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.cache_dir=null] Custom cache directory.
+ * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {...unknown} parts Additional key parts for the specific operation.
+ * @returns {string}
+ */
+export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
+    return JSON.stringify([
+        model_id,
+        options.revision ?? 'main',
+        options.cache_dir ?? null,
+        options.local_files_only ?? false,
+        ...parts,
+    ]);
+}
+
+/**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
  * @param {string} remoteURL The URL of the file that could not be loaded.
@@ -79,16 +101,21 @@ export function handleError(status, remoteURL, fatal) {
 /**
  * Read and track progress when reading a Response object
  *
- * @param {Response|import('./files.js').FileResponse} response The Response object to read
+ * @param {Response|import('./FileResponse.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
+ * @param {number} [expectedSize] The expected size of the file (used when content-length header is missing)
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
-export async function readResponse(response, progress_callback) {
+export async function readResponse(response, progress_callback, expectedSize) {
     const contentLength = response.headers.get('Content-Length');
-    if (contentLength === null) {
-        console.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
+
+    // Use content-length if available, otherwise fall back to expectedSize (from metadata)
+    let total = contentLength ? parseInt(contentLength, 10) : (expectedSize ?? 0);
+
+    if (contentLength === null && !expectedSize) {
+        logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
-    let total = parseInt(contentLength ?? '0');
+
     let buffer = new Uint8Array(total);
     let loaded = 0;
 
@@ -125,4 +152,38 @@ export async function readResponse(response, progress_callback) {
     await read();
 
     return buffer;
+}
+
+/**
+ * Checks if the given URL is a blob URL (created via URL.createObjectURL).
+ * Blob URLs should not be cached as they are temporary in-memory references.
+ * @param {string} url - The URL to check.
+ * @returns {boolean} True if the URL is a blob URL, false otherwise.
+ */
+export function isBlobURL(url) {
+    return isValidUrl(url, ['blob:']);
+}
+
+/**
+ * Converts any URL to an absolute URL if needed.
+ * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
+ * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
+ * @param {string} url - The URL to convert (can be relative or absolute).
+ * @returns {string} The absolute URL.
+ */
+export function toAbsoluteURL(url) {
+    let baseURL;
+
+    if (typeof location !== 'undefined' && location.href) {
+        // Browser environment: use location.href
+        baseURL = location.href;
+    } else if (typeof import.meta !== 'undefined' && import.meta.url) {
+        // Node.js/Bun/Deno module environment: use import.meta.url
+        baseURL = import.meta.url;
+    } else {
+        // Fallback: if no base is available, return the URL unchanged
+        return url;
+    }
+
+    return new URL(url, baseURL).href;
 }

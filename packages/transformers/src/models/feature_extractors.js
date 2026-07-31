@@ -2,8 +2,11 @@ export * from './audio_spectrogram_transformer/feature_extraction_audio_spectrog
 export * from './encodec/feature_extraction_encodec.js';
 export * from './chatterbox/feature_extraction_chatterbox.js';
 export * from './clap/feature_extraction_clap.js';
+export * from './cohere_asr/feature_extraction_cohere_asr.js';
 export * from './dac/feature_extraction_dac.js';
 export * from './gemma3n/feature_extraction_gemma3n.js';
+export * from './gemma4/feature_extraction_gemma4.js';
+export * from './granite_speech/feature_extraction_granite_speech.js';
 export * from './moonshine/feature_extraction_moonshine.js';
 export * from './parakeet/feature_extraction_parakeet.js';
 export * from './pyannote/feature_extraction_pyannote.js';
@@ -12,6 +15,7 @@ export * from './snac/feature_extraction_snac.js';
 export * from './speecht5/feature_extraction_speecht5.js';
 export * from './wav2vec2/feature_extraction_wav2vec2.js';
 export * from './wespeaker/feature_extraction_wespeaker.js';
+export * from './voxtral_realtime/feature_extraction_voxtral_realtime.js';
 export * from './whisper/feature_extraction_whisper.js';
 
 export { FeatureExtractor } from '../feature_extraction_utils.js';

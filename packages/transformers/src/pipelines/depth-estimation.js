@@ -14,17 +14,16 @@ import { interpolate_4d } from '../utils/tensor.js';
  * @property {import('../utils/tensor.js').Tensor} predicted_depth The raw depth map predicted by the model.
  * @property {RawImage} depth The processed depth map as an image (with the same size as the input image).
  *
- * @callback DepthEstimationPipelineCallbackSingle Predicts the depth for a single image input.
- * @param {ImageInput} images The image to compute depth for.
- * @returns {Promise<DepthEstimationOutput>} An object containing the depth estimation result.
- *
- * @callback DepthEstimationPipelineCallbackBatch Predicts the depth for multiple image inputs.
- * @param {ImageInput[]} images The images to compute depth for.
- * @returns {Promise<DepthEstimationOutput[]>} A list of objects containing depth estimation results.
- *
- * @typedef {DepthEstimationPipelineCallbackSingle & DepthEstimationPipelineCallbackBatch} DepthEstimationPipelineCallback
- *
  * @typedef {ImagePipelineConstructorArgs & DepthEstimationPipelineCallback & Disposable} DepthEstimationPipelineType
+ */
+
+/**
+ * @template T
+ * @typedef {T extends ImageInput[] ? DepthEstimationOutput[] : DepthEstimationOutput} DepthEstimationPipelineResult
+ */
+
+/**
+ * @typedef {<T extends ImageInput | ImageInput[]>(images: T) => Promise<DepthEstimationPipelineResult<T>>} DepthEstimationPipelineCallback
  */
 
 /**

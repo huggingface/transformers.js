@@ -11,11 +11,9 @@ export class UltravoxModel extends UltravoxPreTrainedModel {
 
         return default_merge_input_ids_with_audio_features({
             // @ts-ignore
-            audio_token_id: this.config.ignore_index ?? this.config.audio_token_id,
+            audio_token_id: this.config.ignore_index ?? this.config.audio_token_id ?? this.config.audio_token_index,
             ...kwargs,
             audio_features: reshaped_audio_features,
         });
     }
 }
-
-export class VoxtralForConditionalGeneration extends UltravoxModel {}

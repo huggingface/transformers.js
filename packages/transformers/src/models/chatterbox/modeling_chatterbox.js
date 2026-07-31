@@ -49,6 +49,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Speaker embeddings/features (useful for re-using pre-computed speaker data)
         audio_features = null, // float32[batch_size,sequence_length,1024]
@@ -105,7 +106,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
                 if (!past_key_values || target_length !== 1) {
                     throw new Error('Incorrect state encountered during generation.');
                 }
-                const past_length = Object.values(past_key_values)[0].dims.at(-2);
+                const past_length = past_key_values.get_seq_length();
                 attention_mask = ones([inputs_embeds.dims[0], past_length + target_length]);
             }
         }
@@ -118,6 +119,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
                 attention_mask,
                 generation_config,
                 logits_processor,
+                num_logits_to_keep,
             },
             false,
         );
@@ -168,7 +170,7 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
         );
 
         const new_tokens = sequences.slice(null, [
-            params.input_ids.dims[1], // Exclude start of speech token
+            /** @type {Tensor} */ (params.input_ids).dims[1], // Exclude start of speech token
             -1, // Exclude end of speech token
         ]);
 

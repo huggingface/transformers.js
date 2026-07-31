@@ -1,16 +1,10 @@
 import { AutoProcessor, AutoModelForAudioFrameClassification } from "../../../src/transformers.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
+import { load_cached_audio } from "../../asset_cache.js";
 
 export default () => {
   const models_to_test = ["onnx-community/pyannote-segmentation-3.0"];
-
-  let audio;
-  beforeAll(async () => {
-    const url = "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/mlk.npy";
-    const buffer = await (await fetch(url)).arrayBuffer();
-    audio = Float32Array.from(new Float64Array(buffer));
-  });
 
   it(
     `PyAnnoteForAudioFrameClassification`,
@@ -25,6 +19,7 @@ export default () => {
       expect(processor.sampling_rate).toEqual(16000);
 
       // Preprocess audio
+      const audio = await load_cached_audio("mlk");
       const inputs = await processor(audio);
 
       // Run model with inputs
