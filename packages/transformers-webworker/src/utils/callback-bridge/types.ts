@@ -10,10 +10,11 @@ export interface SerializedFunction {
  * Message sent from worker to main thread to invoke a callback
  */
 export interface CallbackInvocationMessage {
-    type: string;
+    type: typeof RESPONSE_CALLBACK_INVOCATION;
     functionId: string;
     args: any[];
 }
 
 export type SerializableOptions = Record<string, any>;
 export type SerializedOptions = Record<string, any>;
+import type { RESPONSE_CALLBACK_INVOCATION } from '../../constants';

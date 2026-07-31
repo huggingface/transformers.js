@@ -10,6 +10,7 @@ export default {
   coveragePathIgnorePatterns: ["node_modules", "tests"],
   coverageProvider: "v8",
   roots: ["./tests/"],
+  testMatch: ["**/*.test.ts"],
   preset: "ts-jest/presets/default-esm",
   transform: {
     "^.+\\.tsx?$": [
@@ -21,6 +22,7 @@ export default {
           esModuleInterop: true,
           skipLibCheck: true,
           isolatedModules: true,
+          noEmit: true,
         },
       },
     ],

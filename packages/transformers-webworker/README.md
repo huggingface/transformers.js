@@ -46,6 +46,9 @@ const classifier = await webWorkerPipeline(
 // Use it like a regular pipeline
 const result = await classifier('I love this!');
 console.log(result);
+
+// Release the model and callback resources when it is no longer needed
+await classifier.dispose();
 ```
 
 ### In Your Web Worker
@@ -66,7 +69,7 @@ self.onmessage = handler.onmessage;
 
 ### Function Callbacks
 
-Function callbacks like `progress_callback` are automatically handled via a callback bridge and will execute in the main thread:
+Top-level, fire-and-forget callbacks like `progress_callback` are automatically handled via a callback bridge and execute in the main thread:
 
 ```typescript
 const pipe = await webWorkerPipeline(worker, 'text-generation', 'model', {
@@ -75,6 +78,12 @@ const pipe = await webWorkerPipeline(worker, 'text-generation', 'model', {
   }
 });
 ```
+
+Only callbacks in the pipeline initialization options are bridged. Callback return values, nested callback functions, call-time callbacks, and class-based streamers such as `TextStreamer` are not supported across the worker boundary. Use a custom worker protocol when token-by-token streaming is required.
+
+### Structured Clone Boundary
+
+Inputs, call-time options, and results use the browser's structured clone algorithm. Class instances lose their prototype when crossing the worker boundary. For example, a `Tensor` or `RawImage` result arrives as structured data without class methods such as `tolist()`. Convert results inside the worker or reconstruct the required type on the main thread when those methods are needed.
 
 ### GPU Acceleration
 
@@ -94,7 +103,13 @@ await webWorkerPipeline(worker, 'text-generation', 'model', {
 });
 ```
 
-**Note:** `session_options` cannot contain GPU devices, WebNN contexts, or typed arrays as these are not serializable across worker boundaries.
+**Note:** GPU devices and WebNN contexts cannot be passed across the worker boundary. Other values supported by the browser's structured clone algorithm, including typed arrays, can be passed normally.
+
+### Multiple Pipelines
+
+Multiple pipeline proxies can share one worker. Requests are routed independently and each initialized pipeline remains loaded until its `dispose()` method is called or the worker terminates.
+
+Call `dispose()` and await any in-flight pipeline requests before calling `worker.terminate()`. Browsers do not emit a termination event that this package can use to reject requests interrupted by `terminate()`.
 
 ## Development
 

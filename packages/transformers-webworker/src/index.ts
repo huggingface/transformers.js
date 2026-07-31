@@ -6,5 +6,6 @@
  */
 
 // Web Worker utilities
-export { default as webWorkerPipeline } from './webWorkerPipeline.js';
-export { default as webWorkerPipelineHandler } from './webWorkerPipelineHandler.js';
+export { default as webWorkerPipeline } from './webWorkerPipeline';
+export type { WebWorkerPipeline } from './webWorkerPipeline';
+export { default as webWorkerPipelineHandler } from './webWorkerPipelineHandler';

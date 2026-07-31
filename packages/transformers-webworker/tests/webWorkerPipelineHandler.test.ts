@@ -1,144 +1,165 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { describe, it, expect, jest, beforeEach, afterAll } from "@jest/globals";
 
-const REQUEST_MESSAGE_TYPE = "transformersjs_worker_pipeline";
-const RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK = "transformersjs_worker_invokeCallback";
+const pipelineMock = jest.fn<any>();
+jest.unstable_mockModule("@huggingface/transformers", () => ({ pipeline: pipelineMock }));
 
-interface WebWorkerPipelineHandler {
-  (): {
-    onmessage: (event: MessageEvent) => Promise<void>;
-  };
-}
+const { default: webWorkerPipelineHandler } = await import("../src/webWorkerPipelineHandler.js");
 
-interface MockSelf {
-  postMessage: jest.Mock;
-}
+const REQUEST = "transformersjs_worker_pipeline";
+const RESPONSE_RESULT = "transformersjs_worker_result";
+const RESPONSE_CALLBACK_INVOCATION = "callback_bridge:invoke";
+
+const request = (data: Record<string, any>) => ({ data: { id: 0, type: REQUEST, pipelineId: "pipeline_0", ...data } }) as MessageEvent;
 
 describe("webWorkerPipelineHandler", () => {
-  let webWorkerPipelineHandler: WebWorkerPipelineHandler;
-  let handler: ReturnType<WebWorkerPipelineHandler>;
-  let mockSelf: MockSelf;
+  let postMessage: jest.Mock;
 
-  beforeEach(async () => {
-    // Clear all mocks
+  beforeEach(() => {
     jest.clearAllMocks();
-
-    // Mock self.postMessage
-    mockSelf = {
-      postMessage: jest.fn(),
-    };
-    (global as any).self = mockSelf;
-
-    // Import the built module
-    const module = await import("../dist/index.js");
-    webWorkerPipelineHandler = module.webWorkerPipelineHandler;
-    handler = webWorkerPipelineHandler();
+    postMessage = jest.fn();
+    (globalThis as any).self = { postMessage };
   });
 
-  it("should create a handler with onmessage function", () => {
-    expect(handler).toHaveProperty("onmessage");
-    expect(typeof handler.onmessage).toBe("function");
+  afterAll(() => {
+    delete (globalThis as any).self;
   });
 
-  it("should ignore messages without correct type", async () => {
+  it("ignores unrelated messages", async () => {
+    const handler = webWorkerPipelineHandler();
     await handler.onmessage({ data: { type: "other" } } as MessageEvent);
-    expect(mockSelf.postMessage).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalled();
   });
 
-  it("should ignore messages without data", async () => {
-    await handler.onmessage({} as MessageEvent);
-    expect(mockSelf.postMessage).not.toHaveBeenCalled();
-  });
+  it("initializes once and runs falsy inputs", async () => {
+    const pipe = Object.assign(jest.fn<any>().mockResolvedValue("result"), { dispose: jest.fn() });
+    pipelineMock.mockResolvedValue(pipe);
+    const handler = webWorkerPipelineHandler();
 
-  it("should return a promise when handling messages", () => {
-    const messageEvent: MessageEvent = {
-      data: {
-        id: 1,
-        type: REQUEST_MESSAGE_TYPE,
+    await handler.onmessage(
+      request({
+        operation: "init",
         task: "text-classification",
         model_id: "test-model",
-        options: {},
-        data: null,
-      },
-    } as MessageEvent;
+        options: { device: "cpu" },
+      }),
+    );
+    await handler.onmessage(request({ id: 1, operation: "run", data: "", pipeOptions: { top_k: 1 } }));
 
-    // The handler returns a promise (don't await to avoid loading real models)
-    const result = handler.onmessage(messageEvent);
-    expect(result instanceof Promise).toBe(true);
+    expect(pipelineMock).toHaveBeenCalledTimes(1);
+    expect(pipe).toHaveBeenCalledWith("", { top_k: 1 });
+    expect(postMessage).toHaveBeenLastCalledWith({ id: 1, type: RESPONSE_RESULT, result: "result" });
   });
 
-  it("should unserialize function callbacks correctly", () => {
-    // Test the unserialize logic by checking what the handler would do
-    const serializedOptions = {
-      progress_callback: {
-        __fn: true,
-        functionId: "cb_progress_callback",
-      },
-      device: "cpu",
-    };
+  it("bridges callback invocations", async () => {
+    pipelineMock.mockImplementation(async (_task, _model, options) => {
+      options.progress_callback({ progress: 50 });
+      return Object.assign(jest.fn(), { dispose: jest.fn() });
+    });
+    const handler = webWorkerPipelineHandler();
 
-    // We can't directly test the internal unserializeOptions function,
-    // but we can test that serialized functions have the expected structure
-    expect(serializedOptions.progress_callback).toHaveProperty("__fn", true);
-    expect(serializedOptions.progress_callback).toHaveProperty("functionId");
-  });
+    await handler.onmessage(
+      request({
+        operation: "init",
+        task: "text-classification",
+        model_id: "test-model",
+        options: { progress_callback: { __fn: true, functionId: "cb_0" } },
+      }),
+    );
 
-  it("should handle callback invocation structure", () => {
-    // Simulate what would happen when a callback is invoked
-    const callbackFn = (...args: any[]) =>
-      mockSelf.postMessage({
-        type: RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-        functionId: "test_callback_id",
-        args,
-      });
-
-    // Call the callback
-    callbackFn({ progress: 50 });
-
-    // Verify postMessage was called with correct structure
-    expect(mockSelf.postMessage).toHaveBeenCalledWith({
-      type: RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-      functionId: "test_callback_id",
+    expect(postMessage).toHaveBeenNthCalledWith(1, {
+      type: RESPONSE_CALLBACK_INVOCATION,
+      functionId: "cb_0",
       args: [{ progress: 50 }],
     });
   });
 
-  it("should handle empty pipeOptions parameter", () => {
-    const messageWithoutPipeOptions: MessageEvent = {
-      data: {
-        id: 1,
-        type: REQUEST_MESSAGE_TYPE,
-        task: "text-classification",
-        model_id: "test-model",
-        options: {},
-        data: "test input",
-        // pipeOptions omitted
-      },
-    } as MessageEvent;
+  it("returns structured initialization and execution errors", async () => {
+    pipelineMock.mockRejectedValue(new Error("Could not load model"));
+    const handler = webWorkerPipelineHandler();
 
-    // Should not throw synchronously when pipeOptions is undefined
-    expect(() => {
-      handler.onmessage(messageWithoutPipeOptions);
-    }).not.toThrow();
+    await handler.onmessage(request({ operation: "init", task: "text-classification", model_id: "test-model", options: {} }));
+
+    expect(postMessage).toHaveBeenCalledWith({
+      id: 0,
+      type: RESPONSE_RESULT,
+      error: expect.objectContaining({ name: "Error", message: "Could not load model" }),
+    });
   });
 
-  it("should properly structure message data", () => {
-    const validMessage = {
-      data: {
-        id: 123,
-        type: REQUEST_MESSAGE_TYPE,
-        task: "text-classification",
-        model_id: "my-model",
-        options: { device: "webgpu" },
-        data: "test input",
-        pipeOptions: { top_k: 5 },
-      },
-    };
+  it("rejects duplicate pipeline IDs without leaking the original", async () => {
+    const originalPipe = Object.assign(jest.fn(), { dispose: jest.fn() });
+    pipelineMock.mockResolvedValue(originalPipe);
+    const handler = webWorkerPipelineHandler();
+    const initRequest = request({ operation: "init", task: "text-classification", model_id: "test-model", options: {} });
 
-    // Verify message structure is valid
-    expect(validMessage.data).toHaveProperty("id");
-    expect(validMessage.data).toHaveProperty("type", REQUEST_MESSAGE_TYPE);
-    expect(validMessage.data).toHaveProperty("task");
-    expect(validMessage.data).toHaveProperty("model_id");
-    expect(validMessage.data).toHaveProperty("data");
+    await handler.onmessage(initRequest);
+    await handler.onmessage(initRequest);
+
+    expect(pipelineMock).toHaveBeenCalledTimes(1);
+    expect(originalPipe.dispose).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenLastCalledWith({
+      id: 0,
+      type: RESPONSE_RESULT,
+      error: expect.objectContaining({ message: "Web Worker pipeline already exists: pipeline_0" }),
+    });
+  });
+
+  it("disposes and removes initialized pipelines", async () => {
+    const dispose = jest.fn<() => Promise<void>>().mockResolvedValue();
+    pipelineMock.mockResolvedValue(Object.assign(jest.fn(), { dispose }));
+    const handler = webWorkerPipelineHandler();
+
+    await handler.onmessage(request({ operation: "init", task: "text-classification", model_id: "test-model", options: {} }));
+    await handler.onmessage(request({ id: 1, operation: "dispose" }));
+    await handler.onmessage(request({ id: 2, operation: "run", data: "input" }));
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenLastCalledWith({
+      id: 2,
+      type: RESPONSE_RESULT,
+      error: expect.objectContaining({ message: "Unknown Web Worker pipeline: pipeline_0" }),
+    });
+  });
+
+  it("waits for in-flight inference before disposing a pipeline", async () => {
+    let finishRun!: () => void;
+    let markRunStarted!: () => void;
+    const runStarted = new Promise<void>((resolve) => (markRunStarted = resolve));
+    const pipe = Object.assign(
+      jest.fn<any>().mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRun = resolve;
+            markRunStarted();
+          }),
+      ),
+      { dispose: jest.fn<() => Promise<void>>().mockResolvedValue() },
+    );
+    pipelineMock.mockResolvedValue(pipe);
+    const handler = webWorkerPipelineHandler();
+    await handler.onmessage(request({ operation: "init", task: "text-classification", model_id: "test-model", options: {} }));
+
+    const runPromise = handler.onmessage(request({ id: 1, operation: "run", data: "input" }));
+    const disposePromise = handler.onmessage(request({ id: 2, operation: "dispose" }));
+    await runStarted;
+    expect(pipe.dispose).not.toHaveBeenCalled();
+
+    finishRun();
+    await Promise.all([runPromise, disposePromise]);
+    expect(pipe.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a pipeline available when disposal fails", async () => {
+    const dispose = jest.fn<() => Promise<void>>().mockRejectedValueOnce(new Error("Temporary failure")).mockResolvedValue();
+    pipelineMock.mockResolvedValue(Object.assign(jest.fn(), { dispose }));
+    const handler = webWorkerPipelineHandler();
+    await handler.onmessage(request({ operation: "init", task: "text-classification", model_id: "test-model", options: {} }));
+
+    await handler.onmessage(request({ id: 1, operation: "dispose" }));
+    await handler.onmessage(request({ id: 2, operation: "dispose" }));
+
+    expect(dispose).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 1, error: expect.objectContaining({ message: "Temporary failure" }) }));
+    expect(postMessage).toHaveBeenLastCalledWith({ id: 2, type: RESPONSE_RESULT, result: null });
   });
 });

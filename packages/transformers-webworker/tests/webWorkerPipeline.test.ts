@@ -1,196 +1,174 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import type { PipelineType } from "@huggingface/transformers";
+import webWorkerPipeline from "../src/webWorkerPipeline.js";
 
-const REQUEST_MESSAGE_TYPE = "transformersjs_worker_pipeline";
-const RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK = "transformersjs_worker_invokeCallback";
-const RESPONSE_MESSAGE_TYPE_RESULT = "transformersjs_worker_result";
+const REQUEST = "transformersjs_worker_pipeline";
+const RESPONSE_RESULT = "transformersjs_worker_result";
+const RESPONSE_CALLBACK_INVOCATION = "callback_bridge:invoke";
 
-type WebWorkerPipeline = <PayloadType = any, ResultType = any>(worker: Worker, task: PipelineType, model_id: string, options?: Record<string, any>) => Promise<(data: PayloadType, pipeOptions?: Record<string, any>) => Promise<ResultType>>;
+class MockWorker {
+  postMessage = jest.fn<(message: any) => void>();
+  private listeners = new Map<string, Set<(event: any) => void>>();
 
-interface MockWorker {
-  postMessage: jest.Mock;
-  onmessage: ((e: MessageEvent) => void) | null;
+  addEventListener(type: string, listener: (event: any) => void) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: (event: any) => void) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatch(type: string, data?: any) {
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(type === "message" ? { data } : (data ?? { type }));
+    }
+  }
+
+  respond(message: any, result: any = null) {
+    this.dispatch("message", { id: message.id, type: RESPONSE_RESULT, result });
+  }
 }
 
 describe("webWorkerPipeline", () => {
-  let webWorkerPipeline: WebWorkerPipeline;
-  let mockWorker: MockWorker;
+  let worker: MockWorker;
 
-  beforeEach(async () => {
-    // Import the built module
-    const module = await import("../dist/index.js");
-    webWorkerPipeline = module.webWorkerPipeline;
-
-    // Create a mock Worker
-    mockWorker = {
-      postMessage: jest.fn(),
-      onmessage: null,
-    };
+  beforeEach(() => {
+    worker = new MockWorker();
   });
 
-  it("should create a pipeline function", async () => {
-    // Setup the worker to respond
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-    }, 0);
+  it("initializes and runs a pipeline with falsy inputs", async () => {
+    worker.postMessage.mockImplementation((message) => worker.respond(message, message.data));
 
-    const pipeline = await webWorkerPipeline(mockWorker as any, "sentiment-analysis", "test-model");
+    const pipe = await webWorkerPipeline<string, string>(worker as unknown as Worker, "text-classification", "test-model");
+    await expect(pipe("")).resolves.toBe("");
 
-    expect(typeof pipeline).toBe("function");
-    expect(mockWorker.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "init",
-        type: REQUEST_MESSAGE_TYPE,
-        task: "sentiment-analysis",
-        model_id: "test-model",
-      }),
-    );
-  });
-
-  it("should send initialization message with correct parameters", async () => {
-    const task: PipelineType = "text-classification";
-    const modelId = "my-model";
-    const options = { device: "cpu" };
-
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-    }, 0);
-
-    await webWorkerPipeline(mockWorker as any, task, modelId, options);
-
-    expect(mockWorker.postMessage).toHaveBeenCalledWith({
-      id: "init",
-      type: REQUEST_MESSAGE_TYPE,
-      data: null,
-      task: task,
-      model_id: modelId,
-      options: options,
-    });
-  });
-
-  it("should serialize function options", async () => {
-    const callback = jest.fn();
-    const options = {
-      progress_callback: callback,
-      device: "cpu",
-    };
-
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-    }, 0);
-
-    await webWorkerPipeline(mockWorker as any, "text-classification", "test-model", options);
-
-    const callArgs = mockWorker.postMessage.mock.calls[0][0] as any;
-    expect(callArgs.options.progress_callback).toEqual({
-      __fn: true,
-      functionId: "cb_progress_callback",
-    });
-    expect(callArgs.options.device).toBe("cpu");
-  });
-
-  it("should handle callback invocations from worker", async () => {
-    const callback = jest.fn();
-    const options = {
-      progress_callback: callback,
-    };
-
-    setTimeout(() => {
-      // First, send init response
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-
-      // Then simulate callback invocation
-      setTimeout(() => {
-        mockWorker.onmessage?.({
-          data: {
-            type: RESPONSE_MESSAGE_TYPE_INVOKE_CALLBACK,
-            functionId: "cb_progress_callback",
-            args: [{ status: "progress", progress: 50 }],
-          },
-        } as MessageEvent);
-      }, 10);
-    }, 0);
-
-    await webWorkerPipeline(mockWorker as any, "text-classification", "test-model", options);
-
-    // Wait for callback to be invoked
-    await new Promise((resolve) => setTimeout(resolve, 20));
-
-    expect(callback).toHaveBeenCalledWith({ status: "progress", progress: 50 });
-  });
-
-  it("should send pipeline execution messages", async () => {
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-    }, 0);
-
-    const pipeline = await webWorkerPipeline(mockWorker as any, "sentiment-analysis", "test-model");
-
-    // Reset mock to clear init call
-    mockWorker.postMessage.mockClear();
-
-    // Simulate execution
-    const executePromise = pipeline("I love this!", { top_k: 1 });
-
-    // Simulate worker response
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: {
-          id: 0,
-          type: RESPONSE_MESSAGE_TYPE_RESULT,
-          result: [{ label: "POSITIVE", score: 0.99 }],
-        },
-      } as MessageEvent);
-    }, 10);
-
-    const result = await executePromise;
-
-    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+    expect(worker.postMessage).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         id: 0,
-        type: REQUEST_MESSAGE_TYPE,
-        data: "I love this!",
-        task: "sentiment-analysis",
+        type: REQUEST,
+        operation: "init",
+        pipelineId: "pipeline_0",
+        task: "text-classification",
         model_id: "test-model",
-        pipeOptions: { top_k: 1 },
       }),
     );
-
-    expect(result).toEqual([{ label: "POSITIVE", score: 0.99 }]);
+    expect(worker.postMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: 1,
+        operation: "run",
+        pipelineId: "pipeline_0",
+        data: "",
+        pipeOptions: {},
+      }),
+    );
   });
 
-  it("should handle errors from worker", async () => {
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: { id: "init", type: RESPONSE_MESSAGE_TYPE_RESULT },
-      } as MessageEvent);
-    }, 0);
+  it("routes concurrent pipelines through one worker without ID collisions", async () => {
+    worker.postMessage.mockImplementation((message) => worker.respond(message, `${message.pipelineId}:${message.data ?? "ready"}`));
 
-    const pipeline = await webWorkerPipeline(mockWorker as any, "text-classification", "test-model");
+    const first = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "first-model");
+    const second = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "second-model");
 
-    const executePromise = pipeline("test input");
+    await expect(Promise.all([first("one"), second("two")])).resolves.toEqual(["pipeline_0:one", "pipeline_1:two"]);
+    expect(worker.postMessage.mock.calls.map(([message]) => message.id)).toEqual([0, 1, 2, 3]);
+  });
 
-    // Simulate worker error
-    setTimeout(() => {
-      mockWorker.onmessage?.({
-        data: {
-          id: 0,
-          type: RESPONSE_MESSAGE_TYPE_RESULT,
-          error: new Error("Pipeline execution failed"),
-        },
-      } as MessageEvent);
-    }, 10);
+  it("serializes callbacks once and invokes them on the main thread", async () => {
+    const callback = jest.fn();
+    worker.postMessage.mockImplementation((message) => worker.respond(message));
 
-    await expect(executePromise).rejects.toThrow("Pipeline execution failed");
+    const pipe = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model", {
+      progress_callback: callback,
+    });
+    const initMessage = worker.postMessage.mock.calls[0][0];
+    const functionId = initMessage.options.progress_callback.functionId;
+
+    worker.dispatch("message", {
+      type: RESPONSE_CALLBACK_INVOCATION,
+      functionId,
+      args: [{ progress: 50 }],
+    });
+    await pipe("input");
+
+    expect(callback).toHaveBeenCalledWith({ progress: 50 });
+    expect(worker.postMessage.mock.calls[1][0]).not.toHaveProperty("options");
+  });
+
+  it("rejects serialized worker errors", async () => {
+    worker.postMessage.mockImplementation((message) => {
+      worker.dispatch("message", {
+        id: message.id,
+        type: RESPONSE_RESULT,
+        error: { name: "RangeError", message: "Model failed" },
+      });
+    });
+
+    await expect(webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model")).rejects.toMatchObject({ name: "RangeError", message: "Model failed" });
+  });
+
+  it("rejects pending requests when the worker fails", async () => {
+    const pipePromise = webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model");
+    worker.dispatch("error", { error: new Error("Worker crashed") });
+    await expect(pipePromise).rejects.toThrow("Worker crashed");
+
+    worker.postMessage.mockImplementation((message) => worker.respond(message));
+    await expect(webWorkerPipeline(worker as unknown as Worker, "text-classification", "other-model")).resolves.toEqual(expect.any(Function));
+  });
+
+  it("contains callback exceptions", async () => {
+    const callbackError = new Error("Callback failed");
+    const callback = jest.fn(() => {
+      throw callbackError;
+    });
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    worker.postMessage.mockImplementation((message) => worker.respond(message));
+    const pipe = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model", {
+      progress_callback: callback,
+    });
+    const functionId = worker.postMessage.mock.calls[0][0].options.progress_callback.functionId;
+
+    expect(() => worker.dispatch("message", { type: RESPONSE_CALLBACK_INVOCATION, functionId, args: [] })).not.toThrow();
+    expect(consoleError).toHaveBeenCalledWith("CallbackBridgeClient: Callback invocation failed", callbackError);
+
+    consoleError.mockRestore();
+    await pipe.dispose();
+  });
+
+  it("disposes the worker pipeline and prevents later calls", async () => {
+    worker.postMessage.mockImplementation((message) => worker.respond(message));
+    const pipe = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model");
+
+    const firstDispose = pipe.dispose();
+    const secondDispose = pipe.dispose();
+    expect(secondDispose).toBe(firstDispose);
+    await firstDispose;
+
+    expect(worker.postMessage.mock.calls[1][0]).toEqual(expect.objectContaining({ operation: "dispose", pipelineId: "pipeline_0" }));
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    await expect(pipe("input")).rejects.toThrow("has been disposed");
+  });
+
+  it("allows disposal to be retried after a failed request", async () => {
+    let disposeAttempts = 0;
+    worker.postMessage.mockImplementation((message) => {
+      if (message.operation === "dispose" && disposeAttempts++ === 0) {
+        worker.dispatch("message", {
+          id: message.id,
+          type: RESPONSE_RESULT,
+          error: { name: "Error", message: "Temporary disposal failure" },
+        });
+      } else {
+        worker.respond(message);
+      }
+    });
+    const pipe = await webWorkerPipeline(worker as unknown as Worker, "text-classification", "test-model");
+
+    await expect(pipe.dispose()).rejects.toThrow("Temporary disposal failure");
+    await expect(pipe.dispose()).resolves.toBeUndefined();
+    await expect(pipe("input")).rejects.toThrow("has been disposed");
+    expect(disposeAttempts).toBe(2);
   });
 });

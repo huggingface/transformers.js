@@ -1,4 +1,4 @@
-import type { CallbackInvocationMessage, SerializableOptions, SerializedOptions } from './types.js';
+import type { CallbackInvocationMessage, SerializableOptions, SerializedOptions } from './types';
 import { RESPONSE_CALLBACK_INVOCATION } from '../../constants';
 
 /**
@@ -7,6 +7,7 @@ import { RESPONSE_CALLBACK_INVOCATION } from '../../constants';
  */
 export class CallbackBridgeClient {
     private callbackMap = new Map<string, Function>();
+    private callbackIdCounter = 0;
     private worker: Worker;
     private messageHandler: (event: MessageEvent) => void;
 
@@ -18,88 +19,23 @@ export class CallbackBridgeClient {
 
     /**
      * Serialize options by replacing functions with callback references
-     * @throws {Error} If options contain non-serializable values like GPU devices or typed arrays
      */
-    serialize(options: SerializableOptions): SerializedOptions {
+    serialize(options: SerializableOptions): { options: SerializedOptions; callbackIds: string[] } {
         const out: SerializedOptions = {};
+        const callbackIds: string[] = [];
 
         Object.entries(options ?? {}).forEach(([key, value]) => {
             if (typeof value === 'function') {
-                const functionId = `cb_${key}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                const functionId = `cb_${this.callbackIdCounter++}`;
                 this.callbackMap.set(functionId, value);
+                callbackIds.push(functionId);
                 out[key] = { __fn: true, functionId };
             } else {
-                // Validate session_options for non-serializable objects
-                if (key === 'session_options' && value) {
-                    this.validateSessionOptions(value);
-                }
                 out[key] = value;
             }
         });
 
-        return out;
-    }
-
-    /**
-     * Validate session_options for non-serializable objects
-     * @private
-     */
-    private validateSessionOptions(sessionOptions: any): void {
-        if (typeof sessionOptions !== 'object' || sessionOptions === null) {
-            return;
-        }
-
-        // Check for GPU device objects in executionProviders
-        if (Array.isArray(sessionOptions.executionProviders)) {
-            for (const provider of sessionOptions.executionProviders) {
-                if (typeof provider === 'object' && provider !== null) {
-                    // Check for GPUDevice
-                    if ('device' in provider && provider.device !== null && typeof provider.device === 'object') {
-                        console.warn(
-                            'CallbackBridgeClient: session_options.executionProviders contains a GPUDevice object which cannot be serialized across worker boundaries. ' +
-                                'Use the "device" parameter instead (e.g., device: "webgpu") and let the worker create its own GPU context.',
-                        );
-                    }
-                    // Check for MLContext (WebNN)
-                    if ('context' in provider && provider.context !== null && typeof provider.context === 'object') {
-                        console.warn(
-                            'CallbackBridgeClient: session_options.executionProviders contains an MLContext object which cannot be serialized across worker boundaries. ' +
-                                'Use the "device" parameter instead (e.g., device: "webnn") and let the worker create its own WebNN context.',
-                        );
-                    }
-                    // Check for gpuDevice in WebNN options
-                    if (
-                        'gpuDevice' in provider &&
-                        provider.gpuDevice !== null &&
-                        typeof provider.gpuDevice === 'object'
-                    ) {
-                        console.warn(
-                            'CallbackBridgeClient: session_options.executionProviders contains a gpuDevice object which cannot be serialized across worker boundaries. ' +
-                                'Use the "device" parameter instead and let the worker create its own GPU context.',
-                        );
-                    }
-                }
-            }
-        }
-
-        // Check for external data with typed arrays
-        if (Array.isArray(sessionOptions.externalData)) {
-            for (const external of sessionOptions.externalData) {
-                if (
-                    external?.data &&
-                    (external.data instanceof Uint8Array ||
-                        external.data instanceof ArrayBuffer ||
-                        ArrayBuffer.isView(external.data))
-                ) {
-                    console.warn(
-                        'CallbackBridgeClient: session_options.externalData contains typed arrays or ArrayBuffers. ' +
-                            'Models with external data files should be loaded directly in the worker thread, not configured via session_options from the main thread. ' +
-                            'The worker will automatically handle external data when loading large models.',
-                    );
-                    break;
-                }
-            }
-        }
+        return { options: out, callbackIds };
     }
 
     /**
@@ -113,7 +49,11 @@ export class CallbackBridgeClient {
             const fn = this.callbackMap.get(functionId);
 
             if (fn) {
-                fn(...args);
+                try {
+                    fn(...(Array.isArray(args) ? args : []));
+                } catch (error) {
+                    console.error('CallbackBridgeClient: Callback invocation failed', error);
+                }
             } else {
                 console.warn(`CallbackBridgeClient: Unknown callback function ID: ${functionId}`);
             }
@@ -125,6 +65,13 @@ export class CallbackBridgeClient {
      */
     clearCallback(functionId: string): void {
         this.callbackMap.delete(functionId);
+    }
+
+    /** Clear callbacks owned by a disposed pipeline. */
+    clearCallbacks(functionIds: string[]): void {
+        for (const functionId of functionIds) {
+            this.callbackMap.delete(functionId);
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ __pycache__
 node_modules
 deno.lock
 package-lock.json
+*.local.*
 
 # Do not track build artifacts/generated files
 packages/*/dist

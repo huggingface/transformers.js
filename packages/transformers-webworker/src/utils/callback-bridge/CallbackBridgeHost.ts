@@ -1,4 +1,4 @@
-import type { SerializedOptions, SerializableOptions, SerializedFunction } from './types.js';
+import type { SerializedOptions, SerializableOptions, SerializedFunction } from './types';
 import { RESPONSE_CALLBACK_INVOCATION } from '../../constants';
 
 /**
@@ -40,7 +40,8 @@ export class CallbackBridgeHost {
             value !== null &&
             '__fn' in value &&
             value.__fn === true &&
-            'functionId' in value
+            'functionId' in value &&
+            typeof value.functionId === 'string'
         );
     }
 }

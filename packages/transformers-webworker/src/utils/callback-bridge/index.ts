@@ -1,3 +1,3 @@
-export { CallbackBridgeClient } from './CallbackBridgeClient.js';
-export { CallbackBridgeHost } from './CallbackBridgeHost.js';
-export type { SerializedFunction, CallbackInvocationMessage, SerializableOptions, SerializedOptions } from './types.js';
+export { CallbackBridgeClient } from './CallbackBridgeClient';
+export { CallbackBridgeHost } from './CallbackBridgeHost';
+export type { SerializedFunction, CallbackInvocationMessage, SerializableOptions, SerializedOptions } from './types';
