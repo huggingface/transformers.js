@@ -63,6 +63,6 @@
     "access": "public"
   },
   "dependencies": {
-    "llguidance": "^0.1.8"
+    "llguidance": "0.2.0"
   }
 }

@@ -2,8 +2,14 @@ import { jest } from "@jest/globals";
 import { Tensor } from "@huggingface/transformers";
 
 const computeMask = jest.fn();
+const computeMaskInto = jest.fn();
 const commitToken = jest.fn();
-const createInterpreter = jest.fn(() => ({ computeMask, commitToken }));
+let supportsComputeMaskInto = false;
+const createInterpreter = jest.fn(() => ({
+  computeMask,
+  ...(supportsComputeMaskInto ? { computeMaskInto } : {}),
+  commitToken,
+}));
 const loadBundledLLGuidance = jest.fn(async () => ({ createInterpreter }));
 
 jest.unstable_mockModule("llguidance", () => ({
@@ -15,6 +21,8 @@ const { LlguidanceConstraint } = await import("../dist/index.js");
 describe("LlguidanceConstraint", () => {
   beforeEach(() => {
     computeMask.mockReset();
+    computeMaskInto.mockReset();
+    supportsComputeMaskInto = false;
     commitToken.mockReset();
     createInterpreter.mockClear();
     loadBundledLLGuidance.mockClear();
@@ -32,15 +40,28 @@ describe("LlguidanceConstraint", () => {
     logits_processor([[0n], [0n]], logits);
 
     expect(loadBundledLLGuidance).toHaveBeenCalledTimes(1);
+    expect(loadBundledLLGuidance).toHaveBeenCalledWith();
     expect(createInterpreter).toHaveBeenCalledWith({ tokenizer, response_format });
     expect(Array.from(logits.data)).toEqual([1, -Infinity, 3, -Infinity, 5, -Infinity, 7, -Infinity]);
   });
 
-  // Ensures caller-provided load options are forwarded without the cache-only control flag.
-  it("passes explicit llguidance load options", async () => {
-    await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" }, { useWasmCache: false, wasmUrl: "custom.wasm" });
+  it("reuses a packed mask buffer when the runtime supports computeMaskInto", async () => {
+    supportsComputeMaskInto = true;
+    computeMaskInto.mockImplementation((target) => {
+      target[0] = 0b0101;
+      return { mask: target, vocabSize: 4 };
+    });
 
-    expect(loadBundledLLGuidance).toHaveBeenCalledWith({ wasmUrl: "custom.wasm" });
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const first = new Tensor("float32", new Float32Array([1, 2, 3, 4]), [1, 4]);
+    const second = new Tensor("float32", new Float32Array([5, 6, 7, 8]), [1, 4]);
+    logits_processor([[0n]], first);
+    logits_processor([[0n]], second);
+
+    expect(computeMask).not.toHaveBeenCalled();
+    expect(computeMaskInto).toHaveBeenCalledTimes(2);
+    expect(computeMaskInto.mock.calls[0][0]).toBe(computeMaskInto.mock.calls[1][0]);
+    expect(Array.from(second.data)).toEqual([5, -Infinity, 7, -Infinity]);
   });
 
   // Confirms sampled tokens are committed back to llguidance so stopping criteria can end generation.
@@ -94,21 +115,6 @@ describe("LlguidanceConstraint", () => {
 
     expect(Array.from(logits.data)).toEqual([1, 2]);
     expect(commitToken).not.toHaveBeenCalled();
-    expect(stopping_criteria([[0n]])).toEqual([true]);
-  });
-
-  // Handles llguidance's post-stop compute error as a normal completion signal.
-  it("treats compute_mask after stop as completed", async () => {
-    computeMask.mockImplementation(() => {
-      throw new Error("compute_mask() called after stop");
-    });
-
-    const { logits_processor, stopping_criteria } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
-    const logits = new Tensor("float32", new Float32Array([1, 2]), [1, 2]);
-
-    logits_processor([[0n]], logits);
-
-    expect(Array.from(logits.data)).toEqual([1, 2]);
     expect(stopping_criteria([[0n]])).toEqual([true]);
   });
 

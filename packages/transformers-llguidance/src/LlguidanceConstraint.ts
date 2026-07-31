@@ -6,7 +6,7 @@ import {
     logger,
     type Tensor,
 } from '@huggingface/transformers';
-import { type LLGuidanceResponseFormat } from 'llguidance';
+import { loadBundledLLGuidance, type JSONSchema, type LLGuidanceTokenizerSource } from 'llguidance';
 
 import { applyMask, forceToken, summarizeMaskResult } from './utils/mask';
 import {
@@ -15,22 +15,20 @@ import {
     type LlguidanceState,
     type LlguidanceStats,
 } from './utils/types';
-import { type LlguidanceLoadOptions, loadLLGuidance } from './utils/wasm';
 
-export type ResponseFormat = LLGuidanceResponseFormat;
-export type { LlguidanceLoadOptions, LlguidanceStats };
+export type ResponseFormat =
+    | { type: 'json_object' }
+    | { type: 'json_schema'; json_schema: JSONSchema }
+    | { type: 'regex'; regex: string };
+export type { LlguidanceStats };
 
 export class LlguidanceConstraint {
-    static async fromResponseFormat(
-        tokenizer: unknown,
-        response_format: ResponseFormat,
-        loadOptions: LlguidanceLoadOptions = {},
-    ) {
+    static async fromResponseFormat(tokenizer: LLGuidanceTokenizerSource, response_format: ResponseFormat) {
         logger.debug('[LlguidanceConstraint] loading llguidance', {
             response_format,
         });
 
-        const runtime = await loadLLGuidance(loadOptions);
+        const runtime = await loadBundledLLGuidance();
         const interpreter = runtime.createInterpreter({
             tokenizer,
             response_format,
@@ -42,7 +40,15 @@ export class LlguidanceConstraint {
             completed: false,
             interpreter,
             step: 0,
-            stats: { steps: 0, computeMaskMs: 0, applyMaskMs: 0, commitTokenMs: 0 },
+            stats: {
+                steps: 0,
+                computeMaskMs: 0,
+                applyMaskMs: 0,
+                commitTokenMs: 0,
+                trieNodesVisited: 0,
+                sharedJsonMaskCacheHits: 0,
+                sharedJsonMaskCacheMisses: 0,
+            },
         };
 
         const logits_processor = new LogitsProcessorList();
@@ -87,21 +93,19 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
         let result: GuidanceMaskResult;
         const maskStart = performance.now();
-        try {
+        const maskWords = vocabSize === undefined ? undefined : Math.ceil(vocabSize / 32);
+        if (this.state.interpreter.computeMaskInto && maskWords !== undefined) {
+            this.state.maskBuffer ??= new Uint32Array(maskWords);
+            result = this.state.interpreter.computeMaskInto(this.state.maskBuffer);
+        } else {
             result = this.state.interpreter.computeMask();
-            this.state.stats.computeMaskMs += performance.now() - maskStart;
-        } catch (error) {
-            this.state.stats.computeMaskMs += performance.now() - maskStart;
-            if (!String((error as Error).message).includes('compute_mask() called after stop')) {
-                throw error;
-            }
-            this.state.completed = true;
-            if (isDebugEnabled()) {
-                logger.debug('[LlguidanceLogitsProcessor] compute after stop', {
-                    step: this.state.step,
-                });
-            }
-            return logits;
+        }
+        this.state.stats.computeMaskMs += performance.now() - maskStart;
+        const maskInstrumentation = this.state.interpreter.maskInstrumentation?.();
+        if (maskInstrumentation) {
+            this.state.stats.trieNodesVisited = maskInstrumentation.trieNodesVisited;
+            this.state.stats.sharedJsonMaskCacheHits = maskInstrumentation.sharedJsonMaskCacheHits;
+            this.state.stats.sharedJsonMaskCacheMisses = maskInstrumentation.sharedJsonMaskCacheMisses;
         }
 
         if (isDebugEnabled()) {
