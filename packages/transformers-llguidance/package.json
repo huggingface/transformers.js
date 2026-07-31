@@ -21,6 +21,7 @@
     "typegen": "tsc --build",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
+    "pretest": "pnpm build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose"
   },
   "repository": {

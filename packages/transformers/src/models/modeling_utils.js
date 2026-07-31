@@ -992,6 +992,8 @@ export class PreTrainedModel extends Callable {
 
             /** @type {[bigint][]} */
             const generated_input_ids = [];
+            /** @type {number[]} */
+            const sampled_token_ids = [];
             // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
             // Loop over each batch
             for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
@@ -999,11 +1001,11 @@ export class PreTrainedModel extends Callable {
 
                 const sampledTokens = await sampler(logs);
                 for (const [newTokenId, logProb] of sampledTokens) {
-                    const bigint = BigInt(newTokenId);
                     // TODO: If branching, use previous beam as a starting point
                     // update generated ids, model inputs, and length for next step
                     scores[batch_idx] += logProb;
-                    generated_input_ids.push([bigint]);
+                    generated_input_ids.push([newTokenId]);
+                    sampled_token_ids.push(Number(newTokenId));
 
                     // TODO: Support beam search
                     break;
@@ -1012,10 +1014,7 @@ export class PreTrainedModel extends Callable {
             for (let batch_idx = 0; batch_idx < generated_input_ids.length; ++batch_idx) {
                 all_input_ids[batch_idx].push(generated_input_ids[batch_idx][0]);
             }
-            prepared_logits_processor.onTokensSampled(
-                generated_input_ids.map(([token_id]) => Number(token_id)),
-                all_input_ids,
-            );
+            prepared_logits_processor.onTokensSampled(sampled_token_ids, all_input_ids);
             if (streamer) {
                 streamer.put(generated_input_ids);
             }
