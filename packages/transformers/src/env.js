@@ -27,6 +27,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
+import { fetchBinary } from './utils/fetch-binary.js';
+
 const VERSION = '4.2.0';
 
 const HAS_SELF = typeof self !== 'undefined';
@@ -174,7 +176,13 @@ const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 // Ensure default fetch is called with the correct receiver in browser environments.
-const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
+// On React Native, `fetch` mangles binary payloads, so route through an XHR-backed
+// implementation instead (see `utils/fetch-binary.js`).
+const DEFAULT_FETCH = IS_REACT_NATIVE_ENV
+    ? fetchBinary
+    : typeof globalThis.fetch === 'function'
+      ? globalThis.fetch.bind(globalThis)
+      : undefined;
 
 /**
  * Log levels for controlling output verbosity.

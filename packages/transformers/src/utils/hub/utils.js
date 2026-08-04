@@ -127,6 +127,16 @@ export async function readResponse(response, progress_callback, expectedSize) {
         logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
     }
 
+    if (!response.body) {
+        // A `FileResponse` in React Native carries no body stream: it resolves its
+        // metadata up front but defers touching the file until the bytes are actually
+        // asked for, so that callers who only want the path never read it. This is that
+        // explicit request, so read it now and report the transfer as a single step.
+        const buffer = new Uint8Array(await response.arrayBuffer());
+        progress_callback({ progress: 100, loaded: buffer.length, total: buffer.length });
+        return buffer;
+    }
+
     let buffer = new Uint8Array(total);
     let loaded = 0;
 

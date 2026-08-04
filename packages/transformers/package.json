@@ -9,19 +9,19 @@
     "node": {
       "import": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.mjs",
-        "react-native": "./dist/transformers.native.mjs"
+        "react-native": "./dist/transformers.native.mjs",
+        "default": "./dist/transformers.node.mjs"
       },
       "require": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.cjs",
-        "react-native": "./dist/transformers.native.cjs"
+        "react-native": "./dist/transformers.native.cjs",
+        "default": "./dist/transformers.node.cjs"
       }
     },
     "default": {
       "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.web.js",
-      "react-native": "./dist/transformers.native.mjs"
+      "react-native": "./dist/transformers.native.mjs",
+      "default": "./dist/transformers.web.js"
     }
   },
   "scripts": {

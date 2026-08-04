@@ -57,24 +57,22 @@ export class FileCache {
             const total = parseInt(contentLength ?? '0');
             let loaded = 0;
 
-            const reader = response.body.getReader();
             if (apis.IS_REACT_NATIVE_ENV) {
+                // React Native's `fetch` is the whatwg-fetch polyfill, whose `Response`
+                // has no `body` stream to read incrementally -- the payload is already
+                // buffered -- so take it in one piece.
+                //
+                // Only small files (configs, tokenizers) reach here: model weights are
+                // streamed straight to disk by `downloadFile()` and never become a
+                // `Response`, which is what keeps them out of the JS heap.
                 await NativeFS.mkdir(path.dirname(filePath));
-                const chunks = [];
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    const progress = total ? (loaded / total) * 100 : 0;
-                    progress_callback?.({ progress, loaded, total });
-                }
-                const combined = new Uint8Array(loaded);
-                let offset = 0;
-                for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length; }
-                await NativeFS.writeFile(tmpPath, Buffer.from(combined).toString('base64'), 'base64');
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await NativeFS.writeFile(tmpPath, buffer.toString('base64'), 'base64');
                 await NativeFS.moveFile(tmpPath, filePath);
+                loaded = buffer.length;
+                progress_callback?.({ progress: 100, loaded, total: total || loaded });
             } else {
+                const reader = response.body.getReader();
                 await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
                 const fileStream = fs.createWriteStream(tmpPath);
                 while (true) {

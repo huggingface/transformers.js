@@ -16,11 +16,38 @@ import {
     makePretrainedOptionsKey,
     readResponse,
 } from './hub/utils.js';
+import { downloadFile } from './hub/download.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
+
+/**
+ * Whether this environment can hand a file path straight to the ONNX runtime, so that
+ * `return_path` loads skip reading the file into a JS buffer. Node.js loads from disk via
+ * `onnxruntime-node`; React Native does the same via `onnxruntime-react-native`.
+ *
+ * NOTE: keep this in sync with the `return_path` argument that `utils/model-loader.js`
+ * passes to `getModelFile()` -- if the two disagree, `return_path` loads either read the
+ * whole model into memory needlessly or throw outright.
+ */
+const CAN_RETURN_PATH = apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV;
+
+/**
+ * The location to hand back for a local file.
+ *
+ * React Native addresses files by `file://` URI everywhere else (see `FileResponse` and
+ * `FileCache`, which pass `response.url` to `native-universal-fs`), so `return_path` loads
+ * stay in that form. `onnxruntime-react-native` strips the prefix itself before opening
+ * the model, so both forms load, but staying with the URI keeps the RN paths consistent.
+ *
+ * @param {FileResponse} response
+ * @returns {string}
+ */
+function filePathOf(response) {
+    return apis.IS_REACT_NATIVE_ENV ? response.url : response.filePath;
+}
 
 /**
  * @typedef {boolean|number} ExternalData
@@ -336,11 +363,16 @@ export async function loadResourceFile(
                 );
             }
 
-            // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            // File not found locally, so we try to download it from the remote server.
+            // On React Native a `return_path` load is streamed to disk further down
+            // instead, so don't open a remote response for it here -- doing so would pull
+            // the whole file into the JS heap, which is what we are avoiding.
+            if (!(apis.IS_REACT_NATIVE_ENV && return_path)) {
+                response = await getFile(remoteURL);
 
-            if (response.status !== 200) {
-                return handleError(response.status, remoteURL, fatal);
+                if (response.status !== 200) {
+                    return handleError(response.status, remoteURL, fatal);
+                }
             }
 
             // Success! We use the proposed cache key from earlier
@@ -362,10 +394,42 @@ export async function loadResourceFile(
         file: filename,
     });
 
+    // A local copy already in hand: either an on-disk file, or a path handed back by a
+    // custom cache. Anything else means the file still has to come down from the remote.
+    const haveLocalFile = typeof response === 'string' || (response instanceof FileResponse && response.exists);
+
+    if (apis.IS_REACT_NATIVE_ENV && return_path && !haveLocalFile) {
+        // Stream the file to disk natively, then reopen it as a local response so the
+        // rest of this function sees an ordinary on-disk file. See `downloadFile`.
+        const targetPath =
+            cache instanceof FileCache
+                ? pathJoin(cache.path, proposedCacheKey)
+                : pathJoin(options.cache_dir ?? env.cacheDir, requestURL);
+
+        const statusCode = await downloadFile(
+            remoteURL,
+            targetPath,
+            Object.fromEntries(getFetchHeaders(remoteURL)),
+            (data) =>
+                dispatchCallback(options.progress_callback, {
+                    status: 'progress',
+                    name: path_or_repo_id,
+                    file: filename,
+                    ...data,
+                }),
+        );
+
+        if (statusCode !== 200) {
+            return handleError(statusCode, remoteURL, fatal);
+        }
+
+        response = await getFile(targetPath);
+    }
+
     let result;
-    if (apis.IS_NODE_ENV && return_path) {
-        // In Node.js with return_path, we skip the buffer read (ONNX runtime
-        // loads from disk directly). A completion progress event is emitted
+    if (CAN_RETURN_PATH && return_path) {
+        // In Node.js and React Native with return_path, we skip the buffer read (ONNX
+        // runtime loads from disk directly). A completion progress event is emitted
         // after the caching block below to ensure progress_total reaches 100%.
     } else {
         /** @type {Uint8Array} */
@@ -440,11 +504,11 @@ export async function loadResourceFile(
         await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
     }
 
-    // In Node.js with return_path, the buffer read is skipped so no progress
-    // events are emitted during loading. Emit a final completion event so
-    // that aggregate progress_total tracking reaches 100%. This is placed
-    // after storeCachedResource so it doesn't conflict with caching progress.
-    if (apis.IS_NODE_ENV && return_path && options.progress_callback && typeof response !== 'string') {
+    // With return_path, the buffer read is skipped so no progress events are
+    // emitted during loading. Emit a final completion event so that aggregate
+    // progress_total tracking reaches 100%. This is placed after
+    // storeCachedResource so it doesn't conflict with caching progress.
+    if (CAN_RETURN_PATH && return_path && options.progress_callback && typeof response !== 'string') {
         const size = parseInt(response.headers.get('content-length'), 10) || 0;
         dispatchCallback(options.progress_callback, {
             status: 'progress',
@@ -463,20 +527,20 @@ export async function loadResourceFile(
     });
 
     if (result) {
-        if (!apis.IS_NODE_ENV && return_path) {
+        if (!CAN_RETURN_PATH && return_path) {
             throw new Error('Cannot return path in a browser environment.');
         }
         return result;
     }
     if (response instanceof FileResponse) {
-        return response.filePath;
+        return filePathOf(response);
     }
 
     // Otherwise, return the cached response (most likely a `FileResponse`).
     // NOTE: A custom cache may return a Response, or a string (file path)
     const cachedResponse = await cache?.match(cacheKey);
     if (cachedResponse instanceof FileResponse) {
-        return cachedResponse.filePath;
+        return filePathOf(cachedResponse);
     } else if (cachedResponse instanceof Response) {
         return new Uint8Array(await cachedResponse.arrayBuffer());
     } else if (typeof cachedResponse === 'string') {
