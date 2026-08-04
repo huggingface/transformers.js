@@ -31,7 +31,12 @@ export class FileCache {
     async match(request) {
         let filePath = path.join(this.path, request);
         let file = apis.IS_REACT_NATIVE_ENV ? await FileResponse.create(filePath) : new FileResponse(filePath);
-        return file.exists ? file : undefined;
+
+        if (file.exists) {
+            return file;
+        } else {
+            return undefined;
+        }
     }
 
     /**

@@ -168,6 +168,19 @@ describe("React Native environment", () => {
     });
   });
 
+  describe("saveBlob", () => {
+    // audio.js/image.js deliberately keep upstream's plain `saveBlob(path, blob)` call --
+    // the React Native branch lives in io.js alone, so it must work through that route.
+    it("writes through the native filesystem on React Native", async () => {
+      const { saveBlob } = await import("../src/utils/io.js");
+      const target = path.join(tmpDir, "saved.bin");
+
+      await saveBlob(target, new Blob([ONNX_BODY]));
+
+      expect(new Uint8Array(fs.readFileSync(target))).toEqual(new Uint8Array(ONNX_BODY));
+    });
+  });
+
   describe("remote model download", () => {
     const REMOTE_MODEL_ID = "testorg/remotemodel";
     let server;

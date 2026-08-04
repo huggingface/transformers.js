@@ -91,6 +91,10 @@ export class FileResponse {
         return response;
     }
 
+    /**
+     * Clone the current FileResponse object.
+     * @returns {FileResponse} A new FileResponse object with the same properties as the current object.
+     */
     clone() {
         let response = new FileResponse(this.filePath);
         response.exists = this.exists;

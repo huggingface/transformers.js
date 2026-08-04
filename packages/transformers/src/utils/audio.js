@@ -12,13 +12,10 @@ import { FFT, max } from './maths.js';
 import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
 import { Tensor, matmul } from './tensor.js';
-import { Buffer } from 'buffer';
-import * as NativeFS from 'native-universal-fs';
 import { logger } from './logger.js';
-import { apis } from '../env.js';
 
 /**
- * Helper function to read audio from a path/URL.
+ * Helper function to load audio from a path/URL.
  * @param {string|URL} url The path/URL to load the audio from.
  * @param {number} sampling_rate The sampling rate to use when decoding the audio.
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
@@ -77,7 +74,9 @@ export async function load_audio(url, sampling_rate) {
     return audio;
 }
 
-/** @deprecated Use {@link load_audio} instead. */
+/**
+ * @deprecated Use {@link load_audio} instead.
+ */
 export const read_audio = load_audio;
 
 /**
@@ -880,14 +879,6 @@ export class RawAudio {
      * @returns {Promise<void>}
      */
     async save(path) {
-        if (apis.IS_REACT_NATIVE_ENV) {
-            const buffer = await this.toBlob().arrayBuffer();
-            await NativeFS.writeFile(path, Buffer.from(buffer).toString('base64'), 'base64');
-            return;
-        }
-        if (apis.IS_WEB_ENV || apis.IS_FS_AVAILABLE) {
-            return saveBlob(path, this.toBlob());
-        }
-        throw new Error('Unable to save because filesystem is disabled in this environment.');
+        return saveBlob(path, this.toBlob());
     }
 }
