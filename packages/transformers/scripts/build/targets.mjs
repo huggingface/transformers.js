@@ -36,6 +36,7 @@ export const BUILD_TARGETS = [
       externalModules: REACT_NATIVE_EXTERNAL_MODULES,
       aliases: REACT_NATIVE_ALIASES,
       usePostBuild: false,
+      supportsImportMeta: false,
     },
   },
   {
@@ -48,6 +49,7 @@ export const BUILD_TARGETS = [
       externalModules: REACT_NATIVE_EXTERNAL_MODULES,
       aliases: REACT_NATIVE_ALIASES,
       usePostBuild: false,
+      supportsImportMeta: false,
     },
   },
   {

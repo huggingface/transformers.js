@@ -22,10 +22,15 @@ async function buildTarget(
     externalModules = [],
     aliases = {},
     usePostBuild = false,
+    supportsImportMeta = true,
   },
   log,
 ) {
   const platform = format === "cjs" ? "node" : "neutral";
+
+  // Runtimes without `import.meta` (e.g. Hermes/Metro) can't even parse it, so let esbuild
+  // rewrite every occurrence to the same empty-object shim it already uses for CJS output.
+  const supported = supportsImportMeta ? undefined : { "import-meta": false };
 
   const regularFile = `transformers${name}${suffix}`;
   const minFile = `transformers${name}.min${suffix}`;
@@ -53,6 +58,7 @@ async function buildTarget(
     outfile: path.join(OUT_DIR, regularFile),
     external: externalModules,
     plugins,
+    supported,
   });
   reportSize(path.join(OUT_DIR, regularFile), log);
 
@@ -66,6 +72,7 @@ async function buildTarget(
     external: externalModules,
     plugins,
     legalComments: "none",
+    supported,
   });
   reportSize(path.join(OUT_DIR, minFile), log);
 }
