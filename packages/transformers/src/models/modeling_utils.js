@@ -17,23 +17,14 @@ export function registerTaskMappings(mappings) {
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
 import { getModelJSON } from '../utils/hub.js';
 import { Seq2SeqLMOutput } from './modeling_outputs.js';
-import {
-    LogitsProcessorList,
-    ForcedBOSTokenLogitsProcessor,
-    ForcedEOSTokenLogitsProcessor,
-    SuppressTokensLogitsProcessor,
-    SuppressTokensAtBeginLogitsProcessor,
-    NoRepeatNGramLogitsProcessor,
-    RepetitionPenaltyLogitsProcessor,
-    NoBadWordsLogitsProcessor,
-    MinLengthLogitsProcessor,
-    MinNewTokensLengthLogitsProcessor,
-    TemperatureLogitsWarper,
-    ClassifierFreeGuidanceLogitsProcessor,
-} from '../generation/logits_process.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
-import { EosTokenCriteria, MaxLengthCriteria, StoppingCriteriaList } from '../generation/stopping_criteria.js';
-import { LogitsSampler } from '../generation/logits_sampler.js';
+import {
+    GenerationController,
+    createLogitsProcessorList,
+    createStoppingCriteriaList,
+    prepareGenerationConfig,
+    prepareGenerationLength,
+} from '../generation/controller.js';
 import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
@@ -41,6 +32,8 @@ import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
+import { getModelId, isInferenceBackend, loadInferenceModel } from '../backends/inference.js';
+import { getDefaultInferenceProvider, getOnnxProviderModule } from '../backends/default.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -252,16 +245,77 @@ export class PreTrainedModel extends Callable {
      * The model class to instantiate is selected based on the `model_type` property of the config object
      * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
-     * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
+     * @param {string|import('../backends/inference.js').InferenceBackend} pretrained_model_name_or_path The model backend, name, or path. A string selects the ONNX backend. It can be:
      * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
      *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
      * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
      *
-     * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
+     * @returns {Promise<PreTrainedModel>} A loaded model.
      */
-    static async from_pretrained(
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        if (typeof pretrained_model_name_or_path === 'string') {
+            const provider = await getDefaultInferenceProvider(pretrained_model_name_or_path);
+            return provider.load({
+                ...options,
+                modelClass: this,
+            });
+        }
+        if (typeof pretrained_model_name_or_path?.constructSessions === 'function') {
+            if (pretrained_model_name_or_path.providerType === 'onnx') {
+                await getOnnxProviderModule();
+            }
+            return /** @type {any} */ (pretrained_model_name_or_path).load({ ...options, modelClass: this });
+        }
+        if (isInferenceBackend(pretrained_model_name_or_path)) {
+            const modelId = getModelId(pretrained_model_name_or_path);
+            /** @type {import('../backends/inference.js').InferenceModelLoadOptions} */
+            const resolvedOptions = { ...options };
+            resolvedOptions.config =
+                resolvedOptions.config ?? (await AutoConfig.from_pretrained(modelId, resolvedOptions));
+            if (
+                resolvedOptions.progress_callback &&
+                !(resolvedOptions.progress_callback instanceof DefaultProgressCallback) &&
+                typeof pretrained_model_name_or_path.listModelArtifacts === 'function'
+            ) {
+                const expectedFiles = await pretrained_model_name_or_path.listModelArtifacts({
+                    ...resolvedOptions,
+                    modelId,
+                });
+                const metadata = await Promise.all(
+                    expectedFiles.map((file) =>
+                        get_file_metadata(pretrained_model_name_or_path, file, resolvedOptions),
+                    ),
+                );
+                /** @type {import('../utils/core.js').FilesLoadingMap} */
+                const filesLoading = {};
+                resolvedOptions.artifactMetadata = {};
+                metadata.forEach((entry, index) => {
+                    if (!entry.exists) return;
+                    const file = expectedFiles[index];
+                    resolvedOptions.artifactMetadata[file] = { size: entry.size, fromCache: entry.fromCache };
+                    filesLoading[file] = {
+                        loaded: entry.fromCache ? (entry.size ?? 0) : 0,
+                        total: entry.size ?? 0,
+                    };
+                });
+                resolvedOptions.progress_callback = new DefaultProgressCallback(
+                    resolvedOptions.progress_callback,
+                    filesLoading,
+                );
+            }
+            // Custom models are duck-typed to the same runtime contract as PreTrainedModel.
+            const model = /** @type {any} */ (await loadInferenceModel(pretrained_model_name_or_path, resolvedOptions));
+            if (typeof model.createAutoregressiveSession === 'function' && model.generation_config == null) {
+                model.generation_config = await getModelJSON(modelId, 'generation_config.json', false, resolvedOptions);
+            }
+            return model;
+        }
+        throw new TypeError('Unsupported pretrained model source.');
+    }
+
+    static async _from_pretrained(
         pretrained_model_name_or_path,
         {
             progress_callback = null,
@@ -270,11 +324,14 @@ export class PreTrainedModel extends Callable {
             local_files_only = false,
             revision = 'main',
             model_file_name = null,
-            subfolder = 'onnx',
+            subfolder = null,
             device = null,
             dtype = null,
             use_external_data_format = null,
             session_options = {},
+            signal = undefined,
+            artifactProvider = undefined,
+            inferenceProvider = undefined,
         } = {},
     ) {
         const options = {
@@ -289,6 +346,9 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            signal,
+            artifactProvider,
+            inferenceProvider,
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -320,6 +380,7 @@ export class PreTrainedModel extends Callable {
                     dtype,
                     device,
                     model_file_name,
+                    inferenceProvider,
                 });
 
                 const metadata = await Promise.all(
@@ -347,9 +408,7 @@ export class PreTrainedModel extends Callable {
         }
 
         const sessions = typeConfig.sessions(config, options, textOnly);
-        const promises = [
-            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
-        ];
+        const promises = [constructSessions(sessions, options, typeConfig.cache_sessions)];
         if (typeConfig.optional_configs) {
             promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
         }
@@ -390,7 +449,7 @@ export class PreTrainedModel extends Callable {
     /**
      * @param {GenerationConfig} generation_config
      * @param {number} input_ids_seq_length The starting sequence length for the input ids.
-     * @returns {LogitsProcessorList}
+     * @returns {import('../generation/logits_process.js').LogitsProcessorList}
      * @private
      */
     _get_logits_processor(
@@ -400,154 +459,7 @@ export class PreTrainedModel extends Callable {
         // prefix_allowed_tokens_fn, TODO
         logits_processor = null,
     ) {
-        const processors = new LogitsProcessorList();
-
-        // if (generation_config.diversity_penalty !== null && generation_config.diversity_penalty > 0.0) {
-        //     processors.push(new HammingDiversityLogitsProcessor(
-        //         generation_config.diversity_penalty,
-        //         generation_config.num_beams,
-        //         generation_config.num_beam_groups
-        //     ));
-        // }
-
-        // if (generation_config.encoder_repetition_penalty !== null && generation_config.encoder_repetition_penalty !== 1.0) {
-        //     processors.push(new EncoderRepetitionPenaltyLogitsProcessor(
-        //         generation_config.encoder_repetition_penalty,
-        //         encoder_input_ids
-        //     ));
-        // }
-
-        if (generation_config.repetition_penalty !== null && generation_config.repetition_penalty !== 1.0) {
-            processors.push(new RepetitionPenaltyLogitsProcessor(generation_config.repetition_penalty));
-        }
-
-        if (generation_config.no_repeat_ngram_size !== null && generation_config.no_repeat_ngram_size > 0) {
-            processors.push(new NoRepeatNGramLogitsProcessor(generation_config.no_repeat_ngram_size));
-        }
-
-        // if (generation_config.encoder_no_repeat_ngram_size !== null && generation_config.encoder_no_repeat_ngram_size > 0) {
-        //     if (this.config.is_encoder_decoder) {
-        //         processors.push(new EncoderNoRepeatNGramLogitsProcessor(
-        //             generation_config.encoder_no_repeat_ngram_size,
-        //             encoder_input_ids
-        //         ));
-        //     } else {
-        //         throw new Error("It's impossible to use `encoder_no_repeat_ngram_size` with decoder-only architecture");
-        //     }
-        // }
-
-        if (generation_config.bad_words_ids !== null) {
-            processors.push(
-                new NoBadWordsLogitsProcessor(generation_config.bad_words_ids, generation_config.eos_token_id),
-            );
-        }
-
-        if (
-            generation_config.min_length !== null &&
-            generation_config.eos_token_id !== null &&
-            generation_config.min_length > 0
-        ) {
-            processors.push(new MinLengthLogitsProcessor(generation_config.min_length, generation_config.eos_token_id));
-        }
-
-        if (
-            generation_config.min_new_tokens !== null &&
-            generation_config.eos_token_id !== null &&
-            generation_config.min_new_tokens > 0
-        ) {
-            processors.push(
-                new MinNewTokensLengthLogitsProcessor(
-                    input_ids_seq_length,
-                    generation_config.min_new_tokens,
-                    generation_config.eos_token_id,
-                ),
-            );
-        }
-
-        // if (prefix_allowed_tokens_fn !== null) {
-        //     processors.push(new PrefixConstrainedLogitsProcessor(
-        //         prefix_allowed_tokens_fn,
-        //         generation_config.num_beams / generation_config.num_beam_groups
-        //     ));
-        // }
-
-        if (generation_config.forced_bos_token_id !== null) {
-            processors.push(new ForcedBOSTokenLogitsProcessor(generation_config.forced_bos_token_id));
-        }
-
-        if (generation_config.forced_eos_token_id !== null) {
-            processors.push(
-                new ForcedEOSTokenLogitsProcessor(generation_config.max_length, generation_config.forced_eos_token_id),
-            );
-        }
-
-        // if (generation_config.remove_invalid_values === true) {
-        //     processors.push(new InfNanRemoveLogitsProcessor());
-        // }
-
-        // if (generation_config.exponential_decay_length_penalty !== null) {
-        //     processors.push(new ExponentialDecayLengthPenalty(
-        //         generation_config.exponential_decay_length_penalty,
-        //         generation_config.eos_token_id,
-        //         input_ids_seq_length
-        //     ));
-        // }
-
-        if (generation_config.suppress_tokens !== null) {
-            processors.push(new SuppressTokensLogitsProcessor(generation_config.suppress_tokens));
-        }
-
-        if (generation_config.begin_suppress_tokens !== null) {
-            const begin_index =
-                input_ids_seq_length > 1 || generation_config.forced_bos_token_id === null
-                    ? input_ids_seq_length
-                    : input_ids_seq_length + 1;
-
-            processors.push(
-                new SuppressTokensAtBeginLogitsProcessor(generation_config.begin_suppress_tokens, begin_index),
-            );
-        }
-
-        // DEPRECATED: https://github.com/huggingface/transformers/pull/29485
-        // if (generation_config.forced_decoder_ids !== null) {
-        //     processors.push(new ForceTokensLogitsProcessor(generation_config.forced_decoder_ids));
-        // }
-
-        // 8. prepare batched CFG externally
-        if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
-            processors.push(new ClassifierFreeGuidanceLogitsProcessor(generation_config.guidance_scale));
-        }
-
-        if (generation_config.temperature === 0 && generation_config.do_sample) {
-            logger.warn(
-                '`do_sample` changed to false because `temperature: 0` implies greedy sampling (always selecting the most likely token), which is incompatible with `do_sample: true`.',
-            );
-            generation_config.do_sample = false;
-        }
-
-        if (generation_config.do_sample) {
-            if (generation_config.temperature !== null && generation_config.temperature !== 1.0) {
-                processors.push(new TemperatureLogitsWarper(generation_config.temperature));
-            }
-            // TODO: Add TopPLogitsWarper and TopKLogitsWarper
-            // if (generation_config.top_k !== null && generation_config.top_k !== 0) {
-            //     processors.push(new TopKLogitsWarper(generation_config.top_k));
-            // }
-            // if (generation_config.top_p !== null && generation_config.top_p < 1.0) {
-            //     processors.push(new TopPLogitsWarper(generation_config.top_p));
-            // }
-        }
-
-        if (logits_processor !== null) {
-            processors.extend(logits_processor);
-        }
-
-        // `LogitNormalization` should always be the last logit processor, when present
-        // if (generation_config.renormalize_logits === true) {
-        //     processors.push(new LogitNormalization());
-        // }
-
-        return processors;
+        return createLogitsProcessorList(generation_config, input_ids_seq_length, logits_processor);
     }
 
     /**
@@ -558,60 +470,22 @@ export class PreTrainedModel extends Callable {
      * @returns {GenerationConfig} The final generation config object to be used by the model for text generation.
      */
     _prepare_generation_config(generation_config, kwargs, cls = GenerationConfig) {
-        // Create empty generation config (contains defaults)
-        // We pass `this.config` so that if `eos_token_id` or `bos_token_id` exist in the model's config, we will use them
-        const config = { ...this.config };
-        for (const key of ['decoder', 'generator', 'text_config']) {
-            // Special case: some models have generation attributes set in the decoder.
-            // Use them if still unset in the generation config.
-            if (key in config) {
-                Object.assign(config, config[key]);
-            }
-        }
-
-        const gen_config = new cls(config);
-
-        // Apply model's generation config, if it exists
-        Object.assign(gen_config, this.generation_config ?? {});
-
-        // Next, use any generation config specified by the user
-        // when calling `generate`
-        if (generation_config) {
-            Object.assign(gen_config, generation_config);
-        }
-
-        // Finally, if any kwargs were passed, use them to overwrite
-        if (kwargs) {
-            Object.assign(gen_config, pick(kwargs, Object.getOwnPropertyNames(gen_config)));
-        }
-
-        return gen_config;
+        return prepareGenerationConfig({
+            modelConfig: this.config,
+            modelGenerationConfig: this.generation_config,
+            generationConfig: generation_config,
+            kwargs,
+            configClass: cls,
+        });
     }
 
     /**
      *
      * @param {GenerationConfig} generation_config
-     * @param {import('../generation/stopping_criteria.js').StoppingCriteria|import('../generation/stopping_criteria.js').StoppingCriteria[]|StoppingCriteriaList} [stopping_criteria=null]
+     * @param {import('../generation/stopping_criteria.js').StoppingCriteria|import('../generation/stopping_criteria.js').StoppingCriteria[]|import('../generation/stopping_criteria.js').StoppingCriteriaList} [stopping_criteria=null]
      */
     _get_stopping_criteria(generation_config, stopping_criteria = null) {
-        const criteria = new StoppingCriteriaList();
-
-        if (generation_config.max_length !== null) {
-            criteria.push(
-                new MaxLengthCriteria(generation_config.max_length, this.config.max_position_embeddings ?? null),
-            );
-        }
-        // if (generation_config.max_time !== null) {
-        //     criteria.push(new MaxTimeCriteria(generation_config.max_time));
-        // }
-        if (generation_config.eos_token_id !== null) {
-            criteria.push(new EosTokenCriteria(generation_config.eos_token_id));
-        }
-
-        if (stopping_criteria) {
-            criteria.extend(stopping_criteria);
-        }
-        return criteria;
+        return createStoppingCriteriaList(generation_config, this.config, stopping_criteria);
     }
 
     /**
@@ -891,9 +765,7 @@ export class PreTrainedModel extends Callable {
         // 6. Prepare `max_length` depending on other stopping criteria.
         let input_ids_length = input_ids.dims.at(-1);
 
-        if (generation_config.max_new_tokens !== null) {
-            generation_config.max_length = input_ids_length + generation_config.max_new_tokens;
-        }
+        prepareGenerationLength(generation_config, input_ids_length);
 
         // input_ids_length = model_inputs[model_input_name].dims.at(1);
         // // inputs instanceof Tensor ?  : inputs.length;
@@ -926,118 +798,57 @@ export class PreTrainedModel extends Callable {
         //     eos_token_ids = [eos_token_ids];
         // }
 
-        const numInputs = model_inputs[model_input_name].dims.at(0);
-
-        // TODO:
-        // done is a list of booleans to keep track of which inputs are done
-        // const done = new Array(numInputs).fill(false);
-        // For efficiency purposes, we remove completed rows from model_inputs
-        // when the beam is complete, and we keep track of the row index
-        // const rowIndexToBatchIndex = new Map();
-
-        const sampler = LogitsSampler.getSampler(generation_config);
-
-        // TODO make > numInputs
-        const scores = new Array(numInputs).fill(0);
-        /** @type {bigint[][]} */
-        const all_input_ids = input_ids.tolist();
-        if (streamer) {
-            streamer.put(all_input_ids);
-        }
-        // const all_generated_input_ids = Array.from({ length: numInputs }, () => []);
-
-        // NOTE: For now, we don't support spawning new beams
-        // TODO: when we do, we simply copy past key values and accumulate into single large tensor
-
-        ////////////////////////////////////////////////////
-        // Generic search which handles 4 generation modes:
-        // - GenerationMode.GREEDY_SEARCH
-        // - GenerationMode.SAMPLE
-        // - GenerationMode.BEAM_SEARCH
-        // - GenerationMode.BEAM_SAMPLE
-        ////////////////////////////////////////////////////
-        let outputs;
         let attentions = {};
         let return_dict_items = {};
-        while (true) {
-            // prepare model inputs
-            model_inputs = this.prepare_inputs_for_generation(all_input_ids, model_inputs, generation_config);
-            outputs = await this.forward(model_inputs);
-
-            if (generation_config.return_dict_in_generate) {
+        const controller = new GenerationController({
+            inputIds: input_ids,
+            generationConfig: generation_config,
+            logitsProcessor: prepared_logits_processor,
+            stoppingCriteria: prepared_stopping_criteria,
+            streamer,
+            collectOutputs: (stepOutputs) => {
+                if (!generation_config.return_dict_in_generate) return;
                 if (generation_config.output_attentions) {
-                    // Get attentions if they are present
-                    const token_attentions = getAttentions(outputs);
+                    const token_attentions = getAttentions(stepOutputs);
                     for (const key in token_attentions) {
-                        if (!(key in attentions)) {
-                            attentions[key] = [];
-                        }
-                        attentions[key].push(token_attentions[key]);
+                        (attentions[key] ??= []).push(token_attentions[key]);
                     }
                 } else if (this._return_dict_in_generate_keys) {
-                    Object.assign(return_dict_items, pick(outputs, this._return_dict_in_generate_keys));
+                    Object.assign(return_dict_items, pick(stepOutputs, this._return_dict_in_generate_keys));
                 }
-            }
+            },
+        });
 
-            // Logits are of the form [batch_size, out_seq_length, vocab_size]
-            // In most cases, this will be [batch_size, 1, vocab_size]
-            // So, we select the last token's logits:
-            // (equivalent to `logits = outputs.logits[:, -1, :]`)
-            // The `.to('float32')` is necessary for models with float16 logits,
-            // and is a no-op for float32 logits.
-            // TODO: Support float16 sampling in the sampler directly
-            const logits = outputs.logits.slice(null, -1, null).to('float32');
-
-            const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
-
-            /** @type {[bigint][]} */
-            const generated_input_ids = [];
-            /** @type {number[]} */
-            const sampled_token_ids = [];
-            // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
-            // Loop over each batch
-            for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
-                const logs = next_tokens_scores[batch_idx];
-
-                const sampledTokens = await sampler(logs);
-                for (const [newTokenId, logProb] of sampledTokens) {
-                    // TODO: If branching, use previous beam as a starting point
-                    // update generated ids, model inputs, and length for next step
-                    scores[batch_idx] += logProb;
-                    generated_input_ids.push([newTokenId]);
-                    sampled_token_ids.push(Number(newTokenId));
-
-                    // TODO: Support beam search
-                    break;
-                }
-            }
-            for (let batch_idx = 0; batch_idx < generated_input_ids.length; ++batch_idx) {
-                all_input_ids[batch_idx].push(generated_input_ids[batch_idx][0]);
-            }
-            prepared_logits_processor.onTokensSampled(sampled_token_ids, all_input_ids);
-            if (streamer) {
-                streamer.put(generated_input_ids);
-            }
-
-            const stop = prepared_stopping_criteria(all_input_ids);
-            if (stop.every((x) => x)) {
-                break;
-            }
-
-            model_inputs = this._update_model_kwargs_for_generation({
-                generated_input_ids,
-                outputs,
-                model_inputs,
-                is_encoder_decoder,
-            });
+        if (controller.allDone) {
+            return generation_config.return_dict_in_generate
+                ? controller.finalize({ past_key_values: kwargs.past_key_values ?? new DynamicCache() })
+                : controller.finalize();
         }
 
-        if (streamer) {
-            streamer.end();
-        }
+        let outputs;
+        try {
+            while (!controller.allDone) {
+                // prepare model inputs
+                model_inputs = this.prepare_inputs_for_generation(
+                    controller.sequences,
+                    model_inputs,
+                    generation_config,
+                );
+                outputs = await this.forward(model_inputs);
+                const step = await controller.step({ logits: outputs.logits, outputs });
+                if (step.allDone) break;
 
-        // TODO: ensure all_input_ids is padded correctly...
-        const sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
+                model_inputs = this._update_model_kwargs_for_generation({
+                    generated_input_ids: step.generatedInputIds,
+                    outputs,
+                    model_inputs,
+                    is_encoder_decoder,
+                });
+            }
+        } catch (error) {
+            controller.abort(error);
+            throw error;
+        }
 
         // Update past key values from the final forward pass
         const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
@@ -1057,17 +868,16 @@ export class PreTrainedModel extends Callable {
         }
 
         if (generation_config.return_dict_in_generate) {
-            return {
-                sequences,
+            return controller.finalize({
                 past_key_values,
                 ...attentions,
                 ...return_dict_items,
                 // TODO:
                 // scores,
                 // logits,
-            };
+            });
         }
-        return sequences;
+        return controller.finalize();
     }
 
     /**

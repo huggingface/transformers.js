@@ -51,6 +51,16 @@ import {
 } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
+import {
+    getModelId,
+    isInferenceBackend,
+    loadInferenceModel,
+    validateInferenceBackendTask,
+    validateInferenceModelTask,
+} from './backends/inference.js';
+import { validateInferenceArtifactProvider } from './backends/artifacts.js';
+import { getModelJSON, getModelText } from './utils/hub.js';
+import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
@@ -60,6 +70,36 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  * @typedef {{[K in AliasType]: InstanceType<typeof SUPPORTED_TASKS[TASK_ALIASES[K]]["pipeline"]>}} AliasTasks A mapping from pipeline aliases to their corresponding pipeline classes.
  * @typedef {SupportedTasks & AliasTasks} AllTasks A mapping from all pipeline names and aliases to their corresponding pipeline classes.
  */
+
+/**
+ * Resolve a custom backend's default chat template without moving rendering policy into the backend.
+ *
+ * @param {import('./backends/inference.js').InferenceBackend} backend
+ * @param {import('./utils/hub.js').PretrainedModelOptions} options
+ * @returns {Promise<string>|null}
+ */
+export function loadInferenceBackendChatTemplate(backend, options) {
+    const source = backend.chatTemplate;
+    if (source == null) return null;
+    if (typeof source !== 'object') {
+        throw new TypeError('Inference backend `chatTemplate` must be an object.');
+    }
+    if (Object.hasOwn(source, 'content')) {
+        if (typeof source.content !== 'string' || Object.hasOwn(source, 'modelId') || Object.hasOwn(source, 'file')) {
+            throw new TypeError(
+                'Inference backend `chatTemplate.content` must be a string and cannot be combined with `modelId` or `file`.',
+            );
+        }
+        return Promise.resolve(source.content);
+    }
+    if (source.modelId !== undefined && typeof source.modelId !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.modelId` must be a string.');
+    }
+    if (source.file !== undefined && typeof source.file !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.file` must be a string.');
+    }
+    return getModelText(source.modelId ?? backend.modelId, source.file ?? CHAT_TEMPLATE_NAME, true, options);
+}
 
 /**
  * Utility factory method to build a `Pipeline` object.
@@ -89,7 +129,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  *  - `"zero-shot-audio-classification"`: will return a `ZeroShotAudioClassificationPipeline`.
  *  - `"zero-shot-image-classification"`: will return a `ZeroShotImageClassificationPipeline`.
  *  - `"zero-shot-object-detection"`: will return a `ZeroShotObjectDetectionPipeline`.
- * @param {string} [model=null] The name of the pre-trained model to use. If not specified, the default model for the task will be used.
+ * @param {string|import('./backends/inference.js').InferenceBackend} [model=null] The model ID or custom inference backend to use. If not specified, the default model for the task will be used.
  * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Optional parameters for the pipeline.
  * @returns {Promise<AllTasks[T]>} A Pipeline object for the specified task.
  * @throws {Error} If an unsupported pipeline is requested.
@@ -105,10 +145,12 @@ export async function pipeline(
         revision = 'main',
         device = null,
         dtype = null,
-        subfolder = 'onnx',
+        subfolder = null,
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
+        signal = undefined,
+        artifactProvider = undefined,
     } = {},
 ) {
     // Apply aliases
@@ -130,21 +172,51 @@ export async function pipeline(
         }
     }
 
+    const customBackend = isInferenceBackend(model) && typeof model.constructSessions !== 'function';
+    const customRegistryProvider =
+        customBackend && typeof (/** @type {any} */ (model).listModelArtifacts) === 'function'
+            ? /** @type {import('./backends/model_registry.js').ModelRegistryInferenceProvider} */ (model)
+            : null;
+    const modelId = getModelId(model);
+    validateInferenceArtifactProvider(artifactProvider);
+    if (customBackend) {
+        validateInferenceBackendTask(/** @type {import('./backends/inference.js').InferenceBackend} */ (model), task);
+    }
+
     // Determine which files the model needs
-    const expected_files = await get_pipeline_files(task, model, {
+    const expected_files = await get_pipeline_files(task, modelId, {
         device,
         dtype,
+        config,
+        cache_dir,
+        local_files_only,
+        revision,
+        model_file_name,
+        inferenceProvider: customRegistryProvider,
+        include_model: !customBackend || customRegistryProvider !== null,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
+    /** @type {Record<string, {size?: number, fromCache?: boolean}>} */
+    const artifactMetadata = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+        const metadata = await Promise.all(
+            expected_files.map(async (file) =>
+                get_file_metadata(customBackend ? model : modelId, file, {
+                    cache_dir,
+                    local_files_only,
+                    revision,
+                    signal,
+                }),
+            ),
+        );
         metadata.forEach((m, i) => {
             if (m.exists) {
+                artifactMetadata[expected_files[i]] = { size: m.size, fromCache: m.fromCache };
                 files_loading[expected_files[i]] = {
-                    loaded: 0,
+                    loaded: m.fromCache ? (m.size ?? 0) : 0,
                     total: m.size ?? 0,
                 };
             }
@@ -165,6 +237,10 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
+        generation_config: null,
+        signal,
+        artifactProvider,
+        artifactMetadata,
     };
 
     // Determine which components to load based on the expected files
@@ -174,8 +250,22 @@ export async function pipeline(
     // Resolve the correct model class (needs config when multiple candidates exist)
     const modelClasses = pipelineInfo.model;
     let modelPromise;
-    if (Array.isArray(modelClasses)) {
-        const resolvedConfig = config ?? (await AutoConfig.from_pretrained(model, pretrainedOptions));
+    if (customBackend) {
+        pretrainedOptions.config = config ?? (await AutoConfig.from_pretrained(modelId, pretrainedOptions));
+        if (task === 'text-generation') {
+            pretrainedOptions.generation_config = await getModelJSON(
+                modelId,
+                'generation_config.json',
+                false,
+                pretrainedOptions,
+            );
+        }
+        modelPromise = loadInferenceModel(/** @type {import('./backends/inference.js').InferenceBackend} */ (model), {
+            ...pretrainedOptions,
+            task,
+        });
+    } else if (Array.isArray(modelClasses)) {
+        const resolvedConfig = config ?? (await AutoConfig.from_pretrained(modelId, pretrainedOptions));
         const { model_type } = resolvedConfig;
         const matchedClass = modelClasses.find((cls) => cls.supports(model_type));
         if (!matchedClass) {
@@ -184,17 +274,40 @@ export async function pipeline(
                     `None of the candidate model classes support this type.`,
             );
         }
-        modelPromise = matchedClass.from_pretrained(model, { ...pretrainedOptions, config: resolvedConfig });
+        modelPromise = matchedClass.from_pretrained(modelId, { ...pretrainedOptions, config: resolvedConfig });
     } else {
-        modelPromise = modelClasses.from_pretrained(model, pretrainedOptions);
+        modelPromise = modelClasses.from_pretrained(modelId, pretrainedOptions);
     }
 
-    // Load all components in parallel
-    const [tokenizer, processor, model_loaded] = await Promise.all([
-        hasTokenizer ? AutoTokenizer.from_pretrained(model, pretrainedOptions) : null,
-        hasProcessor ? AutoProcessor.from_pretrained(model, pretrainedOptions) : null,
-        modelPromise,
-    ]);
+    let tokenizer;
+    let processor;
+    let model_loaded;
+    let chat_template;
+    try {
+        // Load all components in parallel.
+        [tokenizer, processor, model_loaded, chat_template] = await Promise.all([
+            hasTokenizer ? AutoTokenizer.from_pretrained(modelId, pretrainedOptions) : null,
+            hasProcessor ? AutoProcessor.from_pretrained(modelId, pretrainedOptions) : null,
+            modelPromise,
+            customBackend && hasTokenizer
+                ? loadInferenceBackendChatTemplate(
+                      /** @type {import('./backends/inference.js').InferenceBackend} */ (model),
+                      pretrainedOptions,
+                  )
+                : null,
+        ]);
+        if (tokenizer && chat_template != null) tokenizer.chat_template = chat_template;
+        if (customBackend) {
+            validateInferenceModelTask(model_loaded, task);
+        }
+    } catch (error) {
+        // A parallel tokenizer/processor failure may race with a successful GPU model load.
+        const loadedModel = model_loaded ?? (await modelPromise.catch(() => null));
+        try {
+            await loadedModel?.dispose?.();
+        } catch {}
+        throw error;
+    }
 
     const results = { task, model: model_loaded };
     if (tokenizer) results.tokenizer = tokenizer;
@@ -203,7 +316,7 @@ export async function pipeline(
     dispatchCallback(progress_callback, {
         status: 'ready',
         task: task,
-        model: model,
+        model: modelId,
     });
 
     const pipelineClass = pipelineInfo.pipeline;

@@ -2,7 +2,6 @@ import { context } from "esbuild";
 import path from "node:path";
 import { stripNodePrefixPlugin } from "./plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./plugins/ignoreModulesPlugin.mjs";
-import { postBuildPlugin } from "./plugins/postBuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./plugins/externalNodeBuiltinsPlugin.mjs";
 import { rebuildPlugin } from "../../../../scripts/rebuildPlugin.mjs";
 import { OUT_DIR, ROOT_DIR, getEsbuildDevConfig } from "./constants.mjs";
@@ -12,7 +11,7 @@ import { BUILD_TARGETS } from "./targets.mjs";
  * Create an esbuild context for a single build target
  */
 async function createBuildContext(targetName, targetConfig, log) {
-  const { name, suffix, format, ignoreModules, externalModules, usePostBuild } = targetConfig;
+  const { name, suffix, format, ignoreModules, externalModules } = targetConfig;
   const platform = format === "cjs" ? "node" : "neutral";
   const outputFile = `transformers${name}${suffix}`;
 
@@ -23,9 +22,6 @@ async function createBuildContext(targetName, targetConfig, log) {
   }
   plugins.push(stripNodePrefixPlugin());
   plugins.push(externalNodeBuiltinsPlugin());
-  if (usePostBuild) {
-    plugins.push(postBuildPlugin(OUT_DIR, ROOT_DIR));
-  }
   plugins.push(rebuildPlugin(targetName, log));
 
   return context({

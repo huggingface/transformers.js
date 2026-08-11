@@ -69,6 +69,76 @@ describe("TypeScript compilation succeeds", () => {
       }
     });
   }
+
+  it("compiles a readonly plan-only inference backend", () => {
+    const diagnostics = getDiagnosticsFromSource(`
+      import type {
+        CausalGenerationCapabilitiesV1,
+        InferenceBackend,
+        InferenceBackendChatTemplate,
+        InferenceModel,
+        LogitsLeaseV1,
+        PlanAutoregressiveSessionV1,
+        StaticBackendCapabilities,
+      } from "../../types/transformers.js";
+
+      const staticCapabilities = {
+        devices: ["webgpu"],
+        dtypes: ["auto"],
+        tasks: ["text-generation"],
+      } as const satisfies StaticBackendCapabilities;
+
+      const causalGeneration = {
+        sessionVersion: 1,
+        maxBatchSize: 1,
+        cpuModes: [],
+        planModes: ["greedy"],
+        cpuLogits: false,
+        declarativePlans: ["argmax"],
+        tokenPipeline: { defaultDepth: 4, maxDepth: 4 },
+      } as const satisfies CausalGenerationCapabilitiesV1;
+
+      const session: PlanAutoregressiveSessionV1 = {
+        version: 1,
+        batchSize: 1,
+        maxSequenceLength: 128,
+        async *generateWithPlan(_inputs, _plan) {
+          yield { tokenIds: new Uint32Array([1]) };
+        },
+        async dispose() {},
+      };
+
+      const lease: LogitsLeaseV1 = {
+        version: 1,
+        dtype: "float32",
+        shape: [1, 4] as const,
+        async read() { return new Float32Array(4); },
+        release() {},
+      };
+
+      const backend: InferenceBackend = {
+        modelId: "test/model",
+        chatTemplate: { modelId: "test/templates", file: "chat.jinja" },
+        capabilities: staticCapabilities,
+        async load(_options) {
+          const model: InferenceModel = {
+            capabilities: { causalGeneration },
+            async createAutoregressiveSession() { return session; },
+            async dispose() {},
+          };
+          return model;
+        },
+      };
+
+      void backend;
+      void lease;
+      const inlineTemplate = { content: "{{ messages }}" } as const satisfies InferenceBackendChatTemplate;
+      void inlineTemplate;
+    `);
+    if (diagnostics.length > 0) {
+      throw new Error(formatDiagnostics(diagnostics));
+    }
+  });
 });
 
 describe("TypeScript expected errors", () => {

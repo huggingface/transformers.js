@@ -1,8 +1,8 @@
 import { build as esbuild } from "esbuild";
+import { copyFile } from "node:fs/promises";
 import path from "node:path";
 import { stripNodePrefixPlugin } from "./plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./plugins/ignoreModulesPlugin.mjs";
-import { postBuildPlugin } from "./plugins/postBuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./plugins/externalNodeBuiltinsPlugin.mjs";
 import { OUT_DIR, ROOT_DIR, getEsbuildProdConfig } from "./constants.mjs";
 import { reportSize } from "../../../../scripts/reportSize.mjs";
@@ -19,7 +19,6 @@ async function buildTarget(
     format = "esm", // 'esm' | 'cjs'
     ignoreModules = [],
     externalModules = [],
-    usePostBuild = false,
   },
   log,
 ) {
@@ -35,9 +34,6 @@ async function buildTarget(
   }
   plugins.push(stripNodePrefixPlugin());
   plugins.push(externalNodeBuiltinsPlugin());
-  if (usePostBuild) {
-    plugins.push(postBuildPlugin(OUT_DIR, ROOT_DIR));
-  }
 
   log.build(`Building ${colors.bright}${regularFile}${colors.reset}...`);
   await esbuild({
@@ -72,4 +68,13 @@ export async function buildAll(log) {
     log.section(target.name);
     await buildTarget(target.config, log);
   }
+
+  const ortDist = path.resolve(ROOT_DIR, "../transformers-onnx/node_modules/onnxruntime-web/dist");
+  const wasmAssets = [
+    "ort-wasm-simd-threaded.asyncify.mjs",
+    "ort-wasm-simd-threaded.asyncify.wasm",
+    "ort-wasm-simd-threaded.mjs",
+    "ort-wasm-simd-threaded.wasm",
+  ];
+  await Promise.all(wasmAssets.map((file) => copyFile(path.join(ortDist, file), path.join(OUT_DIR, file))));
 }

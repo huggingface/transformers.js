@@ -30,6 +30,12 @@ export class BaseStreamer {
     end() {
         throw Error('Not implemented');
     }
+
+    /**
+     * Function that is called when generation fails. Unlike `end()`, this must not signal successful completion.
+     * @param {unknown} _reason The generation failure.
+     */
+    abort(_reason) {}
 }
 
 const stdout_write = apis.IS_PROCESS_AVAILABLE ? (x) => process.stdout.write(x) : (x) => console.log(x);
@@ -152,6 +158,12 @@ export class TextStreamer extends BaseStreamer {
         this.on_finalized_text(printable_text, true);
     }
 
+    abort(_reason) {
+        this.token_cache = [];
+        this.print_len = 0;
+        this.next_tokens_are_prompt = true;
+    }
+
     /**
      * Prints the new text to stdout. If the stream is ending, also prints a newline.
      * @param {string} text
@@ -254,5 +266,10 @@ export class WhisperTextStreamer extends TextStreamer {
     end() {
         super.end();
         this.on_finalize?.();
+    }
+
+    abort(reason) {
+        super.abort(reason);
+        this.waiting_for_timestamp = false;
     }
 }

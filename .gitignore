@@ -15,3 +15,5 @@ packages/*/types
 
 # Do not track coverage reports
 packages/*/coverage
+
+*.local.*
