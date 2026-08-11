@@ -45,7 +45,7 @@ export async function getCoreModelFile(pretrained_model_name_or_path, fileName, 
     const baseName = `${fileName}${suffix}.onnx`;
     const fullPath = `${options.subfolder ?? ''}/${baseName}`;
 
-    return await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
+    return await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV);
 }
 
 /**
@@ -68,7 +68,7 @@ export async function getModelDataFiles(
     session_options = {},
 ) {
     const baseName = `${fileName}${suffix}.onnx`;
-    const return_path = apis.IS_NODE_ENV;
+    const return_path = apis.IS_NODE_ENV || apis.IS_REACT_NATIVE_ENV;
 
     /** @type {Promise<string|{path: string, data: Uint8Array}>[]} */
     let externalDataPromises = [];

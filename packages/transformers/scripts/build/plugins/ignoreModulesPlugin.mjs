@@ -9,9 +9,9 @@ export const ignoreModulesPlugin = (modules = []) => ({
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const escapedModules = modules.map(escapeRegex);
 
-    // Match both "module" and "node:module" patterns
-    const patterns = escapedModules.flatMap((mod) => [mod, `node:${mod}`]);
-    const filter = new RegExp(`^(${patterns.join("|")})$`);
+    // Match "module", "node:module", and any subpath export of them (e.g. "onnxruntime-web/webgpu").
+    // Without the subpath group, a package listed here would still be bundled when imported via a subpath.
+    const filter = new RegExp(`^(node:)?(${escapedModules.join("|")})(/.*)?$`);
 
     build.onResolve({ filter }, (args) => {
       return { path: args.path, namespace: "ignore-modules" };
@@ -33,6 +33,10 @@ export const ignoreModulesPlugin = (modules = []) => ({
               export default {};
               export const pipeline = noop;
             `,
+          };
+        case "buffer":
+          return {
+            contents: `export const Buffer = globalThis.Buffer; export default { Buffer: globalThis.Buffer };`,
           };
         case "node:fs":
         case "node:path":

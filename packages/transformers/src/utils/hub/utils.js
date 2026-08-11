@@ -1,3 +1,4 @@
+import { apis } from '../../env.js';
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
 import { logger } from '../logger.js';
 
@@ -29,6 +30,16 @@ export function pathJoin(...parts) {
  * @returns {boolean} True if the string is a valid URL, false otherwise.
  */
 export function isValidUrl(string, protocols = null, validHosts = null) {
+    if (apis.IS_REACT_NATIVE_ENV) {
+        const str = String(string);
+        if (!/^\w+:\/\//.test(str)) return false;
+        if (protocols && !protocols.some((protocol) => str.startsWith(protocol))) return false;
+        if (validHosts) {
+            const match = str.match(/^(\w+\:)\/\/(([^:\/?#]*)(?:\:([0-9]+))?)/);
+            if (!match || !validHosts.includes(match[3])) return false;
+        }
+        return true;
+    }
     let url;
     try {
         url = new URL(string);
@@ -114,6 +125,16 @@ export async function readResponse(response, progress_callback, expectedSize) {
 
     if (contentLength === null && !expectedSize) {
         logger.warn('Unable to determine content-length from response headers. Will expand buffer when needed.');
+    }
+
+    if (!response.body) {
+        // A `FileResponse` in React Native carries no body stream: it resolves its
+        // metadata up front but defers touching the file until the bytes are actually
+        // asked for, so that callers who only want the path never read it. This is that
+        // explicit request, so read it now and report the transfer as a single step.
+        const buffer = new Uint8Array(await response.arrayBuffer());
+        progress_callback({ progress: 100, loaded: buffer.length, total: buffer.length });
+        return buffer;
     }
 
     let buffer = new Uint8Array(total);

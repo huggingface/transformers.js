@@ -12,13 +12,15 @@ export const DEVICE_TYPES = Object.freeze({
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
     coreml: 'coreml', // CoreML
+    xnnpack: 'xnnpack', // XNNPACK
+    nnapi: 'nnapi', // NNAPI
 
     webnn: 'webnn', // WebNN (default)
     'webnn-npu': 'webnn-npu', // WebNN NPU
     'webnn-gpu': 'webnn-gpu', // WebNN GPU
     'webnn-cpu': 'webnn-cpu', // WebNN CPU
 });
-const DEFAULT_DEVICE = apis.IS_NODE_ENV ? 'cpu' : 'wasm';
+const DEFAULT_DEVICE = apis.IS_NODE_ENV ? 'cpu' : (apis.IS_REACT_NATIVE_ENV ? 'xnnpack' : 'wasm');
 
 /**
  * @typedef {keyof typeof DEVICE_TYPES} DeviceType
