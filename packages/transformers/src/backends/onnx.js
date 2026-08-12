@@ -102,11 +102,14 @@ let defaultDevices;
 let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
-if (ORT_SYMBOL in globalThis) {
-    // If the JS runtime exposes their own ONNX runtime, use it
-    ONNX = globalThis[ORT_SYMBOL];
-} else if (apis.IS_NODE_ENV) {
-    ONNX = ONNX_NODE;
+// If the JS runtime exposes their own ONNX runtime, use it in place of the bundled one. The environment still
+// decides which device list applies: `ONNX` and `supportedDevices` are set together in every branch below, and
+// an injected runtime that set only the former would leave every `device` option rejected against an empty
+// list ("Unsupported device: ... Should be one of: ").
+const injectedONNX = ORT_SYMBOL in globalThis ? globalThis[ORT_SYMBOL] : undefined;
+
+if (apis.IS_NODE_ENV) {
+    ONNX = injectedONNX ?? ONNX_NODE;
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
@@ -135,7 +138,7 @@ if (ORT_SYMBOL in globalThis) {
     supportedDevices.push('cpu');
     defaultDevices = ['cpu'];
 } else {
-    ONNX = ONNX_WEB;
+    ONNX = injectedONNX ?? ONNX_WEB;
 
     if (apis.IS_WEBNN_AVAILABLE) {
         // TODO: Only push supported providers (depending on available hardware)
