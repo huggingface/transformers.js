@@ -219,7 +219,21 @@ export async function sessionRun(session, inputs, fetches = undefined) {
         }
 
         const output = await runInferenceSession(session, ortFeed, ortFetches);
-        return replaceTensors(output);
+
+        // ORT returns pre-allocated outputs as the exact tensors passed in `fetches`, reuse
+        // the caller's wrappers so no per-run alias wrappers are created and output identity
+        // and disposal stay in the caller's hands.
+        /** @type {Record<string, Tensor>} */
+        const preallocated = {};
+        if (fetches) {
+            for (const [name, tensor] of Object.entries(fetches)) {
+                if (tensor instanceof Tensor && output[name] === /** @type {any} */ (tensor).ort_tensor) {
+                    preallocated[name] = tensor;
+                    delete output[name];
+                }
+            }
+        }
+        return Object.assign(replaceTensors(output), preallocated);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
         // we apply minor formatting to show the most important information
