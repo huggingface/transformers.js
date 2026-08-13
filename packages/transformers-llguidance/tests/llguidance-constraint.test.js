@@ -61,6 +61,15 @@ describe("LlguidanceConstraint", () => {
     expect(computeMaskInto.mock.calls[0][0]).toBe(computeMaskInto.mock.calls[1][0]);
   });
 
+  it("exposes the packed mask to native generation plans", async () => {
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const native = logits_processor.processors[0].getRuntimeGenerationProcessor();
+
+    expect(native.op).toBe("token-mask");
+    expect(Array.from(native.getMask(4))).toEqual([0b0101]);
+    expect(computeMaskInto).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects batched generation before computing a mask", async () => {
     const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
     const logits = new Tensor("float32", new Float32Array(8), [2, 4]);

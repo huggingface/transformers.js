@@ -86,6 +86,24 @@ describe("GenerationController", () => {
         })).toMatchObject({ sampler: { op: "multinomial", temperature: 1.0, topK: 64 } });
     });
 
+    it("compiles one declarative token mask into a multinomial plan", () => {
+        const getMask = jest.fn(() => Uint32Array.of(1));
+        const processor = new TrackingTokenProcessor();
+        processor.getRuntimeGenerationProcessor = () => ({ op: "token-mask", getMask });
+        const processors = new LogitsProcessorList();
+        processors.push(processor);
+        const controller = createGenerationController(
+            { config: {}, generation_config: null },
+            int64Tensor([[1]]),
+            { do_sample: true, top_k: 50, max_new_tokens: 1, logits_processor: processors },
+        );
+        expect(controller.compileRuntimePlan({
+            declarativePlans: ["argmax", "multinomial"],
+            planModes: ["greedy", "multinomial"],
+            tokenPipeline: { defaultDepth: 1 },
+        })).toMatchObject({ processors: [{ op: "token-mask", getMask }] });
+    });
+
   it("notifies logits processors after committing sampled tokens", () => {
     const processor = new TrackingTokenProcessor();
     const processors = new LogitsProcessorList();

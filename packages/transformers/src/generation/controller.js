@@ -289,14 +289,21 @@ export class GenerationController {
         if (this.generationConfig.do_sample) {
             if (!capabilities?.declarativePlans?.includes('multinomial')) return null;
             if (!capabilities?.planModes?.includes('multinomial')) return null;
-            if (!this.logitsProcessor.processors.every((processor) => processor instanceof TemperatureLogitsWarper)) return null;
+            const processors = [];
+            for (const processor of this.logitsProcessor.processors) {
+                if (processor instanceof TemperatureLogitsWarper) continue;
+                const native = processor.getRuntimeGenerationProcessor?.();
+                if (!native || native.op !== 'token-mask' || typeof native.getMask !== 'function') return null;
+                processors.push(native);
+            }
+            if (processors.length > 1) return null;
             const temperature = this.generationConfig.temperature ?? 1.0;
             const topK = this.generationConfig.top_k;
             if (!Number.isFinite(temperature) || temperature <= 0) return null;
             if (!Number.isInteger(topK) || topK < 1 || topK > 128) return null;
             return {
                 version: 1,
-                processors: [],
+                processors,
                 sampler: { op: 'multinomial', temperature, topK },
                 maxNewTokens: Math.max(0, this.maxSequenceLength - this.inputLength),
                 pipelineDepth: capabilities.tokenPipeline?.defaultDepth,

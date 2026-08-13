@@ -173,6 +173,53 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
         return logits;
     }
 
+    getRuntimeGenerationProcessor() {
+        return {
+            op: 'token-mask' as const,
+            getMask: (vocabSize: number) => this.computeRuntimeMask(vocabSize),
+        };
+    }
+
+    private computeRuntimeMask(vocabSize: number): Uint32Array {
+        if (!Number.isInteger(vocabSize) || vocabSize <= 0) {
+            throw failState(this.state, 'LlguidanceConstraint requires a positive vocabulary size.');
+        }
+        if (this.state.completed) return tokenMask(vocabSize, this.state.eosTokenIds);
+        if (this.state.disposed) throw new Error('LlguidanceConstraint has been disposed.');
+
+        this.state.step++;
+        this.state.stats.steps = this.state.step;
+        const maskWords = Math.ceil(vocabSize / 32);
+        if (this.state.maskBuffer?.length !== maskWords) this.state.maskBuffer = new Uint32Array(maskWords);
+
+        let result: LLGuidanceMaskResult;
+        const maskStart = performance.now();
+        try {
+            result = this.state.interpreter.computeMaskInto(this.state.maskBuffer);
+        } catch (error) {
+            disposeState(this.state);
+            throw error;
+        }
+        this.state.stats.computeMaskMs += performance.now() - maskStart;
+        const instrumentation = this.state.interpreter.maskInstrumentation?.();
+        if (instrumentation) {
+            this.state.stats.trieNodesVisited = instrumentation.trieNodesVisited;
+            this.state.stats.sharedJsonMaskCacheHits = instrumentation.sharedJsonMaskCacheHits;
+            this.state.stats.sharedJsonMaskCacheMisses = instrumentation.sharedJsonMaskCacheMisses;
+        }
+
+        if ('stop' in result && result.stop) {
+            this.state.stats.stopReason = result.reason;
+            if (result.reason === 'dead_end') {
+                throw failState(this.state, 'llguidance reached a dead end before satisfying the constraint.');
+            }
+            this.state.completed = true;
+            disposeState(this.state);
+            return tokenMask(vocabSize, this.state.eosTokenIds);
+        }
+        return this.state.maskBuffer;
+    }
+
     onTokenSampled(tokenId: number, batchIdx: number, inputIds: bigint[][]) {
         if (isDebugEnabled()) {
             logger.debug('[LlguidanceLogitsProcessor] token sampled', {
@@ -240,6 +287,14 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
 
         this.onTokenSampled(tokenIds[0], 0, inputIds);
     }
+}
+
+function tokenMask(vocabSize: number, tokenIds: readonly number[]): Uint32Array {
+    const mask = new Uint32Array(Math.ceil(vocabSize / 32));
+    for (const tokenId of tokenIds) {
+        if (tokenId >= 0 && tokenId < vocabSize) mask[tokenId >> 5] |= 1 << (tokenId & 31);
+    }
+    return mask;
 }
 
 class LlguidanceStoppingCriteria extends StoppingCriteria {
