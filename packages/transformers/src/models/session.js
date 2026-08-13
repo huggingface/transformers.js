@@ -186,10 +186,12 @@ function replaceTensors(obj) {
  *
  * @param {Object} session The InferenceSession object to run.
  * @param {Object} inputs An object that maps input names to input tensors.
+ * @param {Record<string, Tensor|null>} [fetches] Optional map of output names to pre-allocated output
+ *   tensors (or `null` to let ONNX Runtime allocate them).
  * @returns {Promise<Object>} A Promise that resolves to an object that maps output names to output tensors.
  * @private
  */
-export async function sessionRun(session, inputs) {
+export async function sessionRun(session, inputs, fetches = undefined) {
     const checkedInputs = validateInputs(session, inputs);
     try {
         // pass the original ort tensor
@@ -206,8 +208,17 @@ export async function sessionRun(session, inputs) {
                 return [k, tensor];
             }),
         );
+        let ortFetches;
+        if (fetches) {
+            ortFetches = Object.fromEntries(
+                Object.entries(fetches).map(([k, v]) => [
+                    k,
+                    v instanceof Tensor ? /** @type {any} */ (v).ort_tensor : v,
+                ]),
+            );
+        }
 
-        const output = await runInferenceSession(session, ortFeed);
+        const output = await runInferenceSession(session, ortFeed, ortFetches);
         return replaceTensors(output);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
