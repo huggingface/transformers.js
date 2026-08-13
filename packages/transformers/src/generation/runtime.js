@@ -16,7 +16,7 @@ import { createGenerationController } from './controller.js';
  * @property {ReadonlyArray<import('./controller.js').GenerationMode>} cpuModes
  * @property {ReadonlyArray<import('./controller.js').GenerationMode>} planModes
  * @property {boolean} cpuLogits
- * @property {ReadonlyArray<'argmax'>} declarativePlans
+ * @property {ReadonlyArray<'argmax'|'multinomial'>} declarativePlans
  * @property {{readonly defaultDepth: number, readonly maxDepth: number}} tokenPipeline
  * @property {SessionConcurrencyCapabilities} [sessionConcurrency]
  */
@@ -61,7 +61,7 @@ import { createGenerationController } from './controller.js';
  * @typedef {Object} RuntimeGenerationPlanV1
  * @property {1} version
  * @property {ReadonlyArray<never>} processors
- * @property {{readonly op: 'argmax'}} sampler
+ * @property {{readonly op: 'argmax'}|{readonly op: 'multinomial', readonly temperature: number, readonly topK: number}} sampler
  * @property {number} maxNewTokens
  * @property {number} [pipelineDepth]
  */
@@ -285,6 +285,9 @@ function validateCapabilities(capabilities, controller, attentionMask) {
     }
     if (capabilities.planModes.includes('greedy') && !capabilities.declarativePlans.includes('argmax')) {
         throw new Error('Runtime greedy plan mode requires the `argmax` declarative plan.');
+    }
+    if (capabilities.planModes.includes('multinomial') && !capabilities.declarativePlans.includes('multinomial')) {
+        throw new Error('Runtime multinomial plan mode requires the `multinomial` declarative plan.');
     }
     if (controller.batchSize > capabilities.maxBatchSize) {
         throw new Error(
