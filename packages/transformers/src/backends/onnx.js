@@ -308,10 +308,13 @@ let webInferenceChain = Promise.resolve();
  * Run an inference session.
  * @param {import('onnxruntime-common').InferenceSession} session The ONNX inference session.
  * @param {Record<string, import('onnxruntime-common').Tensor>} ortFeed The input tensors.
+ * @param {Record<string, import('onnxruntime-common').Tensor|null>} [ortFetches] Optional pre-allocated
+ *   output tensors. Outputs mapped to a tensor are written into it, outputs mapped to `null`
+ *   are allocated by ONNX Runtime as usual.
  * @returns {Promise<Record<string, import('onnxruntime-common').Tensor>>} The output tensors.
  */
-export async function runInferenceSession(session, ortFeed) {
-    const run = () => session.run(ortFeed);
+export async function runInferenceSession(session, ortFeed, ortFetches = undefined) {
+    const run = () => (ortFetches ? session.run(ortFeed, ortFetches) : session.run(ortFeed));
     return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
 }
 
