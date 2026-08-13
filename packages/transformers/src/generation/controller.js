@@ -264,6 +264,7 @@ export class GenerationController {
             this.sequences[index].push(tokenId);
             generatedInputIds.push([tokenId]);
         }
+        this.logitsProcessor.onTokensSampled(Array.from(decision.tokenIds), this.sequences);
         if (this.streamer) this.streamer.put(generatedInputIds);
 
         this.done = this.stoppingCriteria(this.sequences, decision.processedScores);
@@ -283,10 +284,26 @@ export class GenerationController {
      * @returns {Object|null}
      */
     compileRuntimePlan(capabilities) {
+        if (this.generationConfig.num_beams > 1) return null;
+        if (this.generationConfig.output_scores) return null;
+        if (this.generationConfig.do_sample) {
+            if (!capabilities?.declarativePlans?.includes('multinomial')) return null;
+            if (!capabilities?.planModes?.includes('multinomial')) return null;
+            if (!this.logitsProcessor.processors.every((processor) => processor instanceof TemperatureLogitsWarper)) return null;
+            const temperature = this.generationConfig.temperature ?? 1.0;
+            const topK = this.generationConfig.top_k;
+            if (!Number.isFinite(temperature) || temperature <= 0) return null;
+            if (!Number.isInteger(topK) || topK < 1 || topK > 128) return null;
+            return {
+                version: 1,
+                processors: [],
+                sampler: { op: 'multinomial', temperature, topK },
+                maxNewTokens: Math.max(0, this.maxSequenceLength - this.inputLength),
+                pipelineDepth: capabilities.tokenPipeline?.defaultDepth,
+            };
+        }
         if (!capabilities?.declarativePlans?.includes('argmax')) return null;
         if (!capabilities?.planModes?.includes('greedy')) return null;
-        if (this.generationConfig.do_sample || this.generationConfig.num_beams > 1) return null;
-        if (this.generationConfig.output_scores) return null;
         if (this.logitsProcessor.processors.length !== 0) return null;
         return {
             version: 1,

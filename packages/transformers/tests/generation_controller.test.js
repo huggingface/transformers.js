@@ -21,6 +21,17 @@ class ForceTokenProcessor extends LogitsProcessor {
   }
 }
 
+class TrackingTokenProcessor extends LogitsProcessor {
+  constructor() {
+    super();
+    this.onTokensSampled = jest.fn();
+  }
+
+  _call(_inputIds, logits) {
+    return logits;
+  }
+}
+
 class TokenStoppingCriteria extends StoppingCriteria {
   constructor(tokenId) {
     super();
@@ -47,6 +58,45 @@ function createLease(values, release = jest.fn()) {
 }
 
 describe("GenerationController", () => {
+    it("compiles native multinomial plans with temperature", () => {
+        const controller = createGenerationController(
+            { config: {}, generation_config: null },
+            int64Tensor([[1]]),
+            { do_sample: true, temperature: 0.7, top_k: 50, max_new_tokens: 1 },
+        );
+        expect(controller.compileRuntimePlan({
+            declarativePlans: ["argmax", "multinomial"],
+            planModes: ["greedy", "multinomial"],
+            tokenPipeline: { defaultDepth: 1 },
+        })).toMatchObject({
+            sampler: { op: "multinomial", temperature: 0.7, topK: 50 },
+        });
+    });
+
+    it("compiles native multinomial plans with model sampling defaults", () => {
+        const controller = createGenerationController(
+            { config: {}, generation_config: null },
+            int64Tensor([[1]]),
+            { do_sample: true, temperature: 1.0, top_k: 64, top_p: 0.95, max_new_tokens: 1 },
+        );
+        expect(controller.compileRuntimePlan({
+            declarativePlans: ["argmax", "multinomial"],
+            planModes: ["greedy", "multinomial"],
+            tokenPipeline: { defaultDepth: 1 },
+        })).toMatchObject({ sampler: { op: "multinomial", temperature: 1.0, topK: 64 } });
+    });
+
+  it("notifies logits processors after committing sampled tokens", () => {
+    const processor = new TrackingTokenProcessor();
+    const processors = new LogitsProcessorList();
+    processors.push(processor);
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { max_new_tokens: 1, logits_processor: processors });
+
+    controller.commit({ tokenIds: Uint32Array.of(2) });
+
+    expect(processor.onTokensSampled).toHaveBeenCalledWith([2], [[1n, 2n]]);
+  });
+
   it("owns processing, sampling, stopping, streaming, and finalization", async () => {
     const processors = new LogitsProcessorList();
     processors.push(new ForceTokenProcessor(2));

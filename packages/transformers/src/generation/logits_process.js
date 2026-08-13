@@ -22,6 +22,14 @@ export class LogitsProcessor extends Callable {
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
     }
+
+    /**
+     * Notify the processor after tokens have been committed.
+     *
+     * @param {number[]} token_ids The sampled token ID for each batch item.
+     * @param {bigint[][]} input_ids The updated input IDs.
+     */
+    onTokensSampled(token_ids, input_ids) {}
 }
 
 /**
@@ -39,6 +47,14 @@ export class LogitsWarper extends Callable {
     _call(input_ids, logits) {
         throw Error('`_call` should be implemented in a subclass');
     }
+
+    /**
+     * Notify the warper after tokens have been committed.
+     *
+     * @param {number[]} token_ids The sampled token ID for each batch item.
+     * @param {bigint[][]} input_ids The updated input IDs.
+     */
+    onTokensSampled(token_ids, input_ids) {}
 }
 
 /**
@@ -86,6 +102,18 @@ export class LogitsProcessorList extends Callable {
             toReturn = processor(input_ids, toReturn);
         }
         return toReturn;
+    }
+
+    /**
+     * Notify all processors after tokens have been committed.
+     *
+     * @param {number[]} token_ids The sampled token ID for each batch item.
+     * @param {bigint[][]} input_ids The updated input IDs.
+     */
+    onTokensSampled(token_ids, input_ids) {
+        for (const processor of this.processors) {
+            processor.onTokensSampled(token_ids, input_ids);
+        }
     }
 
     [Symbol.iterator]() {
