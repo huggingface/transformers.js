@@ -37,7 +37,7 @@ import { LogitsSampler } from '../generation/logits_sampler.js';
 import { DefaultProgressCallback, pick } from '../utils/core.js';
 import { ModelOutput } from './modeling_outputs.js';
 import { logger } from '../utils/logger.js';
-import { DynamicCache } from '../cache_utils.js';
+import { DynamicCache, StaticCache, presentNameToPastName } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
@@ -695,7 +695,7 @@ export class PreTrainedModel extends Callable {
      * @param {Tensor} [params.inputs=null]
      * @param {number} [params.bos_token_id=null]
      * @param {Record<string, Tensor|number[]>} [params.model_kwargs]
-     * @returns {{inputs_tensor: Tensor, model_inputs: Record<string, Tensor> & {past_key_values?: DynamicCache}, model_input_name: string}} The model-specific inputs for generation.
+     * @returns {{inputs_tensor: Tensor, model_inputs: Record<string, Tensor> & {past_key_values?: DynamicCache|StaticCache}, model_input_name: string}} The model-specific inputs for generation.
      */
     _prepare_model_inputs({ inputs, bos_token_id, model_kwargs }) {
         const model_inputs = pick(model_kwargs, this.forward_params);
@@ -895,6 +895,23 @@ export class PreTrainedModel extends Callable {
             generation_config.max_length = input_ids_length + generation_config.max_new_tokens;
         }
 
+        // Fail fast if the generation cannot fit in the StaticCache: the last sampled
+        // token is never forwarded, so at most `max_length - 1` tokens are cached.
+        const provided_cache = model_inputs.past_key_values ?? kwargs.past_key_values;
+        const static_cache = provided_cache instanceof StaticCache ? provided_cache : null;
+        if (
+            static_cache &&
+            generation_config.max_length !== null &&
+            generation_config.max_length - 1 > static_cache.max_cache_len
+        ) {
+            throw new Error(
+                `The requested generation may cache up to ${generation_config.max_length - 1} tokens ` +
+                    `(input length ${input_ids_length}), which exceeds the StaticCache capacity ` +
+                    `(max_cache_len: ${static_cache.max_cache_len}). ` +
+                    'Increase `max_cache_len`, or reduce `max_new_tokens`/`max_length`.',
+            );
+        }
+
         // input_ids_length = model_inputs[model_input_name].dims.at(1);
         // // inputs instanceof Tensor ?  : inputs.length;
 
@@ -959,72 +976,78 @@ export class PreTrainedModel extends Callable {
         let outputs;
         let attentions = {};
         let return_dict_items = {};
-        while (true) {
-            // prepare model inputs
-            model_inputs = this.prepare_inputs_for_generation(all_input_ids, model_inputs, generation_config);
-            outputs = await this.forward(model_inputs);
 
-            if (generation_config.return_dict_in_generate) {
-                if (generation_config.output_attentions) {
-                    // Get attentions if they are present
-                    const token_attentions = getAttentions(outputs);
-                    for (const key in token_attentions) {
-                        if (!(key in attentions)) {
-                            attentions[key] = [];
+        static_cache?._acquire();
+        try {
+            while (true) {
+                // prepare model inputs
+                model_inputs = this.prepare_inputs_for_generation(all_input_ids, model_inputs, generation_config);
+                outputs = await this.forward(model_inputs);
+
+                if (generation_config.return_dict_in_generate) {
+                    if (generation_config.output_attentions) {
+                        // Get attentions if they are present
+                        const token_attentions = getAttentions(outputs);
+                        for (const key in token_attentions) {
+                            if (!(key in attentions)) {
+                                attentions[key] = [];
+                            }
+                            attentions[key].push(token_attentions[key]);
                         }
-                        attentions[key].push(token_attentions[key]);
+                    } else if (this._return_dict_in_generate_keys) {
+                        Object.assign(return_dict_items, pick(outputs, this._return_dict_in_generate_keys));
                     }
-                } else if (this._return_dict_in_generate_keys) {
-                    Object.assign(return_dict_items, pick(outputs, this._return_dict_in_generate_keys));
                 }
-            }
 
-            // Logits are of the form [batch_size, out_seq_length, vocab_size]
-            // In most cases, this will be [batch_size, 1, vocab_size]
-            // So, we select the last token's logits:
-            // (equivalent to `logits = outputs.logits[:, -1, :]`)
-            // The `.to('float32')` is necessary for models with float16 logits,
-            // and is a no-op for float32 logits.
-            // TODO: Support float16 sampling in the sampler directly
-            const logits = outputs.logits.slice(null, -1, null).to('float32');
+                // Logits are of the form [batch_size, out_seq_length, vocab_size]
+                // In most cases, this will be [batch_size, 1, vocab_size]
+                // So, we select the last token's logits:
+                // (equivalent to `logits = outputs.logits[:, -1, :]`)
+                // The `.to('float32')` is necessary for models with float16 logits,
+                // and is a no-op for float32 logits.
+                // TODO: Support float16 sampling in the sampler directly
+                const logits = outputs.logits.slice(null, -1, null).to('float32');
 
-            const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
+                const next_tokens_scores = prepared_logits_processor(all_input_ids, logits);
 
-            /** @type {[bigint][]} */
-            const generated_input_ids = [];
-            // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
-            // Loop over each batch
-            for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
-                const logs = next_tokens_scores[batch_idx];
+                /** @type {[bigint][]} */
+                const generated_input_ids = [];
+                // const new_kv_cache = [];// NOTE: Only used for beam search when concatenating new kv
+                // Loop over each batch
+                for (let batch_idx = 0; batch_idx < next_tokens_scores.dims.at(0); ++batch_idx) {
+                    const logs = next_tokens_scores[batch_idx];
 
-                const sampledTokens = await sampler(logs);
-                for (const [newTokenId, logProb] of sampledTokens) {
-                    const bigint = BigInt(newTokenId);
-                    // TODO: If branching, use previous beam as a starting point
-                    // update generated ids, model inputs, and length for next step
-                    scores[batch_idx] += logProb;
-                    all_input_ids[batch_idx].push(bigint);
-                    generated_input_ids.push([bigint]);
+                    const sampledTokens = await sampler(logs);
+                    for (const [newTokenId, logProb] of sampledTokens) {
+                        const bigint = BigInt(newTokenId);
+                        // TODO: If branching, use previous beam as a starting point
+                        // update generated ids, model inputs, and length for next step
+                        scores[batch_idx] += logProb;
+                        all_input_ids[batch_idx].push(bigint);
+                        generated_input_ids.push([bigint]);
 
-                    // TODO: Support beam search
+                        // TODO: Support beam search
+                        break;
+                    }
+                }
+                if (streamer) {
+                    streamer.put(generated_input_ids);
+                }
+
+                const stop = prepared_stopping_criteria(all_input_ids);
+                if (stop.every((x) => x)) {
                     break;
                 }
-            }
-            if (streamer) {
-                streamer.put(generated_input_ids);
-            }
 
-            const stop = prepared_stopping_criteria(all_input_ids);
-            if (stop.every((x) => x)) {
-                break;
+                model_inputs = this._update_model_kwargs_for_generation({
+                    generated_input_ids,
+                    outputs,
+                    model_inputs,
+                    is_encoder_decoder,
+                });
             }
-
-            model_inputs = this._update_model_kwargs_for_generation({
-                generated_input_ids,
-                outputs,
-                model_inputs,
-                is_encoder_decoder,
-            });
+        } finally {
+            static_cache?._release();
         }
 
         if (streamer) {
@@ -1037,7 +1060,7 @@ export class PreTrainedModel extends Callable {
         // Update past key values from the final forward pass
         const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
 
-        // Dispose output tensors not held by the cache
+        // Dispose output tensors not held by the cache.
         const cachedTensors = new Set(Object.values(past_key_values));
         for (const tensor of Object.values(outputs)) {
             if (tensor.location === 'gpu-buffer' && !cachedTensors.has(tensor)) {
@@ -1175,25 +1198,20 @@ export async function auto_encoder_forward(self, model_inputs) {
  * Always updates in-place when pastKeyValues is provided; creates a new DynamicCache otherwise.
  *
  * @param {Object} decoderResults The decoder results object.
- * @param {DynamicCache} pastKeyValues The previous past key values.
- * @returns {DynamicCache} The updated past key values cache.
+ * @param {DynamicCache|StaticCache} pastKeyValues The previous past key values.
+ * @returns {DynamicCache|StaticCache} The updated past key values cache.
  */
 export function getPastKeyValues(decoderResults, pastKeyValues) {
+    if (pastKeyValues instanceof StaticCache) {
+        return pastKeyValues;
+    }
+
     /** @type {Record<string, Tensor>} */
     const pkvs = Object.create(null);
 
     for (const name in decoderResults) {
         if (name.startsWith('present')) {
-            const newName = name
-                // Hybrid cache architecture
-                .replace('present_ssm', 'past_ssm') // Mamba
-                .replace('present_conv', 'past_conv') // LFM2
-                .replace('present_recurrent', 'past_recurrent') // Qwen3.5
-                .replace('present_compressor', 'past_compressor') // Deepseek V4
-                .replace('present_indexer', 'past_indexer') // Deepseek V4
-
-                // Standard cache architecture
-                .replace('present', 'past_key_values');
+            const newName = presentNameToPastName(name);
             const is_encoder_pkv = name.includes('encoder');
             if (is_encoder_pkv && pastKeyValues) {
                 // Optimization introduced by optimum to reuse past key values.
@@ -1256,16 +1274,36 @@ export function resolveCacheShape(metadataShape, symbols) {
  *
  * @param {PreTrainedModel} self The model instance.
  * @param {Record<string, any>} decoderFeeds The decoder feeds object to add past key values to.
- * @param {DynamicCache|null} pastKeyValues The cache containing past key values.
- * @returns {DynamicCache} The past key values cache (existing or newly created).
+ * @param {DynamicCache|StaticCache|null} pastKeyValues The cache containing past key values.
+ * @param {Object} [session] The decoder InferenceSession.
+ * @returns {Promise<DynamicCache|StaticCache>} The past key values cache (existing or newly created).
  */
-export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
+export async function addPastKeyValues(self, decoderFeeds, pastKeyValues, session = undefined) {
+    session ??= self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+
+    if (pastKeyValues instanceof StaticCache && !pastKeyValues.allocated) {
+        // First forward pass, allocate the cache from the decoder session's metadata.
+        if (self.config.is_encoder_decoder) {
+            throw new Error('StaticCache does not support encoder-decoder models.');
+        }
+        const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
+        if (batch_size !== 1) {
+            throw new Error(`StaticCache currently only supports batch_size 1 (got ${batch_size}).`);
+        }
+        const num_heads = self.config?.normalized_config?.num_heads;
+        /** @type {Record<string, number>} */
+        const symbols = { batch_size };
+        if (typeof num_heads === 'number') {
+            symbols['batch_size x num_heads'] = batch_size * num_heads;
+        }
+        await pastKeyValues._allocate(session, getCacheNames(self.config), symbols);
+    }
+
     if (pastKeyValues && Object.keys(pastKeyValues).length > 0) {
         Object.assign(decoderFeeds, pastKeyValues);
         return pastKeyValues;
     }
 
-    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
     const batch_size = (decoderFeeds[self.main_input_name] ?? decoderFeeds.attention_mask)?.dims?.[0] ?? 1;
 
     const names = getCacheNames(self.config);
@@ -1350,11 +1388,32 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
     setNumLogitsToKeep(self, new_model_inputs, 0n);
 
     // Unpack the `past_key_values` object into model inputs
-    addPastKeyValues(self, new_model_inputs, past_key_values);
+    await addPastKeyValues(self, new_model_inputs, past_key_values, session);
 
     // Select only the inputs that are needed for the current session
     const fixed = pick(new_model_inputs, session.inputNames);
-    return await sessionRun(session, fixed);
+    return await runDecoderSession(session, fixed, past_key_values);
+}
+
+/**
+ * Run a decoder session, binding cache outputs in place when a `StaticCache` is
+ * used. Decoder runs that may carry a `StaticCache` must go through this function.
+ *
+ * @param {Object} session The decoder InferenceSession.
+ * @param {Record<string, Tensor>} inputs The session inputs.
+ * @param {DynamicCache|StaticCache|null} past_key_values The cache in use.
+ * @returns {Promise<Object>} The session outputs.
+ */
+export async function runDecoderSession(session, inputs, past_key_values) {
+    if (past_key_values instanceof StaticCache) {
+        const num_new_tokens = (inputs.input_ids ?? inputs.inputs_embeds).dims[1];
+        past_key_values._checkCapacity(num_new_tokens);
+        const outputs = await sessionRun(session, inputs, past_key_values._getFetches());
+        past_key_values._assertWrittenInPlace(outputs);
+        past_key_values._commit(num_new_tokens);
+        return outputs;
+    }
+    return await sessionRun(session, inputs);
 }
 
 /**
@@ -1369,7 +1428,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {Tensor} [params.attention_mask=null]
  * @param {Tensor} [params.position_ids=null]
  * @param {Tensor} [params.inputs_embeds=null]
- * @param {DynamicCache} [params.past_key_values=null]
+ * @param {DynamicCache|StaticCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
  * @param {Tensor} [params.num_logits_to_keep=null]
