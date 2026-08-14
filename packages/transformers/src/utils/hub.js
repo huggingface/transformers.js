@@ -258,9 +258,11 @@ async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, r
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
  * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
+ * @param {boolean} [as_blob=false] Whether to return a `Blob` when the file is served from the cache,
+ * rather than reading it into a `Uint8Array`. Only honoured on a cache hit — see the note at the use site.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ * @returns {Promise<string|Uint8Array|Blob|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true. Resolves with a `Blob` when `as_blob` is set and the file came from the cache.
  */
 async function loadResourceFile(
     path_or_repo_id,
@@ -269,6 +271,7 @@ async function loadResourceFile(
     options = {},
     return_path = false,
     cache = null,
+    as_blob = false,
 ) {
     const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
@@ -379,7 +382,26 @@ async function loadResourceFile(
         let buffer;
 
         if (typeof response !== 'string') {
-            if (!options.progress_callback) {
+            if (as_blob && cacheHit) {
+                // The whole point of `as_blob`, and it is one call: a Cache Storage `Response` hands back a
+                // Blob that is a FILE REFERENCE rather than a copy, so the bytes never enter the JS heap.
+                //
+                // Gated on `cacheHit`, which is a deliberate trade rather than caution. Reading the stream to
+                // report progress would defeat the whole thing — the chunks would be resident twice, once as
+                // buffers and once in Blob storage — and on a cold download progress is worth more than peak
+                // memory, because the user is watching several gigabytes arrive. Every load AFTER the first
+                // takes this branch, is instantaneous, and is where the peak actually matters.
+                buffer = /** @type {any} */ (await response.blob());
+
+                dispatchCallback(options.progress_callback, {
+                    status: 'progress',
+                    name: path_or_repo_id,
+                    file: filename,
+                    progress: 100,
+                    loaded: buffer.size,
+                    total: buffer.size,
+                });
+            } else if (!options.progress_callback) {
                 // If no progress callback is specified, we can use the `.arrayBuffer()`
                 // method to read the response.
                 buffer = new Uint8Array(await response.arrayBuffer());
@@ -507,11 +529,20 @@ const INFLIGHT_LOADS = new Map();
  * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
+ * @param {boolean} [as_blob=false] Whether to accept a `Blob` for a file served from the cache, avoiding a
+ * copy of its bytes on the JS heap. Intended for external data, which is handed straight to the runtime.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ * @returns {Promise<string|Uint8Array|Blob>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true. Resolves with a `Blob` when `as_blob` is set and the file came from the cache.
  */
-export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
+export async function getModelFile(
+    path_or_repo_id,
+    filename,
+    fatal = true,
+    options = {},
+    return_path = false,
+    as_blob = false,
+) {
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
@@ -542,7 +573,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             file: filename,
         });
         pending = getCache(options.cache_dir).then((cache) =>
-            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache),
+            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache, as_blob),
         );
         if (loads === INFLIGHT_LOADS) {
             pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
