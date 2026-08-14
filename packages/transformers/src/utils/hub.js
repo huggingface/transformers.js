@@ -388,6 +388,59 @@ export async function loadResourceFile(
                     loaded: buffer.size,
                     total: buffer.size,
                 });
+            } else if (as_blob && toCacheResponse && response.body) {
+                // COLD, and headed for the cache anyway. Stream the body straight into Cache Storage and then
+                // read it back as a Blob, so the bytes go network -> disk -> runtime and never sit on the JS
+                // heap at all.
+                //
+                // This is the case that actually fails. `getModelDataFiles` starts every external-data chunk
+                // concurrently, and reading each one into a `Uint8Array` to report progress means a cold load
+                // peaks at the SUM of the chunks: a 17 GB model raises `Array buffer allocation failed` at
+                // ~16 GB and only completes on a later attempt, once enough files are cached to take the
+                // branch above.
+                //
+                // Progress survives, which is the reason the buffer existed. A pass-through `TransformStream`
+                // counts bytes as they go by; it holds one chunk, not the file, and backpressure keeps it
+                // that way.
+                let loaded = 0;
+                const total = parseInt(response.headers.get('content-length'), 10) || 0;
+                const counting = new TransformStream({
+                    transform(chunk, controller) {
+                        loaded += chunk.byteLength;
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            progress: total ? (loaded / total) * 100 : 0,
+                            loaded,
+                            total,
+                        });
+                        controller.enqueue(chunk);
+                    },
+                });
+
+                // `content-length` explicitly, because the Cache API may strip it — same reason the buffered
+                // store below sets it.
+                const headers = new Headers(response.headers);
+                if (total) headers.set('content-length', String(total));
+
+                try {
+                    await cache.put(cacheKey, new Response(response.body.pipeThrough(counting), { headers }));
+                    const stored = await cache.match(cacheKey);
+                    if (!stored) throw new Error('cache.match missed the entry just written');
+                    buffer = /** @type {any} */ (await stored.blob());
+                    // Already stored, so the block at the end of this function must not store it again.
+                    toCacheResponse = false;
+                } catch (err) {
+                    // The buffered path keeps working when the cache refuses the write (QuotaExceededError is
+                    // the expected one). It cannot reuse `response` — the body is consumed — so it re-fetches.
+                    logger.warn(`Unable to stream response into the cache, falling back to a buffer: ${err}.`);
+                    // `getFile`, not bare `fetch`: it routes through `env.fetch` and applies
+                    // `getFetchHeaders`, so a gated repo keeps its Authorization header on the way back.
+                    const retry = await getFile(remoteURL);
+                    if (retry.status !== 200) return handleError(retry.status, remoteURL, fatal);
+                    buffer = new Uint8Array(await retry.arrayBuffer());
+                }
             } else if (!options.progress_callback) {
                 // If no progress callback is specified, we can use the `.arrayBuffer()`
                 // method to read the response.
