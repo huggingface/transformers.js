@@ -57,7 +57,7 @@ export async function getCoreModelFile(pretrained_model_name_or_path, fileName, 
  * @param {import('./hub.js').PretrainedModelOptions} options Additional options for loading the model.
  * @param {import('./hub.js').ExternalData|Record<string, import('./hub.js').ExternalData>|undefined} use_external_data_format External data format configuration.
  * @param {any} [session_options] Optional session options that may contain externalData configuration.
- * @returns {Promise<Array<string|{path: string, data: Uint8Array}>>} A Promise that resolves to an array of external data files.
+ * @returns {Promise<Array<string|{path: string, data: Uint8Array|Blob}>>} A Promise that resolves to an array of external data files.
  */
 export async function getModelDataFiles(
     pretrained_model_name_or_path,
@@ -70,7 +70,7 @@ export async function getModelDataFiles(
     const baseName = `${fileName}${suffix}.onnx`;
     const return_path = apis.IS_NODE_ENV;
 
-    /** @type {Promise<string|{path: string, data: Uint8Array}>[]} */
+    /** @type {Promise<string|{path: string, data: Uint8Array|Blob}>[]} */
     let externalDataPromises = [];
 
     const num_chunks = resolveExternalDataFormat(use_external_data_format, baseName, fileName);
@@ -85,9 +85,16 @@ export async function getModelDataFiles(
             const fullPath = `${options.subfolder ?? ''}/${path}`;
             // Push getModelFile's promise directly so a failed chunk rejects Promise.all (#1801).
             externalDataPromises.push(
-                getModelFile(pretrained_model_name_or_path, fullPath, true, options, return_path).then((data) =>
-                    data instanceof Uint8Array ? { path, data } : path,
-                ),
+                getModelFile(
+                    pretrained_model_name_or_path,
+                    fullPath,
+                    true,
+                    options,
+                    return_path,
+                    // In the browser, hand onnxruntime-web a Blob rather than a materialised buffer.
+                    // Node keeps returning a path, which is cheaper still.
+                    !return_path,
+                ).then((data) => (data instanceof Uint8Array || data instanceof Blob ? { path, data } : path)),
             );
         }
     } else if (session_options.externalData !== undefined) {
