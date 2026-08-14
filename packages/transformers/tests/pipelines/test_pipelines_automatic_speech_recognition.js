@@ -7,6 +7,33 @@ const PIPELINE_ID = "automatic-speech-recognition";
 
 export default () => {
   describe("Automatic Speech Recognition", () => {
+    it("uses the pipeline tokenizer to decode Moonshine output", async () => {
+      const model = {
+        config: { model_type: "moonshine" },
+        generate: async () => ({}),
+        dispose: async () => {},
+      };
+      const processor = Object.assign(async () => ({}), {
+        feature_extractor: { config: { sampling_rate: 16000 } },
+      });
+      let decodeCalls = 0;
+      const tokenizer = {
+        batch_decode: () => {
+          decodeCalls += 1;
+          return ["decoded text"];
+        },
+      };
+      const pipe = new AutomaticSpeechRecognitionPipeline({
+        task: PIPELINE_ID,
+        model,
+        tokenizer,
+        processor,
+      });
+
+      await expect(pipe._call_moonshine(new Float32Array(16000), {})).resolves.toEqual({ text: "decoded text" });
+      expect(decodeCalls).toBe(1);
+    });
+
     describe("whisper (tiny-random)", () => {
       const model_id = "Xenova/tiny-random-WhisperForConditionalGeneration";
       const SAMPLING_RATE = 16000;
