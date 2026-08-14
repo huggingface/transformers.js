@@ -35,7 +35,7 @@ export class LogitsProcessor extends Callable {
      * Optionally expose this processor as a runtime-native generation operation.
      * Processors without a native representation retain the CPU-logits path.
      *
-     * @returns {{op: 'token-mask', getMask: (vocabSize: number) => Uint32Array}|null}
+     * @returns {{op: 'token-mask', getMask: (vocabSize: number) => Uint32Array, validateCandidates?: (tokenIds: Uint32Array, target?: Uint8Array) => Uint8Array, getFastForward?: (maxTokens?: number) => number[]}|null}
      */
     getRuntimeGenerationProcessor() {
         return null;
@@ -66,7 +66,7 @@ export class LogitsWarper extends Callable {
      */
     onTokensSampled(token_ids, input_ids) {}
 
-    /** @returns {{op: 'token-mask', getMask: (vocabSize: number) => Uint32Array}|null} */
+    /** @returns {{op: 'token-mask', getMask: (vocabSize: number) => Uint32Array, validateCandidates?: (tokenIds: Uint32Array, target?: Uint8Array) => Uint8Array, getFastForward?: (maxTokens?: number) => number[]}|null} */
     getRuntimeGenerationProcessor() {
         return null;
     }

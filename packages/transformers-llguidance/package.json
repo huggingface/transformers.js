@@ -64,6 +64,6 @@
     "access": "public"
   },
   "dependencies": {
-    "llguidance": "0.2.0"
+    "llguidance": "link:../../../llguidance-js/dist"
   }
 }

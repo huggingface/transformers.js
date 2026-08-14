@@ -177,7 +177,36 @@ class LlguidanceLogitsProcessor extends LogitsProcessor {
         return {
             op: 'token-mask' as const,
             getMask: (vocabSize: number) => this.computeRuntimeMask(vocabSize),
+            validateCandidates: (tokenIds: Uint32Array, target?: Uint8Array) =>
+                this.validateRuntimeCandidates(tokenIds, target),
+            getFastForward: (maxTokens?: number) => this.computeRuntimeFastForward(maxTokens),
         };
+    }
+
+    private validateRuntimeCandidates(tokenIds: Uint32Array, target?: Uint8Array): Uint8Array {
+        if (this.state.completed) {
+            const result = target ?? new Uint8Array(tokenIds.length);
+            result.fill(0, 0, tokenIds.length);
+            return result;
+        }
+        if (this.state.disposed) throw new Error('LlguidanceConstraint has been disposed.');
+        try {
+            return this.state.interpreter.validateCandidates(tokenIds, target);
+        } catch (error) {
+            disposeState(this.state);
+            throw error;
+        }
+    }
+
+    private computeRuntimeFastForward(maxTokens?: number): number[] {
+        if (this.state.completed) return [];
+        if (this.state.disposed) throw new Error('LlguidanceConstraint has been disposed.');
+        try {
+            return this.state.interpreter.computeFastForward(maxTokens);
+        } catch (error) {
+            disposeState(this.state);
+            throw error;
+        }
     }
 
     private computeRuntimeMask(vocabSize: number): Uint32Array {

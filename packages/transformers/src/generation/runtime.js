@@ -60,7 +60,7 @@ import { createGenerationController } from './controller.js';
 /**
  * @typedef {Object} RuntimeGenerationPlanV1
  * @property {1} version
- * @property {ReadonlyArray<{readonly op: 'token-mask', readonly getMask: (vocabSize: number) => Uint32Array}>} processors
+ * @property {ReadonlyArray<{readonly op: 'token-mask', readonly getMask: (vocabSize: number) => Uint32Array, readonly validateCandidates?: (tokenIds: Uint32Array, target?: Uint8Array) => Uint8Array, readonly getFastForward?: (maxTokens?: number) => number[]}>} processors
  * @property {{readonly op: 'argmax'}|{readonly op: 'multinomial', readonly temperature: number, readonly topK: number}} sampler
  * @property {number} maxNewTokens
  * @property {number} [pipelineDepth]

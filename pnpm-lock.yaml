@@ -55,6 +55,31 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/transformers-llguidance:
+    dependencies:
+      llguidance:
+        specifier: link:../../../llguidance-js/dist
+        version: link:../../../llguidance-js/dist
+    devDependencies:
+      '@huggingface/transformers':
+        specifier: workspace:*
+        version: link:../transformers
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      '@types/node':
+        specifier: ^24.1.0
+        version: 24.10.9
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
+      jest:
+        specifier: ^30.2.0
+        version: 30.2.0(@types/node@24.10.9)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/transformers-onnx:
     dependencies:
       onnxruntime-common:
@@ -79,31 +104,6 @@ importers:
       onnxruntime-node:
         specifier: 1.24.3
         version: 1.24.3
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-
-  packages/transformers-llguidance:
-    dependencies:
-      llguidance:
-        specifier: 0.2.0
-        version: 0.2.0
-    devDependencies:
-      '@huggingface/transformers':
-        specifier: workspace:*
-        version: link:../transformers
-      '@types/jest':
-        specifier: ^30.0.0
-        version: 30.0.0
-      '@types/node':
-        specifier: ^24.1.0
-        version: 24.10.9
-      esbuild:
-        specifier: ^0.27.2
-        version: 0.27.2
-      jest:
-        specifier: ^30.2.0
-        version: 30.2.0(@types/node@24.10.9)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -1609,9 +1609,6 @@ packages:
 
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
-
-  llguidance@0.2.0:
-    resolution: {integrity: sha512-BvN0WlQLLZC9kkRpz7k4DoAVpplcaJKcKrRVI68tCwPZlWtrGv/kriFyjKwP7y0qBct4M7vmOWEqXJTDFsMB6w==}
 
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
@@ -3774,8 +3771,6 @@ snapshots:
   linkify-it@5.0.0:
     dependencies:
       uc.micro: 2.1.0
-
-  llguidance@0.2.0: {}
 
   locate-path@5.0.0:
     dependencies:

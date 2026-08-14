@@ -3,11 +3,15 @@ import { Tensor } from "@huggingface/transformers";
 
 const computeMask = jest.fn();
 const computeMaskInto = jest.fn();
+const validateCandidates = jest.fn();
+const computeFastForward = jest.fn();
 const commitToken = jest.fn();
 const disposeInterpreter = jest.fn();
 const createInterpreter = jest.fn(() => ({
   computeMask,
   computeMaskInto,
+  validateCandidates,
+  computeFastForward,
   commitToken,
   dispose: disposeInterpreter,
 }));
@@ -23,6 +27,8 @@ describe("LlguidanceConstraint", () => {
   beforeEach(() => {
     computeMask.mockReset();
     computeMaskInto.mockReset();
+    validateCandidates.mockReset();
+    computeFastForward.mockReset();
     commitToken.mockReset();
     disposeInterpreter.mockReset();
     createInterpreter.mockClear();
@@ -68,6 +74,21 @@ describe("LlguidanceConstraint", () => {
     expect(native.op).toBe("token-mask");
     expect(Array.from(native.getMask(4))).toEqual([0b0101]);
     expect(computeMaskInto).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes candidate validation and fast-forward to native plans", async () => {
+    const validity = Uint8Array.of(1, 0);
+    validateCandidates.mockReturnValue(validity);
+    computeFastForward.mockReturnValue([3, 4]);
+    const { logits_processor } = await LlguidanceConstraint.fromResponseFormat({}, { type: "json_object" });
+    const native = logits_processor.processors[0].getRuntimeGenerationProcessor();
+    const ids = Uint32Array.of(3, 9);
+
+    expect(native.validateCandidates(ids)).toBe(validity);
+    expect(validateCandidates).toHaveBeenCalledWith(ids, undefined);
+    expect(native.getFastForward(2)).toEqual([3, 4]);
+    expect(computeFastForward).toHaveBeenCalledWith(2);
+    expect(commitToken).not.toHaveBeenCalled();
   });
 
   it("rejects batched generation before computing a mask", async () => {
