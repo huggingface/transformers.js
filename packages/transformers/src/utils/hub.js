@@ -185,6 +185,25 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
 }
 
 /**
+ * Whether a response may be written to the cache under this key.
+ *
+ * The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache responses for
+ * other schemes (e.g., files bundled within a browser extension). Relative keys are resolved against
+ * the page URL first, since a relative key on an extension page still resolves to a chrome-extension://
+ * request.
+ *
+ * @param {import('./cache.js').CacheInterface} cache The cache instance to store in.
+ * @param {string} cacheKey The cache key to use.
+ * @returns {boolean}
+ */
+function isStorableCacheKey(cache, cacheKey) {
+    if (typeof Cache === 'undefined' || !(cache instanceof Cache)) {
+        return true;
+    }
+    return isValidUrl(toAbsoluteURL(cacheKey, { allowUnresolved: true }), ['http:', 'https:']);
+}
+
+/**
  * Stores a resource in the cache.
  *
  * @param {string} path_or_repo_id The path or repo ID of the model.
@@ -202,15 +221,7 @@ async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, r
         return;
     }
 
-    if (
-        typeof Cache !== 'undefined' &&
-        cache instanceof Cache &&
-        !isValidUrl(toAbsoluteURL(cacheKey, { allowUnresolved: true }), ['http:', 'https:'])
-    ) {
-        // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
-        // responses for other schemes (e.g., files bundled within a browser extension). Relative
-        // keys are resolved against the page URL first, since a relative key on an extension page
-        // still resolves to a chrome-extension:// request.
+    if (!isStorableCacheKey(cache, cacheKey)) {
         return;
     }
 
@@ -401,6 +412,63 @@ async function loadResourceFile(
                     loaded: buffer.size,
                     total: buffer.size,
                 });
+            } else if (as_blob && toCacheResponse && response.body && isStorableCacheKey(cache, cacheKey)) {
+                // COLD, and headed for the cache anyway. Stream the body straight into Cache Storage and then
+                // read it back as a Blob, so the bytes go network -> disk -> runtime and never sit on the JS
+                // heap at all.
+                //
+                // `isStorableCacheKey` for the same reason the buffered store below checks it: the browser
+                // Cache API rejects a non-http(s) key, so on an extension page this branch would write
+                // nothing, warn, and re-download. Buffering is the right answer there.
+                //
+                // This is the case that actually fails. `getModelDataFiles` starts every external-data chunk
+                // concurrently, and reading each one into a `Uint8Array` to report progress means a cold load
+                // peaks at the SUM of the chunks: a 17 GB model raises `Array buffer allocation failed` at
+                // ~16 GB and only completes on a later attempt, once enough files are cached to take the
+                // branch above.
+                //
+                // Progress survives, which is the reason the buffer existed. A pass-through `TransformStream`
+                // counts bytes as they go by; it holds one chunk, not the file, and backpressure keeps it
+                // that way.
+                let loaded = 0;
+                const total = parseInt(response.headers.get('content-length'), 10) || 0;
+                const counting = new TransformStream({
+                    transform(chunk, controller) {
+                        loaded += chunk.byteLength;
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            progress: total ? (loaded / total) * 100 : 0,
+                            loaded,
+                            total,
+                        });
+                        controller.enqueue(chunk);
+                    },
+                });
+
+                // `content-length` explicitly, because the Cache API may strip it — same reason the buffered
+                // store below sets it.
+                const headers = new Headers(response.headers);
+                if (total) headers.set('content-length', String(total));
+
+                try {
+                    await cache.put(cacheKey, new Response(response.body.pipeThrough(counting), { headers }));
+                    const stored = await cache.match(cacheKey);
+                    if (!stored) throw new Error('cache.match missed the entry just written');
+                    buffer = /** @type {any} */ (await stored.blob());
+                    // Already stored, so the block at the end of this function must not store it again.
+                    toCacheResponse = false;
+                } catch (err) {
+                    // The buffered path keeps working when the cache refuses the write (QuotaExceededError is
+                    // the expected one). It cannot reuse `response` — the body is consumed — so it re-fetches.
+                    logger.warn(`Unable to stream response into the cache, falling back to a buffer: ${err}.`);
+                    // `getFile`, not bare `fetch`: it routes through `env.fetch` and applies
+                    // `getFetchHeaders`, so a gated repo keeps its Authorization header on the way back.
+                    const retry = await getFile(remoteURL);
+                    if (retry.status !== 200) return handleError(retry.status, remoteURL, fatal);
+                    buffer = new Uint8Array(await retry.arrayBuffer());
+                }
             } else if (!options.progress_callback) {
                 // If no progress callback is specified, we can use the `.arrayBuffer()`
                 // method to read the response.
