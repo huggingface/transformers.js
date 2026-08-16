@@ -6,7 +6,7 @@ In this tutorial, we'll be building a simple [Svelte](https://svelte.dev/) appli
 
 Useful links:
 
-- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/svelte-translator)
+- [Demo on Hugging Face Spaces](https://huggingface.co/spaces/Xenova/svelte-translator)
 
 ## Prerequisites
 
@@ -89,13 +89,11 @@ We recommend starting the development server again with `npm run dev`
 
 First, let's create some child components. Create a folder called `lib` in the `src` directory, and create the following files:
 
-1. `LanguageSelector.svelte`: This component will allow the user to select the input and output languages. Check out the full list of languages [here](https://github.com/huggingface/transformers.js-examples/tree/main/react-translator/src/components/LanguageSelector.jsx).
+1. `LanguageSelector.svelte`: This component will allow the user to select the input and output languages. Check out the full list of languages in the [NLLB language codes](https://github.com/facebookresearch/flores/blob/main/flores200/README.md#languages-in-flores-200).
 
    ```svelte
    <script>
-     export let type = '';
-     export let defaultLanguage = '';
-     export let onChange = () => {};
+     let { type = '', defaultLanguage = '', onchange = () => {} } = $props();
 
      const LANGUAGES = {
        "Acehnese (Arabic script)": "ace_Arab",
@@ -108,20 +106,19 @@ First, let's create some child components. Create a folder called `lib` in the `
 
    <div class="language-selector">
      <label>{type}: </label>
-     <select value={defaultLanguage} on:change={onChange}>
+     <select value={defaultLanguage} {onchange}>
        {#each Object.entries(LANGUAGES) as [key, value]}
-         <option value={value}>{key}</option>
+         <option {value}>{key}</option>
        {/each}
      </select>
    </div>
    ```
 
-2. `Progress.svelte`: This component will display the progress for downloading each model file.
+2. `Progress.svelte`: This component will display the overall model download progress.
 
    ```svelte
    <script>
-     export let text = '';
-     export let percentage = 0;
+     let { text = '', percentage = 0 } = $props();
    </script>
 
    <div class="progress-container">
@@ -139,15 +136,15 @@ Now let's update `src/routes/+page.svelte`. Replace its contents with the follow
   import Progress from '$lib/Progress.svelte';
 
   // Model loading
-  let ready = null;
-  let disabled = false;
-  let progressItems = [];
+  let ready = $state(null);
+  let disabled = $state(false);
+  let loadProgress = $state(0);
 
   // Inputs and outputs
-  let input = 'I love walking my dog.';
-  let sourceLanguage = 'eng_Latn';
-  let targetLanguage = 'fra_Latn';
-  let output = '';
+  let input = $state('I love walking my dog.');
+  let sourceLanguage = $state('eng_Latn');
+  let targetLanguage = $state('fra_Latn');
+  let output = $state('');
 
   function translate() {}
 </script>
@@ -161,12 +158,12 @@ Now let's update `src/routes/+page.svelte`. Replace its contents with the follow
       <LanguageSelector
         type="Source"
         defaultLanguage="eng_Latn"
-        onChange={(e) => sourceLanguage = e.target.value}
+        onchange={(e) => sourceLanguage = e.target.value}
       />
       <LanguageSelector
         type="Target"
         defaultLanguage="fra_Latn"
-        onChange={(e) => targetLanguage = e.target.value}
+        onchange={(e) => targetLanguage = e.target.value}
       />
     </div>
 
@@ -176,17 +173,13 @@ Now let's update `src/routes/+page.svelte`. Replace its contents with the follow
     </div>
   </div>
 
-  <button disabled={disabled} on:click={translate}>Translate</button>
+  <button {disabled} onclick={translate}>Translate</button>
 
   <div class="progress-bars-container">
     {#if ready === false}
       <label>Loading models... (only run once)</label>
+      <Progress text="Overall progress" percentage={loadProgress} />
     {/if}
-    {#each progressItems as data (data.file)}
-      <div>
-        <Progress text={data.file} percentage={data.progress ?? 0} />
-      </div>
-    {/each}
   </div>
 </main>
 
@@ -344,20 +337,20 @@ First, let's set up the Web Worker and the `translate` function. Replace the `<s
 
 ```svelte
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import LanguageSelector from '$lib/LanguageSelector.svelte';
   import Progress from '$lib/Progress.svelte';
 
   // Model loading
-  let ready = null;
-  let disabled = false;
-  let progressItems = [];
+  let ready = $state(null);
+  let disabled = $state(false);
+  let loadProgress = $state(0);
 
   // Inputs and outputs
-  let input = 'I love walking my dog.';
-  let sourceLanguage = 'eng_Latn';
-  let targetLanguage = 'fra_Latn';
-  let output = '';
+  let input = $state('I love walking my dog.');
+  let sourceLanguage = $state('eng_Latn');
+  let targetLanguage = $state('fra_Latn');
+  let output = $state('');
 
   let worker;
 
@@ -367,32 +360,17 @@ First, let's set up the Web Worker and the `translate` function. Replace the `<s
     });
 
     worker.addEventListener('message', onMessageReceived);
-  });
 
-  onDestroy(() => {
-    worker?.removeEventListener('message', onMessageReceived);
+    return () => {
+      worker?.removeEventListener('message', onMessageReceived);
+    };
   });
 
   function onMessageReceived(e) {
     switch (e.data.status) {
-      case 'initiate':
+      case 'progress_total':
         ready = false;
-        progressItems = [...progressItems, e.data];
-        break;
-
-      case 'progress':
-        progressItems = progressItems.map((item) => {
-          if (item.file === e.data.file) {
-            return { ...item, progress: e.data.progress };
-          }
-          return item;
-        });
-        break;
-
-      case 'done':
-        progressItems = progressItems.filter(
-          (item) => item.file !== e.data.file,
-        );
+        loadProgress = e.data.progress;
         break;
 
       case 'ready':
@@ -421,7 +399,7 @@ First, let's set up the Web Worker and the `translate` function. Replace the `<s
 </script>
 ```
 
-SvelteKit server-renders pages by default, so creating the worker inside `onMount` keeps it browser-only and avoids running Web Worker code during SSR.
+SvelteKit server-renders pages by default, so creating the worker inside `onMount` keeps it browser-only and avoids running Web Worker code during SSR. In Svelte 5, you can return a cleanup function from `onMount` instead of using `onDestroy`.
 
 Now, let's add an event listener in `src/routes/worker.js` to listen for messages from the main thread. We will send back messages (e.g., for model loading progress and text streaming) to the main thread with `self.postMessage`.
 
@@ -431,9 +409,10 @@ self.addEventListener("message", async (event) => {
   // Retrieve the translation pipeline. When called for the first time,
   // this will load the pipeline and save it for future use.
   const translator = await MyTranslationPipeline.getInstance((x) => {
-    // We also add a progress callback to the pipeline so that we can
-    // track model loading.
-    self.postMessage(x);
+    // Forward only progress_total events to show overall download progress
+    if (x.status === "progress_total") {
+      self.postMessage(x);
+    }
   });
 
   // Capture partial output as it streams from the pipeline
