@@ -17,7 +17,7 @@ import { Callable } from './utils/generic.js';
 import { isIntegralNumber, mergeArrays } from './utils/core.js';
 import { getModelJSON } from './utils/hub.js';
 import { max } from './utils/maths.js';
-import { Tensor } from './utils/tensor.js';
+import { Tensor } from './utils/tokenizer_tensor.js';
 import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 
