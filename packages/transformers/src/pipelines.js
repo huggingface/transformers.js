@@ -137,6 +137,9 @@ export async function pipeline(
     const expected_files = await get_pipeline_files(task, model, {
         device,
         dtype,
+        cache_dir,
+        local_files_only,
+        revision,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
