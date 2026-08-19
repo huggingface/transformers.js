@@ -14,6 +14,7 @@ await import("../../src/models/registry.js");
 // Dynamic import after mock setup (required for ESM)
 const { get_files } = await import("../../src/utils/model_registry/get_files.js");
 const { get_model_files } = await import("../../src/utils/model_registry/get_model_files.js");
+const { ModelRegistry } = await import("../../src/utils/model_registry/ModelRegistry.js");
 const { AutoConfig } = await import("../../src/configs.js");
 
 // A minimal config that mimics a BERT-like encoder-only model
@@ -69,6 +70,41 @@ describe("get_files", () => {
     for (const call of mockGetFileMetadata.mock.calls) {
       expect(call[2]).toBeDefined();
     }
+  });
+});
+
+describe("ModelRegistry facades", () => {
+  // The static ModelRegistry methods are the exported API — the bare helpers are not — so the options
+  // have to survive this extra hop too, or public callers stay pinned to `main`.
+  beforeEach(() => {
+    mockGetFileMetadata.mockReset();
+  });
+
+  it("should pass revision and cache_dir through get_tokenizer_files", async () => {
+    setupExistingFiles("tokenizer_config.json");
+
+    const files = await ModelRegistry.get_tokenizer_files("test/model", { revision: "v2", cache_dir: "/tmp/cache" });
+
+    expect(files).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(mockGetFileMetadata).toHaveBeenCalledWith("test/model", "tokenizer_config.json", expect.objectContaining({ revision: "v2", cache_dir: "/tmp/cache" }));
+  });
+
+  it("should pass revision and cache_dir through get_processor_files", async () => {
+    setupExistingFiles("preprocessor_config.json");
+
+    const files = await ModelRegistry.get_processor_files("test/model", { revision: "v2", cache_dir: "/tmp/cache" });
+
+    expect(files).toEqual(["preprocessor_config.json"]);
+    expect(mockGetFileMetadata).toHaveBeenCalledWith("test/model", "preprocessor_config.json", expect.objectContaining({ revision: "v2", cache_dir: "/tmp/cache" }));
+  });
+
+  it("should still work when no options are passed", async () => {
+    setupExistingFiles("tokenizer_config.json");
+
+    const files = await ModelRegistry.get_tokenizer_files("test/model");
+
+    expect(files).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(mockGetFileMetadata).toHaveBeenCalledWith("test/model", "tokenizer_config.json", expect.anything());
   });
 });
 
