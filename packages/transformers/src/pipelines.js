@@ -143,7 +143,7 @@ export async function pipeline(
     let files_loading = {};
     if (progress_callback) {
         /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file, { cache_dir, local_files_only, revision })));
         metadata.forEach((m, i) => {
             if (m.exists) {
                 files_loading[expected_files[i]] = {
