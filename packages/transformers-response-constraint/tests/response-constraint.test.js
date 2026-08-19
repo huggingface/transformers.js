@@ -1,0 +1,506 @@
+import { Tensor } from "@huggingface/transformers";
+
+import { ResponseConstraint } from "../dist/index.js";
+
+const EOS_TOKEN_ID = 256;
+const tokenizer = {
+  tokens: [...Array.from({ length: EOS_TOKEN_ID }, (_, tokenId) => [tokenId]), []],
+  eos_token_id: EOS_TOKEN_ID,
+  special_token_ids: [EOS_TOKEN_ID],
+};
+
+function logits() {
+  return new Tensor("float32", new Float32Array(EOS_TOKEN_ID + 1).fill(1), [1, EOS_TOKEN_ID + 1]);
+}
+
+function isAllowed(scores, tokenId) {
+  return Number.isFinite(scores.data[tokenId]);
+}
+
+async function consume(constraint, text) {
+  const inputIds = [0n];
+  for (const tokenId of new TextEncoder().encode(text)) {
+    const scores = logits();
+    constraint.logits_processor([inputIds], scores);
+    expect(isAllowed(scores, tokenId)).toBe(true);
+    inputIds.push(BigInt(tokenId));
+    constraint.logits_processor.onTokensSampled([tokenId], [inputIds]);
+    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
+  }
+  return inputIds;
+}
+
+function schemaAccepts(schema, text) {
+  const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    type: "json_schema",
+    json_schema: schema,
+  });
+  const inputIds = [0n];
+  for (const tokenId of new TextEncoder().encode(text)) {
+    const scores = logits();
+    try {
+      constraint.logits_processor([inputIds], scores);
+    } catch {
+      return false;
+    }
+    if (!isAllowed(scores, tokenId)) return false;
+    inputIds.push(BigInt(tokenId));
+    constraint.logits_processor.onTokensSampled([tokenId], [inputIds]);
+  }
+  const scores = logits();
+  try {
+    constraint.logits_processor([inputIds], scores);
+  } catch {
+    return false;
+  }
+  return isAllowed(scores, EOS_TOKEN_ID);
+}
+
+describe("ResponseConstraint", () => {
+  it("applies a regex mask", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "[ac]" });
+    const scores = logits();
+
+    constraint.logits_processor([[0n]], scores);
+
+    expect(isAllowed(scores, "a".charCodeAt(0))).toBe(true);
+    expect(isAllowed(scores, "b".charCodeAt(0))).toBe(false);
+    expect(isAllowed(scores, "c".charCodeAt(0))).toBe(true);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+  });
+
+  it("accepts JSON that satisfies a schema", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: {
+        type: "object",
+        properties: { answer: { type: "string", minLength: 1 } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+    });
+    const inputIds = await consume(constraint, '{"answer":"yes"}');
+    const scores = logits();
+
+    constraint.logits_processor([inputIds], scores);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
+    constraint.logits_processor.onTokensSampled([EOS_TOKEN_ID], [[...inputIds, BigInt(EOS_TOKEN_ID)]]);
+
+    expect(constraint.stopping_criteria([[...inputIds, BigInt(EOS_TOKEN_ID)]])).toEqual([true]);
+  });
+
+  it("applies schema structure while producing JSON", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: {
+        type: "object",
+        properties: { answer: { type: "string" } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+    });
+    const initial = logits();
+    constraint.logits_processor([[0n]], initial);
+    expect(isAllowed(initial, "{".charCodeAt(0))).toBe(true);
+    expect(isAllowed(initial, "[".charCodeAt(0))).toBe(false);
+
+    const inputIds = await consume(constraint, "{");
+    const afterOpen = logits();
+    constraint.logits_processor([inputIds], afterOpen);
+    expect(isAllowed(afterOpen, "}".charCodeAt(0))).toBe(false);
+  });
+
+  it("rejects impossible property prefixes and invalid scalar endings", async () => {
+    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: {
+        type: "object",
+        properties: { answer: { type: "string", pattern: "^yes$" } },
+        required: ["answer"],
+        additionalProperties: false,
+      },
+    });
+    const propertyInput = await consume(constraint, '{"');
+    const propertyScores = logits();
+    constraint.logits_processor([propertyInput], propertyScores);
+    expect(isAllowed(propertyScores, "a".charCodeAt(0))).toBe(true);
+    expect(isAllowed(propertyScores, "z".charCodeAt(0))).toBe(false);
+
+    const valueInput = await consume(constraint, 'answer":"x');
+    const valueScores = logits();
+    constraint.logits_processor([valueInput], valueScores);
+    expect(isAllowed(valueScores, '"'.charCodeAt(0))).toBe(false);
+
+    const unicodeProperty = {
+      type: "object",
+      properties: { "😀": { type: "string" } },
+      required: ["😀"],
+      additionalProperties: false,
+    };
+    expect(schemaAccepts(unicodeProperty, '{"😀":"yes"}')).toBe(true);
+    expect(schemaAccepts(unicodeProperty, '{"😁":"yes"}')).toBe(false);
+
+    const escapedProperty = {
+      type: "object",
+      properties: { confidence: { type: "number" } },
+      required: ["confidence"],
+      additionalProperties: false,
+    };
+    expect(schemaAccepts(escapedProperty, '{"c\\u006fnfidence":1}')).toBe(false);
+    expect(schemaAccepts(escapedProperty, '{"c\\n\\n\\n":1}')).toBe(false);
+    const canonicalKeyConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: escapedProperty,
+    });
+    const canonicalKeyInput = await consume(canonicalKeyConstraint, '{"confidence');
+    const canonicalKeyScores = logits();
+    canonicalKeyConstraint.logits_processor([canonicalKeyInput], canonicalKeyScores);
+    expect(isAllowed(canonicalKeyScores, '"'.charCodeAt(0))).toBe(true);
+    expect(isAllowed(canonicalKeyScores, "\\".charCodeAt(0))).toBe(false);
+    const completedPropertyInput = await consume(canonicalKeyConstraint, '":1');
+    const completedPropertyScores = logits();
+    canonicalKeyConstraint.logits_processor([completedPropertyInput], completedPropertyScores);
+    expect(isAllowed(completedPropertyScores, "}".charCodeAt(0))).toBe(true);
+    expect(isAllowed(completedPropertyScores, ",".charCodeAt(0))).toBe(false);
+    expect(schemaAccepts({ type: "object", properties: { "a\nb": true }, required: ["a\nb"], additionalProperties: false }, '{"a\\nb":1}')).toBe(true);
+
+    const languageConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: { enum: ["en", "de", "fr", "es"] },
+    });
+    const languageInput = await consume(languageConstraint, '"');
+    const languageScores = logits();
+    languageConstraint.logits_processor([languageInput], languageScores);
+    expect(isAllowed(languageScores, "e".charCodeAt(0))).toBe(true);
+    expect(isAllowed(languageScores, "d".charCodeAt(0))).toBe(true);
+    expect(isAllowed(languageScores, "x".charCodeAt(0))).toBe(false);
+    expect(isAllowed(languageScores, "\\".charCodeAt(0))).toBe(false);
+    expect(schemaAccepts({ const: "\n" }, '"\\n"')).toBe(true);
+
+    const boundedString = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: { type: "string", maxLength: 2 },
+    });
+    const boundedStringInput = await consume(boundedString, '"ab');
+    const boundedStringScores = logits();
+    boundedString.logits_processor([boundedStringInput], boundedStringScores);
+    expect(isAllowed(boundedStringScores, '"'.charCodeAt(0))).toBe(true);
+    expect(isAllowed(boundedStringScores, "c".charCodeAt(0))).toBe(false);
+    expect(isAllowed(boundedStringScores, "\\".charCodeAt(0))).toBe(false);
+    expect(schemaAccepts({ type: "string", maxLength: 1 }, '"😀"')).toBe(true);
+    expect(schemaAccepts({ type: "string", maxLength: 1 }, '"😀x"')).toBe(false);
+
+    const composed = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: {
+        oneOf: [{ const: "general" }, { type: "object", properties: { role: { type: "string" } }, required: ["role"], additionalProperties: false }],
+      },
+    });
+    const composedInput = await consume(composed, '{"');
+    const composedScores = logits();
+    composed.logits_processor([composedInput], composedScores);
+    expect(isAllowed(composedScores, "r".charCodeAt(0))).toBe(true);
+    expect(isAllowed(composedScores, "z".charCodeAt(0))).toBe(false);
+  });
+
+  it("restricts integer fields to reachable canonical syntax", async () => {
+    const confidence = {
+      type: "object",
+      properties: { confidence: { type: "integer", minimum: 0, maximum: 100 } },
+      required: ["confidence"],
+      additionalProperties: false,
+    };
+
+    // Integer fields follow llguidance's shape: fractions may only contain
+    // zeros and exponents may not be negative, so "0.9" (which would strand the
+    // model in states like "0.9e-" that can never close) is cut off at the "9".
+    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: confidence,
+    });
+    const input = await consume(constraint, '{"confidence":0.');
+    const scores = logits();
+    constraint.logits_processor([input], scores);
+    expect(isAllowed(scores, "0".charCodeAt(0))).toBe(true);
+    expect(isAllowed(scores, "9".charCodeAt(0))).toBe(false);
+
+    const exponent = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: confidence,
+    });
+    const exponentInput = await consume(exponent, '{"confidence":9e');
+    const exponentScores = logits();
+    exponent.logits_processor([exponentInput], exponentScores);
+    expect(isAllowed(exponentScores, "-".charCodeAt(0))).toBe(false);
+    // 9e1 = 90 fits [0, 100]; every exponent starting with 3 puts 9e3+ out of range
+    expect(isAllowed(exponentScores, "1".charCodeAt(0))).toBe(true);
+    expect(isAllowed(exponentScores, "3".charCodeAt(0))).toBe(false);
+
+    expect(schemaAccepts(confidence, '{"confidence":15}')).toBe(true);
+    expect(schemaAccepts(confidence, '{"confidence":1.0}')).toBe(true);
+    expect(schemaAccepts(confidence, '{"confidence":9e1}')).toBe(true);
+    expect(schemaAccepts(confidence, '{"confidence":0.9}')).toBe(false);
+    expect(schemaAccepts(confidence, '{"confidence":9e-1}')).toBe(false);
+
+    // Zero padding carries no information, so it is capped: a model stuck on
+    // "0" is eventually forced to close instead of streaming digits forever.
+    const padded = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: confidence,
+    });
+    const paddedInput = await consume(padded, '{"confidence":95e000');
+    const paddedScores = logits();
+    padded.logits_processor([paddedInput], paddedScores);
+    expect(isAllowed(paddedScores, "0".charCodeAt(0))).toBe(false);
+    expect(isAllowed(paddedScores, "}".charCodeAt(0))).toBe(true);
+
+    // Digits that could never get back into [0, 100] are pruned: after "15",
+    // any further digit forces 150+.
+    const bounded = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: confidence,
+    });
+    const boundedInput = await consume(bounded, '{"confidence":15');
+    const boundedScores = logits();
+    bounded.logits_processor([boundedInput], boundedScores);
+    expect(isAllowed(boundedScores, "0".charCodeAt(0))).toBe(false);
+    expect(isAllowed(boundedScores, "}".charCodeAt(0))).toBe(true);
+
+    // A first digit that cannot start any in-range integer is masked: 4, 40-49,
+    // 400+ all miss [50, 100], while 1 can still reach 100.
+    const range = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: { type: "integer", minimum: 50, maximum: 100 },
+    });
+    const rangeScores = logits();
+    range.logits_processor([[0n]], rangeScores);
+    expect(isAllowed(rangeScores, "5".charCodeAt(0))).toBe(true);
+    expect(isAllowed(rangeScores, "1".charCodeAt(0))).toBe(true);
+    expect(isAllowed(rangeScores, "4".charCodeAt(0))).toBe(false);
+    expect(isAllowed(rangeScores, "-".charCodeAt(0))).toBe(false);
+
+    const negative = { type: "integer", minimum: -50, maximum: -10 };
+    expect(schemaAccepts(negative, "-25")).toBe(true);
+    const negativeConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: negative,
+    });
+    const negativeInput = await consume(negativeConstraint, "-");
+    const negativeScores = logits();
+    negativeConstraint.logits_processor([negativeInput], negativeScores);
+    expect(isAllowed(negativeScores, "2".charCodeAt(0))).toBe(true);
+    expect(isAllowed(negativeScores, "6".charCodeAt(0))).toBe(false);
+
+    // Integer-valued enums get the same protection.
+    expect(schemaAccepts({ enum: [1, 2, 30] }, "30")).toBe(true);
+    expect(schemaAccepts({ enum: [1, 2, 30] }, "1.0")).toBe(true);
+    expect(schemaAccepts({ enum: [1, 2, 30] }, "1.5")).toBe(false);
+
+    // Plain number fields keep full JSON syntax.
+    const ratio = { type: "number", minimum: 0, maximum: 1 };
+    expect(schemaAccepts(ratio, "0.9")).toBe(true);
+    expect(schemaAccepts(ratio, "9e-1")).toBe(true);
+  });
+
+  it("supports composition, conditionals, and local references", async () => {
+    expect(schemaAccepts({ not: { type: "string" } }, "42")).toBe(true);
+    expect(schemaAccepts({ not: { type: "string" } }, '"no"')).toBe(false);
+    expect(schemaAccepts({ allOf: [{ type: "integer", minimum: 2 }, { multipleOf: 2 }] }, "4")).toBe(true);
+    expect(schemaAccepts({ oneOf: [{ type: "string" }, { type: "integer" }] }, "2")).toBe(true);
+
+    const conditional = {
+      type: "object",
+      properties: { kind: { enum: ["text", "count"] }, value: true },
+      required: ["kind", "value"],
+      if: { properties: { kind: { const: "text" } }, required: ["kind"] },
+      then: { properties: { value: { type: "string" } } },
+      else: { properties: { value: { type: "integer" } } },
+    };
+    expect(schemaAccepts(conditional, '{"value":"ok","kind":"text"}')).toBe(true);
+    expect(schemaAccepts(conditional, '{"kind":"text","value":2}')).toBe(false);
+
+    const followUp = {
+      type: "object",
+      properties: { needed: { type: "boolean" }, question: { type: ["string", "null"] } },
+      required: ["needed", "question"],
+      additionalProperties: false,
+      allOf: [
+        {
+          if: { properties: { needed: { const: true } }, required: ["needed"] },
+          then: { properties: { question: { type: "string", minLength: 1 } } },
+          else: { properties: { question: { type: "null" } } },
+        },
+      ],
+    };
+    const followUpConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: followUp,
+    });
+    const followUpInput = await consume(followUpConstraint, '{"needed":true,"question":');
+    const followUpScores = logits();
+    followUpConstraint.logits_processor([followUpInput], followUpScores);
+    expect(isAllowed(followUpScores, '"'.charCodeAt(0))).toBe(true);
+    expect(isAllowed(followUpScores, "n".charCodeAt(0))).toBe(false);
+    expect(schemaAccepts(followUp, '{"question":null,"needed":true}')).toBe(false);
+
+    const referenced = {
+      $defs: { answer: { type: "integer", minimum: 2 } },
+      $ref: "#/$defs/answer",
+    };
+    expect(schemaAccepts(referenced, "3")).toBe(true);
+    expect(schemaAccepts(referenced, "1")).toBe(false);
+
+    const objectUnion = {
+      anyOf: [
+        { type: "object", properties: { a: { type: "string" }, b: { type: "integer" } }, required: ["a"], additionalProperties: false },
+        { type: "object", properties: { a: { type: "string" }, c: { type: "number" } }, required: ["a"], additionalProperties: false },
+      ],
+    };
+    expect(schemaAccepts(objectUnion, '{"a":"x","b":2}')).toBe(true);
+    expect(schemaAccepts(objectUnion, '{"a":"x","b":2,"c":3}')).toBe(false);
+  });
+
+  it("supports deep equality and structural assertions", () => {
+    expect(schemaAccepts({ const: { name: "John", values: [1] } }, '{"values":[1.0],"name":"John"}')).toBe(true);
+    expect(schemaAccepts({ const: "😀" }, '"\\ud83d\\ude00"')).toBe(true);
+    expect(schemaAccepts({ const: "😀" }, '"\\ud83dx"')).toBe(false);
+    expect(schemaAccepts({ type: "array", uniqueItems: true }, '[{"a":[1]},{"a":[1.0]}]')).toBe(false);
+    expect(schemaAccepts({ type: "array", contains: { type: "integer", minimum: 2 }, minContains: 2, maxContains: 2 }, '["x",2,3]')).toBe(true);
+    expect(schemaAccepts({ type: "array", contains: { const: 1 } }, "[0]")).toBe(false);
+  });
+
+  it("supports property patterns and dependencies", () => {
+    const schema = {
+      type: "object",
+      properties: { code: { type: "integer" }, card: { type: "string" }, billing: { type: "string" } },
+      patternProperties: { "^code$": { minimum: 1 }, "^x-": { type: "string" } },
+      dependentRequired: { card: ["billing"] },
+      additionalProperties: false,
+    };
+    expect(schemaAccepts(schema, '{"x-note":"ok","code":2,"billing":"x","card":"1"}')).toBe(true);
+    expect(schemaAccepts(schema, '{"code":0}')).toBe(false);
+    expect(schemaAccepts(schema, '{"card":"1"}')).toBe(false);
+  });
+
+  it("supports recursive references and draft-07 compatibility", () => {
+    const linkedList = {
+      $defs: {
+        node: {
+          type: "object",
+          properties: {
+            value: { type: "string" },
+            next: { anyOf: [{ $ref: "#/$defs/node" }, { type: "null" }] },
+          },
+          required: ["value", "next"],
+          additionalProperties: false,
+        },
+      },
+      $ref: "#/$defs/node",
+    };
+    expect(schemaAccepts(linkedList, '{"value":"a","next":{"value":"b","next":null}}')).toBe(true);
+    expect(schemaAccepts(linkedList, '{"value":"a","next":2}')).toBe(false);
+
+    const tuple = {
+      type: "array",
+      items: [{ type: "string" }, { type: "integer" }],
+      additionalItems: false,
+    };
+    expect(schemaAccepts(tuple, '["x",1]')).toBe(true);
+    expect(schemaAccepts(tuple, '["x",1,true]')).toBe(false);
+  });
+
+  it("supports recognized formats and x-guidance separators", () => {
+    const formats = {
+      date: ["2024-02-29", "2023-02-29"],
+      time: ["23:59:60Z", "22:59:60Z"],
+      "date-time": ["2024-02-29T12:00:00Z", "2023-02-29T12:00:00Z"],
+      duration: ["P1Y2M3DT4H5M6S", "P1YT"],
+      email: ["user+tag@example.com", "user@@example.com"],
+      hostname: ["www.example.com", "-example.com"],
+      ipv4: ["255.255.255.255", "256.0.0.1"],
+      ipv6: ["2001:db8::1", "1::d6::42"],
+      uuid: ["98d80576-482e-427f-8434-7f86890ab222", "98d80576-482e-427f"],
+      uri: ["https://example.com/a%20b?x=1#part", "http://example.com/%GG"],
+      "uri-reference": ["../a/b?x=1#part", "a:b c"],
+      regex: ["^(?:😀|[a-z]+)$", "["],
+      "json-pointer": ["/a~1b/~0key", "/bad~escape"],
+      "relative-json-pointer": ["2/items/0", "01/value"],
+    };
+    for (const [format, [valid, invalid]] of Object.entries(formats)) {
+      if (!schemaAccepts({ type: "string", format }, JSON.stringify(valid))) throw new Error(`Rejected valid ${format}`);
+      if (schemaAccepts({ type: "string", format }, JSON.stringify(invalid))) throw new Error(`Accepted invalid ${format}`);
+    }
+
+    const guided = {
+      type: "object",
+      properties: { a: { type: "integer" }, b: { type: "integer" } },
+      required: ["a", "b"],
+      additionalProperties: false,
+      "x-guidance": { item_separator: "-", key_separator: "_ ", whitespace_flexible: false },
+    };
+    expect(schemaAccepts(guided, '{"a"_ 1-"b"_ 2}')).toBe(true);
+    expect(schemaAccepts(guided, '{"a":1,"b":2}')).toBe(false);
+  });
+
+  it("rejects malformed and unsupported schema shapes", () => {
+    for (const schema of [{ not: [] }, { patternProperties: { "[": true } }, { dependentRequired: { a: ["b", "b"] } }, { minContains: -1 }, { uniqueItems: "yes" }, { unevaluatedProperties: false }]) {
+      expect(() => ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema })).toThrow();
+    }
+  });
+
+  it("supports unconstrained JSON objects", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+    const inputIds = await consume(constraint, '{"nested":{"enabled":true},"count":2}');
+    const scores = logits();
+
+    constraint.logits_processor([inputIds], scores);
+
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it("reuses cached masks without sharing generation state", async () => {
+    const schema = {
+      type: "object",
+      properties: { answer: { enum: ["yes", "no"] } },
+      required: ["answer"],
+      additionalProperties: false,
+    };
+    const first = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: schema,
+    });
+    const second = ResponseConstraint.fromResponseFormat(tokenizer, {
+      type: "json_schema",
+      json_schema: schema,
+    });
+
+    const firstIds = await consume(first, '{"answer":"yes"}');
+    const secondIds = await consume(second, '{"answer":"no"}');
+    const firstScores = logits();
+    const secondScores = logits();
+    first.logits_processor([firstIds], firstScores);
+    second.logits_processor([secondIds], secondScores);
+
+    expect(isAllowed(firstScores, EOS_TOKEN_ID)).toBe(true);
+    expect(isAllowed(secondScores, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it("rejects batched generation", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+
+    expect(() => constraint.logits_processor([[0n], [0n]], new Tensor("float32", new Float32Array((EOS_TOKEN_ID + 1) * 2), [2, EOS_TOKEN_ID + 1]))).toThrow("currently supports batch size 1");
+  });
+
+  it("rejects a sampled token outside the constraint", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "a" });
+    constraint.logits_processor([[0n]], logits());
+
+    expect(() => constraint.logits_processor.onTokensSampled(["b".charCodeAt(0)], [[0n, 98n]])).toThrow("does not satisfy the constraint");
+  });
+
+  it("returns only the generation hooks", async () => {
+    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "a" });
+
+    expect(Object.keys(constraint).sort()).toEqual(["logits_processor", "stopping_criteria"]);
+  });
+});

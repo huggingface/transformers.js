@@ -2,6 +2,7 @@ import { build } from "esbuild";
 import { rmSync } from "node:fs";
 
 rmSync("dist", { recursive: true, force: true });
+rmSync("types", { recursive: true, force: true });
 
 const common = {
   entryPoints: ["src/index.ts"],
@@ -9,7 +10,7 @@ const common = {
   platform: "neutral",
   target: "es2022",
   sourcemap: true,
-  external: ["@huggingface/transformers", "llguidance"],
+  external: ["@huggingface/transformers"],
 };
 
 await Promise.all([
