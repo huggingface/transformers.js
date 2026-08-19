@@ -127,6 +127,9 @@ export class ModelRegistry {
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
      * @param {boolean} [options.include_tokenizer=true] - Whether to check for tokenizer files
      * @param {boolean} [options.include_processor=true] - Whether to check for processor files
+     * @param {string} [options.revision='main'] - Git branch, tag, or commit SHA to list files from
+     * @param {string} [options.cache_dir] - Path to the cache directory
+     * @param {boolean} [options.local_files_only=false] - Whether to only look for the files locally
      * @returns {Promise<string[]>} Array of file paths
      *
      * @example
@@ -148,6 +151,9 @@ export class ModelRegistry {
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string} [options.revision='main'] - Git branch, tag, or commit SHA to list files from
+     * @param {string} [options.cache_dir] - Path to the cache directory
+     * @param {boolean} [options.local_files_only=false] - Whether to only look for the files locally
      * @returns {Promise<string[]>} Array of file paths
      *
      * @example
@@ -167,6 +173,9 @@ export class ModelRegistry {
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string} [options.revision='main'] - Git branch, tag, or commit SHA to list files from
+     * @param {string} [options.cache_dir] - Path to the cache directory
+     * @param {boolean} [options.local_files_only=false] - Whether to only look for the files locally
      * @returns {Promise<string[]>} Array of model file paths
      *
      * @example
@@ -181,28 +190,32 @@ export class ModelRegistry {
      * Get tokenizer files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {import('../hub.js').PretrainedOptions} [options] - Options forwarded to the metadata request, so the
+     * existence check reads the same revision the files will be loaded from.
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
      * @example
      * const files = await ModelRegistry.get_tokenizer_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['tokenizer.json', 'tokenizer_config.json']
      */
-    static async get_tokenizer_files(modelId) {
-        return get_tokenizer_files(modelId);
+    static async get_tokenizer_files(modelId, options = {}) {
+        return get_tokenizer_files(modelId, options);
     }
 
     /**
      * Get processor files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {import('../hub.js').PretrainedOptions} [options] - Options forwarded to the metadata request, so the
+     * existence check reads the same revision the files will be loaded from.
      * @returns {Promise<string[]>} Array of processor file paths
      *
      * @example
      * const files = await ModelRegistry.get_processor_files('onnx-community/vit-base-patch16-224-ONNX');
      * console.log(files); // ['preprocessor_config.json']
      */
-    static async get_processor_files(modelId) {
-        return get_processor_files(modelId);
+    static async get_processor_files(modelId, options = {}) {
+        return get_processor_files(modelId, options);
     }
 
     /**
