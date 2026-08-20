@@ -2,7 +2,7 @@ import { PreTrainedTokenizer, loadTokenizer } from '../../tokenization_utils.js'
 import { Qwen2Tokenizer } from '../qwen2/tokenization_qwen2.js';
 import { logger } from '../../utils/logger.js';
 
-const TOKENIZERS = { Qwen2Tokenizer };
+const TOKENIZERS = { Qwen2Tokenizer, TokenizersBackend: PreTrainedTokenizer };
 
 export class AutoTokenizer {
     static async from_pretrained(
