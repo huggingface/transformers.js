@@ -21,6 +21,9 @@ type GenerationState = {
     mask?: Uint32Array;
 };
 
+const WHITESPACE_REPETITION_PENALTY = 1.2;
+const MAX_CONSECUTIVE_WHITESPACE_TOKENS = 4;
+
 export class ResponseConstraint {
     /**
      * Precomputes the tokenizer-derived data structures used by every
@@ -66,6 +69,10 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
             throw new Error('The constraint reached a dead end before producing a valid output.');
         }
         applyMask(logits, this.state.mask, this.state.constraint.vocabSize);
+        const repeatedWhitespace = this.state.constraint.repeatedWhitespace();
+        if (repeatedWhitespace !== undefined) {
+            discourageRepeatedWhitespace(logits, repeatedWhitespace.tokenIds, repeatedWhitespace.count);
+        }
         return logits;
     }
 }
@@ -90,5 +97,23 @@ class ConstraintStoppingCriteria extends StoppingCriteria {
 function assertSingleSequence(batchSize: number): void {
     if (batchSize !== 1) {
         throw new Error(`ResponseConstraint currently supports batch size 1; received ${batchSize}.`);
+    }
+}
+
+function discourageRepeatedWhitespace(logits: Tensor, tokenIds: readonly number[], count: number): void {
+    const data = logits.data as Float32Array | Float64Array | number[];
+    const stride = logits.dims.at(-1)!;
+    const penalty = WHITESPACE_REPETITION_PENALTY ** count;
+    for (let offset = 0; offset < data.length; offset += stride) {
+        for (const tokenId of tokenIds) {
+            const index = offset + tokenId;
+            if (count >= MAX_CONSECUTIVE_WHITESPACE_TOKENS) {
+                data[index] = -Infinity;
+            } else if (data[index] < 0) {
+                data[index] *= penalty;
+            } else {
+                data[index] /= penalty;
+            }
+        }
     }
 }

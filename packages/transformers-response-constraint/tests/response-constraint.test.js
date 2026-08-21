@@ -85,6 +85,34 @@ describe("ResponseConstraint", () => {
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(true);
   });
 
+  it("discourages repeated non-progressing JSON whitespace", () => {
+    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+    const inputIds = [0n];
+    constraint.logits_processor([inputIds], logits());
+
+    for (let count = 1; count <= 4; ++count) {
+      inputIds.push(10n);
+      expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
+
+      const scores = logits();
+      scores.data[10] = 12;
+      scores.data[32] = 12;
+      scores.data[13] = -12;
+      constraint.logits_processor([inputIds], scores);
+
+      if (count < 4) {
+        expect(scores.data[10]).toBeCloseTo(12 / 1.2 ** count);
+        expect(scores.data[32]).toBeCloseTo(12 / 1.2 ** count);
+        expect(scores.data[13]).toBeCloseTo(-12 * 1.2 ** count);
+      } else {
+        expect(scores.data[10]).toBe(-Infinity);
+        expect(scores.data[32]).toBe(-Infinity);
+        expect(scores.data[13]).toBe(-Infinity);
+      }
+      expect(scores.data["{".charCodeAt(0)]).toBe(1);
+    }
+  });
+
   it("accepts JSON that satisfies a schema", async () => {
     const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
       type: "json_schema",

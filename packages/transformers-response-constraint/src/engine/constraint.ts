@@ -7,6 +7,7 @@ type TrieNode = { childBytes: number[]; childNodes: TrieNode[]; tokenIds: number
 type CachedTokenizer = {
     data: TokenizerData;
     trie: TrieNode;
+    whitespaceTokenIds: number[];
     stringExceptionalTrie: TrieNode;
     stringSafeMask: Uint32Array;
     stringSafeCount: number;
@@ -28,6 +29,7 @@ export type TokenConstraint = {
     vocabSize: number;
     fillMask(target: Uint32Array): boolean;
     commit(tokenId: number): boolean;
+    repeatedWhitespace(): { tokenIds: readonly number[]; count: number } | undefined;
 };
 
 const tokenizerCache = new WeakMap<object, CachedTokenizer>();
@@ -59,6 +61,8 @@ export function createTokenConstraint(
     const tokenStates: Array<unknown> = new Array(tokenizer.data.tokens.length);
     const tokenStamps = new Int32Array(tokenizer.data.tokens.length);
     let stamp = 0;
+    let consecutiveWhitespace = 0;
+    const tracksJsonWhitespace = responseFormat.type !== 'regex';
 
     return {
         vocabSize: tokenizer.data.tokens.length,
@@ -128,8 +132,16 @@ export function createTokenConstraint(
             }
             stamp++;
             if (!machine.viable(next)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
+            consecutiveWhitespace =
+                tracksJsonWhitespace && next === state && isJsonWhitespace(tokenizer.data.tokens[tokenId])
+                    ? consecutiveWhitespace + 1
+                    : 0;
             state = next;
             return false;
+        },
+        repeatedWhitespace() {
+            if (consecutiveWhitespace === 0) return undefined;
+            return { tokenIds: tokenizer.whitespaceTokenIds, count: consecutiveWhitespace };
         },
     };
 }
@@ -153,6 +165,7 @@ function cachedTokenizer(source: TokenizerSource): CachedTokenizer {
     if (cached === undefined) {
         const data = extractTokenizer(source);
         const stringExceptionalTokenIds: number[] = [];
+        const whitespaceTokenIds: number[] = [];
         const stringSafeMask = new Uint32Array(Math.ceil(data.tokens.length / 32));
         const stringSafeLengths = new Uint32Array(data.tokens.length);
         let stringSafeCount = 0;
@@ -160,6 +173,7 @@ function cachedTokenizer(source: TokenizerSource): CachedTokenizer {
         let maxTokenByteLength = 0;
         for (let tokenId = 0; tokenId < data.tokens.length; ++tokenId) {
             const special = data.specialTokenIds.has(tokenId);
+            if (!special && isJsonWhitespace(data.tokens[tokenId])) whitespaceTokenIds.push(tokenId);
             if (!special && data.tokens[tokenId].length > maxTokenByteLength) {
                 maxTokenByteLength = data.tokens[tokenId].length;
             }
@@ -176,6 +190,7 @@ function cachedTokenizer(source: TokenizerSource): CachedTokenizer {
         cached = {
             data,
             trie: createTrie(data.tokens),
+            whitespaceTokenIds,
             stringExceptionalTrie: createTrie(data.tokens, stringExceptionalTokenIds),
             stringSafeMask,
             stringSafeCount,
@@ -305,6 +320,10 @@ function boundedStringMask(tokenizer: CachedTokenizer, capacity: number): { mask
     cached = { mask, count };
     tokenizer.boundedStringMasks.set(capacity, cached);
     return cached;
+}
+
+function isJsonWhitespace(bytes: Uint8Array): boolean {
+    return bytes.length > 0 && bytes.every((byte) => byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0x20);
 }
 
 function setBit(mask: Uint32Array, tokenId: number): void {
