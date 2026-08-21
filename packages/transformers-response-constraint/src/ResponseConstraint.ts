@@ -17,6 +17,7 @@ export type ResponseFormat =
 type GenerationState = {
     completed: boolean;
     constraint: TokenConstraint;
+    processedInputLength?: number;
     mask?: Uint32Array;
 };
 
@@ -53,6 +54,7 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
 
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
+        this.state.processedInputLength ??= inputIds[0].length;
         if (this.state.completed) return logits;
         const logitsVocabSize = logits.dims.at(-1);
         if (logitsVocabSize === undefined || !Number.isInteger(logitsVocabSize) || logitsVocabSize <= 0) {
@@ -66,12 +68,6 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
         applyMask(logits, this.state.mask, this.state.constraint.vocabSize);
         return logits;
     }
-
-    onTokensSampled(tokenIds: number[], inputIds: bigint[][]) {
-        assertSingleSequence(tokenIds.length);
-        assertSingleSequence(inputIds.length);
-        if (!this.state.completed) this.state.completed = this.state.constraint.commit(tokenIds[0]);
-    }
 }
 
 class ConstraintStoppingCriteria extends StoppingCriteria {
@@ -79,8 +75,14 @@ class ConstraintStoppingCriteria extends StoppingCriteria {
         super();
     }
 
-    _call(inputIds: ArrayLike<unknown>[]) {
+    _call(inputIds: ArrayLike<number | bigint>[]) {
         assertSingleSequence(inputIds.length);
+        const input = inputIds[0];
+        const start = this.state.processedInputLength ?? input.length;
+        for (let i = start; i < input.length && !this.state.completed; ++i) {
+            this.state.completed = this.state.constraint.commit(Number(input[i]));
+        }
+        this.state.processedInputLength = input.length;
         return [this.state.completed];
     }
 }

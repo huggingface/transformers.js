@@ -11,8 +11,6 @@ import {
   // Other
   TextStreamer,
   DynamicCache,
-  LogitsProcessor,
-  LogitsProcessorList,
   StoppingCriteria,
   random,
   full,
@@ -207,48 +205,6 @@ describe("Generation parameters", () => {
         expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
         expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
         expect(outputs_seed123.tolist()).toEqual(expected_seed123);
-      },
-      MAX_TEST_EXECUTION_TIME,
-    );
-
-    it(
-      "calls logits processor post-sample hook after full batch step",
-      async () => {
-        class RecordingLogitsProcessor extends LogitsProcessor {
-          snapshots = [];
-
-          _call(input_ids, logits) {
-            return logits;
-          }
-
-          onTokensSampled(token_ids, input_ids) {
-            this.snapshots.push({
-              token_ids,
-              lengths: input_ids.map((ids) => ids.length),
-            });
-          }
-        }
-
-        const processor = new RecordingLogitsProcessor();
-        const logits_processor = new LogitsProcessorList();
-        logits_processor.push(processor);
-
-        const outputs = await generate(model, tokenizer, [DUMMY_TEXT, DUMMY_TEXT], {
-          max_new_tokens: 2,
-          logits_processor,
-        });
-
-        const generated_tokens = outputs.tolist().map((tokens) => tokens.slice(-2).map(Number));
-        expect(processor.snapshots).toEqual([
-          {
-            token_ids: generated_tokens.map((tokens) => tokens[0]),
-            lengths: [3, 3],
-          },
-          {
-            token_ids: generated_tokens.map((tokens) => tokens[1]),
-            lengths: [4, 4],
-          },
-        ]);
       },
       MAX_TEST_EXECUTION_TIME,
     );

@@ -17,14 +17,16 @@ function isAllowed(scores, tokenId) {
   return Number.isFinite(scores.data[tokenId]);
 }
 
+const inputIdsByConstraint = new WeakMap();
+
 async function consume(constraint, text) {
-  const inputIds = [0n];
+  const inputIds = inputIdsByConstraint.get(constraint) ?? [0n];
+  inputIdsByConstraint.set(constraint, inputIds);
   for (const tokenId of new TextEncoder().encode(text)) {
     const scores = logits();
     constraint.logits_processor([inputIds], scores);
     expect(isAllowed(scores, tokenId)).toBe(true);
     inputIds.push(BigInt(tokenId));
-    constraint.logits_processor.onTokensSampled([tokenId], [inputIds]);
     expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
   }
   return inputIds;
@@ -45,7 +47,7 @@ function schemaAccepts(schema, text) {
     }
     if (!isAllowed(scores, tokenId)) return false;
     inputIds.push(BigInt(tokenId));
-    constraint.logits_processor.onTokensSampled([tokenId], [inputIds]);
+    constraint.stopping_criteria([inputIds]);
   }
   const scores = logits();
   try {
@@ -69,6 +71,20 @@ describe("ResponseConstraint", () => {
     expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
   });
 
+  it("does not process the same sampled token twice", async () => {
+    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "ab" });
+    const inputIds = [0n];
+    constraint.logits_processor([inputIds], logits());
+    inputIds.push(BigInt("a".charCodeAt(0)));
+
+    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
+    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
+
+    const scores = logits();
+    constraint.logits_processor([inputIds], scores);
+    expect(isAllowed(scores, "b".charCodeAt(0))).toBe(true);
+  });
+
   it("accepts JSON that satisfies a schema", async () => {
     const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
       type: "json_schema",
@@ -84,7 +100,6 @@ describe("ResponseConstraint", () => {
 
     constraint.logits_processor([inputIds], scores);
     expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
-    constraint.logits_processor.onTokensSampled([EOS_TOKEN_ID], [[...inputIds, BigInt(EOS_TOKEN_ID)]]);
 
     expect(constraint.stopping_criteria([[...inputIds, BigInt(EOS_TOKEN_ID)]])).toEqual([true]);
   });
@@ -495,7 +510,7 @@ describe("ResponseConstraint", () => {
     const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "a" });
     constraint.logits_processor([[0n]], logits());
 
-    expect(() => constraint.logits_processor.onTokensSampled(["b".charCodeAt(0)], [[0n, 98n]])).toThrow("does not satisfy the constraint");
+    expect(() => constraint.stopping_criteria([[0n, 98n]])).toThrow("does not satisfy the constraint");
   });
 
   it("returns only the generation hooks", async () => {

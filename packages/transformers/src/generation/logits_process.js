@@ -88,19 +88,6 @@ export class LogitsProcessorList extends Callable {
         return toReturn;
     }
 
-    /**
-     * Calls Transformers.js-specific post-sampling hooks on processors that need to update state after token selection.
-     * The hook observes the full batch after the current generation step has been appended.
-     *
-     * @param {number[]} token_ids The sampled token IDs for the current generation step.
-     * @param {bigint[][]} input_ids The input IDs after appending the sampled tokens.
-     */
-    onTokensSampled(token_ids, input_ids) {
-        for (const processor of this.processors) {
-            processor.onTokensSampled?.(token_ids, input_ids);
-        }
-    }
-
     [Symbol.iterator]() {
         return this.processors.values();
     }
