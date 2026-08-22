@@ -95,7 +95,7 @@ const ONNX_LOG_LEVEL_NAMES = {
  * The list of supported devices, sorted by priority/performance.
  * @type {import("../utils/devices.js").DeviceType[]}
  */
-const supportedDevices = [];
+export const supportedDevices = [];
 
 /** @type {ONNXExecutionProviders[]} */
 let defaultDevices;
