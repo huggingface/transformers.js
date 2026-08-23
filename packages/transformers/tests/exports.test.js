@@ -96,4 +96,59 @@ describe("supportedDevices public export", () => {
     expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoExpected);
     expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
   });
+
+  it("default branch returns a copy and does not expose internal array", () => {
+    const defaultBefore = transformers.deviceToExecutionProviders();
+    const defaultAlso = transformers.deviceToExecutionProviders(null);
+    expect(defaultAlso).toEqual(defaultBefore);
+
+    // Mutation of returned array does not affect internal state
+    const returned = transformers.deviceToExecutionProviders();
+    try {
+      returned.length = 0;
+    } catch {
+      // ignored
+    }
+    expect(transformers.deviceToExecutionProviders()).toEqual(transformers.deviceToExecutionProviders(null));
+  });
+
+  it("gpu branch returns a fresh array and does not expose internal array", () => {
+    const gpuDevices = transformers.deviceToExecutionProviders("gpu");
+    expect(Array.isArray(gpuDevices)).toBe(true);
+    // Each call returns a fresh array (filter creates new array)
+    const gpuAgain = transformers.deviceToExecutionProviders("gpu");
+    expect(gpuAgain).toEqual(gpuDevices);
+    expect(gpuAgain).not.toBe(gpuDevices); // different reference
+  });
+
+  it("specific device returns execution providers array", () => {
+    const devices = transformers.supportedDevices;
+    expect(devices.length).toBeGreaterThan(0);
+    const someDevice = devices[0];
+
+    const eps = transformers.deviceToExecutionProviders(someDevice);
+    expect(Array.isArray(eps)).toBe(true);
+    expect(eps.length).toBeGreaterThan(0);
+
+    // Returns fresh array each call
+    const epsAgain = transformers.deviceToExecutionProviders(someDevice);
+    expect(epsAgain).toEqual(eps);
+    expect(epsAgain).not.toBe(eps);
+  });
+
+  it("unsupported device throws descriptive error", () => {
+    expect(() => transformers.deviceToExecutionProviders("unsupported-device-xyz")).toThrow("Unsupported device");
+  });
+
+  it("defaultDevices mutation does not affect internal state", () => {
+    const defaultBefore = transformers.deviceToExecutionProviders();
+    const returned = transformers.deviceToExecutionProviders();
+    try {
+      returned.push("malicious-device");
+    } catch {
+      // ignored
+    }
+    expect(transformers.deviceToExecutionProviders()).toEqual(defaultBefore);
+    expect(transformers.deviceToExecutionProviders()).not.toContain("malicious-device");
+  });
 });

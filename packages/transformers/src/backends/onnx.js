@@ -152,9 +152,13 @@ if (ORT_SYMBOL in globalThis) {
     defaultDevices = ['wasm'];
 }
 
-// Public, immutable snapshot of the supported devices. It is frozen so that
-// consumers cannot mutate the library's internal state, which would otherwise
-// corrupt provider selection (e.g. via deviceToExecutionProviders).
+/**
+ * A frozen, immutable snapshot of the supported device types.
+ * Consumers cannot mutate this array; mutations will throw in strict mode
+ * or be silently ignored. This protects the library's internal state from
+ * being corrupted (e.g. via deviceToExecutionProviders).
+ * @type {ReadonlyArray<import("../utils/devices.js").DeviceType>}
+ */
 export const supportedDevices = Object.freeze([...supportedDevicesInternal]);
 
 // @ts-ignore
@@ -163,7 +167,7 @@ const InferenceSession = ONNX.InferenceSession;
 /**
  * Map a device to the execution providers to use for the given device.
  * @param {import("../utils/devices.js").DeviceType|"auto"|null} [device=null] (Optional) The device to run the inference on.
- * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.
+ * @returns {ONNXExecutionProviders[] | import("../utils/devices.js").DeviceType[]} The execution providers for the given device, or the list of supported device types when device is "auto".
  */
 export function deviceToExecutionProviders(device = null) {
     // Use the default execution providers if the user hasn't specified anything.
