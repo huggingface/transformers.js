@@ -172,7 +172,10 @@ const InferenceSession = ONNX.InferenceSession;
 export function deviceToExecutionProviders(device = null) {
     // Use the default execution providers if the user hasn't specified anything.
     // Return a copy so consumers cannot mutate the internal default list.
-    if (!device) return [...defaultDevices];
+    // NOTE: `defaultDevices` may be `undefined` in environments that provide their
+    // own ONNX runtime (via the `Symbol.for('onnxruntime')` global), so we guard the
+    // spread to avoid a `TypeError` and preserve the original (undefined) return.
+    if (!device) return defaultDevices ? [...defaultDevices] : defaultDevices;
 
     // Handle overloaded cases
     switch (device) {
