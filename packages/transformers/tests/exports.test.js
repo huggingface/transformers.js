@@ -39,3 +39,42 @@ describe("Public exports", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("supportedDevices public export", () => {
+  it("is frozen and cannot be mutated by consumers", () => {
+    expect(Object.isFrozen(transformers.supportedDevices)).toBe(true);
+
+    const before = transformers.supportedDevices.slice();
+
+    // Attempt to mutate the public snapshot. This throws in strict mode (ESM) and
+    // is silently ignored otherwise; either way the snapshot must stay intact.
+    try {
+      transformers.supportedDevices.length = 0;
+      transformers.supportedDevices.push("malicious-device");
+      transformers.supportedDevices[0] = "malicious-device";
+    } catch {
+      // Expected in strict mode (frozen object).
+    }
+
+    expect(transformers.supportedDevices).toEqual(before);
+    expect(transformers.supportedDevices.length).toBe(before.length);
+  });
+
+  it("consumer mutation cannot affect deviceToExecutionProviders", () => {
+    const autoBefore = transformers.deviceToExecutionProviders("auto");
+    const snapshot = transformers.supportedDevices;
+    expect(snapshot.length).toBeGreaterThan(0);
+    const someDevice = snapshot[0];
+
+    // Attempt to corrupt the public export.
+    try {
+      transformers.supportedDevices.length = 0;
+    } catch {
+      // ignored
+    }
+
+    // The internal array is private, so provider selection is unaffected.
+    expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoBefore);
+    expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
+  });
+});
