@@ -166,13 +166,15 @@ const InferenceSession = ONNX.InferenceSession;
  * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.
  */
 export function deviceToExecutionProviders(device = null) {
-    // Use the default execution providers if the user hasn't specified anything
-    if (!device) return defaultDevices;
+    // Use the default execution providers if the user hasn't specified anything.
+    // Return a copy so consumers cannot mutate the internal default list.
+    if (!device) return [...defaultDevices];
 
     // Handle overloaded cases
     switch (device) {
         case 'auto':
-            return supportedDevicesInternal;
+            // Return a copy so consumers cannot mutate the internal supported-devices list.
+            return [...supportedDevicesInternal];
         case 'gpu':
             return supportedDevicesInternal.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
     }

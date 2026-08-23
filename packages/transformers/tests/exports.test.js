@@ -77,4 +77,23 @@ describe("supportedDevices public export", () => {
     expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoBefore);
     expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
   });
+
+  it("mutation of the array returned by deviceToExecutionProviders('auto') cannot affect later calls", () => {
+    const autoExpected = transformers.deviceToExecutionProviders("auto").slice();
+    expect(autoExpected.length).toBeGreaterThan(0);
+    const someDevice = transformers.supportedDevices[0];
+
+    // Mutate the *returned* array (the second public path flagged in review).
+    const autoReturned = transformers.deviceToExecutionProviders("auto");
+    try {
+      autoReturned.length = 0;
+      autoReturned.push("malicious-device");
+    } catch {
+      // ignored (frozen/immutable in some environments)
+    }
+
+    // Internal state is private, so subsequent calls return the full, unmutated list.
+    expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoExpected);
+    expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
+  });
 });
