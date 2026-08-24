@@ -85,7 +85,7 @@ export class FileCache {
      * `releaseResume` if the caller abandons the download.
      *
      * @param {string} request
-     * @returns {Promise<{size: number, etag: string|null, total: number} | undefined>}
+     * @returns {Promise<import('../cache.js').ResumeInfo | undefined>}
      */
     async reserveResume(request) {
         const incompletePath = path.join(this.path, request) + '.incomplete';

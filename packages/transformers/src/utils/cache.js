@@ -4,6 +4,19 @@ import { logger } from './logger.js';
 import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 
 /**
+ * Describes a partial download that can be continued with an HTTP `Range` request.
+ *
+ * NOTE: this is a named typedef rather than an inline object type because jsdoc
+ * cannot parse an object literal nested inside a generic (`Promise<{...}>`),
+ * which breaks the API documentation build.
+ *
+ * @typedef {Object} ResumeInfo
+ * @property {number} size Bytes already written to disk for this request.
+ * @property {string|null} etag The validator the partial was started against, if the server sent one.
+ * @property {number} total The full size of the file being downloaded.
+ */
+
+/**
  * @typedef {Object} CacheInterface
  * @property {(request: string) => Promise<Response|import('./hub/FileResponse.js').FileResponse|undefined|string>} match
  * Checks if a request is in the cache and returns the cached response if found.
@@ -11,7 +24,7 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * Adds a response to the cache.
  * @property {(request: string) => Promise<boolean>} [delete]
  * Deletes a request from the cache. Returns true if deleted, false otherwise.
- * @property {(request: string) => Promise<{size: number, etag: string|null, total: number}|undefined>} [reserveResume]
+ * @property {(request: string) => Promise<ResumeInfo|undefined>} [reserveResume]
  * Optional. Claims a request's partial download and reports it (size on disk, its etag, and expected total) so the
  * caller can continue it with an HTTP `Range`/`If-Range` request. Returns undefined when there is nothing to resume
  * or another writer holds the key, in which case the caller must issue an ordinary full request. Implementations that
