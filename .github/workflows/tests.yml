@@ -37,8 +37,8 @@ jobs:
 
   build:
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-
+    runs-on:
+      group: aws-general-8-plus
     strategy:
       matrix:
         node-version: [18, 20, 22]
