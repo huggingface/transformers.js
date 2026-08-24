@@ -1,4 +1,4 @@
-import { configureOnnxProviderHost, OnnxInferenceProvider } from "@huggingface/transformers-onnx";
+import { configureOnnxProviderHost, OnnxInferenceProvider } from "@huggingface/transformers-onnxruntime";
 
 describe("OnnxInferenceProvider", () => {
   it("creates providers from model IDs", () => {

@@ -1,25 +1,25 @@
 {
-  "name": "@huggingface/transformers-onnx",
+  "name": "@huggingface/transformers-onnxruntime",
   "version": "0.1.0",
   "description": "ONNX Runtime inference provider for Transformers.js",
   "type": "module",
-  "main": "./dist/transformers-onnx.node.cjs",
+  "main": "./dist/transformers-onnxruntime.node.cjs",
   "types": "./types/index.d.ts",
   "exports": {
     ".": {
       "node": {
         "import": {
           "types": "./types/index.d.ts",
-          "default": "./dist/transformers-onnx.node.mjs"
+          "default": "./dist/transformers-onnxruntime.node.mjs"
         },
         "require": {
           "types": "./types/index.d.ts",
-          "default": "./dist/transformers-onnx.node.cjs"
+          "default": "./dist/transformers-onnxruntime.node.cjs"
         }
       },
       "default": {
         "types": "./types/index.d.ts",
-        "default": "./dist/transformers-onnx.web.js"
+        "default": "./dist/transformers-onnxruntime.web.js"
       }
     },
     "./testing": {

@@ -7,7 +7,7 @@ import { DEFAULT_MODEL_OPTIONS, MAX_MODEL_LOAD_TIME } from "./init.js";
 
 describe("ONNX provider objects", () => {
   it("configures the Transformers.js host before provider loading", async () => {
-    const { OnnxInferenceProvider } = await import("@huggingface/transformers-onnx");
+    const { OnnxInferenceProvider } = await import("@huggingface/transformers-onnxruntime");
     const provider = OnnxInferenceProvider.from_modelId("test/provider-object");
     class TestModel extends PreTrainedModel {}
     TestModel._from_pretrained = jest.fn(async () => "loaded");
@@ -21,7 +21,7 @@ describe("ONNX provider objects", () => {
   it(
     "loads a real model through a provider object",
     async () => {
-      const { OnnxInferenceProvider } = await import("@huggingface/transformers-onnx");
+      const { OnnxInferenceProvider } = await import("@huggingface/transformers-onnxruntime");
       const provider = OnnxInferenceProvider.from_modelId("hf-internal-testing/tiny-random-LlamaForCausalLM");
       const model = await AutoModelForCausalLM.from_pretrained(provider, DEFAULT_MODEL_OPTIONS);
 

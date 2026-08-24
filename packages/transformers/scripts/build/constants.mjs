@@ -4,13 +4,13 @@ import { fileURLToPath } from "node:url";
 export const DIST_FOLDER = "dist";
 export const NODE_IGNORE_MODULES = [];
 export const NODE_EXTERNAL_MODULES = [
-  "@huggingface/transformers-onnx",
+  "@huggingface/transformers-onnxruntime",
   "sharp",
   // node:* modules are handled by externalNodeBuiltinsPlugin
 ];
 
 export const WEB_IGNORE_MODULES = ["sharp", "fs", "path", "url", "stream", "stream/promises"];
-export const WEB_EXTERNAL_MODULES = ["@huggingface/transformers-onnx"];
+export const WEB_EXTERNAL_MODULES = ["@huggingface/transformers-onnxruntime"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.join(__dirname, "../..");

@@ -69,7 +69,7 @@ export async function buildAll(log) {
     await buildTarget(target.config, log);
   }
 
-  const ortDist = path.resolve(ROOT_DIR, "../transformers-onnx/node_modules/onnxruntime-web/dist");
+  const ortDist = path.resolve(ROOT_DIR, "../transformers-onnxruntime/node_modules/onnxruntime-web/dist");
   const wasmAssets = [
     "ort-wasm-simd-threaded.asyncify.mjs",
     "ort-wasm-simd-threaded.asyncify.wasm",

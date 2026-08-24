@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 
 import { getModelId, isInferenceBackend, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
-import { OnnxInferenceProvider } from "@huggingface/transformers-onnx";
+import { OnnxInferenceProvider } from "@huggingface/transformers-onnxruntime";
 import { AutoModel } from "../src/models/auto/modeling_auto.js";
 import { PreTrainedModel } from "../src/models/modeling_utils.js";
 import { buildResourcePaths } from "../src/utils/hub.js";

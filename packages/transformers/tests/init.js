@@ -1,6 +1,6 @@
 // Helper functions used when initialising the testing environment.
 
-import { initOnnxTestBackend } from "@huggingface/transformers-onnx/testing";
+import { initOnnxTestBackend } from "@huggingface/transformers-onnxruntime/testing";
 
 /**
  * A workaround to define a new backend for onnxruntime, which

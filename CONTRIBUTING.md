@@ -349,7 +349,7 @@ We recommend setting up Prettier in your IDE to format on save:
 This project uses **pnpm workspaces** to manage multiple packages in a monorepo:
 
 - `packages/transformers` - The main Transformers.js library
-- `packages/transformers-onnx` - The TypeScript ONNX Runtime inference provider
+- `packages/transformers-onnxruntime` - The TypeScript ONNX Runtime inference provider
 
 This structure allows for better organization and makes it easier to add framework-specific integrations in the future.
 

@@ -23,7 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Publish ONNX provider to npm
-        run: pnpm --filter @huggingface/transformers-onnx publish --access public --no-git-checks
+        run: pnpm --filter @huggingface/transformers-onnxruntime publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish to npm

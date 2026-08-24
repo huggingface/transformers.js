@@ -20,7 +20,7 @@ const shared = {
 await Promise.all([
   build({
     ...shared,
-    outfile: filePath("../dist/transformers-onnx.node.mjs"),
+    outfile: filePath("../dist/transformers-onnxruntime.node.mjs"),
     platform: "node",
     format: "esm",
     external: ["onnxruntime-common", "onnxruntime-node"],
@@ -29,7 +29,7 @@ await Promise.all([
   }),
   build({
     ...shared,
-    outfile: filePath("../dist/transformers-onnx.node.cjs"),
+    outfile: filePath("../dist/transformers-onnxruntime.node.cjs"),
     platform: "node",
     format: "cjs",
     external: ["onnxruntime-common", "onnxruntime-node"],
@@ -38,7 +38,7 @@ await Promise.all([
   }),
   build({
     ...shared,
-    outfile: filePath("../dist/transformers-onnx.web.js"),
+    outfile: filePath("../dist/transformers-onnxruntime.web.js"),
     platform: "browser",
     format: "esm",
     external: ["onnxruntime-common", "onnxruntime-web"],
