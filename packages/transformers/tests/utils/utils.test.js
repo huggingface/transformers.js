@@ -55,7 +55,7 @@ describe("Utilities", () => {
 
   describe("Hub utilities", () => {
     it("only applies documented session environment overrides", () => {
-      const customFetch = jest.fn();
+      const customFetch = () => {};
       const resolved = resolveEnv({
         fetch: customFetch,
         remoteHost: "https://private-hub.example/",
