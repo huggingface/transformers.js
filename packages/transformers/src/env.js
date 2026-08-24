@@ -171,6 +171,16 @@ const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODE
 const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
 const DEFAULT_HF_TOKEN = globalThis.process?.env?.HF_TOKEN ?? globalThis.process?.env?.HF_ACCESS_TOKEN;
 
+const SESSION_ENV_KEYS = Object.freeze([
+    'allowRemoteModels',
+    'remoteHost',
+    'remotePathTemplate',
+    'allowLocalModels',
+    'localModelPath',
+    'fetch',
+    'hfToken',
+]);
+
 /**
  * Log levels for controlling output verbosity.
  *
@@ -308,10 +318,13 @@ export const env = {
  * @returns {TransformersEnvironment}
  */
 export function resolveEnv(sessionEnv = {}) {
-    return {
-        ...env,
-        ...sessionEnv,
-    };
+    const resolved = { ...env };
+    for (const key of SESSION_ENV_KEYS) {
+        if (Object.hasOwn(sessionEnv, key)) {
+            resolved[key] = sessionEnv[key];
+        }
+    }
+    return resolved;
 }
 
 /**

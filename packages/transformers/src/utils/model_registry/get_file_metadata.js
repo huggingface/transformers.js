@@ -62,6 +62,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
         fetch: env.fetch,
         version: env.version,
         hfToken: env.hfToken,
+        remoteHost: env.remoteHost,
     };
     const pathOptions = {
         cache_dir: options.cache_dir ?? null,

@@ -54,6 +54,23 @@ describe("Utilities", () => {
   });
 
   describe("Hub utilities", () => {
+    it("only applies documented session environment overrides", () => {
+      const customFetch = jest.fn();
+      const resolved = resolveEnv({
+        fetch: customFetch,
+        remoteHost: "https://private-hub.example/",
+        useFS: !resolveEnv().useFS,
+        cacheDir: "/session-cache/",
+        logLevel: 10,
+      });
+
+      expect(resolved.fetch).toBe(customFetch);
+      expect(resolved.remoteHost).toBe("https://private-hub.example/");
+      expect(resolved.useFS).toBe(resolveEnv().useFS);
+      expect(resolved.cacheDir).toBe(resolveEnv().cacheDir);
+      expect(resolved.logLevel).toBe(resolveEnv().logLevel);
+    });
+
     it("Read data from blob", async () => {
       const blob = new Blob(["Hello, world!"], { type: "text/plain" });
       const blobUrl = URL.createObjectURL(blob);

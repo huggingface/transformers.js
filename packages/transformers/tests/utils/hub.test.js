@@ -1,5 +1,6 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
 import { buildResourcePaths, getFetchHeaders } from "../../src/utils/hub.js";
+import { makePretrainedOptionsKey } from "../../src/utils/hub/utils.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -27,6 +28,31 @@ describe("Hub", () => {
       });
 
       expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+
+    it("should authenticate only the configured custom Hub origin", () => {
+      const options = {
+        version: "test-version",
+        hfToken: "scoped-token",
+        remoteHost: "https://private-hub.example/api/",
+      };
+
+      const hubHeaders = getFetchHeaders("https://private-hub.example/api/org/model/config.json", options);
+      const externalHeaders = getFetchHeaders("https://cdn.example/org/model/config.json", options);
+
+      expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
+      expect(externalHeaders.has("Authorization")).toBe(false);
+    });
+
+    it("should fingerprint credentials in memoization keys", () => {
+      const token = "hf_secret-token-value";
+      const first = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
+      const repeated = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
+      const other = makePretrainedOptionsKey("org/model", { env: { hfToken: "hf_other-token" } });
+
+      expect(first).toBe(repeated);
+      expect(first).not.toBe(other);
+      expect(first).not.toContain(token);
     });
   });
 

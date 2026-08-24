@@ -43,6 +43,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @typedef {Object} FetchHeadersOptions Options for generating fetch headers.
  * @property {string} version This version of Transformers.js.
  * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
+ * @property {string|undefined} [remoteHost] Configured Hub endpoint whose origin is trusted to receive `hfToken`.
  */
 
 /**
@@ -51,6 +52,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use.
  * @property {string} version This version of Transformers.js.
  * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
+ * @property {string|undefined} [remoteHost] Configured Hub endpoint whose origin is trusted to receive `hfToken`.
  */
 
 /**
@@ -134,8 +136,21 @@ export function getFetchHeaders(urlOrPath, options) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         headers.set('User-Agent', `transformers.js/${options.version}; is_ci/${IS_CI};`);
 
-        const isHFURL = isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co']);
-        if (isHFURL) {
+        let requestURL;
+        let configuredHubURL;
+        try {
+            requestURL = new URL(urlOrPath);
+            configuredHubURL = options.remoteHost ? new URL(options.remoteHost) : null;
+        } catch (_) {
+            // Local paths do not receive authorization headers.
+        }
+        const isOfficialHubURL =
+            requestURL?.origin === 'https://huggingface.co' || requestURL?.origin === 'https://hf.co';
+        const isConfiguredHubURL =
+            configuredHubURL &&
+            ['http:', 'https:'].includes(configuredHubURL.protocol) &&
+            requestURL?.origin === configuredHubURL.origin;
+        if (isOfficialHubURL || isConfiguredHubURL) {
             if (options.hfToken) {
                 headers.set('Authorization', `Bearer ${options.hfToken}`);
             }
@@ -556,6 +571,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
         fetch: env.fetch,
         version: env.version,
         hfToken: env.hfToken,
+        remoteHost: env.remoteHost,
     };
     const metadataOptions = {
         cache_dir: cacheDir,
@@ -654,6 +670,9 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
     return JSON.parse(text);
 }
 
+let warnedCacheDir = false;
+let warnedLocalFilesOnly = false;
+
 /**
  * Emits deprecation warnings for legacy resource-loading options that should be
  * represented by environment configuration instead.
@@ -662,12 +681,14 @@ export async function getModelJSON(modelPath, fileName, fatal = true, options = 
  * @param {boolean} local_files_only Whether loading is restricted to local files.
  */
 export function maybeAddDeprecatedEnvWarning(cache_dir, local_files_only) {
-    if (cache_dir !== null && cache_dir !== undefined) {
+    if (cache_dir !== null && cache_dir !== undefined && !warnedCacheDir) {
+        warnedCacheDir = true;
         logger.warn(
-            '`cache_dir` is deprecated for environment-style configuration. Use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.',
+            '`cache_dir` is deprecated for environment-style configuration. Use global `env.cacheDir` to set the default cache directory.',
         );
     }
-    if (local_files_only) {
+    if (local_files_only && !warnedLocalFilesOnly) {
+        warnedLocalFilesOnly = true;
         logger.warn(
             '`local_files_only` is deprecated. Use `options.env.allowRemoteModels=false` for session-scoped remote loading control.',
         );

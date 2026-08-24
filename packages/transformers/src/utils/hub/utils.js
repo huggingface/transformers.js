@@ -3,9 +3,7 @@ import { resolveEnv } from '../../env.js';
 import { logger } from '../logger.js';
 
 const FETCH_IDS = new WeakMap();
-const HF_TOKEN_IDS = new Map();
 let NEXT_FETCH_ID = 0;
-let NEXT_HF_TOKEN_ID = 0;
 
 function getFetchId(fetch) {
     if (typeof fetch !== 'function') {
@@ -19,16 +17,28 @@ function getFetchId(fetch) {
     return id;
 }
 
-function getHfTokenId(hfToken) {
+function getHfTokenFingerprint(hfToken) {
     if (!hfToken) {
         return null;
     }
-    let id = HF_TOKEN_IDS.get(hfToken);
-    if (id === undefined) {
-        id = ++NEXT_HF_TOKEN_ID;
-        HF_TOKEN_IDS.set(hfToken, id);
+
+    // Keep credentials out of memoization keys without retaining the raw token in an identity map.
+    let h1 = 1779033703;
+    let h2 = 3144134277;
+    let h3 = 1013904242;
+    let h4 = 2773480762;
+    for (let i = 0; i < hfToken.length; ++i) {
+        const code = hfToken.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ code, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ code, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ code, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ code, 2716044179);
     }
-    return id;
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    return [h1, h2, h3, h4].map((value) => (value >>> 0).toString(16).padStart(8, '0')).join('');
 }
 
 /**
@@ -113,7 +123,7 @@ export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
         env.allowLocalModels,
         env.localModelPath,
         getFetchId(env.fetch),
-        getHfTokenId(env.hfToken),
+        getHfTokenFingerprint(env.hfToken),
         ...parts,
     ]);
 }
