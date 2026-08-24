@@ -8,10 +8,21 @@ import { apis } from '../../env.js';
 // Create a dedicated random instance for generating unique temporary file names
 const rng = new Random();
 
-// How long a `.incomplete.lock` may sit before another writer treats it as
-// stale (a previous run crashed without releasing it). Well above any realistic
-// single-chunk write, but low enough that a resume is not blocked forever.
-const LOCK_STALE_MS = 10 * 60 * 1000;
+// Distinguishes this process from any other lock holder. A pid alone is not
+// enough: on a shared/network cache directory the same pid can exist on a
+// different machine, and we must not read that as "our own writer is alive".
+const INSTANCE_ID = rng._int32().toString(36);
+
+// A live writer refreshes its lock on this interval, so a lock that has not
+// been touched for `LOCK_STALE_MS` belongs to a writer that is gone — not to a
+// slow download. The heartbeat is what makes the staleness check safe.
+const LOCK_HEARTBEAT_MS = 30 * 1000;
+const LOCK_STALE_MS = 5 * 60 * 1000;
+
+// Absolute ceiling. Reached only when the lock looks stale but its owner claims
+// a pid that still resolves, which on a shared cache directory may be an
+// unrelated process on another host. Prevents a permanent deadlock.
+const LOCK_ABANDONED_MS = 60 * 60 * 1000;
 
 /**
  * File system cache implementation that implements the CacheInterface.
@@ -20,9 +31,21 @@ const LOCK_STALE_MS = 10 * 60 * 1000;
  * Large downloads are streamed to a deterministic `<key>.incomplete` file with
  * a small sidecar recording the server `ETag` and expected size. If a download
  * is interrupted the partial is kept, so a later attempt can send a `Range`
- * request (see `getResumeInfo`) and continue instead of starting from byte 0.
+ * request and continue instead of starting from byte 0.
+ *
+ * Resuming is coordinated by a per-key lock that is taken *before* the request
+ * is issued (see `reserveResume`). A caller may only send `Range` for a key it
+ * has reserved, which means a partial response can never reach a writer that
+ * does not own the corresponding partial file.
  */
 export class FileCache {
+    /**
+     * Locks held by this instance, keyed by request. Populated by
+     * `reserveResume` and consumed by `put`/`releaseResume`.
+     * @type {Map<string, {lockPath: string, timer: any}>}
+     */
+    #reservations = new Map();
+
     /**
      * Instantiate a `FileCache` object.
      * @param {string} path
@@ -48,16 +71,27 @@ export class FileCache {
     }
 
     /**
-     * Report whether a resumable partial download exists for `request`.
-     * Returns `{ size, etag, total }` when a `.incomplete` file and its sidecar
-     * are present and internally consistent, otherwise `undefined`. Callers use
-     * this to send a `Range`/`If-Range` request and continue the download.
+     * Reserve a resumable partial download for `request`.
+     *
+     * Takes the per-key write lock and, only if a consistent partial exists,
+     * reports `{ size, etag, total }` so the caller can continue the download
+     * with a `Range`/`If-Range` request. Returns `undefined` when there is
+     * nothing to resume or another writer holds the key, in which case the
+     * caller must perform an ordinary full request.
+     *
+     * Taking the lock here (rather than in `put`) is what guarantees a `206`
+     * is only ever produced by the writer that owns the partial it continues.
+     * A successful reservation is released by the matching `put`, or by
+     * `releaseResume` if the caller abandons the download.
+     *
      * @param {string} request
      * @returns {Promise<{size: number, etag: string|null, total: number} | undefined>}
      */
-    async getResumeInfo(request) {
+    async reserveResume(request) {
         const incompletePath = path.join(this.path, request) + '.incomplete';
         const sidecarPath = incompletePath + '.json';
+
+        let info;
         try {
             const [stat, sidecarRaw] = await Promise.all([
                 fs.promises.stat(incompletePath),
@@ -68,17 +102,62 @@ export class FileCache {
             // Only resume when there is something to resume and we have not
             // somehow written past the expected size. Anything inconsistent
             // falls through to a clean restart.
-            if (stat.size > 0 && (total === 0 || stat.size < total)) {
-                return { size: stat.size, etag: sidecar.etag ?? null, total };
+            if (stat.size > 0 && total > 0 && stat.size < total) {
+                info = { size: stat.size, etag: sidecar.etag ?? null, total };
             }
         } catch {
             // No partial, no sidecar, or unreadable — nothing to resume.
         }
-        return undefined;
+        if (!info) {
+            return undefined;
+        }
+
+        // Only claim the lock once we know a resume is actually possible, so a
+        // pointless reservation never blocks another writer.
+        if (!(await this.#acquireLock(request))) {
+            return undefined;
+        }
+
+        // Re-check under the lock: another writer may have completed or reset
+        // the partial between the stat above and the lock being granted.
+        try {
+            const stat = await fs.promises.stat(incompletePath);
+            if (stat.size !== info.size) {
+                await this.releaseResume(request);
+                return undefined;
+            }
+        } catch {
+            await this.releaseResume(request);
+            return undefined;
+        }
+
+        return info;
+    }
+
+    /**
+     * Release a reservation taken by `reserveResume` without writing anything.
+     * Safe to call when no reservation is held.
+     * @param {string} request
+     * @returns {Promise<void>}
+     */
+    async releaseResume(request) {
+        const reservation = this.#reservations.get(request);
+        if (!reservation) {
+            return;
+        }
+        this.#reservations.delete(request);
+        clearInterval(reservation.timer);
+        await fs.promises.unlink(reservation.lockPath).catch(() => {});
     }
 
     /**
      * Adds the given response to the cache.
+     *
+     * A `206 Partial Content` response is only accepted when this instance
+     * holds a reservation for `request` (see `reserveResume`) and the
+     * `Content-Range` header lines up exactly with the partial on disk;
+     * otherwise the write is refused rather than risking a corrupt entry.
+     *
      * @param {string} request
      * @param {Response} response
      * @param {(data: {progress: number, loaded: number, total: number}) => void} [progress_callback] Optional.
@@ -91,37 +170,52 @@ export class FileCache {
 
         const incompletePath = filePath + '.incomplete';
         const sidecarPath = incompletePath + '.json';
-        const lockPath = incompletePath + '.lock';
+        const resuming = response.status === 206;
 
-        // Claim the deterministic partial for this key. If another writer (this
-        // or another process) already holds it, fall back to the legacy
-        // random-suffix temp path: correct and non-resumable, but it never
-        // corrupts the shared partial — preserving the previous concurrency
+        // A partial response is only meaningful to the writer that owns the
+        // partial it continues. Without a reservation we have no such partial,
+        // so writing this body anywhere would publish a fragment as a whole
+        // file. Refuse instead — the caller must retry without `Range`.
+        const reserved = this.#reservations.has(request);
+        if (resuming && !reserved) {
+            throw new Error(
+                `Refusing to cache a partial (206) response for "${request}" without a resume reservation. ` +
+                    `Retry the request without a \`Range\` header.`,
+            );
+        }
+
+        // Not resuming and no reservation: fall back to the legacy
+        // random-suffix temp path. Correct and non-resumable, but it never
+        // touches the shared partial — preserving the previous concurrency
         // guarantee for parallel loads of the same file.
-        const locked = await this.#acquireLock(lockPath);
-        if (!locked) {
+        if (!reserved && !(await this.#acquireLock(request))) {
             return this.#putUniqueTemp(filePath, response, progress_callback);
         }
 
-        // A 206 (Partial Content) means the server honored our Range request and
-        // we append to the existing partial. Anything else (200) is a fresh
-        // download: discard any stale partial and start over.
-        const resuming = response.status === 206;
-        const total = this.#expectedTotal(response, resuming);
-
-        let loaded = 0;
-        if (resuming) {
-            try {
-                loaded = (await fs.promises.stat(incompletePath)).size;
-            } catch {
-                loaded = 0;
-            }
-        }
-
         try {
+            let loaded = 0;
+            let total;
+
+            if (resuming) {
+                const partialSize = await fs.promises.stat(incompletePath).then(
+                    (s) => s.size,
+                    () => 0,
+                );
+                const range = await this.#validateContentRange(response, request, partialSize, sidecarPath);
+                loaded = range.start;
+                total = range.total;
+            } else {
+                // A fresh download supersedes any partial we were holding.
+                total = parseInt(response.headers.get('Content-Length') ?? '0', 10) || 0;
+            }
+
             // Record the etag + expected total up front so an interrupted write
-            // still leaves a sidecar the next attempt can validate against.
-            await fs.promises.writeFile(sidecarPath, JSON.stringify({ etag: response.headers.get('etag'), total }));
+            // still leaves a sidecar the next attempt can validate against. On a
+            // 206 the validator is the one we resumed against, not the (absent)
+            // ETag of the partial response.
+            if (!resuming) {
+                await fs.promises.writeFile(sidecarPath, JSON.stringify({ etag: response.headers.get('etag'), total }));
+            }
 
             const fileStream = fs.createWriteStream(incompletePath, {
                 flags: resuming ? 'a' : 'w',
@@ -158,13 +252,85 @@ export class FileCache {
             // Atomically publish the completed file and drop the sidecar.
             await fs.promises.rename(incompletePath, filePath);
             await fs.promises.unlink(sidecarPath).catch(() => {});
-        } catch (error) {
-            // Intentionally keep `.incomplete` + sidecar on failure so a later
-            // attempt can resume from here. Only the lock is released (finally).
-            throw error;
         } finally {
-            await fs.promises.unlink(lockPath).catch(() => {});
+            // `.incomplete` + sidecar are intentionally kept on failure so a
+            // later attempt can resume from here. Only the lock is released.
+            await this.releaseResume(request);
         }
+    }
+
+    /**
+     * Validate a `206` response against the partial on disk.
+     *
+     * Every component of `Content-Range: bytes <start>-<end>/<total>` is
+     * checked: the range must begin exactly where the partial ends (no gap and
+     * no overlap), its length must agree with `Content-Length`, and its total
+     * must match what the sidecar recorded. Unsatisfied (`bytes *`/`<total>`)
+     * and suffix (`bytes -500/1234`) forms are rejected outright — neither can
+     * be appended safely.
+     *
+     * A mismatch means our assumptions about the partial no longer hold, so it
+     * is discarded and the caller restarts from byte 0 rather than resuming
+     * onto data that may belong to a different revision of the file.
+     *
+     * @param {Response} response
+     * @param {string} request
+     * @param {number} partialSize
+     * @param {string} sidecarPath
+     * @returns {Promise<{start: number, end: number, total: number}>}
+     */
+    async #validateContentRange(response, request, partialSize, sidecarPath) {
+        const raw = response.headers.get('Content-Range');
+        const match = /^\s*bytes\s+(\d+)-(\d+)\/(\d+)\s*$/.exec(raw ?? '');
+
+        const reject = async (reason) => {
+            const incompletePath = sidecarPath.replace(/\.json$/, '');
+            await fs.promises.unlink(incompletePath).catch(() => {});
+            await fs.promises.unlink(sidecarPath).catch(() => {});
+            return new Error(`Cannot resume "${request}": ${reason}. Discarded the partial; retry from scratch.`);
+        };
+
+        if (!match) {
+            throw await reject(`unusable Content-Range "${raw ?? '<missing>'}"`);
+        }
+
+        const start = parseInt(match[1], 10);
+        const end = parseInt(match[2], 10);
+        const total = parseInt(match[3], 10);
+
+        if (end < start || end >= total) {
+            throw await reject(`inconsistent Content-Range "${raw}"`);
+        }
+        if (start !== partialSize) {
+            throw await reject(
+                `server resumed at byte ${start} but the partial holds ${partialSize} bytes ` +
+                    `(${start > partialSize ? 'gap' : 'overlap'})`,
+            );
+        }
+
+        const contentLength = response.headers.get('Content-Length');
+        if (contentLength !== null) {
+            const expected = end - start + 1;
+            const declared = parseInt(contentLength, 10);
+            if (declared !== expected) {
+                throw await reject(`Content-Length ${declared} does not match Content-Range span ${expected}`);
+            }
+        }
+
+        try {
+            const sidecar = JSON.parse(await fs.promises.readFile(sidecarPath, 'utf-8'));
+            if (typeof sidecar.total === 'number' && sidecar.total > 0 && sidecar.total !== total) {
+                throw await reject(`total size changed from ${sidecar.total} to ${total}`);
+            }
+        } catch (e) {
+            if (e instanceof Error && e.message.startsWith('Cannot resume')) {
+                throw e;
+            }
+            // An unreadable sidecar is not fatal: the Content-Range checks above
+            // already pin the append to the right offset.
+        }
+
+        return { start, end, total };
     }
 
     /**
@@ -177,6 +343,16 @@ export class FileCache {
      * @returns {Promise<void>}
      */
     async #putUniqueTemp(filePath, response, progress_callback) {
+        // This path renames whatever it writes onto the final file, so it must
+        // only ever see a complete body. A partial response reaching here would
+        // publish a fragment as the whole file.
+        if (response.status !== 200) {
+            throw new Error(
+                `Refusing to cache a ${response.status} response as a complete file for "${filePath}". ` +
+                    `Only a full 200 response can be written by the fallback path.`,
+            );
+        }
+
         const id = apis.IS_PROCESS_AVAILABLE ? process.pid : Date.now();
         const randomSuffix = rng._int32().toString(36);
         const tmpPath = filePath + `.tmp.${id}.${randomSuffix}`;
@@ -208,6 +384,10 @@ export class FileCache {
                 fileStream.close((err) => (err ? reject(err) : resolve()));
             });
 
+            if (total && loaded < total) {
+                throw new Error(`Incomplete download for "${filePath}": got ${loaded} of ${total} bytes.`);
+            }
+
             await fs.promises.rename(tmpPath, filePath);
         } catch (error) {
             try {
@@ -218,51 +398,120 @@ export class FileCache {
     }
 
     /**
-     * Total expected file size. For a 206 response it is read from the
-     * `Content-Range: bytes start-end/total` header; for a fresh 200 from
-     * `Content-Length`. Returns 0 when the size is unknown.
-     * @param {Response} response
-     * @param {boolean} resuming
-     * @returns {number}
+     * Acquire the per-key write lock via an exclusive create (`wx`), recording
+     * the owner so its liveness can be checked later. While held, the lock is
+     * refreshed on an interval — an untouched lock therefore means an absent
+     * writer, never a slow one.
+     *
+     * An existing lock is only taken over when it has gone stale *and* its
+     * owner is demonstrably gone, or when it has sat untouched long enough that
+     * it must be treated as abandoned regardless.
+     *
+     * @param {string} request
+     * @returns {Promise<boolean>}
      */
-    #expectedTotal(response, resuming) {
-        if (resuming) {
-            const contentRange = response.headers.get('Content-Range');
-            const match = contentRange && /\/(\d+)\s*$/.exec(contentRange);
-            if (match) {
-                return parseInt(match[1], 10);
+    async #acquireLock(request) {
+        const lockPath = path.join(this.path, request) + '.incomplete.lock';
+
+        if (!(await this.#writeLockFile(lockPath))) {
+            if (!(await this.#isLockAbandoned(lockPath))) {
+                return false;
+            }
+            await fs.promises.unlink(lockPath).catch(() => {});
+            if (!(await this.#writeLockFile(lockPath))) {
+                // Another writer won the race for the abandoned lock.
+                return false;
             }
         }
-        return parseInt(response.headers.get('Content-Length') ?? '0', 10) || 0;
+
+        // Keep the lock warm for as long as we hold it, so other writers can
+        // tell an in-progress download from a crashed one.
+        const timer = setInterval(() => {
+            const now = new Date();
+            fs.promises.utimes(lockPath, now, now).catch(() => {});
+        }, LOCK_HEARTBEAT_MS);
+        timer.unref?.();
+
+        this.#reservations.set(request, { lockPath, timer });
+        return true;
     }
 
     /**
-     * Acquire the per-key write lock via an exclusive create (`wx`). If a lock
-     * already exists but is older than `LOCK_STALE_MS`, it is treated as
-     * abandoned by a crashed writer and stolen.
+     * Exclusively create `lockPath` and stamp it with this writer's identity.
+     * @param {string} lockPath
+     * @returns {Promise<boolean>} Whether the lock was created.
+     */
+    async #writeLockFile(lockPath) {
+        try {
+            const handle = await fs.promises.open(lockPath, 'wx');
+            try {
+                await handle.writeFile(
+                    JSON.stringify({
+                        instance: INSTANCE_ID,
+                        pid: apis.IS_PROCESS_AVAILABLE ? process.pid : null,
+                        startedAt: Date.now(),
+                    }),
+                );
+            } finally {
+                await handle.close();
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Whether an existing lock may be taken over. True only when the lock has
+     * not been refreshed for `LOCK_STALE_MS` and its owning process is gone, or
+     * when it has sat untouched for `LOCK_ABANDONED_MS` and must be reclaimed
+     * to avoid deadlocking on an owner we cannot verify.
      * @param {string} lockPath
      * @returns {Promise<boolean>}
      */
-    async #acquireLock(lockPath) {
+    async #isLockAbandoned(lockPath) {
+        let age;
         try {
-            const fd = await fs.promises.open(lockPath, 'wx');
-            await fd.close();
+            age = Date.now() - (await fs.promises.stat(lockPath)).mtimeMs;
+        } catch {
+            // The lock vanished — treat it as gone so the caller retries.
             return true;
-        } catch (e) {
-            if (e.code !== 'EEXIST') {
-                return false;
-            }
-            // Steal a stale lock left behind by a crashed process.
-            try {
-                const stat = await fs.promises.stat(lockPath);
-                if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
-                    await fs.promises.unlink(lockPath).catch(() => {});
-                    const fd = await fs.promises.open(lockPath, 'wx');
-                    await fd.close();
-                    return true;
-                }
-            } catch {}
+        }
+
+        if (age < LOCK_STALE_MS) {
+            // Refreshed recently: a writer is actively downloading. Leave it be.
             return false;
+        }
+        if (age >= LOCK_ABANDONED_MS) {
+            return true;
+        }
+
+        let owner;
+        try {
+            owner = JSON.parse(await fs.promises.readFile(lockPath, 'utf-8'));
+        } catch {
+            // Unreadable or truncated (e.g. a writer died mid-create): stale.
+            return true;
+        }
+
+        // A lock stamped by this process but no longer tracked belongs to a
+        // reservation we already released; reclaiming it is safe.
+        if (owner?.instance === INSTANCE_ID) {
+            return true;
+        }
+        if (!apis.IS_PROCESS_AVAILABLE || typeof owner?.pid !== 'number') {
+            return true;
+        }
+
+        try {
+            // Signal 0 performs the permission/existence check without sending.
+            process.kill(owner.pid, 0);
+            // The pid resolves, but on a shared cache directory it may belong to
+            // an unrelated process on another host. Wait for the hard ceiling.
+            return false;
+        } catch (e) {
+            // ESRCH: no such process. EPERM: alive but owned by another user.
+            return e?.code === 'ESRCH';
         }
     }
 

@@ -11,9 +11,14 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * Adds a response to the cache.
  * @property {(request: string) => Promise<boolean>} [delete]
  * Deletes a request from the cache. Returns true if deleted, false otherwise.
- * @property {(request: string) => Promise<{size: number, etag: string|null, total: number}|undefined>} [getResumeInfo]
- * Optional. Reports a resumable partial download for a request (size on disk, its etag, and expected total),
- * enabling the caller to continue an interrupted download via an HTTP `Range` request.
+ * @property {(request: string) => Promise<{size: number, etag: string|null, total: number}|undefined>} [reserveResume]
+ * Optional. Claims a request's partial download and reports it (size on disk, its etag, and expected total) so the
+ * caller can continue it with an HTTP `Range`/`If-Range` request. Returns undefined when there is nothing to resume
+ * or another writer holds the key, in which case the caller must issue an ordinary full request. Implementations that
+ * provide this must also provide `releaseResume`, and callers must not send `Range` for a key they did not reserve.
+ * @property {(request: string) => Promise<void>} [releaseResume]
+ * Optional. Releases a reservation taken by `reserveResume` when the caller does not go on to `put` the response.
+ * A matching `put` releases the reservation itself. Releasing an absent reservation is a no-op.
  */
 
 /**

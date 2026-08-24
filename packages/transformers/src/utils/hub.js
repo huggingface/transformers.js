@@ -276,6 +276,12 @@ export async function loadResourceFile(
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
+    // Cache key whose partial we hold a resume reservation for, if any. The
+    // matching `put` releases it; every path that skips the write must release
+    // it explicitly so the key is not blocked for the next writer.
+    /** @type {string|undefined} */
+    let reservedKey;
+
     /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined|string} */
     let response;
 
@@ -342,22 +348,41 @@ export async function loadResourceFile(
             // partial for this key. This only applies to the streaming path
             // (`IS_NODE_ENV && return_path`), where the body is written straight to
             // disk; on the buffered path a 206 would yield only the trailing bytes.
-            // `Range` asks the CDN to continue from the last byte we have; `If-Range`
-            // makes the server fall back to a full 200 if the file changed upstream.
+            //
+            // The reservation claims the partial before the request goes out, so a
+            // `Range` is only ever sent by the writer that owns the bytes it
+            // continues. If the key is already being written, or there is nothing to
+            // resume, we fall through to an ordinary full download.
             let resumeHeaders;
-            if (apis.IS_NODE_ENV && return_path && cache && typeof cache.getResumeInfo === 'function') {
-                const resume = await cache.getResumeInfo(proposedCacheKey);
-                if (resume && resume.size > 0) {
-                    resumeHeaders = { Range: `bytes=${resume.size}-` };
+            if (apis.IS_NODE_ENV && return_path && cache && typeof cache.reserveResume === 'function') {
+                const resume = await cache.reserveResume(proposedCacheKey);
+                if (resume) {
+                    reservedKey = proposedCacheKey;
+                    // Never resume without a validator: a bare `Range` lets the
+                    // server serve bytes from a revision we did not start with,
+                    // splicing two versions into one file. `If-Range` makes the
+                    // server return a full 200 instead if the file changed, and
+                    // without an ETag to pin we restart from byte 0 outright.
                     if (resume.etag) {
-                        resumeHeaders['If-Range'] = resume.etag;
+                        resumeHeaders = {
+                            Range: `bytes=${resume.size}-`,
+                            'If-Range': resume.etag,
+                        };
                     }
                 }
             }
-            response = await getFile(remoteURL, resumeHeaders);
+
+            try {
+                response = await getFile(remoteURL, resumeHeaders);
+            } catch (e) {
+                // Nothing was written; hand the key back to the next writer.
+                if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
+                throw e;
+            }
 
             // 200 (full download) and 206 (resumed partial) are both success.
             if (response.status !== 200 && response.status !== 206) {
+                if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
                 return handleError(response.status, remoteURL, fatal);
             }
 
@@ -448,14 +473,22 @@ export async function loadResourceFile(
         result = buffer;
     }
 
-    if (
-        // Only cache web responses
-        // i.e., do not cache FileResponses (prevents duplication)
-        toCacheResponse &&
-        cacheKey &&
-        typeof response !== 'string'
-    ) {
-        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+    try {
+        if (
+            // Only cache web responses
+            // i.e., do not cache FileResponses (prevents duplication)
+            toCacheResponse &&
+            cacheKey &&
+            typeof response !== 'string'
+        ) {
+            await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+        }
+    } finally {
+        // `put` releases the reservation itself, but it is skipped whenever the
+        // response is not cached — including when another writer finished the
+        // file while this one was downloading. Releasing here covers those
+        // paths; it is a no-op once the reservation is already gone.
+        if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
     }
 
     // In Node.js with return_path, the buffer read is skipped so no progress
