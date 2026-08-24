@@ -15,6 +15,7 @@ import {
     isValidHfModelId,
     makePretrainedOptionsKey,
     readResponse,
+    toAbsoluteURL,
 } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
@@ -204,12 +205,12 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
     if (
         typeof Cache !== 'undefined' &&
         cache instanceof Cache &&
-        isValidUrl(cacheKey) &&
-        !isValidUrl(cacheKey, ['http:', 'https:'])
+        !isValidUrl(toAbsoluteURL(cacheKey), ['http:', 'https:'])
     ) {
         // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
-        // responses for other schemes (e.g., files bundled within a browser extension).
-        // Relative keys are not skipped, since the Cache API resolves them against the page URL.
+        // responses for other schemes (e.g., files bundled within a browser extension). Relative
+        // keys are resolved against the page URL first, since a relative key on an extension page
+        // still resolves to a chrome-extension:// request.
         return;
     }
 

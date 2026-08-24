@@ -168,8 +168,9 @@ export function isBlobURL(url) {
  * Converts any URL to an absolute URL if needed.
  * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
  * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
+ * If the base itself has an opaque origin (e.g. "about:blank"), the URL is returned unresolved.
  * @param {string} url - The URL to convert (can be relative or absolute).
- * @returns {string} The absolute URL.
+ * @returns {string} The absolute URL, or the original URL if it could not be resolved.
  */
 export function toAbsoluteURL(url) {
     let baseURL;
@@ -185,5 +186,10 @@ export function toAbsoluteURL(url) {
         return url;
     }
 
-    return new URL(url, baseURL).href;
+    try {
+        return new URL(url, baseURL).href;
+    } catch {
+        // baseURL has an opaque origin (e.g. "about:blank"), so return the URL unchanged
+        return url;
+    }
 }

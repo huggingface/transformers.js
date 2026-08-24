@@ -44,6 +44,7 @@ class FakeBrowserCache extends Cache {
 describe("Browser cache", () => {
   // Store original values so we can restore them after tests
   const originalCaches = globalThis.caches;
+  const originalLocation = globalThis.location;
   const originalFetch = env.fetch;
   const originalUseFS = env.useFS;
   const originalUseBrowserCache = env.useBrowserCache;
@@ -58,6 +59,8 @@ describe("Browser cache", () => {
   beforeEach(() => {
     cache = new FakeBrowserCache();
     globalThis.caches = { open: async () => cache };
+    // No real `location` exists in Node.js, so emulate an extension page by default
+    globalThis.location = { href: "chrome-extension://abcdefghijklmnop/popup.html" };
 
     env.useFS = false;
     env.useBrowserCache = true;
@@ -84,6 +87,7 @@ describe("Browser cache", () => {
       globalThis.Cache = originalCache;
     }
     globalThis.caches = originalCaches;
+    globalThis.location = originalLocation;
     env.fetch = originalFetch;
     env.useFS = originalUseFS;
     env.useBrowserCache = originalUseBrowserCache;
@@ -100,7 +104,27 @@ describe("Browser cache", () => {
     expect(cache.puts).toEqual([]);
   });
 
-  it("should still cache local files served from a relative path", async () => {
+  it("should not attempt to cache a relative model path that resolves against an extension page", async () => {
+    env.localModelPath = "/models/";
+
+    const file = await getModelFile("my-model", "config.json", true, {});
+
+    expect(file).toBeInstanceOf(Uint8Array);
+    expect(cache.puts).toEqual([]);
+  });
+
+  it("should not throw for a relative model path on an opaque-origin page (e.g. about:blank)", async () => {
+    globalThis.location = { href: "about:blank" };
+    env.localModelPath = "/models/";
+
+    const file = await getModelFile("my-model", "config.json", true, {});
+
+    expect(file).toBeInstanceOf(Uint8Array);
+    expect(cache.puts).toEqual([]);
+  });
+
+  it("should still cache local files served from a relative path on a regular page", async () => {
+    globalThis.location = { href: "https://example.com/index.html" };
     env.localModelPath = "/models/";
 
     const file = await getModelFile("my-model", "config.json", true, {});
