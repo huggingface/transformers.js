@@ -32,7 +32,7 @@ import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
-import { getModelId, isInferenceBackend, loadInferenceModel } from '../backends/inference.js';
+import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel } from '../backends/inference.js';
 import { getDefaultInferenceProvider, getOnnxProviderModule } from '../backends/default.js';
 
 /**
@@ -262,10 +262,8 @@ export class PreTrainedModel extends Callable {
                 modelClass: this,
             });
         }
-        if (typeof pretrained_model_name_or_path?.constructSessions === 'function') {
-            if (pretrained_model_name_or_path.providerType === 'onnx') {
-                await getOnnxProviderModule();
-            }
+        if (isOnnxSessionProvider(pretrained_model_name_or_path)) {
+            await getOnnxProviderModule();
             return /** @type {any} */ (pretrained_model_name_or_path).load({ ...options, modelClass: this });
         }
         if (isInferenceBackend(pretrained_model_name_or_path)) {

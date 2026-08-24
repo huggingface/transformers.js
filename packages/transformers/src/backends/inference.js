@@ -94,13 +94,11 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  * @typedef {Object} InferenceBackend
  * @property {string} modelId Model ID or local path used for shared config, tokenizer, and processor assets.
  * @property {InferenceBackendChatTemplate} [chatTemplate] Default chat template installed on a pipeline tokenizer.
- * @property {string} [providerType] Provider family identifier used for provider-specific host initialization.
  * @property {StaticBackendCapabilities} [capabilities]
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
  * @property {(file: string, options: Object) => Promise<{size?: number, fromCache?: boolean}|null>} [getModelArtifactMetadata] Returns backend-owned cache metadata for an artifact.
  * @property {(file: string, options: Object) => Promise<boolean>} [deleteModelArtifact] Deletes an artifact from backend-owned cache storage.
  * @property {(options: InferenceBackendLoadOptions) => Promise<InferenceModel|Function>} load
- * @property {(names: Record<string, string>, options: Object, cacheSessions?: Object) => Promise<Record<string, Object>>} [constructSessions]
  */
 
 /**
@@ -117,6 +115,22 @@ export function isInferenceBackend(value) {
         value !== null &&
         typeof backend.modelId === 'string' &&
         typeof backend.load === 'function'
+    );
+}
+
+/**
+ * Returns whether a backend is the built-in ONNX session provider. Session providers load
+ * Transformers.js model classes rather than returning runtime-neutral inference models.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isOnnxSessionProvider(value) {
+    const provider = /** @type {any} */ (value);
+    return (
+        isInferenceBackend(value) &&
+        provider.providerType === 'onnx' &&
+        typeof provider.constructSessions === 'function'
     );
 }
 

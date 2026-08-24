@@ -58,33 +58,29 @@ function createLease(values, release = jest.fn()) {
 }
 
 describe("GenerationController", () => {
-    it("compiles native multinomial plans with temperature", () => {
-        const controller = createGenerationController(
-            { config: {}, generation_config: null },
-            int64Tensor([[1]]),
-            { do_sample: true, temperature: 0.7, top_k: 50, max_new_tokens: 1 },
-        );
-        expect(controller.compileRuntimePlan({
-            declarativePlans: ["argmax", "multinomial"],
-            planModes: ["greedy", "multinomial"],
-            tokenPipeline: { defaultDepth: 1 },
-        })).toMatchObject({
-            sampler: { op: "multinomial", temperature: 0.7, topK: 50 },
-        });
+  it("compiles native multinomial plans with temperature", () => {
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { do_sample: true, temperature: 0.7, top_k: 50, max_new_tokens: 1 });
+    expect(
+      controller.compileRuntimePlan({
+        declarativePlans: ["argmax", "multinomial"],
+        planModes: ["greedy", "multinomial"],
+        tokenPipeline: { defaultDepth: 1 },
+      }),
+    ).toMatchObject({
+      sampler: { op: "multinomial", temperature: 0.7, topK: 50 },
     });
+  });
 
-    it("compiles native multinomial plans with model sampling defaults", () => {
-        const controller = createGenerationController(
-            { config: {}, generation_config: null },
-            int64Tensor([[1]]),
-            { do_sample: true, temperature: 1.0, top_k: 64, top_p: 0.95, max_new_tokens: 1 },
-        );
-        expect(controller.compileRuntimePlan({
-            declarativePlans: ["argmax", "multinomial"],
-            planModes: ["greedy", "multinomial"],
-            tokenPipeline: { defaultDepth: 1 },
-        })).toMatchObject({ sampler: { op: "multinomial", temperature: 1.0, topK: 64 } });
-    });
+  it("compiles native multinomial plans with model sampling defaults", () => {
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1]]), { do_sample: true, temperature: 1.0, top_k: 64, top_p: 0.95, max_new_tokens: 1 });
+    expect(
+      controller.compileRuntimePlan({
+        declarativePlans: ["argmax", "multinomial"],
+        planModes: ["greedy", "multinomial"],
+        tokenPipeline: { defaultDepth: 1 },
+      }),
+    ).toMatchObject({ sampler: { op: "multinomial", temperature: 1.0, topK: 64 } });
+  });
 
   it("notifies logits processors after committing sampled tokens", () => {
     const processor = new TrackingTokenProcessor();
@@ -116,6 +112,18 @@ describe("GenerationController", () => {
     expect(streamer.put.mock.calls).toEqual([[[[1n]]], [[[2n]]]]);
     expect(controller.finalize().tolist()).toEqual([[1n, 2n]]);
     expect(streamer.end).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps per-row stopping state sticky for uneven batches", () => {
+    const criteria = new StoppingCriteriaList();
+    criteria.push(new TokenStoppingCriteria(2));
+    const controller = createGenerationController({ config: {}, generation_config: null }, int64Tensor([[1], [1]]), { max_new_tokens: 4, stopping_criteria: criteria });
+
+    expect(controller.commit({ tokenIds: Uint32Array.of(2, 3) }).allDone).toBe(false);
+    expect(controller.done).toEqual([true, false]);
+
+    expect(controller.commit({ tokenIds: Uint32Array.of(3, 2) }).allDone).toBe(true);
+    expect(controller.done).toEqual([true, true]);
   });
 
   it("supports zero-token generation without a model step", () => {

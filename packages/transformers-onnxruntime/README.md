@@ -10,12 +10,16 @@ const provider = OnnxInferenceProvider.from_modelId('onnx-community/model-ONNX')
 
 ## Runtime dependencies
 
-Node applications using the ONNX provider must install `onnxruntime-node` alongside Transformers.js:
+`@huggingface/transformers` installs the Node runtime required by its default ONNX model path:
 
 ```sh
-npm install @huggingface/transformers onnxruntime-node
+npm install @huggingface/transformers
 ```
 
-The Node runtime is an optional peer so browser-only and custom-backend-only installations do not download native ONNX binaries.
+Applications installing this provider directly must also install its optional Node peer when they use ONNX models in Node:
 
-Browser ESM builds load this package lazily through the bare `@huggingface/transformers-onnxruntime` specifier. Direct CDN usage therefore requires an import map for this package and its `onnxruntime-web` dependencies. Keep the provider's copied `.mjs` and `.wasm` files beside `transformers-onnxruntime.web.js`; default relative `wasmPaths` are resolved from that module URL. Alternatively, set `env.backends.onnx.wasm.wasmPaths` before loading a model.
+```sh
+npm install @huggingface/transformers-onnxruntime onnxruntime-node
+```
+
+Browser ESM builds load this package lazily through the bare `@huggingface/transformers-onnxruntime` specifier. Direct CDN usage therefore requires an import map for this package, `onnxruntime-common`, and `onnxruntime-web/webgpu`. The main Transformers.js installation guide contains a complete example. By default, WASM assets load from the pinned `onnxruntime-web` CDN; set `env.backends.onnx.wasm.wasmPaths` before loading a model to host them elsewhere.

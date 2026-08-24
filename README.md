@@ -44,12 +44,23 @@ To install via [NPM](https://www.npmjs.com/package/@huggingface/transformers), r
 npm i @huggingface/transformers
 ```
 
-Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. For example, using [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), you can import the library with:
+Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. The ONNX provider is loaded lazily through bare module specifiers, so direct CDN usage requires an import map:
 ```html
+<script type="importmap">
+{
+  "imports": {
+    "@huggingface/transformers-onnxruntime": "https://cdn.jsdelivr.net/npm/@huggingface/transformers-onnxruntime@0.1.0/dist/transformers-onnxruntime.web.js",
+    "onnxruntime-common": "https://cdn.jsdelivr.net/npm/onnxruntime-common@1.24.3/dist/esm/index.js",
+    "onnxruntime-web/webgpu": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/ort.webgpu.min.mjs"
+  }
+}
+</script>
 <script type="module">
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
 </script>
 ```
+
+The default WASM binaries load from the pinned `onnxruntime-web` CDN. To self-host them, set `env.backends.onnx.wasm.wasmPaths` before loading a model.
 
 
 ## Quick tour
@@ -453,4 +464,3 @@ To find compatible models on the Hub, select the "transformers.js" library tag i
 1. **[YOLOS](https://huggingface.co/docs/transformers/model_doc/yolos)** (from Huazhong University of Science & Technology) released with the paper [You Only Look at One Sequence: Rethinking Transformer in Vision through Object Detection](https://huggingface.co/papers/2106.00666) by Yuxin Fang, Bencheng Liao, Xinggang Wang, Jiemin Fang, Jiyang Qi, Rui Wu, Jianwei Niu, Wenyu Liu.
 1. **[Youtu-LLM](https://huggingface.co/docs/transformers/model_doc/youtu)** (from the Tencent Youtu Team) released with the paper [Youtu-LLM: Unlocking the Native Agentic Potential for Lightweight Large Language Models](https://huggingface.co/papers/2512.24618) by Junru Lu, Jiarui Qin, Lingfeng Qiao, Yinghui Li, Xinyi Dai, Bo Ke, Jianfeng He, Ruizhi Qiao, Di Yin, Xing Sun, Yunsheng Wu, Yinsong Liu, Shuangyin Liu, Mingkong Tang, Haodong Lin, Jiayi Kuang, Fanxu Meng, Xiaojuan Tang, Yunjia Xi, Junjie Huang, Haotong Yang, Zhenyi Shen, Yangning Li, Qianwen Zhang, Yifei Yu, Siyu An, Junnan Dong, Qiufeng Wang, Jie Wang, Keyu Chen, Wei Wen, Taian Guo, Zhifeng Shen, Daohai Yu, Jiahao Li, Ke Li, Zongyi Li, Xiaoyu Tan.
 1. **Zaya** (from Zyphra) released with the paper [ZAYA1-8B Technical Report](https://huggingface.co/papers/2605.05365) by Robert Washbourne, Rishi Iyer, Tomas Figliolia, Henry Zheng, Ryan Lorig-Roach, Sungyeon Yang, Pritish Yuvraj, Quentin Anthony, Yury Tokpanov, Xiao Yang, Ganesh Nanduru, Stephen Ebert, Praneeth Medepalli, Skyler Szot, Srivatsan Rajagopal, Alex Ong, Bhavana Mehta, Beren Millidge.
-

@@ -27,10 +27,10 @@ helped you, or simply ⭐️ the repository to say thank you.
 
 There are several ways you can contribute to 🤗 Transformers.js:
 
-- Fix outstanding issues with the existing code.
-- Submit issues related to bugs or desired new features.
-- Implement new models.
-- Contribute to the examples or to the documentation.
+* Fix outstanding issues with the existing code.
+* Submit issues related to bugs or desired new features.
+* Implement new models.
+* Contribute to the examples or to the documentation.
 
 ## Fixing outstanding issues
 
@@ -55,9 +55,9 @@ To create a new issue, please [use one of the templates](https://github.com/hugg
 
 If there is a new feature you'd like to see in 🤗 Transformers.js, please open an issue and describe:
 
-1. What is the _motivation_ behind this feature? Is it related to a problem or frustration with the library? Is it a feature related to something you need for a project? Is it something you worked on and think it could benefit the community? Whatever it is, we'd love to hear about it!
+1. What is the *motivation* behind this feature? Is it related to a problem or frustration with the library? Is it a feature related to something you need for a project? Is it something you worked on and think it could benefit the community? Whatever it is, we'd love to hear about it!
 2. Describe your requested feature in as much detail as possible. The more you can tell us about it, the better we'll be able to help you.
-3. Provide a _code snippet_ that demonstrates the feature's usage.
+3. Provide a *code snippet* that demonstrates the feature's usage.
 4. If the feature is related to a paper, please include a link.
 
 If your issue is well written we're already 80% of the way there by the time you create it.
@@ -98,7 +98,7 @@ Every model file exports a base class and one or more task heads. For the vast m
 **Decoder-only LLM:**
 
 ```js
-import { PreTrainedModel } from "../modeling_utils.js";
+import { PreTrainedModel } from '../modeling_utils.js';
 
 export class MyModelPreTrainedModel extends PreTrainedModel {}
 export class MyModelModel extends MyModelPreTrainedModel {}
@@ -108,25 +108,22 @@ export class MyModelForCausalLM extends MyModelPreTrainedModel {}
 **Encoder-only model:**
 
 ```js
-import { PreTrainedModel } from "../modeling_utils.js";
-import {
-  MaskedLMOutput,
-  SequenceClassifierOutput,
-} from "../modeling_outputs.js";
+import { PreTrainedModel } from '../modeling_utils.js';
+import { MaskedLMOutput, SequenceClassifierOutput } from '../modeling_outputs.js';
 
 export class MyModelPreTrainedModel extends PreTrainedModel {}
 export class MyModelModel extends MyModelPreTrainedModel {}
 
 export class MyModelForMaskedLM extends MyModelPreTrainedModel {
-  async _call(model_inputs) {
-    return new MaskedLMOutput(await super._call(model_inputs));
-  }
+    async _call(model_inputs) {
+        return new MaskedLMOutput(await super._call(model_inputs));
+    }
 }
 
 export class MyModelForSequenceClassification extends MyModelPreTrainedModel {
-  async _call(model_inputs) {
-    return new SequenceClassifierOutput(await super._call(model_inputs));
-  }
+    async _call(model_inputs) {
+        return new SequenceClassifierOutput(await super._call(model_inputs));
+    }
 }
 ```
 
@@ -136,11 +133,11 @@ Only add the task heads the model actually supports. The available output classe
 
 Most models reuse an existing tokenizer (e.g. all Llama-family models use `LlamaTokenizer`). Only create a new one if the model genuinely needs custom tokenization or preprocessing logic.
 
-| What                           | File                                             | Barrel to update                   |
-| ------------------------------ | ------------------------------------------------ | ---------------------------------- |
-| Custom tokenizer               | `src/models/<name>/tokenization_<name>.js`       | `src/models/tokenizers.js`         |
-| Custom image processor         | `src/models/<name>/image_processing_<name>.js`   | `src/models/image_processors.js`   |
-| Custom multimodal processor    | `src/models/<name>/processing_<name>.js`         | `src/models/processors.js`         |
+| What | File | Barrel to update |
+| --- | --- | --- |
+| Custom tokenizer | `src/models/<name>/tokenization_<name>.js` | `src/models/tokenizers.js` |
+| Custom image processor | `src/models/<name>/image_processing_<name>.js` | `src/models/image_processors.js` |
+| Custom multimodal processor | `src/models/<name>/processing_<name>.js` | `src/models/processors.js` |
 | Custom audio/feature extractor | `src/models/<name>/feature_extraction_<name>.js` | `src/models/feature_extractors.js` |
 
 The class name must match the `tokenizer_class` or `processor_class` field in the model's `tokenizer_config.json` / `preprocessor_config.json` on the Hub.
@@ -213,6 +210,7 @@ pnpm test
 pnpm --filter @huggingface/transformers test -t "MyModelForCausalLM"
 ```
 
+
 ## Create a Pull Request
 
 Before writing any code, we strongly advise you to search through the existing PRs or
@@ -232,7 +230,6 @@ You'll need the following tools installed to contribute to 🤗 Transformers.js:
 - **[pnpm](https://pnpm.io/)** - Fast, disk space efficient package manager
 
 To install pnpm:
-
 ```bash
 npm install -g pnpm
 ```
@@ -270,7 +267,6 @@ Follow the steps below to start contributing:
    the pull request.
 
 ### Pull request checklist
-
 ☐ The pull request title should summarize your contribution.  
 ☐ If your pull request addresses an issue, please mention the issue number in the pull
 request description to make sure they are linked (and people viewing the issue know you
@@ -284,23 +280,19 @@ useful to avoid duplicated work, and to differentiate it from PRs ready to be me
 ☐ If your changes affect user-facing functionality, update the relevant documentation.
 
 ### Tests
-
 We are using [Jest](https://jestjs.io/) to execute unit-tests. All tests can be found in `packages/transformers/tests` and have to end with `.test.js`
 
 Execute all tests
-
 ```bash
 pnpm test
 ```
 
 Execute tests for a specific package
-
 ```bash
 pnpm --filter @huggingface/transformers test
 ```
 
 Execute a specific test file
-
 ```bash
 cd packages/transformers
 pnpm test -- ./tests/models.test.js
@@ -309,17 +301,14 @@ pnpm test -- ./tests/models.test.js
 ### Style guide
 
 #### Code formatting
-
 We use [Prettier](https://prettier.io/) to maintain consistent code formatting across the project. Please ensure your code is formatted before submitting a pull request.
 
 **Format all files:**
-
 ```bash
 pnpm format
 ```
 
 **Check formatting without making changes:**
-
 ```bash
 pnpm format:check
 ```
@@ -329,7 +318,6 @@ pnpm format:check
 We recommend setting up Prettier in your IDE to format on save:
 
 **Visual Studio Code:**
-
 1. Install the [Prettier extension](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 2. Open Settings (Ctrl+, or Cmd+,)
 3. Search for "format on save"
@@ -337,7 +325,6 @@ We recommend setting up Prettier in your IDE to format on save:
 5. Set Prettier as your default formatter: search for "default formatter" and select "Prettier - Code formatter"
 
 **IntelliJ IDEA / WebStorm:**
-
 1. Go to `Settings` → `Languages & Frameworks` → `JavaScript` → `Prettier`
 2. Set the Prettier package path (usually `node_modules/prettier`)
 3. Check "On save" under "Run for files"
@@ -349,7 +336,7 @@ We recommend setting up Prettier in your IDE to format on save:
 This project uses **pnpm workspaces** to manage multiple packages in a monorepo:
 
 - `packages/transformers` - The main Transformers.js library
-- `packages/transformers-onnxruntime` - The TypeScript ONNX Runtime inference provider
+- `packages/transformers-onnxruntime` - The ONNX Runtime inference provider
 
 This structure allows for better organization and makes it easier to add framework-specific integrations in the future.
 
@@ -360,22 +347,18 @@ This structure allows for better organization and makes it easier to add framewo
 The recommended way to develop and test changes is to use the watch mode build and install from the local package:
 
 1. Start the build in watch mode:
-
    ```bash
    pnpm dev
    ```
-
    This will automatically rebuild the library whenever you make changes to the source code.
 
 2. Create a separate test project and install transformers.js from your local development directory:
-
    ```bash
    mkdir my-test-project
    cd my-test-project
    npm init -y
    npm install file:/path/to/transformers.js/packages/transformers
    ```
-
    Replace `/path/to/transformers.js` with the actual path to your cloned repository.
 
 3. Make your changes to the transformers.js source code in the main repository. The watch mode will automatically rebuild the library.

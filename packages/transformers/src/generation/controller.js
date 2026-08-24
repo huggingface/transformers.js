@@ -267,7 +267,10 @@ export class GenerationController {
         this.logitsProcessor.onTokensSampled(Array.from(decision.tokenIds), this.sequences);
         if (this.streamer) this.streamer.put(generatedInputIds);
 
-        this.done = this.stoppingCriteria(this.sequences, decision.processedScores);
+        const newlyDone = this.stoppingCriteria(this.sequences, decision.processedScores);
+        for (let index = 0; index < this.batchSize; ++index) {
+            this.done[index] ||= newlyDone[index];
+        }
         this.terminal = this.done.every(Boolean);
         const nextTokenIds = new Tensor('int64', generatedInputIds.flat(), [this.batchSize, 1]);
         return {
@@ -289,7 +292,8 @@ export class GenerationController {
         if (this.generationConfig.do_sample) {
             if (!capabilities?.declarativePlans?.includes('multinomial')) return null;
             if (!capabilities?.planModes?.includes('multinomial')) return null;
-            if (!this.logitsProcessor.processors.every((processor) => processor instanceof TemperatureLogitsWarper)) return null;
+            if (!this.logitsProcessor.processors.every((processor) => processor instanceof TemperatureLogitsWarper))
+                return null;
             const temperature = this.generationConfig.temperature ?? 1.0;
             const topK = this.generationConfig.top_k;
             if (!Number.isFinite(temperature) || temperature <= 0) return null;

@@ -26,6 +26,9 @@ importers:
       '@huggingface/transformers-onnxruntime':
         specifier: workspace:^
         version: link:../transformers-onnxruntime
+      onnxruntime-node:
+        specifier: 1.24.3
+        version: 1.24.3
       sharp:
         specifier: ^0.34.5
         version: 0.34.5

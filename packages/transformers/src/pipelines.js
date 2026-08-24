@@ -54,6 +54,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
 import {
     getModelId,
     isInferenceBackend,
+    isOnnxSessionProvider,
     loadInferenceModel,
     validateInferenceBackendTask,
     validateInferenceModelTask,
@@ -172,7 +173,7 @@ export async function pipeline(
         }
     }
 
-    const customBackend = isInferenceBackend(model) && typeof model.constructSessions !== 'function';
+    const customBackend = isInferenceBackend(model) && !isOnnxSessionProvider(model);
     const customRegistryProvider =
         customBackend && typeof (/** @type {any} */ (model).listModelArtifacts) === 'function'
             ? /** @type {import('./backends/model_registry.js').ModelRegistryInferenceProvider} */ (model)

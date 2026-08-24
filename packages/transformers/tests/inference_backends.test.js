@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 
-import { getModelId, isInferenceBackend, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
+import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
 import { OnnxInferenceProvider } from "@huggingface/transformers-onnxruntime";
 import { AutoModel } from "../src/models/auto/modeling_auto.js";
 import { PreTrainedModel } from "../src/models/modeling_utils.js";
@@ -21,6 +21,12 @@ describe("inference backends", () => {
     expect(getModelId(objectBackend)).toBe("test/object");
     expect(getModelId(ClassBackend)).toBe("test/class");
     expect(getModelId("test/string")).toBe("test/string");
+  });
+
+  it("uses an explicit marker for ONNX session providers", () => {
+    const constructSessions = () => {};
+    expect(isOnnxSessionProvider({ modelId: "test/custom", load() {}, constructSessions })).toBe(false);
+    expect(isOnnxSessionProvider({ modelId: "test/onnx", load() {}, constructSessions, providerType: "onnx" })).toBe(true);
   });
 
   it("normalizes a model with forward into a callable model", async () => {
@@ -135,6 +141,26 @@ describe("inference backends", () => {
         progress_callback: expect.any(DefaultProgressCallback),
       }),
     );
+    await expect(model({ value: 1 })).resolves.toEqual({ value: 1 });
+  });
+
+  it("does not treat constructSessions as a custom-backend discriminator", async () => {
+    const loaded = {
+      async forward(inputs) {
+        return inputs;
+      },
+      async dispose() {},
+    };
+    const backend = {
+      modelId: "test/model",
+      constructSessions: jest.fn(),
+      load: jest.fn(async () => loaded),
+    };
+
+    const model = await AutoModel.from_pretrained(backend, { config: { model_type: "custom" } });
+
+    expect(backend.load).toHaveBeenCalledWith(expect.objectContaining({ modelId: "test/model" }));
+    expect(backend.constructSessions).not.toHaveBeenCalled();
     await expect(model({ value: 1 })).resolves.toEqual({ value: 1 });
   });
 
