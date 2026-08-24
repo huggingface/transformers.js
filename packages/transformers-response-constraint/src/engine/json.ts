@@ -95,6 +95,22 @@ const SIMPLE_ESCAPES: Record<number, string> = {
     0x72: '\r',
     0x74: '\t',
 };
+const ASSERTED_FORMATS = new Set([
+    'date',
+    'time',
+    'date-time',
+    'duration',
+    'email',
+    'hostname',
+    'ipv4',
+    'ipv6',
+    'uuid',
+    'uri',
+    'uri-reference',
+    'regex',
+    'json-pointer',
+    'relative-json-pointer',
+]);
 
 export function compileJsonSchema(schema: JSONSchema, stringKeyClamp = Infinity): ConstraintState<JsonState> {
     registerSchemaContext(schema, schema);
@@ -152,7 +168,18 @@ function stateMaskKey(state: JsonState, stringKeyClamp: number): string | undefi
 // sound when nothing can inspect the string's content: neither the string schema
 // itself (pattern/format/const/enum or composition keywords) nor any enclosing
 // frame (cross-value keywords such as uniqueItems, contains, or conditionals).
-const CONTENT_DEPENDENT_STRING_KEYWORDS = ['pattern', 'format', 'const', 'enum', '$ref', 'allOf', 'anyOf', 'oneOf', 'not', 'if'];
+const CONTENT_DEPENDENT_STRING_KEYWORDS = [
+    'pattern',
+    'format',
+    'const',
+    'enum',
+    '$ref',
+    'allOf',
+    'anyOf',
+    'oneOf',
+    'not',
+    'if',
+];
 const CONTENT_DEPENDENT_FRAME_KEYWORDS = [
     '$ref',
     'allOf',
@@ -168,11 +195,7 @@ const CONTENT_DEPENDENT_FRAME_KEYWORDS = [
 const contentIndependentStrings = new WeakMap<object, boolean>();
 const contentNeutralFrames = new WeakMap<object, boolean>();
 
-function isContentIndependent(
-    schema: Schema,
-    keywords: readonly string[],
-    cache: WeakMap<object, boolean>,
-): boolean {
+function isContentIndependent(schema: Schema, keywords: readonly string[], cache: WeakMap<object, boolean>): boolean {
     if (schema === true) return true;
     if (schema === false) return false;
     let result = cache.get(schema);
@@ -463,8 +486,8 @@ function numberByte(state: JsonState, byte: number): JsonState {
 // after "0.9" under {type: "integer"} only digits and exponents stay viable,
 // continuations such as "0.9e-" can never close the value, and zero-padding
 // like "0.0e0000…" stays legal forever, so a stuck model streams digits until
-// it hits the token limit. Integer-only fields therefore follow llguidance's
-// integer shape -?(0|[1-9]\d*)(\.0+)?([eE]+?\d+)? — the value stays
+// it hits the token limit. Integer-only fields therefore use the constrained
+// shape -?(0|[1-9]\d*)(\.0+)?([eE]+?\d+)? — the value stays
 // ±digits×10^exponent, so every prefix can still close — with fraction zeros
 // and exponent digits capped (they carry no information beyond two digits), and
 // bytes from which no in-range integer remains reachable are pruned.
@@ -1691,7 +1714,18 @@ function checkSchema(schema: Schema, path: string): void {
             );
         }
     }
-    if (schema.pattern !== undefined) assertPattern(schema.pattern, `${path}.pattern`);
+    if (schema.pattern !== undefined) {
+        assertPattern(schema.pattern, `${path}.pattern`);
+        throw new TypeError(`${path}.pattern cannot be enforced incrementally and is unsupported.`);
+    }
+    if (schema.format !== undefined && typeof schema.format !== 'string') {
+        throw new TypeError(`${path}.format must be a string.`);
+    }
+    if (typeof schema.format === 'string' && ASSERTED_FORMATS.has(schema.format)) {
+        throw new TypeError(
+            `${path}.format ${JSON.stringify(schema.format)} cannot be enforced incrementally and is unsupported.`,
+        );
+    }
     if (isRecord(schema.patternProperties)) {
         for (const pattern of Object.keys(schema.patternProperties))
             assertPattern(pattern, `${path}.patternProperties`);

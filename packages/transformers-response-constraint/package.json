@@ -21,11 +21,9 @@
     "typegen": "tsc --build --force",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
-    "performance": "node performance/run.mjs",
     "pretest": "pnpm build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose",
-    "test:json-corpus": "node tests/corpus/run.mjs",
-    "test:json-corpus:original": "node tests/corpus/run.mjs --original"
+    "test:json-corpus": "node --test tests/corpus/json-schema-corpus.mjs"
   },
   "repository": {
     "type": "git",

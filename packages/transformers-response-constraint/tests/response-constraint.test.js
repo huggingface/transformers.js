@@ -153,12 +153,12 @@ describe("ResponseConstraint", () => {
     expect(isAllowed(afterOpen, "}".charCodeAt(0))).toBe(false);
   });
 
-  it("rejects impossible property prefixes and invalid scalar endings", async () => {
+  it("rejects impossible property and finite scalar prefixes", async () => {
     const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
       type: "json_schema",
       json_schema: {
         type: "object",
-        properties: { answer: { type: "string", pattern: "^yes$" } },
+        properties: { answer: { enum: ["yes"] } },
         required: ["answer"],
         additionalProperties: false,
       },
@@ -169,10 +169,11 @@ describe("ResponseConstraint", () => {
     expect(isAllowed(propertyScores, "a".charCodeAt(0))).toBe(true);
     expect(isAllowed(propertyScores, "z".charCodeAt(0))).toBe(false);
 
-    const valueInput = await consume(constraint, 'answer":"x');
+    const valueInput = await consume(constraint, 'answer":"');
     const valueScores = logits();
     constraint.logits_processor([valueInput], valueScores);
-    expect(isAllowed(valueScores, '"'.charCodeAt(0))).toBe(false);
+    expect(isAllowed(valueScores, "y".charCodeAt(0))).toBe(true);
+    expect(isAllowed(valueScores, "x".charCodeAt(0))).toBe(false);
 
     const unicodeProperty = {
       type: "object",
@@ -254,8 +255,8 @@ describe("ResponseConstraint", () => {
       additionalProperties: false,
     };
 
-    // Integer fields follow llguidance's shape: fractions may only contain
-    // zeros and exponents may not be negative, so "0.9" (which would strand the
+    // Integer fractions may only contain zeros and exponents may not be
+    // negative, so "0.9" (which would strand the
     // model in states like "0.9e-" that can never close) is cut off at the "9".
     const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
       type: "json_schema",
@@ -452,28 +453,7 @@ describe("ResponseConstraint", () => {
     expect(schemaAccepts(tuple, '["x",1,true]')).toBe(false);
   });
 
-  it("supports recognized formats and x-guidance separators", () => {
-    const formats = {
-      date: ["2024-02-29", "2023-02-29"],
-      time: ["23:59:60Z", "22:59:60Z"],
-      "date-time": ["2024-02-29T12:00:00Z", "2023-02-29T12:00:00Z"],
-      duration: ["P1Y2M3DT4H5M6S", "P1YT"],
-      email: ["user+tag@example.com", "user@@example.com"],
-      hostname: ["www.example.com", "-example.com"],
-      ipv4: ["255.255.255.255", "256.0.0.1"],
-      ipv6: ["2001:db8::1", "1::d6::42"],
-      uuid: ["98d80576-482e-427f-8434-7f86890ab222", "98d80576-482e-427f"],
-      uri: ["https://example.com/a%20b?x=1#part", "http://example.com/%GG"],
-      "uri-reference": ["../a/b?x=1#part", "a:b c"],
-      regex: ["^(?:😀|[a-z]+)$", "["],
-      "json-pointer": ["/a~1b/~0key", "/bad~escape"],
-      "relative-json-pointer": ["2/items/0", "01/value"],
-    };
-    for (const [format, [valid, invalid]] of Object.entries(formats)) {
-      if (!schemaAccepts({ type: "string", format }, JSON.stringify(valid))) throw new Error(`Rejected valid ${format}`);
-      if (schemaAccepts({ type: "string", format }, JSON.stringify(invalid))) throw new Error(`Accepted invalid ${format}`);
-    }
-
+  it("supports x-guidance separators", () => {
     const guided = {
       type: "object",
       properties: { a: { type: "integer" }, b: { type: "integer" } },
@@ -489,6 +469,16 @@ describe("ResponseConstraint", () => {
     for (const schema of [{ not: [] }, { patternProperties: { "[": true } }, { dependentRequired: { a: ["b", "b"] } }, { minContains: -1 }, { uniqueItems: "yes" }, { unevaluatedProperties: false }]) {
       expect(() => ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema })).toThrow();
     }
+  });
+
+  it("rejects string assertions that cannot be enforced incrementally", () => {
+    for (const schema of [
+      { type: "string", pattern: "^yes$" },
+      { type: "object", properties: { value: { type: "string", format: "date" } } },
+    ]) {
+      expect(() => ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema })).toThrow("cannot be enforced incrementally");
+    }
+    expect(schemaAccepts({ type: "string", format: "vendor-format" }, '"anything"')).toBe(true);
   });
 
   it("supports unconstrained JSON objects", async () => {

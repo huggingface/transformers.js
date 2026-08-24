@@ -32,7 +32,7 @@ Constraints currently support a single generated sequence at a time. Generation 
 
 ## Supported constraints
 
-The JSON engine implements a practical JSON Schema 2020-12 profile. This includes deep `const` and `enum`, exact decimal bounds and `multipleOf`, recognized string formats, tuple and homogeneous arrays, `contains`, deep `uniqueItems`, object property and dependency assertions, `allOf`/`anyOf`/`oneOf`/`not`, conditionals, local `$ref`, recursive `$defs`, draft-07 compatibility, and root-level `x-guidance` separators. External and dynamic references and unevaluated-property/item assertions remain unsupported.
+The JSON engine implements a practical JSON Schema 2020-12 profile. This includes deep `const` and `enum`, exact decimal bounds and `multipleOf`, tuple and homogeneous arrays, `contains`, deep `uniqueItems`, object property and dependency assertions, `allOf`/`anyOf`/`oneOf`/`not`, conditionals, local `$ref`, recursive `$defs`, draft-07 compatibility, and root-level `x-guidance` separators. String `pattern` and recognized `format` assertions are rejected because they cannot be enforced incrementally; unknown format names remain annotations. External and dynamic references and unevaluated-property/item assertions also remain unsupported.
 
 The regex engine performs full-string matching and supports literals, UTF-8 literals, alternation, groups, character classes, `.`, `\\d`, `\\s`, `\\w`, anchors, and greedy `*`, `+`, `?`, and `{m,n}` quantifiers. Lookarounds, backreferences, lazy quantifiers, and Unicode character classes are intentionally unsupported.
 
