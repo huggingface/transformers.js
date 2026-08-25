@@ -201,7 +201,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 
         // input_features shape: [batch=1, n_mels, total_frames]
         const input_features = inputs;
-        const total_frames = generation_config.num_frames
+        const total_frames = generation_config.num_frames != null
             ? Math.min(input_features.dims[2], generation_config.num_frames)
             : input_features.dims[2];
 
