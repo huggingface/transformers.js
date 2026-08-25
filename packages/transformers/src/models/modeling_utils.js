@@ -999,17 +999,16 @@ export class PreTrainedModel extends Callable {
 
                 const sampledTokens = await sampler(logs);
                 for (const [newTokenId, logProb] of sampledTokens) {
+                    const bigint = BigInt(newTokenId);
                     // TODO: If branching, use previous beam as a starting point
                     // update generated ids, model inputs, and length for next step
                     scores[batch_idx] += logProb;
-                    generated_input_ids.push([newTokenId]);
+                    all_input_ids[batch_idx].push(bigint);
+                    generated_input_ids.push([bigint]);
 
                     // TODO: Support beam search
                     break;
                 }
-            }
-            for (let batch_idx = 0; batch_idx < generated_input_ids.length; ++batch_idx) {
-                all_input_ids[batch_idx].push(generated_input_ids[batch_idx][0]);
             }
             if (streamer) {
                 streamer.put(generated_input_ids);
