@@ -1,4 +1,4 @@
-import { WhisperTokenizer, WhisperForConditionalGeneration, full } from "../../../src/transformers.js";
+import { WhisperTokenizer, WhisperForConditionalGeneration, full, Tensor } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -136,6 +136,65 @@ export default () => {
             [/* Prefix */ 50258n, 50259n, 50358n, 50363n, /* Generated */ 45084n],
             [/* Prefix */ 50258n, 50265n, 50359n, 50363n, /* Generated */ 45084n],
           ]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("num_frames edge cases", () => {
+      it(
+        "num_frames=0 does not fall back to padded tensor length",
+        async () => {
+          const input_features = full([1, 80, 3000], 0.0);
+          const outputs = await model.generate({
+            input_features,
+            max_new_tokens: 1,
+            return_timestamps: true,
+            num_frames: 0,
+          });
+          // With 0 frames the seek loop should not execute — output is just
+          // init tokens + EOS, no generated content from padded silence.
+          const tokens = outputs.tolist()[0];
+          expect(tokens.length).toBeLessThanOrEqual(4);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "short audio (fewer frames than one segment) with timestamps",
+        async () => {
+          // 500 frames << 3000 (one full segment)
+          const short_features = full([1, 80, 500], 0.0);
+          const outputs = await model.generate({
+            input_features: short_features,
+            max_new_tokens: 5,
+            return_timestamps: true,
+            num_frames: 500,
+          });
+          const tokens = outputs.tolist()[0];
+          // Should produce some output without crashing
+          expect(tokens.length).toBeGreaterThan(0);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("timestamp masking", () => {
+      it(
+        "return_timestamps produces timestamp tokens",
+        async () => {
+          const input_features = full([1, 80, 3000], 0.0);
+          const outputs = await model.generate({
+            input_features,
+            max_new_tokens: 4,
+            return_timestamps: true,
+          });
+          const tokens = outputs.tolist()[0].map(Number);
+          // no_timestamps_token_id + 1 is the first timestamp token
+          const { no_timestamps_token_id } = model.generation_config;
+          const timestamp_begin = no_timestamps_token_id + 1;
+          const has_timestamp = tokens.some((t) => t >= timestamp_begin);
+          expect(has_timestamp).toBe(true);
         },
         MAX_TEST_EXECUTION_TIME,
       );
