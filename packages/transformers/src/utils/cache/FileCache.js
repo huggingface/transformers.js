@@ -25,6 +25,27 @@ const LOCK_STALE_MS = 5 * 60 * 1000;
 const LOCK_ABANDONED_MS = 60 * 60 * 1000;
 
 /**
+ * Destroy a write stream and wait until its file descriptor is actually
+ * released. Used on the error paths, where the stream is still open over a
+ * partial or temp file that is about to be unlinked or handed to another
+ * writer. A no-op when the stream is absent or already closed.
+ *
+ * @param {import('node:fs').WriteStream | undefined} stream
+ * @returns {Promise<void>}
+ */
+function destroyStream(stream) {
+    if (!stream || stream.destroyed) {
+        return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+        // `close` fires once the fd is gone, whether the teardown itself
+        // succeeded or not — either way there is nothing further to wait for.
+        stream.once('close', resolve);
+        stream.destroy();
+    });
+}
+
+/**
  * File system cache implementation that implements the CacheInterface.
  * Provides `match` and `put` methods compatible with the Web Cache API.
  *
@@ -192,6 +213,8 @@ export class FileCache {
             return this.#putUniqueTemp(filePath, response, progress_callback);
         }
 
+        /** @type {import('node:fs').WriteStream | undefined} */
+        let fileStream;
         try {
             let loaded = 0;
             let total;
@@ -217,9 +240,13 @@ export class FileCache {
                 await fs.promises.writeFile(sidecarPath, JSON.stringify({ etag: response.headers.get('etag'), total }));
             }
 
-            const fileStream = fs.createWriteStream(incompletePath, {
+            fileStream = fs.createWriteStream(incompletePath, {
                 flags: resuming ? 'a' : 'w',
             });
+            // Write failures are surfaced through the `write`/`close` callbacks
+            // below. Without a listener the same failure also reaches the
+            // process as an unhandled `error` event.
+            fileStream.on('error', () => {});
             const reader = response.body.getReader();
 
             while (true) {
@@ -238,14 +265,27 @@ export class FileCache {
                 progress_callback?.({ progress, loaded, total });
             }
 
+            const stream = fileStream;
             await new Promise((resolve, reject) => {
-                fileStream.close((err) => (err ? reject(err) : resolve()));
+                stream.close((err) => (err ? reject(err) : resolve()));
             });
+            // Closed cleanly, so `finally` has nothing left to tear down.
+            fileStream = undefined;
 
-            // Guard against a truncated body: if we know the expected size and
-            // fell short, keep the partial so the next call can resume rather
-            // than promoting an incomplete file to the final path.
-            if (total && loaded < total) {
+            // The body must match the size we were promised, exactly. Falling
+            // short keeps the partial so the next call can resume; an oversized
+            // body is a broken server or a changed file, and cannot be resumed
+            // onto (the partial now runs past `total`), so it is discarded and
+            // the next attempt starts clean. Neither case is ever published.
+            if (total && loaded !== total) {
+                if (loaded > total) {
+                    await fs.promises.unlink(incompletePath).catch(() => {});
+                    await fs.promises.unlink(sidecarPath).catch(() => {});
+                    throw new Error(
+                        `Oversized download for "${request}": got ${loaded} bytes but expected ${total}. ` +
+                            `Discarded the partial; retry from scratch.`,
+                    );
+                }
                 throw new Error(`Incomplete download for "${request}": got ${loaded} of ${total} bytes.`);
             }
 
@@ -253,6 +293,13 @@ export class FileCache {
             await fs.promises.rename(incompletePath, filePath);
             await fs.promises.unlink(sidecarPath).catch(() => {});
         } finally {
+            // A reader, writer, or progress-callback error leaves the stream
+            // open on the partial. Tear it down *before* the reservation is
+            // released, so the next writer — which may be another process
+            // taking this key the moment the lock disappears — never finds a
+            // file we are still holding open.
+            await destroyStream(fileStream);
+
             // `.incomplete` + sidecar are intentionally kept on failure so a
             // later attempt can resume from here. Only the lock is released.
             await this.releaseResume(request);
@@ -357,11 +404,14 @@ export class FileCache {
         const randomSuffix = rng._int32().toString(36);
         const tmpPath = filePath + `.tmp.${id}.${randomSuffix}`;
 
+        /** @type {import('node:fs').WriteStream | undefined} */
+        let fileStream;
         try {
             const total = parseInt(response.headers.get('Content-Length') ?? '0');
             let loaded = 0;
 
-            const fileStream = fs.createWriteStream(tmpPath);
+            fileStream = fs.createWriteStream(tmpPath);
+            fileStream.on('error', () => {});
             const reader = response.body.getReader();
 
             while (true) {
@@ -380,16 +430,28 @@ export class FileCache {
                 progress_callback?.({ progress, loaded, total });
             }
 
+            const stream = fileStream;
             await new Promise((resolve, reject) => {
-                fileStream.close((err) => (err ? reject(err) : resolve()));
+                stream.close((err) => (err ? reject(err) : resolve()));
             });
+            fileStream = undefined;
 
-            if (total && loaded < total) {
-                throw new Error(`Incomplete download for "${filePath}": got ${loaded} of ${total} bytes.`);
+            // This path renames onto the final file, so the body must match the
+            // declared size exactly — an oversized one is no safer to publish
+            // than a truncated one.
+            if (total && loaded !== total) {
+                throw new Error(
+                    loaded > total
+                        ? `Oversized download for "${filePath}": got ${loaded} bytes but expected ${total}.`
+                        : `Incomplete download for "${filePath}": got ${loaded} of ${total} bytes.`,
+                );
             }
 
             await fs.promises.rename(tmpPath, filePath);
         } catch (error) {
+            // Close the stream before unlinking: an open handle makes the
+            // removal fail outright on Windows and leaves the temp file behind.
+            await destroyStream(fileStream);
             try {
                 await fs.promises.unlink(tmpPath);
             } catch {}
@@ -516,20 +578,43 @@ export class FileCache {
     }
 
     /**
-     * Deletes the cache entry for the given request.
+     * Deletes the cache entry for the given request, including anything an
+     * interrupted resumable download left behind: the `.incomplete` partial,
+     * its sidecar, and the write lock.
+     *
+     * Removing only the completed file would leave a partial that a later
+     * request resumes onto — reviving bytes the caller asked to delete — and a
+     * lock sitting in the way of the next writer.
+     *
      * @param {string} request
-     * @returns {Promise<boolean>} A Promise that resolves to `true` if the cache entry was deleted, `false` otherwise.
+     * @returns {Promise<boolean>} A Promise that resolves to `true` if a cache
+     * entry (the completed file or a partial download) was deleted, `false`
+     * otherwise. A leftover sidecar or lock is cleaned up either way, but on
+     * its own does not count as an entry.
      */
     async delete(request) {
-        let filePath = path.join(this.path, request);
+        const filePath = path.join(this.path, request);
+        const incompletePath = filePath + '.incomplete';
 
-        try {
-            await fs.promises.unlink(filePath);
-            return true;
-        } catch (error) {
-            // File doesn't exist or couldn't be deleted
-            return false;
-        }
+        // Drop our own reservation first, so the lock is removed by the writer
+        // that owns it and its heartbeat stops — rather than unlinking a path a
+        // live timer would keep touching.
+        await this.releaseResume(request);
+
+        const unlink = (target) =>
+            fs.promises.unlink(target).then(
+                () => true,
+                () => false,
+            );
+
+        const [fileDeleted, partialDeleted] = await Promise.all([
+            unlink(filePath),
+            unlink(incompletePath),
+            unlink(incompletePath + '.json'),
+            unlink(incompletePath + '.lock'),
+        ]);
+
+        return fileDeleted || partialDeleted;
     }
 
     // TODO add the rest?

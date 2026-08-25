@@ -23,7 +23,8 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
  * @property {(request: string) => Promise<boolean>} [delete]
- * Deletes a request from the cache. Returns true if deleted, false otherwise.
+ * Deletes a request from the cache. Returns true if deleted, false otherwise. Implementations that support resuming
+ * must also discard any partial download held for the request, so a later call cannot resume onto deleted bytes.
  * @property {(request: string) => Promise<ResumeInfo|undefined>} [reserveResume]
  * Optional. Claims a request's partial download and reports it (size on disk, its etag, and expected total) so the
  * caller can continue it with an HTTP `Range`/`If-Range` request. Returns undefined when there is nothing to resume

@@ -283,6 +283,192 @@ describe("FileCache resumable downloads", () => {
     });
   });
 
+  describe("completion requires the exact declared size", () => {
+    it("refuses to publish an oversized body and discards the partial", async () => {
+      const key = "oversized.onnx";
+      // Server declares 4 bytes and sends 10. Appending the surplus and
+      // renaming would publish a file that is not the one we asked for.
+      await expect(cache.put(key, streamingResponse([bytes("0123456789")], { status: 200, headers: { "Content-Length": "4", etag: '"v1"' } }))).rejects.toThrow(/Oversized download/);
+
+      expect(fs.existsSync(p(key))).toBe(false);
+      // An oversized partial can never be resumed onto (it already runs past
+      // `total`), so it is dropped rather than kept like a truncated one.
+      expect(fs.existsSync(p(key + ".incomplete"))).toBe(false);
+      expect(fs.existsSync(p(key + ".incomplete.json"))).toBe(false);
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+      expect(await cache.reserveResume(key)).toBeUndefined();
+    });
+
+    it("refuses to publish a 206 that overshoots the total", async () => {
+      const key = "oversized-range.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      expect(await cache.reserveResume(key)).toBeDefined();
+
+      // Content-Range is internally consistent and lines up with the partial,
+      // but the body carries more bytes than it promised.
+      await expect(cache.put(key, streamingResponse([bytes("456789EXTRA")], { status: 206, headers: { "Content-Range": "bytes 4-9/10", "Content-Length": "6" } }))).rejects.toThrow(/Oversized download/);
+
+      expect(fs.existsSync(p(key))).toBe(false);
+      expect(fs.existsSync(p(key + ".incomplete"))).toBe(false);
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+    });
+
+    it("still keeps the partial when the body falls short", async () => {
+      const key = "short.onnx";
+      await expect(cache.put(key, streamingResponse([bytes("012")], { status: 200, headers: { "Content-Length": "10", etag: '"v1"' } }))).rejects.toThrow(/Incomplete download/);
+
+      expect(fs.readFileSync(p(key + ".incomplete"), "utf-8")).toBe("012");
+      expect(await cache.reserveResume(key)).toEqual({ size: 3, etag: '"v1"', total: 10 });
+      await cache.releaseResume(key);
+    });
+  });
+
+  describe("the output stream is closed before the key is handed on", () => {
+    /**
+     * Assert nothing is still holding `target` open.
+     *
+     * On Linux the leaked descriptor is directly observable via `/proc/self/fd`,
+     * which is the assertion that actually bites — POSIX happily unlinks a file
+     * that is still open, so the removable check alone would pass either way.
+     * Elsewhere (notably Windows, where an open handle does block the unlink)
+     * the removable check is what is left.
+     */
+    const expectNotHeldOpen = (target) => {
+      const fdDir = "/proc/self/fd";
+      if (fs.existsSync(fdDir)) {
+        const holding = fs.readdirSync(fdDir).filter((fd) => {
+          try {
+            return fs.readlinkSync(path.join(fdDir, fd)) === target;
+          } catch {
+            // The descriptor used to walk the directory may already be gone.
+            return false;
+          }
+        });
+        expect(holding).toEqual([]);
+      }
+      expect(() => fs.unlinkSync(target)).not.toThrow();
+    };
+
+    it("closes the stream when the reader errors mid-body", async () => {
+      const key = "reader-error.onnx";
+      const body = new ReadableStream({
+        pull(controller) {
+          controller.enqueue(bytes("0123"));
+          controller.error(new Error("connection reset"));
+        },
+      });
+      const response = new Response(body, { status: 200, headers: { "Content-Length": "10", etag: '"v1"' } });
+
+      await expect(cache.put(key, response)).rejects.toThrow(/connection reset/);
+
+      // The lock is gone, so another writer may take this key immediately —
+      // it must not find a partial we are still writing into.
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+      expect(fs.existsSync(p(key))).toBe(false);
+      expectNotHeldOpen(p(key + ".incomplete"));
+    });
+
+    it("closes the stream when the progress callback throws", async () => {
+      const key = "callback-error.onnx";
+      const response = streamingResponse([bytes("0123"), bytes("456789")], { status: 200, headers: { "Content-Length": "10", etag: '"v1"' } });
+
+      await expect(
+        cache.put(key, response, () => {
+          throw new Error("callback blew up");
+        }),
+      ).rejects.toThrow(/callback blew up/);
+
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+      expect(fs.existsSync(p(key))).toBe(false);
+      expectNotHeldOpen(p(key + ".incomplete"));
+    });
+
+    it("closes the stream when the writer errors", async () => {
+      const key = "writer-error.onnx";
+      // Make the partial path a directory: opening it for writing fails, and
+      // the failure surfaces asynchronously through the stream.
+      fs.mkdirSync(p(key + ".incomplete"));
+
+      await expect(cache.put(key, streamingResponse([bytes("0123")], { status: 200, headers: { "Content-Length": "10" } }))).rejects.toThrow();
+
+      // The error must not escape as an unhandled 'error' event, and the key
+      // must be released for the next writer.
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+      expect(fs.existsSync(p(key))).toBe(false);
+    });
+
+    it("cleans up the temp file when the fallback path fails", async () => {
+      const key = "fallback-error.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      // Hold the key so `put` takes the unique-temp fallback.
+      seedLock(key, { instance: "other", pid: process.pid, startedAt: Date.now() }, 0);
+
+      await expect(cache.put(key, streamingResponse([bytes("012")], { status: 200, headers: { "Content-Length": "10" } }))).rejects.toThrow(/Incomplete download/);
+
+      // No `.tmp.*` left behind, and the other writer's artifacts are untouched.
+      expect(fs.readdirSync(dir).filter((f) => f.includes(".tmp."))).toEqual([]);
+      expect(fs.existsSync(p(key))).toBe(false);
+      expect(fs.readFileSync(p(key + ".incomplete"), "utf-8")).toBe("0123");
+    });
+  });
+
+  describe("delete removes every artifact of an entry", () => {
+    it("removes the completed file", async () => {
+      const key = "done.onnx";
+      fs.writeFileSync(p(key), "0123456789");
+
+      expect(await cache.delete(key)).toBe(true);
+      expect(fs.readdirSync(dir)).toEqual([]);
+    });
+
+    it("removes a partial, its sidecar, and a stale lock", async () => {
+      const key = "half.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      seedLock(key, { instance: "other", pid: await deadPid(), startedAt: Date.now() }, 10 * 60 * 1000);
+
+      expect(await cache.delete(key)).toBe(true);
+      expect(fs.readdirSync(dir)).toEqual([]);
+      // Nothing is left for a later request to resume onto.
+      expect(await cache.reserveResume(key)).toBeUndefined();
+    });
+
+    it("removes the partial alongside the completed file", async () => {
+      const key = "both.onnx";
+      fs.writeFileSync(p(key), "0123456789");
+      seedPartial(key, "0123", { etag: '"v2"', total: 10 });
+
+      expect(await cache.delete(key)).toBe(true);
+      expect(fs.readdirSync(dir)).toEqual([]);
+    });
+
+    it("releases a reservation this instance holds", async () => {
+      const key = "reserved.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      expect(await cache.reserveResume(key)).toBeDefined();
+
+      expect(await cache.delete(key)).toBe(true);
+      // The lock we owned is gone, not merely unlinked out from under a live
+      // heartbeat — a second delete finds nothing at all.
+      expect(fs.readdirSync(dir)).toEqual([]);
+      expect(await cache.delete(key)).toBe(false);
+    });
+
+    it("returns false when there is nothing cached", async () => {
+      expect(await cache.delete("absent.onnx")).toBe(false);
+    });
+
+    it("does not report a bare leftover lock as a deleted entry", async () => {
+      // `clear_cache` falls back to a second key when `delete` returns false,
+      // so a stray lock must not masquerade as a real entry...
+      const key = "lock-only.onnx";
+      seedLock(key, { instance: "other", pid: process.pid, startedAt: Date.now() }, 0);
+
+      expect(await cache.delete(key)).toBe(false);
+      // ...but it is still swept up.
+      expect(fs.readdirSync(dir)).toEqual([]);
+    });
+  });
+
   describe("lock ownership", () => {
     const key = "locked.onnx";
 
