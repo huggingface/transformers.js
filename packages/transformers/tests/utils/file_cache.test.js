@@ -1,4 +1,6 @@
+import { jest } from "@jest/globals";
 import { spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -397,6 +399,61 @@ describe("FileCache resumable downloads", () => {
       expect(fs.existsSync(p(key))).toBe(false);
     });
 
+    it("waits for a stream that is already mid-teardown", async () => {
+      const key = "mid-teardown.onnx";
+
+      // A stream whose teardown is slow enough to observe. A real fs stream
+      // closes its descriptor within the very next event-loop turn, so the
+      // gap this guards is invisible against one — the `destroyed`-vs-`closed`
+      // distinction is real but only shows up under load.
+      const CLOSE_MS = 250;
+      const events = new EventEmitter();
+      const stream = {
+        destroyed: false,
+        closed: false,
+        on: (...args) => (events.on(...args), stream),
+        once: (...args) => (events.once(...args), stream),
+        write: (_chunk, cb) => (cb(null), true),
+        close: (cb) => {
+          stream.destroy();
+          events.once("close", () => cb(null));
+        },
+        destroy: () => {
+          if (!stream.destroyed) {
+            stream.destroyed = true;
+            // `destroyed` flips now; the descriptor is only released later.
+            setTimeout(() => {
+              stream.closed = true;
+              events.emit("close");
+            }, CLOSE_MS);
+          }
+          return stream;
+        },
+      };
+
+      const spy = jest.spyOn(fs, "createWriteStream").mockImplementation(() => stream);
+      try {
+        const response = streamingResponse([bytes("0123"), bytes("456789")], { status: 200, headers: { "Content-Length": "10", etag: '"v1"' } });
+
+        await expect(
+          cache.put(key, response, () => {
+            stream.destroy();
+            expect(stream.destroyed).toBe(true);
+            expect(stream.closed).toBe(false);
+            throw new Error("callback blew up");
+          }),
+        ).rejects.toThrow(/callback blew up/);
+      } finally {
+        spy.mockRestore();
+      }
+
+      // `put` must not have returned while the descriptor was still open:
+      // the moment it does, the lock is gone and the next writer may open the
+      // same partial.
+      expect(stream.closed).toBe(true);
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(false);
+    });
+
     it("cleans up the temp file when the fallback path fails", async () => {
       const key = "fallback-error.onnx";
       seedPartial(key, "0123", { etag: '"v1"', total: 10 });
@@ -461,10 +518,60 @@ describe("FileCache resumable downloads", () => {
       // `clear_cache` falls back to a second key when `delete` returns false,
       // so a stray lock must not masquerade as a real entry...
       const key = "lock-only.onnx";
-      seedLock(key, { instance: "other", pid: process.pid, startedAt: Date.now() }, 0);
+      seedLock(key, { instance: "other", pid: await deadPid(), startedAt: Date.now() }, 10 * 60 * 1000);
 
       expect(await cache.delete(key)).toBe(false);
       // ...but it is still swept up.
+      expect(fs.readdirSync(dir)).toEqual([]);
+    });
+
+    it("leaves an active writer's lock, partial and sidecar alone", async () => {
+      const key = "in-flight.onnx";
+      fs.writeFileSync(p(key), "an older copy");
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      // Freshly refreshed by a live owner: somebody is downloading right now.
+      seedLock(key, { instance: "other", pid: process.pid, startedAt: Date.now() }, 0);
+
+      // The completed file is what the caller asked to delete, so it goes...
+      expect(await cache.delete(key)).toBe(true);
+      expect(fs.existsSync(p(key))).toBe(false);
+
+      // ...but taking the lock away would let a third writer acquire the same
+      // key and write concurrently with the one already streaming into it.
+      expect(fs.existsSync(p(key + ".incomplete.lock"))).toBe(true);
+      expect(fs.readFileSync(p(key + ".incomplete"), "utf-8")).toBe("0123");
+      expect(fs.existsSync(p(key + ".incomplete.json"))).toBe(true);
+
+      // And the key is still not available to anyone else.
+      expect(await cache.reserveResume(key)).toBeUndefined();
+    });
+
+    it("clears a stale writer's artifacts once its owner is gone", async () => {
+      const key = "crashed.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+      seedLock(key, { instance: "other", pid: await deadPid(), startedAt: Date.now() }, 10 * 60 * 1000);
+
+      expect(await cache.delete(key)).toBe(true);
+      expect(fs.readdirSync(dir)).toEqual([]);
+    });
+
+    it("clears a lock this instance stamped but no longer tracks", async () => {
+      const key = "our-stale.onnx";
+      seedPartial(key, "0123", { etag: '"v1"', total: 10 });
+
+      // Let the cache stamp a lock with its own instance id, then put it back
+      // on disk untracked and aged — what a crashed reservation of ours looks
+      // like. Its pid is alive (it is us), so only the instance check can tell
+      // that reclaiming it is safe.
+      expect(await cache.reserveResume(key)).toBeDefined();
+      const lockPath = p(key + ".incomplete.lock");
+      const stamped = fs.readFileSync(lockPath, "utf-8");
+      await cache.releaseResume(key);
+      fs.writeFileSync(lockPath, stamped);
+      const when = new Date(Date.now() - 10 * 60 * 1000);
+      fs.utimesSync(lockPath, when, when);
+
+      expect(await cache.delete(key)).toBe(true);
       expect(fs.readdirSync(dir)).toEqual([]);
     });
   });

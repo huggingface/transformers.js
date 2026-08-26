@@ -28,20 +28,29 @@ const LOCK_ABANDONED_MS = 60 * 60 * 1000;
  * Destroy a write stream and wait until its file descriptor is actually
  * released. Used on the error paths, where the stream is still open over a
  * partial or temp file that is about to be unlinked or handed to another
- * writer. A no-op when the stream is absent or already closed.
+ * writer.
+ *
+ * The early-out tests `closed`, not `destroyed`: `destroyed` is set
+ * synchronously when teardown *begins*, so a stream already destroyed by an
+ * auto-destroy on error can still be holding its descriptor. `closed` flips
+ * with the `close` event, which is emitted once the descriptor is gone.
  *
  * @param {import('node:fs').WriteStream | undefined} stream
  * @returns {Promise<void>}
  */
 function destroyStream(stream) {
-    if (!stream || stream.destroyed) {
+    if (!stream || stream.closed) {
         return Promise.resolve();
     }
     return new Promise((resolve) => {
-        // `close` fires once the fd is gone, whether the teardown itself
-        // succeeded or not — either way there is nothing further to wait for.
+        // `close` fires whether the teardown itself succeeded or not — either
+        // way there is nothing further to wait for.
         stream.once('close', resolve);
-        stream.destroy();
+        // An already-destroyed stream is mid-teardown; destroying it again is
+        // pointless, but its pending `close` is still worth waiting for.
+        if (!stream.destroyed) {
+            stream.destroy();
+        }
     });
 }
 
@@ -586,6 +595,12 @@ export class FileCache {
      * request resumes onto — reviving bytes the caller asked to delete — and a
      * lock sitting in the way of the next writer.
      *
+     * An in-flight download by another writer is left alone: its lock, partial
+     * and sidecar are that writer's working set, and removing them would let a
+     * third writer take the same key and write concurrently. The completed
+     * file is still removed in that case — it is the entry the caller asked to
+     * delete, and it is not what the other writer is holding.
+     *
      * @param {string} request
      * @returns {Promise<boolean>} A Promise that resolves to `true` if a cache
      * entry (the completed file or a partial download) was deleted, `false`
@@ -595,10 +610,12 @@ export class FileCache {
     async delete(request) {
         const filePath = path.join(this.path, request);
         const incompletePath = filePath + '.incomplete';
+        const lockPath = incompletePath + '.lock';
 
         // Drop our own reservation first, so the lock is removed by the writer
         // that owns it and its heartbeat stops — rather than unlinking a path a
-        // live timer would keep touching.
+        // live timer would keep touching. This also means the check below only
+        // ever considers a lock belonging to somebody else.
         await this.releaseResume(request);
 
         const unlink = (target) =>
@@ -607,11 +624,18 @@ export class FileCache {
                 () => false,
             );
 
+        // Absent, stale-with-a-dead-owner, or stamped by this process: all
+        // report abandoned, and are ours to clear. Anything else is a writer
+        // actively downloading right now.
+        if (!(await this.#isLockAbandoned(lockPath))) {
+            return unlink(filePath);
+        }
+
         const [fileDeleted, partialDeleted] = await Promise.all([
             unlink(filePath),
             unlink(incompletePath),
             unlink(incompletePath + '.json'),
-            unlink(incompletePath + '.lock'),
+            unlink(lockPath),
         ]);
 
         return fileDeleted || partialDeleted;
