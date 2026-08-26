@@ -147,10 +147,7 @@ const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
 
 let dirname__ = './';
 if (RUNNING_LOCALLY) {
-    // NOTE: We wrap `import.meta` in a call to `Object` to prevent Webpack from trying to bundle it in CommonJS.
-    // Although we get the warning: "Accessing import.meta directly is unsupported (only property access or destructuring is supported)",
-    // it is safe to ignore since the bundled value (`{}`) isn't used for CommonJS environments (we use __dirname instead).
-    const _import_meta_url = Object(import.meta).url;
+    const _import_meta_url = import.meta.url;
 
     if (_import_meta_url) {
         dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))); // ESM
