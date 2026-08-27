@@ -62,8 +62,7 @@ describe("External data as a Blob", () => {
     for (const [k, v] of Object.entries(saved)) env[k] = v;
   });
 
-  const load = (as_blob, options = {}, filename = "onnx/model.onnx_data") =>
-    getModelFile("hf-internal-testing/blob-external-data", filename, true, options, false, as_blob);
+  const load = (as_blob, options = {}, filename = "onnx/model.onnx_data") => getModelFile("hf-internal-testing/blob-external-data", filename, true, options, false, as_blob);
 
   it("streams a cold file into the cache and resolves a Blob, storing it once", async () => {
     const progress = [];
