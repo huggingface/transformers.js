@@ -602,7 +602,12 @@ export async function getModelFile(
     // sibling calls within one pipeline() share a single download (and a
     // single `initiate` event). Otherwise fall back to the global in-flight
     // map for concurrent dedup, with entries cleared on settle.
-    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
+    //
+    // `as_blob` is part of the key because it changes the RESOLVED TYPE, not just how the bytes are fetched.
+    // Two callers asking for the same file with different values are not asking the same question: without
+    // it, whichever arrives first decides, and the other gets a `Blob` where it expects a `Uint8Array` or the
+    // reverse. `return_path` is in the key for exactly this reason already.
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path, as_blob);
     const { progress_callback } = options;
     const loads = progress_callback instanceof DefaultProgressCallback ? progress_callback.loads : INFLIGHT_LOADS;
     let pending = loads.get(key);
