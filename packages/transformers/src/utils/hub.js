@@ -395,7 +395,9 @@ async function loadResourceFile(
         if (typeof response !== 'string') {
             if (as_blob && cacheHit) {
                 // The whole point of `as_blob`, and it is one call: a Cache Storage `Response` hands back a
-                // Blob that is a FILE REFERENCE rather than a copy, so the bytes never enter the JS heap.
+                // Blob that is a FILE REFERENCE rather than a copy, so reading the file does not put it on
+                // the JS heap. What the RUNTIME then does with that Blob is a separate question — see the
+                // note on the cold branch below.
                 //
                 // Gated on `cacheHit`, which is a deliberate trade rather than caution. Reading the stream to
                 // report progress would defeat the whole thing — the chunks would be resident twice, once as
@@ -414,8 +416,16 @@ async function loadResourceFile(
                 });
             } else if (as_blob && toCacheResponse && response.body && isStorableCacheKey(cache, cacheKey)) {
                 // COLD, and headed for the cache anyway. Stream the body straight into Cache Storage and then
-                // read it back as a Blob, so the bytes go network -> disk -> runtime and never sit on the JS
-                // heap at all.
+                // read it back as a Blob, so the DOWNLOAD goes network -> disk without the file ever sitting
+                // on the JS heap.
+                //
+                // ⚠️ TWO SEPARATE SAVINGS, AND ONLY ONE OF THEM IS UNCONDITIONAL. This branch is about the
+                // download, happens before onnxruntime-web sees anything, and holds whichever build is in
+                // use — it is what stops a cold multi-gigabyte load dying in `getModelDataFiles` below. What
+                // the runtime does with the Blob afterwards is the other saving and is NOT unconditional: the
+                // JSPI build reads external data from a Blob without materialising it, while the default
+                // asyncify build copies it in. So on the default build this buys the download and not the
+                // session, and the end-to-end peak is unchanged at session creation.
                 //
                 // `isStorableCacheKey` for the same reason the buffered store below checks it: the browser
                 // Cache API rejects a non-http(s) key, so on an extension page this branch would write
