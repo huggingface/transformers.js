@@ -45,7 +45,11 @@ export async function getCoreModelFile(pretrained_model_name_or_path, fileName, 
     const baseName = `${fileName}${suffix}.onnx`;
     const fullPath = `${options.subfolder ?? ''}/${baseName}`;
 
-    return await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV);
+    // Not `as_blob`, so a `Blob` cannot come back — narrowed here rather than widening every caller of a
+    // function that only ever asks for bytes or a path.
+    return /** @type {string|Uint8Array} */ (
+        await getModelFile(pretrained_model_name_or_path, fullPath, true, options, apis.IS_NODE_ENV)
+    );
 }
 
 /**

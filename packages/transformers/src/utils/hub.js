@@ -365,7 +365,9 @@ export async function loadResourceFile(
         // loads from disk directly). A completion progress event is emitted
         // after the caching block below to ensure progress_total reaches 100%.
     } else {
-        /** @type {Uint8Array} */
+        // A `Blob` on the `as_blob` branches, bytes everywhere else. Widened rather than cast away at each
+        // use, so a future branch that forgets which it is fails here instead of at run time.
+        /** @type {Uint8Array|Blob} */
         let buffer;
 
         if (typeof response !== 'string') {
@@ -380,7 +382,7 @@ export async function loadResourceFile(
                 // buffers and once in Blob storage — and on a cold download progress is worth more than peak
                 // memory, because the user is watching several gigabytes arrive. Every load AFTER the first
                 // takes this branch, is instantaneous, and is where the peak actually matters.
-                buffer = /** @type {any} */ (await response.blob());
+                buffer = await response.blob();
 
                 dispatchCallback(options.progress_callback, {
                     status: 'progress',
@@ -438,7 +440,9 @@ export async function loadResourceFile(
                     await cache.put(cacheKey, new Response(response.body.pipeThrough(counting), { headers }));
                     const stored = await cache.match(cacheKey);
                     if (!stored) throw new Error('cache.match missed the entry just written');
-                    buffer = /** @type {any} */ (await stored.blob());
+                    // `cache.match` is typed for every backend, including the Node file cache; what was just
+                    // written here is a `Response`, and only a `Response` has `.blob()`.
+                    buffer = await /** @type {Response} */ (stored).blob();
                     // Already stored, so the block at the end of this function must not store it again.
                     toCacheResponse = false;
                 } catch (err) {
@@ -516,7 +520,12 @@ export async function loadResourceFile(
         cacheKey &&
         typeof response !== 'string'
     ) {
-        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+        // ⛔ NEVER A BLOB HERE, and the two `as_blob` branches are why. A warm read is a cache HIT, which
+        // never sets `toCacheResponse`; a cold stream writes the entry itself and then clears the flag. So
+        // anything reaching this line was buffered, and the narrowing is a statement of that rather than a
+        // convenience — if a third branch ever produces a Blob without storing it, this is where it lands.
+        const buffered = /** @type {Uint8Array} */ (result);
+        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, buffered, options);
     }
 
     // In Node.js with return_path, the buffer read is skipped so no progress
@@ -565,7 +574,7 @@ export async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
-/** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
+/** @type {Map<string, Promise<string|Uint8Array|Blob|null>>} Pending file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
 
 /**
