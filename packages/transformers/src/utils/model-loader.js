@@ -93,6 +93,11 @@ export async function getModelDataFiles(
                         return_path,
                         // In the browser, hand onnxruntime-web a Blob rather than a materialised buffer.
                         // Node keeps returning a path, which is cheaper still.
+                        //
+                        // Accepting a Blob is safe on either web build; only the JSPI one avoids copying it
+                        // into the heap at session creation. The unconditional win is upstream of here — the
+                        // download no longer buffers each chunk, which is what a cold load of a model with
+                        // several multi-gigabyte chunks runs out of memory doing.
                         !return_path,
                     );
                     resolve(data instanceof Uint8Array || data instanceof Blob ? { path, data } : path);
