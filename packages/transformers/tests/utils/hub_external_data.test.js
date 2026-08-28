@@ -113,6 +113,35 @@ describe("External data as a Blob", () => {
     expect(out.length).toBe(BYTES.length);
   });
 
+  // ⛔ THE HALF OF THE MEMORY CLAIM THIS LAYER CAN ACTUALLY TEST. Whether onnxruntime-web copies the Blob at
+  // session creation depends on its build — JSPI does not, the default asyncify one does — and that is not
+  // observable from here. What IS observable, and is the saving this file is responsible for, is that the
+  // DOWNLOAD never materialises the body: no `arrayBuffer()` on the fetched response, on any build.
+  //
+  // Paired with the negative case on purpose. Asserting "never called" alone would pass just as happily if
+  // the spy were wired to the wrong object, so the same spy has to SEE the call on the buffered path.
+  it("streams a cold file without materialising the response, and buffers it when not asked for a Blob", async () => {
+    let materialised = 0;
+    const inner = env.fetch;
+    env.fetch = async (...args) => {
+      const response = await inner(...args);
+      const original = response.arrayBuffer.bind(response);
+      response.arrayBuffer = async () => {
+        ++materialised;
+        return original();
+      };
+      return response;
+    };
+
+    expect(await load(true)).toBeInstanceOf(Blob);
+    expect(materialised).toBe(0);
+
+    // Same spy, same fetch, `as_blob` off: the buffered path reads the body onto the heap, which is what the
+    // streaming branch is avoiding — and proves the assertion above is watching the right object.
+    expect(await load(false, {}, "onnx/other.onnx_data")).toBeInstanceOf(Uint8Array);
+    expect(materialised).toBe(1);
+  });
+
   // ⛔ THE REGRESSION THIS EXISTS FOR. `as_blob` changes the RESOLVED TYPE, so it has to be part of the
   // in-flight dedup key. Without it whichever caller arrives first decides for both, and the other gets a
   // `Blob` where it expects a `Uint8Array` or the reverse — silently, and only under concurrency.
