@@ -245,11 +245,14 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
  * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
- * @param {boolean} [as_blob=false] Whether to return a `Blob` when the file is served from the cache,
- * rather than reading it into a `Uint8Array`. Only honoured on a cache hit — see the note at the use site.
+ * @param {boolean} [as_blob=false] Whether to return a `Blob` rather than reading the file into a
+ * `Uint8Array`. Honoured on two paths: a cache HIT, which reads the cached `Response` directly, and a COLD
+ * file that is headed for the cache anyway, which is streamed into it and read straight back. Ignored — and a
+ * `Uint8Array` returned — when neither applies, which covers a cold file with no cache available and the
+ * fallback taken when the cache refuses the write.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array|Blob|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true. Resolves with a `Blob` when `as_blob` is set and the file came from the cache.
+ * @returns {Promise<string|Uint8Array|Blob|null>} A Promise that resolves with the file path as a string if `return_path` is true; otherwise a `Blob` when `as_blob` was honoured, and the file content as a `Uint8Array` in every other case.
  */
 export async function loadResourceFile(
     path_or_repo_id,
@@ -588,11 +591,12 @@ const INFLIGHT_LOADS = new Map();
  * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
- * @param {boolean} [as_blob=false] Whether to accept a `Blob` for a file served from the cache, avoiding a
- * copy of its bytes on the JS heap. Intended for external data, which is handed straight to the runtime.
+ * @param {boolean} [as_blob=false] Whether to accept a `Blob` instead of a copy of the file's bytes on the JS
+ * heap. Intended for external data, which is handed straight to the runtime. Honoured for a cached file and
+ * for a cold one being written to the cache; a `Uint8Array` comes back otherwise, so callers must handle both.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array|Blob>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true. Resolves with a `Blob` when `as_blob` is set and the file came from the cache.
+ * @returns {Promise<string|Uint8Array|Blob>} A Promise that resolves with the file path as a string if `return_path` is true; otherwise a `Blob` when `as_blob` was honoured, and the file content as a `Uint8Array` in every other case.
  */
 export async function getModelFile(
     path_or_repo_id,
