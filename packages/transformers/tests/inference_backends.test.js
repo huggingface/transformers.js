@@ -7,6 +7,7 @@ import { PreTrainedModel } from "../src/models/modeling_utils.js";
 import { buildResourcePaths } from "../src/utils/hub.js";
 import { loadInferenceBackendChatTemplate } from "../src/pipelines.js";
 import { DefaultProgressCallback } from "../src/utils/core.js";
+import { env } from "../src/env.js";
 
 describe("inference backends", () => {
   it("recognizes object and class backends", () => {
@@ -58,7 +59,7 @@ describe("inference backends", () => {
 
     const model = await loadInferenceModel(backend, { config, dtype: "q4f16" });
 
-    expect(load).toHaveBeenCalledWith({ config, dtype: "q4f16", modelId: "test/model" });
+    expect(load).toHaveBeenCalledWith({ config, dtype: "q4f16", modelId: "test/model", fetch: env.fetch });
     expect(model.config).toBe(config);
   });
 
@@ -114,6 +115,7 @@ describe("inference backends", () => {
     };
     const backend = {
       modelId: "test/model",
+      sharedAssets: { revision: "backend-revision", subfolder: "shared" },
       load: jest.fn(async () => loaded),
       listModelArtifacts: jest.fn(() => ["model.bin"]),
       getModelArtifactMetadata: jest.fn(async () => ({ size: 10, fromCache: true })),
@@ -128,9 +130,17 @@ describe("inference backends", () => {
       signal,
       artifactProvider,
       progress_callback,
+      revision: "load-revision",
     });
 
     expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith("model.bin", expect.objectContaining({ signal }));
+    expect(backend.listModelArtifacts).toHaveBeenCalledWith(
+      expect.objectContaining({ fetch: env.fetch, revision: "backend-revision", subfolder: "shared" }),
+    );
+    expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith(
+      "model.bin",
+      expect.objectContaining({ fetch: env.fetch }),
+    );
     expect(backend.load).toHaveBeenCalledWith(
       expect.objectContaining({
         modelId: "test/model",
@@ -139,6 +149,9 @@ describe("inference backends", () => {
         artifactProvider,
         artifactMetadata: { "model.bin": { size: 10, fromCache: true } },
         progress_callback: expect.any(DefaultProgressCallback),
+        fetch: env.fetch,
+        revision: "backend-revision",
+        subfolder: "shared",
       }),
     );
     await expect(model({ value: 1 })).resolves.toEqual({ value: 1 });
@@ -191,6 +204,13 @@ describe("inference backends", () => {
 
     expect(paths.requestURL).toBe("test/model/tokenizer.json");
     expect(paths.remoteURL).toContain("/test/model/resolve/main/tokenizer.json");
+
+    const nested = buildResourcePaths(backend, "onnx/model.onnx", {
+      revision: "v2",
+      subfolder: "export",
+    });
+    expect(nested.requestURL).toBe("test/model/export/onnx/model.onnx");
+    expect(nested.remoteURL).toContain("/test/model/resolve/v2/export/onnx/model.onnx");
   });
 
   it("resolves and validates inline backend chat templates", async () => {

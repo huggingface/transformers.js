@@ -6,7 +6,7 @@ import { getOnnxProviderModule } from './default.js';
  * @typedef {Object} ModelRegistryInferenceProvider
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} listModelArtifacts
  * @property {(options: Object) => Promise<string[]>} [getAvailableDtypes]
- * @property {(files: string[], sessions: Record<string, string>) => string[]} [filterModelArtifacts]
+ * @property {(files: string[], options: Object) => string[]} [filterModelArtifacts]
  */
 
 /**

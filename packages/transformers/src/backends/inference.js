@@ -20,6 +20,7 @@
 
 import { getCausalGenerationCapabilities, installGenerationRuntime } from '../generation/runtime.js';
 import { validateInferenceArtifactProvider } from './artifacts.js';
+import { env } from '../env.js';
 
 /**
  * @typedef {Object} ForwardCapabilitiesV1
@@ -36,6 +37,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  * @property {Readonly<Record<string, unknown>>} [encoderDecoderGeneration]
  * @property {Readonly<Record<string, unknown>>} [diffusion]
  * @property {Readonly<Record<string, unknown>>} [audioGeneration]
+ * @property {{version: 1, input: 'audio'}} [automaticSpeechRecognition]
  */
 
 /**
@@ -51,6 +53,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
 /**
  * @typedef {import('../utils/hub.js').PretrainedModelOptions & {
  *   modelId: string,
+ *   fetch: typeof globalThis.fetch,
  *   task?: string,
  *   config?: import('../configs.js').PretrainedConfig,
  *   modelClass?: Function,
@@ -61,6 +64,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
 
 /**
  * @typedef {import('../utils/hub.js').PretrainedModelOptions & {
+ *   fetch?: typeof globalThis.fetch,
  *   task?: string,
  *   config?: import('../configs.js').PretrainedConfig,
  *   modelClass?: Function,
@@ -76,6 +80,7 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  * @property {InferenceModelCapabilities} [capabilities]
  * @property {import('../generation/runtime.js').GenerationCapabilitiesV1} [generationCapabilities] Deprecated flat causal-generation capabilities.
  * @property {(options: import('../generation/runtime.js').AutoregressiveSessionOptionsV1) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession]
+ * @property {(audio: Float32Array, options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor>} [transcribeAudio]
  * @property {import('../configs.js').PretrainedConfig} [config]
  * @property {() => Promise<unknown>|unknown} dispose
  */
@@ -86,13 +91,14 @@ import { validateInferenceArtifactProvider } from './artifacts.js';
  *
  * @typedef {
  *   | {content: string, modelId?: never, file?: never}
- *   | {content?: never, modelId?: string, file?: string}
+ *   | {content?: never, modelId?: string, revision?: string, subfolder?: string, file?: string}
  * } InferenceBackendChatTemplate
  */
 
 /**
  * @typedef {Object} InferenceBackend
  * @property {string} modelId Model ID or local path used for shared config, tokenizer, and processor assets.
+ * @property {{revision?: string, subfolder?: string}} [sharedAssets] Backend-selected location details for shared Transformers.js assets.
  * @property {InferenceBackendChatTemplate} [chatTemplate] Default chat template installed on a pipeline tokenizer.
  * @property {StaticBackendCapabilities} [capabilities]
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
@@ -144,6 +150,36 @@ export function getModelId(model) {
     if (typeof model === 'string') return model;
     if (isInferenceBackend(model)) return model.modelId;
     throw new TypeError('Model must be a model ID string or an inference backend with `modelId` and `load(options)`.');
+}
+
+/**
+ * Add host-owned services to options passed across the inference-backend boundary.
+ * The host fetch implementation is authoritative so every backend request observes
+ * Transformers.js environment customization.
+ *
+ * @param {Object} [options]
+ * @returns {Object & {fetch: typeof globalThis.fetch}}
+ */
+export function withInferenceBackendHostOptions(options = {}) {
+    return { ...options, fetch: env.fetch };
+}
+
+/**
+ * Apply backend-selected shared-asset location details. Source-specific values
+ * take precedence over per-load options, which retain their normal defaults.
+ *
+ * @param {InferenceBackend} backend
+ * @param {Object} [options]
+ * @returns {Object}
+ */
+export function withInferenceBackendSharedAssetOptions(backend, options = {}) {
+    const source = backend.sharedAssets;
+    if (!source) return { ...options };
+    return {
+        ...options,
+        revision: source.revision ?? options.revision,
+        subfolder: source.subfolder ?? options.subfolder,
+    };
 }
 
 /**
@@ -241,7 +277,7 @@ export function normalizeInferenceModel(model) {
  * @returns {Promise<InferenceModel|Function>}
  */
 export async function loadInferenceModel(backend, options) {
-    const loadOptions = { ...options, modelId: backend.modelId };
+    const loadOptions = withInferenceBackendHostOptions({ ...options, modelId: backend.modelId });
     if (loadOptions.device === null) loadOptions.device = undefined;
     if (loadOptions.dtype === null) loadOptions.dtype = undefined;
     validateInferenceArtifactProvider(loadOptions.artifactProvider);

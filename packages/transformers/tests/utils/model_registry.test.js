@@ -12,6 +12,7 @@ await import("../../src/models/registry.js");
 // Dynamic import after mock setup (required for ESM)
 const { get_available_dtypes } = await import("../../src/utils/model_registry/get_available_dtypes.js");
 const { ModelRegistry } = await import("../../src/utils/model_registry/ModelRegistry.js");
+const { env } = await import("../../src/env.js");
 
 // A minimal config that mimics a BERT-like encoder-only model
 const ENCODER_ONLY_CONFIG = {
@@ -68,7 +69,14 @@ describe("get_available_dtypes", () => {
     };
 
     await expect(get_available_dtypes("test/model", { config: ENCODER_ONLY_CONFIG, inferenceProvider })).resolves.toEqual(["native"]);
-    expect(inferenceProvider.getAvailableDtypes).toHaveBeenCalledWith(expect.objectContaining({ modelId: "test/model" }));
+    expect(inferenceProvider.getAvailableDtypes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "test/model",
+        modelType: expect.any(String),
+        config: expect.objectContaining(ENCODER_ONLY_CONFIG),
+      }),
+    );
+    expect(inferenceProvider.getAvailableDtypes.mock.calls[0][0]).not.toHaveProperty("sessions");
   });
 
   it("should detect fp32 and q4 for an encoder-only model", async () => {
@@ -208,6 +216,7 @@ describe("custom inference backend artifacts", () => {
     const listModelArtifacts = jest.fn(() => ["config.json", "model.safetensors"]);
     const backend = {
       modelId: "test/custom-model",
+      sharedAssets: { revision: "backend-revision", subfolder: "shared" },
       load() {},
       listModelArtifacts,
     };
@@ -217,6 +226,7 @@ describe("custom inference backend artifacts", () => {
         config: DECODER_ONLY_CONFIG,
         device: "webgpu",
         dtype: "auto",
+        revision: "load-revision",
       }),
     ).resolves.toEqual(["config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json"]);
     expect(listModelArtifacts).toHaveBeenCalledWith(
@@ -225,8 +235,13 @@ describe("custom inference backend artifacts", () => {
         task: "text-generation",
         device: "webgpu",
         dtype: "auto",
+        revision: "backend-revision",
+        subfolder: "shared",
+        fetch: env.fetch,
+        modelType: expect.any(String),
       }),
     );
+    expect(listModelArtifacts.mock.calls[0][0]).not.toHaveProperty("sessions");
   });
 
   it("uses backend-owned cache metadata and deletion hooks", async () => {
@@ -255,6 +270,26 @@ describe("custom inference backend artifacts", () => {
       filesDeleted: 1,
       filesCached: 1,
     });
-    expect(deleteModelArtifact).toHaveBeenCalledWith("model.bin", expect.objectContaining({ inferenceBackend: backend }));
+    expect(deleteModelArtifact).toHaveBeenCalledWith(
+      "model.bin",
+      expect.objectContaining({ inferenceBackend: backend, fetch: env.fetch }),
+    );
+  });
+
+  it("applies backend shared-asset coordinates to direct metadata queries", async () => {
+    mockGetFileMetadata.mockResolvedValue({ exists: true });
+    const backend = {
+      modelId: "test/shared-assets",
+      sharedAssets: { revision: "backend-revision", subfolder: "assets" },
+      load() {},
+    };
+
+    await ModelRegistry.get_file_metadata(backend, "config.json", { revision: "load-revision" });
+
+    expect(mockGetFileMetadata).toHaveBeenCalledWith(
+      backend,
+      "config.json",
+      expect.objectContaining({ revision: "backend-revision", subfolder: "assets" }),
+    );
   });
 });

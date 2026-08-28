@@ -1,9 +1,9 @@
-import { getSessionsConfig } from '../../models/session_config.js';
 import { AutoConfig } from '../../configs.js';
 import { makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
 import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
+import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -23,20 +23,25 @@ import { getModelRegistryInferenceProvider } from '../../backends/model_registry
  * @param {string|null} [options.cache_dir=null] Custom local cache directory.
  * @param {boolean} [options.local_files_only=false] Never hit the network if true.
  * @param {string} [options.revision='main'] Git branch, tag, or commit SHA.
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets.
+ * @param {AbortSignal} [options.signal] Cancellation signal.
  * @returns {Promise<PretrainedConfig>}
  */
 export function get_config(
     modelId,
-    { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+    { config = null, cache_dir = null, local_files_only = false, revision = 'main', subfolder = null, signal = undefined } = {},
 ) {
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
-        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision });
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
     }
-    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision });
+    if (signal) {
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
+    }
+    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision, subfolder });
     return memoizePromise(key, () =>
-        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision }),
+        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal }),
     );
 }
 
@@ -56,7 +61,10 @@ export function get_config(
  * @param {string|null} [options.cache_dir=null] Custom cache directory.
  * @param {boolean} [options.local_files_only=false] Never hit the network if true.
  * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets.
+ * @param {AbortSignal} [options.signal] Cancellation signal.
  * @param {string|null} [options.task=null] Pipeline task requesting the artifacts.
+ * @param {boolean|number|Record<string, boolean|number>} [options.use_external_data_format=null] ONNX external-data configuration.
  * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
@@ -70,25 +78,33 @@ export async function get_model_files(
         cache_dir = null,
         local_files_only = false,
         revision = 'main',
+        subfolder = null,
+        signal = undefined,
+        use_external_data_format = null,
         task = null,
         inferenceProvider = null,
     } = {},
 ) {
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
 
     // Infer model type from config
     const modelType = resolve_model_type(config);
-    const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
     const provider = await getModelRegistryInferenceProvider(inferenceProvider);
     return [
-        ...(await provider.listModelArtifacts({
+        ...(await provider.listModelArtifacts(withInferenceBackendHostOptions({
             modelId,
             task,
-            sessions,
-            optionalConfigs: optional_configs,
+            modelType,
             config,
+            model_file_name,
             dtype: overrideDtype,
             device: overrideDevice,
-        })),
+            cache_dir,
+            local_files_only,
+            revision,
+            subfolder,
+            signal,
+            use_external_data_format,
+        }))),
     ];
 }

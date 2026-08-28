@@ -31,8 +31,8 @@ import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
-import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
-import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel } from '../backends/inference.js';
+import { MODEL_TYPES } from './model_types.js';
+import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel, withInferenceBackendHostOptions, withInferenceBackendSharedAssetOptions } from '../backends/inference.js';
 import { getDefaultInferenceProvider, getOnnxProviderModule } from '../backends/default.js';
 
 /**
@@ -79,12 +79,11 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
+export { MODEL_TYPES } from './model_types.js';
 
 /**
- * Runtime-only model type configuration (forward functions, generation flags).
- * Session/file configuration lives in `MODEL_SESSION_CONFIG` (session_config.js)
- * and is merged in at lookup time by `resolveTypeConfig` to avoid duplication.
+ * Runtime-neutral model behavior configuration (forward functions, generation flags).
+ * Physical session and file configuration belongs to the inference provider.
  */
 const MODEL_RUNTIME_CONFIG = {
     [MODEL_TYPES.DecoderOnly]: {
@@ -158,7 +157,7 @@ const MODEL_RUNTIME_CONFIG = {
  * Resolves the model type config for a given class name and config.
  * @param {string} modelName The name of the class being used to load.
  * @param {Object} config The model config.
- * @returns {{ typeConfig: Object, textOnly: boolean, modelType: number|undefined }}
+ * @returns {{ typeConfig: Object, textOnly: boolean, modelType: string|undefined }}
  */
 function resolveTypeConfig(modelName, config) {
     let modelType = MODEL_TYPE_MAPPING.get(modelName);
@@ -180,9 +179,8 @@ function resolveTypeConfig(modelName, config) {
         }
     }
 
-    const runtimeConfig = MODEL_RUNTIME_CONFIG[modelType] ?? MODEL_RUNTIME_CONFIG.default;
-    const sessionConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
-    return { typeConfig: { ...runtimeConfig, ...sessionConfig }, textOnly, modelType };
+    const typeConfig = MODEL_RUNTIME_CONFIG[modelType] ?? MODEL_RUNTIME_CONFIG.default;
+    return { typeConfig, textOnly, modelType };
 }
 
 export const MODEL_TYPE_MAPPING = new Map();
@@ -257,30 +255,36 @@ export class PreTrainedModel extends Callable {
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         if (typeof pretrained_model_name_or_path === 'string') {
             const provider = await getDefaultInferenceProvider(pretrained_model_name_or_path);
-            return provider.load({
+            return provider.load(withInferenceBackendHostOptions({
                 ...options,
                 modelClass: this,
-            });
+            }));
         }
         if (isOnnxSessionProvider(pretrained_model_name_or_path)) {
             await getOnnxProviderModule();
-            return /** @type {any} */ (pretrained_model_name_or_path).load({ ...options, modelClass: this });
+            return /** @type {any} */ (pretrained_model_name_or_path).load(
+                withInferenceBackendHostOptions({ ...options, modelClass: this }),
+            );
         }
         if (isInferenceBackend(pretrained_model_name_or_path)) {
             const modelId = getModelId(pretrained_model_name_or_path);
             /** @type {import('../backends/inference.js').InferenceModelLoadOptions} */
-            const resolvedOptions = { ...options };
+            const resolvedOptions = withInferenceBackendSharedAssetOptions(pretrained_model_name_or_path, options);
             resolvedOptions.config =
                 resolvedOptions.config ?? (await AutoConfig.from_pretrained(modelId, resolvedOptions));
+            /** @type {ReadonlyArray<string>|null} */
+            let expectedFiles = null;
+            if (typeof pretrained_model_name_or_path.listModelArtifacts === 'function') {
+                expectedFiles = await pretrained_model_name_or_path.listModelArtifacts(withInferenceBackendHostOptions({
+                    ...resolvedOptions,
+                    modelId,
+                }));
+            }
             if (
                 resolvedOptions.progress_callback &&
                 !(resolvedOptions.progress_callback instanceof DefaultProgressCallback) &&
-                typeof pretrained_model_name_or_path.listModelArtifacts === 'function'
+                expectedFiles
             ) {
-                const expectedFiles = await pretrained_model_name_or_path.listModelArtifacts({
-                    ...resolvedOptions,
-                    modelId,
-                });
                 const metadata = await Promise.all(
                     expectedFiles.map((file) =>
                         get_file_metadata(pretrained_model_name_or_path, file, resolvedOptions),
@@ -301,6 +305,14 @@ export class PreTrainedModel extends Callable {
                 resolvedOptions.progress_callback = new DefaultProgressCallback(
                     resolvedOptions.progress_callback,
                     filesLoading,
+                );
+            }
+            if (expectedFiles?.includes('generation_config.json') && resolvedOptions.generation_config == null) {
+                resolvedOptions.generation_config = await getModelJSON(
+                    modelId,
+                    'generation_config.json',
+                    false,
+                    resolvedOptions,
                 );
             }
             // Custom models are duck-typed to the same runtime contract as PreTrainedModel.
@@ -379,6 +391,12 @@ export class PreTrainedModel extends Callable {
                     device,
                     model_file_name,
                     inferenceProvider,
+                    cache_dir,
+                    local_files_only,
+                    revision,
+                    subfolder,
+                    signal,
+                    use_external_data_format,
                 });
 
                 const metadata = await Promise.all(
@@ -405,10 +423,13 @@ export class PreTrainedModel extends Callable {
             }
         }
 
-        const sessions = typeConfig.sessions(config, options, textOnly);
-        const promises = [constructSessions(sessions, options, typeConfig.cache_sessions)];
-        if (typeConfig.optional_configs) {
-            promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
+        const sessionConfig = inferenceProvider?.getSessionConfig?.(modelType, config, { ...options, textOnly });
+        if (!sessionConfig) {
+            throw new Error('The inference provider does not define session artifacts for this model architecture.');
+        }
+        const promises = [constructSessions(sessionConfig.sessions, options, sessionConfig.cache_sessions)];
+        if (sessionConfig.optional_configs) {
+            promises.push(get_optional_configs(pretrained_model_name_or_path, sessionConfig.optional_configs, options));
         }
         const info = await Promise.all(promises);
 

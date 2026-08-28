@@ -1,31 +1,38 @@
-export const MODEL_TYPES = {
-    EncoderOnly: 0,
-    EncoderDecoder: 1,
-    Seq2Seq: 2,
-    Vision2Seq: 3,
-    DecoderOnly: 4,
-    DecoderOnlyWithoutHead: 5,
-    MaskGeneration: 6,
-    ImageTextToText: 7,
-    Musicgen: 8,
-    MultiModality: 9,
-    Phi3V: 10,
-    AudioTextToText: 11,
-    AutoEncoder: 12,
-    ImageAudioTextToText: 13,
-    Supertonic: 14,
-    Chatterbox: 15,
-    VoxtralRealtime: 16,
+const MODEL_TYPES = {
+    EncoderOnly: 'EncoderOnly',
+    EncoderDecoder: 'EncoderDecoder',
+    Seq2Seq: 'Seq2Seq',
+    Vision2Seq: 'Vision2Seq',
+    DecoderOnly: 'DecoderOnly',
+    DecoderOnlyWithoutHead: 'DecoderOnlyWithoutHead',
+    MaskGeneration: 'MaskGeneration',
+    ImageTextToText: 'ImageTextToText',
+    Musicgen: 'Musicgen',
+    MultiModality: 'MultiModality',
+    Phi3V: 'Phi3V',
+    AudioTextToText: 'AudioTextToText',
+    AutoEncoder: 'AutoEncoder',
+    ImageAudioTextToText: 'ImageAudioTextToText',
+    Supertonic: 'Supertonic',
+    Chatterbox: 'Chatterbox',
+    VoxtralRealtime: 'VoxtralRealtime',
+} as const;
+
+type SessionConfig = {
+    sessions(config: any, options: any, textOnly?: boolean): Record<string, string>;
+    cache_sessions?: Record<string, true>;
+    optional_configs?: Record<string, string>;
+    text_only_sessions?: Record<string, string>;
 };
 
-export const MODEL_SESSION_CONFIG = {
+const MODEL_SESSION_CONFIG: Record<string | number, SessionConfig> = {
     [MODEL_TYPES.DecoderOnly]: {
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
+        sessions: (_config, options) => ({ model: options.model_file_name ?? 'model' }),
         cache_sessions: { model: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.DecoderOnlyWithoutHead]: {
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
+        sessions: (_config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
     [MODEL_TYPES.Seq2Seq]: {
         sessions: () => ({ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }),
@@ -55,35 +62,30 @@ export const MODEL_SESSION_CONFIG = {
     },
     [MODEL_TYPES.ImageTextToText]: {
         text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_SESSION_CONFIG[MODEL_TYPES.ImageTextToText].text_only_sessions };
-            if (!textOnly) s['vision_encoder'] = 'vision_encoder';
-            if (config.is_encoder_decoder) s['model'] = 'encoder_model';
-            return s;
+        sessions: (config, _options, textOnly) => {
+            const sessions = { ...MODEL_SESSION_CONFIG[MODEL_TYPES.ImageTextToText].text_only_sessions };
+            if (!textOnly) sessions.vision_encoder = 'vision_encoder';
+            if (config.is_encoder_decoder) sessions.model = 'encoder_model';
+            return sessions;
         },
         cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
         text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_SESSION_CONFIG[MODEL_TYPES.AudioTextToText].text_only_sessions };
-            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
-            return s;
-        },
+        sessions: (_config, _options, textOnly) => ({
+            ...MODEL_SESSION_CONFIG[MODEL_TYPES.AudioTextToText].text_only_sessions,
+            ...(textOnly ? {} : { audio_encoder: 'audio_encoder' }),
+        }),
         cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
         text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_SESSION_CONFIG[MODEL_TYPES.ImageAudioTextToText].text_only_sessions };
-            if (!textOnly) {
-                s['audio_encoder'] = 'audio_encoder';
-                s['vision_encoder'] = 'vision_encoder';
-            }
-            return s;
-        },
+        sessions: (_config, _options, textOnly) => ({
+            ...MODEL_SESSION_CONFIG[MODEL_TYPES.ImageAudioTextToText].text_only_sessions,
+            ...(textOnly ? {} : { audio_encoder: 'audio_encoder', vision_encoder: 'vision_encoder' }),
+        }),
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {
@@ -111,11 +113,7 @@ export const MODEL_SESSION_CONFIG = {
         sessions: () => ({ encoder_model: 'encoder_model', decoder_model: 'decoder_model' }),
     },
     [MODEL_TYPES.Supertonic]: {
-        sessions: () => ({
-            text_encoder: 'text_encoder',
-            latent_denoiser: 'latent_denoiser',
-            voice_decoder: 'voice_decoder',
-        }),
+        sessions: () => ({ text_encoder: 'text_encoder', latent_denoiser: 'latent_denoiser', voice_decoder: 'voice_decoder' }),
     },
     [MODEL_TYPES.Chatterbox]: {
         sessions: () => ({
@@ -129,42 +127,27 @@ export const MODEL_SESSION_CONFIG = {
     },
     [MODEL_TYPES.VoxtralRealtime]: {
         text_only_sessions: { embed_tokens: 'embed_tokens', decoder_model_merged: 'decoder_model_merged' },
-        sessions: (config, options, textOnly) => {
-            const s = { ...MODEL_SESSION_CONFIG[MODEL_TYPES.VoxtralRealtime].text_only_sessions };
-            if (!textOnly) s['audio_encoder'] = 'audio_encoder';
-            return s;
-        },
+        sessions: (_config, _options, textOnly) => ({
+            ...MODEL_SESSION_CONFIG[MODEL_TYPES.VoxtralRealtime].text_only_sessions,
+            ...(textOnly ? {} : { audio_encoder: 'audio_encoder' }),
+        }),
         cache_sessions: { decoder_model_merged: true, audio_encoder: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     default: {
-        sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
+        sessions: (_config, options) => ({ model: options.model_file_name ?? 'model' }),
     },
 };
 
-/**
- * Returns the text-only session names for a given model type, or `null` if
- * the model type does not define a text-only session set.
- * @param {number} modelType The model type enum value.
- * @returns {Record<string, string>|null}
- */
-export function getTextOnlySessions(modelType) {
-    const typeConfig = MODEL_SESSION_CONFIG[modelType];
-    return typeConfig?.text_only_sessions ?? null;
-}
-
-/**
- * Get the session configuration for a given model type.
- * @param {number} modelType The model type enum value.
- * @param {Object} config The model config.
- * @param {Object} [options] Loading options.
- * @returns {{ sessions: Record<string, string>, cache_sessions?: Record<string, true>, optional_configs?: Record<string, string> }}
- */
-export function getSessionsConfig(modelType, config, options = {}) {
+export function getSessionsConfig(modelType: string, config: any, options: any = {}) {
     const typeConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
     return {
         sessions: typeConfig.sessions(config, options, options.textOnly ?? false),
         cache_sessions: typeConfig.cache_sessions,
         optional_configs: typeConfig.optional_configs,
     };
+}
+
+export function getTextOnlySessions(modelType: string): Record<string, string> | null {
+    return MODEL_SESSION_CONFIG[modelType]?.text_only_sessions ?? null;
 }

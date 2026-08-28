@@ -58,9 +58,17 @@ import { createGenerationController } from './controller.js';
  */
 
 /**
+ * @typedef {Object} RuntimeTokenMaskProcessorV1
+ * @property {'token-mask'} op
+ * @property {() => Uint32Array} getMask
+ * @property {(maxTokens?: number) => number[]} [getFastForward]
+ * @property {(tokenIds: Uint32Array, target?: Uint8Array) => Uint8Array} [validateCandidates]
+ */
+
+/**
  * @typedef {Object} RuntimeGenerationPlanV1
  * @property {1} version
- * @property {ReadonlyArray<never>} processors
+ * @property {ReadonlyArray<RuntimeTokenMaskProcessorV1>} processors
  * @property {{readonly op: 'argmax'}|{readonly op: 'multinomial', readonly temperature: number, readonly topK: number}} sampler
  * @property {number} maxNewTokens
  * @property {number} [pipelineDepth]

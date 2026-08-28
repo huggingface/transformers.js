@@ -42,14 +42,13 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
  * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
  * NOTE: This setting is ignored for local requests.
+ * @property {string} [subfolder=null] Optional directory containing shared model assets.
  * @property {AbortSignal} [signal] Signal used to cancel backend-owned model loading.
  * @property {import('../backends/artifacts.js').InferenceArtifactProvider} [artifactProvider] Optional random-access artifact provider supplied to custom inference backends.
  */
 
 /**
  * @typedef {Object} ModelSpecificPretrainedOptions Options for loading a pretrained model.
- * @property {string} [subfolder=null] In case the provider artifacts are located inside a subfolder of the model repo on huggingface.co,
- * you can specify the folder name here.
  * @property {string} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). Currently only valid for encoder- or decoder-only models.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
@@ -138,7 +137,8 @@ export function getFetchHeaders(urlOrPath) {
 export function buildResourcePaths(path_or_repo_id, filename, options = {}, cache = null) {
     path_or_repo_id = getModelId(path_or_repo_id);
     const revision = options.revision ?? 'main';
-    const requestURL = pathJoin(path_or_repo_id, filename);
+    const relativeFilename = options.subfolder ? pathJoin(options.subfolder, filename) : filename;
+    const requestURL = pathJoin(path_or_repo_id, relativeFilename);
 
     const validModelId = isValidHfModelId(path_or_repo_id);
     const localPath = validModelId ? pathJoin(env.localModelPath, requestURL) : requestURL;
@@ -147,7 +147,7 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
         env.remotePathTemplate
             .replaceAll('{model}', path_or_repo_id)
             .replaceAll('{revision}', encodeURIComponent(revision)),
-        filename,
+        relativeFilename,
     );
 
     const proposedCacheKey =
@@ -157,7 +157,7 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
               // If a specific revision is requested, we account for this in the cache key.
               revision === 'main'
                 ? requestURL
-                : pathJoin(path_or_repo_id, revision, filename)
+                : pathJoin(path_or_repo_id, revision, relativeFilename)
             : remoteURL;
 
     return {

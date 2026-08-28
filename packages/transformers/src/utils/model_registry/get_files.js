@@ -15,6 +15,9 @@ import { get_processor_files } from './get_processor_files.js';
  * @param {string|null} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Never hit the network if true
  * @param {string} [options.revision='main'] Model revision
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets
+ * @param {AbortSignal} [options.signal] Cancellation signal
+ * @param {boolean|number|Record<string, boolean|number>} [options.use_external_data_format=null] ONNX external-data configuration
  * @param {string|null} [options.task=null] Pipeline task requesting the artifacts
  * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider
  * @param {boolean} [options.include_tokenizer=true] Whether to check for tokenizer files (set to false for vision-only models)
@@ -32,6 +35,9 @@ export async function get_files(
         cache_dir = null,
         local_files_only = false,
         revision = 'main',
+        subfolder = null,
+        signal = undefined,
+        use_external_data_format = null,
         task = null,
         inferenceProvider = null,
         include_tokenizer = true,
@@ -39,7 +45,7 @@ export async function get_files(
         include_model = true,
     } = {},
 ) {
-    const metadataOptions = { cache_dir, local_files_only, revision };
+    const metadataOptions = { cache_dir, local_files_only, revision, subfolder, signal };
     const files = include_model
         ? await get_model_files(modelId, {
               config,
@@ -48,6 +54,9 @@ export async function get_files(
               model_file_name,
               task,
               inferenceProvider,
+              subfolder,
+              signal,
+              use_external_data_format,
               ...metadataOptions,
           })
         : [];

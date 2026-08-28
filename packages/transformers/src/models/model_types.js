@@ -1,0 +1,20 @@
+/** Semantic model categories used by Transformers.js model dispatch. */
+export const MODEL_TYPES = {
+    EncoderOnly: 'EncoderOnly',
+    EncoderDecoder: 'EncoderDecoder',
+    Seq2Seq: 'Seq2Seq',
+    Vision2Seq: 'Vision2Seq',
+    DecoderOnly: 'DecoderOnly',
+    DecoderOnlyWithoutHead: 'DecoderOnlyWithoutHead',
+    MaskGeneration: 'MaskGeneration',
+    ImageTextToText: 'ImageTextToText',
+    Musicgen: 'Musicgen',
+    MultiModality: 'MultiModality',
+    Phi3V: 'Phi3V',
+    AudioTextToText: 'AudioTextToText',
+    AutoEncoder: 'AutoEncoder',
+    ImageAudioTextToText: 'ImageAudioTextToText',
+    Supertonic: 'Supertonic',
+    Chatterbox: 'Chatterbox',
+    VoxtralRealtime: 'VoxtralRealtime',
+};

@@ -1,7 +1,6 @@
 import { get_files } from './get_files.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
 
@@ -20,6 +19,9 @@ import { getModelRegistryInferenceProvider } from '../../backends/model_registry
  * @param {string|null} [options.cache_dir=null] - Custom cache directory
  * @param {boolean} [options.local_files_only=false] - Never hit the network if true
  * @param {string} [options.revision='main'] - Model revision
+ * @param {string|null} [options.subfolder=null] - Optional directory containing shared assets
+ * @param {AbortSignal} [options.signal] - Cancellation signal
+ * @param {boolean|number|Record<string, boolean|number>} [options.use_external_data_format=null] - ONNX external-data configuration
  * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] - Artifact metadata provider
  * @param {boolean} [options.include_model=true] - Whether to include built-in ONNX model files
  * @returns {Promise<string[]>} Array of file paths that will be loaded
@@ -57,13 +59,9 @@ export async function get_pipeline_files(task, modelId, options = {}) {
     if (task === 'text-generation' && options.include_model !== false) {
         const config = await get_config(modelId, options);
         const modelType = resolve_model_type(config);
-        const textOnlySessions = getTextOnlySessions(modelType);
-
-        if (textOnlySessions) {
-            const provider = await getModelRegistryInferenceProvider(options.inferenceProvider ?? null);
-            if (provider.filterModelArtifacts) {
-                return provider.filterModelArtifacts(files, textOnlySessions);
-            }
+        const provider = await getModelRegistryInferenceProvider(options.inferenceProvider ?? null);
+        if (provider.filterModelArtifacts) {
+            return provider.filterModelArtifacts(files, { modelType, config });
         }
     }
 

@@ -8,6 +8,7 @@ import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource } from '../hub.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
+import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {Object} FileClearStatus
@@ -41,11 +42,12 @@ async function clear_files_from_cache(modelId, files, options = {}) {
 
     const results = await Promise.all(
         files.map(async (filename) => {
-            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, options);
+            const backendOptions = withInferenceBackendHostOptions(options);
+            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, backendOptions);
             if (backendMetadata) {
                 const wasCached = backendMetadata.fromCache === true;
                 const deleted = wasCached
-                    ? (await options.inferenceBackend?.deleteModelArtifact?.(filename, options)) === true
+                    ? (await options.inferenceBackend?.deleteModelArtifact?.(filename, backendOptions)) === true
                     : false;
                 return { file: filename, deleted, wasCached };
             }

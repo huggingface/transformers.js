@@ -1,5 +1,5 @@
 import { MODEL_MAPPING_NAMES, MODEL_TYPE_MAPPING } from '../../models/modeling_utils.js';
-import { MODEL_TYPES } from '../../models/session_config.js';
+import { MODEL_TYPES } from '../../models/model_types.js';
 import { GITHUB_ISSUE_URL } from '../constants.js';
 import { logger } from '../logger.js';
 
@@ -21,7 +21,7 @@ import { logger } from '../logger.js';
  * @param {PretrainedConfig} config The model config object.
  * @param {{ warn?: boolean }} [options] Set `warn` to false to suppress the
  *   fallback warning (defaults to true).
- * @returns {number} One of the MODEL_TYPES enum values.
+ * @returns {string} One of the MODEL_TYPES values.
  */
 export function resolve_model_type(config, { warn = true } = {}) {
     // @ts-ignore - architectures is set via Object.assign in PretrainedConfig constructor

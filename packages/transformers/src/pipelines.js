@@ -56,6 +56,7 @@ import {
     isInferenceBackend,
     isOnnxSessionProvider,
     loadInferenceModel,
+    withInferenceBackendSharedAssetOptions,
     validateInferenceBackendTask,
     validateInferenceModelTask,
 } from './backends/inference.js';
@@ -77,18 +78,22 @@ import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
  *
  * @param {import('./backends/inference.js').InferenceBackend} backend
  * @param {import('./utils/hub.js').PretrainedModelOptions} options
+ * @param {import('./utils/hub.js').PretrainedModelOptions} [loadLocation]
  * @returns {Promise<string>|null}
  */
-export function loadInferenceBackendChatTemplate(backend, options) {
+export function loadInferenceBackendChatTemplate(backend, options, loadLocation = options) {
     const source = backend.chatTemplate;
     if (source == null) return null;
     if (typeof source !== 'object') {
         throw new TypeError('Inference backend `chatTemplate` must be an object.');
     }
     if (Object.hasOwn(source, 'content')) {
-        if (typeof source.content !== 'string' || Object.hasOwn(source, 'modelId') || Object.hasOwn(source, 'file')) {
+        if (
+            typeof source.content !== 'string' ||
+            ['modelId', 'revision', 'subfolder', 'file'].some((key) => Object.hasOwn(source, key))
+        ) {
             throw new TypeError(
-                'Inference backend `chatTemplate.content` must be a string and cannot be combined with `modelId` or `file`.',
+                'Inference backend `chatTemplate.content` must be a string and cannot be combined with source fields.',
             );
         }
         return Promise.resolve(source.content);
@@ -99,7 +104,19 @@ export function loadInferenceBackendChatTemplate(backend, options) {
     if (source.file !== undefined && typeof source.file !== 'string') {
         throw new TypeError('Inference backend `chatTemplate.file` must be a string.');
     }
-    return getModelText(source.modelId ?? backend.modelId, source.file ?? CHAT_TEMPLATE_NAME, true, options);
+    if (source.revision !== undefined && typeof source.revision !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.revision` must be a string.');
+    }
+    if (source.subfolder !== undefined && typeof source.subfolder !== 'string') {
+        throw new TypeError('Inference backend `chatTemplate.subfolder` must be a string.');
+    }
+    const usesSharedRepository = source.modelId === undefined || source.modelId === backend.modelId;
+    const location = usesSharedRepository ? options : loadLocation;
+    return getModelText(source.modelId ?? backend.modelId, source.file ?? CHAT_TEMPLATE_NAME, true, {
+        ...location,
+        revision: source.revision ?? location.revision,
+        subfolder: source.subfolder ?? location.subfolder,
+    });
 }
 
 /**
@@ -154,6 +171,7 @@ export async function pipeline(
         artifactProvider = undefined,
     } = {},
 ) {
+    const loadLocation = { revision, subfolder };
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -179,6 +197,12 @@ export async function pipeline(
             ? /** @type {import('./backends/model_registry.js').ModelRegistryInferenceProvider} */ (model)
             : null;
     const modelId = getModelId(model);
+    if (customBackend) {
+        ({ revision, subfolder } = withInferenceBackendSharedAssetOptions(
+            /** @type {import('./backends/inference.js').InferenceBackend} */ (model),
+            { revision, subfolder },
+        ));
+    }
     validateInferenceArtifactProvider(artifactProvider);
     if (customBackend) {
         validateInferenceBackendTask(/** @type {import('./backends/inference.js').InferenceBackend} */ (model), task);
@@ -192,6 +216,9 @@ export async function pipeline(
         cache_dir,
         local_files_only,
         revision,
+        subfolder,
+        signal,
+        use_external_data_format,
         model_file_name,
         inferenceProvider: customRegistryProvider,
         include_model: !customBackend || customRegistryProvider !== null,
@@ -209,6 +236,7 @@ export async function pipeline(
                     cache_dir,
                     local_files_only,
                     revision,
+                    subfolder,
                     signal,
                 }),
             ),
@@ -253,7 +281,7 @@ export async function pipeline(
     let modelPromise;
     if (customBackend) {
         pretrainedOptions.config = config ?? (await AutoConfig.from_pretrained(modelId, pretrainedOptions));
-        if (task === 'text-generation') {
+        if (expected_files.includes('generation_config.json')) {
             pretrainedOptions.generation_config = await getModelJSON(
                 modelId,
                 'generation_config.json',
@@ -294,6 +322,7 @@ export async function pipeline(
                 ? loadInferenceBackendChatTemplate(
                       /** @type {import('./backends/inference.js').InferenceBackend} */ (model),
                       pretrainedOptions,
+                      loadLocation,
                   )
                 : null,
         ]);

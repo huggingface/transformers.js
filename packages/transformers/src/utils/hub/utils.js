@@ -66,6 +66,7 @@ export function isValidHfModelId(string) {
  * @param {string} [options.revision='main'] Model revision.
  * @param {string|null} [options.cache_dir=null] Custom cache directory.
  * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {string|null} [options.subfolder=null] Optional model subfolder.
  * @param {...unknown} parts Additional key parts for the specific operation.
  * @returns {string}
  */
@@ -75,6 +76,7 @@ export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
         options.revision ?? 'main',
         options.cache_dir ?? null,
         options.local_files_only ?? false,
+        options.subfolder ?? null,
         ...parts,
     ]);
 }

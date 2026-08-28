@@ -8,8 +8,7 @@ import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } fro
 import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
 import { throwIfAborted } from '../core.js';
-import { getModelId } from '../../backends/inference.js';
-import { isInferenceBackend } from '../../backends/inference.js';
+import { getModelId, isInferenceBackend, withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -62,7 +61,10 @@ export async function get_file_metadata(path_or_repo_id, filename, options = {})
     const backend = isInferenceBackend(path_or_repo_id) ? path_or_repo_id : null;
     path_or_repo_id = getModelId(path_or_repo_id);
     const load = async () => {
-        const backendMetadata = await backend?.getModelArtifactMetadata?.(filename, options);
+        const backendMetadata = await backend?.getModelArtifactMetadata?.(
+            filename,
+            withInferenceBackendHostOptions(options),
+        );
         throwIfAborted(options.signal);
         if (backendMetadata) return { exists: true, ...backendMetadata };
         return _get_file_metadata(path_or_repo_id, filename, options);

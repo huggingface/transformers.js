@@ -1,8 +1,8 @@
-import { getSessionsConfig } from '../../models/session_config.js';
 import { get_file_metadata } from './get_file_metadata.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
 import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
+import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -23,6 +23,8 @@ import { getModelRegistryInferenceProvider } from '../../backends/model_registry
  * @param {string} [options.revision='main'] Model revision
  * @param {string} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Only check local files
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets
+ * @param {AbortSignal} [options.signal] Cancellation signal
  * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider
  * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8'])
  */
@@ -34,22 +36,25 @@ export async function get_available_dtypes(
         revision = 'main',
         cache_dir = null,
         local_files_only = false,
+        subfolder = null,
+        signal = undefined,
         inferenceProvider = null,
     } = {},
 ) {
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
 
     const modelType = resolve_model_type(config);
-    const { sessions } = getSessionsConfig(modelType, config, { model_file_name });
-    const metadataOptions = { revision, cache_dir, local_files_only };
+    const metadataOptions = { revision, cache_dir, local_files_only, subfolder, signal };
     const provider = await getModelRegistryInferenceProvider(inferenceProvider);
     if (!provider.getAvailableDtypes) {
         throw new Error('The inference backend does not support dtype discovery.');
     }
-    return provider.getAvailableDtypes({
+    return provider.getAvailableDtypes(withInferenceBackendHostOptions({
         modelId,
-        sessions,
+        modelType,
+        config,
+        model_file_name,
         getFileMetadata: get_file_metadata,
         metadataOptions,
-    });
+    }));
 }

@@ -110,7 +110,7 @@ import { is_cached, is_cached_files, is_pipeline_cached, is_pipeline_cached_file
 import { get_file_metadata } from './get_file_metadata.js';
 import { clear_cache, clear_pipeline_cache } from './clear_cache.js';
 import { get_available_dtypes } from './get_available_dtypes.js';
-import { getModelId, isInferenceBackend } from '../../backends/inference.js';
+import { getModelId, isInferenceBackend, withInferenceBackendSharedAssetOptions } from '../../backends/inference.js';
 
 function resolveModelRegistryRequest(model, options) {
     const inferenceBackend = isInferenceBackend(model) ? model : null;
@@ -120,7 +120,15 @@ function resolveModelRegistryRequest(model, options) {
             : options.inferenceProvider;
     return {
         modelId: getModelId(model),
-        options: inferenceProvider || inferenceBackend ? { ...options, inferenceProvider, inferenceBackend } : options,
+        options: inferenceProvider || inferenceBackend
+            ? {
+                  ...(inferenceBackend
+                      ? withInferenceBackendSharedAssetOptions(inferenceBackend, options)
+                      : options),
+                  inferenceProvider,
+                  inferenceBackend,
+              }
+            : options,
     };
 }
 
@@ -357,7 +365,8 @@ export class ModelRegistry {
      * console.log(metadata.exists, metadata.size); // true, 665
      */
     static async get_file_metadata(path_or_repo_id, filename, options = {}) {
-        return get_file_metadata(path_or_repo_id, filename, options);
+        const request = resolveModelRegistryRequest(path_or_repo_id, options);
+        return get_file_metadata(path_or_repo_id, filename, request.options);
     }
 
     /**

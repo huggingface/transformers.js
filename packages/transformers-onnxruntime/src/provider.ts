@@ -7,6 +7,7 @@ import {
     Tensor as OrtTensor,
 } from './runtime.js';
 import { getOnnxProviderHost } from './host.js';
+import { getSessionsConfig, getTextOnlySessions } from './session-config.js';
 
 const DATA_TYPES = Object.freeze({
     auto: 'auto',
@@ -96,27 +97,33 @@ export class OnnxInferenceProvider {
     }
 
     static listModelArtifacts({
-        sessions,
-        optionalConfigs,
+        modelType,
         config,
+        model_file_name = null,
+        use_external_data_format = null,
         dtype: overrideDtype = null,
         device: overrideDevice = null,
     }: any): string[] {
+        const { sessions, optional_configs: optionalConfigs } = getSessionsConfig(modelType, config, {
+            model_file_name,
+        });
         const files = ['config.json'];
         const customConfig = config?.['transformers.js_config'] ?? {};
         const rawDevice = overrideDevice ?? customConfig.device;
-        const dtype = overrideDtype ?? customConfig.dtype;
-        for (const [sessionName, baseName] of Object.entries(sessions) as [string, string][]) {
-            const device = selectDevice(rawDevice, sessionName);
-            const selectedDtype = selectDtype(dtype, sessionName, device);
+        for (const baseName of Object.values(sessions) as string[]) {
+            const device = selectDevice(rawDevice, baseName);
+            const deviceConfig = customConfig.device_config?.[device];
+            const resolvedConfig = deviceConfig ? { ...customConfig, ...deviceConfig } : customConfig;
+            const dtype = overrideDtype ?? resolvedConfig.dtype;
+            const selectedDtype = selectDtype(dtype, baseName, device, { configDtype: resolvedConfig.dtype });
             const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype] ?? '';
             const fullName = `${baseName}${suffix}.onnx`;
             files.push(`onnx/${fullName}`);
 
-            const externalConfig = customConfig.use_external_data_format;
+            const externalConfig = use_external_data_format ?? resolvedConfig.use_external_data_format;
             const count =
                 typeof externalConfig === 'object' && externalConfig !== null
-                    ? +(externalConfig[fullName] ?? externalConfig[sessionName] ?? 0)
+                    ? +(externalConfig[fullName] ?? externalConfig[baseName] ?? 0)
                     : +(externalConfig ?? 0);
             files.push(...externalDataChunkNames(fullName, count).map((name) => `onnx/${name}`));
         }
@@ -124,7 +131,8 @@ export class OnnxInferenceProvider {
         return files;
     }
 
-    static async getAvailableDtypes({ modelId, sessions, getFileMetadata, metadataOptions }: any): Promise<string[]> {
+    static async getAvailableDtypes({ modelId, modelType, config, model_file_name, getFileMetadata, metadataOptions }: any): Promise<string[]> {
+        const { sessions } = getSessionsConfig(modelType, config, { model_file_name });
         const results = await Promise.all(
             Object.entries(DEFAULT_DTYPE_SUFFIX_MAPPING).map(async ([dtype, suffix]) => ({
                 dtype,
@@ -142,11 +150,17 @@ export class OnnxInferenceProvider {
         return results.filter((result) => result.available).map((result) => result.dtype);
     }
 
-    static filterModelArtifacts(files: string[], sessions: Record<string, string>): string[] {
+    static filterModelArtifacts(files: string[], { modelType, config }: any): string[] {
+        if (!getTextOnlySessions(modelType)) return files;
+        const { sessions } = getSessionsConfig(modelType, config, { textOnly: true });
         const allowedPrefixes = Object.values(sessions).map((name) => `onnx/${name}`);
         return files.filter(
             (file) => !file.startsWith('onnx/') || allowedPrefixes.some((prefix) => file.startsWith(prefix)),
         );
+    }
+
+    getSessionConfig(modelType: string, config: any, options: any = {}) {
+        return getSessionsConfig(modelType, config, options);
     }
 
     readonly providerType = 'onnx';
@@ -167,7 +181,11 @@ export class OnnxInferenceProvider {
             throw new Error('OnnxInferenceProvider requires a Transformers.js model class before it can load a model.');
         }
         const { modelClass: _modelClass, ...loadOptions } = options;
-        return modelClass._from_pretrained(this.modelId, { ...loadOptions, inferenceProvider: this });
+        return modelClass._from_pretrained(this.modelId, {
+            ...loadOptions,
+            fetch: options.fetch ?? getOnnxProviderHost().env.fetch,
+            inferenceProvider: this,
+        });
     }
 
     async getSession(
@@ -394,10 +412,9 @@ function validateInputs(session: any, inputs: Record<string, any>): Record<strin
 
 async function getCoreModelFile(modelId: string, fileName: string, options: any, suffix: string): Promise<any> {
     const baseName = `${fileName}${suffix}.onnx`;
-    const subfolder = options.subfolder ?? 'onnx';
     return getOnnxProviderHost().getModelFile(
         modelId,
-        subfolder ? `${subfolder}/${baseName}` : baseName,
+        `onnx/${baseName}`,
         true,
         options,
         apis.IS_NODE_ENV,
@@ -437,12 +454,11 @@ async function getModelDataFiles(
     }
 
     if (count > 0) {
-        const subfolder = options.subfolder ?? 'onnx';
         return Promise.all(
             externalDataChunkNames(baseName, count).map(async (path) => {
                 const data = await getOnnxProviderHost().getModelFile(
                     modelId,
-                    subfolder ? `${subfolder}/${path}` : path,
+                    `onnx/${path}`,
                     true,
                     options,
                     apis.IS_NODE_ENV,
