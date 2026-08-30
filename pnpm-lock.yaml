@@ -18,8 +18,8 @@ importers:
   packages/transformers:
     dependencies:
       '@huggingface/jinja':
-        specifier: ^0.5.6
-        version: 0.5.6
+        specifier: ^0.5.9
+        version: 0.5.9
       '@huggingface/tokenizers':
         specifier: ^0.1.3
         version: 0.1.3
@@ -390,8 +390,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@huggingface/jinja@0.5.6':
-    resolution: {integrity: sha512-MyMWyLnjqo+KRJYSH7oWNbsOn5onuIvfXYPcc0WOGxU0eHUV7oAYUoQTl2BMdu7ml+ea/bu11UM+EshbeHwtIA==}
+  '@huggingface/jinja@0.5.9':
+    resolution: {integrity: sha512-uWTG+l3VJRsl7EXxYizuL3P+cCPoc3cRqbWWRcQN0FhejRfbdq0RNhCmbY/YDtnTcz9icdLYuLDjsnz4d8JMuw==}
     engines: {node: '>=18'}
 
   '@huggingface/tokenizers@0.1.3':
@@ -2331,7 +2331,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.2':
     optional: true
 
-  '@huggingface/jinja@0.5.6': {}
+  '@huggingface/jinja@0.5.9': {}
 
   '@huggingface/tokenizers@0.1.3': {}
 
