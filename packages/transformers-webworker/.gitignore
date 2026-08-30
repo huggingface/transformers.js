@@ -1,0 +1,7 @@
+node_modules
+dist
+types
+coverage
+*.log
+.DS_Store
+tests/*.test.js

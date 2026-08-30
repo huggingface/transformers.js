@@ -1,0 +1,62 @@
+{
+  "name": "@huggingface/transformers-webworker",
+  "version": "0.0.1",
+  "description": "Web Worker utilities for Transformers.js",
+  "main": "./dist/index.js",
+  "types": "./types/src/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
+    "typegen": "tsc --build",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs && pnpm typegen",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huggingface/transformers.js.git"
+  },
+  "keywords": [
+    "transformers",
+    "transformers.js",
+    "webworker",
+    "huggingface",
+    "machine learning"
+  ],
+  "author": "Hugging Face",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/huggingface/transformers.js/issues"
+  },
+  "homepage": "https://github.com/huggingface/transformers.js#readme",
+  "peerDependencies": {
+    "@huggingface/transformers": "^4.0.0"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "workspace:*",
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
+    "esbuild": "^0.27.2",
+    "jest": "^30.2.0",
+    "jest-environment-node": "^30.2.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
