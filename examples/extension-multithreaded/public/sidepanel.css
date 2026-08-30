@@ -1,0 +1,50 @@
+/* Styles go here */
+
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+h1 {
+    font-size: 40px;
+    text-align: center;
+    font-weight: 500;
+}
+
+h2 {
+    font-size: 20px;
+    text-align: center;
+    font-weight: 400;
+    margin-bottom: 16px;
+}
+
+.container {
+    width: 360px;
+}
+
+html,
+body {
+    min-width: 400px;
+    min-height: 500px;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#text {
+    width: 100%;
+    padding: 8px;
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+#output {
+    font-size: 20px;
+    font-family: 'Roboto Mono', monospace;
+    height: 100px;
+}
