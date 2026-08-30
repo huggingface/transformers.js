@@ -109,6 +109,17 @@ export class Processor extends Callable {
     }
 
     /**
+     * @param {Parameters<PreTrainedTokenizer['parse_response']>} args
+     * @returns {ReturnType<PreTrainedTokenizer['parse_response']>}
+     */
+    parse_response(...args) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to parse response without a tokenizer.');
+        }
+        return this.tokenizer.parse_response(...args);
+    }
+
+    /**
      * Calls the feature_extractor function with the given input.
      * @param {any} input The input to extract features from.
      * @param {...any} args Additional arguments.
