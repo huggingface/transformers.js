@@ -304,7 +304,6 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
 
             if (input_ids[i].length === this.begin_index) {
                 batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
-                continue;
             }
 
             // timestamps have to appear in pairs, except directly before eos_token; mask logits accordingly
