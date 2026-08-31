@@ -1,4 +1,4 @@
-import { Tensor } from "@huggingface/transformers";
+import { PreTrainedTokenizer, Tensor } from "@huggingface/transformers";
 
 import { ResponseConstraint } from "../dist/index.js";
 
@@ -59,6 +59,45 @@ function schemaAccepts(schema, text) {
 }
 
 describe("ResponseConstraint", () => {
+  it("derives token bytes through the configured decoder", () => {
+    const tokenizerJson = {
+      version: "1.0",
+      truncation: null,
+      padding: null,
+      added_tokens: [
+        {
+          id: 1,
+          content: "[EOS]",
+          single_word: false,
+          lstrip: false,
+          rstrip: false,
+          normalized: false,
+          special: true,
+        },
+      ],
+      normalizer: null,
+      pre_tokenizer: null,
+      post_processor: null,
+      decoder: { type: "Replace", pattern: { String: "a" }, content: "b" },
+      model: {
+        type: "WordPiece",
+        unk_token: "[EOS]",
+        continuing_subword_prefix: "##",
+        max_input_chars_per_word: 100,
+        vocab: { a: 0, "[EOS]": 1 },
+      },
+    };
+    const decodedTokenizer = new PreTrainedTokenizer(tokenizerJson, { eos_token: "[EOS]" });
+    const constraint = ResponseConstraint.fromResponseFormat(decodedTokenizer, { type: "regex", regex: "b" });
+    const scores = new Tensor("float32", new Float32Array(2).fill(1), [1, 2]);
+
+    constraint.logits_processor([[0n]], scores);
+
+    expect(decodedTokenizer.decode([0])).toBe("b");
+    expect(isAllowed(scores, 0)).toBe(true);
+    expect(isAllowed(scores, 1)).toBe(false);
+  });
+
   it("applies a regex mask", async () => {
     const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "[ac]" });
     const scores = logits();

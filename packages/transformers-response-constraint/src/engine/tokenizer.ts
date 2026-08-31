@@ -30,10 +30,11 @@ export function extractTokenizer(tokenizer: TokenizerSource): TokenizerData {
         if (!Number.isInteger(id) || id < 0) throw new TypeError(`Tokenizer has an invalid token ID for ${token}.`);
         if (id + 1 > size) size = id + 1;
     }
-    const tokenBytes = tokenBytesConverter(tokenizerJson);
+    const tokenBytes = tokenBytesConverter(source, tokenizerJson);
     const tokens = new Array<Uint8Array | undefined>(size);
     for (const token of vocabularyTokens) {
-        tokens[Number(vocabulary[token])] = tokenBytes(token);
+        const id = Number(vocabulary[token]);
+        tokens[id] = tokenBytes(token, id);
     }
 
     const addedTokens = field(tokenizerJson, 'added_tokens');
@@ -41,7 +42,8 @@ export function extractTokenizer(tokenizer: TokenizerSource): TokenizerData {
         for (const added of addedTokens) {
             if (!isRecord(added) || !Number.isInteger(added.id)) continue;
             while (tokens.length <= Number(added.id)) tokens.push(undefined);
-            tokens[Number(added.id)] = encoder.encode(typeof added.content === 'string' ? added.content : '');
+            const id = Number(added.id);
+            tokens[id] = tokenBytes(typeof added.content === 'string' ? added.content : '', id);
         }
     }
     for (let id = 0; id < tokens.length; ++id) {
@@ -107,23 +109,30 @@ function getVocabulary(source: RecordLike, tokenizerJson: unknown): RecordLike |
     return isRecord(source.vocab) ? source.vocab : undefined;
 }
 
-function tokenBytesConverter(tokenizerJson: unknown): (token: string) => Uint8Array {
-    if (
-        hasComponent(field(tokenizerJson, 'decoder'), 'ByteLevel') ||
-        hasComponent(field(tokenizerJson, 'pre_tokenizer'), 'ByteLevel')
-    ) {
-        const map = getByteLevelMap();
-        return (token) => {
-            const fallback = /^<0x([\da-f]{2})>$/i.exec(token);
+function tokenBytesConverter(source: RecordLike, tokenizerJson: unknown): (token: string, id: number) => Uint8Array {
+    const decoder = field(tokenizerJson, 'decoder');
+    if (field(decoder, 'type') === 'ByteLevel') return byteLevelTokenBytes;
+
+    const decode = source.decode;
+    if (typeof decode === 'function') {
+        const byteFallback = hasComponent(decoder, 'ByteFallback');
+        return (token, id) => {
+            const fallback = byteFallback ? /^<0x([\da-f]{2})>$/i.exec(token) : null;
             if (fallback) return Uint8Array.of(Number.parseInt(fallback[1], 16));
-            const bytes: number[] = [];
-            for (const character of token) {
-                const byte = map.get(character);
-                if (byte === undefined) bytes.push(...encoder.encode(character));
-                else bytes.push(byte);
-            }
-            return Uint8Array.from(bytes);
+            const decoded = decode.call(source, [id], {
+                skip_special_tokens: false,
+                clean_up_tokenization_spaces: false,
+            });
+            if (typeof decoded !== 'string') throw new TypeError(`Tokenizer.decode([${id}]) must return a string.`);
+            return encoder.encode(decoded);
         };
+    }
+
+    if (decoder !== undefined && decoder !== null && field(decoder, 'type') !== 'ByteLevel') {
+        throw new TypeError('Tokenizer decoder semantics require a tokenizer with a decode() method.');
+    }
+    if (hasComponent(decoder, 'ByteLevel') || hasComponent(field(tokenizerJson, 'pre_tokenizer'), 'ByteLevel')) {
+        return byteLevelTokenBytes;
     }
     const modelType = field(field(tokenizerJson, 'model'), 'type');
     const sentencePiece = modelType === 'Unigram' || modelType === 'SentencePiece';
@@ -136,6 +145,19 @@ function tokenBytesConverter(tokenizerJson: unknown): (token: string) => Uint8Ar
             typeof prefix === 'string' && token.startsWith(prefix) ? token.slice(prefix.length) : token,
         );
     };
+}
+
+function byteLevelTokenBytes(token: string): Uint8Array {
+    const fallback = /^<0x([\da-f]{2})>$/i.exec(token);
+    if (fallback) return Uint8Array.of(Number.parseInt(fallback[1], 16));
+    const map = getByteLevelMap();
+    const bytes: number[] = [];
+    for (const character of token) {
+        const byte = map.get(character);
+        if (byte === undefined) bytes.push(...encoder.encode(character));
+        else bytes.push(byte);
+    }
+    return Uint8Array.from(bytes);
 }
 
 function getByteLevelMap(): Map<string, number> {
