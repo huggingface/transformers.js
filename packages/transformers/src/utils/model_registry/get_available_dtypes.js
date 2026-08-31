@@ -25,7 +25,7 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * @param {string} modelId The model id (e.g., "onnx-community/all-MiniLM-L6-v2-ONNX")
  * @param {Object} [options] Optional parameters
  * @param {PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
- * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix)
+ * @param {string|Record<string, string>} [options.model_file_name=null] Override model file names (excluding .onnx suffix)
  * @param {string} [options.revision='main'] Model revision
  * @param {string} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Only check local files
