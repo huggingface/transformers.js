@@ -54,7 +54,7 @@ export function get_config(
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
- * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix).
+ * @param {string|Record<string, string>} [options.model_file_name=null] Override model file names (excluding .onnx suffix).
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(

@@ -124,7 +124,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string|Record<string, string>} [options.model_file_name=null] - Override model file names (excluding .onnx suffix)
      * @param {boolean} [options.include_tokenizer=true] - Whether to check for tokenizer files
      * @param {boolean} [options.include_processor=true] - Whether to check for processor files
      * @returns {Promise<string[]>} Array of file paths
@@ -147,7 +147,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string|Record<string, string>} [options.model_file_name=null] - Override model file names (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of file paths
      *
      * @example
@@ -166,7 +166,7 @@ export class ModelRegistry {
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
      * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string|Record<string, string>} [options.model_file_name=null] - Override model file names (excluding .onnx suffix)
      * @returns {Promise<string[]>} Array of model file paths
      *
      * @example
@@ -215,7 +215,7 @@ export class ModelRegistry {
      * @param {string} modelId - The model id (e.g., "onnx-community/all-MiniLM-L6-v2-ONNX")
      * @param {Object} [options] - Optional parameters
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {string|Record<string, string>} [options.model_file_name=null] - Override model file names (excluding .onnx suffix)
      * @param {string} [options.revision='main'] - Model revision
      * @param {string} [options.cache_dir=null] - Custom cache directory
      * @param {boolean} [options.local_files_only=false] - Only check local files

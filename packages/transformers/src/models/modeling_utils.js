@@ -40,7 +40,7 @@ import { logger } from '../utils/logger.js';
 import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
-import { MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
+import { getSessionsConfig, MODEL_SESSION_CONFIG, MODEL_TYPES } from './session_config.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -346,12 +346,13 @@ export class PreTrainedModel extends Callable {
             }
         }
 
-        const sessions = typeConfig.sessions(config, options, textOnly);
-        const promises = [
-            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
-        ];
-        if (typeConfig.optional_configs) {
-            promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
+        const { sessions, cache_sessions, optional_configs } = getSessionsConfig(modelType, config, {
+            ...options,
+            textOnly,
+        });
+        const promises = [constructSessions(pretrained_model_name_or_path, sessions, options, cache_sessions)];
+        if (optional_configs) {
+            promises.push(get_optional_configs(pretrained_model_name_or_path, optional_configs, options));
         }
         const info = await Promise.all(promises);
 

@@ -143,6 +143,29 @@ export const MODEL_SESSION_CONFIG = {
 };
 
 /**
+ * Apply user-provided file names to a session map.
+ *
+ * Multi-session models accept overrides keyed by either the runtime session
+ * name or its default file name. For example, Seq2Seq's encoder session is
+ * named `model` but loads `encoder_model.onnx` by default, so either key can
+ * be used to override it.
+ *
+ * @param {Record<string, string>} sessions The default session-to-file mapping.
+ * @param {Record<string, string>|null|undefined} overrides Custom file names.
+ * @returns {Record<string, string>}
+ */
+function applyModelFileNames(sessions, overrides) {
+    if (overrides == null) return sessions;
+
+    return Object.fromEntries(
+        Object.entries(sessions).map(([sessionName, defaultName]) => {
+            const override = overrides[sessionName] ?? overrides[defaultName];
+            return [sessionName, typeof override === 'string' ? override : defaultName];
+        }),
+    );
+}
+
+/**
  * Returns the text-only session names for a given model type, or `null` if
  * the model type does not define a text-only session set.
  * @param {number} modelType The model type enum value.
@@ -162,8 +185,13 @@ export function getTextOnlySessions(modelType) {
  */
 export function getSessionsConfig(modelType, config, options = {}) {
     const typeConfig = MODEL_SESSION_CONFIG[modelType] ?? MODEL_SESSION_CONFIG.default;
+    const modelFileName = options.model_file_name;
+    const modelFileNameOverrides = modelFileName !== null && typeof modelFileName === 'object' ? modelFileName : null;
+    const sessionOptions = modelFileNameOverrides ? { ...options, model_file_name: null } : options;
+    const sessions = typeConfig.sessions(config, sessionOptions, options.textOnly ?? false);
+
     return {
-        sessions: typeConfig.sessions(config, options, options.textOnly ?? false),
+        sessions: applyModelFileNames(sessions, modelFileNameOverrides),
         cache_sessions: typeConfig.cache_sessions,
         optional_configs: typeConfig.optional_configs,
     };
