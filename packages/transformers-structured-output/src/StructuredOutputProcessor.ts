@@ -55,8 +55,7 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
         for (let i = start; i < input.length; ++i) {
             if (this.state.constraint.commit(Number(input[i]))) {
                 throw new Error(
-                    'StructuredOutputProcessor observed the tokenizer EOS token after generation continued. ' +
-                        'Ensure the model generation config uses the same eos_token_id as the tokenizer.',
+                    'StructuredOutputProcessor observed the tokenizer EOS token after generation continued. Ensure the model generation config uses the same eos_token_id as the tokenizer.',
                 );
             }
         }
