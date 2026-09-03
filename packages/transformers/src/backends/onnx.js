@@ -102,13 +102,37 @@ let defaultDevices;
 let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
-// If the JS runtime exposes their own ONNX runtime, use it in place of the bundled one. The environment still
-// decides which device list applies: `ONNX` and `supportedDevices` are set together in every branch below, and
-// an injected runtime that set only the former would leave every `device` option rejected against an empty
-// list ("Unsupported device: ... Should be one of: ").
+// If the JS runtime exposes its own ONNX runtime, use it in place of the bundled one.
 const injectedONNX = ORT_SYMBOL in globalThis ? globalThis[ORT_SYMBOL] : undefined;
 
-if (apis.IS_NODE_ENV) {
+/**
+ * Which ONNX Runtime is in use, which decides the list of supported devices below:
+ *  - `node`: onnxruntime-node — the devices depend on the platform.
+ *  - `web`: onnxruntime-web — the devices depend on the browser APIs available.
+ *  - `custom`: an injected runtime that is neither. It implements the onnxruntime API surface (`Tensor`,
+ *    `InferenceSession`, …) without being one of the official packages, so no device list is assumed and the
+ *    runtime is left to apply its own defaults.
+ *
+ * An injected runtime is told apart by the version it stamps on its `env`: every official package sets
+ * `env.versions.web` or `env.versions.node` (see `Env.versions` in onnxruntime-common), a custom runtime sets
+ * neither. The environment alone cannot tell, because embedders inject `onnxruntime-web` from processes where
+ * `IS_NODE_ENV` is true (Electron renderers, Bun, Node fallbacks) and would otherwise be given the node device
+ * list. Without an injected runtime, the environment decides as before.
+ * @type {'node' | 'web' | 'custom'}
+ */
+const runtime = injectedONNX?.env?.versions?.node
+    ? 'node'
+    : injectedONNX?.env?.versions?.web
+      ? 'web'
+      : injectedONNX
+        ? 'custom'
+        : apis.IS_NODE_ENV
+          ? 'node'
+          : 'web';
+
+if (runtime === 'custom') {
+    ONNX = injectedONNX;
+} else if (runtime === 'node') {
     ONNX = injectedONNX ?? ONNX_NODE;
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
