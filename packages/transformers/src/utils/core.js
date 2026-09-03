@@ -142,39 +142,6 @@ export class DefaultProgressCallback extends Callable {
 }
 
 /**
- * Reverses the keys and values of an object.
- *
- * @param {Object} data The object to reverse.
- * @returns {Object} The reversed object.
- * @see https://ultimatecourses.com/blog/reverse-object-keys-and-values-in-javascript
- */
-export function reverseDictionary(data) {
-    // https://ultimatecourses.com/blog/reverse-object-keys-and-values-in-javascript
-    return Object.fromEntries(Object.entries(data).map(([key, value]) => [value, key]));
-}
-
-/**
- * Escapes regular expression special characters from a string by replacing them with their escaped counterparts.
- *
- * @param {string} string The string to escape.
- * @returns {string} The escaped string.
- */
-export function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-}
-
-/**
- * Check if a value is a typed array.
- * @param {*} val The value to check.
- * @returns {boolean} True if the value is a `TypedArray`, false otherwise.
- *
- * Adapted from https://stackoverflow.com/a/71091338/13989043
- */
-export function isTypedArray(val) {
-    return val?.prototype?.__proto__?.constructor?.name === 'TypedArray';
-}
-
-/**
  * Check if a value is an integer.
  * @param {*} x The value to check.
  * @returns {boolean} True if the value is a string, false otherwise.
@@ -206,26 +173,6 @@ export function calculateDimensions(arr) {
         current = current[0];
     }
     return dimensions;
-}
-
-/**
- * Replicate python's .pop() method for objects.
- * @param {Object} obj The object to pop from.
- * @param {string} key The key to pop.
- * @param {*} defaultValue The default value to return if the key does not exist.
- * @returns {*} The value of the popped key.
- * @throws {Error} If the key does not exist and no default value is provided.
- */
-export function pop(obj, key, defaultValue = undefined) {
-    const value = obj[key];
-    if (value !== undefined) {
-        delete obj[key];
-        return value;
-    }
-    if (defaultValue === undefined) {
-        throw Error(`Key ${key} does not exist in object.`);
-    }
-    return defaultValue;
 }
 
 /**
@@ -275,18 +222,6 @@ export function pick(o, props) {
             }
         }),
     );
-}
-
-/**
- * Calculate the length of a string, taking multi-byte characters into account.
- * This mimics the behavior of Python's `len` function.
- * @param {string} s The string to calculate the length of.
- * @returns {number} The length of the string.
- */
-export function len(s) {
-    let length = 0;
-    for (const c of s) ++length;
-    return length;
 }
 
 /**
