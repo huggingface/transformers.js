@@ -77,7 +77,9 @@ export async function load_audio(url, sampling_rate) {
 /**
  * @deprecated Use {@link load_audio} instead.
  */
-export const read_audio = load_audio;
+export async function read_audio(url, sampling_rate) {
+    return await load_audio(url, sampling_rate);
+}
 
 /**
  * Helper function to generate windows that are special cases of the generalized cosine window.

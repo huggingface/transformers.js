@@ -86,7 +86,7 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
+export { MODEL_TYPES } from './session_config.js';
 
 /**
  * Runtime-only model type configuration (forward functions, generation flags).
@@ -1101,7 +1101,7 @@ export class PreTrainedModel extends Callable {
  * @returns {Promise<Seq2SeqLMOutput>} Promise that resolves with the output of the seq2seq model.
  * @private
  */
-export async function seq2seq_forward(self, model_inputs) {
+async function seq2seq_forward(self, model_inputs) {
     let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
         model_inputs;
     // Encode if needed
@@ -1164,7 +1164,7 @@ export async function encoder_forward(self, model_inputs) {
     return await sessionRun(session, encoderFeeds);
 }
 
-export async function auto_encoder_forward(self, model_inputs) {
+async function auto_encoder_forward(self, model_inputs) {
     const encoded = await self.encode(model_inputs);
     const decoded = await self.decode(encoded);
     return decoded;
@@ -1219,7 +1219,7 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
  * @param {Object} model_output The output of the model.
  * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
  */
-export function getAttentions(model_output) {
+function getAttentions(model_output) {
     const attentions = {};
 
     for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
@@ -1376,7 +1376,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
-export async function generic_text_to_text_forward(
+async function generic_text_to_text_forward(
     self,
     {
         // Generic parameters:
@@ -1489,7 +1489,7 @@ export async function generic_text_to_text_forward(
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function audio_text_to_text_forward(self, params) {
+async function audio_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['audio_values', 'input_features'],
@@ -1506,7 +1506,7 @@ export async function audio_text_to_text_forward(self, params) {
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function image_text_to_text_forward(self, params) {
+async function image_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['pixel_values'],
@@ -1559,7 +1559,7 @@ export function cumsum_masked_fill(attention_mask, start_index = 0) {
  *     position_ids = position_ids[:, -input_ids.shape[1] :]
  * ```
  */
-export function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
+function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
     const { input_ids, inputs_embeds, attention_mask } = model_inputs;
 
     const { data, dims } = cumsum_masked_fill(attention_mask, start_index);
@@ -1631,7 +1631,7 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
     };
 }
 
-export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
+function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
     if (self.config.is_encoder_decoder) {
         return encoder_decoder_prepare_inputs_for_generation(self, ...args);
     } else {
@@ -1639,7 +1639,7 @@ export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...a
     }
 }
 
-export function default_merge_input_ids_with_features({
+function default_merge_input_ids_with_features({
     modality_token_id,
     inputs_embeds,
     modality_features,
@@ -1714,7 +1714,7 @@ export function default_merge_input_ids_with_audio_features({
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of configuration objects.
  * @private
  */
-export async function get_optional_configs(pretrained_model_name_or_path, names, options) {
+async function get_optional_configs(pretrained_model_name_or_path, names, options) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {
