@@ -55,7 +55,7 @@ export class DocumentQuestionAnsweringPipeline
         }
 
         // Preprocess image
-        const preparedImage = (await prepareImages(image))[0];
+        const preparedImage = (await prepareImages(image, this.sessionEnv))[0];
         const { pixel_values } = await this.processor(preparedImage);
 
         // Run tokenization

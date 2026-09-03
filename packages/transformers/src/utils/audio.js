@@ -8,6 +8,7 @@
  */
 
 import { getFile } from './hub.js';
+import { resolveEnv } from '../env.js';
 import { FFT, max } from './maths.js';
 import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
@@ -18,9 +19,10 @@ import { logger } from './logger.js';
  * Helper function to load audio from a path/URL.
  * @param {string|URL} url The path/URL to load the audio from.
  * @param {number} sampling_rate The sampling rate to use when decoding the audio.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
-export async function load_audio(url, sampling_rate) {
+export async function load_audio(url, sampling_rate, sessionEnv = {}) {
     if (typeof AudioContext === 'undefined') {
         // Running in node or an environment without AudioContext
         throw Error(
@@ -30,7 +32,15 @@ export async function load_audio(url, sampling_rate) {
         );
     }
 
-    const response = await (await getFile(url)).arrayBuffer();
+    const env = resolveEnv(sessionEnv);
+    const response = await (
+        await getFile(url, {
+            useFS: env.useFS,
+            fetch: env.fetch,
+            version: env.version,
+            hfToken: env.hfToken,
+        })
+    ).arrayBuffer();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
     if (typeof sampling_rate === 'undefined') {
         logger.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`);

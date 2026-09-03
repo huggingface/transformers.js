@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import { RawImage, rand } from "../../src/transformers.js";
 import { load_cached_image } from "../asset_cache.js";
 
@@ -33,6 +34,20 @@ describe("Image utilities", () => {
       const tensor_hwc = rand([128, 256, 3]).mul_(255).to("uint8");
       const image = RawImage.fromTensor(tensor_hwc, "HWC");
       expect(image.size).toEqual([256, 128]);
+    });
+  });
+
+  describe("Session env", () => {
+    it("should use scoped fetch when reading an image URL", async () => {
+      const fetch = jest.fn(async () => ({
+        status: 404,
+        statusText: "Not Found",
+      }));
+
+      await expect(RawImage.fromURL("https://example.com/image.png", { fetch })).rejects.toThrow(
+        'Unable to read image from "https://example.com/image.png"',
+      );
+      expect(fetch).toHaveBeenCalledWith("https://example.com/image.png", expect.any(Object));
     });
   });
 

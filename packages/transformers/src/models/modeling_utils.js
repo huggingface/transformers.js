@@ -15,7 +15,7 @@ export function registerTaskMappings(mappings) {
     MODEL_MAPPING_NAMES = mappings;
 }
 import { GITHUB_ISSUE_URL } from '../utils/constants.js';
-import { getModelJSON } from '../utils/hub.js';
+import { getModelJSON, maybeAddDeprecatedEnvWarning } from '../utils/hub.js';
 import { Seq2SeqLMOutput } from './modeling_outputs.js';
 import {
     LogitsProcessorList,
@@ -275,8 +275,11 @@ export class PreTrainedModel extends Callable {
             dtype = null,
             use_external_data_format = null,
             session_options = {},
+            env: sessionEnv = {},
         } = {},
     ) {
+        maybeAddDeprecatedEnvWarning(cache_dir, local_files_only);
+
         const options = {
             progress_callback,
             config,
@@ -289,11 +292,19 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            env: sessionEnv,
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
 
-        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
+        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, {
+            progress_callback,
+            config,
+            cache_dir,
+            local_files_only,
+            revision,
+            env: sessionEnv,
+        });
 
         const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
 
@@ -320,6 +331,10 @@ export class PreTrainedModel extends Callable {
                     dtype,
                     device,
                     model_file_name,
+                    cache_dir,
+                    local_files_only,
+                    revision,
+                    env: sessionEnv,
                 });
 
                 const metadata = await Promise.all(

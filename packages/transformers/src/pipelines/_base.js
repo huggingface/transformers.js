@@ -1,6 +1,7 @@
 import { PreTrainedTokenizer } from '../tokenization_utils.js';
 import { PreTrainedModel } from '../models/modeling_utils.js';
 import { Processor } from '../processing_utils.js';
+import { resolveEnv } from '../env.js';
 
 import { Callable } from '../utils/generic.js';
 
@@ -15,15 +16,16 @@ import { RawImage } from '../utils/image.js';
 /**
  * Prepare images for further tasks.
  * @param {ImagePipelineInputs} images images to prepare.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<RawImage[]>} returns processed images.
  */
-export async function prepareImages(images) {
+export async function prepareImages(images, sessionEnv = {}) {
     if (!Array.isArray(images)) {
         images = [images];
     }
 
     // Possibly convert any non-images to images
-    return await Promise.all(images.map((x) => RawImage.read(x)));
+    return await Promise.all(images.map((x) => RawImage.read(x, sessionEnv)));
 }
 
 /**
@@ -35,9 +37,10 @@ export async function prepareImages(images) {
  * Prepare audios for further tasks.
  * @param {AudioPipelineInputs} audios audios to prepare.
  * @param {number} sampling_rate sampling rate of the audios.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<Float32Array[]>} The preprocessed audio data.
  */
-export async function prepareAudios(audios, sampling_rate) {
+export async function prepareAudios(audios, sampling_rate, sessionEnv = {}) {
     if (!Array.isArray(audios)) {
         audios = [audios];
     }
@@ -45,7 +48,7 @@ export async function prepareAudios(audios, sampling_rate) {
     return await Promise.all(
         audios.map((x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                return read_audio(x, sampling_rate);
+                return read_audio(x, sampling_rate, sessionEnv);
             } else if (x instanceof Float64Array) {
                 return new Float32Array(x);
             }
@@ -91,6 +94,12 @@ export function get_bounding_box(box, asInteger) {
  * Refer to this class for methods shared across different pipelines.
  */
 export class Pipeline extends Callable {
+    /** @type {Partial<import('../env.js').TransformersEnvironmentSession>} */
+    sessionEnv;
+
+    /** @type {import('../env.js').TransformersEnvironment} */
+    env;
+
     /**
      * Create a new Pipeline.
      * @param {Object} options An object containing the following properties:
@@ -98,13 +107,16 @@ export class Pipeline extends Callable {
      * @param {PreTrainedModel} [options.model] The model used by the pipeline.
      * @param {PreTrainedTokenizer} [options.tokenizer=null] The tokenizer used by the pipeline (if any).
      * @param {Processor} [options.processor=null] The processor used by the pipeline (if any).
+     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.sessionEnv={}] Session-scopable environment overrides.
      */
-    constructor({ task, model, tokenizer = null, processor = null }) {
+    constructor({ task, model, tokenizer = null, processor = null, sessionEnv = {} }) {
         super();
         this.task = task;
         this.model = model;
         this.tokenizer = tokenizer;
         this.processor = processor;
+        this.sessionEnv = sessionEnv;
+        this.env = resolveEnv(sessionEnv);
     }
 
     /** @type {DisposeType} */
@@ -118,6 +130,8 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
+ * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelTokenizerConstructorArgs} TextPipelineConstructorArgs An object used to instantiate a text-based pipeline.
  */
@@ -127,6 +141,8 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
+ * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelProcessorConstructorArgs} AudioPipelineConstructorArgs An object used to instantiate an audio-based pipeline.
  * @typedef {ModelProcessorConstructorArgs} ImagePipelineConstructorArgs An object used to instantiate an image-based pipeline.
@@ -138,6 +154,8 @@ export class Pipeline extends Callable {
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv The session-scopable environment overrides used by the pipeline.
+ * @property {import('../env.js').TransformersEnvironment} env The effective environment used by the pipeline.
  *
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextAudioPipelineConstructorArgs An object used to instantiate a text- and audio-based pipeline.
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextImagePipelineConstructorArgs An object used to instantiate a text- and image-based pipeline.

@@ -5,6 +5,7 @@
  */
 
 import { getCache } from '../cache.js';
+import { resolveEnv } from '../../env.js';
 import { buildResourcePaths, checkCachedResource } from '../hub.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
@@ -35,6 +36,14 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  */
 async function clear_files_from_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
+    const env = resolveEnv(options.env);
+    const pathOptions = {
+        cache_dir: options.cache_dir ?? null,
+        revision: options.revision ?? 'main',
+        localModelPath: env.localModelPath,
+        remoteHost: env.remoteHost,
+        remotePathTemplate: env.remotePathTemplate,
+    };
 
     if (!cache) {
         return {
@@ -50,7 +59,7 @@ async function clear_files_from_cache(modelId, files, options = {}) {
 
     const results = await Promise.all(
         files.map(async (filename) => {
-            const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
+            const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, pathOptions, cache);
 
             const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
             const wasCached = !!cached;
