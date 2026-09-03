@@ -27,6 +27,8 @@
 - sections:
     - local: guides/webgpu
       title: Running models on WebGPU
+    - local: guides/custom-backends
+      title: Custom inference backends
     - local: guides/dtypes
       title: Using quantized models (dtypes)
     - local: guides/private

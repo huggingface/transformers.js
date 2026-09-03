@@ -7,7 +7,8 @@ import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
 import { isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { logger } from '../logger.js';
-import { memoizePromise } from '../memoize_promise.js';
+import { throwIfAborted } from '../core.js';
+import { getModelId, isInferenceBackend, withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
@@ -24,10 +25,12 @@ import { memoizePromise } from '../memoize_promise.js';
  * 5. Range requests typically aren't compressed, and content-range header shows true uncompressed size
  *
  * @param {URL|string} urlOrPath The URL/path of the file.
+ * @param {AbortSignal} [signal] Signal used to cancel the request.
  * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if not supported.
  * @private
  */
-async function fetch_file_head(urlOrPath) {
+async function fetch_file_head(urlOrPath, signal = undefined) {
+    throwIfAborted(signal);
     // Range requests only make sense for HTTP URLs
     if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
         return null;
@@ -35,7 +38,7 @@ async function fetch_file_head(urlOrPath) {
 
     const headers = getFetchHeaders(urlOrPath);
     headers.set('Range', 'bytes=0-0');
-    return env.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
+    return env.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store', signal });
 }
 
 /**
@@ -43,19 +46,44 @@ async function fetch_file_head(urlOrPath) {
  * Uses Range requests for remote files to be efficient.
  * Can also be used as a lightweight file existence check by checking the `.exists` property.
  *
- * @param {string} path_or_repo_id This can be either:
+ * @param {string|import('../../backends/inference.js').InferenceBackend} path_or_repo_id This can be either:
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to check.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata.
  */
-export function get_file_metadata(path_or_repo_id, filename, options = {}) {
+const INFLIGHT_METADATA = new Map();
+const BACKEND_INFLIGHT_METADATA = new WeakMap();
+
+export async function get_file_metadata(path_or_repo_id, filename, options = {}) {
+    throwIfAborted(options.signal);
+    const backend = isInferenceBackend(path_or_repo_id) ? path_or_repo_id : null;
+    path_or_repo_id = getModelId(path_or_repo_id);
+    const load = async () => {
+        const backendMetadata = await backend?.getModelArtifactMetadata?.(
+            filename,
+            withInferenceBackendHostOptions(options),
+        );
+        throwIfAborted(options.signal);
+        if (backendMetadata) return { exists: true, ...backendMetadata };
+        return _get_file_metadata(path_or_repo_id, filename, options);
+    };
+
+    if (options.signal) return load();
     const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
-    return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
+    const inflight = backend ? (BACKEND_INFLIGHT_METADATA.get(backend) ?? new Map()) : INFLIGHT_METADATA;
+    if (backend && !BACKEND_INFLIGHT_METADATA.has(backend)) BACKEND_INFLIGHT_METADATA.set(backend, inflight);
+    let pending = inflight.get(key);
+    if (!pending) {
+        pending = load().finally(() => inflight.delete(key));
+        inflight.set(key, pending);
+    }
+    return pending;
 }
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
+    throwIfAborted(options.signal);
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir);
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
@@ -67,6 +95,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
 
     // Check cache first - if cached, we can get metadata from the cached response
     const cachedResponse = await checkCachedResource(cache, localPath, proposedCacheKey);
+    throwIfAborted(options.signal);
     if (cachedResponse !== undefined && typeof cachedResponse !== 'string') {
         const size = cachedResponse.headers.get('content-length');
         const contentType = cachedResponse.headers.get('content-type');
@@ -83,7 +112,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
         const isURL = isValidUrl(localPath, ['http:', 'https:']);
         if (!isURL) {
             try {
-                const response = await getFile(localPath);
+                const response = await getFile(localPath, options.signal);
                 if (typeof response !== 'string' && response.status !== 404) {
                     const size = response.headers.get('content-length');
                     const contentType = response.headers.get('content-type');
@@ -96,6 +125,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
                     };
                 }
             } catch (e) {
+                throwIfAborted(options.signal);
                 // File doesn't exist locally, continue to remote check
             }
         }
@@ -105,7 +135,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     if (env.allowRemoteModels && !options.local_files_only && validModelId) {
         try {
             // Make a Range request to get metadata without downloading full content
-            const rangeResponse = await fetch_file_head(remoteURL);
+            const rangeResponse = await fetch_file_head(remoteURL, options.signal);
 
             if (rangeResponse && rangeResponse.status >= 200 && rangeResponse.status < 300) {
                 let size;
@@ -147,6 +177,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
                 };
             }
         } catch (e) {
+            throwIfAborted(options.signal);
             // Range request failed most likely because of a network error, timeout, etc.
             logger.warn(`Unable to fetch file metadata for "${remoteURL}": ${e}`);
         }

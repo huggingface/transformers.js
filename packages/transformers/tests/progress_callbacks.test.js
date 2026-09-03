@@ -1,6 +1,7 @@
 import { pipeline, LlamaForCausalLM, AutoModelForCausalLM, WhisperForConditionalGeneration, Gemma3ForConditionalGeneration, Gemma3nForConditionalGeneration, VoxtralRealtimeForConditionalGeneration } from "../src/transformers.js";
 
 import { init, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "./init.js";
+import { DefaultProgressCallback } from "../src/utils/core.js";
 
 // Initialise the testing environment
 init();
@@ -242,6 +243,38 @@ describe("Progress Callbacks", () => {
   // ---- Edge cases ----
   describe("Edge cases", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
+
+    it("keeps aggregate totals stable and suppresses duplicate or regressing updates", () => {
+      const events = [];
+      const callback = new DefaultProgressCallback((event) => events.push(event), {
+        "model.safetensors": { loaded: 0, total: 1000 },
+      });
+      callback({ status: "progress", name: "test/model", file: "model.safetensors", loaded: 500, total: 500 });
+      callback({ status: "progress", name: "test/model", file: "model.safetensors", loaded: 1, total: 4 });
+      callback({ status: "progress", name: "test/model", file: "model.safetensors", loaded: 1000, total: 1000 });
+      callback({ status: "progress", name: "test/model", file: "model.safetensors", loaded: 1000, total: 1000 });
+
+      const totals = events.filter((event) => event.status === "progress_total");
+      expect(totals.map(({ loaded }) => loaded)).toEqual([500, 1000]);
+      expect(totals.every(({ total }) => total === 1000)).toBe(true);
+    });
+
+    it("grows unknown totals without emitting NaN", () => {
+      const events = [];
+      const callback = new DefaultProgressCallback((event) => events.push(event), {});
+      callback({ status: "progress", name: "test/model", file: "model.bin", loaded: 0, total: undefined });
+      callback({ status: "progress", name: "test/model", file: "model.bin", loaded: 100, total: 100 });
+      callback({ status: "progress", name: "test/model", file: "model.bin", loaded: 200, total: 200 });
+      callback({ status: "progress", name: "test/model", file: "model.bin", loaded: 200, total: undefined });
+
+      const totals = events.filter((event) => event.status === "progress_total");
+      expect(totals.map(({ loaded, total }) => [loaded, total])).toEqual([
+        [0, 0],
+        [100, 100],
+        [200, 200],
+      ]);
+      expect(totals.every(({ loaded, total, progress }) => [loaded, total, progress].every(Number.isFinite))).toBe(true);
+    });
 
     it(
       "no progress_total without progress_callback",

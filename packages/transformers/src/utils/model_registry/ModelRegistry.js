@@ -110,6 +110,27 @@ import { is_cached, is_cached_files, is_pipeline_cached, is_pipeline_cached_file
 import { get_file_metadata } from './get_file_metadata.js';
 import { clear_cache, clear_pipeline_cache } from './clear_cache.js';
 import { get_available_dtypes } from './get_available_dtypes.js';
+import { getModelId, isInferenceBackend, withInferenceBackendSharedAssetOptions } from '../../backends/inference.js';
+
+function resolveModelRegistryRequest(model, options) {
+    const inferenceBackend = isInferenceBackend(model) ? model : null;
+    const inferenceProvider =
+        inferenceBackend && typeof inferenceBackend.listModelArtifacts === 'function'
+            ? inferenceBackend
+            : options.inferenceProvider;
+    return {
+        modelId: getModelId(model),
+        options: inferenceProvider || inferenceBackend
+            ? {
+                  ...(inferenceBackend
+                      ? withInferenceBackendSharedAssetOptions(inferenceBackend, options)
+                      : options),
+                  inferenceProvider,
+                  inferenceBackend,
+              }
+            : options,
+    };
+}
 
 /**
  * Static class for cache and file management operations.
@@ -119,7 +140,7 @@ export class ModelRegistry {
     /**
      * Get all files (model, tokenizer, processor) needed for a model.
      *
-     * @param {string} modelId - The model id (e.g., "onnx-community/bert-base-uncased-ONNX")
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend.
      * @param {Object} [options] - Optional parameters
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
@@ -133,8 +154,9 @@ export class ModelRegistry {
      * const files = await ModelRegistry.get_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['config.json', 'tokenizer.json', 'onnx/model_q4.onnx', ...]
      */
-    static async get_files(modelId, options = {}) {
-        return get_files(modelId, options);
+    static async get_files(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_files(request.modelId, request.options);
     }
 
     /**
@@ -142,7 +164,7 @@ export class ModelRegistry {
      * Automatically determines which components are needed based on the task.
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
-     * @param {string} modelId - The model id (e.g., "onnx-community/bert-base-uncased-ONNX")
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend.
      * @param {Object} [options] - Optional parameters
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
@@ -154,14 +176,15 @@ export class ModelRegistry {
      * const files = await ModelRegistry.get_pipeline_files('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(files); // ['config.json', 'tokenizer.json', 'onnx/model_q4.onnx', ...]
      */
-    static async get_pipeline_files(task, modelId, options = {}) {
-        return get_pipeline_files(task, modelId, options);
+    static async get_pipeline_files(task, model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_pipeline_files(task, request.modelId, request.options);
     }
 
     /**
      * Get model files needed for a specific model.
      *
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend.
      * @param {Object} [options] - Optional parameters
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
@@ -173,36 +196,41 @@ export class ModelRegistry {
      * const files = await ModelRegistry.get_model_files('onnx-community/bert-base-uncased-ONNX');
      * console.log(files); // ['config.json', 'onnx/model_q4.onnx', 'generation_config.json']
      */
-    static async get_model_files(modelId, options = {}) {
-        return get_model_files(modelId, options);
+    static async get_model_files(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_model_files(request.modelId, request.options);
     }
 
     /**
      * Get tokenizer files needed for a specific model.
      *
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
+     * @param {Object} [options] - Hub metadata options
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
      * @example
      * const files = await ModelRegistry.get_tokenizer_files('onnx-community/gpt2-ONNX');
      * console.log(files); // ['tokenizer.json', 'tokenizer_config.json']
      */
-    static async get_tokenizer_files(modelId) {
-        return get_tokenizer_files(modelId);
+    static async get_tokenizer_files(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_tokenizer_files(request.modelId, request.options);
     }
 
     /**
      * Get processor files needed for a specific model.
      *
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
+     * @param {Object} [options] - Hub metadata options
      * @returns {Promise<string[]>} Array of processor file paths
      *
      * @example
      * const files = await ModelRegistry.get_processor_files('onnx-community/vit-base-patch16-224-ONNX');
      * console.log(files); // ['preprocessor_config.json']
      */
-    static async get_processor_files(modelId) {
-        return get_processor_files(modelId);
+    static async get_processor_files(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_processor_files(request.modelId, request.options);
     }
 
     /**
@@ -212,7 +240,7 @@ export class ModelRegistry {
      * A dtype is considered available if all required model session files
      * exist for that dtype.
      *
-     * @param {string} modelId - The model id (e.g., "onnx-community/all-MiniLM-L6-v2-ONNX")
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
      * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
@@ -225,8 +253,9 @@ export class ModelRegistry {
      * const dtypes = await ModelRegistry.get_available_dtypes('onnx-community/all-MiniLM-L6-v2-ONNX');
      * console.log(dtypes); // ['fp32', 'fp16', 'int8', 'uint8', 'q8', 'q4']
      */
-    static async get_available_dtypes(modelId, options = {}) {
-        return get_available_dtypes(modelId, options);
+    static async get_available_dtypes(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return get_available_dtypes(request.modelId, request.options);
     }
 
     /**
@@ -234,7 +263,7 @@ export class ModelRegistry {
      * then confirming all required files are cached.
      * Returns a plain boolean — use `is_cached_files` if you need per-file detail.
      *
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -247,15 +276,16 @@ export class ModelRegistry {
      * const cached = await ModelRegistry.is_cached('onnx-community/bert-base-uncased-ONNX');
      * console.log(cached); // true or false
      */
-    static async is_cached(modelId, options = {}) {
-        return is_cached(modelId, options);
+    static async is_cached(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return is_cached(request.modelId, request.options);
     }
 
     /**
      * Checks if all files for a given model are already cached, with per-file detail.
      * Automatically determines which files are needed using get_files().
      *
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -269,8 +299,9 @@ export class ModelRegistry {
      * console.log(status.allCached); // true or false
      * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
      */
-    static async is_cached_files(modelId, options = {}) {
-        return is_cached_files(modelId, options);
+    static async is_cached_files(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return is_cached_files(request.modelId, request.options);
     }
 
     /**
@@ -279,7 +310,7 @@ export class ModelRegistry {
      * Returns a plain boolean — use `is_pipeline_cached_files` if you need per-file detail.
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -292,8 +323,9 @@ export class ModelRegistry {
      * const cached = await ModelRegistry.is_pipeline_cached('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(cached); // true or false
      */
-    static async is_pipeline_cached(task, modelId, options = {}) {
-        return is_pipeline_cached(task, modelId, options);
+    static async is_pipeline_cached(task, model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return is_pipeline_cached(task, request.modelId, request.options);
     }
 
     /**
@@ -301,7 +333,7 @@ export class ModelRegistry {
      * Automatically determines which components are needed based on the task.
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
-     * @param {string} modelId - The model id
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -315,14 +347,15 @@ export class ModelRegistry {
      * console.log(status.allCached); // true or false
      * console.log(status.files); // [{ file: 'config.json', cached: true }, ...]
      */
-    static async is_pipeline_cached_files(task, modelId, options = {}) {
-        return is_pipeline_cached_files(task, modelId, options);
+    static async is_pipeline_cached_files(task, model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return is_pipeline_cached_files(task, request.modelId, request.options);
     }
 
     /**
      * Get metadata for a specific file without downloading it.
      *
-     * @param {string} path_or_repo_id - Model id or path
+     * @param {string|import('../../backends/inference.js').InferenceBackend} path_or_repo_id - Model id, path, or custom backend
      * @param {string} filename - The file name
      * @param {import('../hub.js').PretrainedOptions} [options] - Optional parameters
      * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} File metadata
@@ -332,14 +365,15 @@ export class ModelRegistry {
      * console.log(metadata.exists, metadata.size); // true, 665
      */
     static async get_file_metadata(path_or_repo_id, filename, options = {}) {
-        return get_file_metadata(path_or_repo_id, filename, options);
+        const request = resolveModelRegistryRequest(path_or_repo_id, options);
+        return get_file_metadata(path_or_repo_id, filename, request.options);
     }
 
     /**
      * Clears all cached files for a given model.
      * Automatically determines which files are needed and removes them from the cache.
      *
-     * @param {string} modelId - The model id (e.g., "onnx-community/gpt2-ONNX")
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -354,8 +388,9 @@ export class ModelRegistry {
      * const result = await ModelRegistry.clear_cache('onnx-community/bert-base-uncased-ONNX');
      * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
      */
-    static async clear_cache(modelId, options = {}) {
-        return clear_cache(modelId, options);
+    static async clear_cache(model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return clear_cache(request.modelId, request.options);
     }
 
     /**
@@ -363,7 +398,7 @@ export class ModelRegistry {
      * Automatically determines which components are needed based on the task.
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "image-classification")
-     * @param {string} modelId - The model id (e.g., "onnx-community/gpt2-ONNX")
+     * @param {string|import('../../backends/inference.js').InferenceBackend} model - The model id or custom inference backend
      * @param {Object} [options] - Optional parameters
      * @param {string} [options.cache_dir] - Custom cache directory
      * @param {string} [options.revision] - Model revision (default: 'main')
@@ -376,7 +411,8 @@ export class ModelRegistry {
      * const result = await ModelRegistry.clear_pipeline_cache('text-generation', 'onnx-community/gpt2-ONNX');
      * console.log(`Deleted ${result.filesDeleted} of ${result.filesCached} cached files`);
      */
-    static async clear_pipeline_cache(task, modelId, options = {}) {
-        return clear_pipeline_cache(task, modelId, options);
+    static async clear_pipeline_cache(task, model, options = {}) {
+        const request = resolveModelRegistryRequest(model, options);
+        return clear_pipeline_cache(task, request.modelId, request.options);
     }
 }

@@ -1,0 +1,69 @@
+{
+  "name": "@huggingface/transformers-onnxruntime",
+  "version": "0.1.0",
+  "description": "ONNX Runtime inference provider for Transformers.js",
+  "type": "module",
+  "main": "./dist/transformers-onnxruntime.node.cjs",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "import": {
+          "types": "./types/index.d.ts",
+          "default": "./dist/transformers-onnxruntime.node.mjs"
+        },
+        "require": {
+          "types": "./types/index.d.ts",
+          "default": "./dist/transformers-onnxruntime.node.cjs"
+        }
+      },
+      "default": {
+        "types": "./types/index.d.ts",
+        "default": "./dist/transformers-onnxruntime.web.js"
+      }
+    },
+    "./testing": {
+      "types": "./types/testing.d.ts",
+      "import": "./dist/testing.mjs",
+      "require": "./dist/testing.cjs"
+    }
+  },
+  "scripts": {
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
+    "typegen": "tsc --build",
+    "build": "node scripts/build.mjs && pnpm typegen",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+  },
+  "dependencies": {
+    "onnxruntime-common": "1.24.3",
+    "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c"
+  },
+  "peerDependencies": {
+    "onnxruntime-node": "1.24.3"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@webgpu/types": "^0.1.69",
+    "esbuild": "^0.27.2",
+    "jest": "^30.2.0",
+    "onnxruntime-node": "1.24.3",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "README.md",
+    "!**/*.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0"
+}

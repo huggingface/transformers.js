@@ -93,6 +93,18 @@ export function dispatchCallback(progress_callback, data) {
 }
 
 /**
+ * Throw an abort signal's reason when cancellation has been requested.
+ *
+ * @param {AbortSignal|null|undefined} signal
+ * @param {string} [fallbackMessage]
+ */
+export function throwIfAborted(signal, fallbackMessage = 'Operation aborted.') {
+    if (!signal?.aborted) return;
+    if (typeof signal.throwIfAborted === 'function') signal.throwIfAborted();
+    throw signal.reason ?? new Error(fallbackMessage);
+}
+
+/**
  * A callable progress callback that wraps an original callback and emits
  * aggregate `progress_total` events. Because it extends `Callable`, instances
  * can be passed directly wherever a plain callback function is expected.
@@ -110,6 +122,8 @@ export class DefaultProgressCallback extends Callable {
         super();
         this.callback = callback;
         this.files_loading = files_loading;
+        this.lastAggregateLoaded = -1;
+        this.lastAggregateTotal = -1;
         /** @type {Map<string, Promise<string|Uint8Array|null>>} Pending and completed file loads, used to deduplicate work within a single pipeline() call. */
         this.loads = new Map();
     }
@@ -119,23 +133,34 @@ export class DefaultProgressCallback extends Callable {
      */
     _call(info) {
         if (info.status === 'progress') {
+            const previous = this.files_loading[info.file];
+            const previousLoaded = Number.isFinite(previous?.loaded) ? previous.loaded : 0;
+            const previousTotal = Number.isFinite(previous?.total) ? previous.total : 0;
+            const reportedLoaded = Number.isFinite(info.loaded) ? Math.max(0, info.loaded) : previousLoaded;
+            const reportedTotal = Number.isFinite(info.total) ? Math.max(0, info.total) : 0;
+            const total = Math.max(previousTotal, reportedTotal, reportedLoaded);
+            const loaded = Math.min(total, Math.max(previousLoaded, reportedLoaded));
             this.files_loading[info.file] = {
-                loaded: info.loaded,
-                total: info.total,
-            };
-
-            const loaded = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
-            const total = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.total, 0);
-            const progress = total > 0 ? (loaded / total) * 100 : 0;
-
-            this.callback({
-                status: 'progress_total',
-                name: info.name,
-                progress,
                 loaded,
                 total,
-                files: structuredClone(this.files_loading),
-            });
+            };
+
+            const aggregateLoaded = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.loaded, 0);
+            const aggregateTotal = Object.values(this.files_loading).reduce((acc, curr) => acc + curr.total, 0);
+            const progress = aggregateTotal > 0 ? (aggregateLoaded / aggregateTotal) * 100 : 0;
+
+            if (aggregateLoaded !== this.lastAggregateLoaded || aggregateTotal !== this.lastAggregateTotal) {
+                this.lastAggregateLoaded = aggregateLoaded;
+                this.lastAggregateTotal = aggregateTotal;
+                this.callback({
+                    status: 'progress_total',
+                    name: info.name,
+                    progress,
+                    loaded: aggregateLoaded,
+                    total: aggregateTotal,
+                    files: structuredClone(this.files_loading),
+                });
+            }
         }
         this.callback(info);
     }

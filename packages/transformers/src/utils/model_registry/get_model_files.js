@@ -1,11 +1,9 @@
-import { DEFAULT_DTYPE_SUFFIX_MAPPING, selectDtype } from '../dtypes.js';
-import { selectDevice } from '../devices.js';
-import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
-import { getSessionsConfig } from '../../models/session_config.js';
 import { AutoConfig } from '../../configs.js';
 import { makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
+import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
+import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {import('../../configs.js').PretrainedConfig} PretrainedConfig
@@ -25,20 +23,25 @@ import { resolve_model_type } from './resolve_model_type.js';
  * @param {string|null} [options.cache_dir=null] Custom local cache directory.
  * @param {boolean} [options.local_files_only=false] Never hit the network if true.
  * @param {string} [options.revision='main'] Git branch, tag, or commit SHA.
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets.
+ * @param {AbortSignal} [options.signal] Cancellation signal.
  * @returns {Promise<PretrainedConfig>}
  */
 export function get_config(
     modelId,
-    { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = {},
+    { config = null, cache_dir = null, local_files_only = false, revision = 'main', subfolder = null, signal = undefined } = {},
 ) {
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
-        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision });
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
     }
-    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision });
+    if (signal) {
+        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
+    }
+    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision, subfolder });
     return memoizePromise(key, () =>
-        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision }),
+        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal }),
     );
 }
 
@@ -55,61 +58,53 @@ export function get_config(
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] Override dtype (use this if passing dtype to pipeline)
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] Override device (use this if passing device to pipeline)
  * @param {string} [options.model_file_name=null] Override the model file name (excluding .onnx suffix).
+ * @param {string|null} [options.cache_dir=null] Custom cache directory.
+ * @param {boolean} [options.local_files_only=false] Never hit the network if true.
+ * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.subfolder=null] Optional directory containing shared assets.
+ * @param {AbortSignal} [options.signal] Cancellation signal.
+ * @param {string|null} [options.task=null] Pipeline task requesting the artifacts.
+ * @param {boolean|number|Record<string, boolean|number>} [options.use_external_data_format=null] ONNX external-data configuration.
+ * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] Artifact metadata provider.
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(
     modelId,
-    { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
+    {
+        config = null,
+        dtype: overrideDtype = null,
+        device: overrideDevice = null,
+        model_file_name = null,
+        cache_dir = null,
+        local_files_only = false,
+        revision = 'main',
+        subfolder = null,
+        signal = undefined,
+        use_external_data_format = null,
+        task = null,
+        inferenceProvider = null,
+    } = {},
 ) {
-    config = await get_config(modelId, { config });
-
-    const files = [
-        // Add config.json (always loaded)
-        'config.json',
-    ];
-    const custom_config = config['transformers.js_config'] ?? {};
-
-    const use_external_data_format = custom_config.use_external_data_format;
-    const subfolder = 'onnx'; // Always 'onnx' as per the default in from_pretrained
-
-    const rawDevice = overrideDevice ?? custom_config.device;
-    let dtype = overrideDtype ?? custom_config.dtype;
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, subfolder, signal });
 
     // Infer model type from config
     const modelType = resolve_model_type(config);
-
-    const add_model_file = (fileName, baseName = null) => {
-        baseName = baseName ?? fileName;
-        const selectedDevice = selectDevice(rawDevice, fileName);
-        const selectedDtype = selectDtype(dtype, fileName, selectedDevice);
-
-        const suffix = DEFAULT_DTYPE_SUFFIX_MAPPING[selectedDtype] ?? '';
-        const fullName = `${baseName}${suffix}.onnx`;
-        const fullPath = subfolder ? `${subfolder}/${fullName}` : fullName;
-        files.push(fullPath);
-
-        // Check for external data files
-        const num_chunks = resolveExternalDataFormat(use_external_data_format, fullName, fileName);
-        for (const dataFileName of getExternalDataChunkNames(fullName, num_chunks)) {
-            const dataFilePath = subfolder ? `${subfolder}/${dataFileName}` : dataFileName;
-            files.push(dataFilePath);
-        }
-    };
-
-    // Get session configuration from the shared source of truth
-    const { sessions, optional_configs } = getSessionsConfig(modelType, config, { model_file_name });
-
-    // Add model files based on sessions
-    for (const [sessionKey, baseName] of Object.entries(sessions)) {
-        add_model_file(sessionKey, baseName);
-    }
-
-    // Add optional config files
-    if (optional_configs) {
-        for (const configFile of Object.values(optional_configs)) {
-            files.push(configFile);
-        }
-    }
-
-    return files;
+    const provider = await getModelRegistryInferenceProvider(inferenceProvider);
+    return [
+        ...(await provider.listModelArtifacts(withInferenceBackendHostOptions({
+            modelId,
+            task,
+            modelType,
+            config,
+            model_file_name,
+            dtype: overrideDtype,
+            device: overrideDevice,
+            cache_dir,
+            local_files_only,
+            revision,
+            subfolder,
+            signal,
+            use_external_data_format,
+        }))),
+    ];
 }

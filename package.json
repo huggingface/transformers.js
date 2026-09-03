@@ -8,6 +8,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:packages": "node scripts/test-packages.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "node scripts/dev.mjs"

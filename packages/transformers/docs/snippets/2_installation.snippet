@@ -1,12 +1,24 @@
-
 To install via [NPM](https://www.npmjs.com/package/@huggingface/transformers), run:
+
 ```bash
 npm i @huggingface/transformers
 ```
 
-Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. For example, using [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), you can import the library with:
+Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. The ONNX provider is loaded lazily through bare module specifiers, so direct CDN usage requires an import map:
+
 ```html
+<script type="importmap">
+  {
+    "imports": {
+      "@huggingface/transformers-onnxruntime": "https://cdn.jsdelivr.net/npm/@huggingface/transformers-onnxruntime@0.1.0/dist/transformers-onnxruntime.web.js",
+      "onnxruntime-common": "https://cdn.jsdelivr.net/npm/onnxruntime-common@1.24.3/dist/esm/index.js",
+      "onnxruntime-web/webgpu": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/ort.webgpu.min.mjs"
+    }
+  }
+</script>
 <script type="module">
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
+  import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
 </script>
 ```
+
+The default WASM binaries load from the pinned `onnxruntime-web` CDN. To self-host them, set `env.backends.onnx.wasm.wasmPaths` before loading a model.

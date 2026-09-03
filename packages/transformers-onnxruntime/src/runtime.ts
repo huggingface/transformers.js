@@ -16,23 +16,32 @@
  * @module backends/onnx
  */
 
-import { env, apis, LogLevel } from '../env.js';
+import { getOnnxProviderHost } from './host.js';
+
+declare const __ONNX_MODULE_URL__: string;
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 // In either case, we select the default export if it exists, otherwise we use the named export.
 import * as ONNX_NODE from 'onnxruntime-node';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
-import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
-import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
-import { logger } from '../utils/logger.js';
+import type { Env, InferenceSession as OrtInferenceSession, Tensor as OrtTensor } from 'onnxruntime-common';
+import { loadWasmBinary, loadWasmFactory } from './wasm-cache.js';
 export { Tensor } from 'onnxruntime-common';
 
-/**
- * @typedef {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig} ONNXExecutionProviders
- */
+const { env, apis, logger } = getOnnxProviderHost();
+const LogLevel = { DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, NONE: 50 };
 
-/** @type {Record<import("../utils/devices.js").DeviceType, ONNXExecutionProviders>} */
-const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
+function isBlobURL(url: string): boolean {
+    return url.startsWith('blob:');
+}
+
+function toAbsoluteURL(url: string): string {
+    return new URL(url, globalThis.location?.href ?? __ONNX_MODULE_URL__).href;
+}
+
+type ExecutionProvider = OrtInferenceSession.ExecutionProviderConfig;
+
+const DEVICE_TO_EXECUTION_PROVIDER_MAPPING: Readonly<Record<string, ExecutionProvider | null>> = Object.freeze({
     auto: null, // Auto-detect based on device and environment
     gpu: null, // Auto-detect GPU
     cpu: 'cpu', // CPU
@@ -55,7 +64,7 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
  * @param {number} logLevel - The LogLevel value to convert
  * @returns {number} ONNX Runtime severity level (0-4)
  */
-function getOnnxLogSeverityLevel(logLevel) {
+function getOnnxLogSeverityLevel(logLevel: number): 0 | 1 | 2 | 3 | 4 {
     // ONNX Runtime's log severity levels are defined as follows:
     // (0) ORT_LOGGING_LEVEL_VERBOSE: Print all log messages.
     // (1) ORT_LOGGING_LEVEL_INFO: Print info and higher level log messages.
@@ -79,11 +88,7 @@ function getOnnxLogSeverityLevel(logLevel) {
     }
 }
 
-/**
- * Maps ONNX Runtime numeric severity levels to string log levels.
- * @type {Record<0 | 1 | 2 | 3 | 4, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'>}
- */
-const ONNX_LOG_LEVEL_NAMES = {
+const ONNX_LOG_LEVEL_NAMES: Record<0 | 1 | 2 | 3 | 4, 'verbose' | 'info' | 'warning' | 'error' | 'fatal'> = {
     0: 'verbose',
     1: 'info',
     2: 'warning',
@@ -91,20 +96,16 @@ const ONNX_LOG_LEVEL_NAMES = {
     4: 'fatal',
 };
 
-/**
- * The list of supported devices, sorted by priority/performance.
- * @type {import("../utils/devices.js").DeviceType[]}
- */
-const supportedDevices = [];
+// The list of supported devices, sorted by priority/performance.
+const supportedDevices: string[] = [];
 
-/** @type {ONNXExecutionProviders[]} */
-let defaultDevices;
-let ONNX;
+let defaultDevices: ExecutionProvider[];
+let ONNX: typeof ONNX_NODE;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
-    ONNX = globalThis[ORT_SYMBOL];
+    ONNX = (globalThis as any)[ORT_SYMBOL] as typeof ONNX_NODE;
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE;
 
@@ -135,7 +136,7 @@ if (ORT_SYMBOL in globalThis) {
     supportedDevices.push('cpu');
     defaultDevices = ['cpu'];
 } else {
-    ONNX = ONNX_WEB;
+    ONNX = ONNX_WEB as unknown as typeof ONNX_NODE;
 
     if (apis.IS_WEBNN_AVAILABLE) {
         // TODO: Only push supported providers (depending on available hardware)
@@ -150,15 +151,10 @@ if (ORT_SYMBOL in globalThis) {
     defaultDevices = ['wasm'];
 }
 
-// @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
 
-/**
- * Map a device to the execution providers to use for the given device.
- * @param {import("../utils/devices.js").DeviceType|"auto"|null} [device=null] (Optional) The device to run the inference on.
- * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.
- */
-export function deviceToExecutionProviders(device = null) {
+/** Map a device to the execution providers to use for the given device. */
+export function deviceToExecutionProviders(device: string | null = null): ExecutionProvider[] {
     // Use the default execution providers if the user hasn't specified anything
     if (!device) return defaultDevices;
 
@@ -180,16 +176,14 @@ export function deviceToExecutionProviders(device = null) {
 /**
  * Currently, Transformers.js doesn't support simultaneous loading of sessions in WASM/WebGPU.
  * For this reason, we need to chain the loading calls.
- * @type {Promise<any>}
  */
-let webInitChain = Promise.resolve();
+let webInitChain: Promise<unknown> = Promise.resolve();
 
 /**
  * Promise that resolves when WASM binary has been loaded (if caching is enabled).
  * This ensures we only attempt to load the WASM binary once.
- * @type {Promise<void>|null}
  */
-let wasmLoadPromise = null;
+let wasmLoadPromise: Promise<void> | null = null;
 
 /**
  * Ensures the WASM binary is loaded and cached before creating an inference session.
@@ -228,7 +222,7 @@ async function ensureWasmLoaded() {
     wasmLoadPromise = (async () => {
         // At this point, we know wasmPaths is an object (not a string) because
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
-        const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
+        const urls = ONNX_ENV.wasm.wasmPaths as { wasm: string; mjs: string };
 
         // Load both in parallel; the .mjs blob URL is only kept if wasmBinary succeeded.
         // ORT only sets locateFile when wasmBinary is provided (onnxruntime PR https://github.com/microsoft/onnxruntime/pull/27411), which
@@ -283,26 +277,36 @@ async function ensureWasmLoaded() {
  * @param {Object} session_config ONNX inference session configuration.
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object }>} The ONNX inference session.
  */
-export async function createInferenceSession(buffer_or_path, session_options, session_config) {
+export async function createInferenceSession(
+    buffer_or_path: Uint8Array | string,
+    session_options: OrtInferenceSession.SessionOptions,
+    session_config: Record<string, unknown>,
+): Promise<OrtInferenceSession & { config: Record<string, unknown> }> {
     await ensureWasmLoaded();
     const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
-    const load = () =>
-        InferenceSession.create(buffer_or_path, {
+    const load = () => {
+        const options = {
             // Set default log severity level, but allow overriding through session options
             logSeverityLevel,
             ...session_options,
-        });
+        };
+        const create = InferenceSession.create as (
+            model: Uint8Array | string,
+            options: OrtInferenceSession.SessionOptions,
+        ) => Promise<OrtInferenceSession>;
+        return create(buffer_or_path, options);
+    };
     const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
-    session.config = session_config;
-    return session;
+    const configuredSession = session as OrtInferenceSession & { config: Record<string, unknown> };
+    configuredSession.config = session_config;
+    return configuredSession;
 }
 
 /**
  * Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
  * For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
- * @type {Promise<any>}
  */
-let webInferenceChain = Promise.resolve();
+let webInferenceChain: Promise<Record<string, OrtTensor>> = Promise.resolve({});
 
 /**
  * Run an inference session.
@@ -310,21 +314,23 @@ let webInferenceChain = Promise.resolve();
  * @param {Record<string, import('onnxruntime-common').Tensor>} ortFeed The input tensors.
  * @returns {Promise<Record<string, import('onnxruntime-common').Tensor>>} The output tensors.
  */
-export async function runInferenceSession(session, ortFeed) {
+export async function runInferenceSession(
+    session: OrtInferenceSession,
+    ortFeed: Record<string, OrtTensor>,
+): Promise<Record<string, OrtTensor>> {
     const run = () => session.run(ortFeed);
     return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
 }
 
 /**
  * Check if an object is an ONNX tensor.
- * @param {any} x The object to check
+ * @param x The object to check
  * @returns {boolean} Whether the object is an ONNX tensor.
  */
-export function isONNXTensor(x) {
+export function isONNXTensor(x: unknown): x is OrtTensor {
     return x instanceof ONNX.Tensor;
 }
-/** @type {import('onnxruntime-common').Env} */
-const ONNX_ENV = ONNX?.env;
+const ONNX_ENV: Env = ONNX.env;
 
 /**
  * Check if ONNX's WASM backend is being proxied.
@@ -336,7 +342,17 @@ export function isONNXProxy() {
 }
 
 if (ONNX_ENV) {
+    const configured = (env.backends.onnx ??= {}) as Record<string, any>;
+    const configuredWasm = configured.wasm;
+    const configuredWebgpu = configured.webgpu;
+    for (const [key, value] of Object.entries(configured)) {
+        if (key !== 'wasm' && key !== 'webgpu' && key !== 'setLogLevel') {
+            (ONNX_ENV as any)[key] = value;
+        }
+    }
+
     if (ONNX_ENV.wasm) {
+        Object.assign(ONNX_ENV.wasm, configuredWasm ?? {});
         // Initialize wasm backend with suitable default settings.
 
         // (Optional) Set path to wasm files. This will override the default path search behavior of onnxruntime-web.
@@ -363,11 +379,12 @@ if (ONNX_ENV) {
 
         // Users may wish to proxy the WASM backend to prevent the UI from freezing,
         // However, this is not necessary when using WebGPU, so we default to false.
-        ONNX_ENV.wasm.proxy = false;
+        ONNX_ENV.wasm.proxy ??= false;
     }
 
     if (ONNX_ENV.webgpu) {
-        ONNX_ENV.webgpu.powerPreference = 'high-performance';
+        Object.assign(ONNX_ENV.webgpu, configuredWebgpu ?? {});
+        ONNX_ENV.webgpu.powerPreference ??= 'high-performance';
     }
 
     /**
@@ -375,7 +392,7 @@ if (ONNX_ENV) {
      * levels, and set the log level environment variable in ONNX Runtime.
      * @param {number} logLevel The log level to set.
      */
-    function setLogLevel(logLevel) {
+    function setLogLevel(logLevel: number) {
         const severityLevel = getOnnxLogSeverityLevel(logLevel);
         ONNX_ENV.logLevel = ONNX_LOG_LEVEL_NAMES[severityLevel];
     }
@@ -384,8 +401,8 @@ if (ONNX_ENV) {
     setLogLevel(env.logLevel ?? LogLevel.WARNING);
 
     // Expose ONNX environment variables to `env.backends.onnx`
-    env.backends.onnx = {
-        ...ONNX_ENV,
-        setLogLevel,
-    };
+    Object.assign(configured, ONNX_ENV, { setLogLevel });
+    configured.wasm = ONNX_ENV.wasm;
+    configured.webgpu = ONNX_ENV.webgpu;
+    env.backends.onnx = configured;
 }

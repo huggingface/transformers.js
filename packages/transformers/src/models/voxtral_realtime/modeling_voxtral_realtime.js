@@ -38,7 +38,7 @@ function createEncoderState(model, input_features) {
     const enc_kv_cache = new DynamicCache();
     const enc_names = getCacheNames(audio_config);
     const enc_symbols = { batch_size: 1 };
-    /** @type {import('onnxruntime-common').Tensor.Type} */
+    /** @type {import('../../utils/tensor.js').DataType} */
     let padding_type = 'float32';
     for (const meta of encoder_session.inputMetadata) {
         if (meta.name === 'past_padding_cache') {

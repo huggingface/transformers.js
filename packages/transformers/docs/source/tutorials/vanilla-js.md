@@ -91,9 +91,18 @@ Here's how the UI looks at this point:
 
 ## Step 2: JavaScript setup
 
-With the _boring_ part out of the way, let's start writing some JavaScript code! Create a file called `index.js` and link to it in `index.html` by adding the following to the end of the `<body>`:
+With the _boring_ part out of the way, let's start writing some JavaScript code! Create a file called `index.js`, add the ONNX provider import map, and link to it in `index.html` by adding the following to the end of the `<body>`:
 
 ```html
+<script type="importmap">
+{
+  "imports": {
+    "@huggingface/transformers-onnxruntime": "https://cdn.jsdelivr.net/npm/@huggingface/transformers-onnxruntime@0.1.0/dist/transformers-onnxruntime.web.js",
+    "onnxruntime-common": "https://cdn.jsdelivr.net/npm/onnxruntime-common@1.24.3/dist/esm/index.js",
+    "onnxruntime-web/webgpu": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/ort.webgpu.min.mjs"
+  }
+}
+</script>
 <script src="./index.js" type="module"></script>
 ```
 

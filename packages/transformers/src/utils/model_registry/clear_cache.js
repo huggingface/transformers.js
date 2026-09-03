@@ -8,6 +8,7 @@ import { getCache } from '../cache.js';
 import { buildResourcePaths, checkCachedResource } from '../hub.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
+import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
  * @typedef {Object} FileClearStatus
@@ -35,21 +36,22 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  */
 async function clear_files_from_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir);
-
-    if (!cache) {
-        return {
-            filesDeleted: 0,
-            filesCached: 0,
-            files: files.map((filename) => ({ file: filename, deleted: false, wasCached: false })),
-        };
-    }
-
-    if (!cache.delete) {
+    if (cache && !cache.delete) {
         throw new Error('Cache does not support delete operation');
     }
 
     const results = await Promise.all(
         files.map(async (filename) => {
+            const backendOptions = withInferenceBackendHostOptions(options);
+            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, backendOptions);
+            if (backendMetadata) {
+                const wasCached = backendMetadata.fromCache === true;
+                const deleted = wasCached
+                    ? (await options.inferenceBackend?.deleteModelArtifact?.(filename, backendOptions)) === true
+                    : false;
+                return { file: filename, deleted, wasCached };
+            }
+            if (!cache) return { file: filename, deleted: false, wasCached: false };
             const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
 
             const cached = await checkCachedResource(cache, localPath, proposedCacheKey);

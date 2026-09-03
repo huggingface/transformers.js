@@ -1,8 +1,8 @@
 import { get_files } from './get_files.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
+import { getModelRegistryInferenceProvider } from '../../backends/model_registry.js';
 
 /**
  * Get all files needed for a specific pipeline task.
@@ -16,6 +16,14 @@ import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
  * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+ * @param {string|null} [options.cache_dir=null] - Custom cache directory
+ * @param {boolean} [options.local_files_only=false] - Never hit the network if true
+ * @param {string} [options.revision='main'] - Model revision
+ * @param {string|null} [options.subfolder=null] - Optional directory containing shared assets
+ * @param {AbortSignal} [options.signal] - Cancellation signal
+ * @param {boolean|number|Record<string, boolean|number>} [options.use_external_data_format=null] - ONNX external-data configuration
+ * @param {import('../../backends/model_registry.js').ModelRegistryInferenceProvider|null} [options.inferenceProvider=null] - Artifact metadata provider
+ * @param {boolean} [options.include_model=true] - Whether to include built-in ONNX model files
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported
  */
@@ -41,20 +49,19 @@ export async function get_pipeline_files(task, modelId, options = {}) {
 
     const files = await get_files(modelId, {
         ...options,
+        task,
         include_tokenizer,
         include_processor,
     });
 
     // When loading multimodal models via the text-generation pipeline,
     // only load the sessions needed for text generation (embed_tokens, decoder_model_merged)
-    if (task === 'text-generation') {
+    if (task === 'text-generation' && options.include_model !== false) {
         const config = await get_config(modelId, options);
         const modelType = resolve_model_type(config);
-        const textOnlySessions = getTextOnlySessions(modelType);
-
-        if (textOnlySessions) {
-            const allowedPrefixes = Object.values(textOnlySessions).map((s) => `onnx/${s}`);
-            return files.filter((f) => !f.startsWith('onnx/') || allowedPrefixes.some((p) => f.startsWith(p)));
+        const provider = await getModelRegistryInferenceProvider(options.inferenceProvider ?? null);
+        if (provider.filterModelArtifacts) {
+            return provider.filterModelArtifacts(files, { modelType, config });
         }
     }
 
