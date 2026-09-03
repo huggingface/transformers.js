@@ -1,4 +1,4 @@
-import { LogitsProcessor, LogitsProcessorList, StoppingCriteria, type Tensor } from '@huggingface/transformers';
+import { LogitsProcessor, LogitsProcessorList, type Tensor } from '@huggingface/transformers';
 
 import {
     createTokenConstraint,
@@ -15,7 +15,6 @@ export type ResponseFormat =
     | { type: 'regex'; regex: string };
 
 type GenerationState = {
-    completed: boolean;
     constraint: TokenConstraint;
     processedInputLength?: number;
     mask?: Uint32Array;
@@ -24,29 +23,23 @@ type GenerationState = {
 const WHITESPACE_REPETITION_PENALTY = 1.2;
 const MAX_CONSECUTIVE_WHITESPACE_TOKENS = 4;
 
-export class ResponseConstraint {
+export class StructuredOutputProcessor extends LogitsProcessorList {
     /**
      * Precomputes the tokenizer-derived data structures used by every
-     * constraint. The first constraint per tokenizer otherwise pays this cost
-     * (hundreds of milliseconds for large vocabularies) inside
-     * `fromResponseFormat`; call this once after loading the model to pay it
-     * early instead.
+     * constraint. The first processor per tokenizer otherwise pays this cost
+     * (hundreds of milliseconds for large vocabularies) in its constructor;
+     * call this once after loading the model to pay it early instead.
      */
     static warmup(tokenizer: TokenizerSource): void {
         prepareTokenizer(tokenizer);
     }
 
-    static fromResponseFormat(tokenizer: TokenizerSource, responseFormat: ResponseFormat) {
+    constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat) {
+        super();
         const state: GenerationState = {
-            completed: false,
             constraint: createTokenConstraint(tokenizer, responseFormat),
         };
-        const logits_processor = new LogitsProcessorList();
-        logits_processor.push(new ConstraintLogitsProcessor(state));
-        return {
-            logits_processor,
-            stopping_criteria: new ConstraintStoppingCriteria(state),
-        };
+        this.push(new ConstraintLogitsProcessor(state));
     }
 }
 
@@ -57,11 +50,20 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
 
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
-        this.state.processedInputLength ??= inputIds[0].length;
-        if (this.state.completed) return logits;
+        const input = inputIds[0];
+        const start = this.state.processedInputLength ?? input.length;
+        for (let i = start; i < input.length; ++i) {
+            if (this.state.constraint.commit(Number(input[i]))) {
+                throw new Error(
+                    'StructuredOutputProcessor observed the tokenizer EOS token after generation continued. ' +
+                        'Ensure the model generation config uses the same eos_token_id as the tokenizer.',
+                );
+            }
+        }
+        this.state.processedInputLength = input.length;
         const logitsVocabSize = logits.dims.at(-1);
         if (logitsVocabSize === undefined || !Number.isInteger(logitsVocabSize) || logitsVocabSize <= 0) {
-            throw new Error('ResponseConstraint requires logits with a vocabulary dimension.');
+            throw new Error('StructuredOutputProcessor requires logits with a vocabulary dimension.');
         }
         const words = Math.ceil(logitsVocabSize / 32);
         if (this.state.mask?.length !== words) this.state.mask = new Uint32Array(words);
@@ -77,26 +79,9 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
     }
 }
 
-class ConstraintStoppingCriteria extends StoppingCriteria {
-    constructor(private readonly state: GenerationState) {
-        super();
-    }
-
-    _call(inputIds: ArrayLike<number | bigint>[]) {
-        assertSingleSequence(inputIds.length);
-        const input = inputIds[0];
-        const start = this.state.processedInputLength ?? input.length;
-        for (let i = start; i < input.length && !this.state.completed; ++i) {
-            this.state.completed = this.state.constraint.commit(Number(input[i]));
-        }
-        this.state.processedInputLength = input.length;
-        return [this.state.completed];
-    }
-}
-
 function assertSingleSequence(batchSize: number): void {
     if (batchSize !== 1) {
-        throw new Error(`ResponseConstraint currently supports batch size 1; received ${batchSize}.`);
+        throw new Error(`StructuredOutputProcessor currently supports batch size 1; received ${batchSize}.`);
     }
 }
 

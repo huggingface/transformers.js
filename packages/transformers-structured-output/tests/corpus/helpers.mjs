@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { Tensor } from "@huggingface/transformers";
 
-import { ResponseConstraint } from "../../dist/index.js";
+import { StructuredOutputProcessor } from "../../dist/index.js";
 
 const EOS_TOKEN_ID = 256;
 const encoder = new TextEncoder();
@@ -21,7 +21,7 @@ function allowed(logits, tokenId) {
 }
 
 export function compileJsonSchema(schema) {
-  return ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema });
+  return new StructuredOutputProcessor(tokenizer, { type: "json_schema", json_schema: schema });
 }
 
 export function jsonSchemaAccepts(schema, value, jsonText) {
@@ -36,17 +36,16 @@ export function jsonSchemaAccepts(schema, value, jsonText) {
   for (const tokenId of encoder.encode(text)) {
     const logits = scores();
     try {
-      constraint.logits_processor([inputIds], logits);
+      constraint([inputIds], logits);
       if (!allowed(logits, tokenId)) return false;
       inputIds.push(BigInt(tokenId));
-      constraint.stopping_criteria([inputIds]);
     } catch {
       return false;
     }
   }
   const logits = scores();
   try {
-    constraint.logits_processor([inputIds], logits);
+    constraint([inputIds], logits);
   } catch {
     return false;
   }

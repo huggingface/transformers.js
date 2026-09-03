@@ -1,6 +1,6 @@
 import { PreTrainedTokenizer, Tensor } from "@huggingface/transformers";
 
-import { ResponseConstraint } from "../dist/index.js";
+import { StructuredOutputProcessor } from "../dist/index.js";
 
 const EOS_TOKEN_ID = 256;
 const tokenizer = {
@@ -19,21 +19,20 @@ function isAllowed(scores, tokenId) {
 
 const inputIdsByConstraint = new WeakMap();
 
-async function consume(constraint, text) {
-  const inputIds = inputIdsByConstraint.get(constraint) ?? [0n];
-  inputIdsByConstraint.set(constraint, inputIds);
+async function consume(processor, text) {
+  const inputIds = inputIdsByConstraint.get(processor) ?? [0n];
+  inputIdsByConstraint.set(processor, inputIds);
   for (const tokenId of new TextEncoder().encode(text)) {
     const scores = logits();
-    constraint.logits_processor([inputIds], scores);
+    processor([inputIds], scores);
     expect(isAllowed(scores, tokenId)).toBe(true);
     inputIds.push(BigInt(tokenId));
-    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
   }
   return inputIds;
 }
 
 function schemaAccepts(schema, text) {
-  const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+  const processor = new StructuredOutputProcessor(tokenizer, {
     type: "json_schema",
     json_schema: schema,
   });
@@ -41,24 +40,23 @@ function schemaAccepts(schema, text) {
   for (const tokenId of new TextEncoder().encode(text)) {
     const scores = logits();
     try {
-      constraint.logits_processor([inputIds], scores);
+      processor([inputIds], scores);
     } catch {
       return false;
     }
     if (!isAllowed(scores, tokenId)) return false;
     inputIds.push(BigInt(tokenId));
-    constraint.stopping_criteria([inputIds]);
   }
   const scores = logits();
   try {
-    constraint.logits_processor([inputIds], scores);
+    processor([inputIds], scores);
   } catch {
     return false;
   }
   return isAllowed(scores, EOS_TOKEN_ID);
 }
 
-describe("ResponseConstraint", () => {
+describe("StructuredOutputProcessor", () => {
   it("derives token bytes through the configured decoder", () => {
     const tokenizerJson = {
       version: "1.0",
@@ -88,10 +86,10 @@ describe("ResponseConstraint", () => {
       },
     };
     const decodedTokenizer = new PreTrainedTokenizer(tokenizerJson, { eos_token: "[EOS]" });
-    const constraint = ResponseConstraint.fromResponseFormat(decodedTokenizer, { type: "regex", regex: "b" });
+    const processor = new StructuredOutputProcessor(decodedTokenizer, { type: "regex", regex: "b" });
     const scores = new Tensor("float32", new Float32Array(2).fill(1), [1, 2]);
 
-    constraint.logits_processor([[0n]], scores);
+    processor([[0n]], scores);
 
     expect(decodedTokenizer.decode([0])).toBe("b");
     expect(isAllowed(scores, 0)).toBe(true);
@@ -99,10 +97,10 @@ describe("ResponseConstraint", () => {
   });
 
   it("applies a regex mask", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "[ac]" });
+    const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "[ac]" });
     const scores = logits();
 
-    constraint.logits_processor([[0n]], scores);
+    processor([[0n]], scores);
 
     expect(isAllowed(scores, "a".charCodeAt(0))).toBe(true);
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(false);
@@ -111,33 +109,31 @@ describe("ResponseConstraint", () => {
   });
 
   it("does not process the same sampled token twice", async () => {
-    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "ab" });
+    const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "ab" });
     const inputIds = [0n];
-    constraint.logits_processor([inputIds], logits());
+    processor([inputIds], logits());
     inputIds.push(BigInt("a".charCodeAt(0)));
 
-    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
-    expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
+    processor([inputIds], logits());
 
     const scores = logits();
-    constraint.logits_processor([inputIds], scores);
+    processor([inputIds], scores);
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(true);
   });
 
   it("discourages repeated non-progressing JSON whitespace", () => {
-    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+    const processor = new StructuredOutputProcessor(tokenizer, { type: "json_object" });
     const inputIds = [0n];
-    constraint.logits_processor([inputIds], logits());
+    processor([inputIds], logits());
 
     for (let count = 1; count <= 4; ++count) {
       inputIds.push(10n);
-      expect(constraint.stopping_criteria([inputIds])).toEqual([false]);
 
       const scores = logits();
       scores.data[10] = 12;
       scores.data[32] = 12;
       scores.data[13] = -12;
-      constraint.logits_processor([inputIds], scores);
+      processor([inputIds], scores);
 
       if (count < 4) {
         expect(scores.data[10]).toBeCloseTo(12 / 1.2 ** count);
@@ -153,7 +149,7 @@ describe("ResponseConstraint", () => {
   });
 
   it("accepts JSON that satisfies a schema", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
+    const processor = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: {
         type: "object",
@@ -162,17 +158,15 @@ describe("ResponseConstraint", () => {
         additionalProperties: false,
       },
     });
-    const inputIds = await consume(constraint, '{"answer":"yes"}');
+    const inputIds = await consume(processor, '{"answer":"yes"}');
     const scores = logits();
 
-    constraint.logits_processor([inputIds], scores);
+    processor([inputIds], scores);
     expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
-
-    expect(constraint.stopping_criteria([[...inputIds, BigInt(EOS_TOKEN_ID)]])).toEqual([true]);
   });
 
   it("applies schema structure while producing JSON", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, {
+    const constraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: {
         type: "object",
@@ -182,18 +176,18 @@ describe("ResponseConstraint", () => {
       },
     });
     const initial = logits();
-    constraint.logits_processor([[0n]], initial);
+    constraint([[0n]], initial);
     expect(isAllowed(initial, "{".charCodeAt(0))).toBe(true);
     expect(isAllowed(initial, "[".charCodeAt(0))).toBe(false);
 
     const inputIds = await consume(constraint, "{");
     const afterOpen = logits();
-    constraint.logits_processor([inputIds], afterOpen);
+    constraint([inputIds], afterOpen);
     expect(isAllowed(afterOpen, "}".charCodeAt(0))).toBe(false);
   });
 
   it("rejects impossible property and finite scalar prefixes", async () => {
-    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const constraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: {
         type: "object",
@@ -204,13 +198,13 @@ describe("ResponseConstraint", () => {
     });
     const propertyInput = await consume(constraint, '{"');
     const propertyScores = logits();
-    constraint.logits_processor([propertyInput], propertyScores);
+    constraint([propertyInput], propertyScores);
     expect(isAllowed(propertyScores, "a".charCodeAt(0))).toBe(true);
     expect(isAllowed(propertyScores, "z".charCodeAt(0))).toBe(false);
 
     const valueInput = await consume(constraint, 'answer":"');
     const valueScores = logits();
-    constraint.logits_processor([valueInput], valueScores);
+    constraint([valueInput], valueScores);
     expect(isAllowed(valueScores, "y".charCodeAt(0))).toBe(true);
     expect(isAllowed(valueScores, "x".charCodeAt(0))).toBe(false);
 
@@ -231,49 +225,49 @@ describe("ResponseConstraint", () => {
     };
     expect(schemaAccepts(escapedProperty, '{"c\\u006fnfidence":1}')).toBe(false);
     expect(schemaAccepts(escapedProperty, '{"c\\n\\n\\n":1}')).toBe(false);
-    const canonicalKeyConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const canonicalKeyConstraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: escapedProperty,
     });
     const canonicalKeyInput = await consume(canonicalKeyConstraint, '{"confidence');
     const canonicalKeyScores = logits();
-    canonicalKeyConstraint.logits_processor([canonicalKeyInput], canonicalKeyScores);
+    canonicalKeyConstraint([canonicalKeyInput], canonicalKeyScores);
     expect(isAllowed(canonicalKeyScores, '"'.charCodeAt(0))).toBe(true);
     expect(isAllowed(canonicalKeyScores, "\\".charCodeAt(0))).toBe(false);
     const completedPropertyInput = await consume(canonicalKeyConstraint, '":1');
     const completedPropertyScores = logits();
-    canonicalKeyConstraint.logits_processor([completedPropertyInput], completedPropertyScores);
+    canonicalKeyConstraint([completedPropertyInput], completedPropertyScores);
     expect(isAllowed(completedPropertyScores, "}".charCodeAt(0))).toBe(true);
     expect(isAllowed(completedPropertyScores, ",".charCodeAt(0))).toBe(false);
     expect(schemaAccepts({ type: "object", properties: { "a\nb": true }, required: ["a\nb"], additionalProperties: false }, '{"a\\nb":1}')).toBe(true);
 
-    const languageConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const languageConstraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: { enum: ["en", "de", "fr", "es"] },
     });
     const languageInput = await consume(languageConstraint, '"');
     const languageScores = logits();
-    languageConstraint.logits_processor([languageInput], languageScores);
+    languageConstraint([languageInput], languageScores);
     expect(isAllowed(languageScores, "e".charCodeAt(0))).toBe(true);
     expect(isAllowed(languageScores, "d".charCodeAt(0))).toBe(true);
     expect(isAllowed(languageScores, "x".charCodeAt(0))).toBe(false);
     expect(isAllowed(languageScores, "\\".charCodeAt(0))).toBe(false);
     expect(schemaAccepts({ const: "\n" }, '"\\n"')).toBe(true);
 
-    const boundedString = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const boundedString = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: { type: "string", maxLength: 2 },
     });
     const boundedStringInput = await consume(boundedString, '"ab');
     const boundedStringScores = logits();
-    boundedString.logits_processor([boundedStringInput], boundedStringScores);
+    boundedString([boundedStringInput], boundedStringScores);
     expect(isAllowed(boundedStringScores, '"'.charCodeAt(0))).toBe(true);
     expect(isAllowed(boundedStringScores, "c".charCodeAt(0))).toBe(false);
     expect(isAllowed(boundedStringScores, "\\".charCodeAt(0))).toBe(false);
     expect(schemaAccepts({ type: "string", maxLength: 1 }, '"😀"')).toBe(true);
     expect(schemaAccepts({ type: "string", maxLength: 1 }, '"😀x"')).toBe(false);
 
-    const composed = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const composed = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: {
         oneOf: [{ const: "general" }, { type: "object", properties: { role: { type: "string" } }, required: ["role"], additionalProperties: false }],
@@ -281,7 +275,7 @@ describe("ResponseConstraint", () => {
     });
     const composedInput = await consume(composed, '{"');
     const composedScores = logits();
-    composed.logits_processor([composedInput], composedScores);
+    composed([composedInput], composedScores);
     expect(isAllowed(composedScores, "r".charCodeAt(0))).toBe(true);
     expect(isAllowed(composedScores, "z".charCodeAt(0))).toBe(false);
   });
@@ -297,23 +291,23 @@ describe("ResponseConstraint", () => {
     // Integer fractions may only contain zeros and exponents may not be
     // negative, so "0.9" (which would strand the
     // model in states like "0.9e-" that can never close) is cut off at the "9".
-    const constraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const constraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: confidence,
     });
     const input = await consume(constraint, '{"confidence":0.');
     const scores = logits();
-    constraint.logits_processor([input], scores);
+    constraint([input], scores);
     expect(isAllowed(scores, "0".charCodeAt(0))).toBe(true);
     expect(isAllowed(scores, "9".charCodeAt(0))).toBe(false);
 
-    const exponent = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const exponent = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: confidence,
     });
     const exponentInput = await consume(exponent, '{"confidence":9e');
     const exponentScores = logits();
-    exponent.logits_processor([exponentInput], exponentScores);
+    exponent([exponentInput], exponentScores);
     expect(isAllowed(exponentScores, "-".charCodeAt(0))).toBe(false);
     // 9e1 = 90 fits [0, 100]; every exponent starting with 3 puts 9e3+ out of range
     expect(isAllowed(exponentScores, "1".charCodeAt(0))).toBe(true);
@@ -327,36 +321,36 @@ describe("ResponseConstraint", () => {
 
     // Zero padding carries no information, so it is capped: a model stuck on
     // "0" is eventually forced to close instead of streaming digits forever.
-    const padded = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const padded = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: confidence,
     });
     const paddedInput = await consume(padded, '{"confidence":95e000');
     const paddedScores = logits();
-    padded.logits_processor([paddedInput], paddedScores);
+    padded([paddedInput], paddedScores);
     expect(isAllowed(paddedScores, "0".charCodeAt(0))).toBe(false);
     expect(isAllowed(paddedScores, "}".charCodeAt(0))).toBe(true);
 
     // Digits that could never get back into [0, 100] are pruned: after "15",
     // any further digit forces 150+.
-    const bounded = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const bounded = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: confidence,
     });
     const boundedInput = await consume(bounded, '{"confidence":15');
     const boundedScores = logits();
-    bounded.logits_processor([boundedInput], boundedScores);
+    bounded([boundedInput], boundedScores);
     expect(isAllowed(boundedScores, "0".charCodeAt(0))).toBe(false);
     expect(isAllowed(boundedScores, "}".charCodeAt(0))).toBe(true);
 
     // A first digit that cannot start any in-range integer is masked: 4, 40-49,
     // 400+ all miss [50, 100], while 1 can still reach 100.
-    const range = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const range = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: { type: "integer", minimum: 50, maximum: 100 },
     });
     const rangeScores = logits();
-    range.logits_processor([[0n]], rangeScores);
+    range([[0n]], rangeScores);
     expect(isAllowed(rangeScores, "5".charCodeAt(0))).toBe(true);
     expect(isAllowed(rangeScores, "1".charCodeAt(0))).toBe(true);
     expect(isAllowed(rangeScores, "4".charCodeAt(0))).toBe(false);
@@ -364,13 +358,13 @@ describe("ResponseConstraint", () => {
 
     const negative = { type: "integer", minimum: -50, maximum: -10 };
     expect(schemaAccepts(negative, "-25")).toBe(true);
-    const negativeConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const negativeConstraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: negative,
     });
     const negativeInput = await consume(negativeConstraint, "-");
     const negativeScores = logits();
-    negativeConstraint.logits_processor([negativeInput], negativeScores);
+    negativeConstraint([negativeInput], negativeScores);
     expect(isAllowed(negativeScores, "2".charCodeAt(0))).toBe(true);
     expect(isAllowed(negativeScores, "6".charCodeAt(0))).toBe(false);
 
@@ -415,13 +409,13 @@ describe("ResponseConstraint", () => {
         },
       ],
     };
-    const followUpConstraint = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const followUpConstraint = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: followUp,
     });
     const followUpInput = await consume(followUpConstraint, '{"needed":true,"question":');
     const followUpScores = logits();
-    followUpConstraint.logits_processor([followUpInput], followUpScores);
+    followUpConstraint([followUpInput], followUpScores);
     expect(isAllowed(followUpScores, '"'.charCodeAt(0))).toBe(true);
     expect(isAllowed(followUpScores, "n".charCodeAt(0))).toBe(false);
     expect(schemaAccepts(followUp, '{"question":null,"needed":true}')).toBe(false);
@@ -506,7 +500,7 @@ describe("ResponseConstraint", () => {
 
   it("rejects malformed and unsupported schema shapes", () => {
     for (const schema of [{ not: [] }, { patternProperties: { "[": true } }, { dependentRequired: { a: ["b", "b"] } }, { minContains: -1 }, { uniqueItems: "yes" }, { unevaluatedProperties: false }]) {
-      expect(() => ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema })).toThrow();
+      expect(() => new StructuredOutputProcessor(tokenizer, { type: "json_schema", json_schema: schema })).toThrow();
     }
   });
 
@@ -515,17 +509,17 @@ describe("ResponseConstraint", () => {
       { type: "string", pattern: "^yes$" },
       { type: "object", properties: { value: { type: "string", format: "date" } } },
     ]) {
-      expect(() => ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_schema", json_schema: schema })).toThrow("cannot be enforced incrementally");
+      expect(() => new StructuredOutputProcessor(tokenizer, { type: "json_schema", json_schema: schema })).toThrow("cannot be enforced incrementally");
     }
     expect(schemaAccepts({ type: "string", format: "vendor-format" }, '"anything"')).toBe(true);
   });
 
   it("supports unconstrained JSON objects", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+    const constraint = new StructuredOutputProcessor(tokenizer, { type: "json_object" });
     const inputIds = await consume(constraint, '{"nested":{"enabled":true},"count":2}');
     const scores = logits();
 
-    constraint.logits_processor([inputIds], scores);
+    constraint([inputIds], scores);
 
     expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
   });
@@ -537,11 +531,11 @@ describe("ResponseConstraint", () => {
       required: ["answer"],
       additionalProperties: false,
     };
-    const first = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const first = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: schema,
     });
-    const second = ResponseConstraint.fromResponseFormat(tokenizer, {
+    const second = new StructuredOutputProcessor(tokenizer, {
       type: "json_schema",
       json_schema: schema,
     });
@@ -550,29 +544,30 @@ describe("ResponseConstraint", () => {
     const secondIds = await consume(second, '{"answer":"no"}');
     const firstScores = logits();
     const secondScores = logits();
-    first.logits_processor([firstIds], firstScores);
-    second.logits_processor([secondIds], secondScores);
+    first([firstIds], firstScores);
+    second([secondIds], secondScores);
 
     expect(isAllowed(firstScores, EOS_TOKEN_ID)).toBe(true);
     expect(isAllowed(secondScores, EOS_TOKEN_ID)).toBe(true);
   });
 
   it("rejects batched generation", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "json_object" });
+    const constraint = new StructuredOutputProcessor(tokenizer, { type: "json_object" });
 
-    expect(() => constraint.logits_processor([[0n], [0n]], new Tensor("float32", new Float32Array((EOS_TOKEN_ID + 1) * 2), [2, EOS_TOKEN_ID + 1]))).toThrow("currently supports batch size 1");
+    expect(() => constraint([[0n], [0n]], new Tensor("float32", new Float32Array((EOS_TOKEN_ID + 1) * 2), [2, EOS_TOKEN_ID + 1]))).toThrow("currently supports batch size 1");
   });
 
   it("rejects a sampled token outside the constraint", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "a" });
-    constraint.logits_processor([[0n]], logits());
+    const constraint = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "a" });
+    constraint([[0n]], logits());
 
-    expect(() => constraint.stopping_criteria([[0n, 98n]])).toThrow("does not satisfy the constraint");
+    expect(() => constraint([[0n, 98n]], logits())).toThrow("does not satisfy the constraint");
   });
 
-  it("returns only the generation hooks", async () => {
-    const constraint = await ResponseConstraint.fromResponseFormat(tokenizer, { type: "regex", regex: "a" });
+  it("can be passed directly as a logits processor list", () => {
+    const constraint = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "a" });
 
-    expect(Object.keys(constraint).sort()).toEqual(["logits_processor", "stopping_criteria"]);
+    expect([...constraint]).toHaveLength(1);
+    expect("stopping_criteria" in constraint).toBe(false);
   });
 });

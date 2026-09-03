@@ -6,13 +6,10 @@
   "types": "./types/index.d.ts",
   "type": "module",
   "exports": {
-    "import": {
+    ".": {
       "types": "./types/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "require": {
-      "types": "./types/index.d.ts",
-      "default": "./dist/index.cjs"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {

@@ -1,2 +1,2 @@
-export { ResponseConstraint } from './ResponseConstraint';
-export type { ResponseFormat } from './ResponseConstraint';
+export { StructuredOutputProcessor } from './StructuredOutputProcessor';
+export type { ResponseFormat } from './StructuredOutputProcessor';
