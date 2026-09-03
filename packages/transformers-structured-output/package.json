@@ -1,5 +1,5 @@
 {
-  "name": "@huggingface/transformers-response-constraint",
+  "name": "@huggingface/transformers-structured-output",
   "version": "0.0.0",
   "description": "Dependency-free constrained generation for Transformers.js",
   "main": "./dist/index.cjs",

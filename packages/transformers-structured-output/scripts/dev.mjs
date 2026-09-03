@@ -12,15 +12,15 @@ const watchLogger = {
 
     build.onStart(() => {
       startTime = performance.now();
-      console.log(`[transformers-response-constraint] rebuilding ${build.initialOptions.outfile}...`);
+      console.log(`[transformers-structured-output] rebuilding ${build.initialOptions.outfile}...`);
     });
 
     build.onEnd((result) => {
       const duration = (performance.now() - startTime).toFixed(2);
       if (result.errors.length > 0) {
-        console.log(`[transformers-response-constraint] rebuild failed in ${duration}ms`);
+        console.log(`[transformers-structured-output] rebuild failed in ${duration}ms`);
       } else {
-        console.log(`[transformers-response-constraint] rebuilt ${build.initialOptions.outfile} in ${duration}ms`);
+        console.log(`[transformers-structured-output] rebuilt ${build.initialOptions.outfile} in ${duration}ms`);
       }
     });
   },
@@ -56,7 +56,7 @@ const tscWatch = spawn("tsc", ["--build", "--watch", "--preserveWatchOutput"], {
   shell: true,
 });
 
-console.log("Watching @huggingface/transformers-response-constraint...");
+console.log("Watching @huggingface/transformers-structured-output...");
 
 process.on("SIGINT", async () => {
   tscWatch.kill();
