@@ -245,9 +245,14 @@ async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, r
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
  * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
+ * @param {boolean} [as_blob=false] Whether to return a `Blob` rather than reading the file into a
+ * `Uint8Array`. Honoured on two paths: a cache HIT, which reads the cached `Response` directly, and a COLD
+ * file that is headed for the cache anyway, which is streamed into it and read straight back. Ignored — and a
+ * `Uint8Array` returned — when neither applies, which covers a cold file with no cache available and the
+ * fallback taken when the cache refuses the write.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ * @returns {Promise<string|Uint8Array|Blob|null>} A Promise that resolves with the file path as a string if `return_path` is true; otherwise a `Blob` when `as_blob` was honoured, and the file content as a `Uint8Array` in every other case.
  */
 async function loadResourceFile(
     path_or_repo_id,
@@ -256,6 +261,7 @@ async function loadResourceFile(
     options = {},
     return_path = false,
     cache = null,
+    as_blob = false,
 ) {
     const { requestURL, localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
@@ -362,11 +368,97 @@ async function loadResourceFile(
         // loads from disk directly). A completion progress event is emitted
         // after the caching block below to ensure progress_total reaches 100%.
     } else {
-        /** @type {Uint8Array} */
+        // A `Blob` on the `as_blob` branches, bytes everywhere else. Widened rather than cast away at each
+        // use, so a future branch that forgets which it is fails here instead of at run time.
+        /** @type {Uint8Array|Blob} */
         let buffer;
 
         if (typeof response !== 'string') {
-            if (!options.progress_callback) {
+            if (as_blob && cacheHit) {
+                // The whole point of `as_blob`, and it is one call: a Cache Storage `Response` hands back a
+                // Blob that is a FILE REFERENCE rather than a copy, so reading the file does not put it on
+                // the JS heap. What the RUNTIME then does with that Blob is a separate question — see the
+                // note on the cold branch below.
+                //
+                // Gated on `cacheHit`, which is a deliberate trade rather than caution. Reading the stream to
+                // report progress would defeat the whole thing — the chunks would be resident twice, once as
+                // buffers and once in Blob storage — and on a cold download progress is worth more than peak
+                // memory, because the user is watching several gigabytes arrive. Every load AFTER the first
+                // takes this branch, is instantaneous, and is where the peak actually matters.
+                buffer = await response.blob();
+
+                dispatchCallback(options.progress_callback, {
+                    status: 'progress',
+                    name: path_or_repo_id,
+                    file: filename,
+                    progress: 100,
+                    loaded: buffer.size,
+                    total: buffer.size,
+                });
+            } else if (as_blob && toCacheResponse && response.body) {
+                // COLD, and headed for the cache anyway. Stream the body straight into Cache Storage and then
+                // read it back as a Blob, so the DOWNLOAD goes network -> disk without the file ever sitting
+                // on the JS heap.
+                //
+                // ⚠️ TWO SEPARATE SAVINGS, AND ONLY ONE OF THEM IS UNCONDITIONAL. This branch is about the
+                // download, happens before onnxruntime-web sees anything, and holds whichever build is in
+                // use — it is what stops a cold multi-gigabyte load dying in `getModelDataFiles` below. What
+                // the runtime does with the Blob afterwards is the other saving and is NOT unconditional: the
+                // JSPI build reads external data from a Blob without materialising it, while the default
+                // asyncify build copies it in. So on the default build this buys the download and not the
+                // session, and the end-to-end peak is unchanged at session creation.
+                //
+                // This is the case that actually fails. `getModelDataFiles` starts every external-data chunk
+                // concurrently, and reading each one into a `Uint8Array` to report progress means a cold load
+                // peaks at the SUM of the chunks: a 17 GB model raises `Array buffer allocation failed` at
+                // ~16 GB and only completes on a later attempt, once enough files are cached to take the
+                // branch above.
+                //
+                // Progress survives, which is the reason the buffer existed. A pass-through `TransformStream`
+                // counts bytes as they go by; it holds one chunk, not the file, and backpressure keeps it
+                // that way.
+                let loaded = 0;
+                const total = parseInt(response.headers.get('content-length'), 10) || 0;
+                const counting = new TransformStream({
+                    transform(chunk, controller) {
+                        loaded += chunk.byteLength;
+                        dispatchCallback(options.progress_callback, {
+                            status: 'progress',
+                            name: path_or_repo_id,
+                            file: filename,
+                            progress: total ? (loaded / total) * 100 : 0,
+                            loaded,
+                            total,
+                        });
+                        controller.enqueue(chunk);
+                    },
+                });
+
+                // `content-length` explicitly, because the Cache API may strip it — same reason the buffered
+                // store below sets it.
+                const headers = new Headers(response.headers);
+                if (total) headers.set('content-length', String(total));
+
+                try {
+                    await cache.put(cacheKey, new Response(response.body.pipeThrough(counting), { headers }));
+                    const stored = await cache.match(cacheKey);
+                    if (!stored) throw new Error('cache.match missed the entry just written');
+                    // `cache.match` is typed for every backend, including the Node file cache; what was just
+                    // written here is a `Response`, and only a `Response` has `.blob()`.
+                    buffer = await /** @type {Response} */ (stored).blob();
+                    // Already stored, so the block at the end of this function must not store it again.
+                    toCacheResponse = false;
+                } catch (err) {
+                    // The buffered path keeps working when the cache refuses the write (QuotaExceededError is
+                    // the expected one). It cannot reuse `response` — the body is consumed — so it re-fetches.
+                    logger.warn(`Unable to stream response into the cache, falling back to a buffer: ${err}.`);
+                    // `getFile`, not bare `fetch`: it routes through `env.fetch` and applies
+                    // `getFetchHeaders`, so a gated repo keeps its Authorization header on the way back.
+                    const retry = await getFile(remoteURL);
+                    if (retry.status !== 200) return handleError(retry.status, remoteURL, fatal);
+                    buffer = new Uint8Array(await retry.arrayBuffer());
+                }
+            } else if (!options.progress_callback) {
                 // If no progress callback is specified, we can use the `.arrayBuffer()`
                 // method to read the response.
                 buffer = new Uint8Array(await response.arrayBuffer());
@@ -431,7 +523,12 @@ async function loadResourceFile(
         cacheKey &&
         typeof response !== 'string'
     ) {
-        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+        // ⛔ NEVER A BLOB HERE, and the two `as_blob` branches are why. A warm read is a cache HIT, which
+        // never sets `toCacheResponse`; a cold stream writes the entry itself and then clears the flag. So
+        // anything reaching this line was buffered, and the narrowing is a statement of that rather than a
+        // convenience — if a third branch ever produces a Blob without storing it, this is where it lands.
+        const buffered = /** @type {Uint8Array} */ (result);
+        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, buffered, options);
     }
 
     // In Node.js with return_path, the buffer read is skipped so no progress
@@ -480,7 +577,7 @@ async function loadResourceFile(
     throw new Error('Unable to get model file path or buffer.');
 }
 
-/** @type {Map<string, Promise<string|Uint8Array|null>>} Pending file loads keyed by resource identity. */
+/** @type {Map<string, Promise<string|Uint8Array|Blob|null>>} Pending file loads keyed by resource identity. */
 const INFLIGHT_LOADS = new Map();
 
 /**
@@ -494,11 +591,21 @@ const INFLIGHT_LOADS = new Map();
  * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
  * @param {PretrainedOptions} [options] An object containing optional parameters.
  * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
+ * @param {boolean} [as_blob=false] Whether to accept a `Blob` instead of a copy of the file's bytes on the JS
+ * heap. Intended for external data, which is handed straight to the runtime. Honoured for a cached file and
+ * for a cold one being written to the cache; a `Uint8Array` comes back otherwise, so callers must handle both.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
- * @returns {Promise<string|Uint8Array>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
+ * @returns {Promise<string|Uint8Array|Blob>} A Promise that resolves with the file path as a string if `return_path` is true; otherwise a `Blob` when `as_blob` was honoured, and the file content as a `Uint8Array` in every other case.
  */
-export async function getModelFile(path_or_repo_id, filename, fatal = true, options = {}, return_path = false) {
+export async function getModelFile(
+    path_or_repo_id,
+    filename,
+    fatal = true,
+    options = {},
+    return_path = false,
+    as_blob = false,
+) {
     if (!env.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
@@ -518,7 +625,12 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     // sibling calls within one pipeline() share a single download (and a
     // single `initiate` event). Otherwise fall back to the global in-flight
     // map for concurrent dedup, with entries cleared on settle.
-    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path);
+    //
+    // `as_blob` is part of the key because it changes the RESOLVED TYPE, not just how the bytes are fetched.
+    // Two callers asking for the same file with different values are not asking the same question: without
+    // it, whichever arrives first decides, and the other gets a `Blob` where it expects a `Uint8Array` or the
+    // reverse. `return_path` is in the key for exactly this reason already.
+    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename, fatal, return_path, as_blob);
     const { progress_callback } = options;
     const loads = progress_callback instanceof DefaultProgressCallback ? progress_callback.loads : INFLIGHT_LOADS;
     let pending = loads.get(key);
@@ -529,7 +641,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             file: filename,
         });
         pending = getCache(options.cache_dir).then((cache) =>
-            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache),
+            loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache, as_blob),
         );
         if (loads === INFLIGHT_LOADS) {
             pending = pending.finally(() => INFLIGHT_LOADS.delete(key));
