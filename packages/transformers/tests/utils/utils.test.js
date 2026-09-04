@@ -3,6 +3,7 @@ import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
 import { RawImage } from "../../src/utils/image.js";
 
+import { load_cached_image } from "../asset_cache.js";
 import { MAX_TEST_EXECUTION_TIME } from "../init.js";
 
 describe("Utilities", () => {
@@ -68,7 +69,7 @@ describe("Utilities", () => {
 
     let image;
     beforeAll(async () => {
-      image = await RawImage.fromURL("https://picsum.photos/300/200");
+      image = await load_cached_image("checkerboard_64x32");
     });
 
     it("Can split image into separate channels", async () => {
@@ -94,27 +95,27 @@ describe("Utilities", () => {
     });
 
     it("Read image from URL", async () => {
-      expect(image.width).toBe(300);
-      expect(image.height).toBe(200);
+      expect(image.width).toBe(64);
+      expect(image.height).toBe(32);
       expect(image.channels).toBe(3);
     });
 
     it("Can resize image", async () => {
-      const resized = await image.resize(150, 100);
-      expect(resized.width).toBe(150);
-      expect(resized.height).toBe(100);
+      const resized = await image.resize(32, 16);
+      expect(resized.width).toBe(32);
+      expect(resized.height).toBe(16);
     });
 
     it("Can resize with aspect ratio", async () => {
-      const resized = await image.resize(150, null);
-      expect(resized.width).toBe(150);
-      expect(resized.height).toBe(100);
+      const resized = await image.resize(32, null);
+      expect(resized.width).toBe(32);
+      expect(resized.height).toBe(16);
     });
 
     it("Returns original image if width and height are null", async () => {
       const resized = await image.resize(null, null);
-      expect(resized.width).toBe(300);
-      expect(resized.height).toBe(200);
+      expect(resized.width).toBe(64);
+      expect(resized.height).toBe(32);
     });
   });
 });

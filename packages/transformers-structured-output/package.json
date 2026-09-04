@@ -1,0 +1,65 @@
+{
+  "name": "@huggingface/transformers-structured-output",
+  "version": "0.0.0",
+  "description": "Dependency-free constrained generation for Transformers.js",
+  "main": "./dist/index.cjs",
+  "types": "./types/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
+    "typegen": "tsc --build --force",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs && pnpm typegen",
+    "pretest": "pnpm build",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose",
+    "test:json-corpus": "node --test tests/corpus/json-schema-corpus.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huggingface/transformers.js.git"
+  },
+  "keywords": [
+    "transformers",
+    "transformers.js",
+    "huggingface",
+    "constrained-generation",
+    "structured-output",
+    "json-schema"
+  ],
+  "author": "Hugging Face",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/huggingface/transformers.js/issues"
+  },
+  "homepage": "https://github.com/huggingface/transformers.js#readme",
+  "peerDependencies": {
+    "@huggingface/transformers": "^4.2.0"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "workspace:*",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.1.0",
+    "esbuild": "^0.27.2",
+    "jest": "^30.2.0",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "README.md",
+    "LICENSE",
+    "!**/*.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
