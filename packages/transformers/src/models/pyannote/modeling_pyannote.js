@@ -14,7 +14,7 @@ export class PyAnnoteModel extends PyAnnotePreTrainedModel {}
  * **Example:** Load and run a `PyAnnoteForAudioFrameClassification` for speaker diarization.
  *
  * ```javascript
- * import { AutoProcessor, AutoModelForAudioFrameClassification, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModelForAudioFrameClassification, load_audio } from '@huggingface/transformers';
  *
  * // Load model and processor
  * const model_id = 'onnx-community/pyannote-segmentation-3.0';
@@ -23,7 +23,7 @@ export class PyAnnoteModel extends PyAnnotePreTrainedModel {}
  *
  * // Read and preprocess audio
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/mlk.wav';
- * const audio = await read_audio(url, processor.feature_extractor.config.sampling_rate);
+ * const audio = await load_audio(url, processor.feature_extractor.config.sampling_rate);
  * const inputs = await processor(audio);
  *
  * // Run model with inputs

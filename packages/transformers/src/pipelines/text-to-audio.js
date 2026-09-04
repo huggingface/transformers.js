@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
@@ -59,7 +63,7 @@ import { env } from '../env.js';
  * await output.save('output.wav'); // You can also use `output.toBlob()` to access the audio as a Blob
  * ```
  *
- * **Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See [here](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for the full list of available languages (1107).
+ * **Example:** Multilingual speech generation with `Xenova/mms-tts-fra`. See the [MMS-TTS model list](https://huggingface.co/models?pipeline_tag=text-to-speech&other=vits&sort=trending) for available languages.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -138,7 +142,7 @@ export class TextToAudioPipeline
     }
 
     async _call(text_inputs, options) {
-        // If this.processor is not set, we are using a `AutoModelForTextToWaveform` model
+        // If this.processor is not set, we are using an `AutoModelForTextToWaveform` model
         if (this.processor) {
             return this._call_text_to_spectrogram(text_inputs, options);
         } else if (this.model.config.model_type === 'supertonic') {

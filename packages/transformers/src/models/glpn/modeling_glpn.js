@@ -8,7 +8,7 @@ export class GLPNPreTrainedModel extends PreTrainedModel {}
 export class GLPNModel extends GLPNPreTrainedModel {}
 
 /**
- * import { GLPNForDepthEstimation, AutoProcessor, RawImage, interpolate_4d } from '@huggingface/transformers';
+ * import { GLPNForDepthEstimation, AutoProcessor, RawImage, load_image, interpolate_4d } from '@huggingface/transformers';
  *
  * // Load model and processor
  * const model_id = 'Xenova/glpn-kitti';
@@ -17,7 +17,7 @@ export class GLPNModel extends GLPNPreTrainedModel {}
  *
  * // Load image from URL
  * const url = 'http://images.cocodataset.org/val2017/000000039769.jpg';
- * const image = await RawImage.read(url);
+ * const image = await load_image(url);
  *
  * // Prepare image for the model
  * const inputs = await processor(image);

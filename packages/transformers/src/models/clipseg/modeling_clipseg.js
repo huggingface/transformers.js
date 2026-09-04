@@ -10,7 +10,7 @@ export class CLIPSegModel extends CLIPSegPreTrainedModel {}
  * **Example:** Perform zero-shot image segmentation with a `CLIPSegForImageSegmentation` model.
  *
  * ```javascript
- * import { AutoTokenizer, AutoProcessor, CLIPSegForImageSegmentation, RawImage } from '@huggingface/transformers';
+ * import { AutoTokenizer, AutoProcessor, CLIPSegForImageSegmentation, RawImage, load_image } from '@huggingface/transformers';
  *
  * // Load tokenizer, processor, and model
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/clipseg-rd64-refined');
@@ -22,7 +22,7 @@ export class CLIPSegModel extends CLIPSegPreTrainedModel {}
  * const text_inputs = tokenizer(texts, { padding: true, truncation: true });
  *
  * // Read image and run processor
- * const image = await RawImage.read('https://github.com/timojl/clipseg/blob/master/example_image.jpg?raw=true');
+ * const image = await load_image('https://github.com/timojl/clipseg/blob/master/example_image.jpg?raw=true');
  * const image_inputs = await processor(image);
  *
  * // Run model with both text and pixel inputs

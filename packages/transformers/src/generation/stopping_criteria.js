@@ -1,4 +1,11 @@
 /**
+ * @file Stopping criteria for controlling when generation halts.
+ *
+ * Each criterion returns an array of booleans — one per sequence in the batch —
+ * signalling which sequences should stop emitting tokens. Combine multiple
+ * criteria with `StoppingCriteriaList`, and pass that to `generate()` via
+ * the `stopping_criteria` argument.
+ *
  * @module generation/stopping_criteria
  */
 
@@ -25,6 +32,8 @@ export class StoppingCriteria extends Callable {
     }
 }
 /**
+ * A list of `StoppingCriteria` that stops generation when any one of them returns `true`.
+ * Pass an instance via `stopping_criteria` to any generation call to combine multiple stop conditions.
  */
 export class StoppingCriteriaList extends Callable {
     /**
@@ -75,8 +84,8 @@ export class StoppingCriteriaList extends Callable {
 }
 
 /**
- * This class can be used to stop generation whenever the full generated number of tokens exceeds `max_length`.
- * Keep in mind for decoder-only type of transformers, this will include the initial prompted tokens.
+ * Stops generation whenever the generated sequence length reaches `max_length`.
+ * For decoder-only models, this includes the initial prompt tokens.
  */
 export class MaxLengthCriteria extends StoppingCriteria {
     /**
@@ -98,13 +107,13 @@ export class MaxLengthCriteria extends StoppingCriteria {
 // TODO: add MaxTimeCriteria
 
 /**
- * This class can be used to stop generation whenever the "end-of-sequence" token is generated.
+ * Stops generation whenever an "end-of-sequence" token is generated.
  * By default, it uses the `model.generation_config.eos_token_id`.
  */
 export class EosTokenCriteria extends StoppingCriteria {
     /**
      *
-     * @param {number|number[]} eos_token_id The id of the *end-of-sequence* token.
+     * @param {number|number[]} eos_token_id The ID of the *end-of-sequence* token.
      * Optionally, use a list to set multiple *end-of-sequence* tokens.
      */
     constructor(eos_token_id) {
@@ -131,7 +140,7 @@ export class EosTokenCriteria extends StoppingCriteria {
 }
 
 /**
- * This class can be used to stop generation whenever the user interrupts the process.
+ * Stops generation whenever the user interrupts the process.
  */
 export class InterruptableStoppingCriteria extends StoppingCriteria {
     constructor() {

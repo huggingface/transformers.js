@@ -76,7 +76,7 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
      * @param {number} [options.minlenratio=0.0] Used to calculate the minimum required length for the output sequence.
      * @param {number} [options.maxlenratio=20.0] Used to calculate the maximum allowed length for the output sequence.
      * @param {Object} [options.vocoder=null] The vocoder that converts the mel spectrogram into a speech waveform. If `null`, the output is the mel spectrogram.
-     * @param {boolean} [options.output_cross_attentions=false] Whether or not to return the attentions tensors of the decoder's cross-attention layers.
+     * @param {boolean} [options.output_cross_attentions=false] Whether to return attention tensors from the decoder's cross-attention layers.
      * @returns {Promise<SpeechOutput>} A promise which resolves to an object containing the spectrogram, waveform, and cross-attention tensors.
      */
     async generate_speech(

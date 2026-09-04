@@ -17,7 +17,7 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * Retrieves an appropriate caching backend based on the environment configuration.
  * Attempts to use custom cache, browser cache, or file system cache in that order of priority.
  * @returns {Promise<CacheInterface | null>}
- * @param file_cache_dir {string|null} Path to a directory in which a downloaded pretrained model configuration should be cached if using the file system cache.
+ * @param file_cache_dir {string|null} Path to a directory where downloaded model files should be cached when using the file system cache.
  */
 export async function getCache(file_cache_dir = null) {
     // First, check if the a caching backend is available
