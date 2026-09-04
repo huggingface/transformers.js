@@ -856,6 +856,7 @@ export class PreTrainedModel extends Callable {
         });
 
         const is_encoder_decoder = this.config.is_encoder_decoder;
+        let encoderOutputsToDispose = null;
 
         // 4. Define other model kwargs
         if (!is_encoder_decoder) {
@@ -869,6 +870,7 @@ export class PreTrainedModel extends Callable {
                 model_input_name,
                 generation_config,
             });
+            encoderOutputsToDispose = model_inputs.encoder_outputs;
         }
 
         // 5. Prepare `input_ids` which will be used for auto-regressive generation
@@ -1051,6 +1053,8 @@ export class PreTrainedModel extends Callable {
             await past_key_values.dispose();
         }
 
+        encoderOutputsToDispose?.dispose();
+
         if (generation_config.return_dict_in_generate) {
             return {
                 sequences,
@@ -1199,6 +1203,9 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
                 // Optimization introduced by optimum to reuse past key values.
                 // So, we just replace the constant outputs (`decoderResults[name]`) with the previous past key values.
                 // https://github.com/huggingface/optimum/blob/0bf2c05fb7e1182b52d21b703cfc95fd9e4ea3dc/optimum/onnxruntime/base.py#L677-L704
+                if (decoderResults[name] !== pastKeyValues[newName]) {
+                    decoderResults[name].dispose();
+                }
                 pkvs[newName] = pastKeyValues[newName];
             } else {
                 pkvs[newName] = decoderResults[name];
