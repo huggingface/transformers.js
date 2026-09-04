@@ -749,3 +749,72 @@ export class TopKLogitsWarper extends LogitsWarper {
         this.filter_value = filter_value;
     }
 }
+
+/**
+ * [`LogitsWarper`] that performs min-p, i.e. keeping all tokens that are above a minimum probability, scaled by the
+ * probability of the most likely token. As a result, the filter becomes more aggressive in the presence of
+ * high-probability tokens, which is a sign of a confident output that we shouldn't deviate from.
+ * Often used together with [`TemperatureLogitsWarper`]. Used as an alternative to [`TopPLogitsWarper`] and
+ * [`TopKLogitsWarper`].
+ */
+export class MinPLogitsWarper extends LogitsWarper {
+    /**
+     * Create a `MinPLogitsWarper`.
+     * @param {number} min_p Minimum token probability, which will be scaled by the probability of the most likely
+     * token. It must be a value between 0 and 1. Typical values are in the 0.01-0.2 range.
+     * @param {Object} options Additional options for the min-p filtering.
+     * @param {number} [options.filter_value=-Infinity] All filtered values will be set to this float value.
+     * @param {number} [options.min_tokens_to_keep=1] Minimum number of tokens that cannot be filtered.
+     */
+    constructor(min_p, { filter_value = -Infinity, min_tokens_to_keep = 1 } = {}) {
+        super();
+        if (typeof min_p !== 'number' || min_p < 0 || min_p > 1.0) {
+            throw new Error(`\`min_p\` must be a float in the [0, 1] interval, but is ${min_p}`);
+        }
+        if (!Number.isInteger(min_tokens_to_keep) || min_tokens_to_keep < 1) {
+            throw new Error(`\`min_tokens_to_keep\` must be a positive integer, but is ${min_tokens_to_keep}`);
+        }
+        this.min_p = min_p;
+        this.filter_value = filter_value;
+        this.min_tokens_to_keep = min_tokens_to_keep;
+    }
+
+    /**
+     * Apply logit warper.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Tensor} The processed logits.
+     */
+    _call(input_ids, logits) {
+        const vocab_size = logits.dims.at(-1);
+        const batch_size = logits.data.length / vocab_size;
+        const data = /** @type {Float32Array} */ (logits.data);
+        const log_min_p = Math.log(this.min_p);
+        for (let b = 0; b < batch_size; ++b) {
+            const offset = b * vocab_size;
+
+            // Since softmax is monotonic and shift-invariant, `prob < min_p * max_prob`
+            // is equivalent to `logit < max_logit + log(min_p)`, so the probabilities
+            // never need to be materialized.
+            let max_logit = -Infinity;
+            for (let i = 0; i < vocab_size; ++i) {
+                const v = data[offset + i];
+                if (v > max_logit) max_logit = v;
+            }
+            let threshold = max_logit + log_min_p;
+
+            if (this.min_tokens_to_keep > 1) {
+                // Lower the threshold if needed so that at least `min_tokens_to_keep` tokens survive.
+                const sorted = Array.from(data.subarray(offset, offset + vocab_size)).sort((a, b) => b - a);
+                threshold = Math.min(threshold, sorted[Math.min(this.min_tokens_to_keep, vocab_size) - 1]);
+            }
+
+            for (let i = 0; i < vocab_size; ++i) {
+                if (data[offset + i] < threshold) {
+                    data[offset + i] = this.filter_value;
+                }
+            }
+        }
+        return logits;
+    }
+}

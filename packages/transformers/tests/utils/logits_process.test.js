@@ -2,6 +2,12 @@ import {
   // Pipelines
   pipeline,
   TextGenerationPipeline,
+
+  // Logits processors
+  MinPLogitsWarper,
+
+  // Other
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -108,5 +114,35 @@ describe("Logits Processors", () => {
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("MinPLogitsWarper", () => {
+  it("filters tokens whose probability is below min_p times the top probability", () => {
+    // Probabilities: [0.5, 0.25, 0.1, 0.01] (up to normalization)
+    const logits = new Tensor("float32", new Float32Array([0.5, 0.25, 0.1, 0.01].map(Math.log)), [1, 4]);
+    const warper = new MinPLogitsWarper(0.3);
+    const data = Array.from(warper([[]], logits).data);
+    expect(data[0]).toBeCloseTo(Math.log(0.5)); // ratio 1.0  >= 0.3 -> kept
+    expect(data[1]).toBeCloseTo(Math.log(0.25)); // ratio 0.5 >= 0.3 -> kept
+    expect(data[2]).toBe(-Infinity); // ratio 0.2  < 0.3 -> filtered
+    expect(data[3]).toBe(-Infinity); // ratio 0.02 < 0.3 -> filtered
+  });
+
+  it("keeps at least min_tokens_to_keep tokens", () => {
+    const logits = new Tensor("float32", new Float32Array([0, -10, -20, -30]), [1, 4]);
+    const warper = new MinPLogitsWarper(0.5, { min_tokens_to_keep: 3 });
+    const data = Array.from(warper([[]], logits).data);
+    expect(data.filter((x) => x !== -Infinity)).toHaveLength(3);
+  });
+
+  it("processes each batch row independently", () => {
+    const logits = new Tensor("float32", new Float32Array([0.5, 0.01, 0.01, 0.5].map(Math.log)), [2, 2]);
+    const warper = new MinPLogitsWarper(0.3);
+    const data = Array.from(warper([[], []], logits).data);
+    expect(data[0]).toBeCloseTo(Math.log(0.5));
+    expect(data[1]).toBe(-Infinity);
+    expect(data[2]).toBe(-Infinity);
+    expect(data[3]).toBeCloseTo(Math.log(0.5));
   });
 });

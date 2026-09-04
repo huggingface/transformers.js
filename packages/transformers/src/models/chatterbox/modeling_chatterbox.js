@@ -90,6 +90,42 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
 
             ({ inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], embed_model_inputs));
 
+            // Classifier-free guidance (CFG): the reference PyTorch implementation
+            // (resemble-ai/chatterbox, `T3.inference`) always generates with
+            // `cfg_weight=0.5`, running a batch of two sequences: the conditional
+            // input and an unconditional copy whose *text* token embeddings are
+            // zeroed (`text_emb[1].zero_()`) — speaker conditioning, exaggeration
+            // and speech tokens are shared between the two rows. The multilingual
+            // checkpoint produces unintelligible vocalizations without it.
+            // Enabled by setting `guidance_scale` (= 1 + cfg_weight, i.e. 1.5 for
+            // parity with the python defaults) to a value > 1. The two rows are
+            // recombined by `ClassifierFreeGuidanceLogitsProcessor`, so the
+            // batch size visible to `generate()` remains 1.
+            const use_cfg = generation_config?.guidance_scale > 1;
+            if (use_cfg) {
+                if (input_ids.dims[0] !== 1) {
+                    throw new Error('Classifier-free guidance is only supported for a batch size of 1.');
+                }
+                if (past_key_values && inputs_embeds.dims[1] === 1) {
+                    // Generation step: the sampled speech token is fed to both rows.
+                    inputs_embeds = cat([inputs_embeds, inputs_embeds], 0);
+                } else {
+                    // Prefill: zero out the text token embeddings of the unconditional row.
+                    const ids = input_ids.data;
+                    const hidden_size = inputs_embeds.dims.at(-1);
+                    const unconditional = inputs_embeds.data.slice();
+                    for (let i = 0; i < ids.length; ++i) {
+                        if (ids[i] < START_SPEECH_TOKEN) {
+                            unconditional.fill(0, i * hidden_size, (i + 1) * hidden_size);
+                        }
+                    }
+                    inputs_embeds = cat(
+                        [inputs_embeds, new Tensor(inputs_embeds.type, unconditional, inputs_embeds.dims)],
+                        0,
+                    );
+                }
+            }
+
             if (audio_features && audio_tokens && speaker_embeddings && speaker_features) {
                 // Use pre-computed speech encoder outputs
                 speech_encoder_outputs = { audio_features, audio_tokens, speaker_embeddings, speaker_features };
@@ -98,8 +134,16 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
             if (speech_encoder_outputs || audio_values) {
                 speech_encoder_outputs ??= await this.encode_speech(audio_values);
 
-                // Update LLM inputs
-                inputs_embeds = cat([speech_encoder_outputs.audio_features, inputs_embeds], 1);
+                // Update LLM inputs. With CFG enabled, the speaker conditioning is
+                // shared by (i.e. repeated for) the conditional and unconditional rows.
+                let cond_features = speech_encoder_outputs.audio_features;
+                if (cond_features.dims[0] !== inputs_embeds.dims[0]) {
+                    cond_features = cat(
+                        Array.from({ length: inputs_embeds.dims[0] }, () => cond_features),
+                        0,
+                    );
+                }
+                inputs_embeds = cat([cond_features, inputs_embeds], 1);
                 attention_mask = ones([inputs_embeds.dims[0], inputs_embeds.dims[1]]);
             } else {
                 const target_length = inputs_embeds.dims[1];
@@ -130,6 +174,9 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
     }
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
+        // Forward the generation config to `forward`, which needs `guidance_scale`
+        // to decide whether to build the classifier-free guidance batch.
+        model_inputs.generation_config = generation_config;
         if (!model_inputs.position_ids && this.sessions['embed_tokens'].inputNames.includes('position_ids')) {
             // If position_ids are not provided, we create them on the fly using the position of the START_SPEECH_TOKEN
             if (model_inputs.input_ids.dims[1] === 1) {
