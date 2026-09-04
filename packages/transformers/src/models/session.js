@@ -186,10 +186,12 @@ function replaceTensors(obj) {
  *
  * @param {Object} session The InferenceSession object to run.
  * @param {Object} inputs An object that maps input names to input tensors.
+ * @param {Record<string, Tensor|null>} [fetches] Optional map of output names to pre-allocated output
+ *   tensors (or `null` to let ONNX Runtime allocate them).
  * @returns {Promise<Object>} A Promise that resolves to an object that maps output names to output tensors.
  * @private
  */
-export async function sessionRun(session, inputs) {
+export async function sessionRun(session, inputs, fetches = undefined) {
     const checkedInputs = validateInputs(session, inputs);
     try {
         // pass the original ort tensor
@@ -206,9 +208,32 @@ export async function sessionRun(session, inputs) {
                 return [k, tensor];
             }),
         );
+        let ortFetches;
+        if (fetches) {
+            ortFetches = Object.fromEntries(
+                Object.entries(fetches).map(([k, v]) => [
+                    k,
+                    v instanceof Tensor ? /** @type {any} */ (v).ort_tensor : v,
+                ]),
+            );
+        }
 
-        const output = await runInferenceSession(session, ortFeed);
-        return replaceTensors(output);
+        const output = await runInferenceSession(session, ortFeed, ortFetches);
+
+        // ORT returns pre-allocated outputs as the exact tensors passed in `fetches`, reuse
+        // the caller's wrappers so no per-run alias wrappers are created and output identity
+        // and disposal stay in the caller's hands.
+        /** @type {Record<string, Tensor>} */
+        const preallocated = {};
+        if (fetches) {
+            for (const [name, tensor] of Object.entries(fetches)) {
+                if (tensor instanceof Tensor && output[name] === /** @type {any} */ (tensor).ort_tensor) {
+                    preallocated[name] = tensor;
+                    delete output[name];
+                }
+            }
+        }
+        return Object.assign(replaceTensors(output), preallocated);
     } catch (e) {
         // Error messages can be long (nested) and uninformative. For this reason,
         // we apply minor formatting to show the most important information

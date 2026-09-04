@@ -308,11 +308,57 @@ let webInferenceChain = Promise.resolve();
  * Run an inference session.
  * @param {import('onnxruntime-common').InferenceSession} session The ONNX inference session.
  * @param {Record<string, import('onnxruntime-common').Tensor>} ortFeed The input tensors.
+ * @param {Record<string, import('onnxruntime-common').Tensor|null>} [ortFetches] Optional pre-allocated
+ *   output tensors. Outputs mapped to a tensor are written into it, outputs mapped to `null`
+ *   are allocated by ONNX Runtime as usual.
  * @returns {Promise<Record<string, import('onnxruntime-common').Tensor>>} The output tensors.
  */
-export async function runInferenceSession(session, ortFeed) {
-    const run = () => session.run(ortFeed);
+export async function runInferenceSession(session, ortFeed, ortFetches = undefined) {
+    const run = () => (ortFetches ? session.run(ortFeed, ortFetches) : session.run(ortFeed));
     return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
+}
+
+/** Bytes per element for the data types that may appear as model cache states (see `StaticCache`). */
+const GPU_TENSOR_BYTES_PER_ELEMENT = Object.freeze({
+    float16: 2,
+    float32: 4,
+    int32: 4,
+    uint32: 4,
+});
+
+/**
+ * Allocate a zero-initialized WebGPU-buffer ONNX tensor.
+ *
+ * @param {string} dataType The tensor data type.
+ * @param {number[]} dims The tensor dimensions.
+ * @returns {Promise<{tensor: import('onnxruntime-common').Tensor, gpuBuffer: GPUBuffer}>}
+ */
+export async function createGpuBufferTensor(dataType, dims) {
+    const device = await ONNX_ENV?.webgpu?.device;
+    if (!device) {
+        throw new Error("No WebGPU device available. GPU-buffer tensors require the 'webgpu' device.");
+    }
+    const bytesPerElement = GPU_TENSOR_BYTES_PER_ELEMENT[dataType];
+    if (!bytesPerElement) {
+        throw new Error(
+            `Unsupported data type for a GPU-buffer tensor: '${dataType}'. ` +
+                `Supported types: ${Object.keys(GPU_TENSOR_BYTES_PER_ELEMENT).join(', ')}.`,
+        );
+    }
+    const numElements = dims.reduce((a, b) => a * b, 1);
+    const byteLength = Math.ceil((numElements * bytesPerElement) / 16) * 16; // 16-byte aligned
+    const gpuBuffer = device.createBuffer({
+        size: byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+    try {
+        const tensor = /** @type {any} */ (ONNX.Tensor).fromGpuBuffer(gpuBuffer, { dataType, dims });
+        return { tensor, gpuBuffer };
+    } catch (e) {
+        // The buffer has not been handed to the caller yet, so it must be destroyed here.
+        gpuBuffer.destroy();
+        throw e;
+    }
 }
 
 /**
