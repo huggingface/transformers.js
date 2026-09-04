@@ -84,6 +84,7 @@ export const MODEL_SESSION_CONFIG = {
             }
             return s;
         },
+        cache_sessions: { decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {
