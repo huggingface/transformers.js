@@ -62,9 +62,11 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {Record<string, string>} [extraHeaders] Additional request headers to merge
+ * on top of the default fetch headers (e.g. `Range`/`If-Range` for resuming a download).
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
+export async function getFile(urlOrPath, extraHeaders = undefined) {
     if (env.useFS && !isValidUrl(urlOrPath, ['http:', 'https:', 'blob:'])) {
         return new FileResponse(
             urlOrPath instanceof URL
@@ -74,9 +76,13 @@ export async function getFile(urlOrPath) {
                 : urlOrPath,
         );
     } else {
-        return env.fetch(urlOrPath, {
-            headers: getFetchHeaders(urlOrPath),
-        });
+        const headers = getFetchHeaders(urlOrPath);
+        if (extraHeaders) {
+            for (const [key, value] of Object.entries(extraHeaders)) {
+                headers.set(key, value);
+            }
+        }
+        return env.fetch(urlOrPath, { headers });
     }
 }
 
@@ -270,6 +276,12 @@ async function loadResourceFile(
     // Whether to cache the final response in the end.
     let toCacheResponse = false;
 
+    // Cache key whose partial we hold a resume reservation for, if any. The
+    // matching `put` releases it; every path that skips the write must release
+    // it explicitly so the key is not blocked for the next writer.
+    /** @type {string|undefined} */
+    let reservedKey;
+
     /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined|string} */
     let response;
 
@@ -330,10 +342,47 @@ async function loadResourceFile(
                 );
             }
 
-            // File not found locally, so we try to download it from the remote server
-            response = await getFile(remoteURL);
+            // File not found locally, so we try to download it from the remote server.
+            //
+            // Resume an interrupted download when the Node file cache still holds a
+            // partial for this key. This only applies to the streaming path
+            // (`IS_NODE_ENV && return_path`), where the body is written straight to
+            // disk; on the buffered path a 206 would yield only the trailing bytes.
+            //
+            // The reservation claims the partial before the request goes out, so a
+            // `Range` is only ever sent by the writer that owns the bytes it
+            // continues. If the key is already being written, or there is nothing to
+            // resume, we fall through to an ordinary full download.
+            let resumeHeaders;
+            if (apis.IS_NODE_ENV && return_path && cache && typeof cache.reserveResume === 'function') {
+                const resume = await cache.reserveResume(proposedCacheKey);
+                if (resume) {
+                    reservedKey = proposedCacheKey;
+                    // Never resume without a validator: a bare `Range` lets the
+                    // server serve bytes from a revision we did not start with,
+                    // splicing two versions into one file. `If-Range` makes the
+                    // server return a full 200 instead if the file changed, and
+                    // without an ETag to pin we restart from byte 0 outright.
+                    if (resume.etag) {
+                        resumeHeaders = {
+                            Range: `bytes=${resume.size}-`,
+                            'If-Range': resume.etag,
+                        };
+                    }
+                }
+            }
 
-            if (response.status !== 200) {
+            try {
+                response = await getFile(remoteURL, resumeHeaders);
+            } catch (e) {
+                // Nothing was written; hand the key back to the next writer.
+                if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
+                throw e;
+            }
+
+            // 200 (full download) and 206 (resumed partial) are both success.
+            if (response.status !== 200 && response.status !== 206) {
+                if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
                 return handleError(response.status, remoteURL, fatal);
             }
 
@@ -346,7 +395,7 @@ async function loadResourceFile(
             cache && // 1. A caching system is available
             typeof Response !== 'undefined' && // 2. `Response` is defined (i.e., we are in a browser-like environment)
             response instanceof Response && // 3. result is a `Response` object (i.e., not a `FileResponse`)
-            response.status === 200; // 4. request was successful (status code 200)
+            (response.status === 200 || response.status === 206); // 4. request was successful (200 full, or 206 resumed)
     }
 
     // Start downloading
@@ -424,14 +473,22 @@ async function loadResourceFile(
         result = buffer;
     }
 
-    if (
-        // Only cache web responses
-        // i.e., do not cache FileResponses (prevents duplication)
-        toCacheResponse &&
-        cacheKey &&
-        typeof response !== 'string'
-    ) {
-        await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+    try {
+        if (
+            // Only cache web responses
+            // i.e., do not cache FileResponses (prevents duplication)
+            toCacheResponse &&
+            cacheKey &&
+            typeof response !== 'string'
+        ) {
+            await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
+        }
+    } finally {
+        // `put` releases the reservation itself, but it is skipped whenever the
+        // response is not cached — including when another writer finished the
+        // file while this one was downloading. Releasing here covers those
+        // paths; it is a no-op once the reservation is already gone.
+        if (reservedKey !== undefined) await cache.releaseResume(reservedKey);
     }
 
     // In Node.js with return_path, the buffer read is skipped so no progress
