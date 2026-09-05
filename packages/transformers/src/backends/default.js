@@ -1,3 +1,5 @@
+import * as onnxProviderModule from '@huggingface/transformers-onnxruntime';
+
 import { env, apis } from '../env.js';
 import { logger } from '../utils/logger.js';
 import { getModelFile, MAX_EXTERNAL_DATA_CHUNKS } from '../utils/hub.js';
@@ -19,23 +21,13 @@ const host = {
     maxExternalDataChunks: MAX_EXTERNAL_DATA_CHUNKS,
 };
 
-let modulePromise;
+globalThis[ONNX_HOST_SYMBOL] = host;
+onnxProviderModule.configureOnnxProviderHost(host);
+TensorOpRegistry.register(onnxProviderModule.OnnxTensorOpRegistry);
+
+const modulePromise = Promise.resolve(onnxProviderModule);
 
 export function getOnnxProviderModule() {
-    if (!modulePromise) {
-        globalThis[ONNX_HOST_SYMBOL] = host;
-        const pending = import('@huggingface/transformers-onnxruntime')
-            .then((module) => {
-                module.configureOnnxProviderHost(host);
-                TensorOpRegistry.register(module.OnnxTensorOpRegistry);
-                return module;
-            })
-            .catch((error) => {
-                if (modulePromise === pending) modulePromise = undefined;
-                throw error;
-            });
-        modulePromise = pending;
-    }
     return modulePromise;
 }
 
