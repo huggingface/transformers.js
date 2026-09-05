@@ -92,10 +92,12 @@ const ONNX_LOG_LEVEL_NAMES = {
 };
 
 /**
- * The list of supported devices, sorted by priority/performance.
+ * The internal list of supported devices, sorted by priority/performance.
+ * This array is mutated during module initialization and must remain private;
+ * the public, immutable `supportedDevices` snapshot is exported below.
  * @type {import("../utils/devices.js").DeviceType[]}
  */
-const supportedDevices = [];
+const supportedDevicesInternal = [];
 
 /** @type {ONNXExecutionProviders[]} */
 let defaultDevices;
@@ -119,36 +121,45 @@ if (ORT_SYMBOL in globalThis) {
     // | CoreML                | ❌                  | ❌                  | ❌                  | ❌                  | ✔️                  | ✔️                  |
     switch (process.platform) {
         case 'win32': // Windows x64 and Windows arm64
-            supportedDevices.push('dml');
+            supportedDevicesInternal.push('dml');
             break;
         case 'linux': // Linux x64 and Linux arm64
             if (process.arch === 'x64') {
-                supportedDevices.push('cuda');
+                supportedDevicesInternal.push('cuda');
             }
             break;
         case 'darwin': // MacOS x64 and MacOS arm64
-            supportedDevices.push('coreml');
+            supportedDevicesInternal.push('coreml');
             break;
     }
 
-    supportedDevices.push('webgpu');
-    supportedDevices.push('cpu');
+    supportedDevicesInternal.push('webgpu');
+    supportedDevicesInternal.push('cpu');
     defaultDevices = ['cpu'];
 } else {
     ONNX = ONNX_WEB;
 
     if (apis.IS_WEBNN_AVAILABLE) {
         // TODO: Only push supported providers (depending on available hardware)
-        supportedDevices.push('webnn-npu', 'webnn-gpu', 'webnn-cpu', 'webnn');
+        supportedDevicesInternal.push('webnn-npu', 'webnn-gpu', 'webnn-cpu', 'webnn');
     }
 
     if (apis.IS_WEBGPU_AVAILABLE) {
-        supportedDevices.push('webgpu');
+        supportedDevicesInternal.push('webgpu');
     }
 
-    supportedDevices.push('wasm');
+    supportedDevicesInternal.push('wasm');
     defaultDevices = ['wasm'];
 }
+
+/**
+ * A frozen, immutable snapshot of the supported device types.
+ * Consumers cannot mutate this array; mutations will throw in strict mode
+ * or be silently ignored. This protects the library's internal state from
+ * being corrupted (e.g. via deviceToExecutionProviders).
+ * @type {ReadonlyArray<import("../utils/devices.js").DeviceType>}
+ */
+export const supportedDevices = Object.freeze([...supportedDevicesInternal]);
 
 // @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
@@ -156,25 +167,30 @@ const InferenceSession = ONNX.InferenceSession;
 /**
  * Map a device to the execution providers to use for the given device.
  * @param {import("../utils/devices.js").DeviceType|"auto"|null} [device=null] (Optional) The device to run the inference on.
- * @returns {ONNXExecutionProviders[]} The execution providers to use for the given device.
+ * @returns {ONNXExecutionProviders[] | import("../utils/devices.js").DeviceType[]} The execution providers for the given device, or the list of supported device types when device is "auto".
  */
 export function deviceToExecutionProviders(device = null) {
-    // Use the default execution providers if the user hasn't specified anything
-    if (!device) return defaultDevices;
+    // Use the default execution providers if the user hasn't specified anything.
+    // Return a copy so consumers cannot mutate the internal default list.
+    // NOTE: `defaultDevices` may be `undefined` in environments that provide their
+    // own ONNX runtime (via the `Symbol.for('onnxruntime')` global), so we guard the
+    // spread to avoid a `TypeError` and preserve the original (undefined) return.
+    if (!device) return defaultDevices ? [...defaultDevices] : defaultDevices;
 
     // Handle overloaded cases
     switch (device) {
         case 'auto':
-            return supportedDevices;
+            // Return a copy so consumers cannot mutate the internal supported-devices list.
+            return [...supportedDevicesInternal];
         case 'gpu':
-            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
+            return supportedDevicesInternal.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
     }
 
-    if (supportedDevices.includes(device)) {
+    if (supportedDevicesInternal.includes(device)) {
         return [DEVICE_TO_EXECUTION_PROVIDER_MAPPING[device] ?? device];
     }
 
-    throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevices.join(', ')}.`);
+    throw new Error(`Unsupported device: "${device}". Should be one of: ${supportedDevicesInternal.join(', ')}.`);
 }
 
 /**
