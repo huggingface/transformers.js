@@ -102,11 +102,38 @@ let defaultDevices;
 let ONNX;
 const ORT_SYMBOL = Symbol.for('onnxruntime');
 
-if (ORT_SYMBOL in globalThis) {
-    // If the JS runtime exposes their own ONNX runtime, use it
-    ONNX = globalThis[ORT_SYMBOL];
-} else if (apis.IS_NODE_ENV) {
-    ONNX = ONNX_NODE;
+// If the JS runtime exposes its own ONNX runtime, use it in place of the bundled one.
+const injectedONNX = ORT_SYMBOL in globalThis ? globalThis[ORT_SYMBOL] : undefined;
+
+/**
+ * Which ONNX Runtime is in use, which decides the list of supported devices below:
+ *  - `node`: onnxruntime-node — the devices depend on the platform.
+ *  - `web`: onnxruntime-web — the devices depend on the browser APIs available.
+ *  - `custom`: an injected runtime that is neither. It implements the onnxruntime API surface (`Tensor`,
+ *    `InferenceSession`, …) without being one of the official packages, so no device list is assumed and the
+ *    runtime is left to apply its own defaults.
+ *
+ * An injected runtime is told apart by the version it stamps on its `env`: every official package sets
+ * `env.versions.web` or `env.versions.node` (see `Env.versions` in onnxruntime-common), a custom runtime sets
+ * neither. The environment alone cannot tell, because embedders inject `onnxruntime-web` from processes where
+ * `IS_NODE_ENV` is true (Electron renderers, Bun, Node fallbacks) and would otherwise be given the node device
+ * list. Without an injected runtime, the environment decides as before.
+ * @type {'node' | 'web' | 'custom'}
+ */
+const runtime = injectedONNX?.env?.versions?.node
+    ? 'node'
+    : injectedONNX?.env?.versions?.web
+      ? 'web'
+      : injectedONNX
+        ? 'custom'
+        : apis.IS_NODE_ENV
+          ? 'node'
+          : 'web';
+
+if (runtime === 'custom') {
+    ONNX = injectedONNX;
+} else if (runtime === 'node') {
+    ONNX = injectedONNX ?? ONNX_NODE;
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
@@ -135,7 +162,7 @@ if (ORT_SYMBOL in globalThis) {
     supportedDevices.push('cpu');
     defaultDevices = ['cpu'];
 } else {
-    ONNX = ONNX_WEB;
+    ONNX = injectedONNX ?? ONNX_WEB;
 
     if (apis.IS_WEBNN_AVAILABLE) {
         // TODO: Only push supported providers (depending on available hardware)
