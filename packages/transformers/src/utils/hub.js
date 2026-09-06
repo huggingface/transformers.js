@@ -205,7 +205,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
     if (
         typeof Cache !== 'undefined' &&
         cache instanceof Cache &&
-        !isValidUrl(toAbsoluteURL(cacheKey), ['http:', 'https:'])
+        !isValidUrl(toAbsoluteURL(cacheKey, { allowUnresolved: true }), ['http:', 'https:'])
     ) {
         // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
         // responses for other schemes (e.g., files bundled within a browser extension). Relative

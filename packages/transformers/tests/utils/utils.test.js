@@ -1,6 +1,7 @@
 import { AutoProcessor } from "../../src/transformers.js";
 import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
+import { toAbsoluteURL } from "../../src/utils/hub/utils.js";
 import { RawImage } from "../../src/utils/image.js";
 
 import { MAX_TEST_EXECUTION_TIME } from "../init.js";
@@ -58,6 +59,36 @@ describe("Utilities", () => {
       const blobUrl = URL.createObjectURL(blob);
       const data = await getFile(blobUrl);
       expect(await data.text()).toBe("Hello, world!");
+    });
+
+    describe("toAbsoluteURL", () => {
+      const originalLocation = globalThis.location;
+
+      afterEach(() => {
+        globalThis.location = originalLocation;
+      });
+
+      it("resolves a relative URL against the page", () => {
+        globalThis.location = { href: "https://example.com/app/index.html" };
+        expect(toAbsoluteURL("models/")).toBe("https://example.com/app/models/");
+      });
+
+      it("throws for a malformed URL, so a bad env.backends.onnx.wasm.wasmPaths is not passed on", () => {
+        globalThis.location = { href: "https://example.com/app/index.html" };
+        expect(() => toAbsoluteURL("https://bad host/wasm/")).toThrow(/Invalid URL/);
+      });
+
+      it("throws for a relative URL on an opaque-origin page by default", () => {
+        globalThis.location = { href: "about:blank" };
+        expect(() => toAbsoluteURL("models/")).toThrow(/Invalid URL/);
+      });
+
+      it("returns the URL unchanged instead of throwing when allowUnresolved is set", () => {
+        globalThis.location = { href: "about:blank" };
+        expect(toAbsoluteURL("models/", { allowUnresolved: true })).toBe("models/");
+        // The caller checks the result with isValidUrl, which rejects anything unresolved
+        expect(toAbsoluteURL("https://bad host/wasm/", { allowUnresolved: true })).toBe("https://bad host/wasm/");
+      });
     });
   });
 
