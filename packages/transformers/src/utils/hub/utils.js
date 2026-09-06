@@ -189,13 +189,12 @@ export function toAbsoluteURL(url, { allowUnresolved = false } = {}) {
         return url;
     }
 
-    if (!allowUnresolved) {
-        return new URL(url, baseURL).href;
-    }
-
     try {
         return new URL(url, baseURL).href;
-    } catch {
+    } catch (error) {
+        if (!allowUnresolved) {
+            throw error;
+        }
         // Nothing resolves against an opaque base, so hand back the original for the caller to check
         return url;
     }
