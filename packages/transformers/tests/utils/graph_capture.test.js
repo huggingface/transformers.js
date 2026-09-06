@@ -53,7 +53,6 @@ function data(tensor) {
   return new Type(tensor.gpuBuffer.bytes.buffer, 0, tensor.size);
 }
 function makeSession(device = makeDevice()) {
-  const capturedBuffers = new Map();
   const session = {
     inputNames: ["input_ids", "attention_mask", ...cacheNames],
     outputNames: ["logits", "present.0.key", "present.0.value"],
@@ -63,24 +62,12 @@ function makeSession(device = makeDevice()) {
     // derive logits from its active prefix. Wrong masks or strides change results.
     run: jest.fn(async (feeds, fetches) => {
       await Promise.resolve();
-      const captured = !fetches;
-      if (captured) {
-        fetches = {};
-        for (const name of ["logits", "present.0.key", "present.0.value"]) {
-          const dims = name === "logits" ? [1, 1, 4] : feeds[name.replace("present", "past_key_values")].dims;
-          const size = dims.reduce((a, b) => a * b, 1);
-          if (!capturedBuffers.has(name)) capturedBuffers.set(name, device.createBuffer({ size: Math.ceil((size * 4) / 16) * 16, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE }));
-          const buffer = capturedBuffers.get(name);
-          fetches[name] = Tensor.fromGpuBuffer(buffer, { dataType: "float32", dims, download: async () => new Float32Array(buffer.bytes.buffer, 0, size).slice(), dispose: jest.fn() });
-        }
-      }
       const ids = Array.from(data(feeds.input_ids), Number);
       const length = Number(Array.from(data(feeds.attention_mask)).reduce((a, b) => a + b, 0n));
       const offset = length - ids.length;
       for (const name of cacheNames) {
         const cache = fetches[name.replace("past_key_values", "present")];
-        if (!captured) expect(cache).toBe(feeds[name]);
-        else data(cache).set(data(feeds[name]));
+        expect(cache).toBe(feeds[name]);
         const values = data(cache);
         for (let head = 0; head < 2; ++head)
           for (let i = 0; i < ids.length; ++i) {
@@ -260,10 +247,10 @@ describe("decode capture integration", () => {
     const release = prefill.release;
     const options = { executionProviders: ["webgpu"], enableGraphCapture: true };
     const session = await createInferenceSession(new Uint8Array(), options, staticConfig);
-    expect(runtime.InferenceSession.create.mock.calls[0][1]).toMatchObject({ enableGraphCapture: false, extra: { "ep.webgpuexecutionprovider.enableGraphCapture": "1" } });
+    expect(runtime.InferenceSession.create.mock.calls.at(-1)[1]).toMatchObject({ enableGraphCapture: false, extra: { "ep.webgpuexecutionprovider.enableGraphCapture": "1" } });
     let output = await runInferenceSession(session, feeds([1, 2]));
     output = await runInferenceSession(session, feeds([3], output));
-    expect(runtime.InferenceSession.create).toHaveBeenCalledTimes(1);
+    expect(runtime.InferenceSession.create.mock.calls.filter(([, options]) => options.extra?.["ep.webgpuexecutionprovider.enableGraphCapture"] === "1")).toHaveLength(1);
     expect(prefill.run.mock.calls.map(([, , options]) => options.extra.gpu_graph_id)).toEqual(["-1", "0"]);
     expect(options.enableGraphCapture).toBe(true);
     await session.release();

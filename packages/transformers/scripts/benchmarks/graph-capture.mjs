@@ -19,6 +19,7 @@ import { parseArgs } from "node:util";
 const { values } = parseArgs({
   options: {
     model: { type: "string" },
+    "ort-module": { type: "string" },
     "webgpu-module": { type: "string" },
     output: { type: "string", default: "graph-capture-results.json" },
     "prompt-tokens": { type: "string", default: "128" },
@@ -37,8 +38,8 @@ const numbers = Object.fromEntries(
     return [name, value];
   }),
 );
-if (numbers["new-tokens"] < 2 || numbers.context < numbers["prompt-tokens"] + numbers["new-tokens"])
-  throw new Error("Need at least two new tokens and sufficient --context.");
+if (numbers["new-tokens"] < 3 || numbers.context < numbers["prompt-tokens"] + numbers["new-tokens"])
+  throw new Error("Need at least three new tokens to verify replay, and sufficient --context.");
 
 const require = createRequire(import.meta.url);
 const bindingPath = values["webgpu-module"];
@@ -49,7 +50,32 @@ const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-perf
 if (!adapter?.features.has("shader-f16") || !adapter.features.has("subgroups"))
   throw new Error("The Dawn binding must provide shader-f16 and subgroups. On Windows use a Dawn build with DXC enabled.");
 const adapterInfo = adapter.info;
-register("./ort-web-loader.mjs", import.meta.url);
+// Install log interception before ORT binds its WASM console sinks.
+let replayEvents = 0;
+let verifying = false;
+const originalLog = console.log;
+const originalError = console.error;
+const fs = require("node:fs");
+const originalWriteSync = fs.writeSync;
+const intercept =
+  (original) =>
+  (...args) => {
+    if (verifying) {
+      if (args.some((arg) => String(arg).includes("Replaying the captured WebGpuExecutionProvider graph"))) ++replayEvents;
+    } else original(...args);
+  };
+console.log = intercept(originalLog);
+console.error = intercept(originalError);
+// Emscripten's Node factory writes logs directly to file descriptors 1 and 2.
+fs.writeSync = (fd, data, ...args) => {
+  if (verifying && (fd === 1 || fd === 2) && typeof data === "string") {
+    if (data.includes("Replaying the captured WebGpuExecutionProvider graph")) ++replayEvents;
+    return Buffer.byteLength(data);
+  }
+  return originalWriteSync(fd, data, ...args);
+};
+const runtimeOverride = values["ort-module"] ? pathToFileURL(path.resolve(values["ort-module"])).href : undefined;
+register("./ort-web-loader.mjs", { parentURL: import.meta.url, data: { runtime: runtimeOverride } });
 const ort = await import("onnxruntime-web/webgpu");
 const ortDist = path.dirname(require.resolve("onnxruntime-web"));
 ort.env.wasm.numThreads = 1;
@@ -142,6 +168,7 @@ const report = {
   date: new Date().toISOString(),
   node: process.version,
   ort: ort.env.versions.web,
+  ort_module: runtimeOverride ?? "onnxruntime-web/webgpu",
   webgpu_module: bindingPath,
   adapter: { vendor: adapterInfo.vendor, architecture: adapterInfo.architecture, device: adapterInfo.device, description: adapterInfo.description },
   model: modelSource,
@@ -154,6 +181,38 @@ const report = {
 };
 let expected;
 try {
+  // Verify actual replay before timing. Numerical equality alone also passes
+  // when an older runtime silently ignores the capture provider setting.
+  verifying = true;
+  try {
+    const probe = await AutoModelForCausalLM.from_pretrained(staging, {
+      device: "webgpu",
+      dtype: "q4f16",
+      local_files_only: true,
+      session_options: {
+        enableGraphCapture: true,
+        logSeverityLevel: 1,
+        executionProviders: [{ name: "webgpu", validationMode: "basic" }],
+        externalData: [{ path: weightName, data: weights }],
+      },
+    });
+    try {
+      await probe.generate({ ...inputs, max_new_tokens: Math.min(4, numbers["new-tokens"]), eos_token_id: null, do_sample: false });
+    } finally {
+      await probe.dispose();
+    }
+  } finally {
+    verifying = false;
+    console.log = originalLog;
+    console.error = originalError;
+    fs.writeSync = originalWriteSync;
+  }
+  if (!replayEvents)
+    throw new Error(
+      "No WebGPU graph replay was observed. Use --ort-module with the ORT session-options ordering fix: https://github.com/microsoft/onnxruntime/pull/32456",
+    );
+  report.capture_verification = { replay_log_events: replayEvents, excluded_from_timing: true };
+  console.log(`Verified actual WebGPU graph replay (${replayEvents} events). Starting timed runs.`);
   for (const capture of [false, true]) {
     const createStart = performance.now();
     const model = await AutoModelForCausalLM.from_pretrained(staging, {

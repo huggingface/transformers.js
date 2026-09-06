@@ -85,6 +85,11 @@ console.log(output);
 
 ## Decode graph capture
 
+This feature depends on [ONNX Runtime #32456](https://github.com/microsoft/onnxruntime/pull/32456).
+The currently pinned ORT release ignores the extra provider setting used below.
+Until a fixed release is pinned, use a runtime built with that patch. The benchmark
+helper below builds a patched JS runtime while retaining the pinned WASM binaries.
+
 For compatible decoder models, set `session_options.enableGraphCapture: true`
 to capture and replay single-token decode steps. Prefill always skips capture,
 including one-token prompts and multi-token continuations of an existing cache.
@@ -146,9 +151,13 @@ To benchmark a local graph-ready ORT GenAI Phi-4-mini export through the actual
 Transformers.js generation path, use the repository's benchmark script:
 
 ```sh
+node packages/transformers/scripts/benchmarks/build-ort-extra-options.mjs \
+  --output .cache/ort.webgpu.extra-options.mjs
+
 node packages/transformers/scripts/benchmarks/graph-capture.mjs \
   --model /path/to/Phi-4-mini-instruct \
   --webgpu-module /path/to/dawn.node \
+  --ort-module .cache/ort.webgpu.extra-options.mjs \
   --prompt-tokens 128 --new-tokens 128 --context 2048 \
   --warmup 2 --runs 5 --output graph-capture-results.json
 ```
@@ -156,12 +165,16 @@ node packages/transformers/scripts/benchmarks/graph-capture.mjs \
 Use Node.js 24 or newer and a Dawn binding with `shader-f16` and `subgroups`
 (on Windows, build Dawn with DXC). The script uses ORT Web's Asyncify build,
 compares identical generated token IDs, and reports decode throughput separately
-from time to first token. Model loading and warmup are excluded from decode
+from time to first token. It verifies actual graph-replay log events before timing
+and refuses to report a speedup if capture is inactive. Model loading, verification,
+and warmup are excluded from decode
 measurements. The initial decode calls prepare and capture the graph, so compare
 warmed-up runs; performance depends on the model, context capacity, and hardware.
 
 See the [ONNX Runtime WebGPU documentation](https://onnxruntime.ai/docs/tutorials/web/ep-webgpu.html#graph-capture)
 for the runtime requirements.
+
+See the [Phi-4-mini benchmark report](./graph_capture_benchmark.md) for measured results.
 ## Reporting bugs and providing feedback
 
 Due to the experimental nature of WebGPU, especially in non-Chromium browsers, you may experience issues when trying to run a model (even if it can run in WASM). If you do, please open [an issue on GitHub](https://github.com/huggingface/transformers.js/issues/new?title=[WebGPU]%20Error%20running%20MODEL_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml) and we'll do our best to address it. Thanks!

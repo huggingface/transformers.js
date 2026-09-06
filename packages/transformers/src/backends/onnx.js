@@ -367,6 +367,7 @@ export async function createInferenceSession(buffer_or_path, session_options, se
 
 /** @type {WeakMap<import('onnxruntime-common').InferenceSession, DecodeGraphCaptureSession>} */
 const graphCaptureSessions = new WeakMap();
+
 /**
  * Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
  * For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").

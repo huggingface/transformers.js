@@ -1,0 +1,219 @@
+{
+  "date": "2026-09-06T06:20:39.351Z",
+  "node": "v24.20.0",
+  "ort": "1.26.0-dev.20260416-b7804b056c",
+  "ort_module": "Pinned ORT Web with microsoft/onnxruntime#32456 ordering fix",
+  "webgpu_module": "Dawn Node binding, D3D12, DXC enabled",
+  "adapter": {
+    "vendor": "nvidia",
+    "architecture": "blackwell",
+    "device": "nvidia-geforce-rtx-5080",
+    "description": "D3D12 driver version 32.0.16.1656"
+  },
+  "model": "Phi-4-mini-instruct / ORT GenAI graph-ready INT4 export",
+  "graph_sha256": "eb2e6bc8a269ba9d4a757de89e173936d080b1817cff2b936f148ad478f8f773",
+  "weights_sha256": "b952da81d9c04a72394e2557b4f4e5526d6a51c5d788b4906e04a8fe66588e13",
+  "weights_bytes": 2491416576,
+  "workload": {
+    "prompt-tokens": 128,
+    "new-tokens": 128,
+    "context": 2048,
+    "warmup": 2,
+    "runs": 5
+  },
+  "prompt_ids": [
+    200021, 64614, 277, 750, 495, 2164, 25, 220, 976, 5030, 11282, 5297, 7187,
+    11, 7595, 3158, 11, 15095, 5012, 11348, 11, 326, 21312, 11222, 34205, 13,
+    623, 5030, 11282, 5297, 7187, 11, 7595, 3158, 11, 15095, 5012, 11348, 11,
+    326, 21312, 11222, 34205, 13, 623, 5030, 11282, 5297, 7187, 11, 7595, 3158,
+    11, 15095, 5012, 11348, 11, 326, 21312, 11222, 34205, 13, 623, 5030, 11282,
+    5297, 7187, 11, 7595, 3158, 11, 15095, 5012, 11348, 11, 326, 21312, 11222,
+    34205, 13, 623, 5030, 11282, 5297, 7187, 11, 7595, 3158, 11, 15095, 5012,
+    11348, 11, 326, 21312, 11222, 34205, 13, 623, 5030, 11282, 5297, 7187, 11,
+    7595, 3158, 11, 15095, 5012, 11348, 11, 326, 21312, 11222, 34205, 13, 623,
+    5030, 11282, 5297, 7187, 11, 7595, 3158, 11, 15095, 200020, 200019
+  ],
+  "trials": {
+    "capture_off": {
+      "model_load_ms": 2309.6717,
+      "runs": [
+        {
+          "ttft_ms": 49.447400000000926,
+          "decode_ms": 2265.2273999999998,
+          "decode_tokens_per_second": 56.065011397972675,
+          "total_ms": 2314.6748000000007
+        },
+        {
+          "ttft_ms": 38.295499999998356,
+          "decode_ms": 2248.444300000003,
+          "decode_tokens_per_second": 56.483498390420365,
+          "total_ms": 2286.739800000001
+        },
+        {
+          "ttft_ms": 38.25560000000041,
+          "decode_ms": 2295.8616,
+          "decode_tokens_per_second": 55.316923284922744,
+          "total_ms": 2334.1172000000006
+        },
+        {
+          "ttft_ms": 38.93449999999939,
+          "decode_ms": 2619.3863999999994,
+          "decode_tokens_per_second": 48.48463747082142,
+          "total_ms": 2658.320899999999
+        },
+        {
+          "ttft_ms": 39.18919999999707,
+          "decode_ms": 2530.9138999999996,
+          "decode_tokens_per_second": 50.179502352885265,
+          "total_ms": 2570.1030999999966
+        }
+      ]
+    },
+    "capture_on": {
+      "model_load_ms": 2223.6493999999984,
+      "runs": [
+        {
+          "ttft_ms": 47.96399999999994,
+          "decode_ms": 975.3427999999985,
+          "decode_tokens_per_second": 130.21062953455973,
+          "total_ms": 1023.3067999999985
+        },
+        {
+          "ttft_ms": 39.09900000000198,
+          "decode_ms": 965.3885999999984,
+          "decode_tokens_per_second": 131.55324187586243,
+          "total_ms": 1004.4876000000004
+        },
+        {
+          "ttft_ms": 40.24720000000525,
+          "decode_ms": 975.8820999999953,
+          "decode_tokens_per_second": 130.13867146451463,
+          "total_ms": 1016.1293000000005
+        },
+        {
+          "ttft_ms": 38.903999999994994,
+          "decode_ms": 971.2401000000027,
+          "decode_tokens_per_second": 130.76066360933785,
+          "total_ms": 1010.1440999999977
+        },
+        {
+          "ttft_ms": 44.92250000000058,
+          "decode_ms": 962.799500000001,
+          "decode_tokens_per_second": 131.90700659898542,
+          "total_ms": 1007.7220000000016
+        }
+      ]
+    }
+  },
+  "capture_verification": {
+    "replay_log_events": 2,
+    "excluded_from_timing": true
+  },
+  "summary": {
+    "capture_off_decode_tps": 55.316923284922744,
+    "capture_on_decode_tps": 130.76066360933785,
+    "speedup": 2.363845561977923,
+    "improvement_percent": 136.38455619779228,
+    "identical_tokens": true
+  },
+  "generated_ids": [
+    976, 5030, 11282, 6008, 261, 7968, 328, 3581, 3463, 3158, 316, 7187, 326,
+    26971, 11, 15095, 5012, 11348, 11, 326, 21312, 11222, 34205, 13, 200020,
+    199999, 2, 26113, 25, 355, 220, 2548, 8204, 12324, 12511, 21849, 483, 261,
+    220, 18, 33559, 5678, 328, 35678, 47210, 11, 118014, 51309, 11, 326, 142941,
+    3883, 6049, 6266, 13, 2160, 9811, 29239, 11, 290, 10323, 14518, 35612, 326,
+    853, 31137, 15885, 262, 747, 70, 7606, 13, 49934, 10742, 26477, 128273, 11,
+    49217, 35962, 78856, 11, 326, 22725, 107649, 361, 19904, 535, 13, 355,
+    63901, 8642, 178766, 7398, 138863, 933, 55718, 82027, 483, 52454, 22614,
+    94037, 13, 355, 21235, 130496, 134505, 50795, 22725, 10936, 72869, 483,
+    11202, 8663, 328, 138863, 933, 55718, 82027, 326, 43867, 11242, 13, 89799,
+    178229, 128640, 328, 290, 21235
+  ],
+  "generated_text": "The city library provides a variety of services including access to books and computers, quiet study rooms, and weekly science workshops.# Problem: A 45-year-old male presents with a 3-month history of progressive fatigue, intermittent fever, and unexplained weight loss. On physical examination, the patient appears pale and has mild splenomegaly. Laboratory tests reveal anemia, elevated liver enzymes, and hyperglobulinemia. A peripheral blood smear shows atypical lymphocytes with irregular nuclear contours. A bone marrow biopsy demonstrates hypercellularity with increased numbers of atypical lymphocytes and plasma cells. Immunophenotyping of the bone",
+  "runtime_patch": "https://github.com/microsoft/onnxruntime/pull/32456",
+  "runtime_js_sha256": "fa85789fa12f82afc52dd694efa4f2403002624af8d7fd92683af6715dcbd2b1",
+  "runtime_wasm_sha256": "e0c0c6d3e73d43b8a249972f8358f845b08cc16fec3c80efafdf8bed40366786",
+  "dawn_node_sha256": "18cea3a6c05cf1cd1ff14adb0b1f936ffb3c038da36250863ea27eb6722dd6e1",
+  "earlier_repeat": {
+    "summary": {
+      "capture_off_decode_tps": 51.46211152690518,
+      "capture_on_decode_tps": 128.45471106641443,
+      "speedup": 2.496102613264447,
+      "improvement_percent": 149.6102613264447,
+      "identical_tokens": true
+    },
+    "capture_verification": "Separate verbose run confirmed capture enable=1 and graph replay before measurement.",
+    "trials": {
+      "capture_off": {
+        "model_load_ms": 2878.1549999999997,
+        "runs": [
+          {
+            "ttft_ms": 41.74229999999989,
+            "decode_ms": 2637.0954999999994,
+            "decode_tokens_per_second": 48.159044676235666,
+            "total_ms": 2678.8377999999993
+          },
+          {
+            "ttft_ms": 40.10570000000007,
+            "decode_ms": 2696.315199999999,
+            "decode_tokens_per_second": 47.101318124824594,
+            "total_ms": 2736.420899999999
+          },
+          {
+            "ttft_ms": 38.56290000000081,
+            "decode_ms": 2404.927300000001,
+            "decode_tokens_per_second": 52.80824913085728,
+            "total_ms": 2443.490200000002
+          },
+          {
+            "ttft_ms": 48.372300000002724,
+            "decode_ms": 2457.0265,
+            "decode_tokens_per_second": 51.68849420223999,
+            "total_ms": 2505.3988000000027
+          },
+          {
+            "ttft_ms": 40.36510000000271,
+            "decode_ms": 2467.834999999999,
+            "decode_tokens_per_second": 51.46211152690518,
+            "total_ms": 2508.200100000002
+          }
+        ]
+      },
+      "capture_on": {
+        "model_load_ms": 2134.2765,
+        "runs": [
+          {
+            "ttft_ms": 40.40650000000096,
+            "decode_ms": 986.8781000000017,
+            "decode_tokens_per_second": 128.6886394581051,
+            "total_ms": 1027.2846000000027
+          },
+          {
+            "ttft_ms": 40.32940000000235,
+            "decode_ms": 1047.5270999999993,
+            "decode_tokens_per_second": 121.23791355851327,
+            "total_ms": 1087.8565000000017
+          },
+          {
+            "ttft_ms": 41.09690000000046,
+            "decode_ms": 1140.4545999999973,
+            "decode_tokens_per_second": 111.35910188796669,
+            "total_ms": 1181.5514999999978
+          },
+          {
+            "ttft_ms": 39.409300000002986,
+            "decode_ms": 988.6752999999953,
+            "decode_tokens_per_second": 128.45471106641443,
+            "total_ms": 1028.0845999999983
+          },
+          {
+            "ttft_ms": 39.39860000000044,
+            "decode_ms": 970.9501999999993,
+            "decode_tokens_per_second": 130.79970527839646,
+            "total_ms": 1010.3487999999998
+          }
+        ]
+      }
+    }
+  }
+}
