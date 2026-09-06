@@ -119,7 +119,11 @@ async function getSession(
             for (const key of names) {
                 preferredOutputLocation[key] = 'gpu-buffer';
             }
-            session_options.preferredOutputLocation = preferredOutputLocation;
+            // Preserve explicit output locations, including a global location.
+            session_options.preferredOutputLocation =
+                typeof session_options.preferredOutputLocation === 'string'
+                    ? session_options.preferredOutputLocation
+                    : { ...preferredOutputLocation, ...session_options.preferredOutputLocation };
         }
     }
 
@@ -127,7 +131,13 @@ async function getSession(
     const session_config = {
         dtype: selectedDtype,
         device: selectedDevice,
+        use_static_cache:
+            cache_config && (session_options.enableGraphCapture === true || custom_config.use_static_cache === true),
+        max_cache_length: custom_config.max_cache_length ?? 2048,
+        cache_names: cache_config ? [...getCacheNames(options.config)] : [],
     };
+    // Capture is exclusively for decoder token steps, never for other components.
+    if (!cache_config && session_options.enableGraphCapture) session_options.enableGraphCapture = false;
     return { buffer_or_path, session_options, session_config };
 }
 

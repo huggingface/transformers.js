@@ -52,6 +52,8 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
  * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
  * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
+ * Set `enableGraphCapture: true` with `device: 'webgpu'` to capture only decode steps of a compatible static-KV decoder export.
+ * Prefill skips capture. Configure capacity with `config["transformers.js_config"].max_cache_length` (default 2048).
  */
 
 /**

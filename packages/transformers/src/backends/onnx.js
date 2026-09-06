@@ -25,6 +25,7 @@ import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
 import { logger } from '../utils/logger.js';
+import { DecodeGraphCaptureSession } from './utils/graph-capture.js';
 export { Tensor } from 'onnxruntime-common';
 
 /**
@@ -284,25 +285,100 @@ async function ensureWasmLoaded() {
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object }>} The ONNX inference session.
  */
 export async function createInferenceSession(buffer_or_path, session_options, session_config) {
+    const useStaticCache = session_config?.use_static_cache === true;
+    const capture = useStaticCache && session_options?.enableGraphCapture === true;
+    if (useStaticCache) {
+        const provider = session_options.executionProviders?.[0];
+        if (!ONNX_ENV?.versions?.web || (typeof provider === 'string' ? provider : provider?.name) !== 'webgpu') {
+            throw new Error(
+                'Static KV cache and decode graph capture require ONNX Runtime Web with the WebGPU execution provider.',
+            );
+        }
+        if (isONNXProxy()) throw new Error('Decode graph capture does not support env.backends.onnx.wasm.proxy.');
+        const locations = session_options.preferredOutputLocation;
+        if (locations === 'gpu-buffer' || (typeof locations === 'object' && locations?.logits === 'gpu-buffer')) {
+            throw new Error('Decode graph capture requires CPU logits for token sampling.');
+        }
+    }
     await ensureWasmLoaded();
     const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
-    const load = () =>
-        InferenceSession.create(buffer_or_path, {
-            // Set default log severity level, but allow overriding through session options
-            logSeverityLevel,
-            ...session_options,
-        });
-    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    const create = (options) => {
+        const load = () => InferenceSession.create(buffer_or_path, { logSeverityLevel, ...options });
+        return apis.IS_WEB_ENV || ONNX_ENV?.versions?.web
+            ? (webInitChain = webInitChain.catch(() => {}).then(load))
+            : load();
+    };
+    // Enable capture in the C++ EP through its session config, while retaining
+    // ordinary JS I/O binding. ORT Web's top-level enableGraphCapture keeps the
+    // first bindings forever and mishandles preallocated outputs on replay.
+    // Rebinding the same decode GPU buffers allows normal prefill shapes with
+    // gpu_graph_id=-1, without creating a second copy of the model weights.
+    const session = await create({
+        ...session_options,
+        ...(useStaticCache
+            ? {
+                  enableGraphCapture: false,
+                  extra: {
+                      ...session_options.extra,
+                      'ep.webgpuexecutionprovider.enableGraphCapture': capture ? '1' : '0',
+                  },
+              }
+            : {}),
+    });
     session.config = session_config;
+    if (useStaticCache) {
+        let state;
+        try {
+            const provider = session_options.executionProviders[0];
+            const device =
+                (typeof provider === 'object' &&
+                    /** @type {import('onnxruntime-common').InferenceSession.WebGpuExecutionProviderOption} */ (
+                        provider
+                    ).device) ||
+                (await ONNX_ENV.webgpu?.device);
+            if (!device) throw new Error('Decode graph capture requires the GPUDevice used by ONNX Runtime Web.');
+            state = new DecodeGraphCaptureSession(session, device, {
+                cacheNames: session_config.cache_names,
+                maxCacheLength: session_config.max_cache_length,
+                TensorConstructor: ONNX.Tensor,
+                enableGraphCapture: capture,
+            });
+        } catch (error) {
+            await session.release();
+            throw error;
+        }
+        graphCaptureSessions.set(session, state);
+        const release = session.release.bind(session);
+        session.release = () =>
+            enqueueInference(async () => {
+                try {
+                    await release();
+                } finally {
+                    try {
+                        await state.dispose();
+                    } finally {
+                        graphCaptureSessions.delete(session);
+                    }
+                }
+            });
+    }
     return session;
 }
 
+/** @type {WeakMap<import('onnxruntime-common').InferenceSession, DecodeGraphCaptureSession>} */
+const graphCaptureSessions = new WeakMap();
 /**
  * Currently, Transformers.js doesn't support simultaneous execution of sessions in WASM/WebGPU.
  * For this reason, we need to chain the inference calls (otherwise we get "Error: Session already started").
  * @type {Promise<any>}
  */
 let webInferenceChain = Promise.resolve();
+
+/** @param {() => Promise<any>} run */
+function enqueueInference(run) {
+    // Keep a failed input validation or inference from rejecting every later run.
+    return (webInferenceChain = webInferenceChain.catch(() => {}).then(run));
+}
 
 /**
  * Run an inference session.
@@ -311,8 +387,9 @@ let webInferenceChain = Promise.resolve();
  * @returns {Promise<Record<string, import('onnxruntime-common').Tensor>>} The output tensors.
  */
 export async function runInferenceSession(session, ortFeed) {
-    const run = () => session.run(ortFeed);
-    return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
+    const capture = graphCaptureSessions.get(session);
+    const run = () => (capture ? capture.run(ortFeed) : session.run(ortFeed));
+    return apis.IS_WEB_ENV || ONNX_ENV?.versions?.web || capture ? enqueueInference(run) : run();
 }
 
 /**

@@ -566,6 +566,8 @@ export class AutoConfig {
 /**
  * Transformers.js-specific configuration, possibly present in config.json under the key `transformers.js_config`.
  * @typedef {Object} TransformersJSConfig
+ * @property {boolean} [use_static_cache=false] Use fixed-capacity KV buffers for compatible WebGPU decoder exports. Implied by session_options.enableGraphCapture.
+ * @property {number} [max_cache_length=2048] Maximum static KV cache token count, including the prompt.
  * @property {Record<import('./utils/devices.js').DeviceType, DeviceConfig>} [device_config] Device-specific configurations.
  * @property {Record<string, number>} [free_dimension_overrides] Override the free dimensions of the model.
  * See https://onnxruntime.ai/docs/tutorials/web/env-flags-and-session-options.html#freedimensionoverrides

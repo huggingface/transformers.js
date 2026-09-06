@@ -1,4 +1,5 @@
 import { Tensor } from './utils/tensor.js';
+import { getStaticCacheInfo } from './utils/static-cache.js';
 
 /**
  * A cache class that stores past key values as named tensors.
@@ -36,7 +37,7 @@ class _DynamicCache {
 
         for (const name in self) {
             if (name.startsWith('past_key_values.')) {
-                return self[name].dims.at(-2);
+                return getStaticCacheInfo(self[name].ort_tensor)?.length ?? self[name].dims.at(-2);
             }
         }
         throw new Error('Unable to determine sequence length from the cache.');
