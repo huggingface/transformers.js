@@ -8,7 +8,7 @@ describe("Tokenizers (model-specific)", () => {
     describe(tokenizer_name, () => {
       for (const model_id in TEST_CONFIG) {
         describe(model_id, () => {
-          /** @type {import('../src/tokenizers.js').PreTrainedTokenizer} */
+          /** @type {import('../src/tokenization_utils.js').PreTrainedTokenizer} */
           let tokenizer;
           beforeAll(async () => {
             tokenizer = await TOKENIZER_CLASS.from_pretrained(model_id);
