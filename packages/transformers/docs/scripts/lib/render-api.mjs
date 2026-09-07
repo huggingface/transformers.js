@@ -7,8 +7,8 @@ import path from "node:path";
 
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
 import { matchingBracket, splitTopLevel } from "./scan.mjs";
-import { exampleLines, firstSentence, stripDocArtifacts, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
-import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
+import { exampleLines, firstSentence, paramSignature, stripDocArtifacts, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
+import { parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 // Pages with at least this many top-level items get an "On this page" TOC so
 // the reader doesn't have to scroll an entire page to find a class.
@@ -27,7 +27,7 @@ export function hasRenderableContent(mod, publicNames = null) {
 }
 
 // Rendered-name and callable-link indexes depend only on `(ir, publicNames)`,
-// so callers rendering many pages can build them once and pass them to
+// so callers rendering many pages build them once and pass them to
 // `renderModule` via `opts.linkIndexes`.
 export function buildLinkIndexes(ir, publicNames = null) {
   return {
@@ -36,9 +36,9 @@ export function buildLinkIndexes(ir, publicNames = null) {
   };
 }
 
-export function renderModule(mod, ir, opts = {}) {
+export function renderModule(mod, ir, opts) {
   const publicNames = opts.publicNames ?? null;
-  const { renderedNames, callableLinks } = opts.linkIndexes ?? buildLinkIndexes(ir, publicNames);
+  const { renderedNames, callableLinks } = opts.linkIndexes;
   const ctx = {
     typedefIndex: ir.typedefIndex,
     moduleByName: new Map(ir.modules.map((m) => [m.name, m])),
@@ -262,12 +262,8 @@ function renderFunction(fn, ctx, depth, parent = null, opts = {}) {
 }
 
 function signature(fn, parent) {
-  const params = (fn.params || [])
-    .filter((p) => p.name && !p.name.includes("."))
-    .map((p) => (p.optional ? `[${p.name}]` : p.name))
-    .join(", ");
   const owner = parent ? `${parent}.` : "";
-  return `\`${owner}${fn.displayName ?? fn.name}(${params})\``;
+  return `\`${owner}${fn.displayName ?? fn.name}(${paramSignature(fn.params)})\``;
 }
 
 // ---------- parameter lists ----------
@@ -593,7 +589,7 @@ function prettifyTypeString(raw) {
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
   s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, "'$1'");
 
-  if (isRenderableUtilityType(s)) {
+  if (parseUtilityType(s)) {
     return s.replace(/\s+/g, " ").trim();
   }
 

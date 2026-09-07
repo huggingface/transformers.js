@@ -1,4 +1,10 @@
+import fs from "node:fs";
 import ts from "typescript";
+
+// Parse a JS source file into a TypeScript AST (with parent pointers).
+export function parseJsFile(file) {
+  return ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+}
 
 export function stripQuotes(text) {
   return text.replace(/^['"`]|['"`]$/g, "");

@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { findTopLevel, matchingBracket, splitTopLevel } from "./scan.mjs";
 import { parseImportedType, stripImportPrefixes } from "./text.mjs";
-import { callableReferenceKey, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
+import { parseCallableReference, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
 
 export function buildIR(fileEntities) {
   const modules = new Map();
@@ -126,7 +126,7 @@ function mergeByName(target, items) {
   const seen = new Set(target.map((item) => item.name));
   for (const item of items) {
     if (!item.name || seen.has(item.name)) continue;
-    target.push(clone(item));
+    target.push(structuredClone(item));
     seen.add(item.name);
   }
 }
@@ -293,7 +293,7 @@ function attachClassCallables(modules) {
 }
 
 function normalizeCallable(callable) {
-  const cloned = clone(callable);
+  const cloned = structuredClone(callable);
   return {
     ...cloned,
     params: cloned.params ?? [],
@@ -431,11 +431,11 @@ function* allCallables(modules) {
 
 function inheritCallable(callable, target) {
   if (!callable.description) callable.description = target.description;
-  if (!callable.params?.length && target.params?.length) callable.params = clone(target.params);
-  if (!callable.returns && target.returns) callable.returns = clone(target.returns);
-  if (!callable.throws?.length && target.throws?.length) callable.throws = clone(target.throws);
-  if (!callable.templates?.length && target.templates?.length) callable.templates = clone(target.templates);
-  if (!callable.examples?.length && target.examples?.length) callable.examples = clone(target.examples);
+  if (!callable.params?.length && target.params?.length) callable.params = structuredClone(target.params);
+  if (!callable.returns && target.returns) callable.returns = structuredClone(target.returns);
+  if (!callable.throws?.length && target.throws?.length) callable.throws = structuredClone(target.throws);
+  if (!callable.templates?.length && target.templates?.length) callable.templates = structuredClone(target.templates);
+  if (!callable.examples?.length && target.examples?.length) callable.examples = structuredClone(target.examples);
 }
 
 function resolveUtilityType(type, callableIndex) {
@@ -462,7 +462,7 @@ function resolveUtilityParams(params, callableIndex) {
     const utility = parseUtilityType(param.type);
     const target = utility && findCallable(utility.target, callableIndex);
     if (utility?.kind === UTILITY_TYPES.PARAMETERS && utility.index == null && target?.params?.length) {
-      resolved.push(...clone(target.params));
+      resolved.push(...structuredClone(target.params));
       continue;
     }
     resolved.push({
@@ -474,12 +474,9 @@ function resolveUtilityParams(params, callableIndex) {
 }
 
 function findCallable(ref, callableIndex) {
-  const key = callableReferenceKey(ref);
-  return key ? callableIndex.get(key) : null;
-}
-
-function clone(value) {
-  return structuredClone(value);
+  const parsed = parseCallableReference(ref);
+  if (!parsed) return null;
+  return callableIndex.get(parsed.method ? `${parsed.owner}.${parsed.method}` : parsed.owner);
 }
 
 function tagsOf(entity, name) {

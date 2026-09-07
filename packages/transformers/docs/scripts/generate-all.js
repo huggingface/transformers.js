@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { buildReadme } from "./build_readme.js";
 import { generateApiDocs } from "./lib/generate-api.mjs";
-import { generateSkillDocs } from "./lib/generate-skill.mjs";
 import { loadProject } from "./lib/load.mjs";
-import { packageRoot } from "./lib/paths.mjs";
+import { packageRoot, repoRoot, skillDir } from "./lib/paths.mjs";
+import { renderSkill } from "./lib/render-skill.mjs";
 import { formatValidationResult, validateGeneratedDocs } from "./lib/validate.mjs";
 
 const project = loadProject(packageRoot);
@@ -26,7 +26,11 @@ const runPhase = (name, fn) => {
 const apiResult = runPhase("api docs", () => generateApiDocs({ project }));
 for (const err of apiResult?.errors ?? []) errors.push(`api docs: ${err}`);
 
-const skillResult = runPhase("skill", () => generateSkillDocs({ project }));
+const skillResult = runPhase("skill", () => {
+  const result = renderSkill({ ir: project.ir, tasks: project.tasks, publicNames: project.publicNames, skillDir });
+  console.log(`wrote skill to ${path.relative(repoRoot, skillDir) || skillDir}`);
+  return result;
+});
 for (const err of skillResult?.errors ?? []) errors.push(`skill: ${err}`);
 
 runPhase("readme", () => {

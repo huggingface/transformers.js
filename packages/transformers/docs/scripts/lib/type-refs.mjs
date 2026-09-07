@@ -44,10 +44,6 @@ export function parseUtilityType(raw) {
     : null;
 }
 
-export function isRenderableUtilityType(raw) {
-  return parseUtilityType(raw) !== null;
-}
-
 export function parseCallableReference(raw) {
   if (!raw) return null;
   const text = raw.trim();
@@ -56,10 +52,4 @@ export function parseCallableReference(raw) {
     if (match) return parse(match);
   }
   return null;
-}
-
-export function callableReferenceKey(raw) {
-  const ref = parseCallableReference(raw);
-  if (!ref) return null;
-  return ref.method ? `${ref.owner}.${ref.method}` : ref.owner;
 }

@@ -46,8 +46,8 @@ function splitIntoSegments(lines) {
 }
 
 function parseTag(raw) {
+  // Always matches: `splitIntoSegments` only opens a segment on `@[A-Za-z]`.
   const nameMatch = raw.match(/^@([A-Za-z]+)/);
-  if (!nameMatch) return { tag: "unknown", raw };
   const tag = nameMatch[1];
   let rest = raw.slice(nameMatch[0].length).replace(/^[ \t]+/, "");
 

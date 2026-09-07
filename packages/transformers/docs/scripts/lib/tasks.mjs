@@ -3,13 +3,11 @@
 // supported pipeline task, with its canonical pipeline class and default model.
 
 import ts from "typescript";
-import fs from "node:fs";
 
-import { stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
+import { parseJsFile, stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
 
 export function extractTaskCatalog(indexFile) {
-  const source = fs.readFileSync(indexFile, "utf8");
-  const sf = ts.createSourceFile(indexFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const sf = parseJsFile(indexFile);
 
   const supportedTasks = new Map(); // task-id -> { pipelineClass, defaultModel, type }
   const aliases = new Map(); // alias -> task-id

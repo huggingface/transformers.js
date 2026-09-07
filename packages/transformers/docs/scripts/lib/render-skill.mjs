@@ -13,7 +13,7 @@ import path from "node:path";
 import { listFiles } from "./fs.mjs";
 import { shouldRenderMethod } from "./render-api.mjs";
 import { splitTopLevel } from "./scan.mjs";
-import { exampleLines, firstSentence, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
+import { exampleLines, firstSentence, paramSignature, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
 
 const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-all.js -->";
 const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
@@ -223,14 +223,8 @@ function renderClassSummary(name, ctx) {
   if (methods.length) {
     lines.push("**Methods**", "");
     for (const m of methods) {
-      // Only show top-level params in the summary signature — `options.foo`
-      // rows are nested options, covered by the linked typedef.
-      const params = (m.params ?? [])
-        .filter((p) => p.name && !p.name.includes("."))
-        .map((p) => (p.optional ? `[${p.name}]` : p.name))
-        .join(", ");
       const ret = m.returns?.type ? ` → \`${compactType(m.returns.type)}\`` : "";
-      lines.push(`- \`${m.name}(${params})\`${ret} — ${firstSentence(m.description)}`);
+      lines.push(`- \`${m.name}(${paramSignature(m.params)})\`${ret} — ${firstSentence(m.description)}`);
     }
     lines.push("");
   }

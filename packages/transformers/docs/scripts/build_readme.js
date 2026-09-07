@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import url from "node:url";
 
 import { DOCS_BASE_URL, buildApiSymbolLinks } from "./lib/api-links.mjs";
-import { loadProject } from "./lib/load.mjs";
 import { packageRoot } from "./lib/paths.mjs";
+import { mapLines } from "./lib/text.mjs";
 
 const FILES_TO_INCLUDE = {
   intro: "./docs/snippets/0_introduction.snippet",
@@ -27,12 +26,12 @@ const CUSTOM_LINK_MAP = {
   "./guides/dtypes": `${DOCS_BASE_URL}/guides/dtypes`,
 };
 
-// Default output: the repo root README. Resolved relative to packageRoot
+// Output: the repo root README. Resolved relative to packageRoot
 // (`packages/transformers`) so the path works from any cwd.
-const DEFAULT_README_OUT = "../../README.md";
+const README_OUT = "../../README.md";
 
-export function buildReadme({ project, out = DEFAULT_README_OUT } = {}) {
-  const { ir, publicNames } = project ?? loadProject(packageRoot);
+export function buildReadme({ project }) {
+  const { ir, publicNames } = project;
   const apiLinks = buildApiSymbolLinks(ir, publicNames);
   const snippets = Object.fromEntries(
     Object.entries(FILES_TO_INCLUDE).map(([key, file]) => {
@@ -46,26 +45,9 @@ export function buildReadme({ project, out = DEFAULT_README_OUT } = {}) {
 
   snippets.customUsage = demoteHeadings(snippets.customUsage);
   const readme = fixLinks(renderTemplate(snippets), apiLinks);
-  const target = path.resolve(packageRoot, out);
+  const target = path.resolve(packageRoot, README_OUT);
   fs.writeFileSync(target, readme, "utf8");
   return target;
-}
-
-function main() {
-  const { out } = parseArgs(process.argv.slice(2));
-  const target = buildReadme({ out });
-  console.log(`wrote ${path.relative(process.cwd(), target)}`);
-}
-
-function parseArgs(args) {
-  const outIndex = args.indexOf("--out");
-  if (outIndex !== -1 && !args[outIndex + 1]) {
-    throw new Error("Expected a path after --out.");
-  }
-
-  return {
-    out: outIndex === -1 ? DEFAULT_README_OUT : args[outIndex + 1],
-  };
 }
 
 function renderTemplate({ intro, installation, quickTour, customUsage, tasks, models }) {
@@ -117,14 +99,7 @@ ${models}
 
 function demoteHeadings(markdown) {
   // `#` lines inside fenced code (e.g. shell comments) are not headings.
-  let inFence = false;
-  return markdown
-    .split("\n")
-    .map((line) => {
-      if (/^\s*```/.test(line)) inFence = !inFence;
-      return inFence ? line : line.replace(/^#{1,5}(?=\s)/, "#$&");
-    })
-    .join("\n");
+  return mapLines(markdown, (line, fenced) => (fenced ? line : line.replace(/^#{1,5}(?=\s)/, "#$&")));
 }
 
 function fixLinks(markdown, apiLinks) {
@@ -141,8 +116,4 @@ function fixLinks(markdown, apiLinks) {
     }
     return `(${link})`;
   });
-}
-
-if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-  main();
 }

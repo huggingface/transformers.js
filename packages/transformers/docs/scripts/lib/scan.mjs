@@ -7,6 +7,11 @@
 const OPEN = "<({[";
 const CLOSE = ">)}]";
 
+// The `>` of a function-type arrow (`=>`) is not a closing angle bracket.
+function isArrowTail(text, i) {
+  return text[i] === ">" && text[i - 1] === "=";
+}
+
 // Return the index of the first occurrence of `needle` at top level (depth
 // zero), or -1 if it doesn't appear outside brackets/strings.
 export function findTopLevel(text, needle) {
@@ -20,7 +25,7 @@ export function findTopLevel(text, needle) {
       inStr = ch;
     } else if (OPEN.includes(ch)) {
       depth++;
-    } else if (CLOSE.includes(ch)) {
+    } else if (CLOSE.includes(ch) && !isArrowTail(text, i)) {
       depth--;
     } else if (depth === 0 && ch === needle) {
       return i;
@@ -43,7 +48,7 @@ export function matchingBracket(text, start, open, close) {
       inStr = ch;
     } else if (ch === open) {
       depth++;
-    } else if (ch === close && --depth === 0) {
+    } else if (ch === close && !isArrowTail(text, i) && --depth === 0) {
       return i;
     }
   }
@@ -69,7 +74,7 @@ export function splitTopLevel(text, sep) {
     } else if (OPEN.includes(ch)) {
       depth++;
       buf += ch;
-    } else if (CLOSE.includes(ch)) {
+    } else if (CLOSE.includes(ch) && !isArrowTail(text, i)) {
       depth--;
       buf += ch;
     } else if (depth === 0 && ch === sep) {

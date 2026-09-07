@@ -95,7 +95,7 @@ const pipe = await pipeline("sentiment-analysis", null, {
 ## Device selection
 
 ```javascript
-// Default — CPU via WASM (most compatible)
+// Default — CPU (onnxruntime-node in Node.js, WASM in browsers)
 await pipeline("sentiment-analysis", null);
 
 // GPU via WebGPU (Chrome 113+, fastest for big models)
@@ -148,11 +148,12 @@ anywhere `generate()` is invoked directly.
 - `max_new_tokens` overrides `max_length`. Pass one, not both — `max_new_tokens`
   is usually what you want because it doesn't depend on the prompt length.
 - `min_new_tokens` overrides `min_length` for the same reason.
-- Sampling vs. greedy: setting `do_sample: true` enables `temperature`,
-  `top_k`, `top_p`, and `typical_p`. With `do_sample: false` (the default),
-  those values are silently ignored.
-- Sampling vs. beams: `num_beams > 1` switches to beam search and `do_sample`
-  is ignored. Don't set both.
+- Sampling vs. greedy: setting `do_sample: true` enables `temperature` and
+  `top_k`. With `do_sample: false` (the default), those values are silently
+  ignored.
+- Sampling vs. beams: `do_sample: true` takes precedence — beams are ignored
+  while sampling. For beam search, set `num_beams > 1` and leave `do_sample`
+  off. Don't set both.
 
 <!-- @generated:start id=fields:GenerationConfig -->
 | Option | Type | Description |

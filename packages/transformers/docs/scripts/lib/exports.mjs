@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
-import { stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
+import { parseJsFile, stripQuotes, unwrapObjectFreeze } from "./js-ast.mjs";
 
 export function collectPublicExports(entryFile) {
   const names = new Set();
@@ -24,8 +24,7 @@ function walk(file, visited, names) {
   if (visited.has(file) || !fs.existsSync(file)) return;
   visited.add(file);
 
-  const source = fs.readFileSync(file, "utf8");
-  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const sf = parseJsFile(file);
   const dir = path.dirname(file);
 
   ts.forEachChild(sf, (node) => visitTopLevel(node, sf, dir, visited, names));
@@ -71,8 +70,7 @@ function visitTopLevel(node, sf, dir, visited, names) {
 // `Object.freeze({ ... })`, pull its shorthand-property names into `names`.
 function addNamespaceMembersFromFile(file, wanted, names) {
   if (!fs.existsSync(file)) return;
-  const source = fs.readFileSync(file, "utf8");
-  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const sf = parseJsFile(file);
   const wantedSet = new Set(wanted);
   ts.forEachChild(sf, (node) => {
     if (!ts.isVariableStatement(node) || !hasExportModifier(node)) return;

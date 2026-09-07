@@ -108,10 +108,14 @@ In browsers — or for retry logic and abort signals anywhere — override
 `env.fetch`:
 
 ```javascript
+// Obtain the token from your own backend at runtime; never hard-code one in
+// shipped client code.
+const token = await getHuggingFaceToken();
+
 env.fetch = (url, init) =>
   fetch(url, {
     ...init,
-    headers: { ...init?.headers, Authorization: `Bearer ${process.env.HF_TOKEN}` },
+    headers: { ...init?.headers, Authorization: `Bearer ${token}` },
   });
 ```
 
@@ -138,7 +142,7 @@ ships no ONNX files; it throws a `ModelFileNotFoundError` for missing or
 inaccessible (private/gated) models, and a regular error on network failures.
 
 ```javascript
-import { ModelRegistry } from "@huggingface/transformers";
+import { ModelRegistry, pipeline } from "@huggingface/transformers";
 
 const task = "feature-extraction";
 const modelId = "onnx-community/all-MiniLM-L6-v2-ONNX";

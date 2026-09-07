@@ -3,11 +3,12 @@ import path from "node:path";
 
 import { listFiles } from "./fs.mjs";
 import { apiOutputDir, toctreePath } from "./paths.mjs";
+import { mapLines } from "./text.mjs";
 
-export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toctreePath, project = null } = {}) {
-  const generatedApiPages = listApiPages(outputDir);
-  const linkedApiPages = readToctreeApiPages(tocPath);
-  const sourceDir = path.dirname(tocPath);
+export function validateGeneratedDocs({ project = null } = {}) {
+  const generatedApiPages = listApiPages(apiOutputDir);
+  const linkedApiPages = readToctreeApiPages(toctreePath);
+  const sourceDir = path.dirname(toctreePath);
   const brokenLinks = validateInternalLinks(sourceDir);
 
   const unlisted = difference(generatedApiPages, linkedApiPages);
@@ -166,17 +167,7 @@ const MARKDOWN_LINK_RE = /!?\[(?:[^[\]]|\[[^\]]*\])*\]\(([^)\s]+)(?:\s+"[^"]*")?
 // code — `x[i](y)` in a snippet is not a markdown link, and a `# comment` is
 // not a heading. Line structure is preserved.
 function maskFences(text) {
-  let inFence = false;
-  return text
-    .split("\n")
-    .map((line) => {
-      if (/^\s*```/.test(line)) {
-        inFence = !inFence;
-        return "";
-      }
-      return inFence ? "" : line;
-    })
-    .join("\n");
+  return mapLines(text, (line, fenced) => (fenced ? "" : line));
 }
 
 function isLocalLink(target) {

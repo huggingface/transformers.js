@@ -24,12 +24,29 @@ export function stripDocArtifacts(text) {
   return text.replace(/^\[`?[A-Za-z_$][\w$.]*`?\](?!\()\s*/, "");
 }
 
+const FENCE = /^\s*```/;
+
+// Map every line of `text` through `fn(line, fenced)`, where `fenced` is true
+// for lines inside a fenced code block, including the fence delimiters
+// themselves. Line structure is preserved; an unterminated fence extends to
+// the end of the text.
+export function mapLines(text, fn) {
+  let inFence = false;
+  return text
+    .split("\n")
+    .map((line) => {
+      const isFence = FENCE.test(line);
+      if (isFence) inFence = !inFence;
+      return fn(line, isFence || inFence);
+    })
+    .join("\n");
+}
+
 // Run `transform` over the parts of `text` outside fenced code blocks. Each
 // fence is swapped for a single-line placeholder while the transform runs, so
 // page-level rewrites (link expansion, blank-run collapsing) can't mangle
 // example code. An unterminated fence extends to the end of the text.
 export function transformOutsideFences(text, transform) {
-  const FENCE = /^\s*```/;
   const blocks = [];
   const out = [];
   let fence = null;
@@ -52,6 +69,16 @@ export function transformOutsideFences(text, transform) {
     blocks.push(fence.join("\n"));
   }
   return transform(out.join("\n")).replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[Number(i)]);
+}
+
+// Comma-separated parameter names for a signature. Only top-level params are
+// shown — `options.foo` rows are nested options, covered by the linked typedef.
+// Optional params render as `[name]`.
+export function paramSignature(params) {
+  return (params ?? [])
+    .filter((p) => p.name && !p.name.includes("."))
+    .map((p) => (p.optional ? `[${p.name}]` : p.name))
+    .join(", ");
 }
 
 // One `**Example:** <title>` block with its fenced code, as markdown lines.
