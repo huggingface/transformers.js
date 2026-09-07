@@ -1,3 +1,7 @@
+/**
+ * @module tokenizers
+ */
+
 import { PreTrainedTokenizer, loadTokenizer } from '../../tokenization_utils.js';
 import * as AllTokenizers from '../tokenizers.js';
 import { logger } from '../../utils/logger.js';
@@ -36,7 +40,7 @@ export class AutoTokenizer {
      * - A path to a *directory* containing tokenizer files, e.g., `./my_model_directory/`.
      * @param {import('../../tokenization_utils.js').PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
      *
-     * @returns {Promise<PreTrainedTokenizer>} A new instance of the PreTrainedTokenizer class.
+     * @returns {Promise<PreTrainedTokenizer>} The loaded tokenizer.
      */
     static async from_pretrained(
         pretrained_model_name_or_path,

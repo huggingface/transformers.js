@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareAudios } from './_base.js';
 
 import { softmax } from '../utils/maths.js';
@@ -33,20 +37,20 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Zero shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio when you
- * provide an audio and a set of `candidate_labels`.
+ * Zero-shot audio classification pipeline using `ClapModel`. This pipeline predicts the class of an audio clip from
+ * audio and a set of `candidate_labels`.
  *
- * **Example**: Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
+ * **Example:** Perform zero-shot audio classification with `Xenova/clap-htsat-unfused`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
  * const classifier = await pipeline('zero-shot-audio-classification', 'Xenova/clap-htsat-unfused');
  * const audio = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/dog_barking.wav';
- * const candidate_labels = ['dog', 'vaccum cleaner'];
+ * const candidate_labels = ['dog', 'vacuum cleaner'];
  * const scores = await classifier(audio, candidate_labels);
  * // [
  * //   { score: 0.9993992447853088, label: 'dog' },
- * //   { score: 0.0006007603369653225, label: 'vaccum cleaner' }
+ * //   { score: 0.0006007603369653225, label: 'vacuum cleaner' }
  * // ]
  * ```
  */

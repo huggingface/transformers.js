@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor, topk } from '../utils/tensor.js';
@@ -16,7 +20,7 @@ import { softmax } from '../utils/maths.js';
  * @typedef {ImageClassificationSingle[]} ImageClassificationOutput
  *
  * @typedef {Object} ImageClassificationPipelineOptions Parameters specific to image classification pipelines.
- * @property {number} [top_k=1] The number of top labels that will be returned by the pipeline.
+ * @property {number|null} [top_k=5] The number of top labels to return. Set to `null` to return all labels.
  *
  * @typedef {ImagePipelineConstructorArgs & ImageClassificationPipelineCallback & Disposable} ImageClassificationPipelineType
  */
@@ -43,10 +47,11 @@ import { softmax } from '../utils/maths.js';
  * const output = await classifier(url);
  * // [
  * //   { label: 'tiger, Panthera tigris', score: 0.632695734500885 },
+ * //   ... (top 5 labels by default)
  * // ]
  * ```
  *
- * **Example:** Classify an image and return top `n` classes.
+ * **Example:** Classify an image and return the top `n` classes.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -66,7 +71,7 @@ import { softmax } from '../utils/maths.js';
  *
  * const classifier = await pipeline('image-classification', 'Xenova/vit-base-patch16-224');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
- * const output = await classifier(url, { top_k: 0 });
+ * const output = await classifier(url, { top_k: null });
  * // [
  * //   { label: 'tiger, Panthera tigris', score: 0.632695734500885 },
  * //   { label: 'tiger cat', score: 0.3634825646877289 },

@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages } from './_base.js';
 
 import { RawImage } from '../utils/image.js';
@@ -29,7 +33,7 @@ const SUBTASKS_MAPPING = {
  * @property {number} [overlap_mask_area_threshold=0.8] Mask overlap threshold to eliminate small, disconnected segments.
  * @property {null|string} [subtask=null] Segmentation task to be performed. One of [`panoptic`, `instance`, and `semantic`],
  * depending on model capabilities. If not set, the pipeline will attempt to resolve (in that order).
- * @property {number[]} [label_ids_to_fuse=null] List of label ids to fuse. If not set, do not fuse any labels.
+ * @property {number[]} [label_ids_to_fuse=null] List of label IDs to fuse. If not set, do not fuse any labels.
  * @property {number[][]} [target_sizes=null] List of target sizes for the input images. If not set, use the original image sizes.
  *
  * @callback ImageSegmentationPipelineCallback Segment the input images.
@@ -41,7 +45,7 @@ const SUBTASKS_MAPPING = {
  */
 
 /**
- * Image segmentation pipeline using any `AutoModelForXXXSegmentation`.
+ * Image segmentation pipeline using compatible segmentation models.
  * This pipeline predicts masks of objects and their classes.
  *
  * **Example:** Perform image segmentation with `Xenova/detr-resnet-50-panoptic`.

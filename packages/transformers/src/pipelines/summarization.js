@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Text2TextGenerationPipeline } from './text2text-generation.js';
 
 /**
@@ -19,9 +23,9 @@ import { Text2TextGenerationPipeline } from './text2text-generation.js';
  */
 
 /**
- * A pipeline for summarization tasks, inheriting from Text2TextGenerationPipeline.
+ * Summarization pipeline using sequence-to-sequence language models.
  *
- * **Example:** Summarization w/ `Xenova/distilbart-cnn-6-6`.
+ * **Example:** Summarization with `Xenova/distilbart-cnn-6-6`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

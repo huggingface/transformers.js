@@ -12,7 +12,7 @@ This tutorial will be written as an ES module, but you can easily adapt it to us
 
 **Useful links:**
 
-- [Source code](https://github.com/huggingface/transformers.js/tree/main/examples/node-audio-processing)
+- [Source code](https://github.com/huggingface/transformers.js-examples/tree/main/node-audio-processing)
 - [Documentation](https://huggingface.co/docs/transformers.js)
 
 ## Prerequisites
@@ -98,7 +98,7 @@ console.log(`Execution duration: ${(end - start) / 1000} seconds`);
 console.log(output);
 ```
 
-You can now run the application with `node index.js`. Note that when running the script for the first time, it may take a while to download and cache the model. Subsequent requests will use the cached model, and model loading will be much faster.
+You can now run the application with `node index.js`. Note that when running the script for the first time, it may take a while to download and cache the model. Subsequent runs will use the cached model, so model loading will be much faster.
 
 You should see output similar to:
 

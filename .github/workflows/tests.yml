@@ -18,6 +18,30 @@ env:
   ONNXRUNTIME_NODE_INSTALL: skip
 
 jobs:
+  docs:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @huggingface/transformers docs-generate
+      - name: Check generated docs are in sync
+        run: |
+          if ! git diff --exit-code; then
+            echo ""
+            echo "::error::Generated docs are out of sync with the source." \
+              "Run 'pnpm --filter @huggingface/transformers docs-generate' and commit the result."
+            exit 1
+          fi
+
   build:
     if: github.event.pull_request.draft == false
     runs-on:

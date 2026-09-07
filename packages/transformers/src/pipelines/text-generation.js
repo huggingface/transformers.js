@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
@@ -26,7 +30,7 @@ function isChat(x) {
  * @typedef {TextGenerationSingle[]} TextGenerationOutput
  *
  * @typedef {Object} TextGenerationSpecificParams Parameters specific to text-generation pipelines.
- * @property {boolean} [add_special_tokens] Whether or not to add special tokens when tokenizing the sequences.
+ * @property {boolean} [add_special_tokens] Whether to add special tokens when tokenizing the sequences.
  * @property {boolean} [return_full_text=true] If set to `false` only added text is returned, otherwise the full text is returned.
  * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
  * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.
@@ -48,11 +52,11 @@ function isChat(x) {
  */
 
 /**
- * Language generation pipeline using any `ModelWithLMHead` or `ModelForCausalLM`.
+ * Language generation pipeline using compatible causal language models.
  * This pipeline predicts the words that will follow a specified text prompt.
- * NOTE: For the full list of generation parameters, see [`GenerationConfig`](./utils/generation#module_utils/generation.GenerationConfig).
+ * For all generation parameters, see `GenerationConfig`.
  *
- * **Example:** Text generation with `HuggingFaceTB/SmolLM2-135M` (default settings).
+ * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

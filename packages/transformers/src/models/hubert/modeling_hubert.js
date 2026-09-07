@@ -11,11 +11,11 @@ export class HubertPreTrainedModel extends PreTrainedModel {}
  * **Example:** Load and run a `HubertModel` for feature extraction.
  *
  * ```javascript
- * import { AutoProcessor, AutoModel, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModel, load_audio } from '@huggingface/transformers';
  *
  * // Read and preprocess audio
  * const processor = await AutoProcessor.from_pretrained('Xenova/hubert-base-ls960');
- * const audio = await read_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav', 16000);
+ * const audio = await load_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav', 16000);
  * const inputs = await processor(audio);
  *
  * // Load and run model with inputs

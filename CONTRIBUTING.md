@@ -267,17 +267,21 @@ Follow the steps below to start contributing:
    the pull request.
 
 ### Pull request checklist
-☐ The pull request title should summarize your contribution.  
-☐ If your pull request addresses an issue, please mention the issue number in the pull
-request description to make sure they are linked (and people viewing the issue know you
-are working on it).  
-☐ To indicate a work in progress please prefix the title with `[WIP]`. These are
-useful to avoid duplicated work, and to differentiate it from PRs ready to be merged.  
-☐ Make sure existing tests pass (`pnpm test`).  
-☐ Make sure the build completes successfully (`pnpm build`).  
-☐ Make sure your code is [formatted properly with Prettier](#code-formatting) (`pnpm format:check`).  
-☐ If adding a new feature, also add tests for it.  
-☐ If your changes affect user-facing functionality, update the relevant documentation.
+
+- ☐ The pull request title should summarize your contribution.
+- ☐ If your pull request addresses an issue, please mention the issue number in the pull
+  request description to make sure they are linked (and people viewing the issue know you
+  are working on it).
+- ☐ To indicate a work in progress please prefix the title with `[WIP]`. These are
+  useful to avoid duplicated work, and to differentiate it from PRs ready to be merged.
+- ☐ Make sure existing tests pass (`pnpm test`).
+- ☐ Make sure the build completes successfully (`pnpm build`).
+- ☐ Make sure your code is [formatted properly with Prettier](#code-formatting) (`pnpm format:check`).
+- ☐ If adding a new feature, also add tests for it.
+- ☐ If your changes affect user-facing functionality, update the relevant documentation.
+- ☐ If you changed JSDoc comments, README snippets, or task metadata, regenerate the docs
+  (`pnpm --filter @huggingface/transformers docs-generate`) and commit the result.
+  See [Documentation](#documentation).
 
 ### Tests
 We are using [Jest](https://jestjs.io/) to execute unit-tests. All tests can be found in `packages/transformers/tests` and have to end with `.test.js`
@@ -297,6 +301,29 @@ Execute a specific test file
 cd packages/transformers
 pnpm test -- ./tests/models.test.js
 ```
+
+### Documentation
+
+Parts of the documentation are generated from the source code, and CI fails the build
+if they drift. After changing JSDoc comments in `packages/transformers/src/`, a README
+snippet in `packages/transformers/docs/snippets/`, or task metadata, regenerate with:
+
+```bash
+pnpm --filter @huggingface/transformers docs-generate
+```
+
+and commit the regenerated files together with your change. In particular:
+
+- The repo-root `README.md` is **generated** from `packages/transformers/docs/snippets/*.snippet` —
+  don't edit it by hand; edit the snippet and regenerate.
+- The AI skill files under `.ai/skills/transformers-js/` are partly generated:
+  `references/TASKS.md` entirely, the other files only between
+  `<!-- @generated:start -->` / `<!-- @generated:end -->` markers.
+- The API reference pages (`packages/transformers/docs/source/api/`) are regenerated on
+  every run and are gitignored, so they never need committing.
+
+See [`.ai/AGENTS.md`](.ai/AGENTS.md) for the full map of what is generated versus
+hand-written.
 
 ### Style guide
 

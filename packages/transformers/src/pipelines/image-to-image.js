@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages } from './_base.js';
 import { RawImage } from '../utils/image.js';
 
@@ -21,9 +25,9 @@ import { RawImage } from '../utils/image.js';
  */
 
 /**
- * Image to Image pipeline using any `AutoModelForImageToImage`. This pipeline generates an image based on a previous image input.
+ * Image-to-image pipeline using any `AutoModelForImageToImage`. This pipeline generates an image based on a previous image input.
  *
- * **Example:** Super-resolution w/ `Xenova/swin2SR-classical-sr-x2-64`
+ * **Example:** Super-resolution with `Xenova/swin2SR-classical-sr-x2-64`
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

@@ -1,8 +1,8 @@
 /**
- * @file Helper module for `Tensor` processing.
+ * @file Tensors and tensor operations.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * `Tensor` is the typed n-dimensional array used throughout the library for model inputs
+ * and outputs. This module also provides functions to create, transform, and combine tensors.
  *
  * @module utils/tensor
  */
@@ -22,6 +22,17 @@ import { random } from './random.js';
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
 
+/**
+ * A typed multi-dimensional array.
+ *
+ * **Example:**
+ * ```javascript
+ * import { Tensor } from '@huggingface/transformers';
+ * const tensor = new Tensor('float32', [1, 2, 3, 4, 5, 6], [2, 3]);
+ * tensor.dims;    // [2, 3]
+ * tensor.tolist(); // [[1, 2, 3], [4, 5, 6]]
+ * ```
+ */
 export class Tensor {
     /**
      * Dimensions of the tensor.
@@ -72,7 +83,10 @@ export class Tensor {
     ort_tensor;
 
     /**
-     * Create a new Tensor or copy an existing Tensor.
+     * Create a new Tensor, either from raw data or by wrapping an `onnxruntime` tensor:
+     * - `new Tensor(dataType, data, dims)`, e.g. `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
+     * - `new Tensor(ortTensor)`.
+     *
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
      */
     constructor(...args) {
@@ -109,6 +123,9 @@ export class Tensor {
         });
     }
 
+    /**
+     * Releases the underlying ONNX Runtime tensor (e.g., GPU buffers). Do not use the tensor afterwards.
+     */
     dispose() {
         this.ort_tensor.dispose();
         // this.ort_tensor = undefined;
@@ -136,6 +153,7 @@ export class Tensor {
      * Index into a Tensor object.
      * @param {number} index The index to access.
      * @returns {Tensor} The data at the specified index.
+     * @private
      */
     _getitem(index) {
         const [iterLength, ...iterDims] = this.dims;
@@ -148,21 +166,6 @@ export class Tensor {
         } else {
             return new Tensor(this.type, [this.data[index]], iterDims);
         }
-    }
-
-    /**
-     * @param {number|bigint} item The item to search for in the tensor
-     * @returns {number} The index of the first occurrence of item in the tensor data.
-     */
-    indexOf(item) {
-        const this_data = this.data;
-        for (let index = 0; index < this_data.length; ++index) {
-            // Note: == instead of === so we can match Ints with BigInts
-            if (this_data[index] == item) {
-                return index;
-            }
-        }
-        return -1;
     }
 
     /**
@@ -608,6 +611,8 @@ export class Tensor {
 
     /**
      * In-place version of @see {@link Tensor.squeeze}
+     * @param {number|number[]|null} [dim=null] If given, the input will be squeezed only in the specified dimensions.
+     * @returns {Tensor} `this`, with the specified dimensions of size 1 removed.
      */
     squeeze_(dim = null) {
         this.dims = calc_squeeze_dims(this.dims, dim);
@@ -637,6 +642,9 @@ export class Tensor {
 
     /**
      * In-place version of @see {@link Tensor.flatten}
+     * @param {number} [start_dim=0] the first dim to flatten
+     * @param {number} [end_dim=-1] the last dim to flatten
+     * @returns {Tensor} `this`, flattened along the specified dimensions.
      */
     flatten_(start_dim = 0, end_dim = -1) {
         // TODO validate inputs
@@ -691,6 +699,10 @@ export class Tensor {
         return new Tensor(this.type, this_data, dims); // NOTE: uses same underlying storage
     }
 
+    /**
+     * In-place version of @see {@link Tensor.neg}
+     * @returns {Tensor} `this`, with every element negated.
+     */
     neg_() {
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
@@ -698,6 +710,11 @@ export class Tensor {
         }
         return this;
     }
+
+    /**
+     * Returns a new tensor with the negative of the elements of this tensor.
+     * @returns {Tensor} the output tensor.
+     */
     neg() {
         return this.clone().neg_();
     }
@@ -771,10 +788,22 @@ export class Tensor {
         return this.clone().round_();
     }
 
+    /**
+     * Returns the mean value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the mean of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with means taken along the specified dimension.
+     */
     mean(dim = null, keepdim = false) {
         return mean(this, dim, keepdim);
     }
 
+    /**
+     * Returns the minimum value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the minimum of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with minimum values taken along the specified dimension.
+     */
     min(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
@@ -791,6 +820,12 @@ export class Tensor {
         return new Tensor(type, result, resultDims);
     }
 
+    /**
+     * Returns the maximum value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the maximum of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with maximum values taken along the specified dimension.
+     */
     max(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
@@ -807,6 +842,13 @@ export class Tensor {
         return new Tensor(type, result, resultDims);
     }
 
+    /**
+     * Returns the index of the minimum value of all elements in this tensor.
+     * @param {number|null} [dim=null] the dimension to reduce. Only `null` (reduce over all elements) is currently supported.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} An `int64` scalar tensor containing the index of the minimum value.
+     * @throws {Error} If `dim` is not `null`.
+     */
     argmin(dim = null, keepdim = false) {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
@@ -814,6 +856,14 @@ export class Tensor {
         const index = min(this.data)[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
+
+    /**
+     * Returns the index of the maximum value of all elements in this tensor.
+     * @param {number|null} [dim=null] the dimension to reduce. Only `null` (reduce over all elements) is currently supported.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} An `int64` scalar tensor containing the index of the maximum value.
+     * @throws {Error} If `dim` is not `null`.
+     */
     argmax(dim = null, keepdim = false) {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
@@ -944,13 +994,6 @@ export class Tensor {
 
 /**
  * This creates a nested array of a given type and depth (see examples).
- *
- * @example
- *   NestArray<string, 1>; // string[]
- * @example
- *   NestArray<number, 2>; // number[][]
- * @example
- *   NestArray<string, 3>; // string[][][] etc.
  * @template T
  * @template {number} Depth
  * @template {never[]} [Acc=[]]
@@ -960,11 +1003,13 @@ export class Tensor {
 /**
  * Reshapes a 1-dimensional array into an n-dimensional array, according to the provided dimensions.
  *
- * @example
+ * **Example:**
+ * ```javascript
  *   reshape([10                    ], [1      ]); // Type: number[]      Value: [10]
  *   reshape([1, 2, 3, 4            ], [2, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]); // Type: number[][][]  Value: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
  *   reshape([1, 2, 3, 4, 5, 6, 7, 8], [4, 2   ]); // Type: number[][]    Value: [[1, 2], [3, 4], [5, 6], [7, 8]]
+ * ```
  * @param {T[]|DataArray} data The input array to reshape.
  * @param {DIM} dimensions The target shape/dimensions.
  * @template T
@@ -1560,6 +1605,13 @@ export function full(size, fill_value) {
     return fullHelper(size, fill_value, dtype, typedArrayCls);
 }
 
+/**
+ * Creates a tensor with the same size as `tensor`, filled with `fill_value`.
+ * The tensor's dtype is inferred from `fill_value`.
+ * @param {Tensor} tensor The size of input will determine size of the output tensor.
+ * @param {number|bigint|boolean} fill_value The value to fill the output tensor with.
+ * @returns {Tensor} The filled tensor.
+ */
 export function full_like(tensor, fill_value) {
     return full(tensor.dims, fill_value);
 }

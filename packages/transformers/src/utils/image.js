@@ -1,8 +1,9 @@
 /**
- * @file Helper module for image processing.
+ * @file Image I/O and manipulation.
  *
- * These functions and classes are only used internally,
- * meaning an end-user shouldn't need to access anything here.
+ * `RawImage` wraps a raw pixel buffer with width, height, and channel metadata;
+ * use `load_image()` to decode from paths, URLs, or Blobs, and the instance
+ * methods to resize, convert, and save.
  *
  * @module utils/image
  */
@@ -71,6 +72,16 @@ const CONTENT_TYPE_MAP = new Map([
     ['gif', 'image/gif'],
 ]);
 
+/**
+ * Represents an image stored as a raw pixel buffer.
+ *
+ * **Example:**
+ * ```javascript
+ * import { RawImage } from '@huggingface/transformers';
+ * const image = await RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/artemis.jpeg');
+ * console.log(image.width, image.height, image.channels);
+ * ```
+ */
 export class RawImage {
     /**
      * Create a new `RawImage` object.
@@ -184,7 +195,11 @@ export class RawImage {
 
     /**
      * Helper method to create a new Image from a tensor
-     * @param {Tensor} tensor
+     * @param {Tensor} tensor The 3D tensor containing the image data. Must be of type `uint8`.
+     * @param {'CHW'|'HWC'} [channel_format='CHW'] The dimension ordering of the tensor.
+     * @returns {RawImage} The image created from the tensor.
+     * @throws {Error} If the tensor does not have 3 dimensions, or the channel format,
+     * tensor type, or number of channels is unsupported.
      */
     static fromTensor(tensor, channel_format = 'CHW') {
         if (tensor.dims.length !== 3) {
@@ -192,7 +207,7 @@ export class RawImage {
         }
 
         if (channel_format === 'CHW') {
-            tensor = tensor.transpose(1, 2, 0);
+            tensor = tensor.permute(1, 2, 0);
         } else if (channel_format === 'HWC') {
             // Do nothing
         } else {
@@ -813,6 +828,8 @@ export class RawImage {
 }
 
 /**
- * Helper function to load an image from a URL, path, etc.
+ * Load an image from a URL, file path, `Blob`, `HTMLCanvasElement`, or
+ * `OffscreenCanvas`. Equivalent to `RawImage.read`.
+ * @type {typeof RawImage.read}
  */
 export const load_image = RawImage.read.bind(RawImage);
