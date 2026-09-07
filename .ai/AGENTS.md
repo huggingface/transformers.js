@@ -5,7 +5,7 @@ repository. Agentic users must read and follow it before proposing changes.
 
 ## Available skills
 
-- [`transformers-js`](/.ai/skills/transformers-js/SKILL.md) — how to use the library
+- [`transformers-js`](skills/transformers-js/SKILL.md) — how to use the library
   itself. Load this skill when working on code that calls `@huggingface/transformers`.
 
 ## Contributing
@@ -41,7 +41,7 @@ or generated skill content change:
 pnpm --filter @huggingface/transformers docs-generate
 ```
 
-`docs-generate` runs [`docs/scripts/generate-all.js`](/packages/transformers/docs/scripts/generate-all.js),
+`docs-generate` runs [`docs/scripts/generate-all.js`](../packages/transformers/docs/scripts/generate-all.js),
 which generates:
 
 - `packages/transformers/docs/source/api/**/*.md` from JSDoc comments in
