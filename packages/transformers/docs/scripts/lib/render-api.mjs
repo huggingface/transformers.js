@@ -241,9 +241,7 @@ function renderFunction(fn, ctx, depth, parent = null, opts = {}) {
   // Resolve generic type parameters (`@template {Constraint} T`) inside this
   // function's parameter/return types. Without the constraint map, a `T`
   // would render as `any`.
-  const templateMap = new Map();
-  for (const t of fn.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
-  const fnCtx = templateMap.size ? { ...ctx, templates: templateMap } : ctx;
+  const fnCtx = withTemplates(ctx, fn);
 
   if (fn.deprecated) lines.push("> **Deprecated**", "");
   if (fn.description) lines.push(cleanDescription(fn.description), "");
@@ -373,9 +371,18 @@ function isGenericParamName(name) {
   return /^T[A-Z][A-Za-z]*$/.test(name) || /^[TKV]$/.test(name);
 }
 
+// Resolve `@template {Constraint} T` names inside an entity's types. Without
+// the constraint map, a `T` renders as `any`.
+function withTemplates(ctx, entity) {
+  const templateMap = new Map();
+  for (const t of entity?.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
+  return templateMap.size ? { ...ctx, templates: templateMap } : ctx;
+}
+
 function renderTypedef(td, ctx) {
   if (!shouldRenderTypedef(td, ctx)) return [];
 
+  const tdCtx = withTemplates(ctx, td);
   const { displayed, typeIsShowable } = typedefRenderInfo(td, ctx);
 
   const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, td.name)}"></a>`, "", `### ${td.name}`, ""];
@@ -384,7 +391,7 @@ function renderTypedef(td, ctx) {
     lines.push(`_Type:_ ${displayed}`, "");
   }
   if (td.properties?.length) {
-    lines.push("**Properties**", "", ...renderParamList(td.properties, ctx), "");
+    lines.push("**Properties**", "", ...renderParamList(td.properties, tdCtx), "");
   }
   lines.push(...renderBackingClassMembers(td, ctx));
   return lines;
@@ -424,7 +431,7 @@ function shouldRenderTypedef(td, ctx) {
 }
 
 function typedefRenderInfo(td, ctx) {
-  const displayed = td.type ? renderType(td.type, { ...ctx, selfName: td.name }) : "";
+  const displayed = td.type ? renderType(td.type, { ...withTemplates(ctx, td), selfName: td.name }) : "";
   const isSelfReference = displayed === `\`${td.name}\``;
   const isGenericPassthrough = /^`[A-Z][A-Za-z]?`$/.test(displayed);
   // Collapsed fallbacks (`object`, `unknown`, `any`) carry no real information
@@ -463,7 +470,7 @@ const TUPLE = /^\[(.*)\]$/;
 // Turn a raw JSDoc type string into readable markdown. Prefers author-written
 // names over expanded TS structures; unknown gnarly types become `object`.
 function renderType(raw, ctx, opts = {}) {
-  const pretty = prettifyTypeString(raw);
+  const pretty = prettifyTypeString(raw, ctx?.selfName);
   if (opts.noLink) return `\`${pretty}\``;
 
   const utility = parseUtilityType(pretty);
@@ -540,14 +547,20 @@ function renderArrayType(innerRaw, ctx) {
   return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
 }
 
+// A tuple is one code span with plain member names — ``[`number`, `number`]``
+// is indistinguishable from a broken markdown link, and a link nested inside a
+// bracketed list reads worse than the plain name it replaces.
 function renderTupleType(innerRaw, ctx) {
   const parts = splitTopLevel(innerRaw, ",");
   if (parts.length === 1 && !parts[0].trim()) return "`[]`";
-  const rendered = parts.map((p) => renderType(p.trim(), ctx));
-  // A one-element tuple of a plain name would render as ``[`Name`]``, which is
-  // indistinguishable from a reST cross-reference — keep it inside the span.
-  const single = rendered.length === 1 && rendered[0].match(/^`([^`]+)`$/);
-  return single ? `\`[${single[1]}]\`` : `[${rendered.join(", ")}]`;
+  const rendered = parts.map((p) => stripMarkup(renderType(p.trim(), ctx)));
+  return `\`[${rendered.join(", ")}]\``;
+}
+
+// Reduce rendered markdown (links, code spans) back to the bare type text, so
+// it can be placed inside an enclosing code span.
+function stripMarkup(rendered) {
+  return rendered.replace(/\[`([^`]+)`\]\([^)]*\)/g, "$1").replace(/`/g, "");
 }
 
 function linkIfKnown(name, ctx) {
@@ -664,15 +677,41 @@ function unwrapParens(s) {
 // they stay gnarly rather than being rewritten.
 const MAPPED_TYPE = /\[\s*\w+\s+in\s/;
 
-function isRewritableConditional(s) {
-  return !/\binfer\b/.test(s) && !MAPPED_TYPE.test(s);
+// Indexed access anywhere in the type (`Acc['length']`, `DIM[0]`): the
+// condition depends on a value the union of branches can't express.
+const INDEXED_ACCESS = /\[['"0-9]/;
+
+// Dropping the condition is only honest when the branches stand on their own.
+// A depth-recursive type (`Acc['length'] extends Depth ? T : NestArray<T[],
+// Depth, [...Acc, never]>`) encodes its termination in the condition itself:
+// unioning the branches yields a type that is both wrong and unreadable. Bail
+// on the constructs that mark such a type — a spread accumulator, an indexed
+// access, or a reference to the typedef being defined — and leave it gnarly, so
+// the caller collapses it exactly as it did before this rewrite existed.
+// (A whole-branch `never` is fine: `rewriteConditionals` drops it, which is
+// what a `never` fallback means. See the post-rewrite guard below for a `never`
+// that survives.)
+function isRewritableConditional(s, selfName) {
+  if (/\binfer\b/.test(s) || MAPPED_TYPE.test(s)) return false;
+  if (s.includes("...") || INDEXED_ACCESS.test(s)) return false;
+  if (selfName && new RegExp(`\\b${selfName}\\b`).test(s)) return false;
+  return true;
+}
+
+// A `never` that is still in the rewritten string was never a branch of its
+// own — it sits inside a type argument, where the union of branches can't
+// explain it. Keep the original so it collapses instead.
+function rewriteConditionalsSafely(s, selfName) {
+  if (!isRewritableConditional(s, selfName)) return s;
+  const rewritten = rewriteConditionals(s);
+  return /\bnever\b/.test(rewritten) ? s : rewritten;
 }
 
 // Strip noisy TS constructs from a type string without rewriting structure.
 // Conditional/mapped/infer types collapse to their outermost wrapper; simple
 // unions of names or long generic lists are preserved so the renderer can
 // split them into individual links.
-function prettifyTypeString(raw) {
+function prettifyTypeString(raw, selfName) {
   if (!raw) return "";
   let s = raw.trim();
 
@@ -688,7 +727,7 @@ function prettifyTypeString(raw) {
     return s;
   }
 
-  if (isRewritableConditional(s)) s = rewriteConditionals(s);
+  s = rewriteConditionalsSafely(s, selfName);
   s = spaceObjectLiterals(s);
 
   if (isGnarly(s)) {

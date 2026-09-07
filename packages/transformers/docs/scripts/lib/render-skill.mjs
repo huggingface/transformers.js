@@ -143,9 +143,11 @@ function renderTaskList({ tasks }) {
 function renderTaskRecipe(taskId, info, ctx) {
   const cls = findClass(ctx.ir, info.pipelineClass);
   const aliases = aliasesFor(taskId, ctx.tasks);
-  const lines = [`**Default model:** \`${info.defaultModel}\``];
-  if (aliases.length) lines.push(`**Aliases:** ${aliases.map((a) => `\`${a}\``).join(", ")}`);
-  lines.push("");
+  // Separate paragraphs: consecutive lines would collapse into one, running
+  // the aliases onto the end of the default-model line. Every other bold label
+  // in a task section (`**Example:**`) stands as its own paragraph too.
+  const lines = [`**Default model:** \`${info.defaultModel}\``, ""];
+  if (aliases.length) lines.push(`**Aliases:** ${aliases.map((a) => `\`${a}\``).join(", ")}`, "");
   if (cls?.description) lines.push(cls.description.trim(), "");
   for (const ex of cls?.examples ?? []) lines.push(...exampleLines(ex));
   return lines.join("\n").trimEnd();

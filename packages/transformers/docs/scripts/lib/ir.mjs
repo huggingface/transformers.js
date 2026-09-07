@@ -203,6 +203,11 @@ function ingest(entities, mod) {
 function collectTypedefsFromBlock(block, mod) {
   let current = null;
   let first = true;
+  // `@template {Constraint} [T=default]` tags sit on the block, not on the
+  // individual `@typedef`. Carrying them onto every type declared by the block
+  // lets the renderer resolve `T` in the type expression and in `@property`
+  // types instead of falling back to `any`.
+  const blockTemplates = templatesOf(block);
   const flush = () => {
     if (!current) return;
     if (current.kind === "typedef") mod.typedefs.push(current);
@@ -218,12 +223,13 @@ function collectTypedefsFromBlock(block, mod) {
         description: tag.description || (first ? block.description : ""),
       });
       current = callable
-        ? { ...callable, kind: "callback" }
+        ? { ...callable, kind: "callback", templates: callable.templates?.length ? callable.templates : blockTemplates }
         : {
             kind: "typedef",
             name: tag.name,
             type: tag.type,
             description: tag.description || (first ? block.description : ""),
+            templates: blockTemplates,
             properties: [],
           };
       first = false;
@@ -235,6 +241,7 @@ function collectTypedefsFromBlock(block, mod) {
         description: block.description,
         params: tagsOf(block, "param").map(normalizeParam),
         returns: pickReturns(block),
+        templates: blockTemplates,
       };
       first = false;
     } else if ((tag.tag === "property" || tag.tag === "prop") && current?.kind === "typedef") {
@@ -272,9 +279,7 @@ function buildCallable(fn) {
     // `@template {Constraint} Name` maps the generic name to its constraint;
     // used by the renderer to resolve generic parameter names to something
     // readable instead of a bare `any`.
-    templates: tagsOf(fn, "template")
-      .map((t) => ({ name: t.name, type: t.type }))
-      .filter((t) => t.name),
+    templates: templatesOf(fn),
     examples,
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
   };
@@ -502,6 +507,14 @@ function findCallable(ref, callableIndex) {
   const parsed = parseCallableReference(ref);
   if (!parsed) return null;
   return callableIndex.get(parsed.method ? `${parsed.owner}.${parsed.method}` : parsed.owner);
+}
+
+// `@template {Constraint} Name` -> `{ name, type }`, the shape the renderer
+// uses to resolve generic parameter names to their constraints.
+function templatesOf(entity) {
+  return tagsOf(entity, "template")
+    .map((t) => ({ name: t.name, type: t.type }))
+    .filter((t) => t.name);
 }
 
 function tagsOf(entity, name) {

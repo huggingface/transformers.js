@@ -76,6 +76,7 @@ const scores = await classifier(audio, candidate_labels);
 ### `automatic-speech-recognition`
 
 **Default model:** `Xenova/whisper-tiny.en`
+
 **Aliases:** `asr`
 
 Automatic speech recognition pipeline for transcribing spoken text from audio.
@@ -160,6 +161,7 @@ const output = await transcriber(url, { chunk_length_s: 30, stride_length_s: 5 }
 ### `text-to-audio`
 
 **Default model:** `onnx-community/Supertonic-TTS-ONNX`
+
 **Aliases:** `text-to-speech`
 
 Text-to-audio generation pipeline using any `AutoModelForTextToWaveform` or `AutoModelForTextToSpectrogram`.
@@ -537,6 +539,7 @@ const features = await image_feature_extractor(image);
 ### `text-classification`
 
 **Default model:** `Xenova/distilbert-base-uncased-finetuned-sst-2-english`
+
 **Aliases:** `sentiment-analysis`
 
 Text classification pipeline using `AutoModelForSequenceClassification`.
@@ -584,6 +587,7 @@ const output = await classifier('I hate you!', { top_k: null });
 ### `token-classification`
 
 **Default model:** `Xenova/bert-base-multilingual-cased-ner-hrl`
+
 **Aliases:** `ner`
 
 Named entity recognition pipeline using `AutoModelForTokenClassification`.
@@ -879,6 +883,7 @@ const output = await classifier(text, labels, { multi_label: true });
 ### `feature-extraction`
 
 **Default model:** `onnx-community/all-MiniLM-L6-v2-ONNX`
+
 **Aliases:** `embeddings`
 
 Feature extraction pipeline using no model head. This pipeline extracts the hidden
