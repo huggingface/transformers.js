@@ -24,6 +24,21 @@ class in the [API reference](https://huggingface.co/docs/transformers.js/api/pip
 
 ## Progress tracking
 
+The `progress_total` event reports aggregate progress across every file the model needs,
+which is what a loading bar usually wants:
+
+```javascript
+const pipe = await pipeline("sentiment-analysis", null, {
+  progress_callback: (info) => {
+    if (info.status === "progress_total") {
+      console.log(`Loading model: ${info.progress.toFixed(1)}%`);
+    }
+  },
+});
+```
+
+For per-file detail, listen for `progress` events instead:
+
 ```javascript
 const pipe = await pipeline("sentiment-analysis", null, {
   progress_callback: (info) => {
