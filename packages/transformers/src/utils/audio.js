@@ -815,9 +815,18 @@ function encodeWAV(chunks, rate) {
     /* data chunk length */
     view.setUint32(40, totalLength * 4, true);
 
-    return new Blob([buffer, ...chunks.map((chunk) => /** @type {ArrayBuffer} */ (chunk.buffer))], {
-        type: 'audio/wav',
-    });
+    // SharedArrayBuffer cannot back a BlobPart, so only ArrayBuffer-backed chunks get a zero-copy view.
+    return new Blob(
+        [
+            buffer,
+            ...chunks.map((chunk) =>
+                chunk.buffer instanceof ArrayBuffer
+                    ? new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+                    : chunk.slice(),
+            ),
+        ],
+        { type: 'audio/wav' },
+    );
 }
 
 function writeString(view, offset, string) {
