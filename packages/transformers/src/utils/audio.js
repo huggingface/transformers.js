@@ -78,7 +78,9 @@ export async function load_audio(url, sampling_rate) {
  * @deprecated Use {@link load_audio} instead.
  * @internal
  */
-export const read_audio = load_audio;
+export async function read_audio(url, sampling_rate) {
+    return await load_audio(url, sampling_rate);
+}
 
 /**
  * Helper function to generate windows that are special cases of the generalized cosine window.
@@ -814,9 +816,18 @@ function encodeWAV(chunks, rate) {
     /* data chunk length */
     view.setUint32(40, totalLength * 4, true);
 
-    return new Blob([buffer, ...chunks.map((chunk) => /** @type {ArrayBuffer} */ (chunk.buffer))], {
-        type: 'audio/wav',
-    });
+    // SharedArrayBuffer cannot back a BlobPart, so only ArrayBuffer-backed chunks get a zero-copy view.
+    return new Blob(
+        [
+            buffer,
+            ...chunks.map((chunk) =>
+                chunk.buffer instanceof ArrayBuffer
+                    ? new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+                    : chunk.slice(),
+            ),
+        ],
+        { type: 'audio/wav' },
+    );
 }
 
 function writeString(view, offset, string) {

@@ -16,6 +16,7 @@ import {
     makePretrainedOptionsKey,
     ModelFileNotFoundError,
     readResponse,
+    toAbsoluteURL,
 } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
@@ -195,9 +196,21 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
  * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
  */
-export async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options = {}) {
+async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options = {}) {
     // Check again whether request is in cache. If not, we add the response to the cache
     if ((await cache.match(cacheKey)) !== undefined) {
+        return;
+    }
+
+    if (
+        typeof Cache !== 'undefined' &&
+        cache instanceof Cache &&
+        !isValidUrl(toAbsoluteURL(cacheKey, { allowUnresolved: true }), ['http:', 'https:'])
+    ) {
+        // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
+        // responses for other schemes (e.g., files bundled within a browser extension). Relative
+        // keys are resolved against the page URL first, since a relative key on an extension page
+        // still resolves to a chrome-extension:// request.
         return;
     }
 
@@ -249,7 +262,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
  * @throws Will throw an error if the file is not found and `fatal` is true.
  * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
-export async function loadResourceFile(
+async function loadResourceFile(
     path_or_repo_id,
     filename,
     fatal = true,

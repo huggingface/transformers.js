@@ -204,9 +204,13 @@ export function isBlobURL(url) {
  * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
  * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
  * @param {string} url - The URL to convert (can be relative or absolute).
+ * @param {Object} [options]
+ * @param {boolean} [options.allowUnresolved=false] - Return `url` unchanged instead of throwing when it
+ * cannot be resolved, which happens for a relative URL on a page whose base is opaque (e.g. "about:blank").
+ * Off by default, so a malformed URL still throws for callers that expect one.
  * @returns {string} The absolute URL.
  */
-export function toAbsoluteURL(url) {
+export function toAbsoluteURL(url, { allowUnresolved = false } = {}) {
     let baseURL;
 
     if (typeof location !== 'undefined' && location.href) {
@@ -220,5 +224,13 @@ export function toAbsoluteURL(url) {
         return url;
     }
 
-    return new URL(url, baseURL).href;
+    try {
+        return new URL(url, baseURL).href;
+    } catch (error) {
+        if (!allowUnresolved) {
+            throw error;
+        }
+        // Nothing resolves against an opaque base, so hand back the original for the caller to check
+        return url;
+    }
 }

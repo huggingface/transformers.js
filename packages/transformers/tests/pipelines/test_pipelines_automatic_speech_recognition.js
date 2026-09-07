@@ -458,5 +458,43 @@ export default () => {
         await pipe?.dispose();
       }, MAX_MODEL_DISPOSE_TIME);
     });
+
+    describe("moonshine", () => {
+      it("decodes generated tokens with the pipeline tokenizer", async () => {
+        const sampling_rate = 16000;
+        const generated_tokens = [[1n, 2n, 3n]];
+        let decode_args;
+
+        const processor = Object.assign(async (audio) => ({ input_values: audio }), {
+          feature_extractor: { config: { sampling_rate } },
+        });
+        const tokenizer = {
+          batch_decode(outputs, options) {
+            decode_args = { outputs, options };
+            return ["decoded transcript"];
+          },
+        };
+        const model = {
+          config: { model_type: "moonshine" },
+          async generate() {
+            return generated_tokens;
+          },
+        };
+        const pipe = new AutomaticSpeechRecognitionPipeline({
+          task: PIPELINE_ID,
+          model,
+          tokenizer,
+          processor,
+        });
+
+        const output = await pipe(new Float32Array(sampling_rate));
+
+        expect(output).toEqual({ text: "decoded transcript" });
+        expect(decode_args).toEqual({
+          outputs: generated_tokens,
+          options: { skip_special_tokens: true },
+        });
+      });
+    });
   });
 };

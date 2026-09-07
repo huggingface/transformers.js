@@ -127,6 +127,31 @@ describe("Audio utilities", () => {
       expect(blob.type).toBe("audio/wav");
       expect(blob.size).toBe(4044); // 44 header + 4000 data
     });
+
+    it("should convert to Blob (WAV) from a non-zero-offset subarray view", async () => {
+      // Regression test for https://github.com/huggingface/transformers.js/issues/1704:
+      // the WAV payload must reflect the view's byteOffset/byteLength,
+      // not the start of its backing buffer.
+      const sampling_rate = 16000;
+      const backing = new Float32Array([-1, -0.5, -0.25, 0.125, 0.25, 0.5, 1]);
+      const view = backing.subarray(3); // byteOffset = 12 bytes, 4 samples
+
+      const blob = new RawAudio(view, sampling_rate).toBlob();
+
+      // 44-byte WAV header + only the view's bytes (4 samples * 4 bytes)
+      expect(blob.size).toBe(44 + view.byteLength);
+
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const header = new DataView(bytes.buffer);
+
+      // "data" chunk length must match the view's size
+      expect(header.getUint32(40, true)).toBe(view.byteLength);
+
+      // Payload samples must come from the selected view, not the start of the backing buffer
+      const payload = new Float32Array(bytes.buffer, 44, view.length);
+      expect(Array.from(payload)).toEqual(Array.from(view));
+      expect(payload[0]).toBe(0.125); // backing[3]; would be -1 if the buffer start leaked in
+    });
   });
 
   describe("spectrogram", () => {

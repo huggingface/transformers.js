@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const DIST_FOLDER = "dist";
+const DIST_FOLDER = "dist";
 export const NODE_IGNORE_MODULES = ["onnxruntime-web"];
 export const NODE_EXTERNAL_MODULES = [
   "onnxruntime-common",
