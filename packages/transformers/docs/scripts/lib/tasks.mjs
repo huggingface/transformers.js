@@ -1,6 +1,5 @@
-// Extract the task catalog (`SUPPORTED_TASKS` + `TASK_ALIASES`) from the
-// library source. The skill renderer uses this to emit one task recipe per
-// supported pipeline task, with its canonical pipeline class and default model.
+// Extract `SUPPORTED_TASKS` + `TASK_ALIASES` from the library source. The skill renderer turns each
+// entry into a task recipe with its pipeline class and default model.
 
 import ts from "typescript";
 

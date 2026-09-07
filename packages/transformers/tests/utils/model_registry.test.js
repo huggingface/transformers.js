@@ -226,8 +226,7 @@ describe("get_available_dtypes", () => {
     });
 
     it("should rethrow network-level failures from dtype file probes", async () => {
-      // Config loads fine, but probing the ONNX files fails at the network level:
-      // the caller must see the error rather than an empty dtype list.
+      // A failed probe must surface, rather than produce an empty dtype list.
       mockGetFileMetadata.mockRejectedValue(new TypeError("fetch failed"));
 
       await expect(get_available_dtypes("test/model", { config: ENCODER_ONLY_CONFIG })).rejects.toThrow("fetch failed");

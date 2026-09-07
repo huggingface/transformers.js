@@ -1,10 +1,9 @@
 /**
  * @file Stopping criteria for controlling when generation halts.
  *
- * Each criterion returns an array of booleans — one per sequence in the batch —
- * signalling which sequences should stop emitting tokens. Combine multiple
- * criteria with `StoppingCriteriaList`, and pass that to `generate()` via
- * the `stopping_criteria` argument.
+ * Each criterion returns one boolean per sequence in the batch, indicating which sequences
+ * should stop. Combine criteria with `StoppingCriteriaList` and pass it to `generate()`
+ * as the `stopping_criteria` argument.
  *
  * @module generation/stopping_criteria
  */
@@ -33,7 +32,6 @@ export class StoppingCriteria extends Callable {
 }
 /**
  * A list of `StoppingCriteria` that stops generation when any one of them returns `true`.
- * Pass an instance via `stopping_criteria` to any generation call to combine multiple stop conditions.
  */
 export class StoppingCriteriaList extends Callable {
     /**
@@ -152,8 +150,7 @@ export class InterruptableStoppingCriteria extends StoppingCriteria {
     }
 
     /**
-     * Interrupts the generation process, causing every sequence in the batch to stop
-     * on the next call to this criterion.
+     * Interrupts generation, stopping every sequence on the next call.
      */
     interrupt() {
         this.interrupted = true;

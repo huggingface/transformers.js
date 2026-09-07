@@ -1,8 +1,6 @@
-// Bracket- and string-aware text scanners shared between IR-building and
-// markdown rendering. Type strings can contain nested generics, tuples,
-// function-type arrow lists, etc.; naive split/find on `,`/`|`/`&` would
-// shred them. These helpers know to skip separators that appear inside
-// `<>`, `()`, `{}`, `[]`, or quoted strings.
+// Bracket- and string-aware scanners shared by IR-building and rendering. A naive split/find on
+// `,`/`|`/`&` would shred nested generics, tuples and arrow lists, so these helpers skip separators
+// inside `<>`, `()`, `{}`, `[]` and quoted strings.
 
 const OPEN = "<({[";
 const CLOSE = ">)}]";
@@ -12,10 +10,8 @@ function isArrowTail(text, i) {
   return text[i] === ">" && text[i - 1] === "=";
 }
 
-// Return the index of the first occurrence of `needle` at top level (depth
-// zero), or -1 if it doesn't appear outside brackets/strings. `needle` may be
-// a single character or a longer substring (e.g. `" extends "`), and search
-// starts at `from`.
+// Index of the first top-level (depth-zero) `needle`, or -1. `needle` may be a longer substring
+// (e.g. `" extends "`); the search starts at `from`.
 export function findTopLevel(text, needle, from = 0) {
   let depth = 0;
   let inStr = null;
@@ -36,11 +32,9 @@ export function findTopLevel(text, needle, from = 0) {
   return -1;
 }
 
-// Split a top-level conditional type `Check extends Extends ? A : B` into its
-// two branches, or return null when `text` isn't one. The `?`/`:` pair is
-// matched like a ternary so a conditional nested in the true branch
-// (`X extends Y ? (A extends B ? C : D) : E`, or the same without parens)
-// doesn't steal the outer `:`.
+// Split `Check extends Extends ? A : B` into its branches, or null when `text` isn't one. The
+// `?`/`:` pair is matched like a ternary so a conditional nested in the true branch
+// (`X extends Y ? A extends B ? C : D : E`) can't steal the outer `:`.
 export function splitConditional(text) {
   const EXTENDS = " extends ";
   const ext = findTopLevel(text, EXTENDS);
@@ -94,9 +88,8 @@ export function matchingBracket(text, start, open, close) {
   return -1;
 }
 
-// Split `text` on `sep`, ignoring separators inside brackets/strings.
-// Returns `[text]` (the unsplit input) when no split occurred — callers
-// can use that to detect "this was a single chunk all along".
+// Split `text` on `sep`, ignoring separators inside brackets/strings. Returns `[text]` when no
+// split occurred, so callers can detect a single chunk.
 export function splitTopLevel(text, sep) {
   const out = [];
   let depth = 0;

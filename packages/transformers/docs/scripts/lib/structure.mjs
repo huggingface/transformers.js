@@ -1,6 +1,5 @@
-// Walk a JS file with the TypeScript compiler and produce the structured
-// entities (module header, classes with members, free functions, top-level
-// constants, typedefs) that the IR layer groups into per-module docs.
+// Walk a JS file with the TypeScript compiler and produce the entities (module header, classes,
+// functions, constants, typedefs) that the IR layer groups into per-module docs.
 
 import ts from "typescript";
 import { parseJsDoc } from "./parse.mjs";
@@ -11,9 +10,8 @@ export function extractEntities(source, file) {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
   const entities = { module: null, classes: [], functions: [], variables: [], typedefs: [] };
 
-  // File-level blocks (`@module` / `@file` / standalone `@typedef` / `@callback`)
-  // can't be discovered via node-attached JSDoc — TS attaches them to the next
-  // statement. Scan the raw source and classify by tag.
+  // TS attaches file-level blocks (`@module`, `@file`, standalone `@typedef`/`@callback`) to the
+  // next statement, so they can't be found via node-attached JSDoc. Scan the source and classify.
   for (const m of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
     if (isInsideLineComment(source, m.index)) continue;
     const parsed = parseJsDoc(m[0]);
@@ -81,8 +79,7 @@ function buildMemberEntity(node, sf) {
   return null;
 }
 
-// `ts.getJSDocCommentsAndTags` may return multiple blocks; the nearest/latest
-// one is the canonical JSDoc for the node.
+// `ts.getJSDocCommentsAndTags` may return several blocks; the last one is the node's canonical JSDoc.
 function parseNodeDoc(node) {
   const docs = ts.getJSDocCommentsAndTags(node).filter((d) => ts.isJSDoc(d));
   if (!docs.length) return null;

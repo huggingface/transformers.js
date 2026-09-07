@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-// Validate the generated docs without regenerating them. Useful in CI as a
-// fast check that the locally generated `docs/source/api/` markdown (which is
-// gitignored) is consistent with `docs/source/_toctree.yml` and that internal
-// links resolve.
+// Validate the generated docs without regenerating them: a CI check that the gitignored
+// `docs/source/api/` markdown matches `docs/source/_toctree.yml` and that internal links resolve.
 
 import { listFiles } from "./lib/fs.mjs";
 import { apiOutputDir } from "./lib/paths.mjs";

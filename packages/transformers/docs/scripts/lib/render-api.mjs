@@ -10,14 +10,11 @@ import { matchingBracket, splitConditional, splitTopLevel } from "./scan.mjs";
 import { DOC_REFERENCE, exampleLines, firstSentence, paramSignature, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
 import { parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
-// Pages with at least this many top-level items get an "On this page" TOC so
-// the reader doesn't have to scroll an entire page to find a class.
+// Pages with at least this many top-level items get an "On this page" TOC.
 const TOC_THRESHOLD = 6;
 
-// True when the module contributes any reader-visible content to its API page —
-// at least one public class/function/constant, or a renderable typedef/callback.
-// Used by `generateApiDocs` to skip writing pure-internal modules without
-// having to inspect the rendered markdown.
+// True when the module has reader-visible content: a public class/function/constant, or a renderable
+// typedef/callback. Lets `generateApiDocs` skip internal-only modules without rendering them.
 export function hasRenderableContent(mod, publicNames = null) {
   if (filterPublic(mod.classes, publicNames).length) return true;
   if (filterPublic(mod.functions, publicNames).length) return true;
@@ -26,9 +23,8 @@ export function hasRenderableContent(mod, publicNames = null) {
   return mod.typedefs.some((td) => !isInternalTypedef(td));
 }
 
-// Rendered-name and callable-link indexes depend only on `(ir, publicNames)`,
-// so callers rendering many pages build them once and pass them to
-// `renderModule` via `opts.linkIndexes`.
+// The indexes depend only on `(ir, publicNames)`: build once and pass to `renderModule` via
+// `opts.linkIndexes` when rendering many pages.
 export function buildLinkIndexes(ir, publicNames = null) {
   return {
     renderedNames: buildRenderedNameIndex(ir, publicNames),
@@ -43,8 +39,8 @@ export function renderModule(mod, ir, opts) {
     typedefIndex: ir.typedefIndex,
     moduleByName: new Map(ir.modules.map((m) => [m.name, m])),
     moduleName: mod.name,
-    // Unfiltered: `renderTypedef` needs the module's `_`-prefixed classes,
-    // which are deliberately absent from the public export surface.
+    // Unfiltered: `renderTypedef` needs the module's `_`-prefixed classes, which the public
+    // export surface omits.
     moduleClasses: mod.classes,
     renderedNames,
     callableLinks,
@@ -82,16 +78,13 @@ export function renderModule(mod, ir, opts) {
     for (const cb of mod.callbacks) out.push(...renderFunction(cb, ctx, 3, null, { nameOnlyHeading: true }));
   }
 
-  // Link expansion and blank-run collapsing must not touch example code, so
-  // they run with fenced blocks masked; trailing-whitespace cleanup is safe
-  // (and applied) everywhere.
+  // Link expansion and blank-run collapsing must not touch example code, so fenced blocks are
+  // masked; trailing-whitespace cleanup is safe everywhere.
   return transformOutsideFences(out.join("\n").replace(/[ \t]+$/gm, ""), (text) => expandInlineLinks(text, ctx).replace(/\n{3,}/g, "\n\n")).trimEnd() + "\n";
 }
 
-// Render a one-line "On this page" TOC, but only when the page is large
-// enough to make scrolling expensive. We list classes, functions, and
-// constants — typedefs and callbacks are usually a much longer tail and
-// would dominate the TOC; readers can find them via the section heading.
+// Typedefs and callbacks are a long tail that would dominate the TOC, so only classes, functions
+// and constants are listed; readers reach the rest via the section heading.
 function renderTOC({ classes, functions, constants }, ctx) {
   const total = classes.length + functions.length + constants.length;
   if (total < TOC_THRESHOLD) return [];
@@ -150,12 +143,8 @@ function dedupeByName(items) {
   return items.filter((it) => (seen.has(it.name) ? false : seen.add(it.name)));
 }
 
-// reST-style ``[`TypeName`]`` cross-references carried over from the Python
-// library are left in place here — `expandInlineLinks` turns them into real
-// links (or plain code spans) once the page-level symbol index is available.
-// Normalize `@see Symbol` / `@see {@link Symbol}` to inline markup so it reads
-// as prose rather than raw JSDoc tags — `{@link ...}` is expanded later by
-// `expandInlineLinks` too.
+// reST-style ``[`TypeName`]`` references are left alone; `expandInlineLinks` resolves them once the
+// page-level symbol index exists. `@see Symbol` becomes inline markup so it reads as prose.
 function cleanDescription(text) {
   return text
     .trim()
@@ -163,9 +152,8 @@ function cleanDescription(text) {
     .replace(/@see\s+`?([A-Za-z_$][\w$.]*)`?/g, "`$1`");
 }
 
-// Line-leading `@see` tags parse into an entity's `see` list; surface them so
-// the reference survives into the rendered page. `{@link ...}` entries are
-// expanded to markdown links by the page-level `expandInlineLinks` pass.
+// Line-leading `@see` tags land in `entity.see`; any `{@link ...}` inside them is expanded later by
+// `expandInlineLinks`.
 function seeAlso(entity) {
   return entity.see?.length ? [`**See also:** ${entity.see.join(", ")}`, ""] : [];
 }
@@ -208,8 +196,8 @@ function renderClass(cls, ctx) {
 
 function renderField(f, ctx, parent) {
   if (f.name.startsWith("_")) return [];
-  // Skip undocumented, untyped field entries — pure placeholders with no
-  // reader value. Deprecation flags keep a field visible as a warning.
+  // Undocumented, untyped placeholders carry nothing; a deprecation flag still keeps a field
+  // visible as a warning.
   if (!f.type && !f.description && !f.deprecated && f.defaultValue == null) return [];
 
   const type = f.type ? ` : ${renderType(f.type, ctx)}` : "";
@@ -223,24 +211,20 @@ function renderField(f, ctx, parent) {
   return lines;
 }
 
-// `_`-prefixed methods are the library's convention for internal / subclass-only
-// hooks — they're not part of the user-facing API. Exception: `constructor` is
-// kept even though it has no leading underscore.
+// `_`-prefixed methods are internal / subclass-only hooks by convention, so they stay out of the
+// user-facing API.
 export function shouldRenderMethod(m) {
   if (m.name.startsWith("_")) return false;
   return m.description || m.params?.length || m.returns?.description || m.returns?.type || m.examples?.length || m.throws?.length;
 }
 
-// Also renders callback typedefs (`opts.nameOnlyHeading`) — they're types
-// rather than invocable functions, so the heading is the bare name instead of
-// a `name(params)` signature.
+// `opts.nameOnlyHeading` renders callback typedefs: they are types rather than invocable
+// functions, so the heading is the bare name and not a `name(params)` signature.
 function renderFunction(fn, ctx, depth, parent = null, opts = {}) {
   const anchor = parent ? apiMemberAnchor(ctx.moduleName, parent, fn.anchorName ?? fn.name) : apiSymbolAnchor(ctx.moduleName, fn.anchorName ?? fn.name);
   const heading = opts.nameOnlyHeading ? fn.name : signature(fn, parent);
   const lines = [`<a id="${anchor}"></a>`, "", `${"#".repeat(depth)} ${heading}`, ""];
-  // Resolve generic type parameters (`@template {Constraint} T`) inside this
-  // function's parameter/return types. Without the constraint map, a `T`
-  // would render as `any`.
+  // Without the constraint map, a `T` in the parameter/return types would render as `any`.
   const fnCtx = withTemplates(ctx, fn);
 
   if (fn.deprecated) lines.push("> **Deprecated**", "");
@@ -296,9 +280,8 @@ function renderParamNode(p, ctx, indent) {
   const type = p.type ? ` (${renderType(p.type, ctx)})` : "";
   const opt = p.optional ? " _optional_" : "";
   const def = p.defaultValue != null ? ` — defaults to \`${p.defaultValue}\`` : "";
-  // Fall back to the referenced typedef's first-sentence description when the
-  // author didn't write one inline. Without this, parameters typed as a named
-  // typedef render as a bare `- name (Type) optional` with no prose hint.
+  // Parameters typed as a named typedef and given no inline description borrow that typedef's
+  // first sentence, rather than rendering as a bare `- name (Type) optional`.
   const fallback = p.description ? null : typedefSummary(p.type, ctx);
   const descText = p.description?.trim() || fallback;
   const desc = descText ? ` — ${indentContinuations(descText, contPad)}` : "";
@@ -306,9 +289,8 @@ function renderParamNode(p, ctx, indent) {
   return [line, ...p.children.flatMap((c) => renderParamNode(c, ctx, indent + 1))];
 }
 
-// Look up the named typedef for a parameter's type and return the first
-// sentence of its description, if any. Skips obvious wrappers (unions,
-// arrays, generics) to avoid misleading borrows.
+// First sentence of the named typedef's description. Skips wrappers (unions, arrays, generics) to
+// avoid misleading borrows.
 function typedefSummary(rawType, ctx) {
   if (!rawType || !ctx.typedefIndex) return null;
   const pretty = prettifyTypeString(rawType);
@@ -321,8 +303,7 @@ function typedefSummary(rawType, ctx) {
   return firstSentence(def.description);
 }
 
-// Indent every line after the first so multi-line descriptions (including
-// bulleted continuations) render inside their parent list item.
+// Indent continuation lines so multi-line descriptions render inside their parent list item.
 function indentContinuations(text, pad) {
   const lines = text.split("\n");
   if (lines.length === 1) return text;
@@ -352,9 +333,8 @@ function renderConstant(c, ctx) {
   return lines;
 }
 
-// Skip typedefs that exist purely to thread generic parameters through the
-// type system (`@typedef {T} Name`, `_`-prefixed names) or that are opaque
-// placeholders with no useful content to show a reader.
+// Skip typedefs that only thread generic parameters through the type system (`@typedef {T} Name`,
+// `_`-prefixed names) or that are opaque placeholders with nothing to show.
 function isInternalTypedef(td) {
   if (td.name.startsWith("_")) return true;
   const type = (td.type ?? "").trim();
@@ -365,14 +345,13 @@ function isInternalTypedef(td) {
   return false;
 }
 
-// Generic type parameter names (T, K, V, TItem, TReturnTensor, ...) — show as
-// `any` in rendered types so the reader doesn't chase an undefined symbol.
+// Generic type parameter names (T, K, V, TItem, ...). Rendered as `any` so the reader doesn't
+// chase an undefined symbol.
 function isGenericParamName(name) {
   return /^T[A-Z][A-Za-z]*$/.test(name) || /^[TKV]$/.test(name);
 }
 
-// Resolve `@template {Constraint} T` names inside an entity's types. Without
-// the constraint map, a `T` renders as `any`.
+// Constraint map for `@template {Constraint} T`; an unconstrained `T` renders as `any`.
 function withTemplates(ctx, entity) {
   const templateMap = new Map();
   for (const t of entity?.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
@@ -397,11 +376,9 @@ function renderTypedef(td, ctx) {
   return lines;
 }
 
-// `@typedef {Record<string, Tensor> & _DynamicCache} DynamicCache` is the
-// library's way of saying "a plain object that also has these methods": the
-// members live on a `_`-prefixed class that is never documented on its own,
-// and only the typedef name is exported. Find that class so its members can be
-// rendered under the typedef.
+// `@typedef {Record<string, Tensor> & _DynamicCache} DynamicCache` means "a plain object that also
+// has these methods": the members live on a `_`-prefixed class that is never documented on its own.
+// Find that class so its members render under the typedef.
 function backingClass(td, ctx) {
   if (!td.type || !ctx.moduleClasses?.length) return null;
   const parts = splitTopLevel(prettifyTypeString(td.type), "&").map((p) => p.trim());
@@ -414,10 +391,8 @@ function backingClass(td, ctx) {
   return null;
 }
 
-// Render the backing class's constructor and public methods under the typedef,
-// anchored to the typedef's name (`module_x.DynamicCache.update`) so links
-// point at the name readers actually use. The `_Type:_` line above already
-// shows the remaining, non-private half of the intersection.
+// Anchored to the typedef's name (`module_x.DynamicCache.update`) so links point at the name
+// readers use. The `_Type:_` line above already shows the non-private half of the intersection.
 function renderBackingClassMembers(td, ctx) {
   const cls = backingClass(td, ctx);
   if (!cls) return [];
@@ -434,18 +409,15 @@ function typedefRenderInfo(td, ctx) {
   const displayed = td.type ? renderType(td.type, { ...withTemplates(ctx, td), selfName: td.name }) : "";
   const isSelfReference = displayed === `\`${td.name}\``;
   const isGenericPassthrough = /^`[A-Z][A-Za-z]?`$/.test(displayed);
-  // Collapsed fallbacks (`object`, `unknown`, `any`) carry no real information
-  // — showing `_Type:_ `object`` adds noise without helping the reader.
+  // Collapsed fallbacks carry no information: `_Type:_ `object`` is noise.
   const isOpaque = ["`object`", "`Object`", "`unknown`", "`any`"].includes(displayed);
-  // Unions and intersections are worth showing even when long — every variant
-  // is a named type the reader can click through to. An inline object literal
-  // has no clickable parts, so it earns its place only while it still fits on
-  // a line. Typedefs with a **Properties** list show that instead.
+  // Unions and intersections are shown even when long: every variant is a clickable named type. An
+  // object literal has no clickable parts, so it must still fit on a line. Typedefs with a
+  // **Properties** list show that instead.
   const isUnionOrIntersection = / \| | & /.test(displayed);
   const isObjectLiteral = displayed.startsWith("`{");
   const fitsInline = displayed.length < 120;
-  // `_`-prefixed names are internal by convention and never get a page of
-  // their own, so a type built out of one points the reader nowhere.
+  // `_`-prefixed names never get a page of their own, so a type built from one points nowhere.
   const referencesInternal = /`_[A-Za-z]/.test(displayed);
   const typeIsShowable =
     displayed &&
@@ -467,8 +439,8 @@ const SIMPLE_NAME = new RegExp(`^[A-Za-z_$][\\w$.]*$`);
 const INDEXED_NAME = /^([A-Za-z_$][\w$.]*)\[[^\]]+\]$/;
 const TUPLE = /^\[(.*)\]$/;
 
-// Turn a raw JSDoc type string into readable markdown. Prefers author-written
-// names over expanded TS structures; unknown gnarly types become `object`.
+// Turn a raw JSDoc type string into readable markdown. Prefers author-written names over expanded
+// TS structures; gnarly types become `object`.
 function renderType(raw, ctx, opts = {}) {
   const pretty = prettifyTypeString(raw, ctx?.selfName);
   if (opts.noLink) return `\`${pretty}\``;
@@ -476,20 +448,19 @@ function renderType(raw, ctx, opts = {}) {
   const utility = parseUtilityType(pretty);
   if (utility) return renderUtilityType(utility, ctx);
 
-  // Unions split first. `_`-prefixed variants (internal types from intersections)
-  // are filtered out so they don't leak into the public docs.
+  // Unions split first. `_`-prefixed variants (internal types from intersections) are dropped so
+  // they don't leak into the public docs.
   const unionParts = splitTopLevel(pretty, "|")
     .map((p) => p.trim())
     .filter((p) => !/^_[A-Za-z]/.test(p));
   if (unionParts.length > 1) {
-    // Every variant is rendered (and linked) on its own. `T | T[]` deliberately
-    // stays as two parts — a collapsed `T[]?` reads as "optional array", which
-    // is not what the union means.
+    // `T | T[]` stays two parts: a collapsed `T[]?` reads as "optional array", which the union
+    // does not mean.
     return unionParts.map((p) => renderType(p, ctx)).join(" | ");
   }
   if (unionParts.length === 1 && unionParts[0] !== pretty.trim()) return renderType(unionParts[0], ctx);
 
-  // Same for intersections (`A & B`): drop internal variants before joining.
+  // Same for intersections (`A & B`).
   const intersectParts = splitTopLevel(pretty, "&")
     .map((p) => p.trim())
     .filter((p) => !/^_[A-Za-z]/.test(p));
@@ -547,9 +518,8 @@ function renderArrayType(innerRaw, ctx) {
   return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
 }
 
-// A tuple is one code span with plain member names — ``[`number`, `number`]``
-// is indistinguishable from a broken markdown link, and a link nested inside a
-// bracketed list reads worse than the plain name it replaces.
+// One code span with plain member names: ``[`number`, `number`]`` is indistinguishable from a
+// broken markdown link.
 function renderTupleType(innerRaw, ctx) {
   const parts = splitTopLevel(innerRaw, ",");
   if (parts.length === 1 && !parts[0].trim()) return "`[]`";
@@ -557,8 +527,7 @@ function renderTupleType(innerRaw, ctx) {
   return `\`[${rendered.join(", ")}]\``;
 }
 
-// Reduce rendered markdown (links, code spans) back to the bare type text, so
-// it can be placed inside an enclosing code span.
+// Reduce rendered markdown back to bare type text so it can sit inside an enclosing code span.
 function stripMarkup(rendered) {
   return rendered.replace(/\[`([^`]+)`\]\([^)]*\)/g, "$1").replace(/`/g, "");
 }
@@ -612,13 +581,9 @@ function renderCallableReference(raw, ctx) {
   return linkCallable(ref.owner, ref.owner, ctx) ?? linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
 }
 
-// A conditional type (`Check extends X ? A : B`) resolves to one branch or the
-// other, so the union of its branches is an honest — and readable — stand-in.
-// Rewrite recursively: a branch may itself be a conditional, and a conditional
-// may sit inside a wrapper's generic arguments (`Promise<T extends X ? A[] : A>`
-// -> `Promise<A[] | A>`). Branches keep source order (true branch first) and
-// identical parts are deduped. Callers must skip strings containing `infer` or
-// a mapped type — those stay gnarly.
+// Rewrite `Check extends X ? A : B` to `A | B`, recursively and inside generic args
+// (`Promise<T extends X ? A[] : A>` -> `Promise<A[] | A>`). Source branch order is kept; duplicates
+// are removed. Callers skip `infer` and mapped types.
 function rewriteConditionals(raw) {
   const s = unwrapParens(raw.trim());
   if (!s.includes("extends")) return s;
@@ -663,8 +628,7 @@ function rewriteConditionals(raw) {
   return s;
 }
 
-// Drop parentheses that wrap an entire type — source authors add them to group
-// nested conditionals, and keeping them would leave `(A | B) | C` in the output.
+// Drop parentheses wrapping an entire type; keeping them would leave `(A | B) | C` in the output.
 function unwrapParens(s) {
   let out = s;
   while (out.startsWith("(") && matchingBracket(out, 0, "(", ")") === out.length - 1) {
@@ -673,24 +637,16 @@ function unwrapParens(s) {
   return out;
 }
 
-// Mapped types (`{[K in Keys]: V}`) and `infer` have no readable expansion —
-// they stay gnarly rather than being rewritten.
+// Mapped types (`{[K in Keys]: V}`) have no readable expansion, so they stay gnarly.
 const MAPPED_TYPE = /\[\s*\w+\s+in\s/;
 
-// Indexed access anywhere in the type (`Acc['length']`, `DIM[0]`): the
-// condition depends on a value the union of branches can't express.
+// Indexed access (`Acc['length']`, `DIM[0]`): the condition depends on a value the union of
+// branches can't express.
 const INDEXED_ACCESS = /\[['"0-9]/;
 
-// Dropping the condition is only honest when the branches stand on their own.
-// A depth-recursive type (`Acc['length'] extends Depth ? T : NestArray<T[],
-// Depth, [...Acc, never]>`) encodes its termination in the condition itself:
-// unioning the branches yields a type that is both wrong and unreadable. Bail
-// on the constructs that mark such a type — a spread accumulator, an indexed
-// access, or a reference to the typedef being defined — and leave it gnarly, so
-// the caller collapses it exactly as it did before this rewrite existed.
-// (A whole-branch `never` is fine: `rewriteConditionals` drops it, which is
-// what a `never` fallback means. See the post-rewrite guard below for a `never`
-// that survives.)
+// Bail on conditionals whose condition carries meaning the branches lack: a spread accumulator, an
+// indexed access, or a self-reference (e.g. depth-recursive `NestArray`). A whole-branch `never` is
+// fine; `rewriteConditionals` drops it.
 function isRewritableConditional(s, selfName) {
   if (/\binfer\b/.test(s) || MAPPED_TYPE.test(s)) return false;
   if (s.includes("...") || INDEXED_ACCESS.test(s)) return false;
@@ -698,25 +654,22 @@ function isRewritableConditional(s, selfName) {
   return true;
 }
 
-// A `never` that is still in the rewritten string was never a branch of its
-// own — it sits inside a type argument, where the union of branches can't
-// explain it. Keep the original so it collapses instead.
+// A `never` left in the rewritten string was never a branch of its own: it sits inside a type
+// argument, where the branch union can't explain it. Keep the original so it collapses.
 function rewriteConditionalsSafely(s, selfName) {
   if (!isRewritableConditional(s, selfName)) return s;
   const rewritten = rewriteConditionals(s);
   return /\bnever\b/.test(rewritten) ? s : rewritten;
 }
 
-// Strip noisy TS constructs from a type string without rewriting structure.
-// Conditional/mapped/infer types collapse to their outermost wrapper; simple
-// unions of names or long generic lists are preserved so the renderer can
-// split them into individual links.
+// Strip noisy TS constructs without rewriting structure. Conditional/mapped/infer types collapse to
+// their outermost wrapper; unions of names and long generic lists survive so the renderer can link
+// each part.
 function prettifyTypeString(raw, selfName) {
   if (!raw) return "";
   let s = raw.trim();
 
-  // Types written across several JSDoc lines arrive with embedded newlines;
-  // the scanners below all reason about single-line text.
+  // Multi-line JSDoc types arrive with newlines; the scanners below assume single-line text.
   s = s.replace(/\s+/g, " ").trim();
   s = stripLeading(s, "<", ">"); // <T extends X>(...)
   s = stripImportPrefixes(s);
@@ -732,21 +685,16 @@ function prettifyTypeString(raw, selfName) {
 
   if (isGnarly(s)) {
     const outer = s.match(/^([A-Za-z_$][\w$.]*)(?:<|\s|$)/);
-    // Built-in TS utility types are meaningless shorn of their arguments — the
-    // reader is better served by `unknown` than by a naked `Parameters`.
+    // A built-in utility type is meaningless shorn of its arguments (a naked `Parameters`).
     if (outer && TS_UTILITY_NAMES.has(outer[1])) return "unknown";
-    // Generic wrappers like `Promise<...gnarly...>` need to keep the wrapper —
-    // a bare `Promise` is misleading. Replace the inner with `unknown` so the
-    // reader sees `Promise<unknown>` instead.
+    // Keep the wrapper: a bare `Promise` is misleading, so emit `Promise<unknown>`.
     if (outer && /^[A-Za-z_$][\w$.]*</.test(s)) return `${outer[1]}<unknown>`;
     return outer ? outer[1] : "object";
   }
   return s.replace(/\s+/g, " ").trim();
 }
 
-// `{a: X}` -> `{ a: X }`. Inline object literals are rendered verbatim, and
-// they read much better with breathing room inside the braces. Empty `{}` and
-// braces that already have a space are left alone.
+// `{a: X}` -> `{ a: X }`. Empty `{}` and already-spaced braces are left alone.
 function spaceObjectLiterals(s) {
   return s.replace(/\{(?![\s}])/g, "{ ").replace(/(?<![\s{])\}/g, " }");
 }
@@ -756,22 +704,18 @@ function stripLeading(s, open, close) {
   return end === -1 ? s : s.slice(end + 1).trim();
 }
 
-// Beyond this, a type string stops being something a reader can take in at a
-// glance in a table cell or bullet — it collapses to its outermost wrapper.
+// Beyond this a type stops being scannable in a bullet or table cell, and collapses to its
+// outermost wrapper.
 const MAX_INLINE_TYPE_LENGTH = 160;
 
-// What survives `rewriteConditionals` is renderable verbatim — including
-// callable types (`(a: X) => Y`) and inline object literals (`{a: X, b?: Y}`),
-// whose `?` markers are perfectly readable. Genuinely unreadable shapes are
-// mapped types (`{[K in ...]: V}`), `infer`, an `extends` we couldn't rewrite,
-// indexed accesses into typeof expressions (`Parameters<X['foo']>[0]`), and
-// anything too long to scan.
+// Unreadable inline: mapped types, `infer`, an `extends` that could not be rewritten, indexed
+// access into typeof, or anything over MAX_INLINE_TYPE_LENGTH. Callables and object literals are
+// fine.
 function isGnarly(s) {
   if (/\b(?:infer|extends)\b/.test(s)) return true;
   if (MAPPED_TYPE.test(s)) return true;
-  // Any bracketed indexing like `X['foo']` or `X[0]` inside the type string —
-  // including inside `Parameters<...>` / `ReturnType<...>` — makes it too
-  // noisy to render verbatim.
+  // Any bracketed indexing (`X['foo']`, `X[0]`), including inside `Parameters<...>`, is too noisy
+  // to render verbatim.
   if (/\[['"0-9]/.test(s)) return true;
   return s.length > MAX_INLINE_TYPE_LENGTH;
 }

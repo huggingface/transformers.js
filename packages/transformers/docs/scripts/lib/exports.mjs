@@ -66,8 +66,8 @@ function visitTopLevel(node, sf, dir, visited, names) {
   }
 }
 
-// Look up the named exports in `file` and, for each one whose initializer is
-// `Object.freeze({ ... })`, pull its shorthand-property names into `names`.
+// For each named export in `file` whose initializer is `Object.freeze({ ... })`, pull its
+// shorthand-property names into `names`.
 function addNamespaceMembersFromFile(file, wanted, names) {
   if (!fs.existsSync(file)) return;
   const sf = parseJsFile(file);
@@ -82,9 +82,8 @@ function addNamespaceMembersFromFile(file, wanted, names) {
   });
 }
 
-// If the initializer is `Object.freeze({ ... })`, also treat each shorthand
-// property name inside the object literal as publicly reachable via the
-// exported namespace (e.g. `random.Random`).
+// Shorthand properties of an `Object.freeze({ ... })` initializer are reachable through the
+// exported namespace (e.g. `random.Random`), so they count as public.
 function addFrozenNamespaceMembers(init, names) {
   const literal = unwrapObjectFreeze(init);
   if (!literal) return;

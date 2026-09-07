@@ -80,15 +80,11 @@ export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
 }
 
 /**
- * Error thrown when a model file cannot be found — because the repository does not
- * exist, is gated/private without a valid token, the file is missing from the
- * repository, or the file is unavailable locally with downloads disabled.
+ * Error thrown when a model file is missing or inaccessible: the repository does not exist,
+ * it is gated or private, the file is absent, or downloads are disabled and it is not cached.
  *
- * Note that the Hugging Face Hub responds with 401 for non-existent repositories,
- * so "model does not exist" and "model requires authentication" are indistinguishable.
- *
- * Transient failures (network errors, server errors) are NOT represented by this
- * class; they surface as regular `Error`s (or `TypeError`s from `fetch`).
+ * The Hub returns 401 for nonexistent repositories, so a missing repository and one requiring
+ * authentication are indistinguishable. Network and server failures throw a regular `Error`.
  */
 export class ModelFileNotFoundError extends Error {
     /**
@@ -104,8 +100,7 @@ export class ModelFileNotFoundError extends Error {
 }
 
 /**
- * HTTP statuses indicating the requested file does not exist or is not accessible,
- * as opposed to transient request/server failures.
+ * HTTP statuses indicating the file is missing or inaccessible, rather than a transient failure.
  */
 const NOT_FOUND_STATUSES = new Set([401, 403, 404]);
 
@@ -115,8 +110,7 @@ const NOT_FOUND_STATUSES = new Set([401, 403, 404]);
  * @param {string} remoteURL The URL of the file that could not be loaded.
  * @param {boolean} fatal Whether to raise an error if the file could not be loaded.
  * @returns {null} Returns `null` if `fatal = false`.
- * @throws {ModelFileNotFoundError|Error} If `fatal = true`: a `ModelFileNotFoundError` when the
- * file is missing or inaccessible (401/403/404), otherwise a regular `Error`.
+ * @throws {ModelFileNotFoundError|Error} If `fatal = true`. A `ModelFileNotFoundError` for 401/403/404, otherwise a regular `Error`.
  */
 export function handleError(status, remoteURL, fatal) {
     if (!fatal) {

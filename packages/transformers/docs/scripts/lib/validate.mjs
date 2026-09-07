@@ -14,10 +14,8 @@ export function validateGeneratedDocs({ project = null } = {}) {
   const unlisted = difference(generatedApiPages, linkedApiPages);
   const stale = difference(linkedApiPages, generatedApiPages);
 
-  // Source-quality warnings are advisory: they surface gaps in the JSDoc
-  // (undocumented exports, malformed `@param` lines) that the renderer can't
-  // fix on its own. They don't fail validation — broken links and a stale
-  // toctree do.
+  // Source-quality warnings are advisory: they surface JSDoc gaps the renderer can't fix. Only
+  // broken links and a stale toctree fail validation.
   const docWarnings = [...(project ? collectDocWarnings(project) : []), ...collectAnchorWarnings(sourceDir)];
 
   return {
@@ -61,9 +59,8 @@ export function formatValidationResult(result) {
   return lines.join("\n");
 }
 
-// Walk the IR and report public exports whose JSDoc is empty (no description,
-// no params, no example) and parameters that are missing a name. These don't
-// fail the build but are worth surfacing during a normal docs-generate run.
+// Public exports with empty JSDoc (no description, params or example) and parameters missing a
+// name. Advisory only.
 function collectDocWarnings({ ir, publicNames }) {
   const warnings = [];
   const isPublic = (name) => !publicNames || publicNames.has(name);
@@ -163,9 +160,8 @@ function validateInternalLinks(sourceDir) {
 // Labels may contain one nested level of square brackets (`[`Foo[]?`](...)`).
 const MARKDOWN_LINK_RE = /!?\[(?:[^[\]]|\[[^\]]*\])*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 
-// Blank out fenced code blocks so the link and heading scanners can't match
-// code — `x[i](y)` in a snippet is not a markdown link, and a `# comment` is
-// not a heading. Line structure is preserved.
+// Blank out fenced code so the link and heading scanners can't match it: `x[i](y)` in a snippet is
+// not a markdown link, and a `# comment` is not a heading. Line structure is preserved.
 function maskFences(text) {
   return mapLines(text, (line, fenced) => (fenced ? "" : line));
 }
@@ -208,8 +204,7 @@ function readMarkdownWithIncludes(file, seen = new Set()) {
   });
 }
 
-// Headings made entirely of HTML/entities/punctuation slugify to "" and can
-// never be linked to. None exist today; this guards against regressions.
+// Headings made entirely of HTML/entities/punctuation slugify to "" and can never be linked to.
 function collectAnchorWarnings(sourceDir) {
   const warnings = [];
   for (const file of listFiles(sourceDir, ".md")) {

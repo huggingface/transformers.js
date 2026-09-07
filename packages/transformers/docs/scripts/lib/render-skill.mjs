@@ -1,11 +1,7 @@
 // Render the skill files in `.ai/skills/transformers-js/`. Two kinds of output:
-//
-//  1. Generated fragments injected into hand-written `SKILL.md` between
-//     `<!-- @generated:start id=X -->` and `<!-- @generated:end id=X -->`
-//     sentinels. Prose outside the markers is preserved across runs.
-//
-//  2. Fully generated files under `references/`. These carry a banner at the
-//     top and are rewritten in full on every run.
+//  1. Fragments injected into hand-written `SKILL.md` between `<!-- @generated:start id=X -->` and
+//     `<!-- @generated:end id=X -->` sentinels; prose outside the markers survives every run.
+//  2. Fully generated files under `references/`, banner-marked and rewritten in full each run.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -26,9 +22,8 @@ export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   fs.mkdirSync(refDir, { recursive: true });
   fs.writeFileSync(path.join(refDir, "TASKS.md"), absolutize(renderTasks(ctx)));
 
-  // Expand `<!-- @generated:start id=... -->` markers in every hand-written
-  // markdown file under the skill directory. Prose outside markers is preserved.
-  // Only the generated blocks get absolutized — hand-authored prose is left alone.
+  // Expand `<!-- @generated:start id=... -->` markers in every hand-written markdown file under
+  // the skill directory. Only generated blocks are absolutized; prose is left alone.
   for (const file of listFiles(skillDir, ".md")) {
     const original = fs.readFileSync(file, "utf8");
     if (!original.includes("@generated:start")) continue;
@@ -39,10 +34,8 @@ export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   return { errors: ctx.errors };
 }
 
-// Skill files live outside the docs site, so relative `./foo.md#bar` links —
-// inherited from JSDoc descriptions and from our typedef cross-reference
-// renderer — have to be rewritten to the public docs URL. `.md` becomes the
-// extensionless path the site uses.
+// Skill files live outside the docs site, so relative `./foo.md#bar` links have to be rewritten to
+// the public docs URL, where the path is extensionless.
 function absolutize(markdown) {
   return markdown.replace(/\]\(\.\/([^)\s]+?)\.md(#[^)\s]*)?\)/g, (_, page, anchor = "") => {
     return `](${DOCS_SITE}/${page}${anchor})`;
@@ -143,9 +136,8 @@ function renderTaskList({ tasks }) {
 function renderTaskRecipe(taskId, info, ctx) {
   const cls = findClass(ctx.ir, info.pipelineClass);
   const aliases = aliasesFor(taskId, ctx.tasks);
-  // Separate paragraphs: consecutive lines would collapse into one, running
-  // the aliases onto the end of the default-model line. Every other bold label
-  // in a task section (`**Example:**`) stands as its own paragraph too.
+  // Separate paragraphs: consecutive lines would collapse into one, running the aliases onto the
+  // end of the default-model line.
   const lines = [`**Default model:** \`${info.defaultModel}\``, ""];
   if (aliases.length) lines.push(`**Aliases:** ${aliases.map((a) => `\`${a}\``).join(", ")}`, "");
   if (cls?.description) lines.push(cls.description.trim(), "");
@@ -193,8 +185,7 @@ function propertiesTable(props) {
   return lines.join("\n");
 }
 
-// Split a type string on top-level `|`, returning just the referenced names.
-// Returns [] if the type doesn't look like a union of simple names.
+// Names of a top-level `|` union; [] when the type isn't a union of simple names.
 function splitUnion(type) {
   if (!type) return [];
   const parts = splitTopLevel(type, "|").map((p) => p.trim());
@@ -233,16 +224,13 @@ function renderClassSummary(name, ctx) {
   return lines.join("\n").trimEnd();
 }
 
-// Compact display form of a type string: import prefixes collapsed to bare
-// names, internal whitespace flattened.
+// Import prefixes collapsed to bare names, internal whitespace flattened.
 function compactType(raw) {
   return stripImportPrefixes(raw).replace(/\s+/g, " ").trim();
 }
 
-// Flatten a typedef into its effective properties. If the typedef's type is
-// an intersection like `A & B`, collect properties from each referenced
-// typedef in declaration order (de-duplicated by name). `visited` guards
-// against self-referential intersection typedefs.
+// Flatten a typedef into its effective properties. An intersection (`A & B`) collects from each
+// referenced typedef in declaration order, de-duplicated by name; `visited` guards self-reference.
 function collectProperties(name, ir, visited = new Set()) {
   if (visited.has(name)) return [];
   visited.add(name);
@@ -264,8 +252,7 @@ function collectProperties(name, ir, visited = new Set()) {
   return [...seen.values()];
 }
 
-// Use the IR's cross-reference index (which already prefers canonical
-// definitions over re-export aliases) to find the authoritative typedef.
+// The IR's cross-reference index already prefers canonical definitions over re-export aliases.
 function findTypedef(ir, name) {
   const modName = ir.typedefIndex.get(name);
   if (!modName) return null;
@@ -273,15 +260,13 @@ function findTypedef(ir, name) {
   return mod?.typedefs.find((t) => t.name === name) ?? null;
 }
 
-// Escape table-breaking pipes exactly once — pipes that are already escaped
-// are left alone, so this is safe to apply to text from any source.
+// Escape table-breaking pipes exactly once; already-escaped pipes are left alone.
 function escapeCellPipes(text) {
   return text.replace(/(?<!\\)\|/g, "\\|");
 }
 
-// Compact display: inside a markdown table cell we want inline code spans.
-// Collapse `import('./x.js').Foo` to `Foo`, long inline object types to
-// `object`, and strip newlines.
+// Table cells want inline code spans: `import('./x.js').Foo` becomes `Foo`, long inline object
+// types become `object`, newlines go.
 function renderTypedefType(raw) {
   let compact = compactType(raw);
   if (compact.length > 60 && (compact.startsWith("{") || /[({=]/.test(compact))) {
@@ -290,8 +275,8 @@ function renderTypedefType(raw) {
   return "`" + escapeCellPipes(compact.replace(/`/g, "\\`")) + "`";
 }
 
-// Cells can't contain newlines or un-escaped pipes. `{@link url}` gets turned
-// into a plain URL so agents can still see it.
+// Cells can't contain newlines or un-escaped pipes. `{@link url}` becomes a plain URL so agents
+// can still see it.
 function prepareCell(text) {
   return escapeCellPipes(text || "")
     .replace(/\{@link\s+([^}\s]+)(?:\s+[^}]+)?\}/g, "$1")
@@ -301,8 +286,7 @@ function prepareCell(text) {
     .trim();
 }
 
-// Per-task recipe page. Grouped by modality so readers can find the task they
-// want quickly, with a table of contents up front.
+// Per-task recipe page, grouped by modality with a table of contents up front.
 function renderTasks(ctx) {
   const lines = [
     GENERATED_BANNER,
@@ -333,9 +317,8 @@ function taskAnchor(id) {
   return id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-// Keyword-based grouping keeps the TOC stable without hard-coding per-task
-// metadata. A task falls into the first modality whose keyword matches its id.
-// Order matters: `text-to-audio` must hit "Audio" before "Text".
+// A task falls into the first modality whose keyword matches its id, so order matters:
+// `text-to-audio` must hit "Audio" before "Text".
 const MODALITY_RULES = [
   ["Audio", /audio|speech|asr|tts/],
   ["Vision", /image|vision|depth|object|segment|background|document/],

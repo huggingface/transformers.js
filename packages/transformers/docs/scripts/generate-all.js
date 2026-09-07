@@ -11,8 +11,7 @@ import { formatValidationResult, validateGeneratedDocs } from "./lib/validate.mj
 
 const project = loadProject(packageRoot);
 
-// Run every phase even if an earlier one fails, so a single run surfaces all
-// problems; collect errors per phase and fail at the end.
+// Run every phase even if an earlier one fails, so one run surfaces every problem.
 const errors = [];
 const runPhase = (name, fn) => {
   try {

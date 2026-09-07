@@ -1,10 +1,8 @@
 /**
  * @file Tensors and tensor operations.
  *
- * `Tensor` is the typed n-dimensional array used throughout the library for
- * model inputs and outputs. The functions in this module create, transform,
- * and combine tensors — shape manipulation, slicing, reductions, math ops,
- * and the `.tolist()` / `.item()` escape hatches back to plain JavaScript.
+ * `Tensor` is the typed n-dimensional array used throughout the library for model inputs
+ * and outputs. This module also provides functions to create, transform, and combine tensors.
  *
  * @module utils/tensor
  */
@@ -85,12 +83,9 @@ export class Tensor {
     ort_tensor;
 
     /**
-     * Create a new Tensor.
-     *
-     * Two call shapes are supported:
-     * - `new Tensor(dataType, data, dims)` — build from raw data, e.g.
-     *   `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
-     * - `new Tensor(ortTensor)` — wrap an existing `onnxruntime` tensor.
+     * Create a new Tensor, either from raw data or by wrapping an `onnxruntime` tensor:
+     * - `new Tensor(dataType, data, dims)`, e.g. `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
+     * - `new Tensor(ortTensor)`.
      *
      * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
      */
@@ -129,8 +124,7 @@ export class Tensor {
     }
 
     /**
-     * Releases the resources held by the underlying ONNX Runtime tensor (e.g., GPU buffers).
-     * The tensor should not be used after this method is called.
+     * Releases the underlying ONNX Runtime tensor (e.g., GPU buffers). Do not use the tensor afterwards.
      */
     dispose() {
         this.ort_tensor.dispose();

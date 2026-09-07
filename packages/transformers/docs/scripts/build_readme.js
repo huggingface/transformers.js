@@ -16,8 +16,7 @@ const FILES_TO_INCLUDE = {
 
 const PIPELINE_API_LINK_PREFIX = `${DOCS_BASE_URL}/api/pipelines#module_pipelines.`;
 
-// Links that should point somewhere other than the direct docs URL. Most are
-// README-local anchors or guide/API pages referenced by snippets.
+// Links that point somewhere other than the direct docs URL: README-local anchors, guide/API pages.
 const CUSTOM_LINK_MAP = {
   "./custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
   "/custom_usage#convert-your-models-to-onnx": "#convert-your-models-to-onnx",
@@ -26,8 +25,7 @@ const CUSTOM_LINK_MAP = {
   "./guides/dtypes": `${DOCS_BASE_URL}/guides/dtypes`,
 };
 
-// Output: the repo root README. Resolved relative to packageRoot
-// (`packages/transformers`) so the path works from any cwd.
+// Repo-root README, resolved relative to packageRoot so the path works from any cwd.
 const README_OUT = "../../README.md";
 
 export function buildReadme({ project }) {
@@ -103,8 +101,7 @@ function demoteHeadings(markdown) {
 }
 
 function fixLinks(markdown, apiLinks) {
-  // This is not a complete Markdown parser, just the narrow link rewrite
-  // needed by the README snippets.
+  // Not a Markdown parser, just the narrow link rewrite the README snippets need.
   return markdown.replace(/(?<=\])\((.+?)\)/gm, (_, rawLink) => {
     let link = rawLink;
     if (link in CUSTOM_LINK_MAP) {

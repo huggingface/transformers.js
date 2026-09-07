@@ -280,8 +280,8 @@ Follow the steps below to start contributing:
 - ☐ If adding a new feature, also add tests for it.
 - ☐ If your changes affect user-facing functionality, update the relevant documentation.
 - ☐ If you changed JSDoc comments, README snippets, or task metadata, regenerate the docs
-  (`pnpm --filter @huggingface/transformers docs-generate`) and commit the result — CI
-  fails if generated files drift from the source. See [Documentation](#documentation).
+  (`pnpm --filter @huggingface/transformers docs-generate`) and commit the result.
+  See [Documentation](#documentation).
 
 ### Tests
 We are using [Jest](https://jestjs.io/) to execute unit-tests. All tests can be found in `packages/transformers/tests` and have to end with `.test.js`

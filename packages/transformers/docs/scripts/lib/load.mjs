@@ -1,6 +1,5 @@
-// Shared loader: reads every `.js` file under `src/`, extracts TS-backed
-// entities, builds the IR, and returns it along with the public-export set
-// and the task catalog. Both the API-markdown and skill renderers consume it.
+// Reads every `.js` file under `src/` and returns the IR, the public-export set and the task
+// catalog. Both the API-markdown and skill renderers consume it.
 
 import fs from "node:fs";
 import path from "node:path";

@@ -32,9 +32,8 @@ export function buildIR(fileEntities) {
   return { modules: moduleList, typedefIndex: buildTypedefIndex(modules) };
 }
 
-// Classes win (authoritative for a name). Typedefs fill gaps. Re-export
-// aliases like `@typedef {import('x').Foo} Foo` register last so they can't
-// shadow the canonical definition.
+// Classes are authoritative for a name; typedefs fill gaps. Re-export aliases
+// (`@typedef {import('x').Foo} Foo`) register last so they can't shadow the canonical definition.
 function buildTypedefIndex(modules) {
   const index = new Map();
   for (const mod of modules.values()) {
@@ -131,9 +130,8 @@ function mergeByName(target, items) {
   }
 }
 
-// Keep one entry per name, at the position of its first occurrence. A
-// re-export alias (`@typedef {import('./x.js').Foo} Foo`) says nothing the
-// real declaration doesn't, so when both are present the real one wins —
+// One entry per name, at its first occurrence. When both a re-export alias
+// (`@typedef {import('./x.js').Foo} Foo`) and the real declaration exist, the real one wins:
 // otherwise the name renders as a self-reference and every link to it dangles.
 function dedupeTypes(items) {
   const best = new Map();
@@ -181,8 +179,8 @@ function ingest(entities, mod) {
   }
   for (const v of entities.variables) {
     if (isPrivate(v)) continue;
-    // A `const` annotated with `@param` / `@returns` is a function alias —
-    // hoist it into the functions section so it renders with a proper signature.
+    // A `const` annotated with `@param` / `@returns` is a function alias; hoist it into the
+    // functions section so it renders with a signature.
     if (tagsOf(v, "param").length || tagsOf(v, "returns").length) {
       mod.functions.push(buildCallable(v));
       continue;
@@ -198,15 +196,13 @@ function ingest(entities, mod) {
   }
 }
 
-// A single @typedef/@callback block may declare multiple types; @property tags
-// that follow each typedef attach to it, up to the next typedef/callback.
+// One `@typedef`/`@callback` block may declare several types; `@property` tags attach to the
+// preceding typedef, up to the next one.
 function collectTypedefsFromBlock(block, mod) {
   let current = null;
   let first = true;
-  // `@template {Constraint} [T=default]` tags sit on the block, not on the
-  // individual `@typedef`. Carrying them onto every type declared by the block
-  // lets the renderer resolve `T` in the type expression and in `@property`
-  // types instead of falling back to `any`.
+  // `@template` tags sit on the block, not on the individual `@typedef`. Carry them onto every type
+  // the block declares so the renderer can resolve `T` instead of falling back to `any`.
   const blockTemplates = templatesOf(block);
   const flush = () => {
     if (!current) return;
@@ -257,9 +253,8 @@ function buildMember(m) {
     kind: m.kind,
     name: m.name,
     description: m.description,
-    // An accessor's type is usually written as `@type`, but a getter may
-    // instead document it as `@returns {T}` — same information, and without
-    // this fallback the member renders (or is skipped) with no type at all.
+    // A getter may document its type as `@returns {T}` rather than `@type`; without the fallback
+    // the member has no type at all.
     type: typeOf(m) ?? (m.kind === "getter" ? (pickReturns(m)?.type ?? null) : null),
     defaultValue: m.tags.find((t) => t.tag === "default")?.value ?? m.initializer ?? null,
     deprecated: m.tags.some((t) => t.tag === "deprecated"),
@@ -276,9 +271,8 @@ function buildCallable(fn) {
     aliasType: typeOf(fn),
     see: seeTagsOf(fn),
     throws: tagsOf(fn, "throws").map((t) => ({ type: t.type, description: t.description })),
-    // `@template {Constraint} Name` maps the generic name to its constraint;
-    // used by the renderer to resolve generic parameter names to something
-    // readable instead of a bare `any`.
+    // `@template {Constraint} Name` maps a generic name to its constraint, which the renderer shows
+    // instead of a bare `any`.
     templates: templatesOf(fn),
     examples,
     deprecated: fn.tags.some((t) => t.tag === "deprecated"),
@@ -294,16 +288,13 @@ function attachClassCallables(modules) {
       const callbackName = `${cls.name}Callback`;
       const callback = callbacks.get(callbackName);
       const callSource = callMember && hasCallableShape(callMember) ? callMember : null;
-      // The `XCallback` typedef carries the precise generic signature but no
-      // prose; a documented `_call` carries both. Prefer whichever explains
-      // what calling the instance actually does.
+      // The `XCallback` typedef has the precise generic signature but no prose; a documented
+      // `_call` has both. Prefer whichever explains what calling the instance does.
       const source = (callSource?.description ? callSource : null) ?? callback ?? callSource;
       if (!source) continue;
 
-      // Promote the `_call` / `Callback` description onto the synthesized
-      // signature so the rendered `Foo(...)` line carries prose explaining
-      // what calling the instance does. Without this the page shows only the
-      // bare signature.
+      // Promote the source description onto the synthesized signature; without it the page shows a
+      // bare `Foo(...)` line.
       cls.callable = {
         ...normalizeCallable(source),
         name: cls.name,
@@ -386,10 +377,9 @@ function parseFunctionType(raw) {
   };
 }
 
-// `<Q extends string | string[], const O extends Options = {}>` — a parameter
-// may carry a `const` modifier and a default. Neither says anything a reader of
-// the rendered signature needs, but both used to make the whole entry
-// unparseable, which left `O` rendering as a bare `O`.
+// A template parameter may carry a `const` modifier and a default
+// (`<Q extends string | string[], const O extends Options = {}>`). Both are dropped, but the entry
+// still has to parse, or its name renders unresolved.
 function parseTemplateList(raw) {
   return splitTopLevel(raw, ",")
     .map((part) => {
@@ -509,8 +499,7 @@ function findCallable(ref, callableIndex) {
   return callableIndex.get(parsed.method ? `${parsed.owner}.${parsed.method}` : parsed.owner);
 }
 
-// `@template {Constraint} Name` -> `{ name, type }`, the shape the renderer
-// uses to resolve generic parameter names to their constraints.
+// `@template {Constraint} Name` -> `{ name, type }`, the shape the renderer resolves against.
 function templatesOf(entity) {
   return tagsOf(entity, "template")
     .map((t) => ({ name: t.name, type: t.type }))
@@ -550,10 +539,8 @@ function cleanParamDescription(description) {
   return description.replace(/^\([^)]*\boptional\b[^)]*\):\s*/i, "").trim();
 }
 
-// Canonical example format: `**Example:** <title>\n```lang\n<code>\n```` inside
-// any JSDoc description body. Extracted into a structured `examples` array so
-// renderers can emit them consistently; the source lines are stripped from
-// the description so they're not rendered twice.
+// Canonical example format inside any JSDoc description body. Matches are moved into a structured
+// `examples` array and stripped from the description so they aren't rendered twice.
 const INLINE_EXAMPLE = /\*\*Example:\*\*\s*([^\n]*)\n+```(\w+)?\n([\s\S]*?)\n```/g;
 
 function gatherExamples(description) {

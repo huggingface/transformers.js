@@ -3,8 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-// All files under `dir` (recursive) whose name ends with `ext`, sorted by
-// their `/`-separated relative path so ordering is platform-independent.
+// Recursive; sorted by `/`-separated relative path so ordering is platform-independent.
 export function listFiles(dir, ext) {
   if (!fs.existsSync(dir)) return [];
   return fs

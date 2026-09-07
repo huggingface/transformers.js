@@ -154,7 +154,7 @@ export async function pipeline(
                 }
             });
         } catch (e) {
-            // If we fail to get metadata, we can still proceed without total progress.
+            // Progress totals are best-effort.
             logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
         }
     }
