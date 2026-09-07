@@ -34,7 +34,7 @@ if (apis.IS_WEB_ENV) {
 } else if (sharp) {
     // Running in Node.js, electron, or other non-browser environment
 
-    loadImageFunction = async (/**@type {sharp.Sharp}*/ img) => {
+    loadImageFunction = async (/**@type {import('sharp').Sharp}*/ img) => {
         const metadata = await img.metadata();
         const rawChannels = metadata.channels;
 
