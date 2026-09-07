@@ -151,9 +151,8 @@ anywhere `generate()` is invoked directly.
 - Sampling vs. greedy: `temperature` and `top_k` only take effect with
   `do_sample: true`. Under greedy decoding (the default) they are silently
   ignored.
-- Sampling vs. beams: `do_sample: true` takes precedence — beams are ignored
-  while sampling. For beam search, set `num_beams > 1` and leave `do_sample`
-  off. Don't set both.
+- Beam search is not yet implemented: `num_beams > 1` is accepted but
+  generation still keeps a single sequence, so leave it at the default.
 
 <!-- @generated:start id=fields:GenerationConfig -->
 | Option | Type | Description |

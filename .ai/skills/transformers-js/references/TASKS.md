@@ -239,6 +239,7 @@ const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve
 const output = await classifier(url);
 // [
 //   { label: 'tiger, Panthera tigris', score: 0.632695734500885 },
+//   ... (top 5 labels by default)
 // ]
 ```
 

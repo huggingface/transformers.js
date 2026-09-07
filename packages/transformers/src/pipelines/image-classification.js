@@ -47,6 +47,7 @@ import { softmax } from '../utils/maths.js';
  * const output = await classifier(url);
  * // [
  * //   { label: 'tiger, Panthera tigris', score: 0.632695734500885 },
+ * //   ... (top 5 labels by default)
  * // ]
  * ```
  *
