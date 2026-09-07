@@ -139,16 +139,21 @@ export async function pipeline(
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
-        /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
-        metadata.forEach((m, i) => {
-            if (m.exists) {
-                files_loading[expected_files[i]] = {
-                    loaded: 0,
-                    total: m.size ?? 0,
-                };
-            }
-        });
+        try {
+            /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
+            const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+            metadata.forEach((m, i) => {
+                if (m.exists) {
+                    files_loading[expected_files[i]] = {
+                        loaded: 0,
+                        total: m.size ?? 0,
+                    };
+                }
+            });
+        } catch (e) {
+            // If we fail to get metadata, we can still proceed without total progress.
+            logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
+        }
     }
 
     const pretrainedOptions = {

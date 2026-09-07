@@ -2,6 +2,8 @@
 // `{ description, tags }`. The TS-compiler pass in structure.mjs decides
 // which comments attach to which AST node; this module only parses content.
 
+import { matchingBracket } from "./scan.mjs";
+
 const TAG_START = /^@[A-Za-z]/;
 const FENCE = /^```/;
 const IDENT_PAT = /[A-Za-z_$][\w$]*/.source;
@@ -49,10 +51,11 @@ function parseTag(raw) {
   const tag = nameMatch[1];
   let rest = raw.slice(nameMatch[0].length).replace(/^[ \t]+/, "");
 
-  // `@default` is the only tag whose payload starts with a brace but is *not*
-  // a JSDoc type expression — skip the type extraction for it.
+  // `@default` and `@see` payloads may start with a brace that is *not* a
+  // JSDoc type expression (a literal value, or `{@link ...}`) — skip the type
+  // extraction for them.
   let type = null;
-  if (rest.startsWith("{") && tag !== "default") {
+  if (rest.startsWith("{") && tag !== "default" && tag !== "see") {
     const extracted = extractBalancedBraces(rest, 0);
     if (extracted) {
       type = extracted.content.trim();
@@ -87,14 +90,13 @@ function parseTag(raw) {
     case "default":
       return { tag, value: rest.trim() };
     case "module":
-      return { tag, name: rest.trim() };
+      // Only the first token is the module name; anything after is prose.
+      return { tag, name: rest.trim().split(/\s+/)[0] };
     case "file":
     case "fileoverview":
       return { tag: "file", description: rest.trim() };
     case "see":
       return { tag, description: rest.trim() };
-    case "example":
-      return { tag, body: rest };
     default:
       return { tag, type, description: rest.trim() };
   }
@@ -103,7 +105,7 @@ function parseTag(raw) {
 // Parse `[name=default] description` or `name description`.
 function parseNameAndRest(rest) {
   if (rest.startsWith("[")) {
-    const close = findMatchingBracket(rest, 0);
+    const close = matchingBracket(rest, 0, "[", "]");
     if (close !== -1) {
       const inner = rest.slice(1, close);
       const eq = inner.indexOf("=");
@@ -124,25 +126,9 @@ function parseNameAndRest(rest) {
   };
 }
 
-export function extractBalancedBraces(text, start) {
-  if (text[start] !== "{") return null;
-  let depth = 1;
-  let i = start + 1;
-  while (i < text.length && depth > 0) {
-    if (text[i] === "{") depth++;
-    else if (text[i] === "}") depth--;
-    i++;
-  }
-  return depth === 0 ? { content: text.slice(start + 1, i - 1), endIndex: i } : null;
-}
-
-function findMatchingBracket(text, start) {
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === "[") depth++;
-    else if (text[i] === "]" && --depth === 0) return i;
-  }
-  return -1;
+function extractBalancedBraces(text, start) {
+  const close = matchingBracket(text, start, "{", "}");
+  return close === -1 ? null : { content: text.slice(start + 1, close), endIndex: close + 1 };
 }
 
 function trimDash(text) {

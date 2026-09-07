@@ -6,8 +6,8 @@
 import path from "node:path";
 
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
-import { splitTopLevel } from "./scan.mjs";
-import { firstSentence, stripDocArtifacts } from "./text.mjs";
+import { matchingBracket, splitTopLevel } from "./scan.mjs";
+import { exampleLines, firstSentence, stripDocArtifacts, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
 import { isRenderableUtilityType, parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 // Pages with at least this many top-level items get an "On this page" TOC so
@@ -26,14 +26,25 @@ export function hasRenderableContent(mod, publicNames = null) {
   return mod.typedefs.some((td) => !isInternalTypedef(td));
 }
 
+// Rendered-name and callable-link indexes depend only on `(ir, publicNames)`,
+// so callers rendering many pages can build them once and pass them to
+// `renderModule` via `opts.linkIndexes`.
+export function buildLinkIndexes(ir, publicNames = null) {
+  return {
+    renderedNames: buildRenderedNameIndex(ir, publicNames),
+    callableLinks: buildCallableLinkIndex(ir, publicNames),
+  };
+}
+
 export function renderModule(mod, ir, opts = {}) {
   const publicNames = opts.publicNames ?? null;
+  const { renderedNames, callableLinks } = opts.linkIndexes ?? buildLinkIndexes(ir, publicNames);
   const ctx = {
     typedefIndex: ir.typedefIndex,
     moduleByName: new Map(ir.modules.map((m) => [m.name, m])),
     moduleName: mod.name,
-    renderedNames: buildRenderedNameIndex(ir, publicNames),
-    callableLinks: buildCallableLinkIndex(ir, publicNames),
+    renderedNames,
+    callableLinks,
   };
 
   const classes = filterPublic(mod.classes, publicNames);
@@ -43,7 +54,7 @@ export function renderModule(mod, ir, opts = {}) {
   const out = [];
   out.push(`# ${mod.name}`, "");
   if (mod.description) out.push(mod.description.trim(), "");
-  for (const ex of mod.examples) out.push(...renderExample(ex));
+  for (const ex of mod.examples) out.push(...exampleLines(ex));
 
   out.push(...renderTOC({ classes, functions, constants }, ctx));
 
@@ -65,15 +76,13 @@ export function renderModule(mod, ir, opts = {}) {
   }
   if (mod.callbacks.length) {
     out.push("## Callbacks", "");
-    for (const cb of mod.callbacks) out.push(...renderCallback(cb, ctx));
+    for (const cb of mod.callbacks) out.push(...renderFunction(cb, ctx, 3, null, { nameOnlyHeading: true }));
   }
 
-  return (
-    expandInlineLinks(out.join("\n"), ctx)
-      .replace(/[ \t]+$/gm, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trimEnd() + "\n"
-  );
+  // Link expansion and blank-run collapsing must not touch example code, so
+  // they run with fenced blocks masked; trailing-whitespace cleanup is safe
+  // (and applied) everywhere.
+  return transformOutsideFences(out.join("\n").replace(/[ \t]+$/gm, ""), (text) => expandInlineLinks(text, ctx).replace(/\n{3,}/g, "\n\n")).trimEnd() + "\n";
 }
 
 // Render a one-line "On this page" TOC, but only when the page is large
@@ -138,13 +147,6 @@ function dedupeByName(items) {
   return items.filter((it) => (seen.has(it.name) ? false : seen.add(it.name)));
 }
 
-function renderExample(ex) {
-  const lines = [];
-  if (ex.title) lines.push(`**Example:** ${ex.title}`);
-  lines.push("```" + ex.language, ex.code, "```", "");
-  return lines;
-}
-
 // Descriptions carried over from the Python library sometimes start with a
 // reST-style `[`TypeName`]` cross-reference that JavaScript readers can't follow.
 // Strip the artifact from the start of the first paragraph; leave the rest alone.
@@ -155,6 +157,13 @@ function cleanDescription(text) {
   return stripDocArtifacts(text.trim())
     .replace(/@see\s+(?=\{@link)/g, "")
     .replace(/@see\s+`?([A-Za-z_$][\w$.]*)`?/g, "`$1`");
+}
+
+// Line-leading `@see` tags parse into an entity's `see` list; surface them so
+// the reference survives into the rendered page. `{@link ...}` entries are
+// expanded to markdown links by the page-level `expandInlineLinks` pass.
+function seeAlso(entity) {
+  return entity.see?.length ? [`**See also:** ${entity.see.join(", ")}`, ""] : [];
 }
 
 // `{@link url}` / `{@link url Text}` / `{@link Symbol}` -> markdown.
@@ -172,7 +181,8 @@ function expandInlineLinks(text, ctx) {
 function renderClass(cls, ctx) {
   const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, cls.name)}"></a>`, "", `### ${cls.name}`, ""];
   if (cls.description) lines.push(cleanDescription(cls.description), "");
-  for (const ex of cls.examples) lines.push(...renderExample(ex));
+  lines.push(...seeAlso(cls));
+  for (const ex of cls.examples) lines.push(...exampleLines(ex));
   if (cls.callable) {
     lines.push(...renderFunction({ ...cls.callable, displayName: cls.name, anchorName: `${cls.name}.call` }, ctx, 4));
   }
@@ -198,21 +208,28 @@ function renderField(f, ctx, parent) {
   const lines = [`#### \`${parent}.${f.name}\`${type}`, ""];
   if (f.deprecated) lines.push("> **Deprecated**", "");
   if (f.description) lines.push(cleanDescription(f.description), "");
-  if (f.defaultValue != null && f.defaultValue !== "") lines.push(`**Default:** \`${f.defaultValue}\``, "");
+  // Multiline initializers can't sit inside a single-backtick span — omit them.
+  if (f.defaultValue != null && f.defaultValue !== "" && !f.defaultValue.includes("\n")) {
+    lines.push(`**Default:** \`${f.defaultValue}\``, "");
+  }
   return lines;
 }
 
 // `_`-prefixed methods are the library's convention for internal / subclass-only
 // hooks — they're not part of the user-facing API. Exception: `constructor` is
 // kept even though it has no leading underscore.
-function shouldRenderMethod(m) {
+export function shouldRenderMethod(m) {
   if (m.name.startsWith("_")) return false;
   return m.description || m.params?.length || m.returns?.description || m.returns?.type || m.examples?.length || m.throws?.length;
 }
 
-function renderFunction(fn, ctx, depth, parent = null) {
+// Also renders callback typedefs (`opts.nameOnlyHeading`) — they're types
+// rather than invocable functions, so the heading is the bare name instead of
+// a `name(params)` signature.
+function renderFunction(fn, ctx, depth, parent = null, opts = {}) {
   const anchor = parent ? apiMemberAnchor(ctx.moduleName, parent, fn.anchorName ?? fn.name) : apiSymbolAnchor(ctx.moduleName, fn.anchorName ?? fn.name);
-  const lines = [`<a id="${anchor}"></a>`, "", `${"#".repeat(depth)} ${signature(fn, parent)}`, ""];
+  const heading = opts.nameOnlyHeading ? fn.name : signature(fn, parent);
+  const lines = [`<a id="${anchor}"></a>`, "", `${"#".repeat(depth)} ${heading}`, ""];
   // Resolve generic type parameters (`@template {Constraint} T`) inside this
   // function's parameter/return types. Without the constraint map, a `T`
   // would render as `any`.
@@ -222,6 +239,7 @@ function renderFunction(fn, ctx, depth, parent = null) {
 
   if (fn.deprecated) lines.push("> **Deprecated**", "");
   if (fn.description) lines.push(cleanDescription(fn.description), "");
+  lines.push(...seeAlso(fn));
   if (fn.params?.length) {
     lines.push("**Parameters**", "", ...renderParamList(fn.params, fnCtx), "");
   }
@@ -239,7 +257,7 @@ function renderFunction(fn, ctx, depth, parent = null) {
     }
     lines.push("");
   }
-  for (const ex of fn.examples) lines.push(...renderExample(ex));
+  for (const ex of fn.examples ?? []) lines.push(...exampleLines(ex));
   return lines;
 }
 
@@ -250,24 +268,6 @@ function signature(fn, parent) {
     .join(", ");
   const owner = parent ? `${parent}.` : "";
   return `\`${owner}${fn.displayName ?? fn.name}(${params})\``;
-}
-
-function renderCallback(cb, ctx) {
-  const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, cb.name)}"></a>`, "", `### ${cb.name}`, ""];
-  const templateMap = new Map();
-  for (const t of cb.templates ?? []) if (t.name && t.type) templateMap.set(t.name, t.type);
-  const cbCtx = templateMap.size ? { ...ctx, templates: templateMap } : ctx;
-
-  if (cb.description) lines.push(cleanDescription(cb.description), "");
-  if (cb.params?.length) {
-    lines.push("**Parameters**", "", ...renderParamList(cb.params, cbCtx), "");
-  }
-  if (cb.returns?.type || cb.returns?.description) {
-    const type = cb.returns.type ? renderType(cb.returns.type, cbCtx) : "";
-    const desc = cb.returns.description ? ` — ${cb.returns.description}` : "";
-    lines.push(`**Returns:** ${type}${desc}`, "");
-  }
-  return lines;
 }
 
 // ---------- parameter lists ----------
@@ -345,7 +345,8 @@ function renderConstant(c, ctx) {
   const type = c.type ? ` : ${renderType(c.type, ctx)}` : "";
   const lines = [`<a id="${apiSymbolAnchor(ctx.moduleName, c.name)}"></a>`, "", `### \`${c.name}\`${type}`, ""];
   if (c.description) lines.push(cleanDescription(c.description), "");
-  for (const ex of c.examples) lines.push(...renderExample(ex));
+  lines.push(...seeAlso(c));
+  for (const ex of c.examples) lines.push(...exampleLines(ex));
   return lines;
 }
 
@@ -424,7 +425,7 @@ const TUPLE = /^\[(.*)\]$/;
 
 // Turn a raw JSDoc type string into readable markdown. Prefers author-written
 // names over expanded TS structures; unknown gnarly types become `object`.
-export function renderType(raw, ctx, opts = {}) {
+function renderType(raw, ctx, opts = {}) {
   const pretty = prettifyTypeString(raw);
   if (opts.noLink) return `\`${pretty}\``;
 
@@ -583,12 +584,12 @@ function renderCallableReference(raw, ctx) {
 // Conditional/mapped/infer types collapse to their outermost wrapper; simple
 // unions of names or long generic lists are preserved so the renderer can
 // split them into individual links.
-export function prettifyTypeString(raw) {
+function prettifyTypeString(raw) {
   if (!raw) return "";
   let s = raw.trim();
 
   s = stripLeading(s, "<", ">"); // <T extends X>(...)
-  s = s.replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1");
+  s = stripImportPrefixes(s);
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
   s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, "'$1'");
 
@@ -611,15 +612,8 @@ export function prettifyTypeString(raw) {
 }
 
 function stripLeading(s, open, close) {
-  if (s[0] !== open) return s;
-  let depth = 1;
-  let i = 1;
-  while (i < s.length && depth > 0) {
-    if (s[i] === open) depth++;
-    else if (s[i] === close) depth--;
-    i++;
-  }
-  return depth === 0 ? s.slice(i).trim() : s;
+  const end = matchingBracket(s, 0, open, close);
+  return end === -1 ? s : s.slice(end + 1).trim();
 }
 
 // Conditional types (`A extends B ? X : Y`), mapped types (`{ [K in ...] }`),

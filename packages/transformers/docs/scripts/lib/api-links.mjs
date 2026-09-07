@@ -1,29 +1,29 @@
 export const DOCS_BASE_URL = "https://huggingface.co/docs/transformers.js";
 
-export function buildApiSymbolLinks(ir, publicNames, baseUrl = DOCS_BASE_URL) {
+export function buildApiSymbolLinks(ir, publicNames) {
   const links = new Map();
   const ambiguous = new Set();
   for (const mod of ir.modules) {
     for (const cls of mod.classes) {
       if (!isPublic(cls, publicNames)) continue;
-      addLink(links, ambiguous, cls.name, apiUrl(mod.name, cls.name, baseUrl));
+      addLink(links, ambiguous, cls.name, apiUrl(mod.name, cls.name));
     }
     for (const fn of mod.functions) {
       if (!isPublic(fn, publicNames)) continue;
-      addLink(links, ambiguous, fn.name, apiUrl(mod.name, fn.name, baseUrl));
+      addLink(links, ambiguous, fn.name, apiUrl(mod.name, fn.name));
     }
     for (const constant of mod.constants) {
       if (!isPublic(constant, publicNames)) continue;
-      addLink(links, ambiguous, constant.name, apiUrl(mod.name, constant.name, baseUrl));
+      addLink(links, ambiguous, constant.name, apiUrl(mod.name, constant.name));
     }
-    for (const td of mod.typedefs) addLink(links, ambiguous, td.name, apiUrl(mod.name, td.name, baseUrl));
-    for (const cb of mod.callbacks) addLink(links, ambiguous, cb.name, apiUrl(mod.name, cb.name, baseUrl));
+    for (const td of mod.typedefs) addLink(links, ambiguous, td.name, apiUrl(mod.name, td.name));
+    for (const cb of mod.callbacks) addLink(links, ambiguous, cb.name, apiUrl(mod.name, cb.name));
   }
   return links;
 }
 
-export function apiUrl(moduleName, symbolName, baseUrl = DOCS_BASE_URL) {
-  return `${baseUrl}/api/${moduleName}#${apiSymbolAnchor(moduleName, symbolName)}`;
+function apiUrl(moduleName, symbolName) {
+  return `${DOCS_BASE_URL}/api/${moduleName}#${apiSymbolAnchor(moduleName, symbolName)}`;
 }
 
 export function apiSymbolAnchor(moduleName, symbolName) {

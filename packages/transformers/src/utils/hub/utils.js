@@ -80,12 +80,43 @@ export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
 }
 
 /**
+ * Error thrown when a model file cannot be found — because the repository does not
+ * exist, is gated/private without a valid token, the file is missing from the
+ * repository, or the file is unavailable locally with downloads disabled.
+ *
+ * Note that the Hugging Face Hub responds with 401 for non-existent repositories,
+ * so "model does not exist" and "model requires authentication" are indistinguishable.
+ *
+ * Transient failures (network errors, server errors) are NOT represented by this
+ * class; they surface as regular `Error`s (or `TypeError`s from `fetch`).
+ */
+export class ModelFileNotFoundError extends Error {
+    /**
+     * @param {string} message The error message.
+     * @param {Object} [options] Additional error information.
+     * @param {number|null} [options.status=null] The HTTP status code, when the failure came from a Hub response.
+     */
+    constructor(message, { status = null } = {}) {
+        super(message);
+        this.name = 'ModelFileNotFoundError';
+        this.status = status;
+    }
+}
+
+/**
+ * HTTP statuses indicating the requested file does not exist or is not accessible,
+ * as opposed to transient request/server failures.
+ */
+const NOT_FOUND_STATUSES = new Set([401, 403, 404]);
+
+/**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
  * @param {string} remoteURL The URL of the file that could not be loaded.
  * @param {boolean} fatal Whether to raise an error if the file could not be loaded.
- * @returns {null} Returns `null` if `fatal = true`.
- * @throws {Error} If `fatal = false`.
+ * @returns {null} Returns `null` if `fatal = false`.
+ * @throws {ModelFileNotFoundError|Error} If `fatal = true`: a `ModelFileNotFoundError` when the
+ * file is missing or inaccessible (401/403/404), otherwise a regular `Error`.
  */
 export function handleError(status, remoteURL, fatal) {
     if (!fatal) {
@@ -95,7 +126,11 @@ export function handleError(status, remoteURL, fatal) {
     }
 
     const message = ERROR_MAPPING[status] ?? `Error (${status}) occurred while trying to load file`;
-    throw Error(`${message}: "${remoteURL}".`);
+    const fullMessage = `${message}: "${remoteURL}".`;
+    if (NOT_FOUND_STATUSES.has(status)) {
+        throw new ModelFileNotFoundError(fullMessage, { status });
+    }
+    throw Error(fullMessage);
 }
 
 /**

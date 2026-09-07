@@ -3,7 +3,8 @@
 
 import path from "node:path";
 
-import { findTopLevel, splitTopLevel } from "./scan.mjs";
+import { findTopLevel, matchingBracket, splitTopLevel } from "./scan.mjs";
+import { parseImportedType, stripImportPrefixes } from "./text.mjs";
 import { callableReferenceKey, parseUtilityType, UTILITY_TYPES } from "./type-refs.mjs";
 
 export function buildIR(fileEntities) {
@@ -55,7 +56,7 @@ function buildTypedefIndex(modules) {
 
 function isAliasTypedef(td) {
   if (!td.type) return false;
-  return td.type.replace(/import\(['"][^'"]+['"]\)\./g, "").trim() === td.name;
+  return stripImportPrefixes(td.type).trim() === td.name;
 }
 
 function resolveModule(entities) {
@@ -140,9 +141,9 @@ function dedupeTypes(items) {
 }
 
 function parseImportedTypeRef(type, fromFile) {
-  const m = type?.trim().match(/^import\(['"]([^'"]+)['"]\)\.([A-Za-z_$][\w$]*)$/);
-  if (!m || !m[1].startsWith(".")) return null;
-  return { file: resolveJsPath(path.resolve(path.dirname(fromFile), m[1])), name: m[2] };
+  const ref = parseImportedType(type);
+  if (!ref || !ref.specifier.startsWith(".")) return null;
+  return { file: resolveJsPath(path.resolve(path.dirname(fromFile), ref.specifier)), name: ref.name };
 }
 
 function resolveJsPath(file) {
@@ -160,6 +161,7 @@ function ingest(entities, mod) {
       name: cls.name,
       description,
       examples,
+      see: seeTagsOf(cls),
       members: cls.members.filter((m) => !isPrivate(m)).map(buildMember),
       callable: null,
     });
@@ -181,6 +183,7 @@ function ingest(entities, mod) {
       type: typeOf(v),
       description,
       examples,
+      see: seeTagsOf(v),
     });
   }
 }
@@ -251,6 +254,7 @@ function buildCallable(fn) {
     params: tagsOf(fn, "param").map(normalizeParam),
     returns: pickReturns(fn),
     aliasType: typeOf(fn),
+    see: seeTagsOf(fn),
     throws: tagsOf(fn, "throws").map((t) => ({ type: t.type, description: t.description })),
     // `@template {Constraint} Name` maps the generic name to its constraint;
     // used by the renderer to resolve generic parameter names to something
@@ -383,25 +387,6 @@ function parseFunctionTypeParam(raw) {
   };
 }
 
-function matchingBracket(text, start, open, close) {
-  if (text[start] !== open) return -1;
-  let depth = 1;
-  let inStr = null;
-  for (let i = start + 1; i < text.length; i++) {
-    const ch = text[i];
-    if (inStr) {
-      if (ch === inStr && text[i - 1] !== "\\") inStr = null;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
-      inStr = ch;
-    } else if (ch === open) {
-      depth++;
-    } else if (ch === close && --depth === 0) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 function resolveCallableAliases(modules) {
   const callableIndex = buildCallableIndex(modules);
 
@@ -499,6 +484,12 @@ function clone(value) {
 
 function tagsOf(entity, name) {
   return entity.tags.filter((t) => t.tag === name);
+}
+
+function seeTagsOf(entity) {
+  return tagsOf(entity, "see")
+    .map((t) => t.description)
+    .filter(Boolean);
 }
 
 function typeOf(entity) {

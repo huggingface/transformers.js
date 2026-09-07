@@ -81,6 +81,7 @@ export { DynamicCache } from './cache_utils.js';
 
 // Cache and file management
 export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
+export { ModelFileNotFoundError } from './utils/hub/utils.js';
 
 // Expose common types used across the library for developers to access
 /**

@@ -11,16 +11,35 @@ import { formatValidationResult, validateGeneratedDocs } from "./lib/validate.mj
 
 const project = loadProject(packageRoot);
 
-generateApiDocs({ project });
-const { errors: skillErrors } = generateSkillDocs({ project });
-const readmePath = buildReadme({ project });
-console.log(`wrote ${path.relative(process.cwd(), readmePath)}`);
+// Run every phase even if an earlier one fails, so a single run surfaces all
+// problems; collect errors per phase and fail at the end.
+const errors = [];
+const runPhase = (name, fn) => {
+  try {
+    return fn();
+  } catch (err) {
+    errors.push(`${name}: ${err.message}`);
+    return null;
+  }
+};
 
-const validation = validateGeneratedDocs({ project });
-console.log(formatValidationResult(validation));
-if (skillErrors?.length) {
+const apiResult = runPhase("api docs", () => generateApiDocs({ project }));
+for (const err of apiResult?.errors ?? []) errors.push(`api docs: ${err}`);
+
+const skillResult = runPhase("skill", () => generateSkillDocs({ project }));
+for (const err of skillResult?.errors ?? []) errors.push(`skill: ${err}`);
+
+runPhase("readme", () => {
+  const readmePath = buildReadme({ project });
+  console.log(`wrote ${path.relative(process.cwd(), readmePath)}`);
+});
+
+const validation = runPhase("validation", () => validateGeneratedDocs({ project }));
+if (validation) console.log(formatValidationResult(validation));
+
+if (errors.length) {
   console.log("");
-  console.log(`skill generation failed with ${skillErrors.length} error${skillErrors.length === 1 ? "" : "s"}:`);
-  for (const err of skillErrors) console.log(`- ${err}`);
+  console.log(`docs generation failed with ${errors.length} error${errors.length === 1 ? "" : "s"}:`);
+  for (const err of errors) console.log(`- ${err}`);
 }
-if (!validation.ok || skillErrors?.length) process.exitCode = 1;
+if (errors.length || !validation?.ok) process.exitCode = 1;

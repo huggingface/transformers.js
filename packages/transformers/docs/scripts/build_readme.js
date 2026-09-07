@@ -34,7 +34,15 @@ const DEFAULT_README_OUT = "../../README.md";
 export function buildReadme({ project, out = DEFAULT_README_OUT } = {}) {
   const { ir, publicNames } = project ?? loadProject(packageRoot);
   const apiLinks = buildApiSymbolLinks(ir, publicNames);
-  const snippets = Object.fromEntries(Object.entries(FILES_TO_INCLUDE).map(([key, file]) => [key, fs.readFileSync(path.join(packageRoot, file), "utf8")]));
+  const snippets = Object.fromEntries(
+    Object.entries(FILES_TO_INCLUDE).map(([key, file]) => {
+      try {
+        return [key, fs.readFileSync(path.join(packageRoot, file), "utf8")];
+      } catch (err) {
+        throw new Error(`could not read README snippet "${file}": ${err.message}`, { cause: err });
+      }
+    }),
+  );
 
   snippets.customUsage = demoteHeadings(snippets.customUsage);
   const readme = fixLinks(renderTemplate(snippets), apiLinks);
@@ -108,7 +116,15 @@ ${models}
 }
 
 function demoteHeadings(markdown) {
-  return markdown.replace(/^#{1,5}(?=\s)/gm, "#$&");
+  // `#` lines inside fenced code (e.g. shell comments) are not headings.
+  let inFence = false;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) inFence = !inFence;
+      return inFence ? line : line.replace(/^#{1,5}(?=\s)/, "#$&");
+    })
+    .join("\n");
 }
 
 function fixLinks(markdown, apiLinks) {
@@ -127,6 +143,6 @@ function fixLinks(markdown, apiLinks) {
   });
 }
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
   main();
 }

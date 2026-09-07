@@ -10,7 +10,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { firstSentence } from "./text.mjs";
+import { listFiles } from "./fs.mjs";
+import { shouldRenderMethod } from "./render-api.mjs";
+import { splitTopLevel } from "./scan.mjs";
+import { exampleLines, firstSentence, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
 
 const GENERATED_BANNER = "<!-- DO NOT EDIT: generated from src/**/*.js by docs/scripts/generate-all.js -->";
 const DOCS_SITE = "https://huggingface.co/docs/transformers.js/api";
@@ -26,7 +29,7 @@ export function renderSkill({ ir, tasks, publicNames, skillDir }) {
   // Expand `<!-- @generated:start id=... -->` markers in every hand-written
   // markdown file under the skill directory. Prose outside markers is preserved.
   // Only the generated blocks get absolutized — hand-authored prose is left alone.
-  for (const file of walkMarkdown(skillDir)) {
+  for (const file of listFiles(skillDir, ".md")) {
     const original = fs.readFileSync(file, "utf8");
     if (!original.includes("@generated:start")) continue;
     const injected = injectMarkers(original, { ...ctx, file });
@@ -46,13 +49,6 @@ function absolutize(markdown) {
   });
 }
 
-function walkMarkdown(dir) {
-  return fs
-    .readdirSync(dir, { recursive: true })
-    .filter((p) => p.endsWith(".md"))
-    .map((p) => path.join(dir, p));
-}
-
 // ---------- marker injection ----------
 
 const MARKER_RE = /(<!-- @generated:start id=([^\s]+) -->)([\s\S]*?)(<!-- @generated:end id=\2 -->)/g;
@@ -70,7 +66,6 @@ function injectMarkers(original, ctx) {
 
 // Dispatch a marker id to its generator. Supported ids:
 //   task-list                  full list of supported pipeline tasks
-//   task:<id>                  recipe for a single task
 //   typedef:<Name>             properties table for a named typedef
 //   class:<Name>               class description + fields + methods summary
 //   fields:<ClassName>         properties table built from a class's fields
@@ -80,10 +75,6 @@ function resolveMarker(id, ctx) {
 
   const [kind, arg] = splitOnce(id, ":");
   switch (kind) {
-    case "task": {
-      const info = ctx.tasks.supportedTasks.get(arg);
-      return info ? renderTaskRecipe(arg, info, ctx) : null;
-    }
     case "typedef":
       return renderTypedefTable(arg, ctx);
     case "class":
@@ -108,10 +99,7 @@ function renderModuleExamples(moduleName, ctx) {
     return "";
   }
   const lines = [];
-  for (const ex of mod.examples) {
-    if (ex.title) lines.push(`**Example:** ${ex.title}`, "");
-    lines.push("```" + ex.language, ex.code, "```", "");
-  }
+  for (const ex of mod.examples) lines.push(...exampleLines(ex, { blankAfterTitle: true }));
   return lines.join("\n").trimEnd();
 }
 
@@ -131,7 +119,7 @@ function renderFieldsTable(className, ctx) {
         defaultValue: f.defaultValue,
         description: f.description,
       })),
-    ) || warnEmpty(className, ctx, `fields:${className}`)
+    ) || warnEmpty(`class "${className}" has no fields to render (fields:${className})`, ctx)
   );
 }
 
@@ -159,10 +147,7 @@ function renderTaskRecipe(taskId, info, ctx) {
   if (aliases.length) lines.push(`**Aliases:** ${aliases.map((a) => `\`${a}\``).join(", ")}`);
   lines.push("");
   if (cls?.description) lines.push(cls.description.trim(), "");
-  for (const ex of cls?.examples ?? []) {
-    if (ex.title) lines.push(`**Example:** ${ex.title}`);
-    lines.push("```" + ex.language, ex.code, "```", "");
-  }
+  for (const ex of cls?.examples ?? []) lines.push(...exampleLines(ex));
   return lines.join("\n").trimEnd();
 }
 
@@ -182,15 +167,15 @@ function renderTypedefTable(name, ctx) {
       if (!table) continue;
       parts.push(`**\`${variantName}\`**`, "", table, "");
     }
-    return parts.length ? parts.join("\n").trimEnd() : warnEmpty(name, ctx, `typedef:${name}`);
+    return parts.length ? parts.join("\n").trimEnd() : warnEmpty(`typedef "${name}" has no properties to render (typedef:${name})`, ctx);
   }
 
   const props = collectProperties(name, ctx.ir);
-  return propertiesTable(props) || warnEmpty(name, ctx, `typedef:${name}`);
+  return propertiesTable(props) || warnEmpty(`typedef "${name}" has no properties to render (typedef:${name})`, ctx);
 }
 
-function warnEmpty(name, ctx, marker) {
-  ctx.errors.push(`typedef "${name}" has no properties to render (${marker})`);
+function warnEmpty(message, ctx) {
+  ctx.errors.push(message);
   return "";
 }
 
@@ -198,7 +183,7 @@ function propertiesTable(props) {
   if (!props.length) return "";
   const lines = ["| Option | Type | Description |", "|--------|------|-------------|"];
   for (const p of props) {
-    const type = p.type ? renderTypedefType(p.type, { table: true }) : "";
+    const type = p.type ? renderTypedefType(p.type) : "";
     const nameCell = p.optional ? `\`${p.name}\`?` : `\`${p.name}\``;
     const desc = prepareCell(p.description) + (p.defaultValue != null ? ` _(default: \`${p.defaultValue}\`)_` : "");
     lines.push(`| ${nameCell} | ${type} | ${desc} |`);
@@ -210,20 +195,7 @@ function propertiesTable(props) {
 // Returns [] if the type doesn't look like a union of simple names.
 function splitUnion(type) {
   if (!type) return [];
-  const parts = [];
-  let depth = 0;
-  let buf = "";
-  for (const ch of type) {
-    if ("<({[".includes(ch)) depth++;
-    else if (">)}]".includes(ch)) depth--;
-    if (depth === 0 && ch === "|") {
-      parts.push(buf.trim());
-      buf = "";
-    } else {
-      buf += ch;
-    }
-  }
-  if (buf.trim()) parts.push(buf.trim());
+  const parts = splitTopLevel(type, "|").map((p) => p.trim());
   if (parts.length < 2) return [];
   if (!parts.every((p) => /^[A-Za-z_$][\w$.]*$/.test(p))) return [];
   return parts;
@@ -238,7 +210,8 @@ function renderClassSummary(name, ctx) {
   const lines = [];
   if (cls.description) lines.push(cls.description.trim(), "");
   const fields = cls.members.filter((m) => m.kind !== "method");
-  const methods = cls.members.filter((m) => m.kind === "method" && m.description);
+  // Same visibility rule as the api renderer: `_`-prefixed methods are internal.
+  const methods = cls.members.filter((m) => m.kind === "method" && m.description && shouldRenderMethod(m));
   if (fields.length) {
     lines.push("**Fields**", "");
     for (const f of fields) {
@@ -256,7 +229,7 @@ function renderClassSummary(name, ctx) {
         .filter((p) => p.name && !p.name.includes("."))
         .map((p) => (p.optional ? `[${p.name}]` : p.name))
         .join(", ");
-      const ret = m.returns?.type ? ` → \`${prettifyReturnType(m.returns.type)}\`` : "";
+      const ret = m.returns?.type ? ` → \`${compactType(m.returns.type)}\`` : "";
       lines.push(`- \`${m.name}(${params})\`${ret} — ${firstSentence(m.description)}`);
     }
     lines.push("");
@@ -264,30 +237,31 @@ function renderClassSummary(name, ctx) {
   return lines.join("\n").trimEnd();
 }
 
-function prettifyReturnType(raw) {
-  return raw
-    .replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
+// Compact display form of a type string: import prefixes collapsed to bare
+// names, internal whitespace flattened.
+function compactType(raw) {
+  return stripImportPrefixes(raw).replace(/\s+/g, " ").trim();
 }
 
 // Flatten a typedef into its effective properties. If the typedef's type is
 // an intersection like `A & B`, collect properties from each referenced
-// typedef in declaration order (de-duplicated by name).
-function collectProperties(name, ir) {
+// typedef in declaration order (de-duplicated by name). `visited` guards
+// against self-referential intersection typedefs.
+function collectProperties(name, ir, visited = new Set()) {
+  if (visited.has(name)) return [];
+  visited.add(name);
   const typedef = findTypedef(ir, name);
   if (!typedef) return [];
   if (typedef.properties?.length) return typedef.properties;
 
-  const parts = (typedef.type ?? "")
-    .split("&")
+  const parts = splitTopLevel(typedef.type ?? "", "&")
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length < 2) return [];
 
   const seen = new Map();
   for (const part of parts) {
-    for (const p of collectProperties(part, ir)) {
+    for (const p of collectProperties(part, ir, visited)) {
       if (!seen.has(p.name)) seen.set(p.name, p);
     }
   }
@@ -303,27 +277,28 @@ function findTypedef(ir, name) {
   return mod?.typedefs.find((t) => t.name === name) ?? null;
 }
 
+// Escape table-breaking pipes exactly once — pipes that are already escaped
+// are left alone, so this is safe to apply to text from any source.
+function escapeCellPipes(text) {
+  return text.replace(/(?<!\\)\|/g, "\\|");
+}
+
 // Compact display: inside a markdown table cell we want inline code spans.
 // Collapse `import('./x.js').Foo` to `Foo`, long inline object types to
 // `object`, and strip newlines.
-function renderTypedefType(raw, { table = false } = {}) {
-  let compact = raw
-    .replace(/import\(['"][^'"]+['"]\)\.([A-Za-z_$][\w$.]*)/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
+function renderTypedefType(raw) {
+  let compact = compactType(raw);
   if (compact.length > 60 && (compact.startsWith("{") || /[({=]/.test(compact))) {
     compact = "object";
   }
-  const escaped = compact.replace(table ? /[`|]/g : /`/g, (ch) => `\\${ch}`);
-  return "`" + escaped + "`";
+  return "`" + escapeCellPipes(compact.replace(/`/g, "\\`")) + "`";
 }
 
 // Cells can't contain newlines or un-escaped pipes. `{@link url}` gets turned
 // into a plain URL so agents can still see it.
 function prepareCell(text) {
-  return (text || "")
+  return escapeCellPipes(text || "")
     .replace(/\{@link\s+([^}\s]+)(?:\s+[^}]+)?\}/g, "$1")
-    .replace(/\|/g, "\\|")
     .replace(/:\s*\n\s*-\s+/g, ":<br />- ")
     .replace(/\n\s*-\s+/g, "<br />- ")
     .replace(/\n+/g, " ")
@@ -384,12 +359,8 @@ function groupTasksByModality(supportedTasks) {
 }
 
 function finalize(lines) {
-  return (
-    lines
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trimEnd() + "\n"
-  );
+  // Blank-run collapsing must not touch fenced example code.
+  return transformOutsideFences(lines.join("\n"), (text) => text.replace(/\n{3,}/g, "\n\n")).trimEnd() + "\n";
 }
 
 function aliasesFor(taskId, tasks) {
@@ -405,4 +376,3 @@ function findClass(ir, name) {
   }
   return null;
 }
-

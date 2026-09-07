@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { listFiles } from "./fs.mjs";
 import { apiOutputDir, toctreePath } from "./paths.mjs";
 
 export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toctreePath, project = null } = {}) {
@@ -16,7 +17,7 @@ export function validateGeneratedDocs({ outputDir = apiOutputDir, tocPath = toct
   // (undocumented exports, malformed `@param` lines) that the renderer can't
   // fix on its own. They don't fail validation — broken links and a stale
   // toctree do.
-  const docWarnings = project ? collectDocWarnings(project) : [];
+  const docWarnings = [...(project ? collectDocWarnings(project) : []), ...collectAnchorWarnings(sourceDir)];
 
   return {
     ok: unlisted.length === 0 && stale.length === 0 && brokenLinks.length === 0,
@@ -88,23 +89,18 @@ function collectDocWarnings({ ir, publicNames }) {
         if (!p.name) warnings.push(`${mod.name}: \`${fn.name}\` has a parameter with no name (check for malformed @param)`);
       }
     }
+    for (const td of [...mod.typedefs, ...mod.callbacks]) {
+      if (!td.name) warnings.push(`${mod.name}: a @typedef/@callback has no name (check for malformed tag)`);
+    }
   }
 
   return warnings;
 }
 
 function listApiPages(outputDir) {
-  return listMarkdown(outputDir)
+  return listFiles(outputDir, ".md")
     .map((file) => toApiPage(outputDir, file))
     .sort();
-}
-
-function listMarkdown(dir) {
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { recursive: true })
-    .filter((p) => p.endsWith(".md"))
-    .map((p) => path.join(dir, p));
 }
 
 function toApiPage(outputDir, file) {
@@ -128,17 +124,17 @@ function difference(a, b) {
 }
 
 function validateInternalLinks(sourceDir) {
-  const files = listMarkdown(sourceDir);
+  const files = listFiles(sourceDir, ".md");
   const fileSet = new Set(files.map((file) => relativeMarkdownPath(sourceDir, file)));
   const anchorsByFile = new Map(files.map((file) => [relativeMarkdownPath(sourceDir, file), collectAnchors(file)]));
   const issues = [];
 
   for (const file of files) {
     const rel = relativeMarkdownPath(sourceDir, file);
-    const text = readMarkdownWithIncludes(file);
+    const text = maskFences(readMarkdownWithIncludes(file));
 
     for (const match of text.matchAll(MARKDOWN_LINK_RE)) {
-      const target = match[1] ?? match[2];
+      const target = match[1];
       if (!isLocalLink(target)) continue;
 
       const [targetPath, rawAnchor = ""] = target.split("#");
@@ -163,7 +159,25 @@ function validateInternalLinks(sourceDir) {
   return issues;
 }
 
-const MARKDOWN_LINK_RE = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+// Labels may contain one nested level of square brackets (`[`Foo[]?`](...)`).
+const MARKDOWN_LINK_RE = /!?\[(?:[^[\]]|\[[^\]]*\])*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+
+// Blank out fenced code blocks so the link and heading scanners can't match
+// code — `x[i](y)` in a snippet is not a markdown link, and a `# comment` is
+// not a heading. Line structure is preserved.
+function maskFences(text) {
+  let inFence = false;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+        return "";
+      }
+      return inFence ? "" : line;
+    })
+    .join("\n");
+}
 
 function isLocalLink(target) {
   return !!target && !/^[a-z][a-z0-9+.-]*:/i.test(target) && !target.startsWith("//");
@@ -180,8 +194,8 @@ function relativeMarkdownPath(sourceDir, file) {
 }
 
 function collectAnchors(file) {
-  const text = readMarkdownWithIncludes(file);
-  const anchors = new Set([""]);
+  const text = maskFences(readMarkdownWithIncludes(file));
+  const anchors = new Set();
 
   for (const match of text.matchAll(/<a\s+id=["']([^"']+)["']/g)) anchors.add(match[1]);
   for (const match of text.matchAll(/^#{1,6}\s+(.+)$/gm)) anchors.add(slugHeading(match[1]));
@@ -201,6 +215,22 @@ function readMarkdownWithIncludes(file, seen = new Set()) {
     const resolved = path.resolve(path.dirname(file), includePath);
     return fs.existsSync(resolved) ? readMarkdownWithIncludes(resolved, seen) : match;
   });
+}
+
+// Headings made entirely of HTML/entities/punctuation slugify to "" and can
+// never be linked to. None exist today; this guards against regressions.
+function collectAnchorWarnings(sourceDir) {
+  const warnings = [];
+  for (const file of listFiles(sourceDir, ".md")) {
+    const rel = relativeMarkdownPath(sourceDir, file);
+    const text = maskFences(readMarkdownWithIncludes(file));
+    for (const match of text.matchAll(/^#{1,6}\s+(.+)$/gm)) {
+      if (!slugHeading(match[1])) {
+        warnings.push(`${rel}: heading "${match[1].trim()}" produces an empty anchor`);
+      }
+    }
+  }
+  return warnings;
 }
 
 function slugHeading(text) {

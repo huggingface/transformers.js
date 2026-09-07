@@ -79,19 +79,34 @@ library cannot load a model without them. Two ways to check:
 1. Open the model page on the Hub and look for an `onnx/` directory in the
    "Files and versions" tab.
 2. Programmatically, with `ModelRegistry.get_available_dtypes(modelId)` —
-   returns the list of dtypes shipped, or `[]` if no ONNX files exist.
+   returns the list of dtypes shipped. An empty array means the model exists
+   but ships no ONNX files. It throws a `ModelFileNotFoundError` if the model
+   does not exist or is not accessible (private/gated — the Hub cannot tell
+   these apart), and a regular error on network failures, so an unreachable
+   model is never mistaken for one without ONNX files.
 
 ```javascript
-import { ModelRegistry } from "@huggingface/transformers";
+import { ModelRegistry, ModelFileNotFoundError } from "@huggingface/transformers";
 
-const dtypes = await ModelRegistry.get_available_dtypes("Xenova/some-model");
-if (dtypes.length === 0) {
-  // No ONNX files — not usable with transformers.js.
+// "Xenova/some-model" is a placeholder — substitute the ID you want to check.
+try {
+  const dtypes = await ModelRegistry.get_available_dtypes("Xenova/some-model");
+  if (dtypes.length === 0) {
+    // Model exists but has no ONNX files — not usable with transformers.js.
+  }
+} catch (e) {
+  if (e instanceof ModelFileNotFoundError) {
+    // Model does not exist, or is private/gated without a token.
+  } else {
+    throw e; // network failure — retry rather than blacklisting the model
+  }
 }
 ```
 
 Don't suggest a model without verifying this; the failure mode at runtime is a
-download error that's harder to diagnose than a pre-flight check.
+download error that's harder to diagnose than a pre-flight check. For a fuller
+pre-flight pattern (cache checks, dtype fallback), see
+[`references/CONFIGURATION.md`](references/CONFIGURATION.md#inspecting-models-before-loading).
 
 ### Quantization
 
@@ -104,6 +119,7 @@ at the cost of some accuracy:
 | `fp16`   | ~50% of fp32 | GPU / WebGPU inference                          |
 | `q8`     | ~25% of fp32 | Good default for browsers                       |
 | `q4`     | ~12% of fp32 | Tight memory budgets, large language models     |
+| `q4f16`  | ~12% of fp32 | Like `q4` but with fp16 activations — pairs well with WebGPU LLMs |
 
 ```javascript
 const pipe = await pipeline("text-generation", "onnx-community/Qwen3-0.6B-ONNX", {
@@ -154,10 +170,13 @@ set of environment options, cache management, and private / gated models.
 ## Pipeline options
 
 Every pipeline accepts a `progress_callback` for download progress plus options
-controlling device, dtype, and caching. Task-specific call options (e.g.
-`top_k`, `max_new_tokens`, streaming, chat templates) live with each task in
-[`references/TASKS.md`](references/TASKS.md). Common options and their types:
-[`references/PIPELINE_OPTIONS.md`](references/PIPELINE_OPTIONS.md).
+controlling device, dtype, and caching. The per-task recipes in
+[`references/TASKS.md`](references/TASKS.md) show common call options (e.g.
+`top_k`, `max_new_tokens`) in use; shared loading options, generation
+parameters, streaming, and KV-cache reuse are documented in
+[`references/PIPELINE_OPTIONS.md`](references/PIPELINE_OPTIONS.md). For the
+exhaustive per-task option types, see the
+[API reference](https://huggingface.co/docs/transformers.js/api/pipelines).
 
 ## Things to never do
 

@@ -98,9 +98,14 @@ env.useBrowserCache = true; // default when Cache API is available
 // First visit downloads from the Hub; subsequent visits hit the cache.
 ```
 
-## Custom fetch (private / gated models, retries, etc.)
+## Private / gated models and custom fetch
 
-Override `env.fetch` to inject auth headers, retry logic, or abort signals:
+In Node.js, no configuration is needed for private or gated models: the library
+automatically sends `Authorization: Bearer $HF_TOKEN` with requests to the
+Hugging Face Hub, so setting that environment variable is enough.
+
+In browsers — or for retry logic and abort signals anywhere — override
+`env.fetch`:
 
 ```javascript
 env.fetch = (url, init) =>
@@ -127,6 +132,10 @@ The cache must implement the Web Cache API's `match` and `put` methods.
 `ModelRegistry` reports which files a model needs, whether they're cached
 locally, which dtypes the model ships with, and can clear caches selectively.
 Useful for pre-flight UI and disk management.
+
+Note that `get_available_dtypes` returns `[]` only when the model exists but
+ships no ONNX files; it throws a `ModelFileNotFoundError` for missing or
+inaccessible (private/gated) models, and a regular error on network failures.
 
 ```javascript
 import { ModelRegistry } from "@huggingface/transformers";

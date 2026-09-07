@@ -46,8 +46,9 @@ which generates:
 
 - `packages/transformers/docs/source/api/**/*.md` from JSDoc comments in
   `packages/transformers/src/**/*.js`.
-- Generated sections in `.ai/skills/transformers-js/SKILL.md`.
-- `.ai/skills/transformers-js/references/TASKS.md`.
+- The marker-delimited generated sections in `.ai/skills/transformers-js/SKILL.md`
+  and `references/{CONFIGURATION,PIPELINE_OPTIONS}.md`.
+- `.ai/skills/transformers-js/references/TASKS.md` (fully generated).
 - The repo-root `README.md` from `packages/transformers/docs/snippets/*.snippet`.
 
 Do not edit generated API pages, the generated skill reference files, or the
@@ -71,12 +72,16 @@ the validator (without regenerating), use `pnpm --filter @huggingface/transforme
 
 ### What is generated vs. hand-written
 
-| Path | Generated? |
-|------|------------|
-| `packages/transformers/docs/source/api/**/*.md` | yes — gitignored |
-| `packages/transformers/docs/source/{guides,tutorials,integrations}/*.md` | hand-written |
-| `packages/transformers/docs/source/_toctree.yml` | hand-written (must list every generated API page) |
-| `.ai/skills/transformers-js/SKILL.md` | mixed — prose hand-written, blocks between `<!-- @generated:start ... -->` markers regenerated |
-| `.ai/skills/transformers-js/references/TASKS.md` | fully generated, do not edit |
-| `.ai/skills/transformers-js/references/{CONFIGURATION,PIPELINE_OPTIONS}.md` | mixed (same marker convention as SKILL.md) |
-| `README.md` | generated from `packages/transformers/docs/snippets/*.snippet` |
+| Path | Generated? | Tracked in git? |
+|------|------------|-----------------|
+| `packages/transformers/docs/source/api/**/*.md` | yes | no — gitignored |
+| `packages/transformers/docs/source/{guides,tutorials,integrations}/*.md` | hand-written | yes |
+| `packages/transformers/docs/source/_toctree.yml` | hand-written (must list every generated API page) | yes |
+| `.ai/skills/transformers-js/SKILL.md` | mixed — prose hand-written, blocks between `<!-- @generated:start ... -->` markers regenerated | yes |
+| `.ai/skills/transformers-js/references/TASKS.md` | fully generated, do not edit | yes |
+| `.ai/skills/transformers-js/references/{CONFIGURATION,PIPELINE_OPTIONS}.md` | mixed (same marker convention as SKILL.md) | yes |
+| `README.md` | generated from `packages/transformers/docs/snippets/*.snippet` | yes |
+
+Generated files that are tracked in git (the `.ai/` references and `README.md`) must be
+regenerated and committed together with the source change that affects them — CI fails
+the build if they drift from the source JSDoc.

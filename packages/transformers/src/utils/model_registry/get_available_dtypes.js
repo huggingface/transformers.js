@@ -22,6 +22,9 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * exist for that dtype. For example, a Seq2Seq model needs both an encoder
  * and decoder file — the dtype is only listed if both are present.
  *
+ * An empty array means the model exists and is accessible, but ships no
+ * complete set of ONNX files for any dtype.
+ *
  * @param {string} modelId The model id (e.g., "onnx-community/all-MiniLM-L6-v2-ONNX")
  * @param {Object} [options] Optional parameters
  * @param {PretrainedConfig} [options.config=null] Pre-loaded model config (optional, will be fetched if not provided)
@@ -29,7 +32,13 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * @param {string} [options.revision='main'] Model revision
  * @param {string} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Only check local files
- * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8'])
+ * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8']).
+ * Empty if the model has no ONNX files.
+ * @throws {import('../hub/utils.js').ModelFileNotFoundError} If the model does not exist or is not
+ * accessible (e.g., gated or private without a token). Note that the Hugging Face Hub responds with
+ * 401 for non-existent repositories, so these cases are indistinguishable.
+ * @throws {Error} On network-level or server failures (e.g., offline), so an unreachable
+ * model is never misreported as having no ONNX files.
  */
 export async function get_available_dtypes(
     modelId,

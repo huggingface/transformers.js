@@ -260,7 +260,7 @@ import { pipeline } from '@huggingface/transformers';
 
 const classifier = await pipeline('image-classification', 'Xenova/vit-base-patch16-224');
 const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg';
-const output = await classifier(url, { top_k: 0 });
+const output = await classifier(url, { top_k: null });
 // [
 //   { label: 'tiger, Panthera tigris', score: 0.632695734500885 },
 //   { label: 'tiger cat', score: 0.3634825646877289 },

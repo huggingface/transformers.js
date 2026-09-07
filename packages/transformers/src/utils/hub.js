@@ -14,6 +14,7 @@ import {
     pathJoin,
     isValidHfModelId,
     makePretrainedOptionsKey,
+    ModelFileNotFoundError,
     readResponse,
 } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
@@ -312,7 +313,7 @@ export async function loadResourceFile(
             if (options.local_files_only || !env.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
-                    throw Error(
+                    throw new ModelFileNotFoundError(
                         `\`local_files_only=true\` or \`env.allowRemoteModels=false\` and file was not found locally at "${localPath}".`,
                     );
                 } else {
@@ -324,7 +325,7 @@ export async function loadResourceFile(
             if (!validModelId) {
                 // Before making any requests to the remote server, we check if the model ID is valid.
                 // This prevents unnecessary network requests for invalid model IDs.
-                throw Error(
+                throw new ModelFileNotFoundError(
                     `Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`,
                 );
             }

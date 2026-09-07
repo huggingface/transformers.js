@@ -133,8 +133,9 @@ const translator = await pipeline("translation", "Xenova/nllb-200-distilled-600M
 await translator("Hello", { src_lang: "eng_Latn", tgt_lang: "fra_Latn" });
 ```
 
-Task-specific recipes and every call option for each pipeline are in
-[`TASKS.md`](./TASKS.md).
+The per-task recipes in [`TASKS.md`](./TASKS.md) show the most common call
+options in use. For the exhaustive option types of a specific pipeline, see the
+[API reference](https://huggingface.co/docs/transformers.js/api/pipelines).
 
 ## Generation parameters
 
@@ -223,13 +224,27 @@ For whisper-style chunk / token / finalize callbacks, use `WhisperTextStreamer`.
 
 ### KV cache reuse across calls
 
-Passing the cache from one call to the next skips re-encoding the prefix:
+For multi-turn chat, pass the same `DynamicCache` to every call **and re-send the full
+conversation each turn**. The pipeline uses the cache to skip re-encoding the tokens it
+has already processed (the shared prefix). Do not pass only the new message: the model
+needs the full sequence to compute token positions, so incremental-only input produces
+wrong results.
 
 ```javascript
 import { pipeline, DynamicCache } from "@huggingface/transformers";
 
 const generator = await pipeline("text-generation", "onnx-community/Qwen3-0.6B-ONNX");
-const cache = new DynamicCache();
-await generator("Hello,", { max_new_tokens: 20, past_key_values: cache });
-await generator(" how are you?", { max_new_tokens: 20, past_key_values: cache });
+const past_key_values = new DynamicCache();
+const messages = [{ role: "user", content: "What is the capital of France?" }];
+
+// Turn 1
+const turn1 = await generator(messages, { max_new_tokens: 128, past_key_values });
+messages.push(turn1[0].generated_text.at(-1)); // append the assistant reply
+
+// Turn 2: send the full conversation again — only the new tokens are encoded
+messages.push({ role: "user", content: "What about Germany?" });
+const turn2 = await generator(messages, { max_new_tokens: 128, past_key_values });
+console.log(turn2[0].generated_text.at(-1).content);
+
+await past_key_values.dispose(); // free the cache tensors when the conversation ends
 ```
