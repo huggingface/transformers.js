@@ -128,6 +128,10 @@ export class Tensor {
         });
     }
 
+    /**
+     * Releases the resources held by the underlying ONNX Runtime tensor (e.g., GPU buffers).
+     * The tensor should not be used after this method is called.
+     */
     dispose() {
         this.ort_tensor.dispose();
         // this.ort_tensor = undefined;
@@ -613,6 +617,8 @@ export class Tensor {
 
     /**
      * In-place version of @see {@link Tensor.squeeze}
+     * @param {number|number[]|null} [dim=null] If given, the input will be squeezed only in the specified dimensions.
+     * @returns {Tensor} `this`, with the specified dimensions of size 1 removed.
      */
     squeeze_(dim = null) {
         this.dims = calc_squeeze_dims(this.dims, dim);
@@ -642,6 +648,9 @@ export class Tensor {
 
     /**
      * In-place version of @see {@link Tensor.flatten}
+     * @param {number} [start_dim=0] the first dim to flatten
+     * @param {number} [end_dim=-1] the last dim to flatten
+     * @returns {Tensor} `this`, flattened along the specified dimensions.
      */
     flatten_(start_dim = 0, end_dim = -1) {
         // TODO validate inputs
@@ -696,6 +705,10 @@ export class Tensor {
         return new Tensor(this.type, this_data, dims); // NOTE: uses same underlying storage
     }
 
+    /**
+     * In-place version of @see {@link Tensor.neg}
+     * @returns {Tensor} `this`, with every element negated.
+     */
     neg_() {
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
@@ -703,6 +716,11 @@ export class Tensor {
         }
         return this;
     }
+
+    /**
+     * Returns a new tensor with the negative of the elements of this tensor.
+     * @returns {Tensor} the output tensor.
+     */
     neg() {
         return this.clone().neg_();
     }
@@ -776,10 +794,22 @@ export class Tensor {
         return this.clone().round_();
     }
 
+    /**
+     * Returns the mean value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the mean of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with means taken along the specified dimension.
+     */
     mean(dim = null, keepdim = false) {
         return mean(this, dim, keepdim);
     }
 
+    /**
+     * Returns the minimum value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the minimum of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with minimum values taken along the specified dimension.
+     */
     min(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
@@ -796,6 +826,12 @@ export class Tensor {
         return new Tensor(type, result, resultDims);
     }
 
+    /**
+     * Returns the maximum value of each row of this tensor in the given dimension `dim`.
+     * @param {number|null} [dim=null] the dimension to reduce. If `null`, the maximum of all elements is computed.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} A new tensor with maximum values taken along the specified dimension.
+     */
     max(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
@@ -812,6 +848,13 @@ export class Tensor {
         return new Tensor(type, result, resultDims);
     }
 
+    /**
+     * Returns the index of the minimum value of all elements in this tensor.
+     * @param {number|null} [dim=null] the dimension to reduce. Only `null` (reduce over all elements) is currently supported.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} An `int64` scalar tensor containing the index of the minimum value.
+     * @throws {Error} If `dim` is not `null`.
+     */
     argmin(dim = null, keepdim = false) {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
@@ -819,6 +862,14 @@ export class Tensor {
         const index = min(this.data)[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
+
+    /**
+     * Returns the index of the maximum value of all elements in this tensor.
+     * @param {number|null} [dim=null] the dimension to reduce. Only `null` (reduce over all elements) is currently supported.
+     * @param {boolean} [keepdim=false] whether the output tensor has `dim` retained or not.
+     * @returns {Tensor} An `int64` scalar tensor containing the index of the maximum value.
+     * @throws {Error} If `dim` is not `null`.
+     */
     argmax(dim = null, keepdim = false) {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
@@ -1560,6 +1611,13 @@ export function full(size, fill_value) {
     return fullHelper(size, fill_value, dtype, typedArrayCls);
 }
 
+/**
+ * Creates a tensor with the same size as `tensor`, filled with `fill_value`.
+ * The tensor's dtype is inferred from `fill_value`.
+ * @param {Tensor} tensor The size of input will determine size of the output tensor.
+ * @param {number|bigint|boolean} fill_value The value to fill the output tensor with.
+ * @returns {Tensor} The filled tensor.
+ */
 export function full_like(tensor, fill_value) {
     return full(tensor.dims, fill_value);
 }

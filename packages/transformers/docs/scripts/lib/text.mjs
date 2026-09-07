@@ -17,11 +17,15 @@ export function firstSentence(text) {
   return /[.!?]$/.test(sentence) ? sentence : sentence + ".";
 }
 
-// Descriptions copied from the Python library sometimes start with
-// `[`TypeName`]` (reST cross-reference syntax). Drop the leading artifact —
-// but not a markdown link `[label](url)`, whose bracket is load-bearing.
+// Descriptions copied from the Python library use reST cross-references —
+// ``[`TypeName`]``, sometimes with a `~` prefix or a trailing `()`. Reduce them
+// to plain inline code so the sentence still reads. Renderers that can resolve
+// symbols to anchors (the API pages) link them instead; this is the plain-text
+// fallback. A markdown link `[label](url)` keeps its load-bearing bracket.
+export const DOC_REFERENCE = /\[`~?([A-Za-z_$][\w$.]*(?:\(\))?)`\](?!\()/g;
+
 export function stripDocArtifacts(text) {
-  return text.replace(/^\[`?[A-Za-z_$][\w$.]*`?\](?!\()\s*/, "");
+  return text.replace(DOC_REFERENCE, "`$1`");
 }
 
 const FENCE = /^\s*```/;

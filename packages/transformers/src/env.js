@@ -206,7 +206,7 @@ export const LogLevel = Object.freeze({
  * @property {string} remotePathTemplate Path template to fill in and append to `remoteHost` when loading models.
  * @property {boolean} allowLocalModels Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise.
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
- * @property {string} localModelPath Path to load local models from. Defaults to `/models/`.
+ * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.

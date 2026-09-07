@@ -22,7 +22,7 @@ export class StoppingCriteria extends Callable {
      *
      * @param {number[][]} input_ids (`number[][]` of shape `(batch_size, sequence_length)`):
      * Indices of input sequence tokens in the vocabulary.
-     * @param {number[][]} scores scores (`number[][]` of shape `(batch_size, config.vocab_size)`):
+     * @param {number[][]} scores (`number[][]` of shape `(batch_size, config.vocab_size)`):
      * Prediction scores of a language modeling head. These can be scores for each vocabulary token before SoftMax
      * or scores for each vocabulary token after SoftMax.
      * @returns {boolean[]} A list of booleans indicating whether each sequence should be stopped.
@@ -143,19 +143,36 @@ export class EosTokenCriteria extends StoppingCriteria {
  * Stops generation whenever the user interrupts the process.
  */
 export class InterruptableStoppingCriteria extends StoppingCriteria {
+    /**
+     * Constructs a new instance of `InterruptableStoppingCriteria`.
+     */
     constructor() {
         super();
         this.interrupted = false;
     }
 
+    /**
+     * Interrupts the generation process, causing every sequence in the batch to stop
+     * on the next call to this criterion.
+     */
     interrupt() {
         this.interrupted = true;
     }
 
+    /**
+     * Clears a previous interruption, allowing generation to continue.
+     */
     reset() {
         this.interrupted = false;
     }
 
+    /**
+     * @param {number[][]} input_ids (`number[][]` of shape `(batch_size, sequence_length)`):
+     * Indices of input sequence tokens in the vocabulary.
+     * @param {number[][]} scores (`number[][]` of shape `(batch_size, config.vocab_size)`):
+     * Prediction scores of a language modeling head.
+     * @returns {boolean[]} A list of booleans indicating whether each sequence should be stopped.
+     */
     _call(input_ids, scores) {
         return new Array(input_ids.length).fill(this.interrupted);
     }

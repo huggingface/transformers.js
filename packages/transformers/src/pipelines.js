@@ -67,14 +67,16 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  * @template {PipelineType} T The type of pipeline to return.
  * @param {T} task The task defining which pipeline will be returned. Currently accepted tasks are:
  *  - `"audio-classification"`: will return a `AudioClassificationPipeline`.
- *  - `"automatic-speech-recognition"`: will return a `AutomaticSpeechRecognitionPipeline`.
+ *  - `"automatic-speech-recognition"` (alias "asr" available): will return a `AutomaticSpeechRecognitionPipeline`.
  *  - `"background-removal"`: will return a `BackgroundRemovalPipeline`.
  *  - `"depth-estimation"`: will return a `DepthEstimationPipeline`.
  *  - `"document-question-answering"`: will return a `DocumentQuestionAnsweringPipeline`.
- *  - `"feature-extraction"`: will return a `FeatureExtractionPipeline`.
+ *  - `"feature-extraction"` (alias "embeddings" available): will return a `FeatureExtractionPipeline`.
  *  - `"fill-mask"`: will return a `FillMaskPipeline`.
  *  - `"image-classification"`: will return a `ImageClassificationPipeline`.
+ *  - `"image-feature-extraction"`: will return a `ImageFeatureExtractionPipeline`.
  *  - `"image-segmentation"`: will return a `ImageSegmentationPipeline`.
+ *  - `"image-to-image"`: will return a `ImageToImagePipeline`.
  *  - `"image-to-text"`: will return a `ImageToTextPipeline`.
  *  - `"object-detection"`: will return a `ObjectDetectionPipeline`.
  *  - `"question-answering"`: will return a `QuestionAnsweringPipeline`.
@@ -82,6 +84,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  *  - `"text2text-generation"`: will return a `Text2TextGenerationPipeline`.
  *  - `"text-classification"` (alias "sentiment-analysis" available): will return a `TextClassificationPipeline`.
  *  - `"text-generation"`: will return a `TextGenerationPipeline`.
+ *  - `"text-to-audio"` (alias "text-to-speech" available): will return a `TextToAudioPipeline`.
  *  - `"token-classification"` (alias "ner" available): will return a `TokenClassificationPipeline`.
  *  - `"translation"`: will return a `TranslationPipeline`.
  *  - `"translation_xx_to_yy"`: will return a `TranslationPipeline`.

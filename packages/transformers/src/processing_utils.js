@@ -59,6 +59,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * The image processor used by this processor, if any.
      * @returns {import('./image_processors_utils.js').ImageProcessor|undefined} The image processor of the processor, if it exists.
      */
     get image_processor() {
@@ -66,6 +67,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * The tokenizer used by this processor, if any.
      * @returns {PreTrainedTokenizer|undefined} The tokenizer of the processor, if it exists.
      */
     get tokenizer() {
@@ -73,6 +75,7 @@ export class Processor extends Callable {
     }
 
     /**
+     * The feature extractor used by this processor, if any.
      * @returns {import('./feature_extraction_utils.js').FeatureExtractor|undefined} The feature extractor of the processor, if it exists.
      */
     get feature_extractor() {

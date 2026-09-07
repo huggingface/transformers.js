@@ -6,8 +6,8 @@
 import path from "node:path";
 
 import { apiMemberAnchor, apiSymbolAnchor } from "./api-links.mjs";
-import { matchingBracket, splitTopLevel } from "./scan.mjs";
-import { exampleLines, firstSentence, paramSignature, stripDocArtifacts, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
+import { matchingBracket, splitConditional, splitTopLevel } from "./scan.mjs";
+import { DOC_REFERENCE, exampleLines, firstSentence, paramSignature, stripImportPrefixes, transformOutsideFences } from "./text.mjs";
 import { parseCallableReference, parseUtilityType, TS_UTILITY_NAMES } from "./type-refs.mjs";
 
 // Pages with at least this many top-level items get an "On this page" TOC so
@@ -43,6 +43,9 @@ export function renderModule(mod, ir, opts) {
     typedefIndex: ir.typedefIndex,
     moduleByName: new Map(ir.modules.map((m) => [m.name, m])),
     moduleName: mod.name,
+    // Unfiltered: `renderTypedef` needs the module's `_`-prefixed classes,
+    // which are deliberately absent from the public export surface.
+    moduleClasses: mod.classes,
     renderedNames,
     callableLinks,
   };
@@ -147,14 +150,15 @@ function dedupeByName(items) {
   return items.filter((it) => (seen.has(it.name) ? false : seen.add(it.name)));
 }
 
-// Descriptions carried over from the Python library sometimes start with a
-// reST-style `[`TypeName`]` cross-reference that JavaScript readers can't follow.
-// Strip the artifact from the start of the first paragraph; leave the rest alone.
-// Also normalize `@see Symbol` / `@see {@link Symbol}` to inline markup so it
-// reads as prose rather than raw JSDoc tags — `{@link ...}` is expanded later
-// by `expandInlineLinks`.
+// reST-style ``[`TypeName`]`` cross-references carried over from the Python
+// library are left in place here — `expandInlineLinks` turns them into real
+// links (or plain code spans) once the page-level symbol index is available.
+// Normalize `@see Symbol` / `@see {@link Symbol}` to inline markup so it reads
+// as prose rather than raw JSDoc tags — `{@link ...}` is expanded later by
+// `expandInlineLinks` too.
 function cleanDescription(text) {
-  return stripDocArtifacts(text.trim())
+  return text
+    .trim()
     .replace(/@see\s+(?=\{@link)/g, "")
     .replace(/@see\s+`?([A-Za-z_$][\w$.]*)`?/g, "`$1`");
 }
@@ -173,7 +177,11 @@ function expandInlineLinks(text, ctx) {
       const displayed = (label ?? target).trim();
       return /^https?:\/\//.test(target) ? `[${displayed}](${target})` : (linkReference(target, displayed, ctx) ?? `\`${displayed}\``);
     })
-    .replace(/\[`([A-Za-z_$][\w$]*)`\](?!\()/g, (match, name) => linkIfKnown(name, ctx) ?? match);
+    .replace(DOC_REFERENCE, (_, ref) => {
+      // `pipeline()` reads as a call but resolves as the symbol `pipeline`.
+      const symbol = ref.replace(/\(\)$/, "");
+      return linkReference(symbol, ref, ctx) ?? `\`${ref}\``;
+    });
 }
 
 // ---------- classes, functions, callbacks ----------
@@ -378,7 +386,35 @@ function renderTypedef(td, ctx) {
   if (td.properties?.length) {
     lines.push("**Properties**", "", ...renderParamList(td.properties, ctx), "");
   }
+  lines.push(...renderBackingClassMembers(td, ctx));
   return lines;
+}
+
+// `@typedef {Record<string, Tensor> & _DynamicCache} DynamicCache` is the
+// library's way of saying "a plain object that also has these methods": the
+// members live on a `_`-prefixed class that is never documented on its own,
+// and only the typedef name is exported. Find that class so its members can be
+// rendered under the typedef.
+function backingClass(td, ctx) {
+  if (!td.type || !ctx.moduleClasses?.length) return null;
+  const parts = splitTopLevel(prettifyTypeString(td.type), "&").map((p) => p.trim());
+  if (parts.length < 2) return null;
+  for (const part of parts) {
+    if (!/^_[A-Za-z]/.test(part)) continue;
+    const cls = ctx.moduleClasses.find((c) => c.name === part);
+    if (cls) return cls;
+  }
+  return null;
+}
+
+// Render the backing class's constructor and public methods under the typedef,
+// anchored to the typedef's name (`module_x.DynamicCache.update`) so links
+// point at the name readers actually use. The `_Type:_` line above already
+// shows the remaining, non-private half of the intersection.
+function renderBackingClassMembers(td, ctx) {
+  const cls = backingClass(td, ctx);
+  if (!cls) return [];
+  return cls.members.flatMap((m) => (m.kind === "method" && shouldRenderMethod(m) ? renderFunction(m, ctx, 4, td.name) : []));
 }
 
 function shouldRenderTypedef(td, ctx) {
@@ -395,18 +431,23 @@ function typedefRenderInfo(td, ctx) {
   // — showing `_Type:_ `object`` adds noise without helping the reader.
   const isOpaque = ["`object`", "`Object`", "`unknown`", "`any`"].includes(displayed);
   // Unions and intersections are worth showing even when long — every variant
-  // is a named type the reader can click through to. Opaque inline object
-  // literals (`{...}`) stay hidden.
+  // is a named type the reader can click through to. An inline object literal
+  // has no clickable parts, so it earns its place only while it still fits on
+  // a line. Typedefs with a **Properties** list show that instead.
   const isUnionOrIntersection = / \| | & /.test(displayed);
+  const isObjectLiteral = displayed.startsWith("`{");
   const fitsInline = displayed.length < 120;
+  // `_`-prefixed names are internal by convention and never get a page of
+  // their own, so a type built out of one points the reader nowhere.
+  const referencesInternal = /`_[A-Za-z]/.test(displayed);
   const typeIsShowable =
     displayed &&
     !td.properties?.length &&
-    (isUnionOrIntersection || fitsInline) &&
-    !displayed.startsWith("`{") &&
+    (fitsInline || (isUnionOrIntersection && !isObjectLiteral)) &&
     !isSelfReference &&
     !isGenericPassthrough &&
-    !isOpaque;
+    !isOpaque &&
+    !referencesInternal;
 
   return { displayed, typeIsShowable };
 }
@@ -434,10 +475,9 @@ function renderType(raw, ctx, opts = {}) {
     .map((p) => p.trim())
     .filter((p) => !/^_[A-Za-z]/.test(p));
   if (unionParts.length > 1) {
-    // Common shorthand `T | T[]` (in either order) — collapse to a single link
-    // marked as "single or array" so the reader doesn't see two identical links.
-    const collapsed = collapseSingleOrArray(unionParts, ctx);
-    if (collapsed) return collapsed;
+    // Every variant is rendered (and linked) on its own. `T | T[]` deliberately
+    // stays as two parts — a collapsed `T[]?` reads as "optional array", which
+    // is not what the union means.
     return unionParts.map((p) => renderType(p, ctx)).join(" | ");
   }
   if (unionParts.length === 1 && unionParts[0] !== pretty.trim()) return renderType(unionParts[0], ctx);
@@ -500,31 +540,14 @@ function renderArrayType(innerRaw, ctx) {
   return code ? `\`${code[1]}[]\`` : `${rendered}[]`;
 }
 
-// `T | T[]` (in either order) collapses to one link with a `[]?` suffix —
-// readers don't have to chase two identical-looking links to learn it accepts
-// either a single value or an array. Returns null when the union doesn't
-// match the shape. The single rendered link/text gets `[]?` appended:
-// `Foo` → `` `Foo[]?` ``, `[`Foo`](url)` → `[`Foo[]?`](url)`.
-function collapseSingleOrArray(parts, ctx) {
-  if (parts.length !== 2) return null;
-  const arrayPart = parts.find((p) => p.endsWith("[]"));
-  const singlePart = parts.find((p) => !p.endsWith("[]"));
-  if (!arrayPart || !singlePart) return null;
-  if (arrayPart.slice(0, -2).trim() !== singlePart.trim()) return null;
-  const inner = renderType(singlePart, ctx);
-  // Linked form `[`Name`](url)` — splice `[]?` into the label.
-  const linked = inner.match(/^\[`([^`]+)`\]\(([^)]+)\)$/);
-  if (linked) return `[\`${linked[1]}[]?\`](${linked[2]})`;
-  const code = inner.match(/^`([^`]+)`$/);
-  if (code) return `\`${code[1]}[]?\``;
-  return `${inner}[]?`;
-}
-
 function renderTupleType(innerRaw, ctx) {
   const parts = splitTopLevel(innerRaw, ",");
   if (parts.length === 1 && !parts[0].trim()) return "`[]`";
-  const rendered = parts.map((p) => renderType(p.trim(), ctx)).join(", ");
-  return `[${rendered}]`;
+  const rendered = parts.map((p) => renderType(p.trim(), ctx));
+  // A one-element tuple of a plain name would render as ``[`Name`]``, which is
+  // indistinguishable from a reST cross-reference — keep it inside the span.
+  const single = rendered.length === 1 && rendered[0].match(/^`([^`]+)`$/);
+  return single ? `\`[${single[1]}]\`` : `[${rendered.join(", ")}]`;
 }
 
 function linkIfKnown(name, ctx) {
@@ -576,6 +599,75 @@ function renderCallableReference(raw, ctx) {
   return linkCallable(ref.owner, ref.owner, ctx) ?? linkIfKnown(ref.owner, ctx) ?? `\`${ref.owner}\``;
 }
 
+// A conditional type (`Check extends X ? A : B`) resolves to one branch or the
+// other, so the union of its branches is an honest — and readable — stand-in.
+// Rewrite recursively: a branch may itself be a conditional, and a conditional
+// may sit inside a wrapper's generic arguments (`Promise<T extends X ? A[] : A>`
+// -> `Promise<A[] | A>`). Branches keep source order (true branch first) and
+// identical parts are deduped. Callers must skip strings containing `infer` or
+// a mapped type — those stay gnarly.
+function rewriteConditionals(raw) {
+  const s = unwrapParens(raw.trim());
+  if (!s.includes("extends")) return s;
+
+  const cond = splitConditional(s);
+  if (cond) {
+    const parts = [];
+    for (const branch of [cond.whenTrue, cond.whenFalse]) {
+      for (const part of splitTopLevel(rewriteConditionals(branch), "|")) {
+        const trimmed = part.trim();
+        // A `never` branch contributes nothing to the set of possible values.
+        if (!trimmed || trimmed === "never" || parts.includes(trimmed)) continue;
+        parts.push(trimmed);
+      }
+    }
+    return parts.length ? parts.join(" | ") : "never";
+  }
+
+  for (const sep of ["|", "&"]) {
+    const parts = splitTopLevel(s, sep);
+    if (parts.length > 1) return parts.map((p) => rewriteConditionals(p.trim())).join(` ${sep} `);
+  }
+
+  if (s.endsWith("[]")) {
+    const inner = rewriteConditionals(s.slice(0, -2));
+    // A rewritten union has to be parenthesized before `[]` binds to it.
+    return splitTopLevel(inner, "|").length > 1 ? `(${inner})[]` : `${inner}[]`;
+  }
+
+  if (s.startsWith("(") && matchingBracket(s, 0, "(", ")") === s.length - 1) {
+    return `(${rewriteConditionals(s.slice(1, -1))})`;
+  }
+
+  const generic = s.match(NAMED_GENERIC);
+  if (generic && matchingBracket(s, s.indexOf("<"), "<", ">") === s.length - 1) {
+    const args = splitTopLevel(generic[2], ",")
+      .map((a) => rewriteConditionals(a.trim()))
+      .join(", ");
+    return `${generic[1]}<${args}>`;
+  }
+
+  return s;
+}
+
+// Drop parentheses that wrap an entire type — source authors add them to group
+// nested conditionals, and keeping them would leave `(A | B) | C` in the output.
+function unwrapParens(s) {
+  let out = s;
+  while (out.startsWith("(") && matchingBracket(out, 0, "(", ")") === out.length - 1) {
+    out = out.slice(1, -1).trim();
+  }
+  return out;
+}
+
+// Mapped types (`{[K in Keys]: V}`) and `infer` have no readable expansion —
+// they stay gnarly rather than being rewritten.
+const MAPPED_TYPE = /\[\s*\w+\s+in\s/;
+
+function isRewritableConditional(s) {
+  return !/\binfer\b/.test(s) && !MAPPED_TYPE.test(s);
+}
+
 // Strip noisy TS constructs from a type string without rewriting structure.
 // Conditional/mapped/infer types collapse to their outermost wrapper; simple
 // unions of names or long generic lists are preserved so the renderer can
@@ -584,14 +676,20 @@ function prettifyTypeString(raw) {
   if (!raw) return "";
   let s = raw.trim();
 
+  // Types written across several JSDoc lines arrive with embedded newlines;
+  // the scanners below all reason about single-line text.
+  s = s.replace(/\s+/g, " ").trim();
   s = stripLeading(s, "<", ">"); // <T extends X>(...)
   s = stripImportPrefixes(s);
   s = s.replace(/import\(['"][^'"]+['"]\)/g, "any");
   s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, "'$1'");
 
   if (parseUtilityType(s)) {
-    return s.replace(/\s+/g, " ").trim();
+    return s;
   }
+
+  if (isRewritableConditional(s)) s = rewriteConditionals(s);
+  s = spaceObjectLiterals(s);
 
   if (isGnarly(s)) {
     const outer = s.match(/^([A-Za-z_$][\w$.]*)(?:<|\s|$)/);
@@ -607,25 +705,34 @@ function prettifyTypeString(raw) {
   return s.replace(/\s+/g, " ").trim();
 }
 
+// `{a: X}` -> `{ a: X }`. Inline object literals are rendered verbatim, and
+// they read much better with breathing room inside the braces. Empty `{}` and
+// braces that already have a space are left alone.
+function spaceObjectLiterals(s) {
+  return s.replace(/\{(?![\s}])/g, "{ ").replace(/(?<![\s{])\}/g, " }");
+}
+
 function stripLeading(s, open, close) {
   const end = matchingBracket(s, 0, open, close);
   return end === -1 ? s : s.slice(end + 1).trim();
 }
 
-// Conditional types (`A extends B ? X : Y`), mapped types (`{ [K in ...] }`),
-// and `infer` are unreadable inline. So are indexed accesses into typeof
-// expressions (`Parameters<X['foo']>[0]`) — readable names these are not.
+// Beyond this, a type string stops being something a reader can take in at a
+// glance in a table cell or bullet — it collapses to its outermost wrapper.
+const MAX_INLINE_TYPE_LENGTH = 160;
+
+// What survives `rewriteConditionals` is renderable verbatim — including
+// callable types (`(a: X) => Y`) and inline object literals (`{a: X, b?: Y}`),
+// whose `?` markers are perfectly readable. Genuinely unreadable shapes are
+// mapped types (`{[K in ...]: V}`), `infer`, an `extends` we couldn't rewrite,
+// indexed accesses into typeof expressions (`Parameters<X['foo']>[0]`), and
+// anything too long to scan.
 function isGnarly(s) {
   if (/\b(?:infer|extends)\b/.test(s)) return true;
+  if (MAPPED_TYPE.test(s)) return true;
   // Any bracketed indexing like `X['foo']` or `X[0]` inside the type string —
   // including inside `Parameters<...>` / `ReturnType<...>` — makes it too
   // noisy to render verbatim.
   if (/\[['"0-9]/.test(s)) return true;
-  let angle = 0;
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] === "<") angle++;
-    else if (s[i] === ">") angle = Math.max(0, angle - 1);
-    else if (angle === 0 && (s[i] === "?" || (s[i] === "[" && s[i + 1] === "K"))) return true;
-  }
-  return false;
+  return s.length > MAX_INLINE_TYPE_LENGTH;
 }

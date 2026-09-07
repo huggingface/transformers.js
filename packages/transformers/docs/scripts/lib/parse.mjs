@@ -81,8 +81,10 @@ function parseTag(raw) {
       return { tag, name: rest.trim().split(/\s+/)[0] || null };
     case "template": {
       // `@template {Constraint} Name description` — just the first identifier
-      // after any optional constraint is the template-parameter name.
-      const m = rest.match(/^([A-Za-z_$][\w$]*)/);
+      // after any optional constraint is the template-parameter name. The name
+      // may also be written `[Name=Default]`; the default is documentation
+      // noise, but dropping the whole tag would leave `Name` unresolvable.
+      const m = rest.match(/^\[?([A-Za-z_$][\w$]*)/);
       return { tag, type, name: m?.[1] ?? null };
     }
     case "type":

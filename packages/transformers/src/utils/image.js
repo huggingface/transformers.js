@@ -195,7 +195,11 @@ export class RawImage {
 
     /**
      * Helper method to create a new Image from a tensor
-     * @param {Tensor} tensor
+     * @param {Tensor} tensor The 3D tensor containing the image data. Must be of type `uint8`.
+     * @param {'CHW'|'HWC'} [channel_format='CHW'] The dimension ordering of the tensor.
+     * @returns {RawImage} The image created from the tensor.
+     * @throws {Error} If the tensor does not have 3 dimensions, or the channel format,
+     * tensor type, or number of channels is unsupported.
      */
     static fromTensor(tensor, channel_format = 'CHW') {
         if (tensor.dims.length !== 3) {

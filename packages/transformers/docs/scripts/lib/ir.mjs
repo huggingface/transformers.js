@@ -131,12 +131,22 @@ function mergeByName(target, items) {
   }
 }
 
+// Keep one entry per name, at the position of its first occurrence. A
+// re-export alias (`@typedef {import('./x.js').Foo} Foo`) says nothing the
+// real declaration doesn't, so when both are present the real one wins —
+// otherwise the name renders as a self-reference and every link to it dangles.
 function dedupeTypes(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    if (!item.name || seen.has(item.name)) return false;
-    seen.add(item.name);
-    return true;
+  const best = new Map();
+  for (const item of items) {
+    if (!item.name) continue;
+    const existing = best.get(item.name);
+    if (!existing || (isAliasTypedef(existing) && !isAliasTypedef(item))) best.set(item.name, item);
+  }
+  const emitted = new Set();
+  return items.flatMap((item) => {
+    if (!item.name || emitted.has(item.name)) return [];
+    emitted.add(item.name);
+    return [best.get(item.name)];
   });
 }
 
@@ -240,7 +250,10 @@ function buildMember(m) {
     kind: m.kind,
     name: m.name,
     description: m.description,
-    type: typeOf(m),
+    // An accessor's type is usually written as `@type`, but a getter may
+    // instead document it as `@returns {T}` — same information, and without
+    // this fallback the member renders (or is skipped) with no type at all.
+    type: typeOf(m) ?? (m.kind === "getter" ? (pickReturns(m)?.type ?? null) : null),
     defaultValue: m.tags.find((t) => t.tag === "default")?.value ?? m.initializer ?? null,
     deprecated: m.tags.some((t) => t.tag === "deprecated"),
   };
@@ -275,7 +288,11 @@ function attachClassCallables(modules) {
       const callMember = cls.members.find((m) => m.kind === "method" && m.name === "_call");
       const callbackName = `${cls.name}Callback`;
       const callback = callbacks.get(callbackName);
-      const source = callback ?? (callMember && hasCallableShape(callMember) ? callMember : null);
+      const callSource = callMember && hasCallableShape(callMember) ? callMember : null;
+      // The `XCallback` typedef carries the precise generic signature but no
+      // prose; a documented `_call` carries both. Prefer whichever explains
+      // what calling the instance actually does.
+      const source = (callSource?.description ? callSource : null) ?? callback ?? callSource;
       if (!source) continue;
 
       // Promote the `_call` / `Callback` description onto the synthesized
@@ -364,10 +381,18 @@ function parseFunctionType(raw) {
   };
 }
 
+// `<Q extends string | string[], const O extends Options = {}>` — a parameter
+// may carry a `const` modifier and a default. Neither says anything a reader of
+// the rendered signature needs, but both used to make the whole entry
+// unparseable, which left `O` rendering as a bare `O`.
 function parseTemplateList(raw) {
   return splitTopLevel(raw, ",")
     .map((part) => {
-      const m = part.trim().match(/^([A-Za-z_$][\w$]*)(?:\s+extends\s+(.+))?$/);
+      let text = part.trim().replace(/^const\s+/, "");
+      const eq = findTopLevel(text, "=");
+      // `=` starts a default; `=>` is a function-type arrow inside a constraint.
+      if (eq !== -1 && text[eq + 1] !== ">") text = text.slice(0, eq).trim();
+      const m = text.match(/^([A-Za-z_$][\w$]*)(?:\s+extends\s+(.+))?$/);
       return m ? { name: m[1], type: m[2]?.trim() ?? null } : null;
     })
     .filter(Boolean);

@@ -127,7 +127,7 @@ const classifier = await pipeline("text-classification");
 await classifier("great movie", { top_k: 3 });
 
 const generator = await pipeline("text-generation");
-await generator("Once upon a time", { max_new_tokens: 100, temperature: 0.7 });
+await generator("Once upon a time", { max_new_tokens: 100, do_sample: true, temperature: 0.7 });
 
 const translator = await pipeline("translation", "Xenova/nllb-200-distilled-600M");
 await translator("Hello", { src_lang: "eng_Latn", tgt_lang: "fra_Latn" });
@@ -148,8 +148,8 @@ anywhere `generate()` is invoked directly.
 - `max_new_tokens` overrides `max_length`. Pass one, not both — `max_new_tokens`
   is usually what you want because it doesn't depend on the prompt length.
 - `min_new_tokens` overrides `min_length` for the same reason.
-- Sampling vs. greedy: setting `do_sample: true` enables `temperature` and
-  `top_k`. With `do_sample: false` (the default), those values are silently
+- Sampling vs. greedy: `temperature` and `top_k` only take effect with
+  `do_sample: true`. Under greedy decoding (the default) they are silently
   ignored.
 - Sampling vs. beams: `do_sample: true` takes precedence — beams are ignored
   while sampling. For beam search, set `num_beams > 1` and leave `do_sample`

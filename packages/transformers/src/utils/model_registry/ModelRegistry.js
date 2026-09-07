@@ -352,7 +352,13 @@ export class ModelRegistry {
      * @param {string} path_or_repo_id - Model id or path
      * @param {string} filename - The file name
      * @param {import('../hub.js').PretrainedOptions} [options] - Optional parameters
-     * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} File metadata
+     * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} File metadata.
+     * `exists: false` means the file was determinately not found — never that the check itself failed.
+     * @throws {import('../hub/utils.js').ModelFileNotFoundError} If access to the file was denied (401/403),
+     * e.g. a private or gated repository without a valid token, or a repository which does not exist
+     * (the Hub returns 401 for nonexistent repos).
+     * @throws {Error} On network-level failures (e.g., offline) or server errors, so an
+     * unreachable file is never misreported as missing.
      *
      * **Example:**
      * ```javascript
