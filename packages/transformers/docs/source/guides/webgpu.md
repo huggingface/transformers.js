@@ -83,6 +83,42 @@ console.log(output);
 // ]
 ```
 
+## Text generation with a static KV cache
+
+By default, text-generation models grow their key/value cache on every decoding step, which on WebGPU means destroying and re-creating GPU buffers as the context gets longer. The cost of this per-step reallocation grows with the context length and with the size of the model's KV cache, and for long generations it can become a significant part of the decoding time.
+
+You can opt in to a `StaticCache`, which allocates each cache entry once at a fixed capacity and writes the model's cache outputs in place onto the same GPU buffers, eliminating per-step cache reallocations entirely:
+
+```js
+import { pipeline, StaticCache } from "@huggingface/transformers";
+
+// Create a text generation pipeline on WebGPU
+const generator = await pipeline(
+  "text-generation",
+  "onnx-community/Qwen2.5-0.5B-Instruct",
+  { dtype: "q4", device: "webgpu" },
+);
+
+// Allocate a cache with room for up to 4096 tokens (prompt + generated)
+const past_key_values = new StaticCache({ max_cache_len: 4096 });
+
+const output = await generator("Write me a poem about Machine Learning.", {
+  max_new_tokens: 512,
+  past_key_values,
+});
+
+// The cache is owned by the caller and holds GPU memory: dispose it when done
+await past_key_values.dispose();
+```
+
+Note the following constraints, which are enforced with explicit errors:
+
+- WebGPU only (`device: "webgpu"`).
+- Decoder-only models with batch size 1.
+- The exported model must support past/present cache entries sharing one buffer (true for GQA-based exports).
+
+If any of these do not apply, simply omit `past_key_values` to use the default dynamic cache.
+
 ## Reporting bugs and providing feedback
 
 Due to the experimental nature of WebGPU, especially in non-Chromium browsers, you may experience issues when trying to run a model (even if it can run in WASM). If you do, please open [an issue on GitHub](https://github.com/huggingface/transformers.js/issues/new?title=[WebGPU]%20Error%20running%20MODEL_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml) and we'll do our best to address it. Thanks!
