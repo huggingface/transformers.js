@@ -423,6 +423,36 @@ describe("Tensor operations", () => {
       expect(result).toBeCloseToNested(target);
     });
   });
+
+  describe("remainder", () => {
+    it("should follow the sign of the divisor (python-style modulo)", () => {
+      const t1 = new Tensor("float32", [-3, -1, 0, 1, 3, 4.5], [6]);
+      const target = new Tensor("float32", [1, 1, 0, 1, 1, 0.5], [6]);
+
+      const result = t1.remainder(2);
+      expect(result).toBeCloseToNested(target);
+    });
+    it("should support a negative divisor", () => {
+      const t1 = new Tensor("float32", [3, -3], [2]);
+      const target = new Tensor("float32", [-1, -1], [2]);
+
+      const result = t1.remainder(-2);
+      expect(result).toBeCloseToNested(target);
+    });
+    it("should support int64 (bigint) tensors", () => {
+      const t1 = new Tensor("int64", [-3n, -1n, 0n, 1n, 3n], [5]);
+      const target = new Tensor("int64", [1n, 1n, 0n, 1n, 1n], [5]);
+
+      const result = t1.remainder(2);
+      expect(result).toEqual(target);
+    });
+    it("should operate in place with remainder_", () => {
+      const t1 = new Tensor("int64", [-1n], []);
+      const result = t1.remainder_(2);
+      expect(result).toBe(t1);
+      expect(t1.item()).toBe(1n);
+    });
+  });
   describe("gt", () => {
     it("should perform element-wise greater than comparison with a scalar", () => {
       const t1 = new Tensor("float32", [1, 5, 3, 7], [4]);
