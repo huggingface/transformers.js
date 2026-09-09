@@ -153,13 +153,12 @@ if (ORT_SYMBOL in globalThis) {
 }
 
 /**
- * A frozen, immutable snapshot of the supported device types.
- * Consumers cannot mutate this array; mutations will throw in strict mode
- * or be silently ignored. This protects the library's internal state from
- * being corrupted (e.g. via deviceToExecutionProviders).
- * @type {ReadonlyArray<import("../utils/devices.js").DeviceType>}
+ * Returns a frozen snapshot of the currently supported devices.
+ * @returns {ReadonlyArray<import("../utils/devices.js").DeviceType>}
  */
-export const supportedDevices = Object.freeze([...supportedDevicesInternal]);
+export function getSupportedDevices() {
+    return Object.freeze([...supportedDevicesInternal]);
+}
 
 // @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
@@ -403,5 +402,7 @@ if (ONNX_ENV) {
     env.backends.onnx = {
         ...ONNX_ENV,
         setLogLevel,
+        getSupportedDevices,
+        deviceToExecutionProviders,
     };
 }

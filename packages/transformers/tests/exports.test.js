@@ -41,114 +41,116 @@ describe("Public exports", () => {
 });
 
 describe("supportedDevices public export", () => {
-  it("is frozen and cannot be mutated by consumers", () => {
-    expect(Object.isFrozen(transformers.supportedDevices)).toBe(true);
+  it("getSupportedDevices returns a frozen snapshot", () => {
+    const devices = transformers.env.backends.onnx.getSupportedDevices();
+    expect(Object.isFrozen(devices)).toBe(true);
 
-    const before = transformers.supportedDevices.slice();
+    const before = devices.slice();
 
     // Attempt to mutate the public snapshot. This throws in strict mode (ESM) and
     // is silently ignored otherwise; either way the snapshot must stay intact.
     try {
-      transformers.supportedDevices.length = 0;
-      transformers.supportedDevices.push("malicious-device");
-      transformers.supportedDevices[0] = "malicious-device";
+      devices.length = 0;
+      devices.push("malicious-device");
+      devices[0] = "malicious-device";
     } catch {
       // Expected in strict mode (frozen object).
     }
 
-    expect(transformers.supportedDevices).toEqual(before);
-    expect(transformers.supportedDevices.length).toBe(before.length);
+    expect(devices).toEqual(before);
+    expect(devices.length).toBe(before.length);
   });
 
-  it("consumer mutation cannot affect deviceToExecutionProviders", () => {
-    const autoBefore = transformers.deviceToExecutionProviders("auto");
-    const snapshot = transformers.supportedDevices;
-    expect(snapshot.length).toBeGreaterThan(0);
-    const someDevice = snapshot[0];
+  it("mutating getSupportedDevices() result does not affect internal state", () => {
+    const first = transformers.env.backends.onnx.getSupportedDevices();
+    expect(first.length).toBeGreaterThan(0);
+    const someDevice = first[0];
 
-    // Attempt to corrupt the public export.
+    // Attempt to mutate the returned array.
     try {
-      transformers.supportedDevices.length = 0;
+      first.length = 0;
+      first.push("malicious-device");
     } catch {
       // ignored
     }
 
-    // The internal array is private, so provider selection is unaffected.
-    expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoBefore);
-    expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
+    // Re-fetch and confirm unaffected
+    const second = transformers.env.backends.onnx.getSupportedDevices();
+    expect(second.length).toBeGreaterThan(0);
+    expect(() => transformers.env.backends.onnx.deviceToExecutionProviders(someDevice)).not.toThrow();
   });
 
-  it("mutation of the array returned by deviceToExecutionProviders('auto') cannot affect later calls", () => {
-    const autoExpected = transformers.deviceToExecutionProviders("auto").slice();
-    expect(autoExpected.length).toBeGreaterThan(0);
-    const someDevice = transformers.supportedDevices[0];
+  it("deviceToExecutionProviders returns a defensive copy", () => {
+    const result = transformers.env.backends.onnx.deviceToExecutionProviders("auto");
+    expect(result.length).toBeGreaterThan(0);
+    const someDevice = result[0];
 
-    // Mutate the *returned* array (the second public path flagged in review).
-    const autoReturned = transformers.deviceToExecutionProviders("auto");
+    // Mutate the returned array
     try {
-      autoReturned.length = 0;
-      autoReturned.push("malicious-device");
+      result.length = 0;
+      result.push("malicious-device");
     } catch {
-      // ignored (frozen/immutable in some environments)
+      // ignored
     }
 
-    // Internal state is private, so subsequent calls return the full, unmutated list.
-    expect(transformers.deviceToExecutionProviders("auto")).toEqual(autoExpected);
-    expect(() => transformers.deviceToExecutionProviders(someDevice)).not.toThrow();
+    // Subsequent call returns fresh, unaffected result
+    const result2 = transformers.env.backends.onnx.deviceToExecutionProviders("auto");
+    expect(result2.length).toBeGreaterThan(0);
+    expect(() => transformers.env.backends.onnx.deviceToExecutionProviders(someDevice)).not.toThrow();
   });
 
   it("default branch returns a copy and does not expose internal array", () => {
-    const defaultBefore = transformers.deviceToExecutionProviders();
-    const defaultAlso = transformers.deviceToExecutionProviders(null);
+    const defaultBefore = transformers.env.backends.onnx.deviceToExecutionProviders();
+    const defaultAlso = transformers.env.backends.onnx.deviceToExecutionProviders(null);
     expect(defaultAlso).toEqual(defaultBefore);
 
     // Mutation of returned array does not affect internal state
-    const returned = transformers.deviceToExecutionProviders();
+    const returned = transformers.env.backends.onnx.deviceToExecutionProviders();
     try {
       returned.length = 0;
     } catch {
       // ignored
     }
-    expect(transformers.deviceToExecutionProviders()).toEqual(transformers.deviceToExecutionProviders(null));
+    expect(transformers.env.backends.onnx.deviceToExecutionProviders()).toEqual(transformers.env.backends.onnx.deviceToExecutionProviders(null));
   });
 
   it("gpu branch returns a fresh array and does not expose internal array", () => {
-    const gpuDevices = transformers.deviceToExecutionProviders("gpu");
+    const gpuDevices = transformers.env.backends.onnx.deviceToExecutionProviders("gpu");
     expect(Array.isArray(gpuDevices)).toBe(true);
     // Each call returns a fresh array (filter creates new array)
-    const gpuAgain = transformers.deviceToExecutionProviders("gpu");
+    const gpuAgain = transformers.env.backends.onnx.deviceToExecutionProviders("gpu");
     expect(gpuAgain).toEqual(gpuDevices);
     expect(gpuAgain).not.toBe(gpuDevices); // different reference
   });
 
   it("specific device returns execution providers array", () => {
-    const devices = transformers.supportedDevices;
+    const devices = transformers.env.backends.onnx.getSupportedDevices();
     expect(devices.length).toBeGreaterThan(0);
     const someDevice = devices[0];
 
-    const eps = transformers.deviceToExecutionProviders(someDevice);
+    const eps = transformers.env.backends.onnx.deviceToExecutionProviders(someDevice);
     expect(Array.isArray(eps)).toBe(true);
     expect(eps.length).toBeGreaterThan(0);
 
     // Returns fresh array each call
-    const epsAgain = transformers.deviceToExecutionProviders(someDevice);
+    const epsAgain = transformers.env.backends.onnx.deviceToExecutionProviders(someDevice);
     expect(epsAgain).toEqual(eps);
     expect(epsAgain).not.toBe(eps);
   });
 
   it("unsupported device throws descriptive error", () => {
-    expect(() => transformers.deviceToExecutionProviders("unsupported-device-xyz")).toThrow("Unsupported device");
+    expect(() => transformers.env.backends.onnx.deviceToExecutionProviders("unsupported-device-xyz")).toThrow("Unsupported device");
   });
 
   it("defaultDevices mutation does not affect internal state", () => {
-    const defaultBefore = transformers.deviceToExecutionProviders();
-    const returned = transformers.deviceToExecutionProviders();
+    const defaultBefore = transformers.env.backends.onnx.deviceToExecutionProviders();
+    const returned = transformers.env.backends.onnx.deviceToExecutionProviders();
     try {
       returned.push("malicious-device");
     } catch {
       // ignored
     }
-    expect(transformers.deviceToExecutionProviders()).toEqual(defaultBefore);
-    expect(transformers.deviceToExecutionProviders()).not.toContain("malicious-device");
+    expect(transformers.env.backends.onnx.deviceToExecutionProviders()).toEqual(defaultBefore);
+    expect(transformers.env.backends.onnx.deviceToExecutionProviders()).not.toContain("malicious-device");
   });
 });

@@ -69,6 +69,3 @@ export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
  */
-
-// Backends
-export { supportedDevices, deviceToExecutionProviders } from './backends/onnx.js';
