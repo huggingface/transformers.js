@@ -842,7 +842,7 @@ export function _build_translation_inputs(self, raw_inputs, tokenizer_options, g
         // In the same way as the Python library, we override the post-processor
         // to force the source language to be first:
         const post_processor_config = self._tokenizer.post_processor?.config;
-        if ('single' in post_processor_config) {
+        if (post_processor_config && 'single' in post_processor_config) {
             for (const item of post_processor_config.single) {
                 if ('SpecialToken' in item && self.languageRegex.test(item.SpecialToken.id)) {
                     item.SpecialToken.id = self.lang_to_token(src_lang_token);
