@@ -226,7 +226,7 @@ Git](https://git-scm.com/book/en/v2) is a very good reference.
 
 You'll need the following tools installed to contribute to 🤗 Transformers.js:
 
-- **[Node.js v18](https://nodejs.org/)** or above
+- **[Node.js v20](https://nodejs.org/)** or above
 - **[pnpm](https://pnpm.io/)** - Fast, disk space efficient package manager
 
 To install pnpm:

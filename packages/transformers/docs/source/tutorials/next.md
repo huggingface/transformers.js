@@ -13,8 +13,8 @@ Useful links:
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en/) version 18+
-- [npm](https://www.npmjs.com/) version 9+
+- [Node.js](https://nodejs.org/en/) version 20+
+- [npm](https://www.npmjs.com/) version 10+
 
 ## Client-side inference
 

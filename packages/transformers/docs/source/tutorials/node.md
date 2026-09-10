@@ -24,8 +24,8 @@ Although you can always use the [Python library](https://github.com/huggingface/
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en/) version 18+
-- [npm](https://www.npmjs.com/) version 9+
+- [Node.js](https://nodejs.org/en/) version 20+
+- [npm](https://www.npmjs.com/) version 10+
 
 ## Getting started
 
