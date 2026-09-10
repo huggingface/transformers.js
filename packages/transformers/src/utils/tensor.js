@@ -363,8 +363,10 @@ export class Tensor {
             throw new RangeError('Division by zero');
         }
         for (let i = 0; i < this_data.length; ++i) {
-            // `%` truncates towards zero; shifting by the divisor gives the result the divisor's sign.
-            this_data[i] = ((this_data[i] % divisor) + divisor) % divisor;
+            const remainder = this_data[i] % divisor;
+            // Only shift opposite signs: adding a large divisor can round away a valid remainder.
+            const needs_shift = (remainder < 0 && divisor > 0) || (remainder > 0 && divisor < 0);
+            this_data[i] = needs_shift ? remainder + divisor : remainder;
         }
         return this;
     }

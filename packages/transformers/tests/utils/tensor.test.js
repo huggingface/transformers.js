@@ -440,6 +440,14 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.data)).toEqual([1, 0, -1]);
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
+    it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
+      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
+        const tensor = new Tensor(type, values, [2]);
+        expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
+        expect(Array.from(tensor.data)).toEqual(values);
+        expect(Array.from(tensor.remainder_(divisor).data)).toEqual(values);
+      }
+    });
     it("should follow the sign of the divisor (python-style modulo)", () => {
       const t1 = new Tensor("float32", [-3, -1, 0, 1, 3, 4.5], [6]);
       const target = new Tensor("float32", [1, 1, 0, 1, 1, 0.5], [6]);
@@ -460,6 +468,12 @@ describe("Tensor operations", () => {
 
       const result = t1.remainder(2);
       expect(result).toEqual(target);
+    });
+    it("should support negative bigint divisors and leave exact multiples at zero", () => {
+      const tensor = new Tensor("int64", [-4n, -3n, 0n, 3n, 4n], [5]);
+      const expected = [0n, -1n, 0n, -1n, 0n];
+      expect(Array.from(tensor.remainder(-2n).data)).toEqual(expected);
+      expect(Array.from(tensor.remainder_(-2n).data)).toEqual(expected);
     });
     it("should operate in place with remainder_", () => {
       const t1 = new Tensor("int64", [-1n], []);
