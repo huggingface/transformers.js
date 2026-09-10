@@ -251,6 +251,20 @@ describe("Tensor operations", () => {
   });
 
   describe("rfft", () => {
+    it.each([2, -3])("should reject out-of-range axis %s", async (axis) => {
+      const input = new Tensor("float32", [0, 1, 2, 3, 4, 5], [2, 3]);
+      const dim = new Tensor("int64", [BigInt(axis)], []);
+      await expect(rfft(input, dim)).rejects.toThrow("out of bounds");
+    });
+    it.each([[0, -2], [1, -1]])("should produce the same result for axes %s and %s", async (positive, negative) => {
+      const input = new Tensor("float32", [0, 1, 2, 3, 4, 5], [2, 3]);
+      const dim = new Tensor("int64", [BigInt(negative)], []);
+      const expected = await rfft(input, new Tensor("int64", [BigInt(positive)], []));
+      const actual = await rfft(input, dim);
+      expect(actual.dims).toEqual(expected.dims);
+      expectToBeCloseToArray(expected.data, actual.data);
+      expect(dim.item()).toBe(BigInt(negative));
+    });
     it("non-power of 2", async () => {
       const rows = 2;
       const cols = 3;

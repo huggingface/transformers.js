@@ -359,6 +359,9 @@ export class Tensor {
         // (Typed as `any` since TypeScript cannot apply `%` to `any` and `number | bigint`.)
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
         const divisor = /** @type {any} */ (is_bigint ? BigInt(val) : Number(val));
+        if ((divisor === 0 || divisor === 0n) && this.type.includes('int')) {
+            throw new RangeError('Division by zero');
+        }
         for (let i = 0; i < this_data.length; ++i) {
             // `%` truncates towards zero; shifting by the divisor gives the result the divisor's sign.
             this_data[i] = ((this_data[i] % divisor) + divisor) % divisor;
@@ -1177,10 +1180,11 @@ export async function matmul(a, b) {
  * @returns {Promise<Tensor>} the output tensor.
  */
 export async function rfft(x, a) {
+    const axis = safeIndex(Number(a.item()), x.dims.length);
     const op = await TensorOpRegistry.rfft;
     // ONNX DFT expects a trailing real/imaginary component dimension, so add one to the
     // real-valued input and resolve (possibly negative) axes against the original dimensions.
-    return await op({ x: x.unsqueeze(-1), a: a.remainder(x.dims.length) });
+    return await op({ x: x.unsqueeze(-1), a: new Tensor('int64', [BigInt(axis)], []) });
 }
 
 /**
