@@ -10,8 +10,8 @@ Useful links:
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en/) version 18+
-- [npm](https://www.npmjs.com/) version 9+
+- [Node.js](https://nodejs.org/en/) version 20+
+- [npm](https://www.npmjs.com/) version 10+
 - A browser with WebGPU support (Chrome 113+, Edge 113+, or Firefox/Safari with flags enabled)
 
 ## Step 1: Create the project

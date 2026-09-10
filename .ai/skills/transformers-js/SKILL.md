@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: huggingface
   repository: https://github.com/huggingface/transformers.js
-compatibility: Node.js 18+ (or equivalent Bun / Deno), or a modern browser with ES modules. WebGPU requires runtime and hardware support; WASM is the fallback. Model downloads from the Hugging Face Hub require network access unless you ship models locally.
+compatibility: Node.js 20+ (or equivalent Bun / Deno), or a modern browser with ES modules. WebGPU requires runtime and hardware support; WASM is the fallback. Model downloads from the Hugging Face Hub require network access unless you ship models locally.
 ---
 
 # transformers.js

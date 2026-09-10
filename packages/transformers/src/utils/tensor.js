@@ -338,6 +338,40 @@ export class Tensor {
     }
 
     /**
+     * Return a new Tensor with the element-wise remainder of division by a constant.
+     * Follows Python's modulo semantics, so the result has the same sign as the divisor
+     * (e.g. `-1 mod 2 = 1`). Equivalent to `torch.remainder`.
+     * @param {number|bigint} val The divisor.
+     * @returns {Tensor} The new tensor.
+     */
+    remainder(val) {
+        return this.clone().remainder_(val);
+    }
+
+    /**
+     * In-place version of @see {@link Tensor.remainder}
+     * @param {number|bigint} val The divisor.
+     * @returns {Tensor} Returns `this`.
+     */
+    remainder_(val) {
+        const this_data = this.data;
+        // `%` cannot mix bigint and number operands, so cast the divisor to match the element type.
+        // (Typed as `any` since TypeScript cannot apply `%` to `any` and `number | bigint`.)
+        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        const divisor = /** @type {any} */ (is_bigint ? BigInt(val) : Number(val));
+        if ((divisor === 0 || divisor === 0n) && this.type.includes('int')) {
+            throw new RangeError('Division by zero');
+        }
+        for (let i = 0; i < this_data.length; ++i) {
+            const remainder = this_data[i] % divisor;
+            // Only shift opposite signs: adding a large divisor can round away a valid remainder.
+            const needs_shift = (remainder < 0 && divisor > 0) || (remainder > 0 && divisor < 0);
+            this_data[i] = needs_shift ? remainder + divisor : remainder;
+        }
+        return this;
+    }
+
+    /**
      * Creates a deep copy of the current Tensor.
      * @returns {Tensor} A new Tensor with the same type, data, and dimensions as the original.
      */
@@ -1148,8 +1182,11 @@ export async function matmul(a, b) {
  * @returns {Promise<Tensor>} the output tensor.
  */
 export async function rfft(x, a) {
+    const axis = safeIndex(Number(a.item()), x.dims.length);
     const op = await TensorOpRegistry.rfft;
-    return await op({ x, a });
+    // ONNX DFT expects a trailing real/imaginary component dimension, so add one to the
+    // real-valued input and resolve (possibly negative) axes against the original dimensions.
+    return await op({ x: x.unsqueeze(-1), a: new Tensor('int64', [BigInt(axis)], []) });
 }
 
 /**
