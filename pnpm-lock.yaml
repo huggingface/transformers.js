@@ -24,11 +24,11 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       onnxruntime-node:
-        specifier: 1.30.0-dev.20260909-b905e946b
-        version: 1.30.0-dev.20260909-b905e946b
+        specifier: 1.30.0-dev.20260909-e76036b8e
+        version: 1.30.0-dev.20260909-e76036b8e
       onnxruntime-web:
-        specifier: 1.30.0-dev.20260909-b905e946b
-        version: 1.30.0-dev.20260909-b905e946b
+        specifier: 1.30.0-dev.20260909-e76036b8e
+        version: 1.30.0-dev.20260909-e76036b8e
       sharp:
         specifier: ^0.35.4
         version: 0.35.4(@types/node@24.10.9)
@@ -1491,12 +1491,12 @@ packages:
   onnxruntime-common@1.30.0-dev.20260813-72e1c9c9b8:
     resolution: {integrity: sha512-rgjnYrMP7e7CNGZOIygFaeF5qZCoRtBBeMFGjRNCXNyUpxXMGZIn9EE/LnCjCdCix6MYbyNR3JvMTabCutI9hg==}
 
-  onnxruntime-node@1.30.0-dev.20260909-b905e946b:
-    resolution: {integrity: sha512-tkKNQ702ELoWHrKfkXstolWu28ckU3IZLQ2/YGZjdyOUz8a28G5wFkZ2yWfnGwHhfBqgM3uLAvtT/NYEQMZvRg==}
+  onnxruntime-node@1.30.0-dev.20260909-e76036b8e:
+    resolution: {integrity: sha512-bjhOz3+7qCGftm9YyO+izfCcrLlE8Fg6wo9gWA3iheyZ5sVHfDB6ue7Qg6yE6d1i9LjWCdVynkmgzPLZv13MAg==}
     os: [win32, darwin, linux]
 
-  onnxruntime-web@1.30.0-dev.20260909-b905e946b:
-    resolution: {integrity: sha512-v9irpM/V/D+rVpIkIOOgR8wORiVJ50mPnwvG3VsxJ3MTTrJxIrIqxkqz6dqP9mFp0Sb1bd1h1fGxHLoFjD97wg==}
+  onnxruntime-web@1.30.0-dev.20260909-e76036b8e:
+    resolution: {integrity: sha512-EHgt418NLs/iV30oFgZnYpbzdTZ169k93c3e8zUSG4aeQcUHiYvTIqInBppY7LI2J4peFf6IJQAS2XHwELE+5A==}
 
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
@@ -3358,13 +3358,13 @@ snapshots:
 
   onnxruntime-common@1.30.0-dev.20260813-72e1c9c9b8: {}
 
-  onnxruntime-node@1.30.0-dev.20260909-b905e946b:
+  onnxruntime-node@1.30.0-dev.20260909-e76036b8e:
     dependencies:
       adm-zip: 0.6.0
       global-agent: 4.1.3
       onnxruntime-common: 1.30.0-dev.20260813-72e1c9c9b8
 
-  onnxruntime-web@1.30.0-dev.20260909-b905e946b:
+  onnxruntime-web@1.30.0-dev.20260909-e76036b8e:
     dependencies:
       flatbuffers: 25.9.23
       guid-typescript: 1.0.9
