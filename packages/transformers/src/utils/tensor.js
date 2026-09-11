@@ -359,7 +359,7 @@ export class Tensor {
         // (Typed as `any` since TypeScript cannot apply `%` to `any` and `number | bigint`.)
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
         const divisor = /** @type {any} */ (is_bigint ? BigInt(val) : Number(val));
-        if ((divisor === 0 || divisor === 0n) && this.type.includes('int')) {
+        if ((divisor === 0 || divisor === 0n) && (this.type.includes('int') || this.type === 'bool')) {
             throw new RangeError('Division by zero');
         }
         for (let i = 0; i < this_data.length; ++i) {

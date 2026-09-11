@@ -425,8 +425,8 @@ describe("Tensor operations", () => {
   });
 
   describe("remainder", () => {
-    it.each(["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64"])("should reject zero divisors for %s without mutating the input", (type) => {
-      const values = type.endsWith("64") ? [1n, 2n] : [1, 2];
+    it.each(["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "bool"])("should reject zero divisors for %s without mutating the input", (type) => {
+      const values = type.endsWith("64") ? [1n, 0n] : [1, 0];
       const tensor = new Tensor(type, values, [2]);
       for (const divisor of [0, -0, 0n]) {
         expect(() => tensor.remainder(divisor)).toThrow("Division by zero");
