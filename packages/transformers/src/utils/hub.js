@@ -14,7 +14,9 @@ import {
     pathJoin,
     isValidHfModelId,
     makePretrainedOptionsKey,
+    ModelFileNotFoundError,
     readResponse,
+    toAbsoluteURL,
 } from './hub/utils.js';
 import { getCache, tryCache } from './cache.js';
 import { get_file_metadata } from './model_registry/get_file_metadata.js';
@@ -32,15 +34,14 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
 
 /**
  * @typedef {Object} PretrainedOptions Options for loading a pretrained model.
- * @property {import('./core.js').ProgressCallback} [progress_callback=null] If specified, this function will be called during model construction, to provide the user with progress updates.
- * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration for the model to use instead of an automatically loaded configuration. Configuration can be automatically loaded when:
- * - The model is a model provided by the library (loaded with the *model id* string of a pretrained model).
+ * @property {import('./core.js').ProgressCallback} [progress_callback=null] If specified, this function is called during model construction with progress updates.
+ * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration to use for the model instead of an automatically loaded configuration. Configuration can be automatically loaded when:
+ * - The model is provided by the library and loaded with the *model ID* string of a pretrained model.
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
- * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used.
- * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model).
- * @property {string} [revision='main'] The specific model version to use. It can be a branch name, a tag name, or a commit id,
- * since we use a git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any identifier allowed by git.
- * NOTE: This setting is ignored for local requests.
+ * @property {string} [cache_dir=null] Path to a directory where downloaded model files should be cached if the standard cache should not be used.
+ * @property {boolean} [local_files_only=false] Whether to only look at local files (e.g., not try downloading the model).
+ * @property {string} [revision='main'] The model revision to use. This can be a branch name, tag name, or commit ID.
+ * Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests.
  */
 
 /**
@@ -50,8 +51,8 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {string|Record<string, string>} [model_file_name=null] If specified, load the model with this name (excluding the dtype and .onnx suffixes). For multi-session models, pass a mapping from session or default file names to custom file names.
  * @property {import("./devices.js").DeviceType|Record<string, import("./devices.js").DeviceType>} [device=null] The device to run the model on. If not specified, the device will be chosen from the environment settings.
  * @property {import("./dtypes.js").DataType|Record<string, import("./dtypes.js").DataType>} [dtype=null] The data type to use for the model. If not specified, the data type will be chosen from the environment settings.
- * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
- * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options] (Optional) User-specified session options passed to the runtime. If not provided, suitable defaults will be chosen.
+ * @property {ExternalData|Record<string, ExternalData>} [use_external_data_format=null] Whether to load external data files. `null` uses the model configuration; `false` disables external data; `true` uses one chunk; a number selects the chunk count.
+ * @property {import('onnxruntime-common').InferenceSession.SessionOptions} [session_options={}] User-specified ONNX Runtime session options. Suitable defaults are filled in when omitted.
  */
 
 /**
@@ -195,9 +196,21 @@ export async function checkCachedResource(cache, localPath, proposedCacheKey) {
  * @param {PretrainedOptions} [options] Options containing progress callback and context for progress updates.
  * @returns {Promise<void>}
  */
-export async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options = {}) {
+async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options = {}) {
     // Check again whether request is in cache. If not, we add the response to the cache
     if ((await cache.match(cacheKey)) !== undefined) {
+        return;
+    }
+
+    if (
+        typeof Cache !== 'undefined' &&
+        cache instanceof Cache &&
+        !isValidUrl(toAbsoluteURL(cacheKey, { allowUnresolved: true }), ['http:', 'https:'])
+    ) {
+        // The browser Cache API only supports http(s) URLs as keys, so do not attempt to cache
+        // responses for other schemes (e.g., files bundled within a browser extension). Relative
+        // keys are resolved against the page URL first, since a relative key on an extension page
+        // still resolves to a chrome-extension:// request.
         return;
     }
 
@@ -249,7 +262,7 @@ export async function storeCachedResource(path_or_repo_id, filename, cache, cach
  * @throws Will throw an error if the file is not found and `fatal` is true.
  * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
-export async function loadResourceFile(
+async function loadResourceFile(
     path_or_repo_id,
     filename,
     fatal = true,
@@ -313,7 +326,7 @@ export async function loadResourceFile(
             if (options.local_files_only || !env.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
-                    throw Error(
+                    throw new ModelFileNotFoundError(
                         `\`local_files_only=true\` or \`env.allowRemoteModels=false\` and file was not found locally at "${localPath}".`,
                     );
                 } else {
@@ -325,7 +338,7 @@ export async function loadResourceFile(
             if (!validModelId) {
                 // Before making any requests to the remote server, we check if the model ID is valid.
                 // This prevents unnecessary network requests for invalid model IDs.
-                throw Error(
+                throw new ModelFileNotFoundError(
                     `Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`,
                 );
             }

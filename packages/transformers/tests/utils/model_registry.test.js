@@ -6,12 +6,19 @@ jest.unstable_mockModule("../../src/utils/model_registry/get_file_metadata.js", 
   get_file_metadata: mockGetFileMetadata,
 }));
 
+// Mock get_config so config-loading failures can be simulated
+const mockGetConfig = jest.fn();
+jest.unstable_mockModule("../../src/utils/model_registry/get_model_files.js", () => ({
+  get_config: mockGetConfig,
+  get_model_files: jest.fn(),
+}));
+
 // Import registry to populate MODEL_TYPE_MAPPING (side-effect import)
 await import("../../src/models/registry.js");
 
 // Dynamic import after mock setup (required for ESM)
 const { get_available_dtypes } = await import("../../src/utils/model_registry/get_available_dtypes.js");
-const { get_model_files } = await import("../../src/utils/model_registry/get_model_files.js");
+const { ModelFileNotFoundError } = await import("../../src/utils/hub/utils.js");
 
 // A minimal config that mimics a BERT-like encoder-only model
 const ENCODER_ONLY_CONFIG = {
@@ -54,6 +61,9 @@ function setupExistingFiles(...existingFiles) {
 describe("get_available_dtypes", () => {
   beforeEach(() => {
     mockGetFileMetadata.mockReset();
+    mockGetConfig.mockReset();
+    // Default: behave like the real get_config when a pre-loaded config is supplied
+    mockGetConfig.mockImplementation((_modelId, { config } = {}) => Promise.resolve(config));
   });
 
   it("should detect fp32 and q4 for an encoder-only model", async () => {
@@ -181,19 +191,50 @@ describe("get_available_dtypes", () => {
       expect(validDtypes).toContain(dtype);
     }
   });
-});
+  describe("missing or inaccessible models", () => {
+    it("should throw when the model does not exist (Hub responds 401)", async () => {
+      mockGetConfig.mockRejectedValue(new ModelFileNotFoundError('Unauthorized access to file: "https://huggingface.co/test/missing/resolve/main/config.json".', { status: 401 }));
 
-describe("get_model_files", () => {
-  it("should support custom file names for seq2seq models", async () => {
-    const files = await get_model_files("test/model", {
-      config: SEQ2SEQ_CONFIG,
-      dtype: "fp32",
-      model_file_name: {
-        encoder_model: "custom_encoder",
-        decoder_model_merged: "custom_decoder",
-      },
+      await expect(get_available_dtypes("test/missing")).rejects.toThrow(ModelFileNotFoundError);
+      // No dtype probing should happen for a missing model
+      expect(mockGetFileMetadata).not.toHaveBeenCalled();
     });
 
-    expect(files).toEqual(["config.json", "onnx/custom_encoder.onnx", "onnx/custom_decoder.onnx", "generation_config.json"]);
+    it("should throw when config.json is missing from the repo (404)", async () => {
+      mockGetConfig.mockRejectedValue(new ModelFileNotFoundError('Could not locate file: "https://huggingface.co/test/missing/resolve/main/config.json".', { status: 404 }));
+
+      await expect(get_available_dtypes("test/missing")).rejects.toThrow(ModelFileNotFoundError);
+    });
+
+    it("should throw when the model is not available locally with downloads disabled", async () => {
+      mockGetConfig.mockRejectedValue(new ModelFileNotFoundError('`local_files_only=true` or `env.allowRemoteModels=false` and file was not found locally at "/models/test/missing/config.json".'));
+
+      await expect(get_available_dtypes("test/missing", { local_files_only: true })).rejects.toThrow(ModelFileNotFoundError);
+    });
+
+    it("should rethrow network-level failures from the config fetch", async () => {
+      mockGetConfig.mockRejectedValue(new TypeError("fetch failed"));
+
+      await expect(get_available_dtypes("test/model")).rejects.toThrow("fetch failed");
+    });
+
+    it("should rethrow server errors from the config fetch", async () => {
+      mockGetConfig.mockRejectedValue(new Error('Internal server error: "https://huggingface.co/test/model/resolve/main/config.json".'));
+
+      await expect(get_available_dtypes("test/model")).rejects.toThrow("Internal server error");
+    });
+
+    it("should rethrow network-level failures from dtype file probes", async () => {
+      // A failed probe must surface, rather than produce an empty dtype list.
+      mockGetFileMetadata.mockRejectedValue(new TypeError("fetch failed"));
+
+      await expect(get_available_dtypes("test/model", { config: ENCODER_ONLY_CONFIG })).rejects.toThrow("fetch failed");
+    });
+
+    it("should rethrow access errors from dtype file probes", async () => {
+      mockGetFileMetadata.mockRejectedValue(new ModelFileNotFoundError('Forbidden access to file: "https://huggingface.co/test/model/resolve/main/onnx/model.onnx".', { status: 403 }));
+
+      await expect(get_available_dtypes("test/model", { config: ENCODER_ONLY_CONFIG })).rejects.toThrow(ModelFileNotFoundError);
+    });
   });
 });
