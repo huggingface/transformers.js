@@ -1,7 +1,7 @@
 import { get_files } from './get_files.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
-import { getTextOnlySessions } from '../../models/session_config.js';
+import { getSessionsConfig, getTextOnlySessions } from '../../models/session_config.js';
 import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
 
 /**
@@ -15,7 +15,7 @@ import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
- * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+ * @param {string|Record<string, string>} [options.model_file_name=null] - Override model file names (excluding .onnx suffix)
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported
  */
@@ -53,7 +53,8 @@ export async function get_pipeline_files(task, modelId, options = {}) {
         const textOnlySessions = getTextOnlySessions(modelType);
 
         if (textOnlySessions) {
-            const allowedPrefixes = Object.values(textOnlySessions).map((s) => `onnx/${s}`);
+            const { sessions } = getSessionsConfig(modelType, config, { ...options, textOnly: true });
+            const allowedPrefixes = Object.values(sessions).map((s) => `onnx/${s}`);
             return files.filter((f) => !f.startsWith('onnx/') || allowedPrefixes.some((p) => f.startsWith(p)));
         }
     }
