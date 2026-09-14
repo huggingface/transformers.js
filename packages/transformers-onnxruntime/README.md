@@ -8,6 +8,56 @@ import { OnnxInferenceProvider } from '@huggingface/transformers-onnxruntime';
 const provider = OnnxInferenceProvider.from_modelId('onnx-community/model-ONNX');
 ```
 
+## InferenceBackend
+
+Transformers.js defines `InferenceBackend` as a structural interface in
+`packages/transformers/src/backends/inference.js`. At minimum, a backend has a shared model ID
+and a loader:
+
+```ts
+type InferenceBackend = {
+    modelId: string;
+    load(options: InferenceBackendLoadOptions): Promise<InferenceModel | Function>;
+
+    sharedAssets?: { revision?: string; subfolder?: string };
+    chatTemplate?:
+        | { content: string }
+        | { modelId?: string; revision?: string; subfolder?: string; file?: string };
+    capabilities?: { devices: string[]; dtypes: string[]; tasks: string[] };
+
+    listModelArtifacts?(options: object): string[] | Promise<string[]>;
+    getModelArtifactMetadata?(file: string, options: object): Promise<object | null>;
+    deleteModelArtifact?(file: string, options: object): Promise<boolean>;
+};
+```
+
+`modelId` identifies the config, tokenizer, processor, and other shared Transformers.js assets.
+`sharedAssets`, `chatTemplate`, and `capabilities` are optional backend metadata, while the
+artifact methods let a backend participate in file discovery, progress reporting, and cache
+management. `load()` receives the resolved model ID, the host's `fetch`, normal pretrained-model
+options, and, when available, the parsed config, selected task and model class, generation config,
+and artifact metadata.
+
+A runtime-neutral backend returns either a callable model or an object implementing
+`forward(inputs)` and/or a task-specific entry point such as `createAutoregressiveSession()` for
+causal generation. Every returned model must implement `dispose()` and can declare its execution
+capabilities. Transformers.js normalizes objects with `forward()` into callable models and installs
+the public generation runtime around the autoregressive session contract.
+
+`OnnxInferenceProvider` implements the `modelId` and `load()` entry shape, but it is a specialized
+backend for built-in Transformers.js model classes. Transformers.js recognizes it through
+`providerType === 'onnx'` and `constructSessions()`. Its `load()` receives the semantic model class
+selected by Transformers.js and calls that class's `_from_pretrained()` with itself as the
+`inferenceProvider`; the model class then asks the provider for the architecture's session mapping
+and construction. `constructSessions()` creates normalized ONNX Runtime sessions, and `run()`
+converts between Transformers.js tensors and ONNX Runtime tensors. Thus Transformers.js continues
+to own model semantics and public model behavior, while this package owns ONNX artifacts, runtime
+sessions, execution providers, dtypes, and tensor interop.
+
+For ordinary string model IDs, Transformers.js creates an `OnnxInferenceProvider` automatically.
+The provider's static artifact-discovery methods are also used by the model registry to enumerate
+ONNX files, discover available dtypes, and filter architecture-specific artifacts.
+
 ## Transformers.js boundary
 
 Transformers.js owns semantic model behavior: it parses `config.json`, selects the public
