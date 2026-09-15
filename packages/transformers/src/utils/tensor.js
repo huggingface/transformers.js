@@ -339,8 +339,9 @@ export class Tensor {
 
     /**
      * Return a new Tensor with the element-wise remainder of division by a constant.
-     * Follows Python's modulo semantics, so the result has the same sign as the divisor
-     * (e.g. `-1 mod 2 = 1`). Equivalent to `torch.remainder`.
+     * Uses Python-style modulo signs (e.g. `-1 mod 2 = 1`) while preserving the tensor's dtype.
+     * Negative divisors are unsupported for unsigned and boolean tensors.
+     * This operation does not implement PyTorch's dtype promotion or scalar casting rules.
      * @param {number|bigint} val The divisor.
      * @returns {Tensor} The new tensor.
      */
@@ -361,6 +362,10 @@ export class Tensor {
         const divisor = /** @type {any} */ (is_bigint ? BigInt(val) : Number(val));
         if ((divisor === 0 || divisor === 0n) && (this.type.includes('int') || this.type === 'bool')) {
             throw new RangeError('Division by zero');
+        }
+        // These dtypes cannot store a negative remainder without wrapping.
+        if (divisor < 0 && (this.type.startsWith('uint') || this.type === 'bool')) {
+            throw new RangeError('Negative divisors are not supported for unsigned or boolean tensors');
         }
         for (let i = 0; i < this_data.length; ++i) {
             const remainder = this_data[i] % divisor;

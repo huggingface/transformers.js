@@ -425,6 +425,26 @@ describe("Tensor operations", () => {
   });
 
   describe("remainder", () => {
+    it.each(["uint8", "uint16", "uint32", "uint64", "bool"])("should reject negative divisors for %s without mutating the input", (type) => {
+      const values = type === "uint64" ? [1n, 0n] : [1, 0];
+      const tensor = new Tensor(type, values, [2]);
+      for (const divisor of [-1, -2, -1n, -2n]) {
+        expect(() => tensor.remainder(divisor)).toThrow("Negative divisors are not supported");
+        expect(Array.from(tensor.data)).toEqual(values);
+        expect(() => tensor.remainder_(divisor)).toThrow("Negative divisors are not supported");
+        expect(Array.from(tensor.data)).toEqual(values);
+      }
+    });
+    it.each(["uint8", "uint16", "uint32", "uint64", "bool"])("should still support positive divisors for %s", (type) => {
+      const values = type === "uint64" ? [1n, 0n] : [1, 0];
+      for (const divisor of [2, 2n]) {
+        const tensor = new Tensor(type, values, [2]);
+        expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
+        expect(Array.from(tensor.data)).toEqual(values);
+        expect(tensor.remainder_(divisor)).toBe(tensor);
+        expect(Array.from(tensor.data)).toEqual(values);
+      }
+    });
     it.each(["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "bool"])("should reject zero divisors for %s without mutating the input", (type) => {
       const values = type.endsWith("64") ? [1n, 0n] : [1, 0];
       const tensor = new Tensor(type, values, [2]);
