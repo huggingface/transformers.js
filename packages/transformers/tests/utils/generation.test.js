@@ -11,10 +11,13 @@ import {
   // Other
   TextStreamer,
   DynamicCache,
+  StoppingCriteria,
   random,
   full,
   BeamSearchScorer,
   BeamHypotheses,
+  PreTrainedModel,
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -206,6 +209,31 @@ describe("Generation parameters", () => {
         expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
         expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
         expect(outputs_seed123.tolist()).toEqual(expected_seed123);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "supports custom stopping criteria",
+      async () => {
+        class StopAfterLengthCriteria extends StoppingCriteria {
+          constructor(max_length) {
+            super();
+            this.max_length = max_length;
+          }
+
+          _call(input_ids) {
+            return input_ids.map((ids) => ids.length >= this.max_length);
+          }
+        }
+
+        const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
+          max_new_tokens: 5,
+          stopping_criteria: new StopAfterLengthCriteria(3),
+        });
+
+        // BOS + DUMMY_TEXT + exactly one generated token
+        expect(outputs.dims.at(-1)).toEqual(3);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -592,6 +620,25 @@ describe("PKV caching", () => {
   });
 });
 
+describe("Beam cache reordering", () => {
+  it("preserves DynamicCache methods and reorders decoder rows within each batch", async () => {
+    const decoder = new Tensor("float32", [1, 2, 3, 4], [4, 1, 1, 1]);
+    const encoder = new Tensor("float32", [10, 10, 20, 20], [4, 1, 1, 1]);
+    const cache = new DynamicCache({
+      "past_key_values.0.decoder.key": decoder,
+      "past_key_values.0.encoder.key": encoder,
+    });
+    const reordered = await PreTrainedModel.prototype._reorder_cache(cache, [1, 1, 3, 2]);
+    expect(reordered).toBeInstanceOf(DynamicCache);
+    expect(reordered.get_seq_length()).toBe(1);
+    expect(Array.from(reordered["past_key_values.0.decoder.key"].data)).toEqual([2, 2, 4, 3]);
+    expect(reordered["past_key_values.0.encoder.key"]).toBe(encoder);
+    reordered.update({ "past_key_values.0.decoder.key": full([4, 1, 2, 1], 0.0) });
+    expect(reordered.get_seq_length()).toBe(2);
+    await reordered.dispose();
+  });
+});
+
 describe("Beam search", () => {
   describe(`encoder-decoder`, () => {
     const model_id = "hf-internal-testing/tiny-random-T5ForConditionalGeneration";
@@ -655,6 +702,28 @@ describe("Beam search", () => {
         expect(outputs.dims[0]).toEqual(1);
         expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
         expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([
+      ["standard", {}],
+      ["diverse", { num_beam_groups: 2, diversity_penalty: 0.5 }],
+    ])(
+      "%s beam search keeps batch items independent",
+      async (_name, options) => {
+        tokenizer.padding_side = "left";
+        const texts = ["hello", "a longer input"];
+        const inputs = tokenizer(texts, { padding: true });
+        const config = { num_beams: 4, num_return_sequences: 2, max_new_tokens: 3, ...options };
+        const batched = await model.generate({ ...inputs, ...config, return_dict_in_generate: true });
+        expect(batched.past_key_values).toBeNull();
+        expect(batched.sequences.dims[0]).toBe(4);
+        for (let i = 0; i < texts.length; ++i) {
+          const single = await model.generate({ ...tokenizer(texts[i]), ...config });
+          const tail = (rows) => rows.map((row) => row.slice(-3));
+          expect(tail(batched.sequences.tolist().slice(i * 2, i * 2 + 2))).toEqual(tail(single.tolist()));
+        }
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -779,6 +848,28 @@ describe("Beam search", () => {
         expect(outputs.dims[0]).toEqual(1);
         expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
         expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([
+      ["standard", {}],
+      ["diverse", { num_beam_groups: 2, diversity_penalty: 0.5 }],
+    ])(
+      "%s beam search keeps batch items independent",
+      async (_name, options) => {
+        tokenizer.padding_side = "left";
+        const texts = ["hello", "a longer input"];
+        const inputs = tokenizer(texts, { padding: true });
+        const config = { num_beams: 4, num_return_sequences: 2, max_new_tokens: 3, ...options };
+        const batched = await model.generate({ ...inputs, ...config, return_dict_in_generate: true });
+        expect(batched.past_key_values).toBeNull();
+        expect(batched.sequences.dims[0]).toBe(4);
+        for (let i = 0; i < texts.length; ++i) {
+          const single = await model.generate({ ...tokenizer(texts[i]), ...config });
+          const tail = (rows) => rows.map((row) => row.slice(-3));
+          expect(tail(batched.sequences.tolist().slice(i * 2, i * 2 + 2))).toEqual(tail(single.tolist()));
+        }
       },
       MAX_TEST_EXECUTION_TIME,
     );

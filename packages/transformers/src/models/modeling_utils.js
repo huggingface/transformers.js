@@ -1,7 +1,26 @@
+/**
+ * @file Base model class and shared runtime helpers.
+ *
+ * `PreTrainedModel` owns inference sessions, model configuration, direct forward
+ * calls, and token generation. Architecture-specific model classes extend it,
+ * while most applications load it through an `AutoModel*` class or a pipeline.
+ *
+ * @module models
+ */
+
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
 import { AutoConfig, getCacheNames } from '../configs.js';
-import { Tensor, full_like, cat, zeros_like, ones_like, ones, index_select, index_select_async } from '../utils/tensor.js';
+import {
+    Tensor,
+    full_like,
+    cat,
+    zeros_like,
+    ones_like,
+    ones,
+    index_select,
+    index_select_async,
+} from '../utils/tensor.js';
 import { DataTypeMap } from '../utils/dtypes.js';
 
 // These will be populated by registry.js
@@ -88,7 +107,7 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
+export { MODEL_TYPES } from './session_config.js';
 
 /**
  * Runtime-only model type configuration (forward functions, generation flags).
@@ -199,7 +218,7 @@ export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
 export const MODEL_CLASS_TO_NAME_MAPPING = new Map();
 
 /**
- * A base class for pre-trained models that provides the model configuration and an ONNX session.
+ * A base class for pretrained models that provides the model configuration and inference sessions.
  */
 export class PreTrainedModel extends Callable {
     main_input_name = 'input_ids';
@@ -208,7 +227,7 @@ export class PreTrainedModel extends Callable {
     _return_dict_in_generate_keys = null;
 
     /**
-     * Creates a new instance of the `PreTrainedModel` class.
+     * Create a model from configuration and inference sessions.
      * @param {import('../configs.js').PretrainedConfig} config The model configuration.
      * @param {Record<string, any>} sessions The inference sessions for the model.
      * @param {Record<string, Object>} configs Additional configuration files (e.g., generation_config.json).
@@ -237,7 +256,7 @@ export class PreTrainedModel extends Callable {
 
     /**
      * Disposes of all the ONNX sessions that were created during inference.
-     * @returns {Promise<unknown[]>} An array of promises, one for each ONNX session that is being disposed.
+     * @returns {Promise<void[]>} Resolves after each session has been released.
      * @todo Use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry
      */
     async dispose() {
@@ -255,13 +274,13 @@ export class PreTrainedModel extends Callable {
      * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
      * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
-     * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
-     *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
+     * - A string, the *model ID* of a pretrained model hosted inside a model repo on huggingface.co.
+     *   Valid model IDs can be located at the root level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
      * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
      *
-     * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
+     * @returns {Promise<PreTrainedModel>} A model instance with ready inference sessions.
      */
     static async from_pretrained(
         pretrained_model_name_or_path,
@@ -362,20 +381,18 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * Runs the model with the provided inputs
-     * @param {Object} model_inputs Object containing input tensors
-     * @returns {Promise<Object>} Object containing output tensors
+     * Runs the model with the provided inputs.
+     * @param {Object} model_inputs Object containing input tensors.
+     * @returns {Promise<Object>} Object containing output tensors.
      */
     async _call(model_inputs) {
         return await this.forward(model_inputs);
     }
 
     /**
-     * Forward method for a pretrained model. If not overridden by a subclass, the correct forward method
-     * will be chosen based on the model type.
+     * Run the model's forward pass.
      * @param {Object} model_inputs The input data to the model in the format specified in the ONNX model.
      * @returns {Promise<Object>} The output data from the model in the format specified in the ONNX model.
-     * @throws {Error} This method must be implemented in subclasses.
      */
     async forward(model_inputs) {
         return await this._forward(this, model_inputs);
@@ -802,7 +819,7 @@ export class PreTrainedModel extends Callable {
                 } else if (Array.isArray(decoder_start_token_id)) {
                     if (decoder_start_token_id.length !== batch_size) {
                         throw new Error(
-                            `\`decoder_start_token_id\` expcted to have length ${batch_size} but got ${decoder_start_token_id.length}`,
+                            `\`decoder_start_token_id\` expected to have length ${batch_size} but got ${decoder_start_token_id.length}`,
                         );
                     }
                     decoder_input_ids = decoder_start_token_id;
@@ -832,7 +849,7 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * Generates sequences of token ids for models with a language modeling head.
+     * Generate token sequences with a language-modeling head.
      * @param {import('../generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
@@ -950,17 +967,15 @@ export class PreTrainedModel extends Callable {
                 throw new Error(`num_beam_groups must be >= 1, but got ${num_beam_groups}.`);
             }
             if (num_beam_groups > num_beams) {
-                throw new Error(
-                    `num_beam_groups (${num_beam_groups}) must be <= num_beams (${num_beams}).`,
-                );
+                throw new Error(`num_beam_groups (${num_beam_groups}) must be <= num_beams (${num_beams}).`);
             }
             if (num_beams % num_beam_groups !== 0) {
-                throw new Error(
-                    `num_beams (${num_beams}) must be divisible by num_beam_groups (${num_beam_groups}).`,
-                );
+                throw new Error(`num_beams (${num_beams}) must be divisible by num_beam_groups (${num_beam_groups}).`);
             }
             if (is_group_beam_search && generation_config.do_sample) {
-                throw new Error('Diverse beam sampling (num_beam_groups > 1 with do_sample = true) is not yet supported.');
+                throw new Error(
+                    'Diverse beam sampling (num_beam_groups > 1 with do_sample = true) is not yet supported.',
+                );
             }
             if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
                 throw new Error('Classifier-free guidance (guidance_scale > 1) is not supported with beam search.');
@@ -971,13 +986,17 @@ export class PreTrainedModel extends Callable {
 
             if (is_group_beam_search) {
                 const group_size = num_beams / num_beam_groups;
-                beam_scorers = Array.from({ length: num_beam_groups }, () => new BeamSearchScorer(numInputs, group_size, {
-                    length_penalty: generation_config.length_penalty,
-                    early_stopping: generation_config.early_stopping,
-                    num_return_sequences: group_size,
-                    eos_token_id: generation_config.eos_token_id,
-                    pad_token_id: generation_config.pad_token_id,
-                }));
+                beam_scorers = Array.from(
+                    { length: num_beam_groups },
+                    () =>
+                        new BeamSearchScorer(numInputs, group_size, {
+                            length_penalty: generation_config.length_penalty,
+                            early_stopping: generation_config.early_stopping,
+                            num_return_sequences: group_size,
+                            eos_token_id: generation_config.eos_token_id,
+                            pad_token_id: generation_config.pad_token_id,
+                        }),
+                );
             } else {
                 beam_scorer = new BeamSearchScorer(numInputs, num_beams, {
                     length_penalty: generation_config.length_penalty,
@@ -1225,7 +1244,7 @@ export class PreTrainedModel extends Callable {
                                     indices.length = k;
                                 }
                                 const maxLogit = logits_data[indices[0]];
-                                const probs = new Array(indices.length);
+                                const probs = new Float32Array(indices.length);
                                 let sum = 0;
                                 for (let i = 0; i < indices.length; ++i) {
                                     const val = Math.exp(logits_data[indices[i]] - maxLogit);
@@ -1274,11 +1293,7 @@ export class PreTrainedModel extends Callable {
                     }
 
                     // Let beam_scorer process: route EOS to hypotheses, select continuing beams
-                    ({
-                        next_beam_scores,
-                        next_beam_tokens,
-                        next_beam_indices,
-                    } = beam_scorer.process(
+                    ({ next_beam_scores, next_beam_tokens, next_beam_indices } = beam_scorer.process(
                         all_input_ids,
                         beam_scores,
                         all_next_tokens,
@@ -1303,7 +1318,7 @@ export class PreTrainedModel extends Callable {
 
                 // Reorder KV cache to match beam reordering
                 model_inputs['past_key_values'] = await this._reorder_cache(
-                    this.getPastKeyValues(outputs, model_inputs.past_key_values),
+                    getPastKeyValues(outputs, model_inputs.past_key_values),
                     next_beam_indices,
                 );
             } else {
@@ -1343,11 +1358,19 @@ export class PreTrainedModel extends Callable {
             if (is_beam_search) {
                 // For beam search, we already updated past_key_values during reordering.
                 // Now update the remaining model inputs.
-                model_inputs['input_ids'] = new Tensor('int64', generated_input_ids.flat(), [generated_input_ids.length, 1]);
+                model_inputs['input_ids'] = new Tensor('int64', generated_input_ids.flat(), [
+                    generated_input_ids.length,
+                    1,
+                ]);
 
                 if (!is_encoder_decoder) {
                     model_inputs.attention_mask = cat(
                         [model_inputs.attention_mask, ones([model_inputs.attention_mask.dims[0], 1])],
+                        1,
+                    );
+                } else if ('decoder_attention_mask' in model_inputs) {
+                    model_inputs.decoder_attention_mask = cat(
+                        [model_inputs.decoder_attention_mask, ones([model_inputs.decoder_attention_mask.dims[0], 1])],
                         1,
                     );
                 }
@@ -1417,9 +1440,9 @@ export class PreTrainedModel extends Callable {
             }
 
             // Pad sequences to equal length for tensor creation
-            const max_len = Math.max(...best_sequences.map(s => s.length));
+            const max_len = Math.max(...best_sequences.map((s) => s.length));
             const pad_id = BigInt(generation_config.pad_token_id ?? 0);
-            const padded = best_sequences.map(s => {
+            const padded = best_sequences.map((s) => {
                 const p = [...s];
                 while (p.length < max_len) p.push(pad_id);
                 return p;
@@ -1430,8 +1453,11 @@ export class PreTrainedModel extends Callable {
             sequences = new Tensor('int64', all_input_ids.flat(), [all_input_ids.length, all_input_ids[0].length]);
         }
 
-        // Update past key values from the final forward pass
-        const past_key_values = getPastKeyValues(outputs, model_inputs.past_key_values);
+        // Beam search already extracted and reordered the final cache. Do not restore
+        // the original output tensors, which may have been disposed during reordering.
+        const past_key_values = is_beam_search
+            ? model_inputs.past_key_values
+            : getPastKeyValues(outputs, model_inputs.past_key_values);
 
         // Dispose output tensors not held by the cache
         const cachedTensors = new Set(Object.values(past_key_values));
@@ -1442,7 +1468,8 @@ export class PreTrainedModel extends Callable {
         }
 
         // Dispose cache tensors if no one needs them
-        const keepCacheAlive = 'past_key_values' in kwargs || generation_config.return_dict_in_generate;
+        const keepCacheAlive =
+            !is_beam_search && ('past_key_values' in kwargs || generation_config.return_dict_in_generate);
         if (!keepCacheAlive) {
             await past_key_values.dispose();
         }
@@ -1477,9 +1504,9 @@ export class PreTrainedModel extends Callable {
 
     /**
      * Reorder the past key values cache to match beam reordering.
-     * @param {Object} past_key_values The past key values object.
+     * @param {DynamicCache} past_key_values The past key values cache.
      * @param {number[]} beam_indices Indices indicating which beam each new position came from.
-     * @returns {Promise<Object>} Reordered past key values.
+     * @returns {Promise<DynamicCache>} Reordered past key values.
      */
     async _reorder_cache(past_key_values, beam_indices) {
         if (!past_key_values) return past_key_values;
@@ -1502,17 +1529,35 @@ export class PreTrainedModel extends Callable {
                 }
             }
         }
-        return reordered;
+        return new DynamicCache(reordered);
     }
 
+    /**
+     * Encode image inputs into features for multimodal generation.
+     * @param {any} inputs Vision encoder inputs.
+     * @returns {Promise<any>} Image features.
+     * @internal
+     */
     async encode_image(inputs) {
         return this._encode_input('vision_encoder', inputs, 'image_features');
     }
 
+    /**
+     * Encode token ids into embeddings for multimodal generation.
+     * @param {any} inputs Text encoder inputs.
+     * @returns {Promise<any>} Text embeddings.
+     * @internal
+     */
     async encode_text(inputs) {
         return this._encode_input('embed_tokens', inputs, 'inputs_embeds');
     }
 
+    /**
+     * Encode audio inputs into features for multimodal generation.
+     * @param {any} inputs Audio encoder inputs.
+     * @returns {Promise<any>} Audio features.
+     * @internal
+     */
     async encode_audio(inputs) {
         return this._encode_input('audio_encoder', inputs, 'audio_features');
     }
@@ -1525,7 +1570,7 @@ export class PreTrainedModel extends Callable {
  * @returns {Promise<Seq2SeqLMOutput>} Promise that resolves with the output of the seq2seq model.
  * @private
  */
-export async function seq2seq_forward(self, model_inputs) {
+async function seq2seq_forward(self, model_inputs) {
     let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
         model_inputs;
     // Encode if needed
@@ -1588,7 +1633,7 @@ export async function encoder_forward(self, model_inputs) {
     return await sessionRun(session, encoderFeeds);
 }
 
-export async function auto_encoder_forward(self, model_inputs) {
+async function auto_encoder_forward(self, model_inputs) {
     const encoded = await self.encode(model_inputs);
     const decoded = await self.decode(encoded);
     return decoded;
@@ -1613,6 +1658,8 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
                 .replace('present_ssm', 'past_ssm') // Mamba
                 .replace('present_conv', 'past_conv') // LFM2
                 .replace('present_recurrent', 'past_recurrent') // Qwen3.5
+                .replace('present_compressor', 'past_compressor') // Deepseek V4
+                .replace('present_indexer', 'past_indexer') // Deepseek V4
 
                 // Standard cache architecture
                 .replace('present', 'past_key_values');
@@ -1641,7 +1688,7 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
  * @param {Object} model_output The output of the model.
  * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
  */
-export function getAttentions(model_output) {
+function getAttentions(model_output) {
     const attentions = {};
 
     for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
@@ -1717,6 +1764,31 @@ export function addPastKeyValues(self, decoderFeeds, pastKeyValues) {
 }
 
 /**
+ * Sets `num_logits_to_keep` on `model_inputs` if the decoder session declares it as an input
+ * and it has not already been set.
+ *
+ * `num_logits_to_keep` specifies how many trailing prompt logits the model computes:
+ * - `0n` (or unset) computes logits for the entire sequence — used for prefill/scoring.
+ * - `1n` computes only the last token's logits — used during autoregressive generation,
+ *   since only the last prompt token's logits are needed to sample the next token. For long
+ *   sequences, computing all logits uses a lot of memory, so `1n` significantly reduces the
+ *   memory footprint.
+ * - Any other positive integer keeps the last `num_logits_to_keep` logits.
+ *
+ * @param {PreTrainedModel} self The model instance.
+ * @param {Record<string, any>} model_inputs The model inputs to mutate.
+ * @param {bigint} value The value to set (typically `1n` for generation, `0n` as a fallback).
+ * @private
+ */
+export function setNumLogitsToKeep(self, model_inputs, value) {
+    if (model_inputs.num_logits_to_keep) return;
+    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
+    if (session?.inputNames.includes('num_logits_to_keep')) {
+        model_inputs.num_logits_to_keep = new Tensor('int64', [value], []);
+    }
+}
+
+/**
  * Forward pass of a decoder model.
  * @param {Object} self The decoder model.
  * @param {Object} model_inputs The input data to be used for the forward pass.
@@ -1743,14 +1815,8 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
         new_model_inputs.position_ids = create_position_ids(new_model_inputs, past_key_values, start_index);
     }
 
-    if (session.inputNames.includes('num_logits_to_keep') && !new_model_inputs.num_logits_to_keep) {
-        // `num_logits_to_keep` specifies the number of prompt logits to calculate during generation.
-        // If unset (or 0), all logits will be calculated. If an integer value, only last `num_logits_to_keep`
-        // logits will be calculated. During generation, the default is 1 because only the logits of the last
-        // prompt token are needed for generation. For long sequences, the logits for the entire sequence may
-        // use a lot of memory so, setting `num_logits_to_keep=1` will reduce memory footprint significantly.
-        new_model_inputs.num_logits_to_keep = new Tensor('int64', [0n], []);
-    }
+    // Fallback for non-generation forward calls (e.g. prefill scoring): compute all logits.
+    setNumLogitsToKeep(self, new_model_inputs, 0n);
 
     // Unpack the `past_key_values` object into model inputs
     addPastKeyValues(self, new_model_inputs, past_key_values);
@@ -1775,10 +1841,11 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @param {DynamicCache} [params.past_key_values=null]
  * @param {Object} [params.generation_config=null]
  * @param {Object} [params.logits_processor=null]
+ * @param {Tensor} [params.num_logits_to_keep=null]
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
-export async function generic_text_to_text_forward(
+async function generic_text_to_text_forward(
     self,
     {
         // Generic parameters:
@@ -1799,6 +1866,7 @@ export async function generic_text_to_text_forward(
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // Additional parameters
         ...kwargs
@@ -1876,6 +1944,7 @@ export async function generic_text_to_text_forward(
             position_ids,
             generation_config,
             logits_processor,
+            num_logits_to_keep,
         },
         true,
     );
@@ -1889,7 +1958,7 @@ export async function generic_text_to_text_forward(
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function audio_text_to_text_forward(self, params) {
+async function audio_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['audio_values', 'input_features'],
@@ -1906,7 +1975,7 @@ export async function audio_text_to_text_forward(self, params) {
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function image_text_to_text_forward(self, params) {
+async function image_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['pixel_values'],
@@ -1959,7 +2028,7 @@ export function cumsum_masked_fill(attention_mask, start_index = 0) {
  *     position_ids = position_ids[:, -input_ids.shape[1] :]
  * ```
  */
-export function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
+function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
     const { input_ids, inputs_embeds, attention_mask } = model_inputs;
 
     const { data, dims } = cumsum_masked_fill(attention_mask, start_index);
@@ -1974,12 +2043,7 @@ export function create_position_ids(model_inputs, past_key_values = null, start_
 export function decoder_prepare_inputs_for_generation(self, input_ids, model_inputs, generation_config) {
     const past_length = model_inputs.past_key_values ? model_inputs.past_key_values.get_seq_length() : 0;
 
-    // During generation, only the last token's logits are needed. Setting num_logits_to_keep=1
-    // avoids computing logits for the entire sequence, significantly reducing memory usage.
-    const session = self.sessions['decoder_model_merged'] ?? self.sessions['model'];
-    if (session?.inputNames.includes('num_logits_to_keep') && !model_inputs.num_logits_to_keep) {
-        model_inputs.num_logits_to_keep = new Tensor('int64', [1n], []);
-    }
+    setNumLogitsToKeep(self, model_inputs, 1n);
 
     if (!model_inputs.attention_mask) {
         // If the attention mask is not provided, we attempt to infer based on provided inputs
@@ -2028,13 +2092,15 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
         input_ids = input_ids.map((x) => [x.at(-1)]);
     }
 
+    setNumLogitsToKeep(self, model_inputs, 1n);
+
     return {
         ...model_inputs,
         decoder_input_ids: toI64Tensor(input_ids),
     };
 }
 
-export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
+function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
     if (self.config.is_encoder_decoder) {
         return encoder_decoder_prepare_inputs_for_generation(self, ...args);
     } else {
@@ -2042,7 +2108,7 @@ export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...a
     }
 }
 
-export function default_merge_input_ids_with_features({
+function default_merge_input_ids_with_features({
     modality_token_id,
     inputs_embeds,
     modality_features,
@@ -2117,7 +2183,7 @@ export function default_merge_input_ids_with_audio_features({
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of configuration objects.
  * @private
  */
-export async function get_optional_configs(pretrained_model_name_or_path, names, options) {
+async function get_optional_configs(pretrained_model_name_or_path, names, options) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {

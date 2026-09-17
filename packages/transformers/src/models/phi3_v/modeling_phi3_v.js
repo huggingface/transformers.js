@@ -29,6 +29,7 @@ export class Phi3VForCausalLM extends Phi3VPreTrainedModel {
         // Generic generation parameters
         generation_config = null,
         logits_processor = null,
+        num_logits_to_keep = null,
 
         // TODO: needed?
         ...kwargs
@@ -65,6 +66,7 @@ export class Phi3VForCausalLM extends Phi3VPreTrainedModel {
                 position_ids,
                 generation_config,
                 logits_processor,
+                num_logits_to_keep,
             },
             false,
         );

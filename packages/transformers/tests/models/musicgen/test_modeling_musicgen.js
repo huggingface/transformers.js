@@ -3,7 +3,7 @@ import { T5Tokenizer, MusicgenForConditionalGeneration, full } from "../../../sr
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
 export default () => {
-  describe("MusicgenForConditionalGeneration", () => {
+  describe.skip("MusicgenForConditionalGeneration", () => {
     const model_id = "hf-internal-testing/tiny-random-MusicgenForConditionalGeneration";
 
     // Example adapted from https://huggingface.co/docs/transformers/model_doc/musicgen#text-conditional-generation

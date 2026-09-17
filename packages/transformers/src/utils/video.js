@@ -1,10 +1,24 @@
+/**
+ * @file Browser video loading helpers.
+ *
+ * `load_video()` samples frames from a video source into `RawImage` frames so
+ * vision-language models can consume short clips. Video decoding currently
+ * relies on browser media APIs.
+ *
+ * @module utils/video
+ */
+
 import { RawImage } from './image.js';
 import { env, apis } from '../env.js';
 
+/**
+ * A decoded video frame and its timestamp, in seconds.
+ */
 export class RawVideoFrame {
     /**
-     * @param {RawImage} image
-     * @param {number} timestamp
+     * Create a video frame.
+     * @param {RawImage} image The decoded image for this frame.
+     * @param {number} timestamp The frame timestamp, in seconds.
      */
     constructor(image, timestamp) {
         this.image = image;
@@ -12,10 +26,14 @@ export class RawVideoFrame {
     }
 }
 
+/**
+ * A sampled video represented as decoded frames plus total duration.
+ */
 export class RawVideo {
     /**
-     * @param {RawVideoFrame[]|RawImage[]} frames
-     * @param {number} duration
+     * Create a video from decoded frames.
+     * @param {RawVideoFrame[]|RawImage[]} frames Frames with timestamps, or images to space uniformly across `duration`.
+     * @param {number} duration Duration in seconds.
      */
     constructor(frames, duration) {
         if (frames.length > 0 && frames[0] instanceof RawImage) {
@@ -26,20 +44,33 @@ export class RawVideo {
         this.duration = duration;
     }
 
+    /**
+     * Width of the video frames, in pixels.
+     * @returns {number}
+     */
     get width() {
         return this.frames[0].image.width;
     }
+
+    /**
+     * Height of the video frames, in pixels.
+     * @returns {number}
+     */
     get height() {
         return this.frames[0].image.height;
     }
 
+    /**
+     * Effective sampled frame rate.
+     * @returns {number}
+     */
     get fps() {
         return this.frames.length / this.duration;
     }
 }
 
 /**
- * Loads a video.
+ * Load and sample frames from a video.
  *
  * @param {string|Blob|HTMLVideoElement} src The video to process.
  * @param {Object} [options] Optional parameters.
@@ -54,7 +85,7 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
     }
 
     // TODO: Support efficiently loading all frames using the WebCodecs API.
-    // Specfically, https://developer.mozilla.org/en-US/docs/Web/API/VideoDecoder
+    // Specifically, https://developer.mozilla.org/en-US/docs/Web/API/VideoDecoder
     if (num_frames == null && fps == null) {
         throw new Error('Either num_frames or fps must be provided.');
     }

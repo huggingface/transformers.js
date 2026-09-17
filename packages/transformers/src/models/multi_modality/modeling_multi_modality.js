@@ -1,4 +1,4 @@
-import { PreTrainedModel, decoder_forward } from '../modeling_utils.js';
+import { PreTrainedModel, decoder_forward, setNumLogitsToKeep } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
 import { pick } from '../../utils/core.js';
 import { RawImage } from '../../utils/image.js';
@@ -72,6 +72,8 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         const has_past_key_values = !!model_inputs.past_key_values;
+
+        setNumLogitsToKeep(this, model_inputs, 1n);
 
         if (generation_config.guidance_scale !== null && generation_config.guidance_scale > 1) {
             if (has_past_key_values) {

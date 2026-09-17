@@ -208,11 +208,26 @@ function getNormalizedConfig(config) {
             break;
         case 'youtu':
         case 'deepseek_v3':
+        case 'deepseek_v4':
         case 'glm_moe_dsa':
         case 'mistral4':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
-            mapping['dim_kv'] = 'qk_head_dim';
+            mapping['dim_kv'] = config.model_type === 'deepseek_v4' ? 'head_dim' : 'qk_head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
+        case 'zaya':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_hidden_layers';
+            mapping['hidden_size'] = 'hidden_size';
+            mapping['dim_kv'] = 'head_dim';
+            mapping['num_attention_heads'] = 'num_attention_heads';
+            break;
+        case 'hrm_text':
+            mapping['num_heads'] = 'num_key_value_heads';
+            mapping['num_layers'] = 'num_hidden_layers';
+            mapping['hidden_size'] = 'hidden_size';
+            mapping['dim_kv'] = 'head_dim';
             mapping['num_attention_heads'] = 'num_attention_heads';
             break;
 
@@ -332,7 +347,7 @@ export function getCacheNames(config, options) {
     }
 
     const pkv_prefix = options?.prefix ?? 'past_key_values';
-    const conv_prefix = pkv_prefix === 'present' ? 'present' : 'past';
+    const cache_prefix = pkv_prefix === 'present' ? 'present' : 'past';
     /** @type {Set<string>} */
     const names = new Set();
 
@@ -343,7 +358,7 @@ export function getCacheNames(config, options) {
                 names.add(`${pkv_prefix}.${i}.key`);
                 names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'conv') {
-                names.add(`${conv_prefix}_conv.${i}`);
+                names.add(`${cache_prefix}_conv.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
@@ -356,8 +371,8 @@ export function getCacheNames(config, options) {
 
         for (let i = 0; i < num_layers; ++i) {
             if (!layer_types || layer_types[i] === 'mamba') {
-                names.add(`${conv_prefix}_conv.${i}`);
-                names.add(`${conv_prefix}_ssm.${i}`);
+                names.add(`${cache_prefix}_conv.${i}`);
+                names.add(`${cache_prefix}_ssm.${i}`);
             }
             if (!layer_types || layer_types[i] === 'attention') {
                 names.add(`${pkv_prefix}.${i}.key`);
@@ -373,13 +388,13 @@ export function getCacheNames(config, options) {
                 names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'linear_attention') {
                 if (config.model_type === 'olmo_hybrid') {
-                    names.add(`${conv_prefix}_conv.${i}.key`);
-                    names.add(`${conv_prefix}_conv.${i}.value`);
-                    names.add(`${conv_prefix}_conv.${i}.query`);
+                    names.add(`${cache_prefix}_conv.${i}.key`);
+                    names.add(`${cache_prefix}_conv.${i}.value`);
+                    names.add(`${cache_prefix}_conv.${i}.query`);
                 } else {
-                    names.add(`${conv_prefix}_conv.${i}`);
+                    names.add(`${cache_prefix}_conv.${i}`);
                 }
-                names.add(`${conv_prefix}_recurrent.${i}`);
+                names.add(`${cache_prefix}_recurrent.${i}`);
             } else {
                 throw new Error(`Unsupported layer type: ${layer_types[i]}`);
             }
@@ -396,6 +411,37 @@ export function getCacheNames(config, options) {
         for (let i = 0; i < num_kv_layers; ++i) {
             names.add(`${pkv_prefix}.${i}.key`);
             names.add(`${pkv_prefix}.${i}.value`);
+        }
+        return names;
+    } else if (config.model_type === 'deepseek_v4') {
+        const { layer_types, num_hidden_layers } = /** @type {any} */ (config);
+
+        for (let i = 0; i < num_hidden_layers; ++i) {
+            names.add(`${pkv_prefix}.${i}.key`);
+            names.add(`${pkv_prefix}.${i}.value`);
+
+            const layer_type = layer_types[i];
+            if (layer_type === 'compressed_sparse_attention') {
+                names.add(`${cache_prefix}_compressor.${i}.kv`);
+                names.add(`${cache_prefix}_compressor.${i}.gate`);
+                names.add(`${cache_prefix}_indexer.${i}.kv`);
+                names.add(`${cache_prefix}_indexer.${i}.gate`);
+            } else if (layer_type === 'heavily_compressed_attention') {
+                names.add(`${cache_prefix}_compressor.${i}.kv`);
+                names.add(`${cache_prefix}_compressor.${i}.gate`);
+            } else if (layer_type && layer_type !== 'sliding_attention') {
+                throw new Error(`Unsupported layer type: ${layer_type}`);
+            }
+        }
+        return names;
+    } else if (config.model_type === 'zaya') {
+        const { num_hidden_layers, cca_time1 } = /** @type {any} */ (config);
+        const stride = cca_time1 ?? 1;
+        for (let i = 0; i < num_hidden_layers; i += stride) {
+            names.add(`${pkv_prefix}.${i}.key`);
+            names.add(`${pkv_prefix}.${i}.value`);
+            names.add(`${pkv_prefix}.${i}.conv_state`);
+            names.add(`${pkv_prefix}.${i}.shift_state`);
         }
         return names;
     } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {
@@ -466,7 +512,7 @@ export class PretrainedConfig {
     'transformers.js_config';
 
     /**
-     * Create a new PreTrainedTokenizer instance.
+     * Create a new `PretrainedConfig` from a parsed `config.json` object.
      * @param {Object} configJSON The JSON of the config.
      */
     constructor(configJSON) {
@@ -475,9 +521,9 @@ export class PretrainedConfig {
     }
 
     /**
-     * Loads a pre-trained config from the given `pretrained_model_name_or_path`.
+     * Loads a pretrained config from the given `pretrained_model_name_or_path`.
      *
-     * @param {string} pretrained_model_name_or_path The path to the pre-trained config.
+     * @param {string} pretrained_model_name_or_path The path to the pretrained config.
      * @param {PretrainedOptions} options Additional options for loading the config.
      * @throws {Error} Throws an error if the config.json is not found in the `pretrained_model_name_or_path`.
      *
@@ -505,10 +551,14 @@ export class PretrainedConfig {
 }
 
 /**
- * Helper class which is used to instantiate pretrained configs with the `from_pretrained` function.
+ * Loads a model config from a pretrained id. Thin alias for
+ * `PretrainedConfig.from_pretrained`.
  *
- * @example
+ * ```javascript
+ * import { AutoConfig } from '@huggingface/transformers';
+ *
  * const config = await AutoConfig.from_pretrained('Xenova/bert-base-uncased');
+ * ```
  */
 export class AutoConfig {
     /** @type {typeof PretrainedConfig.from_pretrained} */
@@ -526,7 +576,7 @@ export class AutoConfig {
  * for more information.
  * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
  * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
- * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format=false] Whether to load the model using the external data format (used for models >= 2GB in size).
+ * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format=null] Whether to load the model using the external data format (used for models >= 2GB in size).
  */
 
 /**

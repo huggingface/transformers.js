@@ -79,6 +79,7 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
 
         inputs_embeds,
         decoder_inputs_embeds,
+        num_logits_to_keep = null,
     }) {
         if (!inputs_embeds) {
             ({ inputs_embeds, attention_mask } = await this._prepare_inputs_embeds({
@@ -108,6 +109,7 @@ export class Florence2ForConditionalGeneration extends Florence2PreTrainedModel 
             encoder_attention_mask: attention_mask,
             encoder_hidden_states: encoder_outputs,
             past_key_values,
+            num_logits_to_keep,
         };
         return await decoder_forward(this, decoderFeeds, true);
     }

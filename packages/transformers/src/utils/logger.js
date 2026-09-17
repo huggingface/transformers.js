@@ -9,12 +9,14 @@ import { env, LogLevel } from '../env.js';
 /**
  * Logger that respects the configured log level in env.logLevel.
  *
- * @example
+ * **Example:**
+ * ```javascript
  * import { logger } from './utils/logger.js';
  * logger.info('Model loaded successfully');
  * logger.warn('Deprecated method used');
  * logger.error('Failed to load model');
  * logger.debug('Token count:', tokens.length);
+ * ```
  */
 export const logger = {
     /**

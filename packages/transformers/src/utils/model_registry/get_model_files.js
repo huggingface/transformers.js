@@ -3,6 +3,7 @@ import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
 import { getSessionsConfig } from '../../models/session_config.js';
 import { AutoConfig } from '../../configs.js';
+import { makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
 
@@ -35,7 +36,7 @@ export function get_config(
     if (config !== null) {
         return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision });
     }
-    const key = JSON.stringify([modelId, cache_dir, local_files_only, revision]);
+    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision });
     return memoizePromise(key, () =>
         AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision }),
     );

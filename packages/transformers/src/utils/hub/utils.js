@@ -23,7 +23,7 @@ export function pathJoin(...parts) {
 
 /**
  * Determines whether the given string is a valid URL.
- * @param {string|URL} string The string to test for validity as an URL.
+ * @param {string|URL} string The string to test for validity as a URL.
  * @param {string[]} [protocols=null] A list of valid protocols. If specified, the protocol must be in this list.
  * @param {string[]} [validHosts=null] A list of valid hostnames. If specified, the URL's hostname must be in this list.
  * @returns {boolean} True if the string is a valid URL, false otherwise.
@@ -59,12 +59,58 @@ export function isValidHfModelId(string) {
 }
 
 /**
+ * Builds a stable key for memoizing model/revision/cache scoped work.
+ *
+ * @param {string} model_id Model ID or local model path.
+ * @param {Object} [options] Pretrained loading options.
+ * @param {string} [options.revision='main'] Model revision.
+ * @param {string|null} [options.cache_dir=null] Custom cache directory.
+ * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {...unknown} parts Additional key parts for the specific operation.
+ * @returns {string}
+ */
+export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
+    return JSON.stringify([
+        model_id,
+        options.revision ?? 'main',
+        options.cache_dir ?? null,
+        options.local_files_only ?? false,
+        ...parts,
+    ]);
+}
+
+/**
+ * Error thrown when a model file is missing or inaccessible: the repository does not exist,
+ * it is gated or private, the file is absent, or downloads are disabled and it is not cached.
+ *
+ * The Hub returns 401 for nonexistent repositories, so a missing repository and one requiring
+ * authentication are indistinguishable. Network and server failures throw a regular `Error`.
+ */
+export class ModelFileNotFoundError extends Error {
+    /**
+     * @param {string} message The error message.
+     * @param {Object} [options] Additional error information.
+     * @param {number|null} [options.status=null] The HTTP status code, when the failure came from a Hub response.
+     */
+    constructor(message, { status = null } = {}) {
+        super(message);
+        this.name = 'ModelFileNotFoundError';
+        this.status = status;
+    }
+}
+
+/**
+ * HTTP statuses indicating the file is missing or inaccessible, rather than a transient failure.
+ */
+const NOT_FOUND_STATUSES = new Set([401, 403, 404]);
+
+/**
  * Helper method to handle fatal errors that occur while trying to load a file from the Hugging Face Hub.
  * @param {number} status The HTTP status code of the error.
  * @param {string} remoteURL The URL of the file that could not be loaded.
  * @param {boolean} fatal Whether to raise an error if the file could not be loaded.
- * @returns {null} Returns `null` if `fatal = true`.
- * @throws {Error} If `fatal = false`.
+ * @returns {null} Returns `null` if `fatal = false`.
+ * @throws {ModelFileNotFoundError|Error} If `fatal = true`. A `ModelFileNotFoundError` for 401/403/404, otherwise a regular `Error`.
  */
 export function handleError(status, remoteURL, fatal) {
     if (!fatal) {
@@ -74,7 +120,11 @@ export function handleError(status, remoteURL, fatal) {
     }
 
     const message = ERROR_MAPPING[status] ?? `Error (${status}) occurred while trying to load file`;
-    throw Error(`${message}: "${remoteURL}".`);
+    const fullMessage = `${message}: "${remoteURL}".`;
+    if (NOT_FOUND_STATUSES.has(status)) {
+        throw new ModelFileNotFoundError(fullMessage, { status });
+    }
+    throw Error(fullMessage);
 }
 
 /**
@@ -148,9 +198,13 @@ export function isBlobURL(url) {
  * If the URL is already absolute (http://, https://, or blob:), returns it unchanged (handled by new URL(...)).
  * Otherwise, resolves it relative to the current page location (browser) or module location (Node/Bun/Deno).
  * @param {string} url - The URL to convert (can be relative or absolute).
+ * @param {Object} [options]
+ * @param {boolean} [options.allowUnresolved=false] - Return `url` unchanged instead of throwing when it
+ * cannot be resolved, which happens for a relative URL on a page whose base is opaque (e.g. "about:blank").
+ * Off by default, so a malformed URL still throws for callers that expect one.
  * @returns {string} The absolute URL.
  */
-export function toAbsoluteURL(url) {
+export function toAbsoluteURL(url, { allowUnresolved = false } = {}) {
     let baseURL;
 
     if (typeof location !== 'undefined' && location.href) {
@@ -164,5 +218,13 @@ export function toAbsoluteURL(url) {
         return url;
     }
 
-    return new URL(url, baseURL).href;
+    try {
+        return new URL(url, baseURL).href;
+    } catch (error) {
+        if (!allowUnresolved) {
+            throw error;
+        }
+        // Nothing resolves against an opaque base, so hand back the original for the caller to check
+        return url;
+    }
 }

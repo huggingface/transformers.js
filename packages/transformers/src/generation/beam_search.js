@@ -31,7 +31,7 @@ export class BeamHypotheses {
      * @param {bigint[]} tokens The token ids of the hypothesis.
      */
     add(sum_logprobs, tokens) {
-        const score = sum_logprobs / (tokens.length ** this.length_penalty);
+        const score = sum_logprobs / tokens.length ** this.length_penalty;
         if (this.beams.length < this.num_beams || score > this.worst_score) {
             this.beams.push({ score, tokens });
             if (this.beams.length > this.num_beams) {
@@ -44,9 +44,8 @@ export class BeamHypotheses {
                 }
                 this.beams.splice(worst_idx, 1);
             }
-            this.worst_score = this.beams.length === this.num_beams
-                ? Math.min(...this.beams.map(b => b.score))
-                : -1e9;
+            this.worst_score =
+                this.beams.length === this.num_beams ? Math.min(...this.beams.map((b) => b.score)) : -1e9;
         }
     }
 
@@ -66,7 +65,7 @@ export class BeamHypotheses {
         } else {
             // Heuristic: check if the best possible score for the next step
             // could beat the worst completed hypothesis
-            const highest_attainable_score = best_sum_logprobs / (cur_len ** this.length_penalty);
+            const highest_attainable_score = best_sum_logprobs / cur_len ** this.length_penalty;
             return this.worst_score >= highest_attainable_score;
         }
     }
@@ -86,26 +85,27 @@ export class BeamSearchScorer {
      * @param {number|number[]|null} [options.eos_token_id]
      * @param {number|null} [options.pad_token_id]
      */
-    constructor(batch_size, num_beams, {
-        length_penalty = 1.0,
-        early_stopping = false,
-        num_return_sequences = 1,
-        eos_token_id = null,
-        pad_token_id = null,
-    } = {}) {
+    constructor(
+        batch_size,
+        num_beams,
+        {
+            length_penalty = 1.0,
+            early_stopping = false,
+            num_return_sequences = 1,
+            eos_token_id = null,
+            pad_token_id = null,
+        } = {},
+    ) {
         this.batch_size = batch_size;
         this.num_beams = num_beams;
         this.length_penalty = length_penalty;
         this.early_stopping = early_stopping;
         this.num_return_sequences = num_return_sequences;
-        this.eos_token_ids = eos_token_id === null ? []
-            : (Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id]);
+        this.eos_token_ids = eos_token_id === null ? [] : Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id];
         this.pad_token_id = pad_token_id ?? 0;
 
         if (num_return_sequences > num_beams) {
-            throw new Error(
-                `num_return_sequences (${num_return_sequences}) must be <= num_beams (${num_beams}).`,
-            );
+            throw new Error(`num_return_sequences (${num_return_sequences}) must be <= num_beams (${num_beams}).`);
         }
 
         /** @type {BeamHypotheses[]} */
@@ -160,7 +160,7 @@ export class BeamSearchScorer {
                 const beam_source = next_indices[cand_idx]; // relative to batch
                 const abs_beam_source = batch_idx * this.num_beams + beam_source;
 
-                const is_eos = this.eos_token_ids.some(id => BigInt(id) === beam_token);
+                const is_eos = this.eos_token_ids.some((id) => BigInt(id) === beam_token);
 
                 if (is_eos) {
                     // Add completed hypothesis
@@ -185,7 +185,7 @@ export class BeamSearchScorer {
                     const out_idx = batch_idx * this.num_beams + beam_idx;
                     next_beam_scores[out_idx] = next_beam_scores[last_valid] ?? 0;
                     next_beam_tokens[out_idx] = next_beam_tokens[last_valid] ?? 0n;
-                    next_beam_indices[out_idx] = next_beam_indices[last_valid] ?? (batch_idx * this.num_beams);
+                    next_beam_indices[out_idx] = next_beam_indices[last_valid] ?? batch_idx * this.num_beams;
                 }
             }
 
@@ -230,8 +230,7 @@ export class BeamSearchScorer {
         // Select top num_return_sequences per batch
         const results = [];
         for (let batch_idx = 0; batch_idx < this.batch_size; ++batch_idx) {
-            const sorted = [...this._beam_hyps[batch_idx].beams]
-                .sort((a, b) => b.score - a.score);
+            const sorted = [...this._beam_hyps[batch_idx].beams].sort((a, b) => b.score - a.score);
             for (let i = 0; i < this.num_return_sequences; ++i) {
                 results.push(sorted[i]);
             }

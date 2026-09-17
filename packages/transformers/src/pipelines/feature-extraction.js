@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
@@ -10,8 +14,8 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
 /**
  * @typedef {Object} FeatureExtractionPipelineOptions Parameters specific to feature extraction pipelines.
  * @property {'none'|'mean'|'cls'|'first_token'|'eos'|'last_token'} [pooling="none"] The pooling method to use.
- * @property {boolean} [normalize=false] Whether or not to normalize the embeddings in the last dimension.
- * @property {boolean} [quantize=false] Whether or not to quantize the embeddings.
+ * @property {boolean} [normalize=false] Whether to normalize the embeddings in the last dimension.
+ * @property {boolean} [quantize=false] Whether to quantize the embeddings.
  * @property {'binary'|'ubinary'} [precision='binary'] The precision to use for quantization.
  *
  * @callback FeatureExtractionPipelineCallback Extract the features of the input(s).
@@ -24,7 +28,7 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
 
 /**
  * Feature extraction pipeline using no model head. This pipeline extracts the hidden
- * states from the base transformer, which can be used as features in downstream tasks.
+ * states from the base transformer for use as features in downstream tasks.
  *
  * **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` (without pooling or normalization).
  * ```javascript
@@ -58,13 +62,15 @@ import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
  * console.log(output.tolist());
  * ```
  *
- * **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` models (with pooling and binary quantization).
+ * **Example:** Run feature extraction using `onnx-community/all-MiniLM-L6-v2-ONNX` with pooling and binary quantization.
  * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
  * const extractor = await pipeline('feature-extraction', 'onnx-community/all-MiniLM-L6-v2-ONNX');
  * const output = await extractor('This is a simple test.', { pooling: 'mean', quantize: true, precision: 'binary' });
  * // Tensor {
  * //   type: 'int8',
- * //   data: Int8Array [49, 108, 25, ...],
+ * //   data: Int8Array [49, 108, 25, ...],
  * //   dims: [1, 48]
  * // }
  *
