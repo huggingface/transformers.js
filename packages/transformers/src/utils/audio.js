@@ -656,7 +656,7 @@ export async function spectrogram(
     // TODO: What if `mel_filters` is null?
     const num_mel_filters = mel_filters.length;
 
-    // Perform matrix muliplication:
+    // Perform matrix multiplication:
     // mel_spec = mel_filters @ magnitudes.T
     //  - mel_filters.shape=(80, 201)
     //  - magnitudes.shape=(3000, 201) => magnitudes.T.shape=(201, 3000)
