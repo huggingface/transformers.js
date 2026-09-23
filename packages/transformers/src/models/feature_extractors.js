@@ -8,6 +8,7 @@ export * from './gemma3n/feature_extraction_gemma3n.js';
 export * from './gemma4/feature_extraction_gemma4.js';
 export * from './granite_speech/feature_extraction_granite_speech.js';
 export * from './moonshine/feature_extraction_moonshine.js';
+export * from './nemotron_asr_streaming/feature_extraction_nemotron_asr_streaming.js';
 export * from './parakeet/feature_extraction_parakeet.js';
 export * from './pyannote/feature_extraction_pyannote.js';
 export * from './seamless_m4t/feature_extraction_seamless_m4t.js';
