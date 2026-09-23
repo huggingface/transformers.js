@@ -12,7 +12,9 @@ export class HrmTextForCausalLM extends HrmTextPreTrainedModel {
         // HRM-Text can be pretrained as a PrefixLM.
         // token_type_ids=1 marks tokens inside the bidirectional prefix block,
         // and 0 marks autoregressively generated tokens.
-        prepared.token_type_ids = (prepared.past_key_values ? zeros_like : ones_like)(prepared.input_ids);
+        // Check cached tokens.
+        const has_past_tokens = (prepared.past_key_values?.get_seq_length() ?? 0) > 0;
+        prepared.token_type_ids = (has_past_tokens ? zeros_like : ones_like)(prepared.input_ids);
         return prepared;
     }
 }

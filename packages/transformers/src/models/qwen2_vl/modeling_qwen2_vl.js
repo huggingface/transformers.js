@@ -302,8 +302,9 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
             return model_inputs;
         }
 
-        // Calculate position_ids and rope_deltas
-        if (!model_inputs.past_key_values) {
+        // Check cached tokens, not cache presence.
+        const past_length = model_inputs.past_key_values?.get_seq_length() ?? 0;
+        if (past_length === 0) {
             [model_inputs.position_ids, model_inputs.rope_deltas] = this.get_rope_index(
                 model_inputs.input_ids,
                 model_inputs.image_grid_thw,
@@ -313,8 +314,6 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         } else {
             model_inputs.pixel_values = null;
             // model_inputs.pixel_values_videos = null;
-
-            const past_length = model_inputs.past_key_values.get_seq_length();
 
             if (past_length < model_inputs.input_ids.dims[1]) {
                 // Externally provided `past_key_values` with full input_ids:
