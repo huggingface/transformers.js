@@ -6,6 +6,12 @@ import { Tensor, cat } from '../../utils/tensor.js';
 const LOG_HALF = Math.log(0.5);
 
 /**
+ * @param {number} x
+ * @returns {number}
+ */
+const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+/**
  * Indices of the `k` largest values of `values`, the lowest index first among equal values.
  * @param {ArrayLike<number>} values
  * @param {number} k
@@ -13,7 +19,8 @@ const LOG_HALF = Math.log(0.5);
  */
 function topk_indices(values, k) {
     const indices = Array.from({ length: values.length }, (_, i) => i);
-    indices.sort((a, b) => values[b] - values[a] || a - b);
+    // Comparisons rather than a difference, which is `NaN` for equal infinite values
+    indices.sort((a, b) => (values[a] > values[b] ? -1 : values[a] < values[b] ? 1 : a - b));
     return indices.slice(0, k);
 }
 
@@ -53,7 +60,6 @@ export class Nemotron3DiarizationSpeakerCache {
         this.probs = null;
         /** @type {Float32Array} FIFO queue frames, `[batch_size, fifo_length, hidden_size]`. */
         this.fifo = null;
-        this.batch_size = 0;
         this.hidden_size = 0;
         this.num_cache_frames = 0;
         this.num_fifo_frames = 0;
@@ -66,7 +72,6 @@ export class Nemotron3DiarizationSpeakerCache {
      * @param {number} hidden_size
      */
     lazy_initialization(batch_size, hidden_size) {
-        this.batch_size = batch_size;
         this.hidden_size = hidden_size;
         this.embeds = new Float32Array(batch_size * this.speaker_cache_length * hidden_size);
         this.probs = new Float32Array(batch_size * this.speaker_cache_length * this.num_speakers);
@@ -84,47 +89,20 @@ export class Nemotron3DiarizationSpeakerCache {
         if (!this.is_initialized) {
             this.lazy_initialization(batch_size, hidden_size);
         }
-        const { num_cache_frames, num_fifo_frames } = this;
+        const { num_cache_frames, num_fifo_frames, speaker_cache_length, fifo_length } = this;
         const num_frames = num_cache_frames + num_fifo_frames;
-        const cache_size = num_cache_frames * hidden_size;
-        const fifo_size = num_fifo_frames * hidden_size;
         const data = new Float32Array(batch_size * num_frames * hidden_size);
         for (let b = 0; b < batch_size; ++b) {
             const offset = b * num_frames * hidden_size;
-            const cache_offset = b * this.speaker_cache_length * hidden_size;
-            const fifo_offset = b * this.fifo_length * hidden_size;
-            data.set(this.embeds.subarray(cache_offset, cache_offset + cache_size), offset);
-            data.set(this.fifo.subarray(fifo_offset, fifo_offset + fifo_size), offset + cache_size);
+            const cache_offset = b * speaker_cache_length * hidden_size;
+            const fifo_offset = b * fifo_length * hidden_size;
+            data.set(this.embeds.subarray(cache_offset, cache_offset + num_cache_frames * hidden_size), offset);
+            data.set(
+                this.fifo.subarray(fifo_offset, fifo_offset + num_fifo_frames * hidden_size),
+                offset + num_cache_frames * hidden_size,
+            );
         }
         return new Tensor('float32', data, [batch_size, num_frames, hidden_size]);
-    }
-
-    /**
-     * Speaker probabilities at the encoder frame rate, zeroed on the padding frames.
-     * @param {Tensor} logits Speaker logits of shape `[batch_size, num_frames * subsampling_factor, num_speakers]`.
-     * @param {ArrayLike<number|bigint>|null} mask Valid frames, of shape `[batch_size, num_frames]`.
-     * @returns {Float32Array} Probabilities of shape `[batch_size, num_frames, num_speakers]`.
-     * @private
-     */
-    _pool_probs(logits, mask) {
-        const factor = this.subsampling_factor;
-        const [batch_size, num_logit_frames, num_speakers] = logits.dims;
-        const num_frames = Math.floor(num_logit_frames / factor);
-        const logits_data = /** @type {Float32Array} */ (logits.data);
-        const probs = new Float32Array(batch_size * num_frames * num_speakers);
-        for (let b = 0; b < batch_size; ++b) {
-            for (let t = 0; t < num_frames; ++t) {
-                if (mask && !Number(mask[b * num_frames + t])) continue;
-                const out_offset = (b * num_frames + t) * num_speakers;
-                for (let k = 0; k < factor; ++k) {
-                    const in_offset = (b * num_logit_frames + t * factor + k) * num_speakers;
-                    for (let s = 0; s < num_speakers; ++s) {
-                        probs[out_offset + s] += 1 / (1 + Math.exp(-logits_data[in_offset + s])) / factor;
-                    }
-                }
-            }
-        }
-        return probs;
     }
 
     /**
@@ -153,8 +131,8 @@ export class Nemotron3DiarizationSpeakerCache {
      * @param {Tensor} silence_embeds Learned silence embedding of shape `[hidden_size]`, filling the reserved silence
      * slots of a compressed cache.
      * @param {number} num_chunk_frames Number of chunk frames that join the FIFO queue.
-     * @param {ArrayLike<number|bigint>|null} [mask=null] Valid frames of the step (cached frames, then chunk frames),
-     * of shape `[batch_size, num_input_frames]`, whose padding frames are given zero speaker probabilities.
+     * @param {BigInt64Array|null} [mask=null] Valid frames of the step (cached frames, then chunk frames), of shape
+     * `[batch_size, num_input_frames]`, whose padding frames are given zero speaker probabilities.
      */
     update(chunk_embeds, chunk_logits, silence_embeds, num_chunk_frames, mask = null) {
         const [batch_size, num_embeds, hidden_size] = chunk_embeds.dims;
@@ -162,216 +140,201 @@ export class Nemotron3DiarizationSpeakerCache {
             this.lazy_initialization(batch_size, hidden_size);
         }
         const { num_cache_frames, num_fifo_frames, num_speakers, speaker_cache_length, fifo_length } = this;
-        const probs = this._pool_probs(chunk_logits, mask);
-        const num_input_frames = Math.floor(chunk_logits.dims[1] / this.subsampling_factor);
         const chunk_data = /** @type {Float32Array} */ (chunk_embeds.data);
-
-        // FIFO queue with the chunk appended, `[batch_size, num_queued_frames, hidden_size]`
         const num_queued_frames = num_fifo_frames + num_chunk_frames;
-        const queued = new Float32Array(batch_size * num_queued_frames * hidden_size);
-        for (let b = 0; b < batch_size; ++b) {
-            const offset = b * num_queued_frames * hidden_size;
-            const fifo_offset = b * fifo_length * hidden_size;
-            const chunk_offset = b * num_embeds * hidden_size;
-            queued.set(this.fifo.subarray(fifo_offset, fifo_offset + num_fifo_frames * hidden_size), offset);
-            queued.set(
-                chunk_data.subarray(chunk_offset, chunk_offset + num_chunk_frames * hidden_size),
-                offset + num_fifo_frames * hidden_size,
-            );
-        }
-
         const num_popped = this._num_popped_frames(num_queued_frames);
-        if (num_popped) {
-            // an uncompressed cache still holds plain chunk frames, whose probabilities this step re-estimates
-            // a compressed one is out of order, so the probs stored alongside its frames are the only ones
-            let num_frames = num_cache_frames + num_popped;
-            /** @type {Float32Array} */
-            let cache_embeds = new Float32Array(batch_size * num_frames * hidden_size);
-            /** @type {Float32Array} */
-            let cache_probs = new Float32Array(batch_size * num_frames * num_speakers);
-            for (let b = 0; b < batch_size; ++b) {
-                const embeds_offset = b * num_frames * hidden_size;
-                const cache_offset = b * speaker_cache_length * hidden_size;
-                cache_embeds.set(
-                    this.embeds.subarray(cache_offset, cache_offset + num_cache_frames * hidden_size),
-                    embeds_offset,
-                );
-                const queued_offset = b * num_queued_frames * hidden_size;
-                cache_embeds.set(
-                    queued.subarray(queued_offset, queued_offset + num_popped * hidden_size),
-                    embeds_offset + num_cache_frames * hidden_size,
-                );
 
-                const probs_offset = b * num_frames * num_speakers;
-                const step_offset = b * num_input_frames * num_speakers;
-                const stored_probs = this.is_compressed
-                    ? this.probs.subarray(
-                          b * speaker_cache_length * num_speakers,
-                          (b * speaker_cache_length + num_cache_frames) * num_speakers,
-                      )
-                    : probs.subarray(step_offset, step_offset + num_cache_frames * num_speakers);
-                cache_probs.set(stored_probs, probs_offset);
-                // the FIFO frames follow the cache frames in the step
-                cache_probs.set(
-                    probs.subarray(
-                        step_offset + num_cache_frames * num_speakers,
-                        step_offset + (num_cache_frames + num_popped) * num_speakers,
-                    ),
-                    probs_offset + num_cache_frames * num_speakers,
-                );
-            }
-
-            if (num_frames > speaker_cache_length) {
-                [cache_embeds, cache_probs] = this._compress(cache_embeds, cache_probs, num_frames, silence_embeds);
-                num_frames = speaker_cache_length;
-                this.is_compressed = true;
-            }
-            this.num_cache_frames = num_frames;
+        if (num_popped === 0) {
+            // The chunk fits in the FIFO queue
             for (let b = 0; b < batch_size; ++b) {
-                this.embeds.set(
-                    cache_embeds.subarray(b * num_frames * hidden_size, (b + 1) * num_frames * hidden_size),
-                    b * speaker_cache_length * hidden_size,
-                );
-                this.probs.set(
-                    cache_probs.subarray(b * num_frames * num_speakers, (b + 1) * num_frames * num_speakers),
-                    b * speaker_cache_length * num_speakers,
+                const chunk_offset = b * num_embeds * hidden_size;
+                this.fifo.set(
+                    chunk_data.subarray(chunk_offset, chunk_offset + num_chunk_frames * hidden_size),
+                    (b * fifo_length + num_fifo_frames) * hidden_size,
                 );
             }
+            this.num_fifo_frames = num_queued_frames;
+            return;
         }
 
-        this.num_fifo_frames = num_queued_frames - num_popped;
+        // The oldest queued frames move to the speaker cache, compressed if they overflow it
+        const num_frames = num_cache_frames + num_popped;
+        const compress = num_frames > speaker_cache_length;
+        const num_logit_frames = chunk_logits.dims[1];
+        const logits_data = /** @type {Float32Array} */ (chunk_logits.data);
+        const step_length = mask ? mask.length / batch_size : 0;
         for (let b = 0; b < batch_size; ++b) {
-            const queued_offset = (b * num_queued_frames + num_popped) * hidden_size;
-            this.fifo.set(
-                queued.subarray(queued_offset, queued_offset + this.num_fifo_frames * hidden_size),
-                b * fifo_length * hidden_size,
+            const fifo = this.fifo.subarray(b * fifo_length * hidden_size, (b + 1) * fifo_length * hidden_size);
+            const cache_embeds = this.embeds.subarray(
+                b * speaker_cache_length * hidden_size,
+                (b + 1) * speaker_cache_length * hidden_size,
             );
+            const cache_probs = this.probs.subarray(
+                b * speaker_cache_length * num_speakers,
+                (b + 1) * speaker_cache_length * num_speakers,
+            );
+
+            // The FIFO queue with the chunk appended
+            const queued = new Float32Array(num_queued_frames * hidden_size);
+            queued.set(fifo.subarray(0, num_fifo_frames * hidden_size));
+            queued.set(
+                chunk_data.subarray(b * num_embeds * hidden_size, (b * num_embeds + num_chunk_frames) * hidden_size),
+                num_fifo_frames * hidden_size,
+            );
+
+            // The cache frames, then the popped frames
+            /** @type {Float32Array} */
+            let embeds = new Float32Array(num_frames * hidden_size);
+            embeds.set(cache_embeds.subarray(0, num_cache_frames * hidden_size));
+            embeds.set(queued.subarray(0, num_popped * hidden_size), num_cache_frames * hidden_size);
+
+            // The step (cache frames, then queued frames) estimates their speaker probabilities, except for the frames
+            // of a compressed cache: out of order, their stored probabilities are the only ones
+            let probs = this._pool_probs(
+                logits_data.subarray(b * num_logit_frames * num_speakers, (b + 1) * num_logit_frames * num_speakers),
+                mask?.subarray(b * step_length, (b + 1) * step_length),
+                this.is_compressed ? num_cache_frames : 0,
+                num_frames,
+            );
+            if (this.is_compressed) {
+                probs.set(cache_probs.subarray(0, num_cache_frames * num_speakers));
+            }
+
+            if (compress) {
+                [embeds, probs] = this._compress(embeds, probs, num_frames, silence_embeds);
+            }
+            cache_embeds.set(embeds);
+            cache_probs.set(probs);
+            fifo.set(queued.subarray(num_popped * hidden_size));
         }
+        this.num_cache_frames = Math.min(num_frames, speaker_cache_length);
+        this.num_fifo_frames = num_queued_frames - num_popped;
+        this.is_compressed ||= compress;
     }
 
     /**
-     * Scores every (frame, speaker) pair of one sample: how well the frame represents the speaker alone, `-Infinity`
-     * for the frames where the speaker is silent (and, for a speaker with enough positively scored frames, those where
-     * it overlaps with others).
-     * @param {Float32Array} probs Probabilities of one sample, of shape `[num_frames, num_speakers]`.
-     * @param {number} num_frames
-     * @returns {Float64Array} Scores of shape `[num_frames, num_speakers]`.
+     * Speaker probabilities of the encoder frames `[start, end)` of one sample, zeroed on its padding frames.
+     * @param {Float32Array} logits Speaker logits of the sample at the mel frame rate, of shape
+     * `[num_frames * subsampling_factor, num_speakers]`.
+     * @param {BigInt64Array|undefined} mask Valid encoder frames of the sample, of shape `[num_frames]`.
+     * @param {number} start
+     * @param {number} end
+     * @returns {Float32Array} Probabilities of shape `[end, num_speakers]`, zero before `start`.
      * @private
      */
-    _get_frame_scores(probs, num_frames) {
+    _pool_probs(logits, mask, start, end) {
+        const { subsampling_factor: factor, num_speakers } = this;
+        const probs = new Float32Array(end * num_speakers);
+        for (let t = start; t < end; ++t) {
+            if (mask && !mask[t]) continue;
+            for (let s = 0; s < num_speakers; ++s) {
+                let sum = 0;
+                for (let k = 0; k < factor; ++k) {
+                    sum += sigmoid(logits[(t * factor + k) * num_speakers + s]);
+                }
+                probs[t * num_speakers + s] = sum / factor;
+            }
+        }
+        return probs;
+    }
+
+    /**
+     * Scores every (speaker, frame) pair of one sample: how well the frame represents the speaker alone. The frames
+     * where the speaker is silent (and, for a speaker with enough positively scored frames, those where it overlaps
+     * with others) score `-Infinity`.
+     * @param {Float32Array} probs Speaker probabilities of the frames, of shape `[num_frames, num_speakers]`.
+     * @param {number} num_frames
+     * @param {number} num_scored_frames Number of frames per speaker of the scores, at least `num_frames`.
+     * @returns {Float64Array} Scores of shape `[num_speakers, num_scored_frames]`, zero beyond `num_frames`.
+     * @private
+     */
+    _get_frame_scores(probs, num_frames, num_scored_frames) {
         const { num_speakers, prediction_score_threshold: threshold } = this;
-        const scores = new Float64Array(num_frames * num_speakers);
+        const scores = new Float64Array(num_speakers * num_scored_frames);
         const log_complements = new Float64Array(num_speakers);
         for (let t = 0; t < num_frames; ++t) {
-            const offset = t * num_speakers;
+            const frame_probs = probs.subarray(t * num_speakers, (t + 1) * num_speakers);
             let log_complements_sum = 0;
             for (let s = 0; s < num_speakers; ++s) {
-                log_complements[s] = Math.log(Math.max(1 - probs[offset + s], threshold));
+                log_complements[s] = Math.log(Math.max(1 - frame_probs[s], threshold));
                 log_complements_sum += log_complements[s];
             }
             for (let s = 0; s < num_speakers; ++s) {
-                const p = probs[offset + s];
-                scores[offset + s] =
+                const p = frame_probs[s];
+                scores[s * num_scored_frames + t] =
                     p > 0.5
                         ? Math.log(Math.max(p, threshold)) - log_complements[s] + log_complements_sum - LOG_HALF
                         : -Infinity;
             }
         }
         for (let s = 0; s < num_speakers; ++s) {
+            const speaker_scores = scores.subarray(s * num_scored_frames, s * num_scored_frames + num_frames);
             let num_positive = 0;
-            for (let t = 0; t < num_frames; ++t) {
-                if (scores[t * num_speakers + s] > 0) ++num_positive;
+            for (const score of speaker_scores) {
+                if (score > 0) ++num_positive;
             }
-            if (num_positive < this.min_positive_scores) continue;
-            for (let t = 0; t < num_frames; ++t) {
-                const i = t * num_speakers + s;
-                if (!(scores[i] > 0)) scores[i] = -Infinity;
+            if (num_positive >= this.min_positive_scores) {
+                for (let t = 0; t < num_frames; ++t) {
+                    if (!(speaker_scores[t] > 0)) speaker_scores[t] = -Infinity;
+                }
             }
         }
         return scores;
     }
 
     /**
-     * Adds `boost` to the `num_boosted` best scores of every speaker.
-     * @param {Float64Array} scores Scores of one sample, of shape `[num_frames, num_speakers]` (modified in-place).
-     * @param {number} num_frames
-     * @param {number} num_boosted
-     * @param {number} boost
-     * @private
-     */
-    _boost_scores(scores, num_frames, num_boosted, boost) {
-        const { num_speakers } = this;
-        const column = new Float64Array(num_frames);
-        for (let s = 0; s < num_speakers; ++s) {
-            for (let t = 0; t < num_frames; ++t) {
-                column[t] = scores[t * num_speakers + s];
-            }
-            for (const t of topk_indices(column, num_boosted)) {
-                scores[t * num_speakers + s] += boost;
-            }
-        }
-    }
-
-    /**
-     * Keeps the `speaker_cache_length` most important frames, grouped by speaker and in their original order within
-     * a speaker. `speaker_cache_silence_frames_per_speaker` slots per speaker are filled with `silence_embeds`.
-     * @param {Float32Array} embeds Frames of shape `[batch_size, num_frames, hidden_size]`.
-     * @param {Float32Array} probs Probabilities of shape `[batch_size, num_frames, num_speakers]`.
+     * Keeps the `speaker_cache_length` most important frames of one sample, grouped by speaker and in their original
+     * order within a speaker. `speaker_cache_silence_frames_per_speaker` slots per speaker are filled with
+     * `silence_embeds`.
+     * @param {Float32Array} embeds Frames of shape `[num_frames, hidden_size]`.
+     * @param {Float32Array} probs Speaker probabilities of the frames, of shape `[num_frames, num_speakers]`.
      * @param {number} num_frames
      * @param {Tensor} silence_embeds Learned silence embedding of shape `[hidden_size]`.
-     * @returns {[Float32Array, Float32Array]} The kept frames and their probabilities.
+     * @returns {[Float32Array, Float32Array]} The kept frames and their speaker probabilities.
      * @private
      */
     _compress(embeds, probs, num_frames, silence_embeds) {
-        const { batch_size, hidden_size, num_speakers, speaker_cache_length, num_silence_frames } = this;
+        const { hidden_size, num_speakers, speaker_cache_length } = this;
+        const num_scored_frames = num_frames + this.num_silence_frames;
+        const scores = this._get_frame_scores(probs, num_frames, num_scored_frames);
+        const boosts = [
+            [this.num_strong_boosted_frames, -2 * LOG_HALF],
+            [this.num_weak_boosted_frames, -LOG_HALF],
+        ];
+        for (let s = 0; s < num_speakers; ++s) {
+            const offset = s * num_scored_frames;
+            const speaker_scores = scores.subarray(offset, offset + num_frames);
+            // the frames beyond the cache capacity are the ones popped from the FIFO queue
+            for (let t = speaker_cache_length; t < num_frames; ++t) {
+                speaker_scores[t] += this.latest_frames_score_boost;
+            }
+            for (const [num_boosted, boost] of boosts) {
+                for (const t of topk_indices(speaker_scores, num_boosted)) {
+                    speaker_scores[t] += boost;
+                }
+            }
+            // the silence frames are always kept
+            scores.fill(Infinity, offset + num_frames, offset + num_scored_frames);
+        }
+
+        // The best (speaker, frame) pairs, in speaker then frame order. The slots left when fewer than
+        // `speaker_cache_length` pairs score above `-Infinity` hold the silence embedding too.
+        const kept = topk_indices(scores, speaker_cache_length)
+            .filter((i) => scores[i] !== -Infinity)
+            .sort((a, b) => a - b);
         const silence_data = /** @type {Float32Array} */ (silence_embeds.data);
-        const num_scored_frames = num_frames + num_silence_frames;
-        const sentinel = num_scored_frames * num_speakers;
-
-        const out_embeds = new Float32Array(batch_size * speaker_cache_length * hidden_size);
-        const out_probs = new Float32Array(batch_size * speaker_cache_length * num_speakers);
-        const flat_scores = new Float64Array(num_speakers * num_scored_frames);
-        for (let b = 0; b < batch_size; ++b) {
-            const sample_probs = probs.subarray(b * num_frames * num_speakers, (b + 1) * num_frames * num_speakers);
-            const scores = this._get_frame_scores(sample_probs, num_frames);
-            // frames beyond the cache capacity are the ones popped from fifo
-            for (let i = speaker_cache_length * num_speakers; i < scores.length; ++i) {
-                scores[i] += this.latest_frames_score_boost;
-            }
-            this._boost_scores(scores, num_frames, this.num_strong_boosted_frames, -2 * LOG_HALF);
-            this._boost_scores(scores, num_frames, this.num_weak_boosted_frames, -LOG_HALF);
-
-            // speaker-major scores, the silence frames always kept
-            for (let s = 0; s < num_speakers; ++s) {
-                for (let t = 0; t < num_scored_frames; ++t) {
-                    flat_scores[s * num_scored_frames + t] = t < num_frames ? scores[t * num_speakers + s] : Infinity;
-                }
-            }
-            const kept = topk_indices(flat_scores, speaker_cache_length).map((i) =>
-                flat_scores[i] === -Infinity ? sentinel : i,
-            );
-            kept.sort((x, y) => x - y);
-
-            for (let i = 0; i < speaker_cache_length; ++i) {
-                // the silence frames and the sentinel all point to the silence embedding, appended after the frames
-                const t = kept[i] === sentinel ? num_frames : Math.min(kept[i] % num_scored_frames, num_frames);
-                const out_offset = b * speaker_cache_length + i;
-                if (t === num_frames) {
-                    out_embeds.set(silence_data, out_offset * hidden_size);
-                } else {
-                    const in_offset = b * num_frames + t;
-                    out_embeds.set(
-                        embeds.subarray(in_offset * hidden_size, (in_offset + 1) * hidden_size),
-                        out_offset * hidden_size,
-                    );
-                    out_probs.set(
-                        probs.subarray(in_offset * num_speakers, (in_offset + 1) * num_speakers),
-                        out_offset * num_speakers,
-                    );
-                }
+        const kept_embeds = new Float32Array(speaker_cache_length * hidden_size);
+        const kept_probs = new Float32Array(speaker_cache_length * num_speakers);
+        for (let i = 0; i < speaker_cache_length; ++i) {
+            const t = i < kept.length ? kept[i] % num_scored_frames : num_frames;
+            if (t >= num_frames) {
+                kept_embeds.set(silence_data, i * hidden_size);
+            } else {
+                kept_embeds.set(embeds.subarray(t * hidden_size, (t + 1) * hidden_size), i * hidden_size);
+                kept_probs.set(probs.subarray(t * num_speakers, (t + 1) * num_speakers), i * num_speakers);
             }
         }
-        return [out_embeds, out_probs];
+        return [kept_embeds, kept_probs];
     }
 }
 
@@ -394,9 +357,7 @@ export class Nemotron3DiarizationOutput extends ModelOutput {
     }
 }
 
-export class Nemotron3DiarizationPreTrainedModel extends PreTrainedModel {
-    main_input_name = 'input_features';
-}
+export class Nemotron3DiarizationPreTrainedModel extends PreTrainedModel {}
 
 /**
  * Streaming Sortformer speaker diarization model: predicts, for every spectrogram frame, the activity of up to
@@ -480,15 +441,9 @@ export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3Di
         const is_streaming = num_lookahead_frames !== null || speaker_cache !== null;
         if (speaker_cache === null) {
             // the cache defaults to the streaming FIFO sizes, offline mode overrides them
-            speaker_cache = new Nemotron3DiarizationSpeakerCache(
-                config.streaming_config,
-                is_streaming
-                    ? {}
-                    : {
-                          fifo_length: config.fifo_length,
-                          speaker_cache_update_period: config.speaker_cache_update_period,
-                      },
-            );
+            const { fifo_length, speaker_cache_update_period } = config;
+            const offline_sizes = is_streaming ? {} : { fifo_length, speaker_cache_update_period };
+            speaker_cache = new Nemotron3DiarizationSpeakerCache(config.streaming_config, offline_sizes);
         }
         num_lookahead_frames ??= 0;
 
@@ -540,12 +495,16 @@ export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3Di
                 );
             }
 
+            // A streaming step covers the whole input
+            const step_start = start_idx * factor;
+            const step_end = Math.min(stop_idx * factor, num_frames);
+            const step_features =
+                step_start === 0 && step_end === num_frames
+                    ? input_features
+                    : input_features.slice(null, [step_start, step_end], null);
+
             const outputs = await sessionRun(session, {
-                input_features: input_features.slice(
-                    null,
-                    [start_idx * factor, Math.min(stop_idx * factor, num_frames)],
-                    null,
-                ),
+                input_features: step_features,
                 cached_embeds,
                 attention_mask: new Tensor('int64', step_mask, [batch_size, step_length]),
             });
@@ -554,20 +513,17 @@ export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3Di
                 outputs.logits,
                 outputs.silence_embeds,
                 num_chunk_frames,
-                attention_mask ? step_mask : null,
+                step_mask,
             );
-            logits.push(
-                outputs.logits.slice(null, [cached_length * factor, (cached_length + num_chunk_frames) * factor], null),
-            );
+
+            // with no look-ahead, the last encoder frame may be the padding added by feature stacking
+            const num_chunk_logits = Math.min(num_chunk_frames * factor, num_frames - step_start);
+            const logits_start = cached_length * factor;
+            logits.push(outputs.logits.slice(null, [logits_start, logits_start + num_chunk_logits], null));
         }
 
-        // with no look-ahead, the last encoder frame may be the padding added by feature stacking
-        let all_logits = logits.length === 1 ? logits[0] : cat(logits, 1);
-        if (all_logits.dims[1] > num_frames) {
-            all_logits = all_logits.slice(null, [0, num_frames], null);
-        }
         return new Nemotron3DiarizationOutput({
-            logits: all_logits,
+            logits: logits.length === 1 ? logits[0] : cat(logits, 1),
             speaker_cache: is_streaming ? speaker_cache : null,
         });
     }

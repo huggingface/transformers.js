@@ -36,6 +36,9 @@ export class Nemotron3DiarizationProcessor extends Processor {
     static feature_extractor_class = AutoFeatureExtractor;
     static uses_processor_config = true;
 
+    /** @type {string} Streaming mode of the sessions, one of `streaming_modes`, set with `set_streaming_mode`. */
+    streaming_mode;
+
     constructor(config, components, chat_template) {
         super(config, components, chat_template);
 
@@ -45,8 +48,6 @@ export class Nemotron3DiarizationProcessor extends Processor {
         /** Streaming modes the checkpoint supports, name to `[chunk_length, chunk_right_context]` in encoder frames. */
         this.streaming_modes = this.config.streaming_modes ?? DEFAULT_STREAMING_MODES;
 
-        /** @type {string} */
-        this.streaming_mode;
         this.set_streaming_mode(this.config.streaming_mode ?? 'low_latency');
     }
 
@@ -167,22 +168,20 @@ export class Nemotron3DiarizationProcessor extends Processor {
             );
         }
 
-        const inputs = await this.feature_extractor(audio, { center: is_first_audio_chunk });
-        if (!is_streaming) {
-            return inputs;
-        }
-
-        const mask_data = /** @type {BigInt64Array} */ (inputs.attention_mask.data);
-        let num_frames = 0;
-        for (let i = 0; i < mask_data.length; ++i) {
-            num_frames += Number(mask_data[i]);
-        }
-
         /** @type {{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }} */
-        const outputs = {
-            input_features: inputs.input_features.slice(null, [0, num_frames], null),
-            attention_mask: inputs.attention_mask.slice(null, [0, num_frames]),
-        };
+        const outputs = await this.feature_extractor(audio, { center: is_first_audio_chunk });
+        if (!is_streaming) {
+            return outputs;
+        }
+
+        // Drop the trailing frames whose analysis window reaches past the chunk (the valid frames come first)
+        const mask_data = /** @type {BigInt64Array} */ (outputs.attention_mask.data);
+        const first_padding_frame = mask_data.indexOf(0n);
+        const num_frames = first_padding_frame === -1 ? mask_data.length : first_padding_frame;
+        if (num_frames < mask_data.length) {
+            outputs.input_features = outputs.input_features.slice(null, [0, num_frames], null);
+            outputs.attention_mask = outputs.attention_mask.slice(null, [0, num_frames]);
+        }
         if (!is_last_audio_chunk) {
             const expected_num_frames = this.num_mel_frames_per_audio_chunk;
             if (num_frames !== expected_num_frames) {
