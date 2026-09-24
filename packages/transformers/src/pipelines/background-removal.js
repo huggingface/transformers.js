@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { ImageSegmentationPipeline } from './image-segmentation.js';
 import { prepareImages } from './_base.js';
 import { RawImage } from '../utils/image.js';
@@ -24,7 +28,7 @@ import { RawImage } from '../utils/image.js';
  */
 
 /**
- * Background removal pipeline using certain `AutoModelForXXXSegmentation`.
+ * Background removal pipeline using compatible image segmentation models.
  * This pipeline removes the backgrounds of images.
  *
  * **Example:** Perform background removal with `Xenova/modnet`.

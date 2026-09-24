@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { max, softmax } from '../utils/maths.js';
@@ -63,7 +67,7 @@ import { max, softmax } from '../utils/maths.js';
  */
 
 /**
- * Named Entity Recognition pipeline using any `ModelForTokenClassification`.
+ * Named entity recognition pipeline using `AutoModelForTokenClassification`.
  *
  * **Example:** Perform named entity recognition with `Xenova/bert-base-NER`.
  * ```javascript
@@ -77,7 +81,7 @@ import { max, softmax } from '../utils/maths.js';
  * // ]
  * ```
  *
- * **Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all labels).
+ * **Example:** Perform named entity recognition with `Xenova/bert-base-NER` (and return all entity labels).
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *

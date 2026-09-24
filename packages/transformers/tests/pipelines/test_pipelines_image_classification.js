@@ -42,6 +42,20 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+      it(
+        "return all labels (top_k=null)",
+        async () => {
+          const output = await pipe(images[0], { top_k: null });
+          // The test model has exactly two labels, so returning "all" means both.
+          expect(output).toHaveLength(2);
+          const target = [
+            { label: "LABEL_1", score: 0.5020533800125122 },
+            { label: "LABEL_0", score: 0.4979466497898102 },
+          ];
+          expect(output).toBeCloseToNested(target, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("batch_size>1", () => {

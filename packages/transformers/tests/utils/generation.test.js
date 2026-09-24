@@ -11,6 +11,7 @@ import {
   // Other
   TextStreamer,
   DynamicCache,
+  StoppingCriteria,
   random,
   full,
 } from "../../src/transformers.js";
@@ -204,6 +205,31 @@ describe("Generation parameters", () => {
         expect(outputs_seed42_a.tolist()).toEqual(expected_seed42);
         expect(outputs_seed42_b.tolist()).toEqual(expected_seed42);
         expect(outputs_seed123.tolist()).toEqual(expected_seed123);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "supports custom stopping criteria",
+      async () => {
+        class StopAfterLengthCriteria extends StoppingCriteria {
+          constructor(max_length) {
+            super();
+            this.max_length = max_length;
+          }
+
+          _call(input_ids) {
+            return input_ids.map((ids) => ids.length >= this.max_length);
+          }
+        }
+
+        const outputs = await generate(model, tokenizer, DUMMY_TEXT, {
+          max_new_tokens: 5,
+          stopping_criteria: new StopAfterLengthCriteria(3),
+        });
+
+        // BOS + DUMMY_TEXT + exactly one generated token
+        expect(outputs.dims.at(-1)).toEqual(3);
       },
       MAX_TEST_EXECUTION_TIME,
     );
