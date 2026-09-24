@@ -31,9 +31,11 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
     /**
      * Computes the log-Mel spectrogram of the provided audio waveform.
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
+     * @param {Object} [options]
+     * @param {boolean} [options.center=true] Whether to pad the waveform on both sides so that the STFT frames are centered.
      * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    async _extract_fbank_features(waveform) {
+    async _extract_fbank_features(waveform, { center = true } = {}) {
         // Parakeet uses a custom preemphasis strategy: Apply preemphasis to entire waveform at once
         const preemphasis = this.config.preemphasis;
         waveform = new Float64Array(waveform); // Clone to avoid destructive changes
@@ -53,7 +55,7 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
                 log_mel: 'log',
                 mel_floor: -Infinity,
                 pad_mode: 'constant',
-                center: true,
+                center,
 
                 // Custom
                 transpose: true,

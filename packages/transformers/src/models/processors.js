@@ -14,6 +14,7 @@ export * from './lfm2_vl/processing_lfm2_vl.js';
 export * from './llava/processing_llava.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './moonshine/processing_moonshine.js';
+export * from './nemotron3_diarization/processing_nemotron3_diarization.js';
 export * from './owlvit/processing_owlvit.js';
 export * from './paligemma/processing_paligemma.js';
 export * from './phi3_v/processing_phi3_v.js';
