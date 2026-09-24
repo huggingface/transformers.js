@@ -425,6 +425,13 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
 }
 
 /**
+ * Flattened copies of the mel filter banks given to `spectrogram`. A feature extractor passes the same filter bank at
+ * every call, and flattening it costs as much as the spectrogram of a short (e.g., streaming) input.
+ * @type {WeakMap<number[][], Float32Array>}
+ */
+const FLAT_MEL_FILTERS = new WeakMap();
+
+/**
  * Calculates a spectrogram over one waveform using the Short-Time Fourier Transform.
  *
  * This function can create the following kinds of spectrograms:
@@ -661,9 +668,13 @@ export async function spectrogram(
     //  - mel_filters.shape=(80, 201)
     //  - magnitudes.shape=(3000, 201) => magnitudes.T.shape=(201, 3000)
     //  - mel_spec.shape=(80, 3000)
+    let flat_mel_filters = FLAT_MEL_FILTERS.get(mel_filters);
+    if (!flat_mel_filters) {
+        flat_mel_filters = new Float32Array(mel_filters.flat());
+        FLAT_MEL_FILTERS.set(mel_filters, flat_mel_filters);
+    }
     let mel_spec = await matmul(
-        // TODO: Make `mel_filters` a Tensor during initialization
-        new Tensor('float32', mel_filters.flat(), [num_mel_filters, num_frequency_bins]),
+        new Tensor('float32', flat_mel_filters, [num_mel_filters, num_frequency_bins]),
         new Tensor('float32', transposedMagnitudeData, [num_frequency_bins, d1Max]),
     );
     if (transpose) {
