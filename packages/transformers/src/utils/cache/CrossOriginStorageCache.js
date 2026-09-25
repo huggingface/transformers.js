@@ -112,6 +112,7 @@ export class CrossOriginStorage {
     _storeBlobInCOS = async (blob, hashHex) => {
         const handle = await navigator.crossOriginStorage.requestFileHandle(makeHashDescriptor(hashHex), {
             create: true,
+            origins: '*',
         });
         const writableStream = await handle.createWritable();
         await writableStream.write(blob);

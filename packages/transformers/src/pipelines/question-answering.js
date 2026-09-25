@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline } from './_base.js';
 
 import { product } from '../utils/core.js';
@@ -10,13 +14,13 @@ import { softmax } from '../utils/maths.js';
 
 /**
  * @typedef {Object} QuestionAnsweringOutput
- * @property {number} score The probability associated to the answer.
+ * @property {number} score The probability associated with the answer.
  * @property {number} [start] The character start index of the answer (in the tokenized version of the input).
  * @property {number} [end] The character end index of the answer (in the tokenized version of the input).
  * @property {string} answer The answer to the question.
  *
  * @typedef {Object} QuestionAnsweringPipelineOptions Parameters specific to question answering pipelines.
- * @property {number} [top_k=1] The number of top answer predictions to be returned.
+ * @property {number} [top_k=1] The number of top answer predictions to return.
  *
  * @typedef {TextPipelineConstructorArgs & QuestionAnsweringPipelineCallback & Disposable} QuestionAnsweringPipelineType
  */
@@ -36,7 +40,7 @@ import { softmax } from '../utils/maths.js';
  */
 
 /**
- * Question Answering pipeline using any `ModelForQuestionAnswering`.
+ * Question answering pipeline using `AutoModelForQuestionAnswering`.
  *
  * **Example:** Run question answering with `Xenova/distilbert-base-uncased-distilled-squad`.
  * ```javascript

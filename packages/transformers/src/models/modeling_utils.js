@@ -1,3 +1,13 @@
+/**
+ * @file Base model class and shared runtime helpers.
+ *
+ * `PreTrainedModel` owns inference sessions, model configuration, direct forward
+ * calls, and token generation. Architecture-specific model classes extend it,
+ * while most applications load it through an `AutoModel*` class or a pipeline.
+ *
+ * @module models
+ */
+
 import { Callable } from '../utils/generic.js';
 import { constructSessions, sessionRun } from './session.js';
 import { AutoConfig, getCacheNames } from '../configs.js';
@@ -86,7 +96,7 @@ export function boolTensor(value) {
     return new Tensor('bool', [value], [1]);
 }
 
-export { getSessionsConfig, getTextOnlySessions, MODEL_TYPES } from './session_config.js';
+export { MODEL_TYPES } from './session_config.js';
 
 /**
  * Runtime-only model type configuration (forward functions, generation flags).
@@ -197,7 +207,7 @@ export const MODEL_NAME_TO_CLASS_MAPPING = new Map();
 export const MODEL_CLASS_TO_NAME_MAPPING = new Map();
 
 /**
- * A base class for pre-trained models that provides the model configuration and an ONNX session.
+ * A base class for pretrained models that provides the model configuration and inference sessions.
  */
 export class PreTrainedModel extends Callable {
     main_input_name = 'input_ids';
@@ -206,7 +216,7 @@ export class PreTrainedModel extends Callable {
     _return_dict_in_generate_keys = null;
 
     /**
-     * Creates a new instance of the `PreTrainedModel` class.
+     * Create a model from configuration and inference sessions.
      * @param {import('../configs.js').PretrainedConfig} config The model configuration.
      * @param {Record<string, any>} sessions The inference sessions for the model.
      * @param {Record<string, Object>} configs Additional configuration files (e.g., generation_config.json).
@@ -235,7 +245,7 @@ export class PreTrainedModel extends Callable {
 
     /**
      * Disposes of all the ONNX sessions that were created during inference.
-     * @returns {Promise<unknown[]>} An array of promises, one for each ONNX session that is being disposed.
+     * @returns {Promise<void[]>} Resolves after each session has been released.
      * @todo Use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry
      */
     async dispose() {
@@ -253,13 +263,13 @@ export class PreTrainedModel extends Callable {
      * (either passed as an argument or loaded from `pretrained_model_name_or_path` if possible)
      *
      * @param {string} pretrained_model_name_or_path The name or path of the pretrained model. Can be either:
-     * - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
-     *   Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
+     * - A string, the *model ID* of a pretrained model hosted inside a model repo on huggingface.co.
+     *   Valid model IDs can be located at the root level, like `bert-base-uncased`, or namespaced under a
      *   user or organization name, like `dbmdz/bert-base-german-cased`.
      * - A path to a *directory* containing model weights, e.g., `./my_model_directory/`.
      * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
      *
-     * @returns {Promise<PreTrainedModel>} A new instance of the `PreTrainedModel` class.
+     * @returns {Promise<PreTrainedModel>} A model instance with ready inference sessions.
      */
     static async from_pretrained(
         pretrained_model_name_or_path,
@@ -360,20 +370,18 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * Runs the model with the provided inputs
-     * @param {Object} model_inputs Object containing input tensors
-     * @returns {Promise<Object>} Object containing output tensors
+     * Runs the model with the provided inputs.
+     * @param {Object} model_inputs Object containing input tensors.
+     * @returns {Promise<Object>} Object containing output tensors.
      */
     async _call(model_inputs) {
         return await this.forward(model_inputs);
     }
 
     /**
-     * Forward method for a pretrained model. If not overridden by a subclass, the correct forward method
-     * will be chosen based on the model type.
+     * Run the model's forward pass.
      * @param {Object} model_inputs The input data to the model in the format specified in the ONNX model.
      * @returns {Promise<Object>} The output data from the model in the format specified in the ONNX model.
-     * @throws {Error} This method must be implemented in subclasses.
      */
     async forward(model_inputs) {
         return await this._forward(this, model_inputs);
@@ -800,7 +808,7 @@ export class PreTrainedModel extends Callable {
                 } else if (Array.isArray(decoder_start_token_id)) {
                     if (decoder_start_token_id.length !== batch_size) {
                         throw new Error(
-                            `\`decoder_start_token_id\` expcted to have length ${batch_size} but got ${decoder_start_token_id.length}`,
+                            `\`decoder_start_token_id\` expected to have length ${batch_size} but got ${decoder_start_token_id.length}`,
                         );
                     }
                     decoder_input_ids = decoder_start_token_id;
@@ -830,7 +838,7 @@ export class PreTrainedModel extends Callable {
     }
 
     /**
-     * Generates sequences of token ids for models with a language modeling head.
+     * Generate token sequences with a language-modeling head.
      * @param {import('../generation/parameters.js').GenerationFunctionParameters} options
      * @returns {Promise<ModelOutput|Tensor>} The output of the model, which can contain the generated token ids, attentions, and scores.
      */
@@ -1081,14 +1089,32 @@ export class PreTrainedModel extends Callable {
         return output[outputName];
     }
 
+    /**
+     * Encode image inputs into features for multimodal generation.
+     * @param {any} inputs Vision encoder inputs.
+     * @returns {Promise<any>} Image features.
+     * @internal
+     */
     async encode_image(inputs) {
         return this._encode_input('vision_encoder', inputs, 'image_features');
     }
 
+    /**
+     * Encode token ids into embeddings for multimodal generation.
+     * @param {any} inputs Text encoder inputs.
+     * @returns {Promise<any>} Text embeddings.
+     * @internal
+     */
     async encode_text(inputs) {
         return this._encode_input('embed_tokens', inputs, 'inputs_embeds');
     }
 
+    /**
+     * Encode audio inputs into features for multimodal generation.
+     * @param {any} inputs Audio encoder inputs.
+     * @returns {Promise<any>} Audio features.
+     * @internal
+     */
     async encode_audio(inputs) {
         return this._encode_input('audio_encoder', inputs, 'audio_features');
     }
@@ -1101,7 +1127,7 @@ export class PreTrainedModel extends Callable {
  * @returns {Promise<Seq2SeqLMOutput>} Promise that resolves with the output of the seq2seq model.
  * @private
  */
-export async function seq2seq_forward(self, model_inputs) {
+async function seq2seq_forward(self, model_inputs) {
     let { encoder_outputs, input_ids, decoder_input_ids, decoder_attention_mask, ...other_decoder_inputs } =
         model_inputs;
     // Encode if needed
@@ -1164,7 +1190,7 @@ export async function encoder_forward(self, model_inputs) {
     return await sessionRun(session, encoderFeeds);
 }
 
-export async function auto_encoder_forward(self, model_inputs) {
+async function auto_encoder_forward(self, model_inputs) {
     const encoded = await self.encode(model_inputs);
     const decoded = await self.decode(encoded);
     return decoded;
@@ -1219,7 +1245,7 @@ export function getPastKeyValues(decoderResults, pastKeyValues) {
  * @param {Object} model_output The output of the model.
  * @returns {{cross_attentions?: Tensor[]}} An object containing attentions.
  */
-export function getAttentions(model_output) {
+function getAttentions(model_output) {
     const attentions = {};
 
     for (const attnName of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
@@ -1376,7 +1402,7 @@ export async function decoder_forward(self, model_inputs, is_encoder_decoder = f
  * @returns {Promise<Tensor>} The model's output tensor
  * @private
  */
-export async function generic_text_to_text_forward(
+async function generic_text_to_text_forward(
     self,
     {
         // Generic parameters:
@@ -1489,7 +1515,7 @@ export async function generic_text_to_text_forward(
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function audio_text_to_text_forward(self, params) {
+async function audio_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['audio_values', 'input_features'],
@@ -1506,7 +1532,7 @@ export async function audio_text_to_text_forward(self, params) {
  * @returns {Promise<Tensor>} The model's output tensor.
  * @private
  */
-export async function image_text_to_text_forward(self, params) {
+async function image_text_to_text_forward(self, params) {
     return await generic_text_to_text_forward(self, {
         ...params,
         modality_input_names: ['pixel_values'],
@@ -1559,7 +1585,7 @@ export function cumsum_masked_fill(attention_mask, start_index = 0) {
  *     position_ids = position_ids[:, -input_ids.shape[1] :]
  * ```
  */
-export function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
+function create_position_ids(model_inputs, past_key_values = null, start_index = 0) {
     const { input_ids, inputs_embeds, attention_mask } = model_inputs;
 
     const { data, dims } = cumsum_masked_fill(attention_mask, start_index);
@@ -1631,7 +1657,7 @@ export function encoder_decoder_prepare_inputs_for_generation(self, input_ids, m
     };
 }
 
-export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
+function multimodal_text_to_text_prepare_inputs_for_generation(self, ...args) {
     if (self.config.is_encoder_decoder) {
         return encoder_decoder_prepare_inputs_for_generation(self, ...args);
     } else {
@@ -1639,7 +1665,7 @@ export function multimodal_text_to_text_prepare_inputs_for_generation(self, ...a
     }
 }
 
-export function default_merge_input_ids_with_features({
+function default_merge_input_ids_with_features({
     modality_token_id,
     inputs_embeds,
     modality_features,
@@ -1714,7 +1740,7 @@ export function default_merge_input_ids_with_audio_features({
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of configuration objects.
  * @private
  */
-export async function get_optional_configs(pretrained_model_name_or_path, names, options) {
+async function get_optional_configs(pretrained_model_name_or_path, names, options) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {

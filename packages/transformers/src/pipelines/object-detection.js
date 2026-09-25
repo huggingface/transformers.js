@@ -1,3 +1,7 @@
+/**
+ * @module pipelines
+ */
+
 import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
 
 /**
@@ -16,7 +20,7 @@ import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
  *
  * @typedef {Object} ObjectDetectionPipelineOptions Parameters specific to object detection pipelines.
  * @property {number} [threshold=0.9] The threshold used to filter boxes by score.
- * @property {boolean} [percentage=false] Whether to return the boxes coordinates in percentage (true) or in pixels (false).
+ * @property {boolean} [percentage=false] Whether to return box coordinates as percentages (true) or pixels (false).
  *
  * @typedef {ImagePipelineConstructorArgs & ObjectDetectionPipelineCallback & Disposable} ObjectDetectionPipelineType
  */
