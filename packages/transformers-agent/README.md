@@ -40,25 +40,32 @@ const agent = new Agent({
 
 const result = await agent.prompt("Who are you?");
 
-console.log(result.response);
-console.log(result.thinking);
-console.log(result.toolCalls);
-console.log(result.usage);
+for (const part of result) {
+  if (part.type === "thinking") console.log(part.value);
+  if (part.type === "text") console.log(part.value);
+  if (part.type === "tool-call") console.log(part.value);
+}
 ```
 
-`response` is model-visible answer text. `thinking` is parsed separately from the model's reasoning channel. The SDK does not combine the two.
+`prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls.
 
 ### Streaming
 
-`promptStreaming()` yields cumulative snapshots for one model turn:
+`promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. The stream closes when the turn completes; there is no final `done` chunk.
 
 ```ts
-for await (const chunk of agent.promptStreaming("Explain WebGPU briefly.")) {
-  renderThinking(chunk.thinking);
-  renderResponse(chunk.response);
+let response = "";
+let thinking = "";
 
-  if (chunk.done) {
-    console.log(chunk.toolCalls, chunk.usage);
+for await (const chunk of agent.promptStreaming("Explain WebGPU briefly.")) {
+  if (chunk.type === "thinking") {
+    thinking += chunk.value;
+    renderThinking(thinking);
+  } else if (chunk.type === "text") {
+    response += chunk.value;
+    renderResponse(response);
+  } else if (chunk.type === "tool-call") {
+    console.log(chunk.value);
   }
 }
 ```
@@ -103,7 +110,7 @@ const agent = new Agent({
 });
 
 const first = await agent.prompt("What's the weather in London?");
-const call = first.toolCalls[0];
+const call = first.find((part) => part.type === "tool-call")?.value;
 
 if (call?.name === "get_weather") {
   // prompt() returned the call without executing it. The application chooses
@@ -128,7 +135,7 @@ if (call?.name === "get_weather") {
     },
   ]);
 
-  console.log(final.response);
+  console.log(final.find((part) => part.type === "text")?.value);
 }
 ```
 

@@ -5,29 +5,19 @@ import type { ToolCall, ToolResponse } from './tools';
 
 export type { ModelAdapter, ModelAdapterContext, ParseResult, ParsedToolCall } from '../adapters/types';
 
-export interface Usage {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-}
-
-export interface PromptResult {
-    response: string;
-    thinking: string;
-    toolCalls: ToolCall[];
-    usage: Usage;
-}
-
-export interface StreamChunk extends PromptResult {
-    done: boolean;
-}
-
 export type Prompt = string | Message[];
 
 export type MessageContent = TextContent | ImageContent | AudioContent | ToolCallContent | ToolResponseContent;
 
+export type LanguageModelMessageContent = MessageContent | ThinkingContent;
+
 export interface TextContent {
     type: 'text';
+    value: string;
+}
+
+export interface ThinkingContent {
+    type: 'thinking';
     value: string;
 }
 

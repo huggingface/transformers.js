@@ -13,9 +13,6 @@ export type {
     ModelConfig,
     AgentConfig,
     Prompt,
-    PromptResult,
-    Usage,
-    StreamChunk,
     ToolCall,
     ToolResponse,
     ToolSuccess,
@@ -23,5 +20,7 @@ export type {
     ToolResultContent,
     Message,
     MessageContent,
+    LanguageModelMessageContent,
+    ThinkingContent,
 } from './types';
 export type { ToolDeclaration, ToolExecute, ToolParameter, ToolParameters, ToolOptions, ToolList } from './Tool';

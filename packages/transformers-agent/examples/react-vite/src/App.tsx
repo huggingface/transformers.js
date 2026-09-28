@@ -1,26 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Agent, Model, Tool } from "@huggingface/transformers-agent";
+import {
+  Agent,
+  Model,
+  Tool,
+  type LanguageModelMessageContent,
+} from "@huggingface/transformers-agent";
 
 type Status = "idle" | "working" | "ready" | "error";
-type ToolCallView = {
-  callID: string;
-  name: string;
-  arguments: Record<string, unknown>;
-};
-
-type PromptChunkView = {
-  done: boolean;
-  thinking: string;
-  response: string;
-  toolCalls: ToolCallView[];
-  usage?: { totalTokens?: number };
-};
-
 type ResponseView = {
   id: number;
   prompt: string;
+  thinking: string;
   text: string;
-  result: PromptChunkView | null;
+  result: LanguageModelMessageContent[] | null;
   done: boolean;
   error?: string;
 };
@@ -125,6 +117,7 @@ export function App() {
       {
         id: responseId,
         prompt: currentPrompt,
+        thinking: "",
         text: "",
         result: null,
         done: false,
@@ -145,35 +138,42 @@ export function App() {
           enableThinking: false,
         });
       }
-      let finalOutput: PromptChunkView | null = null;
-      for await (const chunk of agentRef.current.promptStreaming(
-        currentPrompt,
-      )) {
-        const typedChunk = chunk as unknown as PromptChunkView;
+      let thinking = "";
+      let text = "";
+      const result: LanguageModelMessageContent[] = [];
+      const reader = agentRef.current
+        .promptStreaming(currentPrompt)
+        .getReader();
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+        result.push(chunk);
+        if (chunk.type === "thinking") thinking += chunk.value;
+        if (chunk.type === "text") text += chunk.value;
         setResponses((prev) =>
           prev.map((response) =>
             response.id === responseId
               ? {
                   ...response,
-                  text: typedChunk.response,
-                  result: typedChunk,
-                  done: typedChunk.done,
+                  thinking,
+                  text,
+                  result: [...result],
                 }
               : response,
           ),
         );
-        //console.log(typedChunk);
-        finalOutput = typedChunk;
-      }
-
-      if (!finalOutput) {
-        throw new Error("No output received from promptStreaming().");
       }
 
       setStatus("ready");
-      addLog(
-        `Prompt complete. toolCalls=${finalOutput.toolCalls.length}, totalTokens=${finalOutput.usage?.totalTokens ?? 0}`,
+      setResponses((prev) =>
+        prev.map((response) =>
+          response.id === responseId ? { ...response, done: true } : response,
+        ),
       );
+      const toolCallCount = result.filter(
+        (part) => part.type === "tool-call",
+      ).length;
+      addLog(`Prompt complete. toolCalls=${toolCallCount}`);
     } catch (error) {
       const message = errorMessage(error);
       setResponses((prev) =>
@@ -290,23 +290,27 @@ export function App() {
                       <div className="min-h-6 whitespace-pre-wrap">
                         {response.text || "Thinking..."}
                       </div>
+                      {response.thinking ? (
+                        <details className="mt-3 rounded-lg bg-ink/[0.03] p-3">
+                          <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-ink/50">
+                            Thinking
+                          </summary>
+                          <pre className="mt-2 text-xs whitespace-pre-wrap text-ink/75">
+                            {response.thinking}
+                          </pre>
+                        </details>
+                      ) : null}
                       {response.result === null ? null : (
                         <div className="mt-4 space-y-2 border-t border-ink/10 pt-3">
                           <div className="rounded-lg bg-ink/[0.03] p-3">
-                            {response.result.thinking ? (
-                              <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap text-ink/75">
-                                {response.result.thinking}
-                              </pre>
-                            ) : null}
-                            {response.result.response ? (
-                              <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
-                                {response.result.response}
-                              </pre>
-                            ) : null}
-                            {response.result.toolCalls.length > 0 ? (
+                            {response.result.some(
+                              (part) => part.type === "tool-call",
+                            ) ? (
                               <pre className="mt-2 rounded-md bg-white/80 p-2 text-xs whitespace-pre-wrap">
                                 {JSON.stringify(
-                                  response.result.toolCalls,
+                                  response.result.filter(
+                                    (part) => part.type === "tool-call",
+                                  ),
                                   null,
                                   2,
                                 )}

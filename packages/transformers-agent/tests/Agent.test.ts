@@ -57,20 +57,27 @@ test("returns tool calls without executing them and accepts an external response
   const first = await agent.prompt("What is the weather in London?");
   assert.equal(generateCount, 1);
   assert.equal(executeCount, 0);
-  assert.equal(first.thinking, "Check the weather service.");
-  assert.equal(first.response, "");
-  assert.deepEqual(first.toolCalls, [
+  assert.deepEqual(first, [
     {
-      callID: "toolcall_1",
-      name: "get_weather",
-      arguments: { location: "London" },
+      type: "thinking",
+      value: "Check the weather service.",
+    },
+    {
+      type: "tool-call",
+      value: {
+        callID: "toolcall_1",
+        name: "get_weather",
+        arguments: { location: "London" },
+      },
     },
   ]);
+  const firstCall = first.find((part) => part.type === "tool-call");
+  if (!firstCall) throw new Error("Expected a tool call.");
 
-  const toolResult = await weatherTool.execute(first.toolCalls[0].arguments as { location: string });
+  const toolResult = await weatherTool.execute(firstCall.value.arguments as { location: string });
   assert.equal(executeCount, 1);
 
-  first.toolCalls[0].arguments.location = "Paris";
+  firstCall.value.arguments.location = "Paris";
   const storedCall = agent.history[1].content;
   assert.equal(typeof storedCall === "string" ? undefined : storedCall[0].type, "tool-call");
   assert.deepEqual(typeof storedCall === "string" || storedCall[0].type !== "tool-call" ? undefined : storedCall[0].value.arguments, { location: "London" });
@@ -103,7 +110,7 @@ test("returns tool calls without executing them and accepts an external response
         {
           type: "tool-response",
           value: {
-            callID: first.toolCalls[0].callID,
+            callID: firstCall.value.callID,
             name: "get_weather",
             result: toolResult,
           },
@@ -113,9 +120,7 @@ test("returns tool calls without executing them and accepts an external response
   ]);
 
   assert.equal(generateCount, 2);
-  assert.equal(second.response, "It is sunny in London.");
-  assert.equal(second.thinking, "");
-  assert.deepEqual(second.toolCalls, []);
+  assert.deepEqual(second, [{ type: "text", value: "It is sunny in London." }]);
   assert.deepEqual(conversations[1].slice(-2), [
     {
       role: "assistant",
@@ -138,4 +143,83 @@ test("returns tool calls without executing them and accepts an external response
       name: "get_weather",
     },
   ]);
+});
+
+test("streams incremental thinking and text content and closes without a done chunk", async () => {
+  const tokenizer = Object.assign(() => ({ input_ids: { dims: [1, 2], size: 2 } }), {
+    apply_chat_template() {
+      return "rendered prompt";
+    },
+    decode() {
+      return "<think>Check first.</think>Check that result.";
+    },
+  });
+  const model = {
+    modelId: "test-model",
+    isInitialized: true,
+    tokenizer,
+    model: {
+      config: {},
+      async generate({ streamer }: { streamer: { callback_function: (text: string) => void } }) {
+        streamer.callback_function("<think>Check");
+        streamer.callback_function(" first.</think>");
+        streamer.callback_function("Check");
+        streamer.callback_function(" that");
+        streamer.callback_function(" result.");
+        return {
+          dims: [1, 3],
+          slice: () => ({ data: [1] }),
+        };
+      },
+    },
+  } as unknown as Model;
+  const agent = new Agent({ model, adapter: new ModelAdapterBase() });
+
+  const chunks = [];
+  for await (const chunk of agent.promptStreaming("Check this")) chunks.push(chunk);
+
+  assert.deepEqual(chunks, [
+    { type: "thinking", value: "Check" },
+    { type: "thinking", value: " first." },
+    { type: "text", value: "Check" },
+    { type: "text", value: " that" },
+    { type: "text", value: " result." },
+  ]);
+});
+
+test("does not reconcile streamed deltas against a different final decode", async () => {
+  const tokenizer = Object.assign(() => ({ input_ids: { dims: [1, 2], size: 2 } }), {
+    apply_chat_template() {
+      return "rendered prompt";
+    },
+    decode() {
+      return "<think>Final thinking.</think>Final response.";
+    },
+  });
+  const model = {
+    modelId: "test-model",
+    isInitialized: true,
+    tokenizer,
+    model: {
+      config: {},
+      async generate({ streamer }: { streamer: { callback_function: (text: string) => void } }) {
+        streamer.callback_function("<think>Streamed thinking.</think>");
+        streamer.callback_function("Streamed response.");
+        return {
+          dims: [1, 3],
+          slice: () => ({ data: [1] }),
+        };
+      },
+    },
+  } as unknown as Model;
+  const agent = new Agent({ model, adapter: new ModelAdapterBase() });
+
+  const chunks = [];
+  for await (const chunk of agent.promptStreaming("Check this")) chunks.push(chunk);
+
+  assert.deepEqual(chunks, [
+    { type: "thinking", value: "Streamed thinking." },
+    { type: "text", value: "Streamed response." },
+  ]);
+  assert.equal(agent.history.at(-1)?.content, "Final response.");
 });

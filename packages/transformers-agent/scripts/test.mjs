@@ -11,7 +11,10 @@ const entryPoint = join(tempDir, "entry.mjs");
 const transformersStub = join(tempDir, "transformers-stub.mjs");
 
 try {
-  await writeFile(transformersStub, "export class DynamicCache {}\nexport class TextStreamer { constructor() {} }\n");
+  await writeFile(
+    transformersStub,
+    "export class DynamicCache {}\nexport class TextStreamer { constructor(_tokenizer, options) { Object.assign(this, options); } }\n",
+  );
   await writeFile(
     entryPoint,
     [

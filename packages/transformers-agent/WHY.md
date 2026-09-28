@@ -169,7 +169,8 @@ const agent = new Agent({
 });
 
 for await (const chunk of agent.promptStreaming("Who are you?")) {
-  console.log(chunk.response, chunk.thinking);
+  if (chunk.type === "thinking") console.log("Thinking:", chunk.value);
+  if (chunk.type === "text") console.log("Response:", chunk.value);
 }
 ```
 
@@ -214,5 +215,5 @@ const agent = new Agent({
 });
 
 const result = await agent.prompt("Whats the weather in London?");
-console.log(result.toolCalls);
+console.log(result.filter((part) => part.type === "tool-call"));
 ```
