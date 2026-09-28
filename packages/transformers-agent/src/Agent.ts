@@ -26,6 +26,7 @@ export class Agent {
     private _history: Message[] = [];
     private _modelHistory: ModelMessage[] = [];
     private readonly _initialPrompts: Message[];
+    private _latestUsage: Usage | null = null;
     private itemIdCounter = 0;
     private promptActive = false;
     private readonly adapterRegistry = new ModelAdapterRegistry();
@@ -36,6 +37,10 @@ export class Agent {
 
     get initialPrompts(): ReadonlyArray<Message> {
         return this.cloneMessages(this._initialPrompts);
+    }
+
+    getLatestUsage(): Usage | null {
+        return this._latestUsage ? { ...this._latestUsage } : null;
     }
 
     constructor(config: AgentConfig) {
@@ -71,6 +76,7 @@ export class Agent {
         this._history = this.cloneMessages(this._initialPrompts);
         this.validateHistory(this._history);
         this._modelHistory = this.cloneMessages(this._initialPrompts);
+        this._latestUsage = null;
     }
 
     private async generateTurn(
@@ -85,6 +91,7 @@ export class Agent {
         }
 
         this.promptActive = true;
+        const turnStartedAt = performance.now();
         const historyLength = this._history.length;
         const modelHistoryLength = this._modelHistory.length;
         try {
@@ -115,12 +122,7 @@ export class Agent {
                 this.nextItemId(prefix),
             );
             const toolCalls = parsed.toolCalls.map((call) => this.toPublicToolCall(call));
-            const result = this.createAssistantContent(
-                parsed.thinkingText,
-                parsed.visibleText,
-                toolCalls,
-                generated.usage,
-            );
+            const result = this.createAssistantContent(parsed.thinkingText, parsed.visibleText, toolCalls);
 
             if (parsed.visibleText || toolCalls.length > 0) {
                 const assistantMessage = this.createAssistantMessage(parsed.visibleText, toolCalls);
@@ -133,12 +135,12 @@ export class Agent {
             }
 
             for (const part of result) {
-                if (part.type === 'tool-call') {
-                    onChunk?.(this.cloneContentPart(part));
-                } else if (part.type === 'usage') {
-                    onChunk?.({ type: 'usage', value: { ...part.value } });
-                }
+                if (part.type === 'tool-call') onChunk?.(this.cloneContentPart(part));
             }
+            this._latestUsage = {
+                ...generated.usage,
+                totalTimeMs: performance.now() - turnStartedAt,
+            };
             return result;
         } catch (error) {
             this._history.length = historyLength;
@@ -195,7 +197,6 @@ export class Agent {
         thinking: string,
         response: string,
         toolCalls: ToolCall[],
-        usage: Usage,
     ): LanguageModelMessageContent[] {
         return [
             ...(thinking ? [{ type: 'thinking' as const, value: thinking }] : []),
@@ -204,7 +205,6 @@ export class Agent {
                 type: 'tool-call' as const,
                 value: { ...call, arguments: this.cloneSerializable(call.arguments) },
             })),
-            { type: 'usage', value: { ...usage } },
         ];
     }
 
@@ -240,6 +240,7 @@ export class Agent {
         onDelta?: (text: string) => void,
     ): Promise<{ modelContent: string; usage: Usage }> {
         let completionTokens = 0;
+        let firstTokenAt: number | undefined;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
         const model = this.model.model;
@@ -247,10 +248,12 @@ export class Agent {
             skip_prompt: true,
             skip_special_tokens: false,
             callback_function: (text: string) => {
+                if (text) firstTokenAt ??= performance.now();
                 streamedRawText += text;
                 onDelta?.(text);
             },
             token_callback_function: (tokens: bigint[]) => {
+                if (tokens.length > 0) firstTokenAt ??= performance.now();
                 completionTokens += tokens.length;
             },
         });
@@ -278,6 +281,7 @@ export class Agent {
             return_dict: true,
         });
         const promptTokens = input.input_ids?.dims?.[1] ?? input.input_ids?.size ?? 0;
+        const generationStartedAt = performance.now();
         const output = (await model.generate({
             ...input,
             max_new_tokens: this.maxNewTokens,
@@ -286,6 +290,8 @@ export class Agent {
                 : { do_sample: false }),
             streamer,
         })) as { sequences?: unknown } | unknown;
+        const generationEndedAt = performance.now();
+        const generationTimeMs = generationEndedAt - generationStartedAt;
         const sequences =
             typeof output === 'object' && output !== null && 'sequences' in output
                 ? (output as { sequences?: unknown }).sequences
@@ -294,6 +300,12 @@ export class Agent {
             const sequenceLength = (sequences as { dims?: number[] }).dims?.[1];
             if (sequenceLength !== undefined) completionTokens = Math.max(0, sequenceLength - promptTokens);
         }
+        const timeToFirstTokenMs =
+            firstTokenAt === undefined
+                ? completionTokens > 0
+                    ? generationTimeMs
+                    : 0
+                : firstTokenAt - generationStartedAt;
         const modelRawText = this.decodeGeneratedContinuation(sequences, promptTokens) ?? streamedRawText;
         return {
             modelContent: this.adapter.normalizeAssistantContent(modelRawText),
@@ -301,6 +313,10 @@ export class Agent {
                 promptTokens,
                 completionTokens,
                 totalTokens: promptTokens + completionTokens,
+                tokensPerSecond: generationTimeMs > 0 ? (completionTokens * 1000) / generationTimeMs : 0,
+                timeToFirstTokenMs,
+                generationTimeMs,
+                totalTimeMs: generationEndedAt - generationStartedAt,
             },
         };
     }

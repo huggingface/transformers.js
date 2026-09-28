@@ -173,9 +173,9 @@ export function App() {
       const toolCallCount = result.filter(
         (part) => part.type === "tool-call",
       ).length;
-      const usage = result.find((part) => part.type === "usage")?.value;
+      const usage = agentRef.current.getLatestUsage();
       addLog(
-        `Prompt complete. toolCalls=${toolCallCount}, totalTokens=${usage?.totalTokens ?? 0}`,
+        `Prompt complete. toolCalls=${toolCallCount}, totalTokens=${usage?.totalTokens ?? 0}, tps=${usage?.tokensPerSecond.toFixed(1) ?? "0.0"}, totalTimeMs=${usage?.totalTimeMs.toFixed(1) ?? "0.0"}`,
       );
     } catch (error) {
       const message = errorMessage(error);

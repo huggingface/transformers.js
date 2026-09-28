@@ -44,15 +44,16 @@ for (const part of result) {
   if (part.type === "thinking") console.log(part.value);
   if (part.type === "text") console.log(part.value);
   if (part.type === "tool-call") console.log(part.value);
-  if (part.type === "usage") console.log(part.value);
 }
+
+console.log(agent.getLatestUsage());
 ```
 
-`prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls. The final item is `{ type: "usage", value }`, containing `promptTokens`, `completionTokens`, and `totalTokens` for the turn.
+`prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls. After a turn completes, `getLatestUsage()` returns its token counts, `tokensPerSecond`, `timeToFirstTokenMs`, `generationTimeMs`, and `totalTimeMs`. TPS measures completion tokens over model generation time; total time also includes local prompt preparation and response parsing. It returns `null` before the first completed turn and after `clearHistory()`.
 
 ### Streaming
 
-`promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. A single usage chunk is emitted after all response content and immediately before the stream closes; there is no `done` chunk.
+`promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. The stream closes when the turn completes; there is no `done` chunk.
 
 ```ts
 let response = "";
@@ -67,10 +68,10 @@ for await (const chunk of agent.promptStreaming("Explain WebGPU briefly.")) {
     renderResponse(response);
   } else if (chunk.type === "tool-call") {
     console.log(chunk.value);
-  } else if (chunk.type === "usage") {
-    console.log(chunk.value.totalTokens);
   }
 }
+
+console.log(agent.getLatestUsage());
 ```
 
 ### History

@@ -53,6 +53,7 @@ test("returns tool calls without executing them and accepts an external response
     tools: [weatherTool],
     enableThinking: true,
   });
+  assert.equal(agent.getLatestUsage(), null);
 
   const first = await agent.prompt("What is the weather in London?");
   assert.equal(generateCount, 1);
@@ -70,11 +71,12 @@ test("returns tool calls without executing them and accepts an external response
         arguments: { location: "London" },
       },
     },
-    {
-      type: "usage",
-      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
-    },
   ]);
+  const firstUsage = agent.getLatestUsage();
+  assertUsage(firstUsage);
+  if (!firstUsage) throw new Error("Expected usage.");
+  firstUsage.totalTokens = 0;
+  assertUsage(agent.getLatestUsage());
   const firstCall = first.find((part) => part.type === "tool-call");
   if (!firstCall) throw new Error("Expected a tool call.");
 
@@ -124,13 +126,8 @@ test("returns tool calls without executing them and accepts an external response
   ]);
 
   assert.equal(generateCount, 2);
-  assert.deepEqual(second, [
-    { type: "text", value: "It is sunny in London." },
-    {
-      type: "usage",
-      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
-    },
-  ]);
+  assert.deepEqual(second, [{ type: "text", value: "It is sunny in London." }]);
+  assertUsage(agent.getLatestUsage());
   assert.deepEqual(conversations[1].slice(-2), [
     {
       role: "assistant",
@@ -153,6 +150,8 @@ test("returns tool calls without executing them and accepts an external response
       name: "get_weather",
     },
   ]);
+  agent.clearHistory();
+  assert.equal(agent.getLatestUsage(), null);
 });
 
 test("streams incremental thinking and text content and closes without a done chunk", async () => {
@@ -194,11 +193,8 @@ test("streams incremental thinking and text content and closes without a done ch
     { type: "text", value: "Check" },
     { type: "text", value: " that" },
     { type: "text", value: " result." },
-    {
-      type: "usage",
-      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
-    },
   ]);
+  assertUsage(agent.getLatestUsage());
 });
 
 test("does not reconcile streamed deltas against a different final decode", async () => {
@@ -234,10 +230,19 @@ test("does not reconcile streamed deltas against a different final decode", asyn
   assert.deepEqual(chunks, [
     { type: "thinking", value: "Streamed thinking." },
     { type: "text", value: "Streamed response." },
-    {
-      type: "usage",
-      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
-    },
   ]);
+  assertUsage(agent.getLatestUsage());
   assert.equal(agent.history.at(-1)?.content, "Final response.");
 });
+
+function assertUsage(usage: ReturnType<Agent["getLatestUsage"]>) {
+  assert.ok(usage);
+  assert.equal(usage.promptTokens, 2);
+  assert.equal(usage.completionTokens, 1);
+  assert.equal(usage.totalTokens, 3);
+  assert.ok(Number.isFinite(usage.tokensPerSecond));
+  assert.ok(usage.tokensPerSecond >= 0);
+  assert.ok(usage.timeToFirstTokenMs >= 0);
+  assert.ok(usage.generationTimeMs >= usage.timeToFirstTokenMs);
+  assert.ok(usage.totalTimeMs >= usage.generationTimeMs);
+}

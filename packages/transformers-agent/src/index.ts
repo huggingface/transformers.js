@@ -23,6 +23,5 @@ export type {
     LanguageModelMessageContent,
     ThinkingContent,
     Usage,
-    UsageContent,
 } from './types';
 export type { ToolDeclaration, ToolExecute, ToolParameter, ToolParameters, ToolOptions, ToolList } from './Tool';
