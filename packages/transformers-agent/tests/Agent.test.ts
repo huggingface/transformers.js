@@ -70,6 +70,10 @@ test("returns tool calls without executing them and accepts an external response
         arguments: { location: "London" },
       },
     },
+    {
+      type: "usage",
+      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
+    },
   ]);
   const firstCall = first.find((part) => part.type === "tool-call");
   if (!firstCall) throw new Error("Expected a tool call.");
@@ -120,7 +124,13 @@ test("returns tool calls without executing them and accepts an external response
   ]);
 
   assert.equal(generateCount, 2);
-  assert.deepEqual(second, [{ type: "text", value: "It is sunny in London." }]);
+  assert.deepEqual(second, [
+    { type: "text", value: "It is sunny in London." },
+    {
+      type: "usage",
+      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
+    },
+  ]);
   assert.deepEqual(conversations[1].slice(-2), [
     {
       role: "assistant",
@@ -184,6 +194,10 @@ test("streams incremental thinking and text content and closes without a done ch
     { type: "text", value: "Check" },
     { type: "text", value: " that" },
     { type: "text", value: " result." },
+    {
+      type: "usage",
+      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
+    },
   ]);
 });
 
@@ -220,6 +234,10 @@ test("does not reconcile streamed deltas against a different final decode", asyn
   assert.deepEqual(chunks, [
     { type: "thinking", value: "Streamed thinking." },
     { type: "text", value: "Streamed response." },
+    {
+      type: "usage",
+      value: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
+    },
   ]);
   assert.equal(agent.history.at(-1)?.content, "Final response.");
 });

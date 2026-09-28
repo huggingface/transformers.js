@@ -9,7 +9,13 @@ export type Prompt = string | Message[];
 
 export type MessageContent = TextContent | ImageContent | AudioContent | ToolCallContent | ToolResponseContent;
 
-export type LanguageModelMessageContent = MessageContent | ThinkingContent;
+export type LanguageModelMessageContent = MessageContent | ThinkingContent | UsageContent;
+
+export interface Usage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+}
 
 export interface TextContent {
     type: 'text';
@@ -19,6 +25,11 @@ export interface TextContent {
 export interface ThinkingContent {
     type: 'thinking';
     value: string;
+}
+
+export interface UsageContent {
+    type: 'usage';
+    value: Usage;
 }
 
 export interface ImageContent {

@@ -173,7 +173,10 @@ export function App() {
       const toolCallCount = result.filter(
         (part) => part.type === "tool-call",
       ).length;
-      addLog(`Prompt complete. toolCalls=${toolCallCount}`);
+      const usage = result.find((part) => part.type === "usage")?.value;
+      addLog(
+        `Prompt complete. toolCalls=${toolCallCount}, totalTokens=${usage?.totalTokens ?? 0}`,
+      );
     } catch (error) {
       const message = errorMessage(error);
       setResponses((prev) =>

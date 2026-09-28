@@ -44,14 +44,15 @@ for (const part of result) {
   if (part.type === "thinking") console.log(part.value);
   if (part.type === "text") console.log(part.value);
   if (part.type === "tool-call") console.log(part.value);
+  if (part.type === "usage") console.log(part.value);
 }
 ```
 
-`prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls.
+`prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls. The final item is `{ type: "usage", value }`, containing `promptTokens`, `completionTokens`, and `totalTokens` for the turn.
 
 ### Streaming
 
-`promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. The stream closes when the turn completes; there is no final `done` chunk.
+`promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. A single usage chunk is emitted after all response content and immediately before the stream closes; there is no `done` chunk.
 
 ```ts
 let response = "";
@@ -66,6 +67,8 @@ for await (const chunk of agent.promptStreaming("Explain WebGPU briefly.")) {
     renderResponse(response);
   } else if (chunk.type === "tool-call") {
     console.log(chunk.value);
+  } else if (chunk.type === "usage") {
+    console.log(chunk.value.totalTokens);
   }
 }
 ```

@@ -10,6 +10,7 @@ import type {
     ModelAdapter,
     Prompt,
     ToolCall,
+    Usage,
 } from './types';
 
 type ModelMessage = Message & { thinking?: string };
@@ -114,7 +115,12 @@ export class Agent {
                 this.nextItemId(prefix),
             );
             const toolCalls = parsed.toolCalls.map((call) => this.toPublicToolCall(call));
-            const result = this.createAssistantContent(parsed.thinkingText, parsed.visibleText, toolCalls);
+            const result = this.createAssistantContent(
+                parsed.thinkingText,
+                parsed.visibleText,
+                toolCalls,
+                generated.usage,
+            );
 
             if (parsed.visibleText || toolCalls.length > 0) {
                 const assistantMessage = this.createAssistantMessage(parsed.visibleText, toolCalls);
@@ -127,7 +133,11 @@ export class Agent {
             }
 
             for (const part of result) {
-                if (part.type === 'tool-call') onChunk?.(this.cloneContentPart(part));
+                if (part.type === 'tool-call') {
+                    onChunk?.(this.cloneContentPart(part));
+                } else if (part.type === 'usage') {
+                    onChunk?.({ type: 'usage', value: { ...part.value } });
+                }
             }
             return result;
         } catch (error) {
@@ -185,6 +195,7 @@ export class Agent {
         thinking: string,
         response: string,
         toolCalls: ToolCall[],
+        usage: Usage,
     ): LanguageModelMessageContent[] {
         return [
             ...(thinking ? [{ type: 'thinking' as const, value: thinking }] : []),
@@ -193,6 +204,7 @@ export class Agent {
                 type: 'tool-call' as const,
                 value: { ...call, arguments: this.cloneSerializable(call.arguments) },
             })),
+            { type: 'usage', value: { ...usage } },
         ];
     }
 
@@ -226,7 +238,8 @@ export class Agent {
     private async generateAssistantMessage(
         conversation: Array<Record<string, unknown>>,
         onDelta?: (text: string) => void,
-    ): Promise<{ modelContent: string }> {
+    ): Promise<{ modelContent: string; usage: Usage }> {
+        let completionTokens = 0;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
         const model = this.model.model;
@@ -236,6 +249,9 @@ export class Agent {
             callback_function: (text: string) => {
                 streamedRawText += text;
                 onDelta?.(text);
+            },
+            token_callback_function: (tokens: bigint[]) => {
+                completionTokens += tokens.length;
             },
         });
 
@@ -274,9 +290,18 @@ export class Agent {
             typeof output === 'object' && output !== null && 'sequences' in output
                 ? (output as { sequences?: unknown }).sequences
                 : output;
+        if (completionTokens === 0 && sequences && typeof sequences === 'object') {
+            const sequenceLength = (sequences as { dims?: number[] }).dims?.[1];
+            if (sequenceLength !== undefined) completionTokens = Math.max(0, sequenceLength - promptTokens);
+        }
         const modelRawText = this.decodeGeneratedContinuation(sequences, promptTokens) ?? streamedRawText;
         return {
             modelContent: this.adapter.normalizeAssistantContent(modelRawText),
+            usage: {
+                promptTokens,
+                completionTokens,
+                totalTokens: promptTokens + completionTokens,
+            },
         };
     }
 
