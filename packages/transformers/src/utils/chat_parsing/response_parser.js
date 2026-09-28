@@ -1,53 +1,66 @@
 import { processField, STREAMABLE_PARSERS } from './content_parsers.js';
-import { findMatch, loadResponseTemplate, partialLiteralStart } from './response_templates.js';
+import { findMatch, loadResponseTemplate, partialLiteralStart, truncatePastLastAnchor } from './response_templates.js';
 
-export function parseResponse(text, responseTemplate) {
+/**
+ * @typedef {Object} ParseResponseOptions
+ * @property {string} prefix Full chat prompt sent to the model. Parsing starts after its last matching template start anchor; pass an empty string when `text` contains the complete assistant message.
+ * @property {boolean} [partial=false] Treat `text` as an accumulated in-progress generation. Incomplete structured fields and missing required fields are omitted instead of failing final validation.
+ */
+
+/**
+ * Parse generated assistant text according to a response template.
+ *
+ * @param {string} text Generated assistant text, excluding the prompt prefix.
+ * @param {Object} responseTemplate Model-specific response format.
+ * @param {ParseResponseOptions} options Parsing context and finalization mode.
+ * @returns {Object.<string, *>} Parsed assistant message.
+ */
+export function parseResponse(text, responseTemplate, options) {
+    const { prefix, partial = false } = options ?? {};
     if (typeof text !== 'string') throw new TypeError('parse_response expects a string.');
-    const parser = new BestEffortResponseParser(responseTemplate);
-    parser.consume(text);
-    return parser.snapshot();
+    if (typeof prefix !== 'string') {
+        throw new TypeError('parse_response requires a string prefix. Pass an empty string to opt out.');
+    }
+    const parser = new ResponseParser(responseTemplate);
+    const responsePrefix = truncatePastLastAnchor(parser.spec.startAnchor, prefix);
+    parser.consume(responsePrefix + text, !partial);
+    return parser.snapshot(partial);
 }
 
-class BestEffortResponseParser {
+class ResponseParser {
     constructor(responseTemplate) {
         this.spec = loadResponseTemplate(responseTemplate);
         this.output = clone(this.spec.defaults);
         this.current = this.spec.implicit;
         this.captures = {};
-        this.body = '';
+        this.body = null;
         this.position = 0;
     }
 
-    consume(text) {
-        while (this.position < text.length) {
+    consume(text, final) {
+        while (true) {
             const watch = this.watchlist();
             let best = null;
             for (const item of watch) {
                 const anchor = item.kind === 'open' ? item.field.open : item.field.close;
-                const match = findMatch(anchor, text, this.position);
+                const match = findMatch(anchor, text, this.position, final && item.kind === 'close');
                 if (!match) continue;
                 const candidate = { ...item, match };
                 if (!best || compareCandidates(candidate, best) < 0) best = candidate;
             }
 
             if (!best) {
-                const holdStart = partialLiteralStart(
-                    watch.map((item) => (item.kind === 'open' ? item.field.open : item.field.close)),
-                    text,
-                    this.position,
-                );
+                const holdStart = final
+                    ? text.length
+                    : partialLiteralStart(
+                          watch.map((item) => (item.kind === 'open' ? item.field.open : item.field.close)),
+                          text,
+                          this.position,
+                      );
                 this.accumulate(text.slice(this.position, holdStart));
                 this.position = holdStart;
+                if (final) this.closeCurrent();
                 break;
-            }
-
-            if (best.kind === 'orphan_close') {
-                this.storeBestEffort(best.field, text.slice(this.position, best.match.start), best.match.groups);
-                this.position = best.match.end;
-                this.current = this.spec.implicit;
-                this.captures = {};
-                this.body = '';
-                continue;
             }
 
             this.accumulate(text.slice(this.position, best.match.start));
@@ -59,13 +72,14 @@ class BestEffortResponseParser {
                 this.body = '';
             } else {
                 this.closeCurrent();
+                if (best.match.start === best.match.end) break;
             }
         }
     }
 
-    snapshot() {
+    snapshot(partial) {
         const output = clone(this.output);
-        if (this.current !== null && this.body) {
+        if (partial && this.current !== null && this.body !== null) {
             const field = this.spec.fields[this.current];
             if (STREAMABLE_PARSERS.has(field.content) || field.close === null) {
                 try {
@@ -74,6 +88,13 @@ class BestEffortResponseParser {
                     // A partial numeric value may not be parseable yet.
                 }
             }
+        }
+        if (!partial) {
+            const missing = Object.values(this.spec.fields)
+                .filter((field) => !field.optional && !Object.hasOwn(output, field.name))
+                .map((field) => field.name);
+            if (missing.length)
+                throw new Error(`Required response_template fields missing from parsed output: ${missing}`);
         }
         for (const [key, value] of Object.entries(output)) {
             if (!Object.hasOwn(this.spec.defaults, key) && isEmpty(value)) delete output[key];
@@ -91,51 +112,46 @@ class BestEffortResponseParser {
             .map((field) => ({ kind: 'open', field }));
         const implicit = this.spec.implicit === null ? null : this.spec.fields[this.spec.implicit];
         if (implicit?.close) watch.push({ kind: 'close', field: implicit });
-        if (this.position === 0 && !this.body) {
-            for (const field of Object.values(this.spec.fields)) {
-                if (field.open && field.close) watch.push({ kind: 'orphan_close', field });
-            }
-        }
         return watch;
     }
 
     accumulate(text) {
-        if (text && this.current !== null) this.body += text;
+        if (text && this.current !== null) {
+            this.body = (this.body ?? '') + text;
+        }
     }
 
     closeCurrent() {
-        if (this.current !== null && this.body) {
+        if (this.current !== null && this.body !== null) {
             const field = this.spec.fields[this.current];
-            this.storeBestEffort(field, this.body, this.captures);
+            this.store(this.output, field, processField(this.body, field, this.captures));
         }
         this.current = this.spec.implicit;
         this.captures = {};
-        this.body = '';
-    }
-
-    storeBestEffort(field, body, captures) {
-        if (!body) return;
-        try {
-            this.store(this.output, field, processField(body, field, captures));
-        } catch {
-            // Best-effort parsing omits malformed or incomplete structured regions.
-        }
+        this.body = null;
     }
 
     store(output, field, value) {
         if (field.join !== null) {
-            if (typeof value !== 'string') return;
-            output[field.name] = Object.hasOwn(output, field.name) ? output[field.name] + field.join + value : value;
+            if (typeof value !== 'string') {
+                throw new Error(`Field '${field.name}': join requires each match to parse to a string.`);
+            }
+            setOwn(
+                output,
+                field.name,
+                Object.hasOwn(output, field.name) ? output[field.name] + field.join + value : value,
+            );
         } else if (field.repeats) {
-            (output[field.name] ??= []).push(value);
+            if (!Object.hasOwn(output, field.name)) setOwn(output, field.name, []);
+            output[field.name].push(value);
         } else {
-            output[field.name] = value;
+            setOwn(output, field.name, value);
         }
     }
 }
 
 function compareCandidates(a, b) {
-    const kindRank = { open: 0, close: 1, orphan_close: 2 };
+    const kindRank = { open: 0, close: 1 };
     return (
         a.match.start - b.match.start ||
         b.match.end - b.match.start - (a.match.end - a.match.start) ||
@@ -159,4 +175,8 @@ function clone(value) {
         return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
     }
     return value;
+}
+
+function setOwn(object, key, value) {
+    Object.defineProperty(object, key, { value, writable: true, enumerable: true, configurable: true });
 }

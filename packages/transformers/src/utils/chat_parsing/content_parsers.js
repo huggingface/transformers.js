@@ -17,22 +17,25 @@ function parseText(text, args) {
 function parseInteger(text, args) {
     const value = parseText(text, args);
     if (!/^[+-]?\d+$/.test(value)) throw new Error(`Could not parse ${JSON.stringify(value)} as an integer.`);
-    return Number.parseInt(value, 10);
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isSafeInteger(parsed)) {
+        throw new Error(`Could not parse ${JSON.stringify(value)} without losing integer precision.`);
+    }
+    return parsed;
 }
 
 function parseFloatValue(text, args) {
     const value = parseText(text, args);
-    if (!value || !Number.isFinite(Number(value)))
-        throw new Error(`Could not parse ${JSON.stringify(value)} as a float.`);
-    return Number(value);
+    const parsed = Number(value);
+    if (!value || !Number.isFinite(parsed)) throw new Error(`Could not parse ${JSON.stringify(value)} as a float.`);
+    return parsed;
 }
 
 function parseBoolean(text, args) {
     const value = parseText(text, args).toLowerCase();
-    if (!['true', '1', 'false', '0'].includes(value)) {
-        throw new Error(`Could not parse ${JSON.stringify(value)} as a boolean.`);
-    }
-    return ['true', '1'].includes(value);
+    if (value === 'true' || value === '1') return true;
+    if (value === 'false' || value === '0') return false;
+    throw new Error(`Could not parse ${JSON.stringify(value)} as a boolean.`);
 }
 
 const LAX_OPEN = '\x01';
@@ -74,9 +77,9 @@ function parseXMLInline(text, args) {
         if (key === undefined) throw new Error("xml-inline tag_pattern requires a named 'key' group.");
         const value = parseNested(match.groups?.value ?? '', args.value_parser);
         if (Object.hasOwn(output, key) && args.merge_duplicates) {
-            output[key] = Array.isArray(output[key]) ? [...output[key], value] : [output[key], value];
+            setOwn(output, key, Array.isArray(output[key]) ? [...output[key], value] : [output[key], value]);
         } else {
-            output[key] = value;
+            setOwn(output, key, value);
         }
     }
     return output;
@@ -92,7 +95,7 @@ function parseKeyValueLines(text, args) {
         if (!line || index < 0) continue;
         const key = parseText(line.slice(0, index), args);
         const value = parseText(line.slice(index + keyValueSeparator.length), args);
-        output[key] = parseNested(value, args.value_parser);
+        setOwn(output, key, parseNested(value, args.value_parser));
     }
     return output;
 }
@@ -166,4 +169,8 @@ function escapeRegex(value) {
 
 function isObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function setOwn(object, key, value) {
+    Object.defineProperty(object, key, { value, writable: true, enumerable: true, configurable: true });
 }

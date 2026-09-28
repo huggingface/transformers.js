@@ -30,9 +30,11 @@ const gemma4Template = {
   },
 };
 
+const parseGemma4 = (text, options = {}) => parseResponse(text, gemma4Template, { prefix: "<|turn>model\n", ...options });
+
 describe("Response templates", () => {
   it("parses a complete thinking response", () => {
-    expect(parseResponse("<|channel>thought\nI should answer briefly.<channel|>Paris<turn|>", gemma4Template)).toEqual({
+    expect(parseGemma4("<|channel>thought\nI should answer briefly.<channel|>Paris<turn|>")).toEqual({
       role: "assistant",
       thinking: "I should answer briefly.",
       content: "Paris",
@@ -40,21 +42,21 @@ describe("Response templates", () => {
   });
 
   it("parses an unfinished thinking region", () => {
-    expect(parseResponse("<|channel>thought\nI should check", gemma4Template)).toEqual({
+    expect(parseGemma4("<|channel>thought\nI should check", { partial: true })).toEqual({
       role: "assistant",
       thinking: "I should check",
     });
   });
 
   it("holds an unfinished delimiter out of the parsed text", () => {
-    expect(parseResponse("<|channel>thought\nI should check<chan", gemma4Template)).toEqual({
+    expect(parseGemma4("<|channel>thought\nI should check<chan", { partial: true })).toEqual({
       role: "assistant",
       thinking: "I should check",
     });
   });
 
   it("holds the literal prefix of an unfinished regex delimiter", () => {
-    expect(parseResponse("<|channel>thought\nUse a tool.<channel|><|tool_ca", gemma4Template)).toEqual({
+    expect(parseGemma4("<|channel>thought\nUse a tool.<channel|><|tool_ca", { partial: true })).toEqual({
       role: "assistant",
       thinking: "Use a tool.",
     });
@@ -63,12 +65,13 @@ describe("Response templates", () => {
   it("recognizes a thinking close marker whose opener was prefilled", () => {
     const template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: {
         thinking: { open: "<think>", close: "</think>", content: "text" },
         content: { content: "text" },
       },
     };
-    expect(parseResponse("prefilled reasoning</think>answer", template)).toEqual({
+    expect(parseResponse("answer", template, { prefix: "history<assistant><think>prefilled reasoning</think>" })).toEqual({
       role: "assistant",
       thinking: "prefilled reasoning",
       content: "answer",
@@ -80,7 +83,7 @@ describe("Response templates", () => {
     const parsed = [];
     for (const chunk of ["<|channel>thought\nI should", " answer.<channel|>", "Paris"]) {
       response += chunk;
-      parsed.push(parseResponse(response, gemma4Template));
+      parsed.push(parseGemma4(response, { partial: true }));
     }
     expect(parsed).toEqual([
       { role: "assistant", thinking: "I should" },
@@ -91,12 +94,12 @@ describe("Response templates", () => {
 
   it("omits incomplete structured fields until they close", () => {
     const partial = '<|channel>thought\nUse weather.<channel|><|tool_call>call:get_weather{city:<|"|>Par';
-    expect(parseResponse(partial, gemma4Template)).toEqual({
+    expect(parseGemma4(partial, { partial: true })).toEqual({
       role: "assistant",
       thinking: "Use weather.",
     });
 
-    expect(parseResponse(`${partial}is<|"|>}<tool_call|>`, gemma4Template)).toEqual({
+    expect(parseGemma4(`${partial}is<|"|>}<tool_call|>`)).toEqual({
       role: "assistant",
       thinking: "Use weather.",
       tool_calls: [
@@ -109,24 +112,26 @@ describe("Response templates", () => {
   });
 
   it("returns plain content when no explicit region is generated", () => {
-    expect(parseResponse("Paris", gemma4Template)).toEqual({ role: "assistant", content: "Paris" });
+    expect(parseGemma4("Paris")).toEqual({ role: "assistant", content: "Paris" });
   });
 
   it("parses a complete implicit JSON field", () => {
     const template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: { content: { content: "json" } },
     };
-    expect(parseResponse('{"city":"Paris"}', template)).toEqual({
+    expect(parseResponse('{"city":"Paris"}', template, { prefix: "" })).toEqual({
       role: "assistant",
       content: { city: "Paris" },
     });
-    expect(parseResponse('{"city":', template)).toEqual({ role: "assistant" });
+    expect(parseResponse('{"city":', template, { prefix: "", partial: true })).toEqual({ role: "assistant" });
   });
 
   it("does not mutate array defaults across repeated parsing", () => {
     const template = {
       defaults: { role: "assistant", tool_calls: [] },
+      start_anchor: "<assistant>",
       fields: {
         tool_calls: {
           open: "<tool>",
@@ -137,25 +142,27 @@ describe("Response templates", () => {
       },
     };
     const response = '<tool>{"name":"weather"}</tool>';
-    expect(parseResponse(response, template).tool_calls).toEqual([{ name: "weather" }]);
-    expect(parseResponse(response, template).tool_calls).toEqual([{ name: "weather" }]);
+    expect(parseResponse(response, template, { prefix: "" }).tool_calls).toEqual([{ name: "weather" }]);
+    expect(parseResponse(response, template, { prefix: "" }).tool_calls).toEqual([{ name: "weather" }]);
     expect(template.defaults.tool_calls).toEqual([]);
   });
 
   it("ignores zero-width regex anchors without hanging", () => {
     const template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: {
         marker: { open_pattern: "(?=x)", close: "</marker>", content: "text" },
         content: { content: "text" },
       },
     };
-    expect(parseResponse("x", template)).toEqual({ role: "assistant", content: "x" });
+    expect(parseResponse("x", template, { prefix: "" })).toEqual({ role: "assistant", content: "x" });
   });
 
   it("parses whitespace around lax JSON keys", () => {
     const template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: {
         tool_calls: {
           open: "<tool>",
@@ -165,7 +172,7 @@ describe("Response templates", () => {
         },
       },
     };
-    expect(parseResponse('<tool>{ city: "Paris", days : 3 }</tool>', template)).toEqual({
+    expect(parseResponse('<tool>{ city: "Paris", days : 3 }</tool>', template, { prefix: "" })).toEqual({
       role: "assistant",
       tool_calls: { city: "Paris", days: 3 },
     });
@@ -174,9 +181,96 @@ describe("Response templates", () => {
   it("omits malformed partial booleans", () => {
     const template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: { content: { content: "bool" } },
     };
-    expect(parseResponse("f", template)).toEqual({ role: "assistant" });
-    expect(parseResponse("false", template)).toEqual({ role: "assistant", content: false });
+    expect(parseResponse("f", template, { prefix: "", partial: true })).toEqual({ role: "assistant" });
+    expect(parseResponse("false", template, { prefix: "" })).toEqual({ role: "assistant", content: false });
+  });
+
+  it("uses a prompt-prefilled opener for partial output", () => {
+    const template = {
+      defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
+      fields: {
+        thinking: { open: "<think>", close: "</think>", content: "text" },
+        content: { content: "text" },
+      },
+    };
+    expect(parseResponse("still reasoning", template, { prefix: "history<assistant><think>", partial: true })).toEqual({
+      role: "assistant",
+      thinking: "still reasoning",
+    });
+  });
+
+  it("requires explicit prompt and start-anchor context", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: { content: { content: "text" } },
+    };
+    expect(() => parseResponse("answer", template)).toThrow("requires a string prefix");
+    expect(() => parseResponse("answer", { fields: template.fields }, { prefix: "" })).toThrow("must define 'start_anchor' or 'start_anchor_pattern'");
+  });
+
+  it("throws for malformed completed structured fields", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        tool: { open: "<tool>", close: "</tool>", content: "json" },
+      },
+    };
+    expect(() => parseResponse("<tool>{bad}</tool>", template, { prefix: "", partial: true })).toThrow("Could not parse response field as JSON");
+  });
+
+  it("enforces required fields only for final responses", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        answer: { open: "<answer>", close: "</answer>", optional: false },
+      },
+    };
+    expect(parseResponse("", template, { prefix: "", partial: true })).toEqual({});
+    expect(() => parseResponse("", template, { prefix: "" })).toThrow("Required response_template fields missing from parsed output: answer");
+  });
+
+  it("closes structured fields with an end anchor on finalization", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        data: { open: "<json>", close_pattern: String.raw`\Z`, content: "json", optional: false },
+      },
+    };
+    expect(parseResponse('<json>{"city":"Paris"}', template, { prefix: "" })).toEqual({
+      data: { city: "Paris" },
+    });
+  });
+
+  it("defines model-generated keys without changing object prototypes", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        content: { content: "kv-lines", content_args: { kv_sep: "=" } },
+      },
+    };
+    const parsed = parseResponse("__proto__=safe", template, { prefix: "" });
+    expect(Object.getPrototypeOf(parsed.content)).toBe(Object.prototype);
+    expect(Object.hasOwn(parsed.content, "__proto__")).toBe(true);
+    expect(parsed.content.__proto__).toBe("safe");
+  });
+
+  it("supports field names that shadow object prototype properties", () => {
+    const fields = JSON.parse('{"__proto__":{"open":"<x>","close":"</x>","optional":false}}');
+    const parsed = parseResponse("<x>value</x>", { start_anchor: "<assistant>", fields }, { prefix: "" });
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(Object.hasOwn(parsed, "__proto__")).toBe(true);
+    expect(parsed.__proto__).toBe("value");
+  });
+
+  it("rejects integers that cannot be represented precisely", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: { content: { content: "int" } },
+    };
+    expect(() => parseResponse("9007199254740993", template, { prefix: "" })).toThrow("without losing integer precision");
   });
 });

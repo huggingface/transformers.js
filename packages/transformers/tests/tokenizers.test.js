@@ -555,6 +555,7 @@ describe("Chat templates", () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
     const response_template = {
       defaults: { role: "assistant" },
+      start_anchor: "<assistant>",
       fields: {
         thinking: { open: "<think>", close: "</think>", content: "text" },
         content: { content: "text" },
@@ -566,11 +567,11 @@ describe("Chat templates", () => {
     });
 
     expect(configured.response_template).toBe(response_template);
-    expect(configured.parse_response("<think>still reasoning")).toEqual({
+    expect(configured.parse_response("still reasoning", { prefix: "<assistant><think>", partial: true })).toEqual({
       role: "assistant",
       thinking: "still reasoning",
     });
-    expect(configured.parse_response("<think>finished</think>answer")).toEqual({
+    expect(configured.parse_response("<think>finished</think>answer", { prefix: "" })).toEqual({
       role: "assistant",
       thinking: "finished",
       content: "answer",

@@ -128,6 +128,7 @@ export default () => {
           const previousTemplate = pipe.tokenizer.response_template;
           pipe.tokenizer.response_template = {
             defaults: { role: "assistant" },
+            start_anchor: "<assistant>",
             fields: { content: { content: "text" } },
           };
           const spy = jest.spyOn(pipe.tokenizer, "parse_response");

@@ -1,7 +1,5 @@
 import { compileRegex, hasContentParser, validateTransformStrings } from './content_parsers.js';
 
-// Start anchors locate the assistant response within a prompt prefix upstream. This parser only
-// receives generated response text, but accepts the metadata so upstream tokenizer configs load.
 const TOP_LEVEL_KEYS = new Set(['version', 'defaults', 'fields', 'start_anchor', 'start_anchor_pattern']);
 const FIELD_KEYS = new Set([
     'open',
@@ -18,7 +16,6 @@ const FIELD_KEYS = new Set([
 ]);
 
 export function loadResponseTemplate(spec) {
-    if (spec?.__responseTemplate === true) return spec;
     assertObject(spec, 'response_template');
     if ((spec.version ?? 1) !== 1) throw new Error(`Unsupported response_template version: ${spec.version}`);
     assertKnownKeys(spec, TOP_LEVEL_KEYS, 'response_template');
@@ -26,17 +23,19 @@ export function loadResponseTemplate(spec) {
     assertObject(spec.fields, 'response_template.fields');
     if (Object.keys(spec.fields).length === 0) throw new Error('response_template.fields must not be empty.');
 
-    const fields = {};
-    let implicit = null;
-    for (const [name, raw] of Object.entries(spec.fields)) {
-        const field = buildField(name, raw);
-        fields[name] = field;
-        if (field.open === null) {
-            if (implicit !== null) throw new Error('response_template may define at most one field without an opener.');
-            implicit = name;
-        }
+    /** @type {[string, ReturnType<typeof buildField>][]} */
+    const fieldEntries = Object.entries(spec.fields).map(([name, raw]) => [name, buildField(name, raw)]);
+    const implicitFields = fieldEntries.filter(([, field]) => field.open === null);
+    if (implicitFields.length > 1) {
+        throw new Error('response_template may define at most one field without an opener.');
     }
-    return { __responseTemplate: true, defaults: { ...(spec.defaults ?? {}) }, fields, implicit };
+    const fields = Object.fromEntries(fieldEntries);
+    const implicit = implicitFields[0]?.[0] ?? null;
+    const startAnchor = compileAnchor(spec, 'response_template', 'start_anchor', 'start_anchor_pattern');
+    if (startAnchor === null) {
+        throw new Error("response_template must define 'start_anchor' or 'start_anchor_pattern'.");
+    }
+    return { defaults: { ...(spec.defaults ?? {}) }, fields, implicit, startAnchor };
 }
 
 function buildField(name, raw) {
@@ -46,6 +45,10 @@ function buildField(name, raw) {
     if (!hasContentParser(content)) throw new Error(`Unknown response_template content parser: ${content}`);
     const open = compileAnchor(raw, `Field '${name}'`, 'open', 'open_pattern');
     const close = compileAnchor(raw, `Field '${name}'`, 'close', 'close_pattern');
+    if (raw.content_args !== undefined) assertObject(raw.content_args, `Field '${name}': content_args`);
+    assertOptionalBoolean(raw.repeats, `Field '${name}': repeats`);
+    assertOptionalBoolean(raw.optional, `Field '${name}': optional`);
+    assertOptionalBoolean(raw.transform_each, `Field '${name}': transform_each`);
     if (raw.join !== undefined && typeof raw.join !== 'string')
         throw new Error(`Field '${name}': join must be a string.`);
     if (raw.join !== undefined && !raw.repeats) throw new Error(`Field '${name}': join requires repeats.`);
@@ -53,7 +56,7 @@ function buildField(name, raw) {
         throw new Error(`Field '${name}': transform_each requires transform.`);
     const transform = raw.transform ?? null;
     validateTransformStrings(`Field '${name}'`, transform);
-    if ([...(open?.namedGroups ?? []), ...(close?.namedGroups ?? [])].length && transform === null) {
+    if ((open?.namedGroups.length || close?.namedGroups.length) && transform === null) {
         throw new Error(`Field '${name}' has named regex groups but no transform.`);
     }
     return {
@@ -64,6 +67,7 @@ function buildField(name, raw) {
         contentArgs: raw.content_args ?? {},
         repeats: raw.repeats ?? false,
         join: raw.join ?? null,
+        optional: raw.optional ?? true,
         transform,
         transformEach: raw.transform_each ?? false,
     };
@@ -99,7 +103,7 @@ function compileAnchor(source, scope, literalKey, patternKey) {
     return null;
 }
 
-export function findMatch(anchor, text, position) {
+export function findMatch(anchor, text, position, allowZeroWidth = false) {
     let best = null;
     if (anchor.literals) {
         for (const literal of anchor.literals) {
@@ -111,22 +115,41 @@ export function findMatch(anchor, text, position) {
     } else {
         anchor.pattern.lastIndex = position;
         const match = anchor.pattern.exec(text);
-        if (match?.[0].length) {
+        if (match && (match[0].length || (allowZeroWidth && match.index === text.length))) {
             best = { start: match.index, end: match.index + match[0].length, groups: match.groups ?? {} };
         }
     }
     return best;
 }
 
+export function truncatePastLastAnchor(anchor, text) {
+    let lastEnd = null;
+    if (anchor.literals) {
+        for (const literal of anchor.literals) {
+            const position = text.lastIndexOf(literal);
+            if (position >= 0) lastEnd = Math.max(lastEnd ?? 0, position + literal.length);
+        }
+    } else {
+        anchor.pattern.lastIndex = 0;
+        for (let match = anchor.pattern.exec(text); match; match = anchor.pattern.exec(text)) {
+            lastEnd = match.index + match[0].length;
+            if (!match[0].length) anchor.pattern.lastIndex += 1;
+        }
+    }
+    return lastEnd === null ? text : text.slice(lastEnd);
+}
+
 export function partialLiteralStart(anchors, text, position) {
     let start = text.length;
     for (const anchor of anchors) {
         if (!anchor?.partialPrefixes?.length) continue;
-        for (let index = position; index < text.length; ++index) {
-            const suffix = text.slice(index);
-            if (anchor.partialPrefixes.some((literal) => literal.startsWith(suffix) && literal !== suffix)) {
-                start = Math.min(start, index);
-                break;
+        for (const prefix of anchor.partialPrefixes) {
+            const maxLength = Math.min(prefix.length - 1, text.length - position);
+            for (let length = maxLength; length > 0; --length) {
+                if (prefix.startsWith(text.slice(-length))) {
+                    start = Math.min(start, text.length - length);
+                    break;
+                }
             }
         }
     }
@@ -158,4 +181,8 @@ function assertObject(value, name) {
 function assertKnownKeys(value, allowed, name) {
     const unknown = Object.keys(value).filter((key) => !allowed.has(key));
     if (unknown.length) throw new Error(`${name} has unknown keys: ${unknown.sort()}`);
+}
+
+function assertOptionalBoolean(value, name) {
+    if (value !== undefined && typeof value !== 'boolean') throw new Error(`${name} must be a boolean.`);
 }

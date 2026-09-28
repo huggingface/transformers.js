@@ -629,20 +629,24 @@ export class PreTrainedTokenizer
 
     /**
      * Parse generated text into an assistant message using the tokenizer's response template.
-     * Parsing is best-effort: completed fields are parsed, current text fields contain the
-     * available text, and incomplete structured fields are omitted.
+     * Completed responses are validated against required fields. Pass `partial: true` for
+     * accumulated generation, where incomplete structured fields and missing required fields are omitted.
      *
      * @param {string} response Generated response text, which may be partial or complete.
-     * @param {Object} [options]
+     * @param {Object} options
+     * @param {string} options.prefix Chat prompt sent to the model. Pass an empty string when the response contains the complete message.
+     * @param {boolean} [options.partial=false] Whether the response is an incomplete generation snapshot.
      * @param {Object|null} [options.response_template=null] Template override. Defaults to `tokenizer.response_template`.
      * @returns {Object} The parsed assistant message.
      */
-    parse_response(response, { response_template = null } = {}) {
+    parse_response(response, options) {
+        const { prefix, partial = false, response_template: templateOverride = null } = options ?? {};
+        let response_template = templateOverride;
         response_template ??= this.response_template;
         if (response_template === null) {
             throw new Error('This tokenizer does not have a response_template for parsing chat responses.');
         }
-        return parseResponse(response, response_template);
+        return parseResponse(response, response_template, { prefix, partial });
     }
 
     /**
