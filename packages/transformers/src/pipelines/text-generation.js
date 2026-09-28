@@ -14,7 +14,7 @@ import { pick } from '../utils/core.js';
  */
 
 function isChat(x) {
-    return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+    return Array.isArray(x) && x.every((x) => x !== null && typeof x === 'object' && 'role' in x);
 }
 
 /**
@@ -35,6 +35,7 @@ function isChat(x) {
  * @property {Object[]|null} [tools=null] A list of tools to expose to chat templates that support tool use.
  * @property {Record<string, string>[]|null} [documents=null] A list of documents to expose to chat templates that support RAG.
  * @property {string|null} [chat_template=null] A specific chat template (or template name) to apply.
+ * @property {boolean} [skip_special_tokens=true] Whether to remove special tokens while decoding. Response templates retain them for parsing.
  * @property {Object} [tokenizer_encode_kwargs] Additional keyword arguments to pass along to the encoding step of the tokenizer.
  * If the text input is a chat, it is passed to `apply_chat_template`. Otherwise, it is passed to the tokenizer's call function.
  * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & TextGenerationSpecificParams} TextGenerationConfig
@@ -113,6 +114,7 @@ export class TextGenerationPipeline
             documents,
             chat_template,
             tokenizer_encode_kwargs,
+            skip_special_tokens: skip_special_tokens_arg,
             ...generation_kwargs
         } = generate_kwargs;
 
@@ -183,17 +185,25 @@ export class TextGenerationPipeline
             })
         );
 
-        const decoded = this.tokenizer.batch_decode(outputTokenIds, {
-            skip_special_tokens: true,
-        });
+        const skip_special_tokens = this.tokenizer.response_template ? false : (skip_special_tokens_arg ?? true);
+        const decodeOptions = { skip_special_tokens };
+        const decoded = this.tokenizer.batch_decode(outputTokenIds, decodeOptions);
 
         let promptLengths;
+        let decodedPrompts;
         if (!return_full_text && text_inputs.input_ids.dims.at(-1) > 0) {
-            promptLengths = this.tokenizer
-                .batch_decode(text_inputs.input_ids, {
-                    skip_special_tokens: true,
-                })
-                .map((x) => x.length);
+            decodedPrompts = this.tokenizer.batch_decode(text_inputs.input_ids, decodeOptions);
+            if (this.tokenizer.response_template) {
+                const promptTokenLength = text_inputs.input_ids.dims.at(-1);
+                const generatedTokenIds = outputTokenIds.tolist().map((ids) => ids.slice(promptTokenLength));
+                decoded.splice(
+                    0,
+                    decoded.length,
+                    ...generatedTokenIds.map((ids) => (ids.length ? this.tokenizer.decode(ids, decodeOptions) : '')),
+                );
+            } else {
+                promptLengths = decodedPrompts.map((x) => x.length);
+            }
         }
 
         /** @type {TextGenerationOutput[]} */
@@ -208,7 +218,15 @@ export class TextGenerationPipeline
             toReturn[textIndex].push(
                 /** @type {TextGenerationSingle} */ ({
                     generated_text: isChatInput
-                        ? [.../** @type {Chat[]} */ (texts)[textIndex], { role: 'assistant', content: decoded[i] }]
+                        ? [
+                              .../** @type {Chat[]} */ (texts)[textIndex],
+                              this.tokenizer.response_template
+                                  ? this.tokenizer.parse_response(decoded[i], {
+                                        prefix: decodedPrompts?.[textIndex] ?? '',
+                                        tools,
+                                    })
+                                  : { role: 'assistant', content: decoded[i] },
+                          ]
                         : decoded[i],
                 }),
             );

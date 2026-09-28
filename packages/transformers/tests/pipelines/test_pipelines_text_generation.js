@@ -121,6 +121,34 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "chat input parses a configured response template",
+        async () => {
+          const responseTemplate = {
+            defaults: { role: "assistant" },
+            start_anchor: "<s>",
+            fields: { content: { content: "text" } },
+          };
+          const previousTemplate = pipe.tokenizer.response_template;
+          pipe.tokenizer.response_template = responseTemplate;
+          const parsed = { role: "assistant", thinking: "reasoning", content: "answer" };
+          const spy = jest.spyOn(pipe.tokenizer, "parse_response").mockReturnValue(parsed);
+
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 3 });
+            expect(output[0].generated_text.at(-1)).toBe(parsed);
+            expect(spy).toHaveBeenCalledWith(expect.any(String), {
+              prefix: expect.any(String),
+              tools: undefined,
+            });
+          } finally {
+            spy.mockRestore();
+            pipe.tokenizer.response_template = previousTemplate;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1

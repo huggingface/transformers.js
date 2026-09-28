@@ -551,6 +551,41 @@ describe("Extra decoding tests", () => {
 });
 
 describe("Chat templates", () => {
+  it("should load and parse response templates", async () => {
+    const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
+    const response_template = {
+      defaults: { role: "assistant" },
+      start_anchor: "[INST]",
+      fields: {
+        thinking: { open: "<think>", close: "</think>", content: "text" },
+        content: { content: "text" },
+      },
+    };
+    const configured = new tokenizer.constructor(tokenizer._tokenizerJSON, {
+      ...tokenizer.config,
+      response_template,
+    });
+
+    expect(configured.response_template).toBe(response_template);
+    expect(
+      configured.parse_response("reasoning</think>answer", {
+        prefix: "[INST]<think>",
+      }),
+    ).toEqual({ role: "assistant", thinking: "reasoning", content: "answer" });
+    expect(
+      configured.parse_response(["<think>one</think>first", "<think>two</think>second"], {
+        prefix: "[INST]",
+      }),
+    ).toEqual([
+      { role: "assistant", thinking: "one", content: "first" },
+      { role: "assistant", thinking: "two", content: "second" },
+    ]);
+
+    const parser = configured.get_response_parser({ prefix: "[INST]" });
+    parser.feed("<think>streamed</think>response");
+    expect(parser.finalize()[0]).toEqual({ role: "assistant", thinking: "streamed", content: "response" });
+  });
+
   it("should generate a chat template", async () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
 

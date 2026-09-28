@@ -20,6 +20,7 @@ import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
+import { ResponseParser, parseResponse } from './utils/chat_parsing/index.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -95,7 +96,9 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
 /**
  * @typedef {Object} Message
  * @property {'user' | 'assistant' | 'system' | (string & {})} role The role of the message.
- * @property {string | MessageContent[]} content The content of the message. Can be a simple string or an array of content objects.
+ * @property {string | MessageContent[]} [content] The content of the message. Can be a simple string or an array of content objects.
+ * @property {string} [thinking] The model's parsed reasoning text.
+ * @property {Object[]} [tool_calls] Tool calls requested by the model.
  */
 
 /**
@@ -303,6 +306,7 @@ export class PreTrainedTokenizer
             }
             this.chat_template = chat_template;
         }
+        this.response_template = tokenizerConfig.response_template ?? null;
         this._compiled_template_cache = new Map();
 
         const special_tokens = getSpecialTokens(this._tokenizer);
@@ -623,6 +627,79 @@ export class PreTrainedTokenizer
         }
 
         return this.decode_single(token_ids, decode_args);
+    }
+
+    /**
+     * Parse one or more generated responses according to a response template.
+     *
+     * @param {string | string[] | number[] | bigint[] | number[][] | bigint[][] | Tensor} response Generated response text or token IDs.
+     * @param {Object} [options]
+     * @param {Object|null} [options.schema=null] Response template. Defaults to `tokenizer.response_template`.
+     * @param {string | string[] | number[] | bigint[] | number[][] | bigint[][] | Tensor | null} [options.prefix=null] Prompt text or IDs preceding generation.
+     * @param {Object[]|null} [options.tools=null] Tools whose schemas are used to coerce parsed arguments.
+     * @returns {Object | Object[]} A parsed message or batch of messages.
+     */
+    parse_response(response, { schema = null, prefix = null, tools = null } = {}) {
+        schema ??= this.response_template;
+        if (schema === null)
+            throw new Error('This tokenizer does not have a response_template for parsing chat responses.');
+        if (prefix === null)
+            throw new Error('parse_response requires prefix. Pass an empty string or array to opt out.');
+
+        const { values: responses, batched } = this._decode_response_input(response, true);
+        let prefixes;
+        if (Array.isArray(prefix) && prefix.length === 0) {
+            prefixes = new Array(responses.length).fill('');
+        } else {
+            const decoded = this._decode_response_input(prefix, true);
+            if (decoded.batched) {
+                if (decoded.values.length !== responses.length) {
+                    throw new Error(`Got ${responses.length} response(s) but ${decoded.values.length} prefix(es).`);
+                }
+                prefixes = decoded.values;
+            } else {
+                prefixes = new Array(responses.length).fill(decoded.values[0]);
+            }
+        }
+        const parsed = responses.map((text, index) => parseResponse(text, schema, { prefix: prefixes[index], tools }));
+        return batched ? parsed : parsed[0];
+    }
+
+    /**
+     * Create a stateful parser for an incrementally generated response.
+     *
+     * @param {Object} [options]
+     * @param {Object|null} [options.response_template=null] Response template. Defaults to `tokenizer.response_template`.
+     * @param {string | number[] | bigint[] | Tensor | null} [options.prefix=null] Prompt preceding generation.
+     * @param {Object[]|null} [options.tools=null] Tools whose schemas are used to coerce parsed arguments.
+     * @returns {ResponseParser} The response parser.
+     */
+    get_response_parser({ response_template = null, prefix = null, tools = null } = {}) {
+        response_template ??= this.response_template;
+        if (response_template === null) throw new Error('This tokenizer does not have a response_template set.');
+        if (prefix !== null && typeof prefix !== 'string') {
+            const decoded = this._decode_response_input(prefix, true);
+            if (decoded.batched) throw new Error('prefix must be a single sequence for get_response_parser.');
+            prefix = decoded.values[0];
+        }
+        return new ResponseParser(response_template, { prefix, tools });
+    }
+
+    _decode_response_input(value, stringsAreBatch) {
+        if (typeof value === 'string') return { values: [value], batched: false };
+        if (value instanceof Tensor) {
+            if (value.dims.length === 1 || (value.dims.length === 2 && value.dims[0] === 1)) {
+                return { values: [this.decode(value)], batched: false };
+            }
+            if (value.dims.length === 2) return { values: this.batch_decode(value), batched: true };
+            throw new Error(`Expected response input to have 1-2 dimensions, got ${value.dims.length}.`);
+        }
+        if (!Array.isArray(value)) throw new TypeError('Response input must be text or token IDs.');
+        if (value.length === 0) return { values: [], batched: stringsAreBatch };
+        if (typeof value[0] === 'string') return { values: value, batched: true };
+        if (isIntegralNumber(value[0])) return { values: [this.decode(value)], batched: false };
+        if (Array.isArray(value[0])) return { values: this.batch_decode(value), batched: true };
+        throw new TypeError('Response input must be text or token IDs.');
     }
 
     /**
