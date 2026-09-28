@@ -121,6 +121,28 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "chat input is not parsed automatically when a response template is configured",
+        async () => {
+          const previousTemplate = pipe.tokenizer.response_template;
+          pipe.tokenizer.response_template = {
+            defaults: { role: "assistant" },
+            fields: { content: { content: "text" } },
+          };
+          const spy = jest.spyOn(pipe.tokenizer, "parse_response");
+
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 3 });
+            expect(output).toEqual(chat_target);
+            expect(spy).not.toHaveBeenCalled();
+          } finally {
+            spy.mockRestore();
+            pipe.tokenizer.response_template = previousTemplate;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1

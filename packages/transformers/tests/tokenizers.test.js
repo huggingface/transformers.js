@@ -551,6 +551,32 @@ describe("Extra decoding tests", () => {
 });
 
 describe("Chat templates", () => {
+  it("should load and explicitly parse response templates", async () => {
+    const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
+    const response_template = {
+      defaults: { role: "assistant" },
+      fields: {
+        thinking: { open: "<think>", close: "</think>", content: "text" },
+        content: { content: "text" },
+      },
+    };
+    const configured = new tokenizer.constructor(tokenizer._tokenizerJSON, {
+      ...tokenizer.config,
+      response_template,
+    });
+
+    expect(configured.response_template).toBe(response_template);
+    expect(configured.parse_response("<think>still reasoning")).toEqual({
+      role: "assistant",
+      thinking: "still reasoning",
+    });
+    expect(configured.parse_response("<think>finished</think>answer")).toEqual({
+      role: "assistant",
+      thinking: "finished",
+      content: "answer",
+    });
+  });
+
   it("should generate a chat template", async () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");
 

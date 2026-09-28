@@ -20,6 +20,7 @@ import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
+import { parseResponse } from './utils/chat_parsing/index.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -303,6 +304,7 @@ export class PreTrainedTokenizer
             }
             this.chat_template = chat_template;
         }
+        this.response_template = tokenizerConfig.response_template ?? null;
         this._compiled_template_cache = new Map();
 
         const special_tokens = getSpecialTokens(this._tokenizer);
@@ -623,6 +625,24 @@ export class PreTrainedTokenizer
         }
 
         return this.decode_single(token_ids, decode_args);
+    }
+
+    /**
+     * Parse generated text into an assistant message using the tokenizer's response template.
+     * Parsing is best-effort: completed fields are parsed, current text fields contain the
+     * available text, and incomplete structured fields are omitted.
+     *
+     * @param {string} response Generated response text, which may be partial or complete.
+     * @param {Object} [options]
+     * @param {Object|null} [options.response_template=null] Template override. Defaults to `tokenizer.response_template`.
+     * @returns {Object} The parsed assistant message.
+     */
+    parse_response(response, { response_template = null } = {}) {
+        response_template ??= this.response_template;
+        if (response_template === null) {
+            throw new Error('This tokenizer does not have a response_template for parsing chat responses.');
+        }
+        return parseResponse(response, response_template);
     }
 
     /**
