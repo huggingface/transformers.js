@@ -576,6 +576,32 @@ describe("Chat templates", () => {
       thinking: "finished",
       content: "answer",
     });
+    expect(
+      configured.parse_response(["first", "second"], {
+        prefix: ["<assistant>", "history<assistant>"],
+      }),
+    ).toEqual([
+      { role: "assistant", content: "first" },
+      { role: "assistant", content: "second" },
+    ]);
+    expect(configured.parse_response(["first", "second"], { prefix: "<assistant>" })).toEqual([
+      { role: "assistant", content: "first" },
+      { role: "assistant", content: "second" },
+    ]);
+    expect(() => configured.parse_response(["first", "second"], { prefix: [""] })).toThrow("response and prefix batches must have the same length");
+
+    const parser = configured.get_response_parser({ prefix: "<assistant><think>" });
+    expect(parser.feed("still ")).toEqual({ role: "assistant", thinking: "still" });
+    expect(parser.feed("reasoning</think>answer")).toEqual({
+      role: "assistant",
+      thinking: "still reasoning",
+      content: "answer",
+    });
+    expect(parser.finalize()).toEqual({
+      role: "assistant",
+      thinking: "still reasoning",
+      content: "answer",
+    });
   });
 
   it("should generate a chat template", async () => {

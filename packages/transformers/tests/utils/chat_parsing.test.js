@@ -1,4 +1,4 @@
-import { parseResponse } from "../../src/utils/chat_parsing/index.js";
+import { parseResponse, ResponseParser } from "../../src/utils/chat_parsing/index.js";
 
 const gemma4Template = {
   defaults: { role: "assistant" },
@@ -90,6 +90,85 @@ describe("Response templates", () => {
       { role: "assistant", thinking: "I should answer." },
       { role: "assistant", thinking: "I should answer.", content: "Paris" },
     ]);
+  });
+
+  it("parses incremental chunks without reparsing accumulated text", () => {
+    const parser = new ResponseParser(gemma4Template, { prefix: "<|turn>model\n" });
+    expect(parser.feed("<|channel>thought\nI should")).toEqual({
+      role: "assistant",
+      thinking: "I should",
+    });
+    expect(parser.feed(" answer.<channel")).toEqual({
+      role: "assistant",
+      thinking: "I should answer.",
+    });
+    expect(parser.feed("|>Paris")).toEqual({
+      role: "assistant",
+      thinking: "I should answer.",
+      content: "Paris",
+    });
+    expect(parser.finalize()).toEqual({
+      role: "assistant",
+      thinking: "I should answer.",
+      content: "Paris",
+    });
+    expect(() => parser.feed("more")).toThrow("already finalized");
+    expect(() => parser.finalize()).toThrow("already finalized");
+  });
+
+  it("enforces required fields only when an incremental parser is finalized", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: { answer: { open: "<answer>", close: "</answer>", optional: false } },
+    };
+    const parser = new ResponseParser(template, { prefix: "" });
+    expect(parser.feed("")).toEqual({});
+    expect(() => parser.finalize()).toThrow("Required response_template fields missing from parsed output: answer");
+  });
+
+  it("does not commit growing regex captures at chunk boundaries", () => {
+    const parser = new ResponseParser(gemma4Template, { prefix: "<|turn>model\n" });
+    expect(parser.feed("<|tool_call>call:get_wea")).toEqual({ role: "assistant" });
+    expect(parser.feed('ther{city:<|"|>Paris<|"|>}<tool_call|>')).toEqual({
+      role: "assistant",
+      tool_calls: [
+        {
+          type: "function",
+          function: { name: "get_weather", arguments: { city: "Paris" } },
+        },
+      ],
+    });
+    expect(parser.finalize()).toEqual({
+      role: "assistant",
+      tool_calls: [
+        {
+          type: "function",
+          function: { name: "get_weather", arguments: { city: "Paris" } },
+        },
+      ],
+    });
+  });
+
+  it("returns immutable snapshots with structural sharing", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        items: { open: "<item>", close: "</item>", content: "json", repeats: true },
+      },
+    };
+    const parser = new ResponseParser(template, { prefix: "" });
+    const first = parser.feed('<item>{"value":1}</item>');
+    const second = parser.feed('<item>{"value":2}</item>');
+
+    expect(first).toEqual({ items: [{ value: 1 }] });
+    expect(second).toEqual({ items: [{ value: 1 }, { value: 2 }] });
+    expect(second.items).not.toBe(first.items);
+    expect(second.items[0]).toBe(first.items[0]);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.items)).toBe(true);
+    expect(Object.isFrozen(first.items[0])).toBe(true);
+    expect(() => (first.items[0].value = 3)).toThrow();
+    expect(parser.finalize()).toEqual(second);
   });
 
   it("omits incomplete structured fields until they close", () => {

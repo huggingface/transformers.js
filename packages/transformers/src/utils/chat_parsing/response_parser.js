@@ -18,52 +18,103 @@ import { findMatch, loadResponseTemplate, partialLiteralStart, truncatePastLastA
 export function parseResponse(text, responseTemplate, options) {
     const { prefix, partial = false } = options ?? {};
     if (typeof text !== 'string') throw new TypeError('parse_response expects a string.');
-    if (typeof prefix !== 'string') {
-        throw new TypeError('parse_response requires a string prefix. Pass an empty string to opt out.');
-    }
-    const parser = new ResponseParser(responseTemplate);
-    const responsePrefix = truncatePastLastAnchor(parser.spec.startAnchor, prefix);
-    parser.consume(responsePrefix + text, !partial);
-    return parser.snapshot(partial);
+    const parser = new ResponseParser(responseTemplate, { prefix });
+    const snapshot = parser.feed(text);
+    return partial ? snapshot : parser.finalize();
 }
 
-class ResponseParser {
-    constructor(responseTemplate) {
+export class ResponseParser {
+    /**
+     * @param {Object} responseTemplate Model-specific response format.
+     * @param {Object} options
+     * @param {string} options.prefix Full chat prompt sent to the model. Pass an empty string to opt out.
+     */
+    constructor(responseTemplate, options) {
+        const { prefix } = options ?? {};
+        if (typeof prefix !== 'string') {
+            throw new TypeError('ResponseParser requires a string prefix. Pass an empty string to opt out.');
+        }
         this.spec = loadResponseTemplate(responseTemplate);
         this.output = clone(this.spec.defaults);
+        for (const value of Object.values(this.output)) deepFreeze(value);
         this.current = this.spec.implicit;
         this.captures = {};
         this.body = null;
         this.position = 0;
+        this.buffer = truncatePastLastAnchor(this.spec.startAnchor, prefix);
+        this.finalized = false;
+        this.process(false);
     }
 
-    consume(text, final) {
+    /**
+     * Parse the next decoded text chunk and return the current partial message.
+     * @param {string} text Newly decoded text. Do not pass previously consumed text again.
+     * @returns {Object.<string, *>}
+     */
+    feed(text) {
+        if (this.finalized) throw new Error('ResponseParser is already finalized.');
+        if (typeof text !== 'string') throw new TypeError('ResponseParser.feed expects a string.');
+        this.buffer += text;
+        this.process(false);
+        return this.snapshot(true);
+    }
+
+    /**
+     * Finish parsing, resolve end-of-input anchors, and validate required fields.
+     * @returns {Object.<string, *>}
+     */
+    finalize() {
+        if (this.finalized) throw new Error('ResponseParser is already finalized.');
+        this.process(true);
+        const output = this.snapshot(false);
+        this.finalized = true;
+        return output;
+    }
+
+    process(final) {
         while (true) {
             const watch = this.watchlist();
             let best = null;
+            let pendingStart = this.buffer.length;
             for (const item of watch) {
                 const anchor = item.kind === 'open' ? item.field.open : item.field.close;
-                const match = findMatch(anchor, text, this.position, final && item.kind === 'close');
+                const match = findMatch(anchor, this.buffer, this.position, final && item.kind === 'close');
+                if (!final && anchor.pattern) {
+                    const prefix = anchor.partialPrefixes[0];
+                    const prefixStart = prefix ? this.buffer.indexOf(prefix, this.position) : -1;
+                    if (prefixStart >= 0 && (!match || prefixStart < match.start || match.end === this.buffer.length)) {
+                        pendingStart = Math.min(pendingStart, prefixStart);
+                    }
+                    if (match?.end === this.buffer.length) {
+                        pendingStart = Math.min(pendingStart, match.start);
+                        continue;
+                    }
+                }
                 if (!match) continue;
                 const candidate = { ...item, match };
                 if (!best || compareCandidates(candidate, best) < 0) best = candidate;
             }
 
+            if (best && best.match.start >= pendingStart) best = null;
+
             if (!best) {
                 const holdStart = final
-                    ? text.length
-                    : partialLiteralStart(
-                          watch.map((item) => (item.kind === 'open' ? item.field.open : item.field.close)),
-                          text,
-                          this.position,
+                    ? this.buffer.length
+                    : Math.min(
+                          pendingStart,
+                          partialLiteralStart(
+                              watch.map((item) => (item.kind === 'open' ? item.field.open : item.field.close)),
+                              this.buffer,
+                              this.position,
+                          ),
                       );
-                this.accumulate(text.slice(this.position, holdStart));
+                this.accumulate(this.buffer.slice(this.position, holdStart));
                 this.position = holdStart;
                 if (final) this.closeCurrent();
                 break;
             }
 
-            this.accumulate(text.slice(this.position, best.match.start));
+            this.accumulate(this.buffer.slice(this.position, best.match.start));
             this.position = best.match.end;
             if (best.kind === 'open') {
                 this.closeCurrent();
@@ -78,7 +129,7 @@ class ResponseParser {
     }
 
     snapshot(partial) {
-        const output = clone(this.output);
+        const output = { ...this.output };
         if (partial && this.current !== null && this.body !== null) {
             const field = this.spec.fields[this.current];
             if (STREAMABLE_PARSERS.has(field.content) || field.close === null) {
@@ -99,7 +150,7 @@ class ResponseParser {
         for (const [key, value] of Object.entries(output)) {
             if (!Object.hasOwn(this.spec.defaults, key) && isEmpty(value)) delete output[key];
         }
-        return output;
+        return Object.freeze(output);
     }
 
     watchlist() {
@@ -142,10 +193,10 @@ class ResponseParser {
                 Object.hasOwn(output, field.name) ? output[field.name] + field.join + value : value,
             );
         } else if (field.repeats) {
-            if (!Object.hasOwn(output, field.name)) setOwn(output, field.name, []);
-            output[field.name].push(value);
+            const previous = Object.hasOwn(output, field.name) ? output[field.name] : [];
+            setOwn(output, field.name, Object.freeze([...previous, deepFreeze(value)]));
         } else {
-            setOwn(output, field.name, value);
+            setOwn(output, field.name, deepFreeze(value));
         }
     }
 }
@@ -173,6 +224,14 @@ function clone(value) {
     if (Array.isArray(value)) return value.map(clone);
     if (value !== null && typeof value === 'object') {
         return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
+    }
+    return value;
+}
+
+function deepFreeze(value) {
+    if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+        for (const item of Object.values(value)) deepFreeze(item);
+        Object.freeze(value);
     }
     return value;
 }

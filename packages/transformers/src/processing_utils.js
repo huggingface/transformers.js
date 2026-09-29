@@ -124,6 +124,30 @@ export class Processor extends Callable {
     }
 
     /**
+     * Parse generated assistant text via the underlying tokenizer.
+     * @param {Parameters<PreTrainedTokenizer['parse_response']>} args
+     * @returns {ReturnType<PreTrainedTokenizer['parse_response']>}
+     */
+    parse_response(...args) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to parse response without a tokenizer.');
+        }
+        return this.tokenizer.parse_response(...args);
+    }
+
+    /**
+     * Create an incremental response parser via the underlying tokenizer.
+     * @param {Parameters<PreTrainedTokenizer['get_response_parser']>} args
+     * @returns {ReturnType<PreTrainedTokenizer['get_response_parser']>}
+     */
+    get_response_parser(...args) {
+        if (!this.tokenizer) {
+            throw new Error('Unable to create a response parser without a tokenizer.');
+        }
+        return this.tokenizer.get_response_parser(...args);
+    }
+
+    /**
      * Calls the feature_extractor function with the given input.
      * @param {any} input The input to extract features from.
      * @param {...any} args Additional arguments.

@@ -20,7 +20,7 @@ import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
-import { parseResponse } from './utils/chat_parsing/index.js';
+import { parseResponse, ResponseParser } from './utils/chat_parsing/index.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -632,12 +632,13 @@ export class PreTrainedTokenizer
      * Completed responses are validated against required fields. Pass `partial: true` for
      * accumulated generation, where incomplete structured fields and missing required fields are omitted.
      *
-     * @param {string} response Generated response text, which may be partial or complete.
+     * @template {string|string[]} T
+     * @param {T} response Generated response text, which may be partial or complete.
      * @param {Object} options
-     * @param {string} options.prefix Chat prompt sent to the model. Pass an empty string when the response contains the complete message.
+     * @param {string|string[]} options.prefix Chat prompt sent to the model. A string prefix is broadcast across a response batch.
      * @param {boolean} [options.partial=false] Whether the response is an incomplete generation snapshot.
      * @param {Object|null} [options.response_template=null] Template override. Defaults to `tokenizer.response_template`.
-     * @returns {Object} The parsed assistant message.
+     * @returns {T extends string ? Object : Object[]} The parsed assistant message or messages.
      */
     parse_response(response, options) {
         const { prefix, partial = false, response_template: templateOverride = null } = options ?? {};
@@ -646,7 +647,37 @@ export class PreTrainedTokenizer
         if (response_template === null) {
             throw new Error('This tokenizer does not have a response_template for parsing chat responses.');
         }
-        return parseResponse(response, response_template, { prefix, partial });
+        if (!Array.isArray(response)) {
+            if (Array.isArray(prefix)) throw new TypeError('prefix must be a string when response is a string.');
+            return /** @type {any} */ (parseResponse(response, response_template, { prefix, partial }));
+        }
+        if (Array.isArray(prefix) && prefix.length !== response.length) {
+            throw new Error('response and prefix batches must have the same length.');
+        }
+        return /** @type {any} */ (
+            response.map((text, index) =>
+                parseResponse(text, response_template, {
+                    prefix: Array.isArray(prefix) ? prefix[index] : prefix,
+                    partial,
+                }),
+            )
+        );
+    }
+
+    /**
+     * Create an explicit incremental parser for one generated response.
+     * @param {Object} options
+     * @param {string} options.prefix Chat prompt sent to the model. Pass an empty string to opt out.
+     * @param {Object|null} [options.response_template=null] Template override. Defaults to `tokenizer.response_template`.
+     * @returns {ResponseParser}
+     */
+    get_response_parser(options) {
+        const { prefix, response_template: templateOverride = null } = options ?? {};
+        const response_template = templateOverride ?? this.response_template;
+        if (response_template === null) {
+            throw new Error('This tokenizer does not have a response_template for parsing chat responses.');
+        }
+        return new ResponseParser(response_template, { prefix });
     }
 
     /**

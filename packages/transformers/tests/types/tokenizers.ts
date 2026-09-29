@@ -3,6 +3,7 @@ import type {
   BatchEncoding,
 } from "../../src/tokenization_utils.js";
 import type { Tensor } from "../../src/utils/tensor.js";
+import type { ResponseParser } from "../../src/utils/chat_parsing/response_parser.js";
 
 import type { Expect, Equal, ExpectError } from "./_base.ts";
 
@@ -90,4 +91,15 @@ type IsAssignable<T, U> = T extends U ? true : false;
     return_dict: false,
   });
   type T1 = Expect<Equal<typeof output, number[]>>;
+}
+
+// Response parsing preserves batch shape and exposes an incremental parser.
+{
+  const output = tokenizer.parse_response(["first", "second"], { prefix: "" });
+  type T0 = Expect<Equal<typeof output, Object[]>>;
+}
+
+{
+  const parser = tokenizer.get_response_parser({ prefix: "" });
+  type T0 = Expect<Equal<typeof parser, ResponseParser>>;
 }
