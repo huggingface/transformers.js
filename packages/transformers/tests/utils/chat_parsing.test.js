@@ -32,7 +32,61 @@ const gemma4Template = {
 
 const parseGemma4 = (text, options = {}) => parseResponse(text, gemma4Template, { prefix: "<|turn>model\n", ...options });
 
+// onnx-community/granite-4.0-micro-ONNX
+const granite4Template = {
+  defaults: { role: "assistant" },
+  start_anchor: "<|start_of_role|>assistant<|end_of_role|>",
+  fields: {
+    thinking: { open: "<think>", close: "</think>", content: "text" },
+    tool_calls: {
+      open: "<tool_call>",
+      close: "</tool_call>",
+      repeats: true,
+      content: "json",
+      transform: { type: "function", function: "{content}" },
+    },
+    content: { close: "<|end_of_text|>", content: "text" },
+  },
+};
+
+// onnx-community/LFM2.5-350M-ONNX
+const lfm25Template = {
+  defaults: { role: "assistant" },
+  start_anchor: "<|im_start|>assistant\n",
+  fields: {
+    thinking: { open: "<think>", close: "</think>", content: "text" },
+    content: { close: "<|im_end|>", content: "text" },
+  },
+};
+
 describe("Response templates", () => {
+  it("parses onnx-community/granite-4.0-micro-ONNX responses", () => {
+    const prefix = "<|start_of_role|>user<|end_of_role|>What is the weather?<|end_of_text|>\n" + "<|start_of_role|>assistant<|end_of_role|>";
+    const response = '<think>Use the weather tool.</think><tool_call>\n{"name":"get_weather","arguments":{"city":"Paris"}}\n</tool_call><|end_of_text|>';
+
+    expect(parseResponse(response, granite4Template, { prefix })).toEqual({
+      role: "assistant",
+      thinking: "Use the weather tool.",
+      tool_calls: [
+        {
+          type: "function",
+          function: { name: "get_weather", arguments: { city: "Paris" } },
+        },
+      ],
+    });
+  });
+
+  it("parses onnx-community/LFM2.5-350M-ONNX responses", () => {
+    const prefix = "<|startoftext|><|im_start|>user\nWhat is the capital of France?<|im_end|>\n<|im_start|>assistant\n";
+    const response = "<think>I should answer directly.</think>Paris.<|im_end|>";
+
+    expect(parseResponse(response, lfm25Template, { prefix })).toEqual({
+      role: "assistant",
+      thinking: "I should answer directly.",
+      content: "Paris.",
+    });
+  });
+
   it("parses a complete thinking response", () => {
     expect(parseGemma4("<|channel>thought\nI should answer briefly.<channel|>Paris<turn|>")).toEqual({
       role: "assistant",
