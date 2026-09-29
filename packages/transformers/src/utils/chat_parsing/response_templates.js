@@ -115,7 +115,7 @@ export function findMatch(anchor, text, position, allowZeroWidth = false) {
     } else {
         anchor.pattern.lastIndex = position;
         const match = anchor.pattern.exec(text);
-        if (match && (match[0].length || (allowZeroWidth && match.index === text.length))) {
+        if (match && (match[0].length || allowZeroWidth)) {
             best = { start: match.index, end: match.index + match[0].length, groups: match.groups ?? {} };
         }
     }

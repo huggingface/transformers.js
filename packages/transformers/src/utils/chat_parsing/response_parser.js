@@ -72,15 +72,23 @@ export class ResponseParser {
     }
 
     process(final) {
+        const handledZeroWidth = new Map();
         while (true) {
             const watch = this.watchlist();
             let best = null;
             let pendingStart = this.buffer.length;
             for (const item of watch) {
                 const anchor = item.kind === 'open' ? item.field.open : item.field.close;
-                const match = findMatch(anchor, this.buffer, this.position, final && item.kind === 'close');
+                const match = findMatch(anchor, this.buffer, this.position, item.kind === 'close');
+                if (match && match.start === match.end && handledZeroWidth.get(anchor) === match.start) continue;
                 if (!final && anchor.pattern) {
                     const prefix = anchor.partialPrefixes[0];
+                    if (!prefix) {
+                        if (!match || match.start > this.position || match.end === this.buffer.length) {
+                            pendingStart = Math.min(pendingStart, this.position);
+                            continue;
+                        }
+                    }
                     const prefixStart = prefix ? this.buffer.indexOf(prefix, this.position) : -1;
                     if (prefixStart >= 0 && (!match || prefixStart < match.start || match.end === this.buffer.length)) {
                         pendingStart = Math.min(pendingStart, prefixStart);
@@ -91,7 +99,11 @@ export class ResponseParser {
                     }
                 }
                 if (!match) continue;
-                const candidate = { ...item, match };
+                if (!final && literalMatchCanExtend(anchor, this.buffer, match)) {
+                    pendingStart = Math.min(pendingStart, match.start);
+                    continue;
+                }
+                const candidate = { ...item, anchor, match };
                 if (!best || compareCandidates(candidate, best) < 0) best = candidate;
             }
 
@@ -123,7 +135,7 @@ export class ResponseParser {
                 this.body = '';
             } else {
                 this.closeCurrent();
-                if (best.match.start === best.match.end) break;
+                if (best.match.start === best.match.end) handledZeroWidth.set(best.anchor, best.match.start);
             }
         }
     }
@@ -199,6 +211,12 @@ export class ResponseParser {
             setOwn(output, field.name, deepFreeze(value));
         }
     }
+}
+
+function literalMatchCanExtend(anchor, text, match) {
+    if (!anchor.literals) return false;
+    const available = text.slice(match.start);
+    return anchor.literals.some((literal) => literal.length > available.length && literal.startsWith(available));
 }
 
 function compareCandidates(a, b) {

@@ -59,6 +59,16 @@ const lfm25Template = {
   },
 };
 
+function expectAllChunkSplitsToMatch(text, template, expected) {
+  expect(parseResponse(text, template, { prefix: "" })).toEqual(expected);
+  for (let split = 0; split <= text.length; ++split) {
+    const parser = new ResponseParser(template, { prefix: "" });
+    parser.feed(text.slice(0, split));
+    parser.feed(text.slice(split));
+    expect(parser.finalize()).toEqual(expected);
+  }
+}
+
 describe("Response templates", () => {
   it("parses onnx-community/granite-4.0-micro-ONNX responses", () => {
     const prefix = "<|start_of_role|>user<|end_of_role|>What is the weather?<|end_of_text|>\n" + "<|start_of_role|>assistant<|end_of_role|>";
@@ -375,6 +385,60 @@ describe("Response templates", () => {
     };
     expect(parseResponse('<json>{"city":"Paris"}', template, { prefix: "" })).toEqual({
       data: { city: "Paris" },
+    });
+  });
+
+  it("parses prefixless regex delimiters independently of chunk boundaries", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        region: { open_pattern: String.raw`(?:<tool>|<call>)`, close: "</region>" },
+        content: { content: "text" },
+      },
+    };
+    expectAllChunkSplitsToMatch("<tool>value</region>tail", template, {
+      region: "value",
+      content: "tail",
+    });
+  });
+
+  it("prefers longer literal delimiters independently of chunk boundaries", () => {
+    const openerTemplate = {
+      start_anchor: "<assistant>",
+      fields: {
+        region: { open: ["<x>", "<x>long"], close: "</x>" },
+        content: { content: "text" },
+      },
+    };
+    expectAllChunkSplitsToMatch("<x>longvalue</x>tail", openerTemplate, {
+      region: "value",
+      content: "tail",
+    });
+
+    const closerTemplate = {
+      start_anchor: "<assistant>",
+      fields: {
+        region: { open: "<x>", close: ["</x>", "</x>long"] },
+        content: { content: "text" },
+      },
+    };
+    expectAllChunkSplitsToMatch("<x>value</x>longtail", closerTemplate, {
+      region: "value",
+      content: "tail",
+    });
+  });
+
+  it("supports zero-width close patterns away from end of input", () => {
+    const template = {
+      start_anchor: "<assistant>",
+      fields: {
+        region: { open: "<x>", close_pattern: "(?=END)" },
+        content: { content: "text" },
+      },
+    };
+    expectAllChunkSplitsToMatch("<x>valueENDtail", template, {
+      region: "value",
+      content: "ENDtail",
     });
   });
 
