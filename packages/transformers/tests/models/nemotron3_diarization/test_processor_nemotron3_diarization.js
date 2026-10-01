@@ -31,7 +31,7 @@ export default () => {
         expect(processor).toBeInstanceOf(Nemotron3DiarizationProcessor);
         expect(processor.streaming_mode).toBe("low_latency");
         expect(Object.keys(processor.streaming_modes).sort()).toEqual(["low_latency", "ultra_low_latency", "very_low_latency"]);
-        expect(() => processor.set_streaming_mode("offline")).toThrow();
+        expect(() => processor.set_streaming_mode("offline")).toThrow('Unknown `streaming_mode` "offline"');
 
         const expected = {
           low_latency: [1040, 104, 72, 16680, 17040, 11264],
@@ -55,8 +55,8 @@ export default () => {
         // Offline outputs are the features alone
         const offline = await processor(audio);
         expect(Object.keys(offline).sort()).toEqual(["attention_mask", "input_features"]);
-        await expect(processor(audio, { is_first_audio_chunk: false })).rejects.toThrow();
-        await expect(processor(audio, { is_last_audio_chunk: true })).rejects.toThrow();
+        await expect(processor(audio, { is_first_audio_chunk: false })).rejects.toThrow("In non-streaming mode");
+        await expect(processor(audio, { is_last_audio_chunk: true })).rejects.toThrow("In non-streaming mode");
 
         // Every streaming chunk but the last carries `num_lookahead_frames`, the chunk sizes following the mode
         processor.set_streaming_mode("very_low_latency");
@@ -70,7 +70,7 @@ export default () => {
         expect(later.input_features.dims).toEqual([1, 104, 128]);
 
         // A chunk of the wrong size is rejected unless it is the last one
-        await expect(processor(audio.subarray(0, 16000), { is_streaming: true })).rejects.toThrow();
+        await expect(processor(audio.subarray(0, 16000), { is_streaming: true })).rejects.toThrow("A `low_latency` chunk must hold 104 mel frames, got 100");
         const last = await processor(audio.subarray(0, 16000), { is_streaming: true, is_first_audio_chunk: false, is_last_audio_chunk: true });
         expect(last.num_lookahead_frames).toBeUndefined();
         expect(last.input_features.dims).toEqual([1, 97, 128]);

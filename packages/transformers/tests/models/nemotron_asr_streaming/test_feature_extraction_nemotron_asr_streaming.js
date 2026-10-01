@@ -95,7 +95,7 @@ export default () => {
     it(
       "uncentered windows need at least n_fft samples",
       async () => {
-        await expect(feature_extractor(new Float32Array(511), { center: false })).rejects.toThrow();
+        await expect(feature_extractor(new Float32Array(511), { center: false })).rejects.toThrow("Uncentered feature extraction needs at least `n_fft` (512) audio samples, got 511.");
       },
       MAX_TEST_EXECUTION_TIME,
     );

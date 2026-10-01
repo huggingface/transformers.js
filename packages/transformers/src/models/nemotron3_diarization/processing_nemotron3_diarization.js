@@ -2,6 +2,7 @@ import { AutoFeatureExtractor } from '../auto/feature_extraction_auto.js';
 import { Processor } from '../../processing_utils.js';
 import { Tensor } from '../../utils/tensor.js';
 import { validate_audio_inputs } from '../../feature_extraction_utils.js';
+import { round } from '../../utils/maths.js';
 
 /**
  * Streaming modes of the released checkpoint: name to `[chunk_length, chunk_right_context]` in encoder frames.
@@ -11,15 +12,6 @@ const DEFAULT_STREAMING_MODES = Object.freeze({
     very_low_latency: [6, 2], // 0.64 s
     ultra_low_latency: [3, 1], // 0.32 s
 });
-
-/**
- * Rounds a number to the given number of decimals, like Python's `round`.
- * @param {number} x
- * @param {number} decimals
- */
-function round(x, decimals) {
-    return Number(x.toFixed(decimals));
-}
 
 /**
  * @typedef {Object} SpeakerSegment

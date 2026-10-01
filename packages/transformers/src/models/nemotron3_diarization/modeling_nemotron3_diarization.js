@@ -52,7 +52,7 @@ export class Nemotron3DiarizationSpeakerCache {
      * @param {number} [options.speaker_cache_update_period] Number of encoder frames moved from the FIFO queue to the
      * speaker cache when the queue overflows. Defaults to `config.speaker_cache_update_period`.
      */
-    constructor(config, { fifo_length = undefined, speaker_cache_update_period = undefined } = {}) {
+    constructor(config, { fifo_length, speaker_cache_update_period } = {}) {
         this.fifo_length = fifo_length ?? config.fifo_length;
         this.speaker_cache_update_period = speaker_cache_update_period ?? config.speaker_cache_update_period;
         this.speaker_cache_length = config.speaker_cache_length;
@@ -77,8 +77,6 @@ export class Nemotron3DiarizationSpeakerCache {
         this.frames = null;
         /** @type {Float32Array} Speaker probabilities of the cache frames, `[batch_size, speaker_cache_length, num_speakers]`. */
         this.probs = null;
-        /** @type {Float32Array} Scratch buffer of the frames kept by a compression, `[speaker_cache_length, hidden_size]`. */
-        this._kept_frames = null;
         this.batch_size = 0;
         this.hidden_size = 0;
         this.capacity = 0;
@@ -96,7 +94,6 @@ export class Nemotron3DiarizationSpeakerCache {
         this.batch_size = batch_size;
         this.hidden_size = hidden_size;
         this.probs = new Float32Array(batch_size * this.speaker_cache_length * this.num_speakers);
-        this._kept_frames = new Float32Array(this.speaker_cache_length * hidden_size);
         this._reserve(this.speaker_cache_length + this.fifo_length);
         this.is_initialized = true;
     }
@@ -356,7 +353,7 @@ export class Nemotron3DiarizationSpeakerCache {
         // `speaker_cache_length` pairs score above `-Infinity` hold the silence embedding too.
         const kept = topk_indices(scores, speaker_cache_length);
         const silence_data = /** @type {Float32Array} */ (silence_embeds.data);
-        const kept_frames = this._kept_frames;
+        const kept_frames = new Float32Array(speaker_cache_length * hidden_size);
         const kept_probs = new Float32Array(speaker_cache_length * num_speakers);
         for (let i = 0; i < speaker_cache_length; ++i) {
             const t = i < kept.length ? kept[i] % num_scored_frames : num_frames;
@@ -403,7 +400,7 @@ export class Nemotron3DiarizationPreTrainedModel extends PreTrainedModel {}
  * **Example:** Offline speaker diarization of a whole recording.
  *
  * ```javascript
- * import { AutoProcessor, AutoModelForAudioFrameClassification, load_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModelForAudioFrameClassification, load_audio, cat } from '@huggingface/transformers';
  *
  * const model_id = 'onnx-community/Nemotron-3-Diarization-ONNX';
  * const processor = await AutoProcessor.from_pretrained(model_id);
@@ -415,7 +412,7 @@ export class Nemotron3DiarizationPreTrainedModel extends PreTrainedModel {}
  * const inputs = await processor(audio);
  * const { logits } = await model(inputs); // [1, num_frames, 8], one frame every 10 ms
  * const segments = processor.extract_speaker_dict(logits, inputs.attention_mask)[0];
- * // [{ Start: 0.36, End: 9.31, Speaker: 0 }, { Start: 9.17, End: 13.83, Speaker: 1 }, ...]
+ * // [{ Start: 0.35, End: 9.31, Speaker: 0 }, { Start: 9.15, End: 13.81, Speaker: 1 }, ...]
  * ```
  *
  * **Example:** Streaming speaker diarization, one audio chunk at a time.
@@ -445,6 +442,7 @@ export class Nemotron3DiarizationPreTrainedModel extends PreTrainedModel {}
  *   speaker_cache = outputs.speaker_cache;
  * }
  * const segments = processor.extract_speaker_dict(cat(logits, 1))[0];
+ * // [{ Start: 0.36, End: 9.31, Speaker: 0 }, { Start: 9.17, End: 13.83, Speaker: 1 }, ...]
  * ```
  */
 export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3DiarizationPreTrainedModel {
@@ -499,7 +497,7 @@ export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3Di
             const mask_data = attention_mask.data;
             for (let b = 0; b < batch_size; ++b) {
                 for (let t = 0; t < num_embeds; ++t) {
-                    embed_mask[b * num_embeds + t] = Number(mask_data[b * num_frames + t * factor]) ? 1n : 0n;
+                    embed_mask[b * num_embeds + t] = mask_data[b * num_frames + t * factor] ? 1n : 0n;
                 }
             }
         }

@@ -210,9 +210,9 @@ export default () => {
       "rejects an invalid look-ahead",
       async () => {
         const input_features = make_features(1, 256, 128);
-        await expect(model({ input_features, num_lookahead_frames: -1 })).rejects.toThrow();
+        await expect(model({ input_features, num_lookahead_frames: -1 })).rejects.toThrow("`num_lookahead_frames` (-1) must be between 0 and one less than the number of encoder frames of the input (32).");
         // nothing but look-ahead
-        await expect(model({ input_features: input_features.slice(null, [0, 8], null), num_lookahead_frames: 1 })).rejects.toThrow();
+        await expect(model({ input_features: input_features.slice(null, [0, 8], null), num_lookahead_frames: 1 })).rejects.toThrow("`num_lookahead_frames` (1) must be between 0 and one less than the number of encoder frames of the input (1).");
       },
       MAX_TEST_EXECUTION_TIME,
     );
