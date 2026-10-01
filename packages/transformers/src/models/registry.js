@@ -519,6 +519,7 @@ const MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['wavlm', 'WavLMForAudioFrameClassification'],
     ['wav2vec2', 'Wav2Vec2ForAudioFrameClassification'],
     ['pyannote', 'PyAnnoteForAudioFrameClassification'],
+    ['nemotron3_diarization', 'Nemotron3DiarizationForAudioFrameClassification'],
 ]);
 
 const MODEL_FOR_IMAGE_MATTING_MAPPING_NAMES = new Map([['vitmatte', 'VitMatteForImageMatting']]);
