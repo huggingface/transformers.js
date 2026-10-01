@@ -58,6 +58,65 @@ export class Nemotron3DiarizationProcessor extends Processor {
     }
 
     /**
+     * Extracts the model inputs of a whole recording, or of one chunk of a streaming session.
+     *
+     * @param {Float32Array|Float64Array} audio The audio waveform, sampled at `feature_extractor.config.sampling_rate`.
+     * @param {Object} [options]
+     * @param {boolean} [options.is_streaming=false] Whether the audio is one chunk of a streaming session,
+     * `is_first_audio_chunk` and `is_last_audio_chunk` telling the first and the last chunks from the others. The chunk
+     * sizes are those of `streaming_mode`, changed with `set_streaming_mode`. Every chunk but the last must hold
+     * exactly `num_samples_first_audio_chunk` audio samples for the first one and `num_samples_per_audio_chunk` for the
+     * later ones.
+     * @param {boolean} [options.is_first_audio_chunk=true] Whether this is the first chunk of a streaming session. The
+     * feature extractor centers the analysis windows (`center=true`) for the first chunk and for offline use, and does
+     * not (`center=false`) for the later chunks, so that the per-chunk spectrogram reproduces, frame for frame, a single
+     * full-utterance pass. Must be `true` when `is_streaming=false`.
+     * @param {boolean} [options.is_last_audio_chunk=false] Whether this chunk ends the streaming session. A chunk of a
+     * session ends with `chunk_right_context` look-ahead encoder frames that the model scores at the next step only, and
+     * that its next chunk opens with. The last chunk has no next step, so every one of its frames is scored, whatever
+     * their number, and its end is zero-padded as a full-utterance pass pads the end of the audio, so that it yields the
+     * last frames of the utterance. Must be `false` when `is_streaming=false`.
+     * @returns {Promise<{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }>} The feature
+     * extractor outputs, `input_features` and `attention_mask`. In streaming mode the trailing frames whose analysis
+     * window reaches past a chunk other than the last are dropped, so `input_features` holds exactly the frames of the
+     * chunk and can be passed to the model as is, and every chunk but the last also carries `num_lookahead_frames`, the
+     * number of its trailing look-ahead encoder frames, which puts the model in streaming mode.
+     */
+    async _call(audio, { is_streaming = false, is_first_audio_chunk = true, is_last_audio_chunk = false } = {}) {
+        validate_audio_inputs(audio, 'Nemotron3DiarizationProcessor');
+
+        if (!is_streaming && (!is_first_audio_chunk || is_last_audio_chunk)) {
+            throw new Error(
+                'In non-streaming mode (`is_streaming=false`), `is_first_audio_chunk` must be `true` and ' +
+                    '`is_last_audio_chunk` must be `false`.',
+            );
+        }
+
+        /** @type {{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }} */
+        const inputs = await this.feature_extractor(audio, { center: is_first_audio_chunk, is_last_audio_chunk });
+        if (is_streaming) {
+            const mask_data = /** @type {BigInt64Array} */ (inputs.attention_mask.data);
+            const num_frames = Number(mask_data.reduce((a, b) => a + b, 0n));
+            inputs.input_features = inputs.input_features.slice(null, [0, num_frames], null);
+            inputs.attention_mask = inputs.attention_mask.slice(null, [0, num_frames]);
+            if (!is_last_audio_chunk) {
+                const expected_num_frames = this.num_mel_frames_per_audio_chunk;
+                if (num_frames !== expected_num_frames) {
+                    const which = is_first_audio_chunk
+                        ? 'num_samples_first_audio_chunk'
+                        : 'num_samples_per_audio_chunk';
+                    throw new Error(
+                        `A \`${this.streaming_mode}\` chunk must hold ${expected_num_frames} mel frames, got ${num_frames}: ` +
+                            `feed \`${which}\` audio samples, or pass \`is_last_audio_chunk=true\` for the last chunk of the session.`,
+                    );
+                }
+                inputs.num_lookahead_frames = this._streaming_chunk_sizes[1];
+            }
+        }
+        return inputs;
+    }
+
+    /**
      * `[chunk_length, chunk_right_context]` of the streaming mode, in encoder frames.
      * @type {[number, number]}
      * @private
@@ -118,78 +177,6 @@ export class Nemotron3DiarizationProcessor extends Processor {
     }
 
     /**
-     * First audio sample of the chunk starting at `mel_frame_idx`. An uncentered window starts half a transform
-     * before the frame it belongs to, so a chunk starts `n_fft / 2` samples before its first frame.
-     * @param {number} mel_frame_idx The index of the first mel frame of the chunk.
-     * @returns {number} The index of the first audio sample of the chunk.
-     */
-    audio_chunk_start(mel_frame_idx) {
-        const { hop_length, n_fft } = this.feature_extractor.config;
-        return mel_frame_idx * hop_length - Math.floor(n_fft / 2);
-    }
-
-    /**
-     * Extracts the model inputs of a whole recording, or of one chunk of a streaming session.
-     *
-     * In streaming mode, the trailing frames whose analysis window reaches past a chunk other than the last are
-     * dropped, so `input_features` holds exactly the frames of the chunk, and every chunk but the last also carries
-     * `num_lookahead_frames`, the number of its trailing look-ahead encoder frames, which puts the model in
-     * streaming mode.
-     *
-     * @param {Float32Array|Float64Array} audio The audio waveform, sampled at `feature_extractor.config.sampling_rate`.
-     * @param {Object} [options]
-     * @param {boolean} [options.is_streaming=false] Whether the audio is one chunk of a streaming session. Every chunk
-     * but the last must hold exactly `num_samples_first_audio_chunk` audio samples for the first one and
-     * `num_samples_per_audio_chunk` for the later ones.
-     * @param {boolean} [options.is_first_audio_chunk=true] Whether this is the first chunk of a streaming session.
-     * The analysis windows are centered for the first chunk and for offline use, and not for the later chunks, so that
-     * the per-chunk spectrogram reproduces, frame for frame, a single full-utterance pass. Must be `true` when
-     * `is_streaming=false`.
-     * @param {boolean} [options.is_last_audio_chunk=false] Whether this chunk ends the streaming session. The last chunk
-     * has no look-ahead, so every one of its frames is scored, whatever their number, and its end is zero-padded as a
-     * full-utterance pass pads the end of the audio, so that it yields the last frames of the utterance. Must be
-     * `false` when `is_streaming=false`.
-     * @returns {Promise<{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }>}
-     */
-    async _call(audio, { is_streaming = false, is_first_audio_chunk = true, is_last_audio_chunk = false } = {}) {
-        validate_audio_inputs(audio, 'Nemotron3DiarizationProcessor');
-
-        if (!is_streaming && (!is_first_audio_chunk || is_last_audio_chunk)) {
-            throw new Error(
-                'In non-streaming mode (`is_streaming=false`), `is_first_audio_chunk` must be `true` and ' +
-                    '`is_last_audio_chunk` must be `false`.',
-            );
-        }
-
-        /** @type {{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }} */
-        const outputs = await this.feature_extractor(audio, { center: is_first_audio_chunk, is_last_audio_chunk });
-        if (!is_streaming) {
-            return outputs;
-        }
-
-        // Drop the trailing frames whose analysis window reaches past the chunk (the valid frames come first)
-        const mask_data = /** @type {BigInt64Array} */ (outputs.attention_mask.data);
-        const first_padding_frame = mask_data.indexOf(0n);
-        const num_frames = first_padding_frame === -1 ? mask_data.length : first_padding_frame;
-        if (num_frames < mask_data.length) {
-            outputs.input_features = outputs.input_features.slice(null, [0, num_frames], null);
-            outputs.attention_mask = outputs.attention_mask.slice(null, [0, num_frames]);
-        }
-        if (!is_last_audio_chunk) {
-            const expected_num_frames = this.num_mel_frames_per_audio_chunk;
-            if (num_frames !== expected_num_frames) {
-                const which = is_first_audio_chunk ? 'num_samples_first_audio_chunk' : 'num_samples_per_audio_chunk';
-                throw new Error(
-                    `A \`${this.streaming_mode}\` chunk must hold ${expected_num_frames} mel frames, got ${num_frames}: ` +
-                        `feed \`${which}\` audio samples, or pass \`is_last_audio_chunk=true\` for the last chunk of the session.`,
-                );
-            }
-            outputs.num_lookahead_frames = this._streaming_chunk_sizes[1];
-        }
-        return outputs;
-    }
-
-    /**
      * Turns the per-frame speaker logits of `Nemotron3DiarizationForAudioFrameClassification` into speech segments.
      *
      * @param {Tensor} logits Logits returned by the model, of shape `[batch_size, num_frames, num_speakers]`, at the
@@ -235,5 +222,16 @@ export class Nemotron3DiarizationProcessor extends Processor {
             speaker_dicts.push(segments);
         }
         return speaker_dicts;
+    }
+
+    /**
+     * First audio sample of the chunk starting at `mel_frame_idx`. An uncentered window starts half a transform
+     * before the frame it belongs to, so a chunk starts `n_fft / 2` samples before its first frame.
+     * @param {number} mel_frame_idx The index of the first mel frame of the chunk.
+     * @returns {number} The index of the first audio sample of the chunk.
+     */
+    audio_chunk_start(mel_frame_idx) {
+        const { hop_length, n_fft } = this.feature_extractor.config;
+        return mel_frame_idx * hop_length - Math.floor(n_fft / 2);
     }
 }

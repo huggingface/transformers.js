@@ -28,6 +28,8 @@ export class NemotronAsrStreamingFeatureExtractor extends ParakeetFeatureExtract
         validate_audio_inputs(audio, 'NemotronAsrStreamingFeatureExtractor');
 
         const { n_fft, hop_length } = this.config;
+        // the last frame a centered pass counts reaches up to `n_fft / 2 - hop_length` past the audio; padded after the
+        // preemphasis, which would otherwise turn the first zero into `-preemphasis * audio[-1]`
         const num_end_padding = !center && is_last_audio_chunk ? Math.floor(n_fft / 2) - hop_length : 0;
         const num_samples = audio.length + num_end_padding;
         if (!center && num_samples < n_fft) {

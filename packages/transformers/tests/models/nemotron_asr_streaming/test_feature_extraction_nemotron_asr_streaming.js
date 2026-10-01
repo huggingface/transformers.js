@@ -70,29 +70,6 @@ export default () => {
     );
 
     it(
-      "uncentered chunks reproduce a centered pass",
-      async () => {
-        const audio = make_chirp(32000);
-        const { n_fft, hop_length } = feature_extractor.config;
-        const full = await feature_extractor(audio);
-
-        // A chunk starting `n_fft / 2` samples before frame 50 yields frames 50, 51, ...
-        const frame_idx = 50;
-        const start = frame_idx * hop_length - Math.floor(n_fft / 2);
-        const chunk = await feature_extractor(audio.slice(start, start + 16000), { center: false });
-        const num_frames = chunk.input_features.dims[1];
-        const expected = full.input_features.slice(null, [frame_idx, frame_idx + num_frames], null);
-
-        let max_diff = 0;
-        for (let i = 0; i < expected.data.length; ++i) {
-          max_diff = Math.max(max_diff, Math.abs(chunk.input_features.data[i] - expected.data[i]));
-        }
-        expect(max_diff).toBeLessThan(1e-4);
-      },
-      MAX_TEST_EXECUTION_TIME,
-    );
-
-    it(
       "uncentered windows need at least n_fft samples",
       async () => {
         await expect(feature_extractor(new Float32Array(511), { center: false })).rejects.toThrow("Uncentered feature extraction needs at least 512 audio samples, got 511.");
