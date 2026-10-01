@@ -455,7 +455,8 @@ export class Nemotron3DiarizationForAudioFrameClassification extends Nemotron3Di
      * as a whole to the FIFO queue sized by `config.streaming_config`. Offline mode, neither given: the input is a
      * whole recording, split into chunks of `config.chunk_length` encoder frames that take up to
      * `config.chunk_right_context` look-ahead frames from the following ones, with a FIFO queue sized by
-     * `config.fifo_length`; no cache is returned.
+     * `config.fifo_length`; no cache is returned. A session of a single chunk (a recording shorter than the first chunk)
+     * passes neither, so it runs offline, which scores it the same way: as one chunk, with an empty cache.
      *
      * @param {Object} model_inputs
      * @param {Tensor} model_inputs.input_features Log-Mel features of shape `[batch_size, num_frames, num_mel_bins]`.

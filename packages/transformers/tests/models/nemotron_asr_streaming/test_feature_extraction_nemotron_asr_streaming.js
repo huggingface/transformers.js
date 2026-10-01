@@ -95,7 +95,11 @@ export default () => {
     it(
       "uncentered windows need at least n_fft samples",
       async () => {
-        await expect(feature_extractor(new Float32Array(511), { center: false })).rejects.toThrow("Uncentered feature extraction needs at least `n_fft` (512) audio samples, got 511.");
+        await expect(feature_extractor(new Float32Array(511), { center: false })).rejects.toThrow("Uncentered feature extraction needs at least 512 audio samples, got 511.");
+        // the last chunk of a stream is zero-padded by `n_fft / 2 - hop_length` samples
+        await expect(feature_extractor(new Float32Array(415), { center: false, is_last_audio_chunk: true })).rejects.toThrow("Uncentered feature extraction needs at least 416 audio samples, got 415.");
+        const { input_features } = await feature_extractor(new Float32Array(416), { center: false, is_last_audio_chunk: true });
+        expect(input_features.dims).toEqual([1, 1, 128]);
       },
       MAX_TEST_EXECUTION_TIME,
     );

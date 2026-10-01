@@ -33,18 +33,21 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
      * @param {Float32Array|Float64Array} waveform The audio waveform to process.
      * @param {Object} [options]
      * @param {boolean} [options.center=true] Whether to pad the waveform on both sides so that the STFT frames are centered.
+     * @param {number} [options.num_end_padding=0] Number of zeros to append to the waveform, after the preemphasis.
      * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
-    async _extract_fbank_features(waveform, { center = true } = {}) {
+    async _extract_fbank_features(waveform, { center = true, num_end_padding = 0 } = {}) {
         // Parakeet uses a custom preemphasis strategy: Apply preemphasis to entire waveform at once
         const preemphasis = this.config.preemphasis;
-        waveform = new Float64Array(waveform); // Clone to avoid destructive changes
-        for (let j = waveform.length - 1; j >= 1; --j) {
-            waveform[j] -= preemphasis * waveform[j - 1];
+        const num_samples = waveform.length;
+        const signal = new Float64Array(num_samples + num_end_padding); // Clone to avoid destructive changes
+        signal.set(waveform);
+        for (let j = num_samples - 1; j >= 1; --j) {
+            signal[j] -= preemphasis * signal[j - 1];
         }
 
         const features = await spectrogram(
-            waveform,
+            signal,
             this.window, // window
             this.window.length, // frame_length
             this.config.hop_length, // hop_length

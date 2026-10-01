@@ -131,8 +131,8 @@ export class Nemotron3DiarizationProcessor extends Processor {
     /**
      * Extracts the model inputs of a whole recording, or of one chunk of a streaming session.
      *
-     * In streaming mode, the trailing frames whose analysis window reaches past the chunk are dropped, so
-     * `input_features` holds exactly the frames of the chunk, and every chunk but the last also carries
+     * In streaming mode, the trailing frames whose analysis window reaches past a chunk other than the last are
+     * dropped, so `input_features` holds exactly the frames of the chunk, and every chunk but the last also carries
      * `num_lookahead_frames`, the number of its trailing look-ahead encoder frames, which puts the model in
      * streaming mode.
      *
@@ -146,8 +146,9 @@ export class Nemotron3DiarizationProcessor extends Processor {
      * the per-chunk spectrogram reproduces, frame for frame, a single full-utterance pass. Must be `true` when
      * `is_streaming=false`.
      * @param {boolean} [options.is_last_audio_chunk=false] Whether this chunk ends the streaming session. The last chunk
-     * has no look-ahead, so every one of its frames is scored, whatever their number. Must be `false` when
-     * `is_streaming=false`.
+     * has no look-ahead, so every one of its frames is scored, whatever their number, and its end is zero-padded as a
+     * full-utterance pass pads the end of the audio, so that it yields the last frames of the utterance. Must be
+     * `false` when `is_streaming=false`.
      * @returns {Promise<{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }>}
      */
     async _call(audio, { is_streaming = false, is_first_audio_chunk = true, is_last_audio_chunk = false } = {}) {
@@ -161,7 +162,7 @@ export class Nemotron3DiarizationProcessor extends Processor {
         }
 
         /** @type {{ input_features: Tensor; attention_mask: Tensor; num_lookahead_frames?: number }} */
-        const outputs = await this.feature_extractor(audio, { center: is_first_audio_chunk });
+        const outputs = await this.feature_extractor(audio, { center: is_first_audio_chunk, is_last_audio_chunk });
         if (!is_streaming) {
             return outputs;
         }

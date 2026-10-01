@@ -183,25 +183,48 @@ export default () => {
           step_logits.push(outputs.logits);
           speaker_cache = outputs.speaker_cache;
         }
-        expect(step_logits.map((x) => x.dims[1])).toEqual([72, 72, 72, 83]);
+        expect(step_logits.map((x) => x.dims[1])).toEqual([72, 72, 72, 84]);
         expect(speaker_cache.num_cache_frames).toBe(12);
         expect(speaker_cache.num_fifo_frames).toBe(4);
         expect(speaker_cache.is_compressed).toBe(true);
 
+        // the last chunk is zero-padded at its end as the offline path pads the audio, so every frame is emitted
         const logits = cat(step_logits, 1);
         expectLogitsCloseTo(logits, {
-          dims: [1, 299, 4],
-          mean: 0.41420215368270874,
+          dims: [1, 300, 4],
+          mean: 0.4149632155895233,
           first: [0.7759641408920288, 0.5326508283615112, -0.9915345907211304, 1.2059553861618042],
-          last: [0.9267847537994385, -0.005907908082008362, -0.48862895369529724, 1.5985972881317139],
+          last: [0.9025133848190308, 0.040718138217926025, -0.4899365305900574, 1.7142759561538696],
         });
         expect(processor.extract_speaker_dict(logits)).toEqual([
           [
-            { Start: 0.0, End: 2.99, Speaker: 0 },
-            { Start: 0.0, End: 2.96, Speaker: 1 },
-            { Start: 0.0, End: 2.99, Speaker: 3 },
+            { Start: 0.0, End: 3.0, Speaker: 0 },
+            { Start: 0.0, End: 3.0, Speaker: 1 },
+            { Start: 0.0, End: 3.0, Speaker: 3 },
           ],
         ]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "streaming audio shorter than a chunk",
+      async () => {
+        // A session of a single chunk carries neither look-ahead nor cache, so it runs offline: same logits, no cache
+        const audio = make_audio(8000);
+        processor.set_streaming_mode("low_latency");
+        expect(audio.length).toBeLessThan(processor.num_samples_first_audio_chunk);
+        const inputs = await processor(audio, { is_streaming: true, is_last_audio_chunk: true });
+        expect(inputs.num_lookahead_frames).toBeUndefined();
+        const { logits, speaker_cache } = await model(inputs);
+        expect(speaker_cache).toBeNull();
+        expect(logits.dims).toEqual([1, 50, 4]);
+
+        // offline, the trailing frame whose window reaches past the audio is masked rather than dropped
+        const offline = await model(await processor(audio));
+        expect(offline.logits.dims).toEqual([1, 51, 4]);
+        const expected = offline.logits.slice(null, [0, 50], null).data;
+        logits.data.forEach((x, i) => expect(x).toBeCloseTo(expected[i], 5));
       },
       MAX_TEST_EXECUTION_TIME,
     );

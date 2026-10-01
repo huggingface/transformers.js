@@ -73,7 +73,7 @@ export default () => {
         await expect(processor(audio.subarray(0, 16000), { is_streaming: true })).rejects.toThrow("A `low_latency` chunk must hold 104 mel frames, got 100");
         const last = await processor(audio.subarray(0, 16000), { is_streaming: true, is_first_audio_chunk: false, is_last_audio_chunk: true });
         expect(last.num_lookahead_frames).toBeUndefined();
-        expect(last.input_features.dims).toEqual([1, 97, 128]);
+        expect(last.input_features.dims).toEqual([1, 98, 128]); // zero-padded by `n_fft / 2 - hop_length` samples
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -81,33 +81,50 @@ export default () => {
     it(
       "streaming chunks reproduce a full-utterance pass",
       async () => {
-        const audio = make_audio(4 * 16000);
-        const full = await processor(audio);
-        const num_valid_frames = Array.from(full.attention_mask.data, Number).reduce((a, b) => a + b, 0);
-
-        let frame_idx = 0;
-        let num_chunks = 0;
-        while (true) {
-          const is_first = frame_idx === 0;
-          const start = is_first ? 0 : processor.audio_chunk_start(frame_idx);
-          const num_samples = is_first ? processor.num_samples_first_audio_chunk : processor.num_samples_per_audio_chunk;
-          if (start + num_samples > audio.length) break;
-
-          const chunk = await processor(audio.subarray(start, start + num_samples), { is_streaming: true, is_first_audio_chunk: is_first });
-          const num_frames = processor.num_mel_frames_per_audio_chunk;
-          expect(chunk.input_features.dims).toEqual([1, num_frames, 128]);
-          const expected = full.input_features.slice(null, [frame_idx, frame_idx + num_frames], null);
+        /**
+         * @param {Tensor} chunk_features The features of a chunk.
+         * @param {Tensor} full_features The features of the full pass.
+         * @param {number} frame_idx The frame of the full pass the chunk starts at.
+         */
+        const expectFramesCloseTo = (chunk_features, full_features, frame_idx) => {
+          const expected = full_features.slice(null, [frame_idx, frame_idx + chunk_features.dims[1]], null);
           let max_diff = 0;
           for (let i = 0; i < expected.data.length; ++i) {
-            max_diff = Math.max(max_diff, Math.abs(chunk.input_features.data[i] - expected.data[i]));
+            max_diff = Math.max(max_diff, Math.abs(chunk_features.data[i] - expected.data[i]));
           }
           expect(max_diff).toBeLessThan(1e-4);
+        };
 
-          frame_idx += processor.num_mel_frames_per_step;
-          ++num_chunks;
+        const { n_fft, hop_length } = processor.feature_extractor.config;
+        // The window of the last frame of the full pass ends `max_overhang - audio.length % hop_length` samples past the
+        // audio: the last chunk needs end padding for that frame with a multiple of `hop_length` samples, and none with
+        // `max_overhang` more.
+        const max_overhang = Math.floor(n_fft / 2) - hop_length;
+        for (const num_audio_samples of [400 * hop_length, 400 * hop_length + max_overhang]) {
+          const audio = make_audio(num_audio_samples);
+          const full = await processor(audio);
+          const num_valid_frames = Array.from(full.attention_mask.data, Number).reduce((a, b) => a + b, 0);
+
+          let frame_idx = 0;
+          let start = 0;
+          while (true) {
+            const is_first = frame_idx === 0;
+            start = is_first ? 0 : processor.audio_chunk_start(frame_idx);
+            const num_samples = is_first ? processor.num_samples_first_audio_chunk : processor.num_samples_per_audio_chunk;
+            if (start + num_samples > audio.length) break;
+
+            const chunk = await processor(audio.subarray(start, start + num_samples), { is_streaming: true, is_first_audio_chunk: is_first });
+            expect(chunk.input_features.dims).toEqual([1, processor.num_mel_frames_per_audio_chunk, 128]);
+            expectFramesCloseTo(chunk.input_features, full.input_features, frame_idx);
+            frame_idx += processor.num_mel_frames_per_step;
+          }
+          expect(frame_idx).toBeGreaterThan(processor.num_mel_frames_per_step);
+
+          // The last chunk holds the rest of the audio, down to the last frame of the full pass
+          const last = await processor(audio.subarray(start), { is_streaming: true, is_first_audio_chunk: false, is_last_audio_chunk: true });
+          expect(frame_idx + last.input_features.dims[1]).toBe(num_valid_frames);
+          expectFramesCloseTo(last.input_features, full.input_features, frame_idx);
         }
-        expect(num_chunks).toBeGreaterThan(1);
-        expect(frame_idx).toBeLessThan(num_valid_frames);
       },
       MAX_TEST_EXECUTION_TIME,
     );
