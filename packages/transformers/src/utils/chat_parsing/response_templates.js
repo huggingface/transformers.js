@@ -3,7 +3,7 @@
  */
 
 import { logger } from '../logger.js';
-import { CONTENT_PARSERS, validate_transform_strings } from './content_parsers.js';
+import { CONTENT_PARSERS, is_object, type_name, validate_transform_strings } from './content_parsers.js';
 import { compile_pattern, escape_pattern } from './regex.js';
 
 /**
@@ -50,8 +50,6 @@ const FIELD_KEYS = new Set([
     'transform_each',
 ]);
 
-const is_object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-const type_name = (value) => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);
 const unknown_keys = (object, allowed) =>
     Object.keys(object)
         .filter((key) => !allowed.has(key))

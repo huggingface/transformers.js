@@ -1009,8 +1009,8 @@ describe("Response templates", () => {
       const tool = (open_pattern) => template_with({ t: { open_pattern, close: "</t>", transform: { name: "{name}", content: "{content}" } }, content: {} });
       // Python's `\w` is Unicode-aware
       expect(parse_response("<call:météo>x</t>", tool(String.raw`<call:(?P<name>\w+)>`), { prefix: "" }).t).toEqual({ name: "météo", content: "x" });
-      // Escaped punctuation, lone braces, named backreferences and comments
-      expect(parse_response('{"x"}y</t>', tool(String.raw`(?#comment)(?P<name>\{\"x\"})(?P=name)?`), { prefix: "" }).t).toEqual({ name: '{"x"}', content: "y" });
+      // Escaped punctuation, lone braces and named backreferences
+      expect(parse_response('{"x"}y</t>', tool(String.raw`(?P<name>\{\"x\"})(?P=name)?`), { prefix: "" }).t).toEqual({ name: '{"x"}', content: "y" });
       // Global inline flags
       expect(parse_response("<CALL:a>x</t>", tool(String.raw`(?i)<call:(?P<name>\w)>`), { prefix: "" }).t).toEqual({ name: "a", content: "x" });
       // Optional named groups that don't participate are not captured

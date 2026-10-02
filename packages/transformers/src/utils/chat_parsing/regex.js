@@ -1,8 +1,8 @@
 /**
  * Response templates are written for Python's `regex` module, so their patterns are translated to
- * JavaScript once, at load time. Besides syntax (`(?P<name>`, `\Z`, inline flags, ...), this keeps
- * Python's semantics: `\w`, `\d` and `\b` are Unicode-aware, and `$` also matches before a trailing
- * newline. Patterns always use `DOTALL`, like in Python.
+ * JavaScript once, at load time. Besides syntax (`(?P<name>`, `\Z`, ...), this keeps Python's semantics:
+ * `\w`, `\d` and `\b` are Unicode-aware, and `$` also matches before a trailing newline. Patterns always
+ * use `DOTALL`, like in Python.
  *
  * Each pattern also gets a "partial" variant, which emulates `regex`'s `partial=True` search: every
  * atom `X` becomes `(?:X|$)`, so the pattern also matches any prefix of a match that runs into the
@@ -23,15 +23,8 @@ const ESCAPES = {
     B: `(?:(?<=${W})(?=${W})|(?<!${W})(?!${W}))`,
     A: String.raw`(?<![\s\S])`,
     Z: String.raw`(?![\s\S])`,
-    a: String.raw`\x07`,
 };
-const CLASS_ESCAPES = {
-    w: WORD,
-    d: String.raw`\p{Nd}`,
-    D: String.raw`\P{Nd}`,
-    b: String.raw`\x08`,
-    a: String.raw`\x07`,
-};
+const CLASS_ESCAPES = { w: WORD, d: String.raw`\p{Nd}`, D: String.raw`\P{Nd}`, b: String.raw`\x08` };
 /** Escapes that mean the same in both languages. */
 const NATIVE_ESCAPES = new Set('sSntrfv0');
 /** Characters that must be escaped to be literal in a `u`-mode regular expression. */
@@ -39,7 +32,7 @@ const SYNTAX_CHARACTERS = new Set('^$\\.*+?()[]{}|/');
 const HEX_LENGTHS = { x: 2, u: 4, U: 8 };
 
 const QUANTIFIER = /\{(\d*)(,?)(\d*)\}/y;
-const GROUP = /\((?:\?(?:(:|=|!|<=|<!)|P?<(\w+)>|P=(\w+)\)|[imsx]*(?:-[imsx]+)?:))?/y;
+const GROUP = /\((?:\?(?:(:|=|!|<=|<!)|P?<(\w+)>|P=(\w+)\)))?/y;
 
 /**
  * Translate a Python `regex` pattern to JavaScript.
@@ -51,13 +44,10 @@ function translate(pattern) {
     // Global inline flags must lead the pattern, as in Python.
     const leading = /^(?:\(\?[a-zA-Z]+\))*/.exec(pattern)[0];
     let flags = 'su';
-    let ascii = false;
-    for (const flag of leading.replace(/[(?)]/g, '')) {
-        if (flag === 'a') ascii = true;
-        else if (flag === 'i' || flag === 'm') flags += flags.includes(flag) ? '' : flag;
+    for (const flag of new Set(leading.replace(/[(?)]/g, ''))) {
+        if (flag === 'i') flags += flag;
         else if (flag !== 's' && flag !== 'u') throw new Error(`unsupported inline flag '${flag}'`);
     }
-    const end = flags.includes('m') ? String.raw`(?![\s\S])` : '$';
     const names = [];
     let i = leading.length;
 
@@ -77,21 +67,14 @@ function translate(pattern) {
         ++i;
         if (i >= pattern.length) throw new Error('bad escape (end of pattern)');
         const e = next_character();
-        if (!ascii) {
-            if (in_class && e === 'W') throw new Error(String.raw`\W inside a character class is not supported`);
-            const replacement = (in_class ? CLASS_ESCAPES : ESCAPES)[e];
-            if (replacement !== undefined) return replacement;
-        }
-        if (NATIVE_ESCAPES.has(e) || 'wWdDbB'.includes(e)) return `\\${e}`;
+        if (in_class && e === 'W') throw new Error(String.raw`\W inside a character class is not supported`);
+        const replacement = (in_class ? CLASS_ESCAPES : ESCAPES)[e];
+        if (replacement !== undefined) return replacement;
+        if (NATIVE_ESCAPES.has(e)) return `\\${e}`;
         if (e in HEX_LENGTHS) {
             const hex = pattern.slice(i, (i += HEX_LENGTHS[e]));
             if (!/^[\da-fA-F]+$/.test(hex) || hex.length !== HEX_LENGTHS[e]) throw new Error(`bad escape \\${e}${hex}`);
             return `\\u{${hex}}`;
-        }
-        if (e === 'p' || e === 'P') {
-            const name = pattern[i] === '{' ? pattern.slice(i + 1, pattern.indexOf('}', i)) : pattern[i];
-            i += pattern[i] === '{' ? name.length + 2 : 1;
-            return `\\${e}{${name}}`;
         }
         if (/\d/.test(e)) {
             // Backreference: Python reads at most two digits.
@@ -128,7 +111,7 @@ function translate(pattern) {
         let source = '';
         let partial = '';
         /** Append to both outputs; atoms are optional at the end of the input in the partial variant. */
-        const append = (text, partial_text = `(?:${text}|${end})`) => {
+        const append = (text, partial_text = `(?:${text}|$)`) => {
             source += text;
             partial += partial_text;
         };
@@ -139,12 +122,6 @@ function translate(pattern) {
             } else if (c === '[') {
                 append(character_class());
             } else if (c === '(') {
-                if (pattern.startsWith('(?#', i)) {
-                    const close = pattern.indexOf(')', i);
-                    if (close < 0) throw new Error('missing ), unterminated comment');
-                    i = close + 1;
-                    continue;
-                }
                 GROUP.lastIndex = i;
                 const [head, kind, name, reference] = /** @type {RegExpExecArray} */ (GROUP.exec(pattern));
                 if (head === '(' && pattern[i + 1] === '?') {
@@ -164,7 +141,7 @@ function translate(pattern) {
                 } else if (kind === '=') {
                     append(`${open}${inner})`, `${open}${inner_partial})`);
                 } else {
-                    append(`${open}${inner})`, `${open}${inner_partial}|${end})`);
+                    append(`${open}${inner})`, `${open}${inner_partial}|$)`);
                 }
             } else if (c === ')') {
                 if (depth === 0) throw new Error(`unbalanced parenthesis at position ${i}`);
@@ -195,8 +172,8 @@ function translate(pattern) {
                 partial += quantifier;
             } else if (c === '|' || c === '^' || c === '$') {
                 ++i;
-                // Without MULTILINE, Python's `$` also matches before a trailing newline
-                const text = c === '$' && !flags.includes('m') ? String.raw`(?=\n?(?![\s\S]))` : c;
+                // Python's `$` also matches before a trailing newline
+                const text = c === '$' ? String.raw`(?=\n?(?![\s\S]))` : c;
                 source += text;
                 partial += text;
             } else if (c === '.') {

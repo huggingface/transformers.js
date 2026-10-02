@@ -1,4 +1,4 @@
-import { STREAMABLE_PARSERS, process_field, to_float, to_int } from './content_parsers.js';
+import { STREAMABLE_PARSERS, is_object, process_field, to_float, to_int } from './content_parsers.js';
 import { search } from './regex.js';
 import { load_response_template, truncate_past_last_anchor } from './response_templates.js';
 
@@ -22,8 +22,6 @@ import { load_response_template, truncate_past_last_anchor } from './response_te
  * @typedef {['open'|'close', ResponseTemplateField]} WatchItem
  * @typedef {['open'|'close', ResponseTemplateField, import('./regex.js').Match]} Candidate
  */
-
-const is_object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
  * The JSON schema types a tool parameter accepts.

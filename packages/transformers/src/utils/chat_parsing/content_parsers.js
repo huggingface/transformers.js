@@ -5,6 +5,9 @@
 
 import { compile_pattern, escape_pattern, search } from './regex.js';
 
+export const is_object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+export const type_name = (value) => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);
+
 /**
  * Python's `int(text)`: optional sign, digits with optional single underscores, surrounding whitespace.
  * @param {string} text
@@ -89,14 +92,9 @@ function _json(text, args) {
         return JSON.parse(working);
     } catch (error) {
         if (args.allow_non_json) return _text(text, args);
-        if (working === text) {
-            throw new Error(
-                `json parser could not parse region as JSON.\nContent: ${JSON.stringify(text)}\nError: ${error.message}`,
-            );
-        }
+        const transformed = working === text ? '' : `\nTransformed: ${JSON.stringify(working)}`;
         throw new Error(
-            `json: could not parse after dialect transforms.\n` +
-                `Original: ${JSON.stringify(text)}\nTransformed: ${JSON.stringify(working)}\nError: ${error.message}`,
+            `json parser could not parse region as JSON.\nContent: ${JSON.stringify(text)}${transformed}\nError: ${error.message}`,
         );
     }
 }
@@ -124,7 +122,7 @@ function _xml_inline(text, args) {
         if (key === undefined) {
             throw new Error(`xml-inline: tag_pattern must have a named group 'key'. Pattern: ${tag_pattern}`);
         }
-        const value = _sub_parse(m.groups && 'value' in m.groups ? (m.groups.value ?? null) : '', value_parser);
+        const value = _sub_parse(m.groups.value ?? '', value_parser);
         if (out.has(key) && merge) {
             if (!Array.isArray(out.get(key))) out.set(key, [out.get(key)]);
             out.get(key).push(value);
@@ -190,9 +188,6 @@ function full_placeholder(text) {
     const m = PLACEHOLDER.sticky.exec(text);
     return m !== null && m[0].length === text.length ? m[1] : null;
 }
-
-const is_object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-const type_name = (value) => (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value);
 
 /**
  * Recursively walk a transform template, which is used to restructure
