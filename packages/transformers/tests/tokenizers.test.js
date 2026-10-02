@@ -550,6 +550,131 @@ describe("Extra decoding tests", () => {
   );
 });
 
+describe("Response templates", () => {
+  const cohere_template = {
+    defaults: { role: "assistant" },
+    start_anchor: "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>",
+    fields: {
+      content: { open: "<|START_RESPONSE|>", close: "<|END_RESPONSE|>", content: "text" },
+      thinking: { open: "<|START_THINKING|>", close: "<|END_THINKING|>", content: "text" },
+      tool_calls: {
+        open: "<|START_ACTION|>",
+        close: "<|END_ACTION|>",
+        content: "json",
+        transform_each: true,
+        transform: { type: "function", function: { name: "{tool_name}", arguments: "{parameters}" } },
+      },
+    },
+  };
+  const qwen3_template = {
+    defaults: { role: "assistant" },
+    start_anchor: "<|im_start|>assistant\n",
+    fields: {
+      thinking: { open: "<think>", close: "</think>", content: "text" },
+      tool_calls: {
+        open_pattern: String.raw`<tool_call>\s*<function=(?P<name>\w+)>`,
+        close: "</tool_call>",
+        repeats: true,
+        content: "xml-inline",
+        content_args: { tag_pattern: String.raw`<parameter=(?P<key>\w+)>\s*(?P<value>.*?)\s*</parameter>` },
+        transform: { type: "function", function: { name: "{name}", arguments: "{content}" } },
+      },
+    },
+  };
+  const model_out = (name, params) => `<|START_THINKING|>Think ${name}.<|END_THINKING|>` + `<|START_ACTION|>[\n    {"tool_call_id": "0", "tool_name": "${name}", "parameters": ${params}}\n]<|END_ACTION|><|END_OF_TURN_TOKEN|>`;
+  const out_a = model_out("tool_a", '{"x": "1"}');
+  const out_b = model_out("tool_b", '{"y": "2"}');
+  const parsed_a = {
+    role: "assistant",
+    thinking: "Think tool_a.",
+    tool_calls: [{ type: "function", function: { name: "tool_a", arguments: { x: "1" } } }],
+  };
+  const parsed_b = {
+    role: "assistant",
+    thinking: "Think tool_b.",
+    tool_calls: [{ type: "function", function: { name: "tool_b", arguments: { y: "2" } } }],
+  };
+
+  /** @type {import('../src/tokenization_utils.js').PreTrainedTokenizer} */
+  let tokenizer;
+  beforeAll(async () => {
+    const base = await AutoTokenizer.from_pretrained("Xenova/gpt2");
+    // Loaded from `tokenizer_config.json`, like any other tokenizer setting
+    tokenizer = new base.constructor(base._tokenizerJSON, { ...base.config, response_template: cohere_template });
+  }, MAX_TOKENIZER_LOAD_TIME);
+
+  it("loads the template from the tokenizer config", () => {
+    expect(tokenizer.response_template).toBe(cohere_template);
+    expect(tokenizer.parse_response(out_a, { prefix: "" })).toEqual(parsed_a);
+  });
+
+  it("accepts token ids", () => {
+    const ids = tokenizer.encode(out_a);
+    expect(tokenizer.parse_response(ids, { prefix: "" })).toEqual(parsed_a);
+    expect(tokenizer.parse_response([ids, tokenizer.encode(out_b)], { prefix: "" })).toEqual([parsed_a, parsed_b]);
+    // A 2D tensor is a batch, even with a single item
+    const { input_ids } = tokenizer(out_a);
+    expect(tokenizer.parse_response(input_ids, { prefix: "" })).toEqual([parsed_a]);
+    expect(tokenizer.parse_response(input_ids.squeeze(0), { prefix: "" })).toEqual(parsed_a);
+  });
+
+  it("parses batches", () => {
+    expect(tokenizer.parse_response([out_a, out_b], { prefix: "" })).toEqual([parsed_a, parsed_b]);
+    // A single-item batch returns a one-element list, not a bare message.
+    expect(tokenizer.parse_response([out_a], { prefix: "" })).toEqual([parsed_a]);
+  });
+
+  it("accepts an explicit template", () => {
+    const thinking = { start_anchor: "<a>", fields: { thinking: { open: "<|START_THINKING|>", close: "<|END_THINKING|>" } } };
+    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: { version: 1, ...thinking } })).toEqual({ thinking: "Think tool_a." });
+    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: thinking })).toEqual({ thinking: "Think tool_a." });
+  });
+
+  it("requires a prefix and a template", () => {
+    expect(() => tokenizer.parse_response(out_a)).toThrow("requires `prefix`");
+    const base = new tokenizer.constructor(tokenizer._tokenizerJSON, { ...tokenizer.config, response_template: undefined });
+    expect(() => base.parse_response(out_a, { prefix: "" })).toThrow("does not have a `response_template`");
+    expect(() => base.get_response_parser({ prefix: "" })).toThrow("does not have a `response_template`");
+  });
+
+  it("decodes token-id prefixes", () => {
+    const prefix = "<|im_start|>assistant\n<think>\n";
+    const options = { response_template: qwen3_template };
+    const from_str = tokenizer.parse_response("hi</think>", { ...options, prefix });
+    expect(from_str).toEqual({ role: "assistant", thinking: "hi" });
+    expect(tokenizer.parse_response("hi</think>", { ...options, prefix: tokenizer.encode(prefix) })).toEqual(from_str);
+  });
+
+  it("broadcasts or matches prefixes for batched responses", () => {
+    const prefix = "<|im_start|>assistant\n<think>\n";
+    const options = { response_template: qwen3_template };
+    const responses = ["thinking A</think>", "thinking B</think>"];
+    const expected = [
+      { role: "assistant", thinking: "thinking A" },
+      { role: "assistant", thinking: "thinking B" },
+    ];
+    expect(tokenizer.parse_response(responses, { ...options, prefix })).toEqual(expected);
+    expect(tokenizer.parse_response(responses, { ...options, prefix: [prefix, prefix] })).toEqual(expected);
+    // An empty array is the explicit opt-out, so the prefilled <think> is never seen
+    expect(tokenizer.parse_response(responses, { ...options, prefix: [] })).toEqual([{ role: "assistant" }, { role: "assistant" }]);
+    expect(() => tokenizer.parse_response(responses, { ...options, prefix: [prefix] })).toThrow("Got 2 response(s) but 1 prefix(es)");
+  });
+
+  it("creates incremental parsers", () => {
+    const tools = [{ type: "function", function: { name: "set_alarm", parameters: { type: "object", properties: { hour: { type: "integer" } } } } }];
+    const parser = tokenizer.get_response_parser({ response_template: qwen3_template, prefix: tokenizer.encode("<|im_start|>assistant\n<think>\n"), tools });
+    expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["thinking"]);
+    parser.feed("body</think><tool_call>\n<function=set_alarm>\n");
+    parser.feed("<parameter=hour>\n7\n</parameter>\n</function>\n</tool_call>");
+    expect(parser.finalize()[0]).toEqual({
+      role: "assistant",
+      thinking: "body",
+      tool_calls: [{ type: "function", function: { name: "set_alarm", arguments: { hour: 7 } } }],
+    });
+    expect(() => tokenizer.get_response_parser({ prefix: ["a", "b"] })).toThrow("must be a single sequence");
+  });
+});
+
 describe("Chat templates", () => {
   it("should generate a chat template", async () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/mistral-tokenizer-v1");

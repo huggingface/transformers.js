@@ -121,6 +121,38 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "chat input is parsed with the response template, using the prompt as prefix",
+        async () => {
+          // When the chat template pre-writes the start of the assistant message (here, an
+          // opening <think> block), the pipeline must pass the prompt to `parse_response` as
+          // `prefix` so that generated text is correctly routed into the prefilled region.
+          const { chat_template, response_template } = pipe.tokenizer;
+          pipe.tokenizer.chat_template = "{% for message in messages %}" + "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}" + "{% endfor %}" + "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<think>\n' }}{% endif %}";
+          pipe.tokenizer.response_template = {
+            defaults: { role: "assistant" },
+            start_anchor: "<|im_start|>assistant\n",
+            fields: {
+              thinking: { open: "<think>", close: "</think>", content: "text" },
+              content: { close: "<|im_end|>", content: "text" },
+            },
+          };
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 3 });
+            const message = output[0].generated_text.at(-1);
+            // The tiny model never emits </think>, so everything it generates stays inside the
+            // `thinking` region opened by the chat template in the prompt.
+            expect(message.role).toBe("assistant");
+            expect(message).not.toHaveProperty("content");
+            expect(typeof message.thinking).toBe("string");
+            expect(message.thinking.length).toBeGreaterThan(0);
+          } finally {
+            Object.assign(pipe.tokenizer, { chat_template, response_template });
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1
