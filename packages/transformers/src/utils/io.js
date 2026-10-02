@@ -1,3 +1,5 @@
+import * as NativeFS from 'native-universal-fs';
+import { Buffer } from 'buffer';
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline as pipe } from 'node:stream/promises';
@@ -33,6 +35,10 @@ export async function saveBlob(path, blob) {
 
         // Revoke the Object URL to free up memory
         URL.revokeObjectURL(dataURL);
+    } else if (apis.IS_REACT_NATIVE_ENV) {
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        await NativeFS.writeFile(path, base64, 'base64');
     } else if (apis.IS_FS_AVAILABLE) {
         // Convert Blob to a Node.js Readable Stream
         const webStream = blob.stream();
