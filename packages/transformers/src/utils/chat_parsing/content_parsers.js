@@ -36,7 +36,14 @@ export function to_float(text) {
 }
 
 function _text(text, args) {
-    return (args.strip ?? true) ? text.trim() : text;
+    let value = (args.strip ?? true) ? text.trim() : text;
+    if (args.strip_prefix && value.startsWith(args.strip_prefix)) {
+        value = value.slice(args.strip_prefix.length);
+    }
+    if (args.strip_suffix && value.endsWith(args.strip_suffix)) {
+        value = value.slice(0, -args.strip_suffix.length);
+    }
+    return (args.strip ?? true) ? value.trim() : value;
 }
 
 function _int(text, args) {
@@ -63,6 +70,7 @@ const LAX_CLOSE = '\x02';
  *   - `unquoted_keys` (bool): quote bare-identifier keys before parsing.
  *   - `string_delims` ([[open, close], ...]): strings delimited by these
  *     custom markers are pre-extracted, then restored as standard JSON strings.
+ *   - `prefix` / `suffix` (string): restore syntax consumed by region delimiters.
  *   - `allow_non_json` (bool): return stripped text if parsing fails.
  */
 function _json(text, args) {
@@ -73,7 +81,7 @@ function _json(text, args) {
         throw new Error('json: input contains reserved sentinel characters (\\x01/\\x02); cannot parse safely.');
     }
 
-    let working = text;
+    let working = `${args.prefix ?? ''}${text}${args.suffix ?? ''}`;
     const captured = [];
     for (const [open_d, close_d] of string_delims) {
         const pattern = compile_pattern(`${escape_pattern(open_d)}(.*?)${escape_pattern(close_d)}`);
@@ -151,6 +159,182 @@ function _kv_lines(text, args) {
     return Object.fromEntries(out);
 }
 
+/** Parse a Python-style list of function calls without evaluating model output. */
+function _python_call_list(text) {
+    let pos = 0;
+    const fail = (message) => {
+        throw new Error(`python-call-list: ${message} at position ${pos}. Content: ${JSON.stringify(text)}`);
+    };
+    const skip = () => {
+        while (/\s/.test(text[pos] ?? '')) ++pos;
+    };
+    const take = (value) => {
+        skip();
+        if (!text.startsWith(value, pos)) fail(`expected ${JSON.stringify(value)}`);
+        pos += value.length;
+    };
+    const identifier = () => {
+        skip();
+        const match = /^[A-Za-z_]\w*/.exec(text.slice(pos));
+        if (match === null) fail('expected identifier');
+        pos += match[0].length;
+        return match[0];
+    };
+    const string = () => {
+        skip();
+        const quote = text[pos++];
+        let out = '';
+        while (pos < text.length) {
+            const char = text[pos++];
+            if (char === quote) return out;
+            if (char !== '\\') {
+                out += char;
+                continue;
+            }
+            if (pos >= text.length) fail('unterminated escape sequence');
+            const escaped = text[pos++];
+            const simple = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
+            if (Object.hasOwn(simple, escaped)) {
+                out += simple[escaped];
+            } else if (/[0-7]/.test(escaped)) {
+                let digits = escaped;
+                while (digits.length < 3 && /[0-7]/.test(text[pos] ?? '')) digits += text[pos++];
+                out += String.fromCodePoint(Number.parseInt(digits, 8));
+            } else if (escaped === '\n') {
+                // Python ignores an escaped physical newline.
+            } else if (escaped === '\r') {
+                if (text[pos] === '\n') ++pos;
+            } else if (escaped === '\\' || escaped === '"' || escaped === "'") {
+                out += escaped;
+            } else if (escaped === 'N') {
+                fail('named unicode escapes are not supported');
+            } else if (escaped === 'x' || escaped === 'u' || escaped === 'U') {
+                const size = escaped === 'x' ? 2 : escaped === 'u' ? 4 : 8;
+                const digits = text.slice(pos, pos + size);
+                if (!new RegExp(`^[0-9a-fA-F]{${size}}$`).test(digits)) fail(`invalid \\${escaped} escape`);
+                const codepoint = Number.parseInt(digits, 16);
+                if (codepoint > 0x10ffff) fail('unicode escape is outside the valid range');
+                out += String.fromCodePoint(codepoint);
+                pos += size;
+            } else {
+                out += `\\${escaped}`;
+            }
+        }
+        fail('unterminated string');
+    };
+    const sequence = (open, close) => {
+        take(open);
+        const values = [];
+        skip();
+        if (text[pos] === close) {
+            ++pos;
+            return values;
+        }
+        while (true) {
+            values.push(value());
+            skip();
+            if (text[pos] === close) {
+                ++pos;
+                return values;
+            }
+            take(',');
+            skip();
+            if (text[pos] === close) {
+                ++pos;
+                return values;
+            }
+        }
+    };
+    const mapping = () => {
+        take('{');
+        const entries = [];
+        skip();
+        if (text[pos] === '}') {
+            ++pos;
+            return {};
+        }
+        while (true) {
+            skip();
+            const key = text[pos] === '"' || text[pos] === "'" ? string() : identifier();
+            take(':');
+            entries.push([key, value()]);
+            skip();
+            if (text[pos] === '}') {
+                ++pos;
+                return Object.fromEntries(entries);
+            }
+            take(',');
+            skip();
+            if (text[pos] === '}') {
+                ++pos;
+                return Object.fromEntries(entries);
+            }
+        }
+    };
+    const value = () => {
+        skip();
+        const char = text[pos];
+        if (char === '"' || char === "'") return string();
+        if (char === '[') return sequence('[', ']');
+        if (char === '(') return sequence('(', ')');
+        if (char === '{') return mapping();
+        const number = /^[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/.exec(text.slice(pos));
+        if (number !== null) {
+            pos += number[0].length;
+            return Number(number[0]);
+        }
+        const name = identifier();
+        if (name === 'True' || name === 'true') return true;
+        if (name === 'False' || name === 'false') return false;
+        if (name === 'None' || name === 'null') return null;
+        fail(`unsupported value ${JSON.stringify(name)}`);
+    };
+    const call = () => {
+        const name = identifier();
+        take('(');
+        const entries = [];
+        skip();
+        if (text[pos] === ')') {
+            ++pos;
+            return { name, arguments: {} };
+        }
+        while (true) {
+            const key = identifier();
+            take('=');
+            entries.push([key, value()]);
+            skip();
+            if (text[pos] === ')') {
+                ++pos;
+                return { name, arguments: Object.fromEntries(entries) };
+            }
+            take(',');
+            skip();
+            if (text[pos] === ')') {
+                ++pos;
+                return { name, arguments: Object.fromEntries(entries) };
+            }
+        }
+    };
+
+    take('[');
+    const calls = [];
+    skip();
+    if (text[pos] !== ']') {
+        while (true) {
+            calls.push(call());
+            skip();
+            if (text[pos] === ']') break;
+            take(',');
+            skip();
+            if (text[pos] === ']') break;
+        }
+    }
+    take(']');
+    skip();
+    if (pos !== text.length) fail('unexpected trailing content');
+    return calls;
+}
+
 export const CONTENT_PARSERS = {
     text: _text,
     int: _int,
@@ -159,6 +343,7 @@ export const CONTENT_PARSERS = {
     json: _json,
     'xml-inline': _xml_inline,
     'kv-lines': _kv_lines,
+    'python-call-list': _python_call_list,
 };
 
 // Parsers whose output is the verbatim body text (modulo whitespace) — chunks

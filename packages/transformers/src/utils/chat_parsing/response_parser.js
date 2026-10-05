@@ -361,8 +361,8 @@ export class ResponseParser {
      * region is the null sink (no implicit declared, no explicit open), we
      * silently discard. Every routed chunk emits a `region_chunk` event so
      * consumers can render live; `dirty: true` flags chunks from structured
-     * parsers (json, xml-inline, kv-lines) whose raw text will only be
-     * parsed into the final value on close.
+     * parsers (json, xml-inline, kv-lines) and transformed text whose raw
+     * text will only be parsed into the final value on close.
      * @param {ResponseEvent[]} events
      * @param {string} text
      * @private
@@ -375,7 +375,10 @@ export class ResponseParser {
             this._opened = true;
         }
         this._body += text;
-        const dirty = !STREAMABLE_PARSERS.has(field.content);
+        const dirty =
+            !STREAMABLE_PARSERS.has(field.content) ||
+            Boolean(field.content_args.strip_prefix) ||
+            Boolean(field.content_args.strip_suffix);
         events.push({ type: 'region_chunk', field: this._current, text, dirty });
     }
 

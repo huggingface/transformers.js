@@ -39,7 +39,7 @@ const gpt_oss_template = {
   start_anchor: "<|start|>assistant",
   fields: {
     thinking: { open: "<|channel|>analysis<|message|>", close: "<|end|>", content: "text" },
-    content: { open: "<|channel|>final<|message|>", close: "<|end|>", content: "text" },
+    content: { open: "<|channel|>final<|message|>", close: ["<|end|>", "<|return|>"], content: "text" },
     tool_calls: {
       open_pattern: String.raw`<\|channel\|>commentary to=functions\.(?P<name>\w+).*?<\|message\|>`,
       close: "<|call|>",
@@ -102,6 +102,73 @@ const gemma4_template = {
       transform: { type: "function", function: { name: "{name}", arguments: "{content}" } },
     },
     content: { close: ["<turn|>", "<|tool_response>", "<eos>"], content: "text" },
+  },
+};
+
+const granite30_template = {
+  defaults: { role: "assistant" },
+  start_anchor: "<|start_of_role|>assistant<|end_of_role|>",
+  fields: {
+    tool_calls: {
+      open_pattern: String.raw`\{\s*(?="tool"\s*:)`,
+      close: "<|end_of_text|>",
+      content: "json",
+      content_args: { prefix: "{" },
+      transform: [{ type: "function", function: { name: "{content.tool}", arguments: "{content.parameters}" } }],
+    },
+    content: { close: "<|end_of_text|>", content: "text" },
+  },
+};
+
+const granite33_template = {
+  defaults: { role: "assistant" },
+  start_anchor_pattern: String.raw`<\|start_of_role\|>assistant(?:\s+\[[^\n]*\])?<\|end_of_role\|>`,
+  fields: {
+    thinking: { open: "<think>", close: "</think>", content: "text" },
+    tool_calls: {
+      open: "<|tool_call|>",
+      close: "<|end_of_text|>",
+      content: "json",
+      transform_each: true,
+      transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
+    },
+    content: {
+      close: "<|end_of_text|>",
+      content: "text",
+      content_args: { strip_prefix: "<response>", strip_suffix: "</response>" },
+    },
+  },
+};
+
+const granite4_template = {
+  defaults: { role: "assistant" },
+  start_anchor: "<|start_of_role|>assistant<|end_of_role|>",
+  fields: {
+    thinking: { open: "<think>", close: "</think>", content: "text" },
+    tool_calls: {
+      open: "<tool_call>",
+      close: "</tool_call>",
+      repeats: true,
+      content: "json",
+      transform: { type: "function", function: "{content}" },
+    },
+    content: { close: "<|end_of_text|>", content: "text" },
+  },
+};
+
+const lfm_template = {
+  defaults: { role: "assistant" },
+  start_anchor: "<|im_start|>assistant\n",
+  fields: {
+    thinking: { open: "<think>", close: "</think>", content: "text" },
+    tool_calls: {
+      open: "<|tool_call_start|>",
+      close: "<|tool_call_end|>",
+      content: "python-call-list",
+      transform_each: true,
+      transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
+    },
+    content: { close: "<|im_end|>", content: "text" },
   },
 };
 
@@ -169,6 +236,10 @@ const STREAMING_FIXTURES = [
   ["smollm", smollm_template, '<think>thinking</think>\n<tool_call>{"name": "fn", "arguments": {"x": 1}}</tool_call>'],
   ["qwen3", qwen3_template, "<think>short thought</think>\n" + "<tool_call>\n<function=get_weather>\n" + "<parameter=city>\nParis\n</parameter>\n" + "</function>\n</tool_call>"],
   ["gemma4", gemma4_template, '<|channel>thought\nhi<channel|><|tool_call>call:foo{a:1,b:<|"|>bar<|"|>}<tool_call|>'],
+  ["granite30", granite30_template, '{"tool":"get_weather","parameters":{"city":"Paris"}}<|end_of_text|>'],
+  ["granite33", granite33_template, "<think>check weather</think><response>It is sunny.</response><|end_of_text|>"],
+  ["granite4", granite4_template, '<think>check weather</think><tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call><|end_of_text|>'],
+  ["lfm", lfm_template, '<think>check weather</think><|tool_call_start|>[get_weather(city="Paris", options={"units": "C"})]<|tool_call_end|><|im_end|>'],
   [
     // Exercises `join` fields (two thinking blocks) and dotted transform paths.
     "inkling",
@@ -339,6 +410,99 @@ describe("Response templates", () => {
           },
         ],
       });
+    });
+
+    it("granite 3.0 tool call", () => {
+      const model_out = '{\n    "tool": "get_weather",\n    "parameters": {\n        "city": "Paris"\n    }\n}<|end_of_text|>';
+      expect(parse_response(model_out, granite30_template, { prefix: "" })).toEqual({
+        role: "assistant",
+        tool_calls: [{ type: "function", function: { name: "get_weather", arguments: { city: "Paris" } } }],
+      });
+    });
+
+    it("granite 3.3 tool calls", () => {
+      const model_out = '<|tool_call|>[{"name":"get_weather","arguments":{"cities":["Paris","Tokyo"]}},{"name":"get_time","arguments":{"utc":true}}]<|end_of_text|>';
+      expect(parse_response(model_out, granite33_template, { prefix: "" })).toEqual({
+        role: "assistant",
+        tool_calls: [
+          { type: "function", function: { name: "get_weather", arguments: { cities: ["Paris", "Tokyo"] } } },
+          { type: "function", function: { name: "get_time", arguments: { utc: true } } },
+        ],
+      });
+    });
+
+    it("granite 3 thinking response", () => {
+      const model_out = "<think>I should answer briefly.</think><response>Paris.</response><|end_of_text|>";
+      expect(parse_response(model_out, granite33_template, { prefix: "" })).toEqual({
+        role: "assistant",
+        thinking: "I should answer briefly.",
+        content: "Paris.",
+      });
+    });
+
+    it("granite 4 tool calls", () => {
+      const model_out = '<think>Use two tools.</think><tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call>\n<tool_call>{"name":"get_time","arguments":{"utc":true}}</tool_call><|end_of_text|>';
+      expect(parse_response(model_out, granite4_template, { prefix: "" })).toEqual({
+        role: "assistant",
+        thinking: "Use two tools.",
+        tool_calls: [
+          { type: "function", function: { name: "get_weather", arguments: { city: "Paris" } } },
+          { type: "function", function: { name: "get_time", arguments: { utc: true } } },
+        ],
+      });
+    });
+
+    it("lfm pythonic tool calls", () => {
+      const model_out = '<think>Use two tools.</think><|tool_call_start|>[get_weather(city="Paris", options={"units": "C", "days": [1, 2]}), set_alarm(hour=7, enabled=True, note=None)]<|tool_call_end|>Checking now.<|im_end|>';
+      expect(parse_response(model_out, lfm_template, { prefix: "" })).toEqual({
+        role: "assistant",
+        thinking: "Use two tools.",
+        tool_calls: [
+          { type: "function", function: { name: "get_weather", arguments: { city: "Paris", options: { units: "C", days: [1, 2] } } } },
+          { type: "function", function: { name: "set_alarm", arguments: { hour: 7, enabled: true, note: null } } },
+        ],
+        content: "Checking now.",
+      });
+    });
+
+    it("rejects malformed lfm pythonic tool calls without evaluating them", () => {
+      const model_out = "<|tool_call_start|>[get_weather(__proto__=process.exit())]<|tool_call_end|>";
+      expect(() => parse_response(model_out, lfm_template, { prefix: "" })).toThrow("unsupported value");
+    });
+
+    it("parses python string escapes and accepts trailing commas in lfm tool calls", () => {
+      const model_out = String.raw`<|tool_call_start|>[search(query="a\q", quote="a\"b", path="a\\b", octal="\101", options={"limit": 2,},),]<|tool_call_end|>`;
+      expect(parse_response(model_out, lfm_template, { prefix: "" }).tool_calls).toEqual([
+        {
+          type: "function",
+          function: {
+            name: "search",
+            arguments: {
+              query: String.raw`a\q`,
+              quote: 'a"b',
+              path: String.raw`a\b`,
+              octal: "A",
+              options: { limit: 2 },
+            },
+          },
+        },
+      ]);
+    });
+
+    it("handles python line continuations and rejects named unicode escapes", () => {
+      const continued = '<|tool_call_start|>[search(query="a\\\nb")]<|tool_call_end|>';
+      expect(parse_response(continued, lfm_template, { prefix: "" }).tool_calls[0].function.arguments.query).toBe("ab");
+      const named = String.raw`<|tool_call_start|>[search(query="\N{LATIN CAPITAL LETTER A}")]<|tool_call_end|>`;
+      expect(() => parse_response(named, lfm_template, { prefix: "" })).toThrow("named unicode escapes are not supported");
+    });
+
+    it("treats empty text wrappers as no-ops", () => {
+      const template = {
+        start_anchor: "<assistant>",
+        fields: { content: { content: "text", content_args: { strip_prefix: "", strip_suffix: "" } } },
+      };
+      expect(parse_response("answer", template, { prefix: "" })).toEqual({ content: "answer" });
+      expect(stream_all(template, ["answer"]).events.find((event) => event.type === "region_chunk")?.dirty).toBe(false);
     });
 
     it("inkling multi-block message", () => {
@@ -642,6 +806,12 @@ describe("Response templates", () => {
         xml_call: "<name=foo><age=10>",
         kv_call: "k1: v1\nk2: v2",
       });
+    });
+
+    it("marks wrapper-stripped text as dirty until close", () => {
+      const { message, events } = stream_all(granite33_template, chunk_fixed("<think>reason</think><response>answer</response><|end_of_text|>", 1));
+      expect(message).toEqual({ role: "assistant", thinking: "reason", content: "answer" });
+      expect(new Set(events.filter((e) => e.type === "region_chunk" && e.field === "content").map((e) => e.dirty))).toEqual(new Set([true]));
     });
 
     it("streams prefixless regex delimiters without waiting for the end of the stream", () => {
