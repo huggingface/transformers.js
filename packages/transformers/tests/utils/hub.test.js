@@ -1,4 +1,5 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { buildResourcePaths } from "../../src/utils/hub.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -6,6 +7,16 @@ import fs from "node:fs";
 // TODO: Set cache folder to a temp directory
 
 describe("Hub", () => {
+  describe("Resource paths", () => {
+    it("should version tokenizer metadata browser cache keys", () => {
+      const tokenizerConfig = buildResourcePaths("onnx-community/model", "tokenizer_config.json");
+      const tokenizer = buildResourcePaths("onnx-community/model", "tokenizer.json");
+
+      expect(tokenizerConfig.proposedCacheKey).toBe(`${tokenizerConfig.remoteURL}?transformersjs_metadata_v=2`);
+      expect(tokenizer.proposedCacheKey).toBe(tokenizer.remoteURL);
+    });
+  });
+
   describe("Loading models", () => {
     it(
       "should load a model from the local cache",

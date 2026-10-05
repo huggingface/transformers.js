@@ -144,7 +144,7 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
         filename,
     );
 
-    const proposedCacheKey =
+    let proposedCacheKey =
         cache instanceof FileCache
             ? // Choose cache key for filesystem cache
               // When using the main revision (default), we use the request URL as the cache key.
@@ -153,6 +153,10 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
                 ? requestURL
                 : pathJoin(path_or_repo_id, revision, filename)
             : remoteURL;
+
+    if (!(cache instanceof FileCache) && filename === 'tokenizer_config.json') {
+        proposedCacheKey += '?transformersjs_metadata_v=2';
+    }
 
     return {
         requestURL,
