@@ -144,10 +144,7 @@ const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
 
 let dirname__ = './';
 if (RUNNING_LOCALLY) {
-    // NOTE: We wrap `import.meta` in a call to `Object` to prevent Webpack from trying to bundle it in CommonJS.
-    // Although we get the warning: "Accessing import.meta directly is unsupported (only property access or destructuring is supported)",
-    // it is safe to ignore since the bundled value (`{}`) isn't used for CommonJS environments (we use __dirname instead).
-    const _import_meta_url = Object(import.meta).url;
+    const _import_meta_url = import.meta.url;
 
     if (_import_meta_url) {
         dirname__ = path.dirname(path.dirname(url.fileURLToPath(_import_meta_url))); // ESM
@@ -176,26 +173,26 @@ const SESSION_ENV_KEYS = Object.freeze([
     'localModelPath',
     'fetch',
     'hfToken',
+    'cacheDir',
 ]);
 
 /**
- * Log levels for controlling output verbosity.
+ * Log-level enum. Assign to `env.logLevel` to control how verbose the library
+ * is. Higher values silence more: `DEBUG` (10) surfaces everything,
+ * `NONE` (50) suppresses all output. Default is `WARNING` (30).
  *
- * Each level is represented by a number, where higher numbers include all lower level messages.
- * Use these values to set `env.logLevel`.
+ * | Level     | Value | Shows                                     |
+ * |-----------|-------|-------------------------------------------|
+ * | `DEBUG`   | 10    | Every message, including debug traces.    |
+ * | `INFO`    | 20    | Errors, warnings, and info messages.      |
+ * | `WARNING` | 30    | Errors and warnings.                      |
+ * | `ERROR`   | 40    | Only errors.                              |
+ * | `NONE`    | 50    | Nothing.                                  |
  *
- * @example
+ * ```javascript
  * import { env, LogLevel } from '@huggingface/transformers';
- *
- * // Set log level to show only errors
  * env.logLevel = LogLevel.ERROR;
- *
- * // Set log level to show errors, warnings, and info
- * env.logLevel = LogLevel.INFO;
- *
- * // Disable all logging
- * env.logLevel = LogLevel.NONE;
- *
+ * ```
  */
 export const LogLevel = Object.freeze({
     /** All messages including debug output (value: 10) */
@@ -222,6 +219,7 @@ export const LogLevel = Object.freeze({
  * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
+ * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  */
 
 /**
@@ -233,7 +231,6 @@ export const LogLevel = Object.freeze({
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
- * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
  * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. This must be an object that
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.

@@ -37,7 +37,6 @@ env.cacheDir = '/path/to/cache/directory/';
 | `useFS` | `boolean` | Whether to use the file system to load files. By default, it is `true` if available. |
 | `useBrowserCache` | `boolean` | Whether to use Cache API to cache models. By default, it is `true` if available. |
 | `useFSCache` | `boolean` | Whether to use the file system to cache files. By default, it is `true` if available. |
-| `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 | `useCustomCache` | `boolean` | Whether to use a custom cache system (defined by `customCache`), defaults to `false`. |
 | `customCache` | `CacheInterface\|null` | The custom cache to use. Defaults to `null`. This must be an object that implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache. |
 | `useWasmCache` | `boolean` | Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime. Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads. |
@@ -50,6 +49,7 @@ env.cacheDir = '/path/to/cache/directory/';
 | `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `fetch` | `(input: string \| URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
 | `hfToken` | `string\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. |
+| `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 <!-- @generated:end id=typedef:TransformersEnvironment -->
 
 ## Log levels

@@ -161,6 +161,7 @@ export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
         env.remotePathTemplate,
         env.allowLocalModels,
         env.localModelPath,
+        env.cacheDir,
         getFetchId(env.fetch),
         getHfTokenFingerprint(env.hfToken),
         ...parts,

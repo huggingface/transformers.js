@@ -36,7 +36,7 @@ export { getFetchHeaders } from './hub/utils.js';
 
 /**
  * @typedef {Object} ModelLoadingOptions Options for fetching model files.
- * @property {string|null} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. Deprecated: use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.
+ * @property {string|null} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. Deprecated: use `options.env.cacheDir` for a session-scoped cache directory, or global `env.cacheDir` for the default.
  * @property {string} [revision='main'] The specific model version to use. Ignored for local requests.
  * @property {string} localModelPath Path to load local models from.
  * @property {string} remoteHost Host URL to load models from.
@@ -71,7 +71,7 @@ export { getFetchHeaders } from './hub/utils.js';
  * - The model is provided by the library and loaded with the *model ID* string of a pretrained model.
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
  * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env={}] Session-scopable environment overrides.
- * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. Deprecated: use `env.cacheDir` for the default cache directory and `options.env` for session-scopable resource loading settings.
+ * @property {string} [cache_dir=null] Path to a directory in which a downloaded pretrained model configuration should be cached if the standard cache should not be used. Deprecated: use `options.env.cacheDir` for a session-scoped cache directory, or global `env.cacheDir` for the default.
  * @property {boolean} [local_files_only=false] Whether or not to only look at local files (e.g., not try downloading the model). Deprecated: use `options.env.allowRemoteModels=false` for session-scoped remote loading control.
  * @property {string} [revision='main'] The model revision to use. This can be a branch name, tag name, or commit ID.
  * Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests.
@@ -647,7 +647,7 @@ export function maybeAddDeprecatedEnvWarning(cache_dir, local_files_only) {
     if (cache_dir !== null && cache_dir !== undefined && !warnedCacheDir) {
         warnedCacheDir = true;
         logger.warn(
-            '`cache_dir` is deprecated for environment-style configuration. Use global `env.cacheDir` to set the default cache directory.',
+            '`cache_dir` is deprecated. Use `options.env.cacheDir` for a session-scoped cache directory, or global `env.cacheDir` for the default.',
         );
     }
     if (local_files_only && !warnedLocalFilesOnly) {

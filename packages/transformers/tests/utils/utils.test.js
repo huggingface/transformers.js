@@ -61,15 +61,17 @@ describe("Utilities", () => {
       const resolved = resolveEnv({
         fetch: customFetch,
         remoteHost: "https://private-hub.example/",
-        useFS: !resolveEnv().useFS,
         cacheDir: "/session-cache/",
+        useFS: !resolveEnv().useFS,
+        useFSCache: !resolveEnv().useFSCache,
         logLevel: 10,
       });
 
       expect(resolved.fetch).toBe(customFetch);
       expect(resolved.remoteHost).toBe("https://private-hub.example/");
+      expect(resolved.cacheDir).toBe("/session-cache/");
       expect(resolved.useFS).toBe(resolveEnv().useFS);
-      expect(resolved.cacheDir).toBe(resolveEnv().cacheDir);
+      expect(resolved.useFSCache).toBe(resolveEnv().useFSCache);
       expect(resolved.logLevel).toBe(resolveEnv().logLevel);
     });
 

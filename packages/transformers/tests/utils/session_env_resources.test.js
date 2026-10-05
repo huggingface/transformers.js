@@ -4,6 +4,8 @@ import { CrossOriginStorage } from "../../src/utils/cache/CrossOriginStorageCach
 import { loadWasmBinary } from "../../src/backends/utils/cacheWasm.js";
 import { env } from "../../src/env.js";
 import { getCache } from "../../src/utils/cache.js";
+import { FileCache } from "../../src/utils/cache/FileCache.js";
+import { Pipeline } from "../../src/pipelines/_base.js";
 
 describe("Session-scoped resource loading", () => {
   describe("Cross-origin storage", () => {
@@ -67,6 +69,57 @@ describe("Session-scoped resource loading", () => {
       await cache.match("https://huggingface.co/org/model/resolve/main/model.onnx");
 
       expect(fetch).toHaveBeenCalledWith("https://huggingface.co/org/model/raw/main/model.onnx", expect.any(Object));
+    });
+  });
+
+  describe("Cache directory", () => {
+    const originalUseBrowserCache = env.useBrowserCache;
+    const originalUseCustomCache = env.useCustomCache;
+    const originalUseFSCache = env.useFSCache;
+    const originalExperimental = env.experimental_useCrossOriginStorage;
+
+    beforeEach(() => {
+      env.useBrowserCache = false;
+      env.useCustomCache = false;
+      env.experimental_useCrossOriginStorage = false;
+      env.useFSCache = true;
+    });
+
+    afterAll(() => {
+      env.useBrowserCache = originalUseBrowserCache;
+      env.useCustomCache = originalUseCustomCache;
+      env.useFSCache = originalUseFSCache;
+      env.experimental_useCrossOriginStorage = originalExperimental;
+    });
+
+    it("should use the session-scoped cacheDir for the file system cache", async () => {
+      const cache = await getCache(null, { env: { cacheDir: "/session-cache/" } });
+
+      expect(cache).toBeInstanceOf(FileCache);
+      expect(/** @type {FileCache} */ (cache).path).toBe("/session-cache/");
+    });
+
+    it("should let the deprecated cache_dir override the session cacheDir", async () => {
+      const cache = await getCache("/legacy-cache/", { env: { cacheDir: "/session-cache/" } });
+
+      expect(/** @type {FileCache} */ (cache).path).toBe("/legacy-cache/");
+    });
+  });
+
+  describe("Pipeline env", () => {
+    it("should resolve pipeline.env on access, applying session overrides over the live global env", () => {
+      const scopedFetch = () => {};
+      const pipe = new Pipeline({ task: "test", model: null, sessionEnv: { fetch: scopedFetch } });
+      const originalRemoteHost = env.remoteHost;
+
+      try {
+        env.remoteHost = "https://changed-later.example/";
+        expect(pipe.env.fetch).toBe(scopedFetch);
+        expect(pipe.env.remoteHost).toBe("https://changed-later.example/");
+        expect(pipe.sessionEnv).toEqual({ fetch: scopedFetch });
+      } finally {
+        env.remoteHost = originalRemoteHost;
+      }
     });
   });
 

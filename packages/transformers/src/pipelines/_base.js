@@ -97,9 +97,6 @@ export class Pipeline extends Callable {
     /** @type {Partial<import('../env.js').TransformersEnvironmentSession>} */
     sessionEnv;
 
-    /** @type {import('../env.js').TransformersEnvironment} */
-    env;
-
     /**
      * Create a new Pipeline.
      * @param {Object} options An object containing the following properties:
@@ -116,7 +113,16 @@ export class Pipeline extends Callable {
         this.tokenizer = tokenizer;
         this.processor = processor;
         this.sessionEnv = sessionEnv;
-        this.env = resolveEnv(sessionEnv);
+    }
+
+    /**
+     * The effective environment for this pipeline: the global `env` with this
+     * pipeline's `sessionEnv` overrides applied. Resolved on every access so that
+     * it stays consistent with the per-call resolution used when loading inputs.
+     * @type {import('../env.js').TransformersEnvironment}
+     */
+    get env() {
+        return resolveEnv(this.sessionEnv);
     }
 
     /** @type {DisposeType} */
