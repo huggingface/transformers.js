@@ -104,6 +104,21 @@ describe("Audio utilities", () => {
       expect(fetch).toHaveBeenCalledWith("https://example.com/audio.wav", expect.any(Object));
       expect(audio).toEqual(new Float32Array([0.25, 0.5]));
     });
+
+    it("should authenticate audio requests to the scoped Hub", async () => {
+      const fetch = jest.fn(async () => ({
+        arrayBuffer: async () => new ArrayBuffer(8),
+      }));
+
+      await load_audio("https://private-hub.example/audio.wav", 16000, {
+        fetch,
+        remoteHost: "https://private-hub.example/",
+        hfToken: "scoped-token",
+      });
+
+      const headers = fetch.mock.calls[0][1].headers;
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
   });
 
   describe("RawAudio", () => {

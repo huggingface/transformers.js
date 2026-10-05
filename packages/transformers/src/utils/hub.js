@@ -10,6 +10,7 @@ import { FileResponse } from './hub/FileResponse.js';
 import { FileCache } from './cache/FileCache.js';
 import {
     handleError,
+    getFetchHeaders,
     isValidUrl,
     pathJoin,
     isValidHfModelId,
@@ -23,6 +24,7 @@ import { get_file_metadata } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
+export { getFetchHeaders } from './hub/utils.js';
 
 /**
  * @typedef {boolean|number} ExternalData
@@ -39,13 +41,6 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {string} localModelPath Path to load local models from.
  * @property {string} remoteHost Host URL to load models from.
  * @property {string} remotePathTemplate Path template to fill in and append to `remoteHost` when loading models.
- */
-
-/**
- * @typedef {Object} FetchHeadersOptions Options for generating fetch headers.
- * @property {string} version This version of Transformers.js.
- * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
- * @property {string|undefined} [remoteHost] Configured Hub endpoint whose origin is trusted to receive `hfToken`.
  */
 
 /**
@@ -118,51 +113,6 @@ export async function getFile(urlOrPath, options) {
             headers: getFetchHeaders(urlOrPath, options),
         });
     }
-}
-
-/**
- * Generates appropriate HTTP headers for fetching resources.
- * In Node.js environments, adds User-Agent and Authorization headers when applicable.
- * In browser environments, returns minimal headers for security.
- *
- * @param {URL|string} urlOrPath The URL or path being fetched.
- * @param {FetchHeadersOptions} options Options for generating fetch headers.
- * @returns {Headers} A Headers object with appropriate headers for the request.
- */
-export function getFetchHeaders(urlOrPath, options) {
-    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
-    const headers = new Headers();
-
-    if (isNode) {
-        const IS_CI = !!process.env?.TESTING_REMOTELY;
-        headers.set('User-Agent', `transformers.js/${options.version}; is_ci/${IS_CI};`);
-
-        let requestURL;
-        let configuredHubURL;
-        try {
-            requestURL = new URL(urlOrPath);
-            configuredHubURL = options.remoteHost ? new URL(options.remoteHost) : null;
-        } catch (_) {
-            // Local paths do not receive authorization headers.
-        }
-        const isOfficialHubURL =
-            requestURL?.origin === 'https://huggingface.co' || requestURL?.origin === 'https://hf.co';
-        const isConfiguredHubURL =
-            configuredHubURL &&
-            ['http:', 'https:'].includes(configuredHubURL.protocol) &&
-            requestURL?.origin === configuredHubURL.origin;
-        if (isOfficialHubURL || isConfiguredHubURL) {
-            if (options.hfToken) {
-                headers.set('Authorization', `Bearer ${options.hfToken}`);
-            }
-        }
-    } else {
-        // Running in a browser-environment, so we use default headers
-        // NOTE: We do not allow passing authorization headers in the browser,
-        // since this would require exposing the token to the client.
-    }
-
-    return headers;
 }
 
 /**
@@ -622,7 +572,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             name: path_or_repo_id,
             file: filename,
         });
-        pending = getCache(cacheDir).then((cache) => {
+        pending = getCache(cacheDir, { env: options.env, allowRemote: !localFilesOnly }).then((cache) => {
             const paths = buildResourcePaths(path_or_repo_id, filename, pathOptions, cache);
             return loadResourceFile(path_or_repo_id, filename, {
                 fatal,

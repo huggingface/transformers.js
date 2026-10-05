@@ -12,7 +12,7 @@
  * @module backends/onnx
  */
 
-import { env, apis, LogLevel } from '../env.js';
+import { env, apis, LogLevel, resolveEnv } from '../env.js';
 
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 import ONNX_NODE from './onnx-node.js';
@@ -192,7 +192,7 @@ let wasmLoadPromise = null;
  *
  * @returns {Promise<void>}
  */
-async function ensureWasmLoaded() {
+async function ensureWasmLoaded(sessionEnv = {}) {
     // If already loading or loaded, return the existing promise
     if (wasmLoadPromise) {
         return wasmLoadPromise;
@@ -221,6 +221,7 @@ async function ensureWasmLoaded() {
 
     // Start loading the WASM binary
     wasmLoadPromise = (async () => {
+        const resolvedEnv = resolveEnv(sessionEnv);
         // At this point, we know wasmPaths is an object (not a string) because
         // shouldUseWasmCache checks for wasmPaths.wasm and wasmPaths.mjs
         const urls = /** @type {{ wasm: string, mjs: string }} */ (ONNX_ENV.wasm.wasmPaths);
@@ -234,7 +235,7 @@ async function ensureWasmLoaded() {
             urls.wasm && !isBlobURL(urls.wasm)
                 ? (async () => {
                       try {
-                          const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm));
+                          const wasmBinary = await loadWasmBinary(toAbsoluteURL(urls.wasm), resolvedEnv.fetch);
                           if (wasmBinary) {
                               ONNX_ENV.wasm.wasmBinary = wasmBinary;
                               wasmBinaryLoaded = true;
@@ -249,7 +250,7 @@ async function ensureWasmLoaded() {
             urls.mjs && !isBlobURL(urls.mjs)
                 ? (async () => {
                       try {
-                          const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs));
+                          const wasmFactoryBlob = await loadWasmFactory(toAbsoluteURL(urls.mjs), resolvedEnv.fetch);
                           if (wasmFactoryBlob) {
                               // @ts-ignore
                               ONNX_ENV.wasm.wasmPaths.mjs = wasmFactoryBlob;
@@ -276,10 +277,11 @@ async function ensureWasmLoaded() {
  * @param {Uint8Array|string} buffer_or_path The ONNX model buffer or path.
  * @param {import('onnxruntime-common').InferenceSession.SessionOptions} session_options ONNX inference session options.
  * @param {Object} session_config ONNX inference session configuration.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<import('onnxruntime-common').InferenceSession & { config: Object }>} The ONNX inference session.
  */
-export async function createInferenceSession(buffer_or_path, session_options, session_config) {
-    await ensureWasmLoaded();
+export async function createInferenceSession(buffer_or_path, session_options, session_config, sessionEnv = {}) {
+    await ensureWasmLoaded(sessionEnv);
     const logSeverityLevel = getOnnxLogSeverityLevel(env.logLevel ?? LogLevel.WARNING);
     const load = () =>
         InferenceSession.create(buffer_or_path, {

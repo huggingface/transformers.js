@@ -42,6 +42,45 @@ function getHfTokenFingerprint(hfToken) {
 }
 
 /**
+ * Generates request headers without exposing a Hub token to untrusted origins.
+ * @param {URL|string} urlOrPath The URL or local path being fetched.
+ * @param {Object} options Header options.
+ * @param {string} options.version Transformers.js version.
+ * @param {string|undefined} options.hfToken Hugging Face access token.
+ * @param {string|undefined} [options.remoteHost] Configured Hub endpoint whose origin may receive the token.
+ * @returns {Headers}
+ */
+export function getFetchHeaders(urlOrPath, options) {
+    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
+    const headers = new Headers();
+
+    if (isNode) {
+        const IS_CI = !!process.env?.TESTING_REMOTELY;
+        headers.set('User-Agent', `transformers.js/${options.version}; is_ci/${IS_CI};`);
+
+        let requestURL;
+        let configuredHubURL;
+        try {
+            requestURL = new URL(urlOrPath);
+            configuredHubURL = options.remoteHost ? new URL(options.remoteHost) : null;
+        } catch (_) {
+            // Local paths do not receive authorization headers.
+        }
+        const isOfficialHubURL =
+            requestURL?.origin === 'https://huggingface.co' || requestURL?.origin === 'https://hf.co';
+        const isConfiguredHubURL =
+            configuredHubURL &&
+            ['http:', 'https:'].includes(configuredHubURL.protocol) &&
+            requestURL?.origin === configuredHubURL.origin;
+        if ((isOfficialHubURL || isConfiguredHubURL) && options.hfToken) {
+            headers.set('Authorization', `Bearer ${options.hfToken}`);
+        }
+    }
+
+    return headers;
+}
+
+/**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
  *
  * @param {...string} parts Multiple parts of a path.

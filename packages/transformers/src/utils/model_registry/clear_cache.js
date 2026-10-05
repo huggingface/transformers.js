@@ -35,7 +35,10 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  * @returns {Promise<CacheClearResult>}
  */
 async function clear_files_from_cache(modelId, files, options = {}) {
-    const cache = await getCache(options?.cache_dir);
+    const cache = await getCache(options?.cache_dir, {
+        env: options.env,
+        allowRemote: !options.local_files_only,
+    });
     const env = resolveEnv(options.env);
     const pathOptions = {
         cache_dir: options.cache_dir ?? null,

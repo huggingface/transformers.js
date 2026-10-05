@@ -5,9 +5,10 @@ import { logger } from '../../utils/logger.js';
 /**
  * Loads and caches a file from the given URL.
  * @param {string} url The URL of the file to load.
+ * @param {(input: string | URL, init?: any) => Promise<any>} fetch Fetch implementation to use.
  * @returns {Promise<Response|import('../../utils/hub/FileResponse.js').FileResponse|null|string>} The response object, or null if loading failed.
  */
-async function loadAndCacheFile(url) {
+async function loadAndCacheFile(url, fetch) {
     const fileName = url.split('/').pop();
 
     /** @type {import('../../utils/cache.js').CacheInterface|undefined} */
@@ -27,7 +28,7 @@ async function loadAndCacheFile(url) {
     }
 
     // If not in cache, fetch it
-    const response = await env.fetch(url);
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
@@ -48,11 +49,12 @@ async function loadAndCacheFile(url) {
 /**
  * Loads and caches the WASM binary for ONNX Runtime.
  * @param {string} wasmURL The URL of the WASM file to load.
+ * @param {(input: string | URL, init?: any) => Promise<any>} [fetch=env.fetch] Fetch implementation to use.
  * @returns {Promise<ArrayBuffer|null>} The WASM binary as an ArrayBuffer, or null if loading failed.
  */
 
-export async function loadWasmBinary(wasmURL) {
-    const response = await loadAndCacheFile(wasmURL);
+export async function loadWasmBinary(wasmURL, fetch = env.fetch) {
+    const response = await loadAndCacheFile(wasmURL, fetch);
     if (!response || typeof response === 'string') return null;
 
     try {
@@ -67,9 +69,10 @@ export async function loadWasmBinary(wasmURL) {
  * Loads and caches the WASM Factory (.mjs file) for ONNX Runtime.
  * Creates a blob URL from cached content (when safe) to bridge Cache API with dynamic imports used in ORT.
  * @param {string} libURL The URL of the WASM Factory to load.
+ * @param {(input: string | URL, init?: any) => Promise<any>} [fetch=env.fetch] Fetch implementation to use.
  * @returns {Promise<string|null>} The blob URL (if enabled), original URL (if disabled), or null if loading failed.
  */
-export async function loadWasmFactory(libURL) {
+export async function loadWasmFactory(libURL, fetch = env.fetch) {
     // We can't use Blob URLs in some environments (Service Workers, Chrome extensions) due to security restrictions on dynamic import() of blob URLs.
     // In such cases, just return the original URL and don't bother caching since dynamic import() won't use the Cache API anyway.
     // See https://github.com/huggingface/transformers.js/issues/1532.
@@ -78,7 +81,7 @@ export async function loadWasmFactory(libURL) {
     }
 
     // Fetch from cache or network, then create blob URL
-    const response = await loadAndCacheFile(libURL);
+    const response = await loadAndCacheFile(libURL, fetch);
     if (!response || typeof response === 'string') return null;
 
     try {

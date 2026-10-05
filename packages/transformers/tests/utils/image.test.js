@@ -44,10 +44,26 @@ describe("Image utilities", () => {
         statusText: "Not Found",
       }));
 
-      await expect(RawImage.fromURL("https://example.com/image.png", { fetch })).rejects.toThrow(
-        'Unable to read image from "https://example.com/image.png"',
-      );
+      await expect(RawImage.fromURL("https://example.com/image.png", { fetch })).rejects.toThrow('Unable to read image from "https://example.com/image.png"');
       expect(fetch).toHaveBeenCalledWith("https://example.com/image.png", expect.any(Object));
+    });
+
+    it("should authenticate image requests to the scoped Hub", async () => {
+      const fetch = jest.fn(async () => ({
+        status: 404,
+        statusText: "Not Found",
+      }));
+
+      await expect(
+        RawImage.fromURL("https://private-hub.example/image.png", {
+          fetch,
+          remoteHost: "https://private-hub.example/",
+          hfToken: "scoped-token",
+        }),
+      ).rejects.toThrow('Unable to read image from "https://private-hub.example/image.png"');
+
+      const headers = fetch.mock.calls[0][1].headers;
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
     });
   });
 

@@ -169,6 +169,7 @@ export class RawImage {
             fetch: env.fetch,
             version: env.version,
             hfToken: env.hfToken,
+            remoteHost: env.remoteHost,
         });
         if (response.status !== 200) {
             throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);

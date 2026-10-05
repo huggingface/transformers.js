@@ -9,7 +9,7 @@
  */
 
 import { RawImage } from './image.js';
-import { env, apis } from '../env.js';
+import { apis, resolveEnv } from '../env.js';
 
 /**
  * A decoded video frame and its timestamp, in seconds.
@@ -76,10 +76,11 @@ export class RawVideo {
  * @param {Object} [options] Optional parameters.
  * @param {number} [options.num_frames=null] The number of frames to sample uniformly.
  * @param {number} [options.fps=null] The number of frames to sample per second.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  *
  * @returns {Promise<RawVideo>} The loaded video.
  */
-export async function load_video(src, { num_frames = null, fps = null } = {}) {
+export async function load_video(src, { num_frames = null, fps = null, env: sessionEnv = {} } = {}) {
     if (!apis.IS_BROWSER_ENV) {
         throw new Error('`load_video` is currently only supported in browser environments.');
     }
@@ -91,6 +92,7 @@ export async function load_video(src, { num_frames = null, fps = null } = {}) {
     }
 
     const frames = [];
+    const env = resolveEnv(sessionEnv);
 
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';

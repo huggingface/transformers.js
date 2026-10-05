@@ -39,6 +39,7 @@ export async function load_audio(url, sampling_rate, sessionEnv = {}) {
             fetch: env.fetch,
             version: env.version,
             hfToken: env.hfToken,
+            remoteHost: env.remoteHost,
         })
     ).arrayBuffer();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
