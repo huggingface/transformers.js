@@ -17,6 +17,7 @@ export class VitsTokenizer extends PreTrainedTokenizer {
         super(tokenizerJSON, tokenizerConfig);
 
         // Custom decoder function
+        // @ts-expect-error ts(2322)
         this._tokenizer.decoder = new VitsDecoder({ type: 'VitsDecoder' });
     }
 }

@@ -1,19 +1,16 @@
 /**
- * @file Module used to configure Transformers.js.
+ * @file Global configuration for the library. Mutate fields on the exported
+ * `env` object at startup to change where models are loaded from, how files
+ * are cached, and how verbose logging is.
  *
- * **Example:** Disable remote models.
+ * **Example:** Load models from your own server and disable remote downloads.
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.allowRemoteModels = false;
- * ```
- *
- * **Example:** Set local model path.
- * ```javascript
- * import { env } from '@huggingface/transformers';
  * env.localModelPath = '/path/to/local/models/';
  * ```
  *
- * **Example:** Set cache directory.
+ * **Example:** Point the filesystem cache at a custom directory (Node.js).
  * ```javascript
  * import { env } from '@huggingface/transformers';
  * env.cacheDir = '/path/to/cache/directory/';
@@ -26,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.2.0';
+const VERSION = '4.3.0';
 
 const HAS_SELF = typeof self !== 'undefined';
 
@@ -214,8 +211,7 @@ export const LogLevel = Object.freeze({
 });
 
 /**
- * Session-scopable variables that describe the model, task, or resource-loading contract that one pipeline or library must control without affecting others
- *
+ * Session-scopable variables that one pipeline or library can override without affecting others.
  * @typedef {Object} TransformersEnvironmentSession
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
@@ -223,39 +219,36 @@ export const LogLevel = Object.freeze({
  * @property {string} remotePathTemplate Path template to fill in and append to `remoteHost` when loading models.
  * @property {boolean} allowLocalModels Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise.
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
- * @property {string} localModelPath Path to load local models from. Defaults to `/models/`.
+ * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
  * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub.
  */
 
 /**
- * Global variables that describe runtime facts, backend singleton state, or application-owned infrastructure shared across models
- *
+ * Global variables that describe runtime facts, backend singleton state, or application-owned infrastructure.
  * @typedef {Object} TransformersEnvironmentGlobal
  * @property {string} version This version of Transformers.js.
- * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Expose environment variables of different backends,
- * allowing users to set these variables if they want to.
- * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.ERROR.
+ * @property {{onnx: Partial<import('onnxruntime-common').Env> & { setLogLevel?: (logLevel: number) => void }}} backends Exposes backend environment settings that users can override.
+ * @property {number} logLevel The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING.
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
- * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `./.cache`.
+ * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  * @property {boolean} useCustomCache Whether to use a custom cache system (defined by `customCache`), defaults to `false`.
- * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. Note: this must be an object which
+ * @property {import('./utils/cache.js').CacheInterface|null} customCache The custom cache to use. Defaults to `null`. This must be an object that
  * implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache.
  * @property {boolean} useWasmCache Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime.
  * Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads.
- * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to 'transformers-cache'.
+ * @property {string} cacheKey The cache key to use for storing models and WASM binaries. Defaults to `transformers-cache`.
  * @property {boolean} experimental_useCrossOriginStorage Whether to use the Cross-Origin Storage API to cache model files
  * across origins, allowing different sites to share the same cached model weights. Defaults to `false`.
  * Requires the Cross-Origin Storage Chrome extension: {@link https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih}.
- * The `experimental_` prefix indicates that the underlying browser API is not yet standardised and may change or be
+ * The `experimental_` prefix indicates that the underlying browser API is not yet standardized and may change or be
  * removed without a major version bump. For more information, see {@link https://github.com/WICG/cross-origin-storage}.
  */
 
 /**
- * Global variable given visible to users to control execution. This provides users a simple way to configure Transformers.js.
- *
+ * Global configuration, combining application-wide and session-scopable settings.
  * @typedef {TransformersEnvironmentGlobal & TransformersEnvironmentSession} TransformersEnvironment
  */
 
@@ -312,8 +305,7 @@ export const env = {
 };
 
 /**
- * Create a session environment by applying session-scopable overrides to the global environment defaults.
- *
+ * Create a session environment by applying session-scopable overrides to the global defaults.
  * @param {Partial<TransformersEnvironmentSession>} sessionEnv Session-scopable environment overrides.
  * @returns {TransformersEnvironment}
  */

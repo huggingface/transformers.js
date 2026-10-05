@@ -29,11 +29,11 @@ export class WavLMPreTrainedModel extends PreTrainedModel {}
  * **Example:** Load and run a `WavLMModel` for feature extraction.
  *
  * ```javascript
- * import { AutoProcessor, AutoModel, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModel, load_audio } from '@huggingface/transformers';
  *
  * // Read and preprocess audio
  * const processor = await AutoProcessor.from_pretrained('Xenova/wavlm-base');
- * const audio = await read_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav', 16000);
+ * const audio = await load_audio('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav', 16000);
  * const inputs = await processor(audio);
  *
  * // Run model with inputs
@@ -84,12 +84,12 @@ export class WavLMForSequenceClassification extends WavLMPreTrainedModel {
  *
  * **Example:** Extract speaker embeddings with `WavLMForXVector`.
  * ```javascript
- * import { AutoProcessor, AutoModel, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModel, load_audio } from '@huggingface/transformers';
  *
  * // Read and preprocess audio
  * const processor = await AutoProcessor.from_pretrained('Xenova/wavlm-base-plus-sv');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
- * const audio = await read_audio(url, 16000);
+ * const audio = await load_audio(url, 16000);
  * const inputs = await processor(audio);
  *
  * // Run model with inputs
@@ -127,12 +127,12 @@ export class WavLMForXVector extends WavLMPreTrainedModel {
  *
  * **Example:** Perform speaker diarization with `WavLMForAudioFrameClassification`.
  * ```javascript
- * import { AutoProcessor, AutoModelForAudioFrameClassification, read_audio } from '@huggingface/transformers';
+ * import { AutoProcessor, AutoModelForAudioFrameClassification, load_audio } from '@huggingface/transformers';
  *
  * // Read and preprocess audio
  * const processor = await AutoProcessor.from_pretrained('Xenova/wavlm-base-plus-sd');
  * const url = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav';
- * const audio = await read_audio(url, 16000);
+ * const audio = await load_audio(url, 16000);
  * const inputs = await processor(audio);
  *
  * // Run model with inputs

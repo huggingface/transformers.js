@@ -162,26 +162,37 @@ export class ChatterboxModel extends ChatterboxPreTrainedModel {
 
     /** @type {PreTrainedModel['generate']} */
     async generate(params) {
-        const { sequences, audio_tokens, speaker_embeddings, speaker_features } = /** @type {any} */ (
+        // A caller-supplied cache is updated in place and handed back as the same object,
+        // so keep a reference to tell it apart from a cache created for this call.
+        const supplied_past_key_values = params.past_key_values;
+
+        const { sequences, audio_tokens, speaker_embeddings, speaker_features, past_key_values } = /** @type {any} */ (
             await super.generate({
                 ...params,
                 return_dict_in_generate: true,
             })
         );
 
-        const new_tokens = sequences.slice(null, [
-            /** @type {Tensor} */ (params.input_ids).dims[1], // Exclude start of speech token
-            -1, // Exclude end of speech token
-        ]);
+        try {
+            const new_tokens = sequences.slice(null, [
+                /** @type {Tensor} */ (params.input_ids).dims[1], // Exclude start of speech token
+                -1, // Exclude end of speech token
+            ]);
 
-        const silence_tokens = full([new_tokens.dims[0], 3], SILENCE_TOKEN); // Add 3 silence tokens
-        const speech_tokens = cat([audio_tokens, new_tokens, silence_tokens], 1);
+            const silence_tokens = full([new_tokens.dims[0], 3], SILENCE_TOKEN); // Add 3 silence tokens
+            const speech_tokens = cat([audio_tokens, new_tokens, silence_tokens], 1);
 
-        const { waveform } = await sessionRun(this.sessions['conditional_decoder'], {
-            speech_tokens,
-            speaker_features,
-            speaker_embeddings,
-        });
-        return waveform;
+            const { waveform } = await sessionRun(this.sessions['conditional_decoder'], {
+                speech_tokens,
+                speaker_features,
+                speaker_embeddings,
+            });
+            return waveform;
+        } finally {
+            // Only dispose caches created here: a caller-supplied cache stays caller-owned.
+            if (past_key_values !== supplied_past_key_values) {
+                await past_key_values?.dispose();
+            }
+        }
     }
 }

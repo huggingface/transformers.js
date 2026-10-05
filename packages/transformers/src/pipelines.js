@@ -1,5 +1,5 @@
 /**
- * @file Pipelines provide a high-level, easy to use, API for running machine learning models.
+ * @file Pipelines provide a high-level, easy-to-use API for running machine learning models.
  *
  * **Example:** Instantiate pipeline using the `pipeline` function.
  * ```javascript
@@ -68,14 +68,16 @@ import { maybeAddDeprecatedEnvWarning } from './utils/hub.js';
  * @template {PipelineType} T The type of pipeline to return.
  * @param {T} task The task defining which pipeline will be returned. Currently accepted tasks are:
  *  - `"audio-classification"`: will return a `AudioClassificationPipeline`.
- *  - `"automatic-speech-recognition"`: will return a `AutomaticSpeechRecognitionPipeline`.
+ *  - `"automatic-speech-recognition"` (alias "asr" available): will return a `AutomaticSpeechRecognitionPipeline`.
  *  - `"background-removal"`: will return a `BackgroundRemovalPipeline`.
  *  - `"depth-estimation"`: will return a `DepthEstimationPipeline`.
  *  - `"document-question-answering"`: will return a `DocumentQuestionAnsweringPipeline`.
- *  - `"feature-extraction"`: will return a `FeatureExtractionPipeline`.
+ *  - `"feature-extraction"` (alias "embeddings" available): will return a `FeatureExtractionPipeline`.
  *  - `"fill-mask"`: will return a `FillMaskPipeline`.
  *  - `"image-classification"`: will return a `ImageClassificationPipeline`.
+ *  - `"image-feature-extraction"`: will return a `ImageFeatureExtractionPipeline`.
  *  - `"image-segmentation"`: will return a `ImageSegmentationPipeline`.
+ *  - `"image-to-image"`: will return a `ImageToImagePipeline`.
  *  - `"image-to-text"`: will return a `ImageToTextPipeline`.
  *  - `"object-detection"`: will return a `ObjectDetectionPipeline`.
  *  - `"question-answering"`: will return a `QuestionAnsweringPipeline`.
@@ -83,6 +85,7 @@ import { maybeAddDeprecatedEnvWarning } from './utils/hub.js';
  *  - `"text2text-generation"`: will return a `Text2TextGenerationPipeline`.
  *  - `"text-classification"` (alias "sentiment-analysis" available): will return a `TextClassificationPipeline`.
  *  - `"text-generation"`: will return a `TextGenerationPipeline`.
+ *  - `"text-to-audio"` (alias "text-to-speech" available): will return a `TextToAudioPipeline`.
  *  - `"token-classification"` (alias "ner" available): will return a `TokenClassificationPipeline`.
  *  - `"translation"`: will return a `TranslationPipeline`.
  *  - `"translation_xx_to_yy"`: will return a `TranslationPipeline`.
@@ -90,7 +93,7 @@ import { maybeAddDeprecatedEnvWarning } from './utils/hub.js';
  *  - `"zero-shot-audio-classification"`: will return a `ZeroShotAudioClassificationPipeline`.
  *  - `"zero-shot-image-classification"`: will return a `ZeroShotImageClassificationPipeline`.
  *  - `"zero-shot-object-detection"`: will return a `ZeroShotObjectDetectionPipeline`.
- * @param {string} [model=null] The name of the pre-trained model to use. If not specified, the default model for the task will be used.
+ * @param {string} [model=null] The name of the pretrained model to use. If not specified, the default model for the task will be used.
  * @param {import('./utils/hub.js').PretrainedModelOptions} [options] Optional parameters for the pipeline.
  * @returns {Promise<AllTasks[T]>} A Pipeline object for the specified task.
  * @throws {Error} If an unsupported pipeline is requested.
@@ -149,20 +152,25 @@ export async function pipeline(
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
-        /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-        const metadata = await Promise.all(
-            expected_files.map(async (file) =>
-                get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
-            ),
-        );
-        metadata.forEach((m, i) => {
-            if (m.exists) {
-                files_loading[expected_files[i]] = {
-                    loaded: 0,
-                    total: m.size ?? 0,
-                };
-            }
-        });
+        try {
+            /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
+            const metadata = await Promise.all(
+                expected_files.map(async (file) =>
+                    get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
+                ),
+            );
+            metadata.forEach((m, i) => {
+                if (m.exists) {
+                    files_loading[expected_files[i]] = {
+                        loaded: 0,
+                        total: m.size ?? 0,
+                    };
+                }
+            });
+        } catch (e) {
+            // Progress totals are best-effort.
+            logger.warn(`Unable to fetch model file metadata for total progress tracking: ${e}`);
+        }
     }
 
     const pretrainedOptions = {

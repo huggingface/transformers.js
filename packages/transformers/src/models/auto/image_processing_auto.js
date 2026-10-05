@@ -1,9 +1,25 @@
+/**
+ * @module processors
+ */
+
 import { getModelJSON } from '../../utils/hub.js';
 import { ImageProcessor } from '../../image_processors_utils.js';
 import * as AllImageProcessors from '../image_processors.js';
 import { GITHUB_ISSUE_URL, IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
 import { logger } from '../../utils/logger.js';
 
+/**
+ * Loads an image processor from a pretrained id. The concrete class is
+ * selected from the `image_processor_type` in `preprocessor_config.json`.
+ *
+ * ```javascript
+ * import { AutoImageProcessor, load_image } from '@huggingface/transformers';
+ *
+ * const processor = await AutoImageProcessor.from_pretrained('Xenova/clip-vit-base-patch16');
+ * const image = await load_image('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/artemis.jpeg');
+ * const { pixel_values } = await processor(image);
+ * ```
+ */
 export class AutoImageProcessor {
     /** @type {typeof ImageProcessor.from_pretrained} */
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
