@@ -154,8 +154,11 @@ export function buildResourcePaths(path_or_repo_id, filename, options = {}, cach
                 : pathJoin(path_or_repo_id, revision, filename)
             : remoteURL;
 
-    if (!(cache instanceof FileCache) && filename === 'tokenizer_config.json') {
-        proposedCacheKey += '?transformersjs_metadata_v=2';
+    if (filename === 'tokenizer_config.json') {
+        proposedCacheKey =
+            cache instanceof FileCache
+                ? pathJoin('transformersjs_metadata_v2', proposedCacheKey)
+                : `${proposedCacheKey}?transformersjs_metadata_v=2`;
     }
 
     return {

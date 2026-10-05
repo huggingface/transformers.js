@@ -1,4 +1,5 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { FileCache } from "../../src/utils/cache/FileCache.js";
 import { buildResourcePaths } from "../../src/utils/hub.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -14,6 +15,15 @@ describe("Hub", () => {
 
       expect(tokenizerConfig.proposedCacheKey).toBe(`${tokenizerConfig.remoteURL}?transformersjs_metadata_v=2`);
       expect(tokenizer.proposedCacheKey).toBe(tokenizer.remoteURL);
+    });
+
+    it("should version tokenizer metadata filesystem cache keys", () => {
+      const cache = new FileCache("cache");
+      const tokenizerConfig = buildResourcePaths("onnx-community/model", "tokenizer_config.json", {}, cache);
+      const tokenizer = buildResourcePaths("onnx-community/model", "tokenizer.json", {}, cache);
+
+      expect(tokenizerConfig.proposedCacheKey).toBe("transformersjs_metadata_v2/onnx-community/model/tokenizer_config.json");
+      expect(tokenizer.proposedCacheKey).toBe("onnx-community/model/tokenizer.json");
     });
   });
 
