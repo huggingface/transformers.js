@@ -4,6 +4,24 @@ import { FeatureExtractionPipeline } from "../src/pipelines/feature-extraction.j
 import { Tensor, TensorOpRegistry } from "../src/transformers.js";
 
 describe("device-resident feature extraction", () => {
+  it("does not fall through to default operations for custom backend tensors", async () => {
+    const tensor = Tensor.fromBackendStorage({
+      backend: "unregistered-webgpu",
+      handle: {},
+      type: "float32",
+      dims: [1],
+      size: 1,
+      location: "gpu-buffer",
+      get data() {
+        throw new Error("Unexpected readback.");
+      },
+      dispose() {},
+    });
+
+    await expect(TensorOpRegistry.resolve("top_k", [tensor])).rejects.toThrow('Tensor operation "top_k" for backend "unregistered-webgpu" requires a registered implementation.');
+    tensor.dispose();
+  });
+
   it("dispatches pooling and normalization to the tensor backend without reading CPU data", async () => {
     const disposals = [];
     const createDeviceTensor = (stage, dims) => {

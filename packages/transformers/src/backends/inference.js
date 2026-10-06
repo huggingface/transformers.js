@@ -28,6 +28,9 @@
 import { getCausalGenerationCapabilities, installGenerationRuntime } from '../generation/runtime.js';
 import { validateInferenceArtifactProvider } from './artifacts.js';
 import { env } from '../env.js';
+import { getModelFile } from '../utils/hub.js';
+import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
+import { delete_file_from_cache } from '../utils/model_registry/delete_file_from_cache.js';
 
 /**
  * @typedef {Object} ForwardCapabilitiesV1
@@ -215,7 +218,6 @@ export function getModelId(model) {
 
 /**
  * Load a model artifact through Transformers.js transport, progress, and cache handling.
- * The dynamic import avoids a static cycle because the Hub utilities also accept inference backends.
  *
  * @param {string} modelId
  * @param {string} file
@@ -224,7 +226,6 @@ export function getModelId(model) {
  */
 export async function getInferenceBackendModelFile(modelId, file, options = {}) {
     const { fatal = true, returnPath = false, ...loadOptions } = options;
-    const { getModelFile } = await import('../utils/hub.js');
     return getModelFile(modelId, file, fatal, loadOptions, returnPath);
 }
 
@@ -236,7 +237,6 @@ export async function getInferenceBackendModelFile(modelId, file, options = {}) 
  * @param {Object} [options]
  */
 export async function getInferenceBackendModelFileMetadata(modelId, file, options = {}) {
-    const { get_file_metadata } = await import('../utils/model_registry/get_file_metadata.js');
     return get_file_metadata(modelId, file, options);
 }
 
@@ -249,7 +249,6 @@ export async function getInferenceBackendModelFileMetadata(modelId, file, option
  * @returns {Promise<boolean>}
  */
 export async function deleteInferenceBackendModelFile(modelId, file, options = {}) {
-    const { delete_file_from_cache } = await import('../utils/model_registry/clear_cache.js');
     return delete_file_from_cache(modelId, file, options);
 }
 

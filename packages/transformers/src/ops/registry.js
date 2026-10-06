@@ -49,15 +49,7 @@ export class TensorOpRegistry {
      */
     static async resolve(name, inputs = [], { required = true, fallback = true } = {}) {
         const backend = getInputBackend(inputs);
-        let implementation = backend ? implementations.get(backend) : null;
-
-        if (!implementation?.[name] && fallback) {
-            if (!defaultImplementation) {
-                const { getOnnxProviderModule } = await import('../backends/default.js');
-                await getOnnxProviderModule();
-            }
-            implementation = defaultImplementation;
-        }
+        const implementation = backend ? implementations.get(backend) : fallback ? defaultImplementation : null;
 
         const operation = await implementation?.[name];
         if (typeof operation === 'function') return operation.bind(implementation);
