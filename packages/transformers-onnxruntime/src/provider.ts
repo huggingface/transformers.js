@@ -418,15 +418,20 @@ function validateInputs(session: any, inputs: Record<string, any>): Record<strin
     return checkedInputs;
 }
 
+/**
+ * Load one artifact through the per-load host service when Transformers.js provides it, and
+ * through the first-party ONNX host otherwise (direct package imports).
+ */
+function loadModelFile(modelId: string, file: string, options: any, returnPath = false): Promise<any> {
+    if (typeof options.getModelFile === 'function') {
+        return options.getModelFile(modelId, file, { ...options, fatal: true, returnPath });
+    }
+    return getOnnxProviderHost().getModelFile(modelId, file, true, options, returnPath);
+}
+
 async function getCoreModelFile(modelId: string, fileName: string, options: any, suffix: string): Promise<any> {
     const baseName = `${fileName}${suffix}.onnx`;
-    return (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
-        modelId,
-        `onnx/${baseName}`,
-        true,
-        options,
-        apis.IS_NODE_ENV,
-    );
+    return loadModelFile(modelId, `onnx/${baseName}`, options, apis.IS_NODE_ENV);
 }
 
 function externalDataChunkNames(fullName: string, count: number): string[] {
@@ -464,13 +469,7 @@ async function getModelDataFiles(
     if (count > 0) {
         return Promise.all(
             externalDataChunkNames(baseName, count).map(async (path) => {
-                const data = await (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
-                    modelId,
-                    `onnx/${path}`,
-                    true,
-                    options,
-                    apis.IS_NODE_ENV,
-                );
+                const data = await loadModelFile(modelId, `onnx/${path}`, options, apis.IS_NODE_ENV);
                 return data instanceof Uint8Array ? { path, data } : path;
             }),
         );
@@ -479,15 +478,7 @@ async function getModelDataFiles(
         return Promise.all(
             sessionOptions.externalData.map(async (item: any) =>
                 typeof item.data === 'string'
-                    ? {
-                          ...item,
-                          data: await (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
-                              modelId,
-                              item.data,
-                              true,
-                              options,
-                          ),
-                      }
+                    ? { ...item, data: await loadModelFile(modelId, item.data, options) }
                     : item,
             ),
         );

@@ -15,6 +15,13 @@
  * The returned model may be callable, or may expose a `forward(inputs)` method.
  * Generation models expose `createAutoregressiveSession(options)`; Transformers.js installs their public `generate()`.
  *
+ * Contract stability. The following parts are stable: `modelId`, `load()`, static `capabilities`,
+ * `sharedAssets`, `chatTemplate`, the registry hooks, the host services passed to `load()`, loaded
+ * models with `forward()` and `dispose()`, and the `forward` capability. Everything marked
+ * "Experimental" below is being developed together with a first external runtime and may change
+ * in a minor release: the normalized-session contract, causal generation, the object-detection
+ * hooks, and the random-access `artifactProvider`.
+ *
  * @module backends/inference
  */
 
@@ -28,17 +35,13 @@ import { env } from '../env.js';
  */
 
 /**
- * Execution capabilities of a loaded inference model. Capability families without a versioned
- * Transformers.js integration remain opaque until their task-specific session contract is defined.
+ * Execution capabilities of a loaded inference model. Every listed capability has a consumer in
+ * Transformers.js. New capability families are added here together with the code that reads them.
  *
  * @typedef {Object} InferenceModelCapabilities
- * @property {ForwardCapabilitiesV1} [forward]
- * @property {import('../generation/runtime.js').CausalGenerationCapabilitiesV1} [causalGeneration]
- * @property {Readonly<Record<string, unknown>>} [encoderDecoderGeneration]
- * @property {Readonly<Record<string, unknown>>} [diffusion]
- * @property {Readonly<Record<string, unknown>>} [audioGeneration]
- * @property {{version: 1, input: 'audio'}} [automaticSpeechRecognition]
- * @property {{version: 1, preprocess?: 'model', postprocess: 'model'}} [objectDetection]
+ * @property {ForwardCapabilitiesV1} [forward] Stable. The model implements `forward(inputs)`.
+ * @property {import('../generation/runtime.js').CausalGenerationCapabilitiesV1} [causalGeneration] Experimental: The model implements `createAutoregressiveSession(options)`.
+ * @property {{version: 1, preprocess?: 'model', postprocess: 'model'}} [objectDetection] Experimental: The model owns object-detection preprocessing and/or postprocessing.
  */
 
 /**
@@ -55,12 +58,17 @@ import { env } from '../env.js';
  * Versioned capability for providers that construct the normalized sessions consumed by built-in
  * Transformers.js model classes.
  *
+ * Experimental: the session roles and file names passed to `constructSessions()` come from the
+ * built-in ONNX session configuration. A portable execution manifest is planned to replace them.
+ *
  * @typedef {Object} SessionProviderCapabilitiesV1
  * @property {1} version
  */
 
 /**
  * Runtime-neutral session consumed by built-in Transformers.js model classes.
+ *
+ * Experimental: see {@link SessionProviderCapabilitiesV1}.
  *
  * @typedef {Object} InferenceSession
  * @property {ReadonlyArray<string>} inputNames
@@ -101,13 +109,11 @@ import { env } from '../env.js';
 /**
  * @typedef {Object} InferenceModel
  * @property {(inputs: Record<string, import('../utils/tensor.js').Tensor>) => Promise<Record<string, import('../utils/tensor.js').Tensor>>} [forward]
- * @property {(options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor|Record<string, unknown>>} [generate]
+ * @property {(options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor|Record<string, unknown>>} [generate] Provider-owned generation. When the model implements `createAutoregressiveSession()`, Transformers.js installs its own `generate()` and replaces this one.
  * @property {InferenceModelCapabilities} [capabilities]
- * @property {import('../generation/runtime.js').GenerationCapabilitiesV1} [generationCapabilities] Deprecated flat causal-generation capabilities.
- * @property {(options: import('../generation/runtime.js').AutoregressiveSessionOptionsV1) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession]
- * @property {(audio: Float32Array, options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor>} [transcribeAudio]
- * @property {(images: import('../utils/image.js').RawImage[]) => Promise<Record<string, unknown>>} [preprocessObjectDetection]
- * @property {(outputs: Record<string, import('../utils/tensor.js').Tensor>, threshold?: number, targetSizes?: number[][]|null) => Promise<unknown>|unknown} [postProcessObjectDetection]
+ * @property {(options: import('../generation/runtime.js').AutoregressiveSessionOptionsV1) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession] Experimental: Required with `capabilities.causalGeneration`.
+ * @property {(images: import('../utils/image.js').RawImage[]) => Promise<Record<string, unknown>>} [preprocessObjectDetection] Experimental: Used when `capabilities.objectDetection.preprocess === 'model'`.
+ * @property {(outputs: Record<string, import('../utils/tensor.js').Tensor>, threshold?: number, targetSizes?: number[][]|null) => Promise<unknown>|unknown} [postProcessObjectDetection] Experimental: Used when `capabilities.objectDetection.postprocess === 'model'`.
  * @property {import('../configs.js').PretrainedConfig} [config]
  * @property {() => Promise<unknown>|unknown} dispose
  */
@@ -128,8 +134,8 @@ import { env } from '../env.js';
  * @property {{revision?: string, subfolder?: string}} [sharedAssets] Backend-selected location details for shared Transformers.js assets.
  * @property {InferenceBackendChatTemplate} [chatTemplate] Default chat template installed on a pipeline tokenizer.
  * @property {StaticBackendCapabilities} [capabilities]
- * @property {SessionProviderCapabilitiesV1} [sessionProvider] Declares support for normalized built-in model sessions.
- * @property {(names: Record<string, string>, options: InferenceBackendLoadOptions, cacheSessions?: Record<string, boolean>) => Promise<Record<string, InferenceSession>>} [constructSessions]
+ * @property {SessionProviderCapabilitiesV1} [sessionProvider] Experimental: Declares support for normalized built-in model sessions.
+ * @property {(names: Record<string, string>, options: InferenceBackendLoadOptions, cacheSessions?: Record<string, boolean>) => Promise<Record<string, InferenceSession>>} [constructSessions] Experimental: Required with `sessionProvider`.
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
  * @property {(file: string, options: Object) => Promise<{size?: number, fromCache?: boolean}|null>} [getModelArtifactMetadata] Returns backend-owned cache metadata for an artifact.
  * @property {(file: string, options: Object) => Promise<boolean>} [deleteModelArtifact] Deletes an artifact from backend-owned cache storage.
@@ -199,19 +205,27 @@ export function getModelId(model) {
 }
 
 /**
+ * @typedef {Object & {
+ *   fatal?: boolean,
+ *   returnPath?: boolean,
+ * }} InferenceBackendModelFileOptions Pretrained loading options plus two artifact-specific flags.
+ * `fatal` (default `true`) rejects on a missing file instead of resolving `null`. `returnPath`
+ * (default `false`) returns a filesystem path instead of bytes where the environment supports it.
+ */
+
+/**
  * Load a model artifact through Transformers.js transport, progress, and cache handling.
  * The dynamic import avoids a static cycle because the Hub utilities also accept inference backends.
  *
  * @param {string} modelId
  * @param {string} file
- * @param {boolean} [fatal]
- * @param {Object} [options]
- * @param {boolean} [returnPath]
+ * @param {InferenceBackendModelFileOptions} [options]
  * @returns {Promise<string|Uint8Array|null>}
  */
-export async function getInferenceBackendModelFile(modelId, file, fatal = true, options = {}, returnPath = false) {
+export async function getInferenceBackendModelFile(modelId, file, options = {}) {
+    const { fatal = true, returnPath = false, ...loadOptions } = options;
     const { getModelFile } = await import('../utils/hub.js');
-    return getModelFile(modelId, file, fatal, options, returnPath);
+    return getModelFile(modelId, file, fatal, loadOptions, returnPath);
 }
 
 /**

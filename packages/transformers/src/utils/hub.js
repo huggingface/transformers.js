@@ -44,7 +44,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * NOTE: This setting is ignored for local requests.
  * @property {string} [subfolder=null] Optional directory containing shared model assets.
  * @property {AbortSignal} [signal] Signal used to cancel backend-owned model loading.
- * @property {import('../backends/artifacts.js').InferenceArtifactProvider} [artifactProvider] Optional random-access artifact provider supplied to custom inference backends.
+ * @property {import('../backends/artifacts.js').InferenceArtifactProvider} [artifactProvider] Experimental: Optional random-access artifact provider passed through to custom inference backends. Transformers.js validates its shape and does not read from it.
  */
 
 /**

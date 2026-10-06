@@ -157,7 +157,7 @@ describe("OnnxInferenceProvider", () => {
       getModelFile,
     });
 
-    expect(getModelFile).toHaveBeenCalledWith("onnx-community/test-model", "onnx/model_quantized.onnx", true, expect.any(Object), false);
+    expect(getModelFile).toHaveBeenCalledWith("onnx-community/test-model", "onnx/model_quantized.onnx", expect.objectContaining({ fatal: true, returnPath: false }));
     expect(hostGetModelFile).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,11 @@
 /**
  * @file Runtime-neutral random-access artifact provider contracts.
+ *
+ * @experimental These contracts let an application hand a custom runtime a random-access view of
+ * its artifacts, for example to read weights lazily from large graph files. Transformers.js only
+ * validates the shape and passes the provider through to `load()`. The contract is being developed
+ * together with a first external runtime and may change in a minor release.
+ *
  * @module backends/artifacts
  */
 

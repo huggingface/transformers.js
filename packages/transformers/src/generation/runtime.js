@@ -21,8 +21,6 @@ import { createGenerationController } from './controller.js';
  * @property {SessionConcurrencyCapabilities} [sessionConcurrency]
  */
 
-/** @typedef {CausalGenerationCapabilitiesV1} GenerationCapabilitiesV1 */
-
 /**
  * @typedef {Object} LogitsLeaseV1
  * @property {1} version
@@ -113,13 +111,13 @@ import { createGenerationController } from './controller.js';
 const activeSessionCounts = new WeakMap();
 
 /**
- * Resolve the causal-generation capability while accepting the original flat V1 field.
+ * Resolve the causal-generation capability of a loaded model.
  *
  * @param {Object|Function} model
  * @returns {CausalGenerationCapabilitiesV1|undefined}
  */
 export function getCausalGenerationCapabilities(model) {
-    return model?.capabilities?.causalGeneration ?? model?.generationCapabilities;
+    return model?.capabilities?.causalGeneration;
 }
 
 /**

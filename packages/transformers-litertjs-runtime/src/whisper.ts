@@ -110,8 +110,9 @@ export function createWhisperModel(model: CompiledModel, generationConfig: Gener
     const callable = () => {
         throw new Error('LiteRT Whisper supports `generate()` rather than a generic forward pass.');
     };
+    // Speech recognition has no versioned execution capability yet, so the model declares none and
+    // relies on the pipeline calling `generate()` directly.
     return Object.assign(callable, {
-        capabilities: { automaticSpeechRecognition: { version: 1, input: 'audio' } },
         generate: (options: Record<string, unknown>) =>
             greedyGenerate(model, options.inputs as Tensor, generationConfig, options),
         dispose: () => model.delete(),

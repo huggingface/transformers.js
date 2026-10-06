@@ -202,14 +202,16 @@ describe("custom autoregressive sessions", () => {
       modelId: "test/controller-model",
       load: jest.fn(async () => ({
         generation_config: {},
-        generationCapabilities: {
-          sessionVersion: 1,
-          maxBatchSize: 1,
-          cpuModes: ["greedy", "multinomial"],
-          planModes: [],
-          cpuLogits: true,
-          declarativePlans: [],
-          tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: ["greedy", "multinomial"],
+            planModes: [],
+            cpuLogits: true,
+            declarativePlans: [],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+          },
         },
         createAutoregressiveSession: jest.fn(async () => session),
         async forward(inputs) {
@@ -378,14 +380,16 @@ describe("custom autoregressive sessions", () => {
       modelId: "test/batch-controller-model",
       load: jest.fn(async () => ({
         generation_config: {},
-        generationCapabilities: {
-          sessionVersion: 1,
-          maxBatchSize: 1,
-          cpuModes: ["greedy"],
-          planModes: [],
-          cpuLogits: true,
-          declarativePlans: [],
-          tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: ["greedy"],
+            planModes: [],
+            cpuLogits: true,
+            declarativePlans: [],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+          },
         },
         createAutoregressiveSession,
         async forward(inputs) {
@@ -458,14 +462,16 @@ describe("custom autoregressive sessions", () => {
       modelId: "test/malformed-lease-model",
       load: jest.fn(async () => ({
         generation_config: {},
-        generationCapabilities: {
-          sessionVersion: 1,
-          maxBatchSize: 1,
-          cpuModes: ["greedy"],
-          planModes: [],
-          cpuLogits: true,
-          declarativePlans: [],
-          tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+        capabilities: {
+          causalGeneration: {
+            sessionVersion: 1,
+            maxBatchSize: 1,
+            cpuModes: ["greedy"],
+            planModes: [],
+            cpuLogits: true,
+            declarativePlans: [],
+            tokenPipeline: { defaultDepth: 1, maxDepth: 1 },
+          },
         },
         createAutoregressiveSession: jest.fn(async () => session),
         async dispose() {},

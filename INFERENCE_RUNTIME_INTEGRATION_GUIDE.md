@@ -20,7 +20,27 @@ Your provider owns runtime-specific behavior:
 
 The provider contract is structural. You do not need to extend a Transformers.js class or import private Transformers.js modules.
 
-## 1. Choose the model contract
+## Contract stability
+
+The contract has two tiers. Build on the stable tier. Use the experimental tier only when you are prepared to follow changes in minor releases.
+
+**Stable.** These parts will only change in a major release:
+
+- the provider object: `modelId`, `load(options)`, static `capabilities`, `sharedAssets`, `chatTemplate`, and the registry hooks `listModelArtifacts()`, `getModelArtifactMetadata()`, `deleteModelArtifact()`;
+- the host services passed to `load()`: `getModelFile()`, `getModelFileMetadata()`, `deleteModelFile()`, and `fetch`;
+- the loaded model: `forward(inputs)`, `dispose()`, and the `forward` capability;
+- device-resident tensors: `Tensor.fromBackendStorage()`, `tensor.getBackendStorage()`, and `TensorOpRegistry`.
+
+**Experimental.** These parts are being developed together with a first external runtime. They are exported and typed, and they work today, but their shape may change in a minor release:
+
+- the normalized-session contract (`sessionProvider` and `constructSessions()`);
+- causal text generation (`capabilities.causalGeneration` and `createAutoregressiveSession()`);
+- the object-detection hooks (`capabilities.objectDetection`);
+- the random-access `artifactProvider` loading option.
+
+Each experimental part is marked `@experimental` in the Transformers.js type definitions and described in [Experimental contracts](#experimental-contracts) below. The portable execution manifest that will eventually replace the ONNX-shaped session roles is a proposal, not a contract; see [INFERENCE_EXECUTION_MANIFEST_PROPOSAL.md](INFERENCE_EXECUTION_MANIFEST_PROPOSAL.md).
+
+## 1. Implement the generic forward contract
 
 For an ordinary model, implement the generic forward contract. Transformers.js gives the loaded model named `Tensor` inputs and expects named `Tensor` outputs:
 
@@ -34,53 +54,9 @@ type InferenceModel = {
 };
 ```
 
-This is the recommended starting point. It lets Transformers.js retain preprocessing, postprocessing, and task semantics while your package only handles execution.
+This is the recommended starting point. It lets Transformers.js retain preprocessing, postprocessing, and task semantics while your package only handles execution. A model may also be a plain callable function with `dispose()` attached; Transformers.js treats a callable and a `forward()` method the same way.
 
-To reuse the built-in Transformers.js model classes across many architectures, implement the normalized-session contract instead. A session provider needs `modelId`, `sessionProvider: { version: 1 }`, and `constructSessions()`. It does not need a model-specific `load()` method:
-
-```js
-export class MySessionProvider {
-    sessionProvider = { version: 1 };
-
-    constructor(modelId) {
-        this.modelId = modelId;
-    }
-
-    async constructSessions(names, options, cacheSessions) {
-        return Object.fromEntries(
-            await Promise.all(
-                Object.entries(names).map(async ([role, file]) => {
-                    const modelData = await options.getModelFile(
-                        this.modelId,
-                        file,
-                        true,
-                        options,
-                    );
-                    const session = await compileGraph(modelData, options);
-                    return [
-                        role,
-                        {
-                            inputNames: session.inputNames,
-                            outputNames: session.outputNames,
-                            inputMetadata: session.inputMetadata,
-                            outputMetadata: session.outputMetadata,
-                            config: session.config,
-                            run: (inputs) => runSession(session, inputs),
-                            release: () => session.dispose(),
-                        },
-                    ];
-                }),
-            ),
-        );
-    }
-}
-```
-
-Transformers.js selects the semantic model class from `config.json`, determines the required session roles, and calls `constructSessions()`. The provider compiles those graph files and returns normalized sessions. This path lets one graph runtime reuse architecture-specific forward methods, generation orchestration, and output classes without implementing a loader for every model class or emulating the ONNX Runtime API.
-
-Each returned session must provide `inputNames`, `outputNames`, `run(inputs)`, and `release()`. Metadata and runtime-specific `config` are optional. If one session fails to initialize, release every session already created before rejecting `constructSessions()`.
-
-Generation and task-specific execution require an additional, versioned model capability. Do not imitate an existing provider with unversioned methods and assume Transformers.js will detect them. Use a contract already represented by `InferenceModelCapabilities` in [`packages/transformers/src/backends/inference.js`](packages/transformers/src/backends/inference.js), or add a versioned integration to Transformers.js first.
+Transformers.js reads exactly three loaded-model capabilities: `forward`, `causalGeneration`, and `objectDetection`. Declare only the ones your model implements. Do not invent capability names or copy unversioned methods from another provider and expect Transformers.js to detect them. If a task needs an execution contract that does not exist yet, propose the versioned contract in Transformers.js first.
 
 ## 2. Implement the provider
 
@@ -88,8 +64,6 @@ A generic forward provider only requires:
 
 - `modelId`: the repository ID or local path containing the Transformers.js-compatible shared assets;
 - `load(options)`: a function that returns the executable model.
-
-A normalized-session provider uses the versioned `sessionProvider` marker and `constructSessions()` instead of `load()`.
 
 `modelId` normally points to a repository containing `config.json` plus the tokenizer or processor files for the model. The runtime artifact may live in this repository or in a separate repository known by your provider.
 
@@ -124,6 +98,10 @@ export class MyInferenceProvider {
         return this.modelFile;
     }
 
+    artifactOptions(options) {
+        return { ...options, revision: this.artifactRevision, subfolder: null };
+    }
+
     async load(options) {
         this.validateOptions(options);
         options.signal?.throwIfAborted();
@@ -132,12 +110,7 @@ export class MyInferenceProvider {
         const modelData = await options.getModelFile(
             this.artifactModelId,
             modelFile,
-            true,
-            {
-                ...options,
-                revision: this.artifactRevision,
-                subfolder: null,
-            },
+            this.artifactOptions(options),
         );
         const session = await createSession(modelData, {
             device: options.device,
@@ -191,16 +164,13 @@ export class MyInferenceProvider {
 }
 ```
 
-The example assumes that `createSession()` accepts the value returned by `getModelFile()`. Adapt that boundary to your runtime. In browsers, model files are normally returned as `Uint8Array`. Node providers that require a filesystem path can pass `true` as the final `returnPath` argument:
+The example assumes that `createSession()` accepts the value returned by `getModelFile()`. Adapt that boundary to your runtime. In browsers, model files are returned as `Uint8Array`. Node providers that require a filesystem path set `returnPath: true` in the options:
 
 ```js
-const bytesOrPath = await options.getModelFile(
-    modelId,
-    file,
-    true,
-    options,
-    isNode,
-);
+const bytesOrPath = await options.getModelFile(modelId, file, {
+    ...options,
+    returnPath: isNode,
+});
 ```
 
 Keep runtime-native tensors inside the provider. Public inputs and outputs must use the Transformers.js `Tensor` type and preserve the model's input and output names.
@@ -265,19 +235,20 @@ type InferenceBackendLoadOptions = PretrainedModelOptions & {
     getModelFile: (
         modelId: string,
         file: string,
-        fatal?: boolean,
-        options?: object,
-        returnPath?: boolean,
+        options?: PretrainedModelOptions & {
+            fatal?: boolean; // default true: reject instead of resolving null
+            returnPath?: boolean; // default false: return a path where supported
+        },
     ) => Promise<string | Uint8Array | null>;
     getModelFileMetadata: (
         modelId: string,
         file: string,
-        options?: object,
+        options?: PretrainedModelOptions,
     ) => Promise<{ exists: boolean; size?: number; fromCache?: boolean }>;
     deleteModelFile: (
         modelId: string,
         file: string,
-        options?: object,
+        options?: PretrainedModelOptions,
     ) => Promise<boolean>;
     task?: string;
     config?: PretrainedConfig;
@@ -286,7 +257,7 @@ type InferenceBackendLoadOptions = PretrainedModelOptions & {
 };
 ```
 
-The options also include normal loading values such as `device`, `dtype`, `revision`, `subfolder`, `cache_dir`, `local_files_only`, `session_options`, `progress_callback`, and `signal`.
+All three file services share one shape: the repository ID, the file name, and an options object. Pass the load options through and override only what differs for your artifact, usually `revision` and `subfolder`. The options also include normal loading values such as `device`, `dtype`, `revision`, `subfolder`, `cache_dir`, `local_files_only`, `session_options`, `progress_callback`, and `signal`.
 
 Always load model artifacts with `options.getModelFile()`. Do not construct a Hub URL and call `globalThis.fetch()` for model files. The host loader provides:
 
@@ -298,6 +269,8 @@ Always load model artifacts with `options.getModelFile()`. Do not construct a Hu
 - abort-signal handling.
 
 Use `options.fetch` instead of `globalThis.fetch` for network requests that are not model artifacts. Check `options.signal` before and after expensive asynchronous work. If loading fails, release every session or buffer that was already created before rethrowing the error.
+
+These options are the complete public host surface. The built-in ONNX provider additionally receives a private host object with the Transformers.js environment, logger, and cache because it is a first-party package; third-party providers do not, and should not model their integration on it.
 
 ## 5. Describe supported configurations
 
@@ -335,6 +308,8 @@ provider.sharedAssets = {
 
 `sharedAssets` changes only the `revision` and `subfolder` used for shared files. It does not change `modelId` or describe the runtime artifact repository.
 
+Be aware of what this split can and cannot do today. A provider that borrows shared assets from a different repository must know, per model, which repository is compatible and what the runtime graph's input and output names and shapes are. The experimental LiteRT.js provider does this with a hard-coded descriptor table. That is the right approach for a curated list of fixed-shape models. A provider that wants to run arbitrary Hub repositories without per-model work needs the experimental normalized-session contract described below.
+
 ## 7. Integrate with `ModelRegistry` and cache management
 
 The basic provider works without registry hooks. Add the following hooks so applications can list required files, inspect download sizes and cache state, and clear runtime artifacts:
@@ -361,11 +336,11 @@ listModelArtifacts(options) {
 
 async getModelArtifactMetadata(file, options) {
     if (file !== this.selectModelFile(options)) return null;
-    const metadata = await options.getModelFileMetadata(this.artifactModelId, file, {
-        ...options,
-        revision: this.artifactRevision,
-        subfolder: null,
-    });
+    const metadata = await options.getModelFileMetadata(
+        this.artifactModelId,
+        file,
+        this.artifactOptions(options),
+    );
     return metadata.exists
         ? { size: metadata.size, fromCache: metadata.fromCache }
         : null;
@@ -373,11 +348,11 @@ async getModelArtifactMetadata(file, options) {
 
 async deleteModelArtifact(file, options) {
     if (file !== this.selectModelFile(options)) return false;
-    return options.deleteModelFile(this.artifactModelId, file, {
-        ...options,
-        revision: this.artifactRevision,
-        subfolder: null,
-    });
+    return options.deleteModelFile(
+        this.artifactModelId,
+        file,
+        this.artifactOptions(options),
+    );
 }
 ```
 
@@ -445,77 +420,88 @@ Test the provider at the following levels:
 4. Exercise `ModelRegistry.get_model_files()`, metadata lookup, cache detection, and cache clearing when registry hooks are implemented.
 5. Verify the first load downloads artifacts and a second load reuses the cache in both browser and Node environments supported by the runtime.
 
-Use [`packages/transformers-litertjs-runtime`](packages/transformers-litertjs-runtime) as a compact example of a separate runtime repository with host-managed caching. Use [`packages/transformers-onnxruntime`](packages/transformers-onnxruntime) as a reference for a more advanced provider that maps many Transformers.js model architectures to multiple runtime sessions.
+Use [`packages/transformers-litertjs-runtime`](packages/transformers-litertjs-runtime) as a compact example of a separate runtime repository with host-managed caching. [`packages/transformers-onnxruntime`](packages/transformers-onnxruntime) is the first-party default provider; it shows how the normalized-session contract maps many architectures to multiple runtime sessions, but it also uses private host services that are not part of the public contract.
 
-## 11. Execution manifest design
+## Experimental contracts
 
-The normalized-session contract removes per-model runtime loaders, but graph files alone do not describe which graph is an encoder, decoder, embedding model, cache updater, or task head. They also do not describe graph variants, named state bindings, multimodal routing, or generation behavior. A future portable execution manifest should describe those semantics without exposing nodes from one graph format as the Transformers.js public API.
+Everything in this section works today and is covered by tests, but is marked `@experimental` in the type definitions. Each contract is being shaped with a first external runtime and may change in a minor release. If you build on one, pin your Transformers.js version and follow the changelog.
 
-The proposed first version is repository metadata consumed by Transformers.js and passed to any compatible provider:
+### Normalized sessions: one provider for all built-in architectures
 
-```ts
-type ExecutionManifestV1 = {
-    version: 1;
-    modelType?: string;
-    artifacts: Record<
-        string,
-        {
-            file: string;
-            format: string;
-            role: string;
-            variants?: Array<{
-                file: string;
-                dtype?: string;
-                device?: string;
-            }>;
-            externalData?: string[];
-        }
-    >;
-    sessions: Record<
-        string,
-        {
-            artifact: string;
-            inputs?: Record<string, string>;
-            outputs?: Record<string, string>;
-            state?: Array<{
-                input: string;
-                output: string;
-                axis?: number;
-            }>;
-        }
-    >;
-    orchestration: {
-        kind: 'single' | 'encoder-decoder' | 'causal-decoder' | 'multimodal';
-        entrypoints: Record<string, string>;
-    };
-    extensions?: Record<string, unknown>;
-};
+To reuse the built-in Transformers.js model classes across many architectures, implement the normalized-session contract instead of a model-specific `load()`. A session provider needs `modelId`, `sessionProvider: { version: 1 }`, and `constructSessions()`:
+
+```js
+export class MySessionProvider {
+    sessionProvider = { version: 1 };
+
+    constructor(modelId) {
+        this.modelId = modelId;
+    }
+
+    async constructSessions(names, options, cacheSessions) {
+        return Object.fromEntries(
+            await Promise.all(
+                Object.entries(names).map(async ([role, file]) => {
+                    const modelData = await options.getModelFile(
+                        this.modelId,
+                        file,
+                        options,
+                    );
+                    const session = await compileGraph(modelData, options);
+                    return [
+                        role,
+                        {
+                            inputNames: session.inputNames,
+                            outputNames: session.outputNames,
+                            inputMetadata: session.inputMetadata,
+                            outputMetadata: session.outputMetadata,
+                            config: session.config,
+                            run: (inputs) => runSession(session, inputs),
+                            release: () => session.dispose(),
+                        },
+                    ];
+                }),
+            ),
+        );
+    }
+}
 ```
 
-Artifact entries describe files and selectable variants. Session entries map semantic roles to artifacts and define logical input, output, and persistent-state bindings. Orchestration identifies a versioned Transformers.js execution protocol rather than embedding runtime-specific control flow. Providers remain responsible for compiling the selected artifact and may reject unsupported formats, devices, data types, or orchestration kinds.
+Transformers.js selects the semantic model class from `config.json`, determines the required session roles, and calls `constructSessions()`. The provider compiles those graph files and returns normalized sessions. Each returned session must provide `inputNames`, `outputNames`, `run(inputs)`, and `release()`. Metadata and runtime-specific `config` are optional. If one session fails to initialize, release every session already created before rejecting `constructSessions()`.
 
-The manifest should follow these compatibility rules:
+This path lets one graph runtime reuse architecture-specific forward methods, generation orchestration, and output classes without implementing a loader for every model class. It is the answer for a runtime that can execute an exported op graph, for example a WebGPU engine that parses ONNX files and runs them with its own kernels.
 
-- `version` changes only for incompatible structural changes;
-- graph format names and provider extensions are open strings;
-- semantic roles and orchestration kinds are versioned by Transformers.js;
-- unknown optional fields are ignored, while unknown required orchestration kinds are rejected;
-- file selection uses the same resolved manifest in loading, progress calculation, cache inspection, and deletion;
-- runtime-specific settings live under namespaced `extensions`, not in common session semantics;
-- tensor ownership and state lifetime use the public backend-storage contract rather than graph-format handles.
+Know the limitation before you build on it. The session roles and base file names in `names` come from the built-in ONNX session configuration, so they follow ONNX export conventions such as `model`, `encoder_model`, or `decoder_model_merged`. A non-ONNX runtime has to map those conventions onto its own artifacts. The [execution manifest proposal](INFERENCE_EXECUTION_MANIFEST_PROPOSAL.md) describes how this is meant to become portable; until it is implemented, the contract is experimental.
 
-The first implementation target should be `single`, followed by `causal-decoder` using the existing autoregressive-session protocol. `encoder-decoder` and `multimodal` should be added only after their graph roles, state transitions, and input-binding rules are represented without architecture-specific callbacks. Until this manifest is implemented, normalized session providers use the existing Transformers.js model configuration and session-role mappings.
+### Causal text generation
+
+A model that owns its decoding loop declares `capabilities.causalGeneration` and implements `createAutoregressiveSession(options)`. Transformers.js then installs its own `generate()` on the model and drives the session, so the public generation API, logits processors, stopping criteria, and streaming behave the same as for built-in models.
+
+The session protocol has two flavors. The pull session is the minimum: `prefill(inputs)` and `decode(inputs)` each return a logits lease that Transformers.js reads and releases, and Transformers.js samples on the CPU. The plan session is additive: `generateWithPlan(inputs, plan)` lets a runtime that keeps logits on device run sampling and token-mask processors itself. The capability object tells Transformers.js which modes, batch sizes, and pipeline depths the session supports.
+
+See `CausalGenerationCapabilitiesV1`, `PullAutoregressiveSessionV1`, `PlanAutoregressiveSessionV1`, and `LogitsLeaseV1` in the type definitions for the exact shapes. No provider in this repository implements this contract yet; it is being developed against an external WebGPU runtime.
+
+### Object-detection hooks
+
+Some fixed-shape detection models bake preprocessing or postprocessing into the graph or require model-specific decoding of the raw output. A loaded model can take over either step by declaring `capabilities.objectDetection` with `preprocess: 'model'` and/or `postprocess: 'model'` and implementing `preprocessObjectDetection(images)` and/or `postProcessObjectDetection(outputs, threshold, targetSizes)`. The object-detection pipeline calls those methods in place of its own steps. The LiteRT.js YOLO model uses this hook.
+
+This is a task-specific escape hatch. It will either be generalized into one mechanism for model-owned pipeline steps or replaced; do not use it as a template for other tasks.
+
+### Random-access artifact provider
+
+Applications can pass an `artifactProvider` loading option with `readJson(file)` and `openByteSource(file)`. A byte source supports concurrent, independently positioned range reads, which lets a runtime that parses graph files itself read weights lazily instead of loading whole files into memory. Transformers.js validates the provider's shape and passes it through to `load()` unchanged; it does not read from it. See `InferenceArtifactProvider` and `RandomAccessByteSource` in the type definitions.
 
 ## Integration checklist
 
-- The provider exposes a string `modelId` plus either `load(options)` or the versioned normalized-session contract.
+- The provider exposes a string `modelId` plus `load(options)`, or the experimental normalized-session contract.
 - `load()` uses `options.getModelFile()` for every runtime artifact.
 - Network requests use the host-provided `options.fetch`.
 - Loading honors `device`, `dtype`, `session_options`, `local_files_only`, and `signal` where applicable.
 - The loaded model accepts and returns named Transformers.js tensors.
-- The loaded model declares only execution capabilities it implements.
+- The loaded model declares only the execution capabilities Transformers.js reads: `forward`, and where applicable the experimental `causalGeneration` or `objectDetection`.
 - `dispose()` releases all runtime resources.
 - Static capabilities accurately describe supported tasks, devices, and data types.
 - Artifact discovery and artifact loading use one shared selection rule.
 - Registry hooks expose accurate size, cache, and deletion behavior.
 - At least one complete Transformers.js pipeline passes with the provider.
+- If you build on an experimental contract, your package pins the Transformers.js version it was tested with.

@@ -124,7 +124,6 @@ export class LiteRtInferenceProvider {
         const modelBytes = await options.getModelFile(
             this.artifactModelId,
             artifact.file,
-            true,
             getArtifactOptions(options, artifact.revision),
         );
         if (!(modelBytes instanceof Uint8Array)) {

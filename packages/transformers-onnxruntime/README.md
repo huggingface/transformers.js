@@ -4,6 +4,9 @@ ONNX Runtime inference provider for Transformers.js. It maps Transformers.js mod
 
 For the generic provider contract, host services, caching hooks, tensor ownership, and integration requirements, see the [Inference Runtime Integration Guide](../../INFERENCE_RUNTIME_INTEGRATION_GUIDE.md).
 
+> [!NOTE]
+> This package is the first-party default provider. Besides the public provider contract it uses a private host object (`configureOnnxProviderHost`) that gives it the Transformers.js environment, logger, cache, and tensor constructors. Third-party providers do not receive that object and should not model their integration on it; the public contract is the one described in the integration guide.
+
 ## Usage
 
 Transformers.js uses this provider automatically for string model IDs:
