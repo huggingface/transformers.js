@@ -19,15 +19,19 @@
  * @module env
  */
 
+import * as NativeFS from 'native-universal-fs';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
+import { fetchBinary } from './utils/fetch-binary.js';
+
 const VERSION = '4.3.0';
 
 const HAS_SELF = typeof self !== 'undefined';
+const IS_REACT_NATIVE_ENV = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 
-const IS_FS_AVAILABLE = !isEmpty(fs);
+const IS_FS_AVAILABLE = !isEmpty(fs) || !isEmpty(NativeFS);
 const IS_PATH_AVAILABLE = !isEmpty(path);
 const IS_WEB_CACHE_AVAILABLE = HAS_SELF && 'caches' in self;
 
@@ -103,6 +107,9 @@ export const apis = Object.freeze({
     /** Whether we are running in a web-like environment (browser, web worker, or Deno web runtime) */
     IS_WEB_ENV,
 
+    /** Whether we are running in a React Native environment */
+    IS_REACT_NATIVE_ENV,
+
     /** Whether we are running in a service worker environment */
     IS_SERVICE_WORKER_ENV,
 
@@ -143,7 +150,9 @@ export const apis = Object.freeze({
 const RUNNING_LOCALLY = IS_FS_AVAILABLE && IS_PATH_AVAILABLE;
 
 let dirname__ = './';
-if (RUNNING_LOCALLY) {
+if (IS_REACT_NATIVE_ENV) {
+    dirname__ = NativeFS.DocumentDirectoryPath;
+} else if (RUNNING_LOCALLY) {
     const _import_meta_url = import.meta.url;
 
     if (_import_meta_url) {
@@ -161,7 +170,13 @@ const DEFAULT_LOCAL_MODEL_PATH = '/models/';
 const localModelPath = RUNNING_LOCALLY ? path.join(dirname__, DEFAULT_LOCAL_MODEL_PATH) : DEFAULT_LOCAL_MODEL_PATH;
 
 // Ensure default fetch is called with the correct receiver in browser environments.
-const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
+// On React Native, `fetch` mangles binary payloads, so route through an XHR-backed
+// implementation instead (see `utils/fetch-binary.js`).
+const DEFAULT_FETCH = IS_REACT_NATIVE_ENV
+    ? fetchBinary
+    : typeof globalThis.fetch === 'function'
+      ? globalThis.fetch.bind(globalThis)
+      : undefined;
 
 /**
  * Log-level enum. Assign to `env.logLevel` to control how verbose the library
@@ -208,6 +223,7 @@ export const LogLevel = Object.freeze({
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {boolean} useFS Whether to use the file system to load files. By default, it is `true` if available.
+ * @property {boolean} rnUseCanvas Whether to use Canvas API in React Native for image processing. Defaults to `true`.
  * @property {boolean} useBrowserCache Whether to use Cache API to cache models. By default, it is `true` if available.
  * @property {boolean} useFSCache Whether to use the file system to cache files. By default, it is `true` if available.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
@@ -259,6 +275,7 @@ export const env = {
     allowLocalModels: !(IS_BROWSER_ENV || IS_WEBWORKER_ENV || IS_DENO_WEB_RUNTIME), // Default to true for non-web environments, false for web environments
     localModelPath: localModelPath,
     useFS: IS_FS_AVAILABLE,
+    rnUseCanvas: true,
 
     /////////////////// Cache settings ///////////////////
     useBrowserCache: IS_WEB_CACHE_AVAILABLE,
