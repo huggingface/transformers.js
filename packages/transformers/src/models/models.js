@@ -119,6 +119,7 @@ export * from './mt5/modeling_mt5.js';
 export * from './multi_modality/modeling_multi_modality.js';
 export * from './musicgen/modeling_musicgen.js';
 export * from './nanochat/modeling_nanochat.js';
+export * from './nemotron3_diarization/modeling_nemotron3_diarization.js';
 export * from './nemotron_h/modeling_nemotron_h.js';
 export * from './neobert/modeling_neobert.js';
 export * from './nomic_bert/modeling_nomic_bert.js';
