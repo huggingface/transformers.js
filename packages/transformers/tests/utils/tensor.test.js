@@ -1,3 +1,5 @@
+import { jest } from "@jest/globals";
+
 import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 
@@ -6,6 +8,51 @@ init();
 describe("Tensor operations", () => {
   it("rejects data that does not match the declared shape", () => {
     expect(() => new Tensor("float32", [1, 2, 3], [2, 2])).toThrow("does not match shape [2,2] (4)");
+  });
+
+  it("wraps provider-owned storage without reading device data", async () => {
+    const handle = { gpuBuffer: true };
+    const dispose = jest.fn(async () => "disposed");
+    const tensor = Tensor.fromBackendStorage({
+      backend: "test-webgpu",
+      handle,
+      type: "float32",
+      dims: [2, 3],
+      get data() {
+        throw new Error("readback");
+      },
+      size: 6,
+      location: "gpu-buffer",
+      dispose,
+    });
+
+    expect(tensor.backend).toBe("test-webgpu");
+    expect(tensor.location).toBe("gpu-buffer");
+    expect(tensor.getBackendStorage("test-webgpu").handle).toBe(handle);
+    expect(tensor.getBackendStorage("another-backend")).toBeNull();
+    expect(() => tensor.data).toThrow("readback");
+
+    const firstDispose = tensor.dispose();
+    expect(tensor.dispose()).toBe(firstDispose);
+    await expect(firstDispose).resolves.toBe("disposed");
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("validates provider-owned storage", () => {
+    const storage = {
+      backend: "test",
+      handle: {},
+      type: "float32",
+      data: new Float32Array(1),
+      dims: [2],
+      size: 1,
+      location: "gpu-buffer",
+      dispose() {},
+    };
+
+    expect(() => Tensor.fromBackendStorage(storage)).toThrow("does not match shape [2] (2)");
+    expect(() => Tensor.fromBackendStorage({ ...storage, size: 2, backend: "" })).toThrow("`backend`");
+    expect(() => Tensor.fromBackendStorage({ ...storage, size: 2, type: "invalid" })).toThrow("Unsupported backend tensor type");
   });
 
   describe("cat", () => {

@@ -32,8 +32,15 @@ import { DynamicCache } from '../cache_utils.js';
 import { get_model_files } from '../utils/model_registry/get_model_files.js';
 import { get_file_metadata } from '../utils/model_registry/get_file_metadata.js';
 import { MODEL_TYPES } from './model_types.js';
-import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel, withInferenceBackendHostOptions, withInferenceBackendSharedAssetOptions } from '../backends/inference.js';
-import { getDefaultInferenceProvider, getOnnxProviderModule } from '../backends/default.js';
+import {
+    getModelId,
+    isInferenceBackend,
+    isSessionInferenceProvider,
+    loadInferenceModel,
+    withInferenceBackendHostOptions,
+    withInferenceBackendSharedAssetOptions,
+} from '../backends/inference.js';
+import { getDefaultInferenceProvider } from '../backends/default.js';
 
 /**
  * Converts an array or Tensor of integers to an int64 Tensor.
@@ -255,16 +262,18 @@ export class PreTrainedModel extends Callable {
     static async from_pretrained(pretrained_model_name_or_path, options = {}) {
         if (typeof pretrained_model_name_or_path === 'string') {
             const provider = await getDefaultInferenceProvider(pretrained_model_name_or_path);
-            return provider.load(withInferenceBackendHostOptions({
-                ...options,
-                modelClass: this,
-            }));
-        }
-        if (isOnnxSessionProvider(pretrained_model_name_or_path)) {
-            await getOnnxProviderModule();
-            return /** @type {any} */ (pretrained_model_name_or_path).load(
-                withInferenceBackendHostOptions({ ...options, modelClass: this }),
+            return provider.load(
+                withInferenceBackendHostOptions({
+                    ...options,
+                    modelClass: this,
+                }),
             );
+        }
+        if (isSessionInferenceProvider(pretrained_model_name_or_path)) {
+            return this._from_pretrained(getModelId(pretrained_model_name_or_path), {
+                ...withInferenceBackendHostOptions(options),
+                inferenceProvider: pretrained_model_name_or_path,
+            });
         }
         if (isInferenceBackend(pretrained_model_name_or_path)) {
             const modelId = getModelId(pretrained_model_name_or_path);
@@ -275,10 +284,12 @@ export class PreTrainedModel extends Callable {
             /** @type {ReadonlyArray<string>|null} */
             let expectedFiles = null;
             if (typeof pretrained_model_name_or_path.listModelArtifacts === 'function') {
-                expectedFiles = await pretrained_model_name_or_path.listModelArtifacts(withInferenceBackendHostOptions({
-                    ...resolvedOptions,
-                    modelId,
-                }));
+                expectedFiles = await pretrained_model_name_or_path.listModelArtifacts(
+                    withInferenceBackendHostOptions({
+                        ...resolvedOptions,
+                        modelId,
+                    }),
+                );
             }
             if (
                 resolvedOptions.progress_callback &&

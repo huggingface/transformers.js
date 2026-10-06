@@ -39,6 +39,7 @@ const wrap = async (session_bytes: number[], session_options: any, names: string
 
 // In-memory registry of initialized ONNX operators
 export class OnnxTensorOpRegistry {
+    static readonly backend = 'onnx';
     static _nearest_interpolate_4d: any;
     static _bilinear_interpolate_4d: any;
     static _bicubic_interpolate_4d: any;

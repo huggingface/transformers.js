@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 
-import { getModelId, isInferenceBackend, isOnnxSessionProvider, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
+import { getModelId, isInferenceBackend, isOnnxSessionProvider, isSessionInferenceProvider, loadInferenceModel, normalizeInferenceModel, validateInferenceBackendTask, validateInferenceModelTask } from "../src/backends/inference.js";
 import { OnnxInferenceProvider } from "@huggingface/transformers-onnxruntime";
 import { AutoModel } from "../src/models/auto/modeling_auto.js";
 import { PreTrainedModel } from "../src/models/modeling_utils.js";
@@ -24,10 +24,12 @@ describe("inference backends", () => {
     expect(getModelId("test/string")).toBe("test/string");
   });
 
-  it("uses an explicit marker for ONNX session providers", () => {
+  it("uses a versioned marker for runtime-neutral session providers", () => {
     const constructSessions = () => {};
     expect(isOnnxSessionProvider({ modelId: "test/custom", load() {}, constructSessions })).toBe(false);
-    expect(isOnnxSessionProvider({ modelId: "test/onnx", load() {}, constructSessions, providerType: "onnx" })).toBe(true);
+    expect(isSessionInferenceProvider({ modelId: "test/custom", load() {}, constructSessions })).toBe(false);
+    expect(isSessionInferenceProvider({ modelId: "test/custom", constructSessions, sessionProvider: { version: 1 } })).toBe(true);
+    expect(isOnnxSessionProvider({ modelId: "test/onnx", load() {}, constructSessions, sessionProvider: { version: 1 }, providerType: "onnx" })).toBe(true);
   });
 
   it("normalizes a model with forward into a callable model", async () => {
@@ -59,7 +61,17 @@ describe("inference backends", () => {
 
     const model = await loadInferenceModel(backend, { config, dtype: "q4f16" });
 
-    expect(load).toHaveBeenCalledWith({ config, dtype: "q4f16", modelId: "test/model", fetch: env.fetch });
+    expect(load).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config,
+        dtype: "q4f16",
+        modelId: "test/model",
+        fetch: env.fetch,
+        getModelFile: expect.any(Function),
+        getModelFileMetadata: expect.any(Function),
+        deleteModelFile: expect.any(Function),
+      }),
+    );
     expect(model.config).toBe(config);
   });
 
@@ -134,13 +146,8 @@ describe("inference backends", () => {
     });
 
     expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith("model.bin", expect.objectContaining({ signal }));
-    expect(backend.listModelArtifacts).toHaveBeenCalledWith(
-      expect.objectContaining({ fetch: env.fetch, revision: "backend-revision", subfolder: "shared" }),
-    );
-    expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith(
-      "model.bin",
-      expect.objectContaining({ fetch: env.fetch }),
-    );
+    expect(backend.listModelArtifacts).toHaveBeenCalledWith(expect.objectContaining({ fetch: env.fetch, revision: "backend-revision", subfolder: "shared" }));
+    expect(backend.getModelArtifactMetadata).toHaveBeenCalledWith("model.bin", expect.objectContaining({ fetch: env.fetch }));
     expect(backend.load).toHaveBeenCalledWith(
       expect.objectContaining({
         modelId: "test/model",
@@ -175,6 +182,20 @@ describe("inference backends", () => {
     expect(backend.load).toHaveBeenCalledWith(expect.objectContaining({ modelId: "test/model" }));
     expect(backend.constructSessions).not.toHaveBeenCalled();
     await expect(model({ value: 1 })).resolves.toEqual({ value: 1 });
+  });
+
+  it("passes model classes to runtime-neutral session providers", async () => {
+    class TestModel extends PreTrainedModel {}
+    const provider = {
+      modelId: "test/session-provider",
+      sessionProvider: { version: 1 },
+      constructSessions: jest.fn(),
+    };
+    TestModel._from_pretrained = jest.fn(async () => "loaded");
+
+    await expect(TestModel.from_pretrained(provider)).resolves.toBe("loaded");
+
+    expect(TestModel._from_pretrained).toHaveBeenCalledWith("test/session-provider", expect.objectContaining({ inferenceProvider: provider, getModelFile: expect.any(Function) }));
   });
 
   it("represents string IDs with the ONNX fallback backend", async () => {

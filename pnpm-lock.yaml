@@ -58,6 +58,28 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/transformers-litertjs-runtime:
+    dependencies:
+      '@litertjs/core':
+        specifier: 2.5.3
+        version: 2.5.3
+    devDependencies:
+      '@huggingface/transformers':
+        specifier: workspace:^
+        version: link:../transformers
+      '@types/node':
+        specifier: ^24.1.0
+        version: 24.10.9
+      '@webgpu/types':
+        specifier: ^0.1.69
+        version: 0.1.69
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/transformers-onnxruntime:
     dependencies:
       onnxruntime-common:
@@ -675,6 +697,12 @@ packages:
   '@jsdoc/salty@0.2.9':
     resolution: {integrity: sha512-yYxMVH7Dqw6nO0d5NIV8OQWnitU8k6vXH8NtgqAfIa/IUqRMxRv/NUJJ08VEKbAakwxlgBl5PJdrU0dMPStsnw==}
     engines: {node: '>=v12.0.0'}
+
+  '@litertjs/core@2.5.3':
+    resolution: {integrity: sha512-PlGmbMOq9WitX7FO0jhbdJw9GthatsyuCQXjTt/wJZo0FLaw48q4tz8IwqgqCIkviYGr9OFDL1kCnN4nzWoyJQ==}
+
+  '@litertjs/wasm-utils@2.5.3':
+    resolution: {integrity: sha512-4fJiw6tBQnIs+0jH/OQ16nYOiSl8/+zZnn5h2ul8aTKHi05sVqZW580Tmk78pC2kT39A9OYBVdFawteZ/sI1kQ==}
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
@@ -2679,6 +2707,12 @@ snapshots:
   '@jsdoc/salty@0.2.9':
     dependencies:
       lodash: 4.17.23
+
+  '@litertjs/core@2.5.3':
+    dependencies:
+      '@litertjs/wasm-utils': 2.5.3
+
+  '@litertjs/wasm-utils@2.5.3': {}
 
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:

@@ -124,4 +124,40 @@ describe("OnnxInferenceProvider", () => {
       }),
     ).rejects.toThrow("exceeds the maximum allowed value (2)");
   });
+
+  it("prefers the per-load cache-aware model file service", async () => {
+    const hostGetModelFile = jest.fn(async () => {
+      throw new Error("host fallback should not be used");
+    });
+    configureOnnxProviderHost({
+      env: { backends: { onnx: {} }, fetch: globalThis.fetch },
+      apis: {
+        IS_NODE_ENV: false,
+        IS_WEB_ENV: true,
+        IS_WEBGPU_AVAILABLE: false,
+        IS_WEBNN_AVAILABLE: false,
+        IS_DENO_WEB_RUNTIME: false,
+        IS_SAFARI_BELOW_26: false,
+        IS_SERVICE_WORKER_ENV: false,
+        IS_CHROME_AVAILABLE: false,
+      },
+      logger: console,
+      getModelFile: hostGetModelFile,
+      getCacheNames: () => new Set(),
+      createBackendTensor: () => null,
+      getBackendTensorStorage: () => null,
+      maxExternalDataChunks: 2,
+    });
+    const getModelFile = jest.fn(async () => new Uint8Array([1]));
+
+    await OnnxInferenceProvider.from_modelId("onnx-community/test-model").getSession("model", {
+      config: {},
+      device: "cpu",
+      dtype: "q8",
+      getModelFile,
+    });
+
+    expect(getModelFile).toHaveBeenCalledWith("onnx-community/test-model", "onnx/model_quantized.onnx", true, expect.any(Object), false);
+    expect(hostGetModelFile).not.toHaveBeenCalled();
+  });
 });

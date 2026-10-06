@@ -1,6 +1,6 @@
 import { Pipeline } from './_base.js';
 
-import { Tensor, mean_pooling, quantize_embeddings } from '../utils/tensor.js';
+import { Tensor, mean_pooling_async, normalize_tensor, quantize_embeddings, slice_tensor } from '../utils/tensor.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -102,27 +102,33 @@ export class FeatureExtractionPipeline
         /** @type {Tensor} */
         let result = outputs.last_hidden_state ?? outputs.logits ?? outputs.token_embeddings;
 
+        const replaceResult = async (pending) => {
+            const previous = result;
+            result = await pending;
+            if (result !== previous && previous.backend !== 'cpu') await previous.dispose();
+        };
+
         switch (pooling) {
             case 'none':
                 // Skip pooling
                 break;
             case 'mean':
-                result = mean_pooling(result, model_inputs.attention_mask);
+                await replaceResult(mean_pooling_async(result, model_inputs.attention_mask));
                 break;
             case 'first_token':
             case 'cls':
-                result = result.slice(null, 0);
+                await replaceResult(slice_tensor(result, null, 0));
                 break;
             case 'last_token':
             case 'eos':
-                result = result.slice(null, -1);
+                await replaceResult(slice_tensor(result, null, -1));
                 break;
             default:
                 throw Error(`Pooling method '${pooling}' not supported.`);
         }
 
         if (normalize) {
-            result = result.normalize(2, -1);
+            await replaceResult(normalize_tensor(result, 2, -1));
         }
 
         if (quantize) {

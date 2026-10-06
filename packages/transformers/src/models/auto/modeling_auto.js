@@ -44,7 +44,7 @@ import { CUSTOM_ARCHITECTURES, MODEL_CLASS_TYPE_MAPPING, MODEL_MAPPINGS } from '
 
 import * as ALL_MODEL_FILES from '../models.js';
 import { logger } from '../../utils/logger.js';
-import { getModelId, isInferenceBackend, isOnnxSessionProvider } from '../../backends/inference.js';
+import { getModelId, isInferenceBackend, isSessionInferenceProvider } from '../../backends/inference.js';
 
 /**
  * Base class of all AutoModels. Contains the `from_pretrained` function
@@ -97,7 +97,7 @@ class PretrainedMixin {
     ) {
         if (
             isInferenceBackend(pretrained_model_name_or_path) &&
-            !isOnnxSessionProvider(pretrained_model_name_or_path)
+            !isSessionInferenceProvider(pretrained_model_name_or_path)
         ) {
             return PreTrainedModel.from_pretrained(pretrained_model_name_or_path, {
                 progress_callback,

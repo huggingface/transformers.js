@@ -11,6 +11,27 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 import { withInferenceBackendHostOptions } from '../../backends/inference.js';
 
 /**
+ * Delete one file from Transformers.js cache storage.
+ *
+ * @param {string} modelId
+ * @param {string} filename
+ * @param {Object} [options]
+ * @returns {Promise<boolean>}
+ */
+export async function delete_file_from_cache(modelId, filename, options = {}) {
+    const cache = await getCache(options?.cache_dir);
+    if (!cache) return false;
+    if (!cache.delete) throw new Error('Cache does not support delete operation');
+
+    const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
+    const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
+    if (!cached) return false;
+
+    const deletedWithProposed = await cache.delete(proposedCacheKey);
+    return deletedWithProposed || (proposedCacheKey !== localPath && (await cache.delete(localPath)));
+}
+
+/**
  * @typedef {Object} FileClearStatus
  * @property {string} file - The file path
  * @property {boolean} deleted - Whether the file was successfully deleted
@@ -43,7 +64,10 @@ async function clear_files_from_cache(modelId, files, options = {}) {
     const results = await Promise.all(
         files.map(async (filename) => {
             const backendOptions = withInferenceBackendHostOptions(options);
-            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(filename, backendOptions);
+            const backendMetadata = await options.inferenceBackend?.getModelArtifactMetadata?.(
+                filename,
+                backendOptions,
+            );
             if (backendMetadata) {
                 const wasCached = backendMetadata.fromCache === true;
                 const deleted = wasCached
@@ -57,16 +81,7 @@ async function clear_files_from_cache(modelId, files, options = {}) {
             const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
             const wasCached = !!cached;
 
-            let deleted = false;
-            if (wasCached) {
-                // Try proposedCacheKey first (remote URL for browser Cache API, request path for FileCache),
-                // then fall back to localPath in case the entry was cached under the local key instead.
-                const deletedWithProposed = await cache.delete(proposedCacheKey);
-                const deletedWithLocal =
-                    !deletedWithProposed && proposedCacheKey !== localPath ? await cache.delete(localPath) : false;
-
-                deleted = deletedWithProposed || deletedWithLocal;
-            }
+            const deleted = wasCached ? await delete_file_from_cache(modelId, filename, options) : false;
 
             return { file: filename, deleted, wasCached };
         }),

@@ -1,7 +1,7 @@
 /**
  * @file Runtime-neutral inference backend helpers.
  *
- * An inference backend is a model factory with a shared pretrained model ID:
+ * A generic inference backend is a model factory with a shared pretrained model ID:
  *
  * ```js
  * const backend = {
@@ -38,6 +38,7 @@ import { env } from '../env.js';
  * @property {Readonly<Record<string, unknown>>} [diffusion]
  * @property {Readonly<Record<string, unknown>>} [audioGeneration]
  * @property {{version: 1, input: 'audio'}} [automaticSpeechRecognition]
+ * @property {{version: 1, preprocess?: 'model', postprocess: 'model'}} [objectDetection]
  */
 
 /**
@@ -51,9 +52,33 @@ import { env } from '../env.js';
  */
 
 /**
+ * Versioned capability for providers that construct the normalized sessions consumed by built-in
+ * Transformers.js model classes.
+ *
+ * @typedef {Object} SessionProviderCapabilitiesV1
+ * @property {1} version
+ */
+
+/**
+ * Runtime-neutral session consumed by built-in Transformers.js model classes.
+ *
+ * @typedef {Object} InferenceSession
+ * @property {ReadonlyArray<string>} inputNames
+ * @property {ReadonlyArray<string>} outputNames
+ * @property {unknown} [inputMetadata]
+ * @property {unknown} [outputMetadata]
+ * @property {Readonly<Record<string, unknown>>} [config]
+ * @property {(inputs: Record<string, import('../utils/tensor.js').Tensor>) => Promise<Record<string, import('../utils/tensor.js').Tensor>>} run
+ * @property {() => Promise<unknown>|unknown} release
+ */
+
+/**
  * @typedef {import('../utils/hub.js').PretrainedModelOptions & {
  *   modelId: string,
  *   fetch: typeof globalThis.fetch,
+ *   getModelFile: typeof getInferenceBackendModelFile,
+ *   getModelFileMetadata: typeof getInferenceBackendModelFileMetadata,
+ *   deleteModelFile: typeof deleteInferenceBackendModelFile,
  *   task?: string,
  *   config?: import('../configs.js').PretrainedConfig,
  *   modelClass?: Function,
@@ -81,6 +106,8 @@ import { env } from '../env.js';
  * @property {import('../generation/runtime.js').GenerationCapabilitiesV1} [generationCapabilities] Deprecated flat causal-generation capabilities.
  * @property {(options: import('../generation/runtime.js').AutoregressiveSessionOptionsV1) => Promise<import('../generation/runtime.js').AutoregressiveSessionV1>} [createAutoregressiveSession]
  * @property {(audio: Float32Array, options: Record<string, unknown>) => Promise<import('../utils/tensor.js').Tensor>} [transcribeAudio]
+ * @property {(images: import('../utils/image.js').RawImage[]) => Promise<Record<string, unknown>>} [preprocessObjectDetection]
+ * @property {(outputs: Record<string, import('../utils/tensor.js').Tensor>, threshold?: number, targetSizes?: number[][]|null) => Promise<unknown>|unknown} [postProcessObjectDetection]
  * @property {import('../configs.js').PretrainedConfig} [config]
  * @property {() => Promise<unknown>|unknown} dispose
  */
@@ -101,15 +128,17 @@ import { env } from '../env.js';
  * @property {{revision?: string, subfolder?: string}} [sharedAssets] Backend-selected location details for shared Transformers.js assets.
  * @property {InferenceBackendChatTemplate} [chatTemplate] Default chat template installed on a pipeline tokenizer.
  * @property {StaticBackendCapabilities} [capabilities]
+ * @property {SessionProviderCapabilitiesV1} [sessionProvider] Declares support for normalized built-in model sessions.
+ * @property {(names: Record<string, string>, options: InferenceBackendLoadOptions, cacheSessions?: Record<string, boolean>) => Promise<Record<string, InferenceSession>>} [constructSessions]
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
  * @property {(file: string, options: Object) => Promise<{size?: number, fromCache?: boolean}|null>} [getModelArtifactMetadata] Returns backend-owned cache metadata for an artifact.
  * @property {(file: string, options: Object) => Promise<boolean>} [deleteModelArtifact] Deletes an artifact from backend-owned cache storage.
- * @property {(options: InferenceBackendLoadOptions) => Promise<InferenceModel|Function>} load
+ * @property {(options: InferenceBackendLoadOptions) => Promise<InferenceModel|Function>} [load] Required unless `sessionProvider` and `constructSessions()` are implemented.
  */
 
 /**
- * Returns whether a value implements the custom inference backend contract.
- * Classes with static `modelId` and `load` members are supported too.
+ * Returns whether a value implements either the generic model-factory contract or the versioned
+ * normalized-session contract. Classes with static members are supported too.
  *
  * @param {unknown} value
  * @returns {value is InferenceBackend}
@@ -120,7 +149,26 @@ export function isInferenceBackend(value) {
         (typeof value === 'object' || typeof value === 'function') &&
         value !== null &&
         typeof backend.modelId === 'string' &&
-        typeof backend.load === 'function'
+        (typeof backend.load === 'function' ||
+            (backend.sessionProvider?.version === 1 && typeof backend.constructSessions === 'function'))
+    );
+}
+
+/**
+ * Returns whether a backend implements the versioned normalized-session contract used by built-in
+ * Transformers.js model classes.
+ *
+ * @param {unknown} value
+ * @returns {value is InferenceBackend & {sessionProvider: SessionProviderCapabilitiesV1, constructSessions: Function}}
+ */
+export function isSessionInferenceProvider(value) {
+    const provider = /** @type {any} */ (value);
+    return (
+        (typeof value === 'object' || typeof value === 'function') &&
+        value !== null &&
+        typeof provider.modelId === 'string' &&
+        provider.sessionProvider?.version === 1 &&
+        typeof provider.constructSessions === 'function'
     );
 }
 
@@ -133,11 +181,7 @@ export function isInferenceBackend(value) {
  */
 export function isOnnxSessionProvider(value) {
     const provider = /** @type {any} */ (value);
-    return (
-        isInferenceBackend(value) &&
-        provider.providerType === 'onnx' &&
-        typeof provider.constructSessions === 'function'
-    );
+    return isSessionInferenceProvider(value) && provider.providerType === 'onnx';
 }
 
 /**
@@ -149,7 +193,50 @@ export function isOnnxSessionProvider(value) {
 export function getModelId(model) {
     if (typeof model === 'string') return model;
     if (isInferenceBackend(model)) return model.modelId;
-    throw new TypeError('Model must be a model ID string or an inference backend with `modelId` and `load(options)`.');
+    throw new TypeError(
+        'Model must be a model ID string or an inference backend with `modelId` and either `load(options)` or the normalized-session contract.',
+    );
+}
+
+/**
+ * Load a model artifact through Transformers.js transport, progress, and cache handling.
+ * The dynamic import avoids a static cycle because the Hub utilities also accept inference backends.
+ *
+ * @param {string} modelId
+ * @param {string} file
+ * @param {boolean} [fatal]
+ * @param {Object} [options]
+ * @param {boolean} [returnPath]
+ * @returns {Promise<string|Uint8Array|null>}
+ */
+export async function getInferenceBackendModelFile(modelId, file, fatal = true, options = {}, returnPath = false) {
+    const { getModelFile } = await import('../utils/hub.js');
+    return getModelFile(modelId, file, fatal, options, returnPath);
+}
+
+/**
+ * Read model artifact metadata through Transformers.js cache-aware discovery.
+ *
+ * @param {string} modelId
+ * @param {string} file
+ * @param {Object} [options]
+ */
+export async function getInferenceBackendModelFileMetadata(modelId, file, options = {}) {
+    const { get_file_metadata } = await import('../utils/model_registry/get_file_metadata.js');
+    return get_file_metadata(modelId, file, options);
+}
+
+/**
+ * Delete one model artifact from Transformers.js cache storage.
+ *
+ * @param {string} modelId
+ * @param {string} file
+ * @param {Object} [options]
+ * @returns {Promise<boolean>}
+ */
+export async function deleteInferenceBackendModelFile(modelId, file, options = {}) {
+    const { delete_file_from_cache } = await import('../utils/model_registry/clear_cache.js');
+    return delete_file_from_cache(modelId, file, options);
 }
 
 /**
@@ -158,10 +245,21 @@ export function getModelId(model) {
  * Transformers.js environment customization.
  *
  * @param {Object} [options]
- * @returns {Object & {fetch: typeof globalThis.fetch}}
+ * @returns {Object & {
+ *   fetch: typeof globalThis.fetch,
+ *   getModelFile: typeof getInferenceBackendModelFile,
+ *   getModelFileMetadata: typeof getInferenceBackendModelFileMetadata,
+ *   deleteModelFile: typeof deleteInferenceBackendModelFile,
+ * }}
  */
 export function withInferenceBackendHostOptions(options = {}) {
-    return { ...options, fetch: env.fetch };
+    return {
+        ...options,
+        fetch: env.fetch,
+        getModelFile: getInferenceBackendModelFile,
+        getModelFileMetadata: getInferenceBackendModelFileMetadata,
+        deleteModelFile: deleteInferenceBackendModelFile,
+    };
 }
 
 /**

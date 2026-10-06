@@ -1,0 +1,45 @@
+{
+  "name": "@huggingface/transformers-litertjs-runtime",
+  "version": "0.1.0",
+  "description": "LiteRT.js inference provider for Transformers.js",
+  "type": "module",
+  "main": "./dist/transformers-litertjs-runtime.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./dist/transformers-litertjs-runtime.js"
+    }
+  },
+  "scripts": {
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
+    "typegen": "tsc --build",
+    "build": "node scripts/build.mjs && pnpm typegen",
+    "test": "pnpm build && node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@litertjs/core": "2.5.3"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": "workspace:^"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "workspace:^",
+    "@types/node": "^24.1.0",
+    "@webgpu/types": "^0.1.69",
+    "esbuild": "^0.27.2",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "README.md",
+    "!**/*.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0"
+}

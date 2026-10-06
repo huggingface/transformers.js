@@ -131,7 +131,14 @@ export class OnnxInferenceProvider {
         return files;
     }
 
-    static async getAvailableDtypes({ modelId, modelType, config, model_file_name, getFileMetadata, metadataOptions }: any): Promise<string[]> {
+    static async getAvailableDtypes({
+        modelId,
+        modelType,
+        config,
+        model_file_name,
+        getFileMetadata,
+        metadataOptions,
+    }: any): Promise<string[]> {
         const { sessions } = getSessionsConfig(modelType, config, { model_file_name });
         const results = await Promise.all(
             Object.entries(DEFAULT_DTYPE_SUFFIX_MAPPING).map(async ([dtype, suffix]) => ({
@@ -164,6 +171,7 @@ export class OnnxInferenceProvider {
     }
 
     readonly providerType = 'onnx';
+    readonly sessionProvider = { version: 1 } as const;
     modelClass: any;
 
     constructor(
@@ -412,7 +420,7 @@ function validateInputs(session: any, inputs: Record<string, any>): Record<strin
 
 async function getCoreModelFile(modelId: string, fileName: string, options: any, suffix: string): Promise<any> {
     const baseName = `${fileName}${suffix}.onnx`;
-    return getOnnxProviderHost().getModelFile(
+    return (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
         modelId,
         `onnx/${baseName}`,
         true,
@@ -456,7 +464,7 @@ async function getModelDataFiles(
     if (count > 0) {
         return Promise.all(
             externalDataChunkNames(baseName, count).map(async (path) => {
-                const data = await getOnnxProviderHost().getModelFile(
+                const data = await (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
                     modelId,
                     `onnx/${path}`,
                     true,
@@ -471,7 +479,15 @@ async function getModelDataFiles(
         return Promise.all(
             sessionOptions.externalData.map(async (item: any) =>
                 typeof item.data === 'string'
-                    ? { ...item, data: await getOnnxProviderHost().getModelFile(modelId, item.data, true, options) }
+                    ? {
+                          ...item,
+                          data: await (options.getModelFile ?? getOnnxProviderHost().getModelFile)(
+                              modelId,
+                              item.data,
+                              true,
+                              options,
+                          ),
+                      }
                     : item,
             ),
         );

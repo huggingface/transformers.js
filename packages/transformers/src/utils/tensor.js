@@ -22,6 +22,58 @@ const NOOP_DISPOSE = () => {};
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
 
+/**
+ * Provider-owned storage wrapped by a public Transformers.js `Tensor`.
+ *
+ * The handle is opaque outside the backend identified by `backend`. Device-resident storage may
+ * throw from `data` when synchronous CPU access is unavailable. `Tensor.dispose()` owns the
+ * storage and invokes `dispose()` at most once.
+ *
+ * @typedef {Object} BackendTensorStorage
+ * @property {string} backend Stable identifier for the backend that owns `handle`.
+ * @property {unknown} handle Opaque runtime-native tensor or buffer.
+ * @property {DataType} type
+ * @property {number[]} dims
+ * @property {DataArray} data Synchronously accessible data, when supported by the storage location.
+ * @property {number} size
+ * @property {string} location Provider-defined storage location, such as `cpu` or `gpu-buffer`.
+ * @property {() => Promise<unknown>|unknown} dispose Releases the provider-owned storage.
+ */
+
+/** @param {BackendTensorStorage} storage */
+function validateBackendTensorStorage(storage) {
+    if (!storage || typeof storage !== 'object') {
+        throw new TypeError('Backend tensor storage must be an object.');
+    }
+    if (typeof storage.backend !== 'string' || storage.backend.length === 0) {
+        throw new TypeError('Backend tensor storage requires a non-empty `backend` identifier.');
+    }
+    if (!('handle' in storage)) {
+        throw new TypeError('Backend tensor storage requires an opaque `handle`.');
+    }
+    if (!Object.hasOwn(DataTypeMap, storage.type)) {
+        throw new TypeError(`Unsupported backend tensor type: ${String(storage.type)}.`);
+    }
+    if (!Array.isArray(storage.dims) || storage.dims.some((value) => !Number.isInteger(value) || value < 0)) {
+        throw new TypeError('Backend tensor storage `dims` must contain non-negative integers.');
+    }
+    const expectedSize = storage.dims.reduce((product, dimension) => product * dimension, 1);
+    if (!Number.isInteger(storage.size) || storage.size !== expectedSize) {
+        throw new RangeError(
+            `Backend tensor storage size (${storage.size}) does not match shape [${storage.dims}] (${expectedSize}).`,
+        );
+    }
+    if (typeof storage.location !== 'string' || storage.location.length === 0) {
+        throw new TypeError('Backend tensor storage requires a non-empty `location`.');
+    }
+    if (!('data' in storage)) {
+        throw new TypeError('Backend tensor storage requires a `data` accessor.');
+    }
+    if (typeof storage.dispose !== 'function') {
+        throw new TypeError('Backend tensor storage requires a `dispose()` method.');
+    }
+}
+
 export class Tensor {
     /**
      * Dimensions of the tensor.
@@ -64,6 +116,14 @@ export class Tensor {
      */
     get location() {
         return this._storage.location;
+    }
+
+    /**
+     * The stable identifier of the backend that owns this tensor's storage.
+     * @type {string}
+     */
+    get backend() {
+        return this._storage.backend;
     }
 
     _storage;
@@ -120,18 +180,36 @@ export class Tensor {
     }
 
     dispose() {
-        this._storage.dispose?.();
+        return this._storage.dispose?.();
     }
 
     /**
      * Construct a Tensor around provider-owned storage.
-     * @param {Object} storage
+     * The returned tensor owns `storage`; its `dispose()` callback is invoked at most once.
+     * Runtime-native handles must only be consumed by the backend named by `storage.backend`.
+     *
+     * @param {BackendTensorStorage} storage
      * @returns {Tensor}
-     * @internal
      */
     static fromBackendStorage(storage) {
+        validateBackendTensorStorage(storage);
+        const dispose = storage.dispose.bind(storage);
+        let disposeResult;
+        let disposed = false;
+        const ownedStorage = new Proxy(storage, {
+            get(target, property, receiver) {
+                if (property !== 'dispose') return Reflect.get(target, property, receiver);
+                return () => {
+                    if (!disposed) {
+                        disposed = true;
+                        disposeResult = dispose();
+                    }
+                    return disposeResult;
+                };
+            },
+        });
         const tensor = Object.create(Tensor.prototype);
-        tensor._storage = storage;
+        tensor._storage = ownedStorage;
         return new Proxy(tensor, {
             get: (obj, key) => {
                 if (typeof key === 'string') {
@@ -144,9 +222,15 @@ export class Tensor {
         });
     }
 
-    /** @internal */
-    getBackendStorage() {
-        return this._storage;
+    /**
+     * Returns this tensor's provider-owned storage. If `backend` is provided, returns `null` unless
+     * it matches the storage owner. Providers should check ownership before using the opaque handle.
+     *
+     * @param {string} [backend]
+     * @returns {BackendTensorStorage|null}
+     */
+    getBackendStorage(backend = undefined) {
+        return backend === undefined || this._storage.backend === backend ? this._storage : null;
     }
 
     /**
@@ -1105,11 +1189,11 @@ export async function interpolate_4d(input, { size = null, mode = 'bilinear' } =
 
     let op;
     if (mode === 'nearest') {
-        op = await TensorOpRegistry.nearest_interpolate_4d;
+        op = await TensorOpRegistry.resolve('nearest_interpolate_4d', [input]);
     } else if (mode === 'bilinear') {
-        op = await TensorOpRegistry.bilinear_interpolate_4d;
+        op = await TensorOpRegistry.resolve('bilinear_interpolate_4d', [input]);
     } else if (mode === 'bicubic') {
-        op = await TensorOpRegistry.bicubic_interpolate_4d;
+        op = await TensorOpRegistry.resolve('bicubic_interpolate_4d', [input]);
     } else {
         throw new Error(`Unsupported mode: ${mode}`);
     }
@@ -1126,7 +1210,7 @@ export async function interpolate_4d(input, { size = null, mode = 'bilinear' } =
  * @returns {Promise<Tensor>} The matrix product of the two tensors.
  */
 export async function matmul(a, b) {
-    const op = await TensorOpRegistry.matmul;
+    const op = await TensorOpRegistry.resolve('matmul', [a, b]);
     return await op({ a, b });
 }
 
@@ -1138,7 +1222,7 @@ export async function matmul(a, b) {
  * @returns {Promise<Tensor>} the output tensor.
  */
 export async function rfft(x, a) {
-    const op = await TensorOpRegistry.rfft;
+    const op = await TensorOpRegistry.resolve('rfft', [x, a]);
     return await op({ x, a });
 }
 
@@ -1150,7 +1234,7 @@ export async function rfft(x, a) {
  * @returns {Promise<[Tensor, Tensor]>} the output tuple of (Tensor, LongTensor) of top-k elements and their indices.
  */
 export async function topk(x, k) {
-    const op = await TensorOpRegistry.top_k;
+    const op = await TensorOpRegistry.resolve('top_k', [x]);
 
     if (k == null) {
         k = x.dims.at(-1);
@@ -1174,7 +1258,7 @@ const arrayToIndexTensor = (array) => new Tensor('int64', array, [array.length])
  * @returns {Promise<Tensor>} Sliced data tensor.
  */
 export async function slice(data, starts, ends, axes, steps) {
-    const op = await TensorOpRegistry.slice;
+    const op = await TensorOpRegistry.resolve('slice', [data]);
     return await op({
         x: data,
         s: arrayToIndexTensor(starts),
@@ -1227,6 +1311,46 @@ export function mean_pooling(last_hidden_state, attention_mask) {
     }
 
     return new Tensor(last_hidden_state.type, returnedData, shape);
+}
+
+/**
+ * Mean-pool embeddings with a backend implementation when one is registered, otherwise use the
+ * CPU implementation.
+ * @param {Tensor} last_hidden_state
+ * @param {Tensor} attention_mask
+ * @returns {Promise<Tensor>}
+ */
+export async function mean_pooling_async(last_hidden_state, attention_mask) {
+    const op = await TensorOpRegistry.resolve('mean_pooling', [last_hidden_state], {
+        required: false,
+        fallback: false,
+    });
+    return op ? await op(last_hidden_state, attention_mask) : mean_pooling(last_hidden_state, attention_mask);
+}
+
+/**
+ * Slice a tensor with a backend implementation when one is registered, otherwise use the CPU
+ * implementation.
+ * @param {Tensor} input
+ * @param {...(number|number[]|null)} slices
+ * @returns {Promise<Tensor>}
+ */
+export async function slice_tensor(input, ...slices) {
+    const op = await TensorOpRegistry.resolve('slice_tensor', [input], { required: false, fallback: false });
+    return op ? await op(input, ...slices) : input.slice(...slices);
+}
+
+/**
+ * Normalize a tensor with a backend implementation when one is registered, otherwise use the CPU
+ * implementation.
+ * @param {Tensor} input
+ * @param {number} [p=2]
+ * @param {number} [dim=1]
+ * @returns {Promise<Tensor>}
+ */
+export async function normalize_tensor(input, p = 2, dim = 1) {
+    const op = await TensorOpRegistry.resolve('normalize', [input], { required: false, fallback: false });
+    return op ? await op(input, p, dim) : input.normalize(p, dim);
 }
 
 /**

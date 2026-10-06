@@ -51,6 +51,7 @@ export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';
 export { load_video, RawVideo, RawVideoFrame } from './utils/video.js';
 export * from './utils/tensor.js';
+export { TensorOpRegistry } from './ops/registry.js';
 export { softmax, log_softmax, dot, cos_sim } from './utils/maths.js';
 export { random } from './utils/random.js';
 
@@ -60,7 +61,7 @@ export { DynamicCache } from './cache_utils.js';
 export { ModelRegistry } from './utils/model_registry/ModelRegistry.js';
 
 // Inference backends
-export { getModelId, isInferenceBackend } from './backends/inference.js';
+export { getModelId, isInferenceBackend, isSessionInferenceProvider } from './backends/inference.js';
 
 // Expose common types used across the library for developers to access
 /**
@@ -69,6 +70,7 @@ export { getModelId, isInferenceBackend } from './backends/inference.js';
  * @typedef {import('./tokenization_utils.js').Message} Message
  * @typedef {import('./tokenization_utils.js').PretrainedTokenizerOptions} PretrainedTokenizerOptions
  * @typedef {import('./utils/dtypes.js').DataType} DataType
+ * @typedef {import('./utils/tensor.js').BackendTensorStorage} BackendTensorStorage
  * @typedef {import('./utils/devices.js').DeviceType} DeviceType
  * @typedef {import('./utils/core.js').ProgressCallback} ProgressCallback
  * @typedef {import('./utils/core.js').ProgressInfo} ProgressInfo
@@ -79,6 +81,8 @@ export { getModelId, isInferenceBackend } from './backends/inference.js';
  * @typedef {import('./backends/inference.js').InferenceModelCapabilities} InferenceModelCapabilities
  * @typedef {import('./backends/inference.js').StaticBackendCapabilities} StaticBackendCapabilities
  * @typedef {import('./backends/inference.js').ForwardCapabilitiesV1} ForwardCapabilitiesV1
+ * @typedef {import('./backends/inference.js').SessionProviderCapabilitiesV1} SessionProviderCapabilitiesV1
+ * @typedef {import('./backends/inference.js').InferenceSession} InferenceSession
  * @typedef {import('./generation/runtime.js').CausalGenerationCapabilitiesV1} CausalGenerationCapabilitiesV1
  * @typedef {import('./generation/runtime.js').GenerationCapabilitiesV1} GenerationCapabilitiesV1
  * @typedef {import('./generation/runtime.js').AutoregressiveSessionV1} AutoregressiveSessionV1

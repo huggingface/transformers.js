@@ -67,11 +67,23 @@ export class ObjectDetectionPipeline
 
         const imageSizes = percentage ? null : preparedImages.map((x) => [x.height, x.width]);
 
-        const { pixel_values, pixel_mask } = await this.processor(preparedImages);
-        const output = await this.model({ pixel_values, pixel_mask });
+        const model = /** @type {any} */ (this.model);
+        const modelOwnsPreprocessing =
+            model.capabilities?.objectDetection?.version === 1 &&
+            model.capabilities.objectDetection.preprocess === 'model' &&
+            typeof model.preprocessObjectDetection === 'function';
+        const modelInputs = modelOwnsPreprocessing
+            ? await model.preprocessObjectDetection(preparedImages)
+            : await this.processor(preparedImages);
+        const output = await this.model(modelInputs);
 
-        // @ts-ignore
-        const processed = this.processor.image_processor.post_process_object_detection(output, threshold, imageSizes);
+        const processed =
+            model.capabilities?.objectDetection?.version === 1 &&
+            model.capabilities.objectDetection.postprocess === 'model' &&
+            typeof model.postProcessObjectDetection === 'function'
+                ? await model.postProcessObjectDetection(output, threshold, imageSizes)
+                : // @ts-ignore
+                  this.processor.image_processor.post_process_object_detection(output, threshold, imageSizes);
 
         // Add labels
         // @ts-expect-error TS2339
