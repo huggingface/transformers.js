@@ -43,6 +43,7 @@ export * from './donut_swin/modeling_donut_swin.js';
 export * from './dpt/modeling_dpt.js';
 export * from './efficientnet/modeling_efficientnet.js';
 export * from './electra/modeling_electra.js';
+export * from './embedding_gemma2/modeling_embedding_gemma2.js';
 export * from './ernie4_5/modeling_ernie4_5.js';
 export * from './esm/modeling_esm.js';
 export * from './eurobert/modeling_eurobert.js';
