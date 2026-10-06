@@ -4,13 +4,35 @@ import { logger } from './logger.js';
 import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 
 /**
+ * Describes a partial download that can be continued with an HTTP `Range` request.
+ *
+ * NOTE: this is a named typedef rather than an inline object type because jsdoc
+ * cannot parse an object literal nested inside a generic (`Promise<{...}>`),
+ * which breaks the API documentation build.
+ *
+ * @typedef {Object} ResumeInfo
+ * @property {number} size Bytes already written to disk for this request.
+ * @property {string|null} etag The validator the partial was started against, if the server sent one.
+ * @property {number} total The full size of the file being downloaded.
+ */
+
+/**
  * @typedef {Object} CacheInterface
  * @property {(request: string) => Promise<Response|import('./hub/FileResponse.js').FileResponse|undefined|string>} match
  * Checks if a request is in the cache and returns the cached response if found.
  * @property {(request: string, response: Response, progress_callback?: (data: {progress: number, loaded: number, total: number}) => void) => Promise<void>} put
  * Adds a response to the cache.
  * @property {(request: string) => Promise<boolean>} [delete]
- * Deletes a request from the cache. Returns true if deleted, false otherwise.
+ * Deletes a request from the cache. Returns true if deleted, false otherwise. Implementations that support resuming
+ * must also discard any partial download held for the request, so a later call cannot resume onto deleted bytes.
+ * @property {(request: string) => Promise<ResumeInfo|undefined>} [reserveResume]
+ * Optional. Claims a request's partial download and reports it (size on disk, its etag, and expected total) so the
+ * caller can continue it with an HTTP `Range`/`If-Range` request. Returns undefined when there is nothing to resume
+ * or another writer holds the key, in which case the caller must issue an ordinary full request. Implementations that
+ * provide this must also provide `releaseResume`, and callers must not send `Range` for a key they did not reserve.
+ * @property {(request: string) => Promise<void>} [releaseResume]
+ * Optional. Releases a reservation taken by `reserveResume` when the caller does not go on to `put` the response.
+ * A matching `put` releases the reservation itself. Releasing an absent reservation is a no-op.
  */
 
 /**
