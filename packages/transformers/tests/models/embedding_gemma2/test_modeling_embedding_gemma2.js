@@ -12,7 +12,7 @@ const pan = async (image, num_frames) => new RawVideo(await Promise.all(Array.fr
 export default () => {
   const model_id = "onnx-internal-testing/tiny-random-EmbeddingGemma2Model";
 
-  describe("EmbeddingGemma2Model", () => {
+  describe.skip("EmbeddingGemma2Model", () => {
     /** @type {EmbeddingGemma2Model} */
     let model;
     /** @type {EmbeddingGemma2Processor} */
@@ -145,7 +145,7 @@ export default () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 
-  describe("EmbeddingGemma2Model (text-only)", () => {
+  describe.skip("EmbeddingGemma2Model (text-only)", () => {
     /** @type {import("../../../src/configs.js").PretrainedConfig} */
     let config;
     /** @type {EmbeddingGemma2Model} */

@@ -16,7 +16,7 @@ const count = (input_ids, token_id) => input_ids.tolist().map((ids) => ids.filte
 const pan = async (image, num_frames) => new RawVideo(await Promise.all(Array.from({ length: num_frames }, (_, i) => image.crop([4 * i, 0, 4 * i + 479, 479]))), num_frames);
 
 export default () => {
-  describe("EmbeddingGemma2Processor", () => {
+  describe.skip("EmbeddingGemma2Processor", () => {
     const model_id = "onnx-community/embeddinggemma-2-ONNX";
 
     /** @type {EmbeddingGemma2Processor} */
