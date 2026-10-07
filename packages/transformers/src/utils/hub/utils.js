@@ -1,5 +1,84 @@
 import { ERROR_MAPPING, REPO_ID_REGEX } from './constants.js';
+import { resolveEnv } from '../../env.js';
 import { logger } from '../logger.js';
+
+const FETCH_IDS = new WeakMap();
+let NEXT_FETCH_ID = 0;
+
+function getFetchId(fetch) {
+    if (typeof fetch !== 'function') {
+        return null;
+    }
+    let id = FETCH_IDS.get(fetch);
+    if (id === undefined) {
+        id = ++NEXT_FETCH_ID;
+        FETCH_IDS.set(fetch, id);
+    }
+    return id;
+}
+
+function getHfTokenFingerprint(hfToken) {
+    if (!hfToken) {
+        return null;
+    }
+
+    // Keep credentials out of memoization keys without retaining the raw token in an identity map.
+    let h1 = 1779033703;
+    let h2 = 3144134277;
+    let h3 = 1013904242;
+    let h4 = 2773480762;
+    for (let i = 0; i < hfToken.length; ++i) {
+        const code = hfToken.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ code, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ code, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ code, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ code, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    return [h1, h2, h3, h4].map((value) => (value >>> 0).toString(16).padStart(8, '0')).join('');
+}
+
+/**
+ * Generates request headers without exposing a Hub token to untrusted origins.
+ * @param {URL|string} urlOrPath The URL or local path being fetched.
+ * @param {Object} options Header options.
+ * @param {string} options.version Transformers.js version.
+ * @param {string|undefined} options.hfToken Hugging Face access token.
+ * @param {string|undefined} [options.remoteHost] Configured Hub endpoint whose origin may receive the token.
+ * @returns {Headers}
+ */
+export function getFetchHeaders(urlOrPath, options) {
+    const isNode = typeof process !== 'undefined' && process?.release?.name === 'node';
+    const headers = new Headers();
+
+    if (isNode) {
+        const IS_CI = !!process.env?.TESTING_REMOTELY;
+        headers.set('User-Agent', `transformers.js/${options.version}; is_ci/${IS_CI};`);
+
+        let requestURL;
+        let configuredHubURL;
+        try {
+            requestURL = new URL(urlOrPath);
+            configuredHubURL = options.remoteHost ? new URL(options.remoteHost) : null;
+        } catch (_) {
+            // Local paths do not receive authorization headers.
+        }
+        const isOfficialHubURL =
+            requestURL?.origin === 'https://huggingface.co' || requestURL?.origin === 'https://hf.co';
+        const isConfiguredHubURL =
+            configuredHubURL &&
+            ['http:', 'https:'].includes(configuredHubURL.protocol) &&
+            requestURL?.origin === configuredHubURL.origin;
+        if ((isOfficialHubURL || isConfiguredHubURL) && options.hfToken) {
+            headers.set('Authorization', `Bearer ${options.hfToken}`);
+        }
+    }
+
+    return headers;
+}
 
 /**
  * Joins multiple parts of a path into a single path, while handling leading and trailing slashes.
@@ -66,15 +145,25 @@ export function isValidHfModelId(string) {
  * @param {string} [options.revision='main'] Model revision.
  * @param {string|null} [options.cache_dir=null] Custom cache directory.
  * @param {boolean} [options.local_files_only=false] Whether to avoid remote lookups.
+ * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @param {...unknown} parts Additional key parts for the specific operation.
  * @returns {string}
  */
 export function makePretrainedOptionsKey(model_id, options = {}, ...parts) {
+    const env = resolveEnv(options.env);
     return JSON.stringify([
         model_id,
         options.revision ?? 'main',
         options.cache_dir ?? null,
         options.local_files_only ?? false,
+        env.allowRemoteModels,
+        env.remoteHost,
+        env.remotePathTemplate,
+        env.allowLocalModels,
+        env.localModelPath,
+        env.cacheDir,
+        getFetchId(env.fetch),
+        getHfTokenFingerprint(env.hfToken),
         ...parts,
     ]);
 }

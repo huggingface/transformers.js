@@ -51,6 +51,7 @@ import {
 } from './pipelines/index.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
+import { maybeAddDeprecatedEnvWarning } from './utils/hub.js';
 
 /**
  * @typedef {keyof typeof SUPPORTED_TASKS} TaskType
@@ -112,8 +113,11 @@ export async function pipeline(
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
+        env: sessionEnv = {},
     } = {},
 ) {
+    maybeAddDeprecatedEnvWarning(cache_dir, local_files_only);
+
     // Apply aliases
     // @ts-ignore
     task = TASK_ALIASES[task] ?? task;
@@ -135,8 +139,14 @@ export async function pipeline(
 
     // Determine which files the model needs
     const expected_files = await get_pipeline_files(task, model, {
+        config,
+        cache_dir,
+        local_files_only,
+        revision,
         device,
         dtype,
+        model_file_name,
+        env: sessionEnv,
     });
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
@@ -144,7 +154,11 @@ export async function pipeline(
     if (progress_callback) {
         try {
             /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-            const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+            const metadata = await Promise.all(
+                expected_files.map(async (file) =>
+                    get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
+                ),
+            );
             metadata.forEach((m, i) => {
                 if (m.exists) {
                     files_loading[expected_files[i]] = {
@@ -173,6 +187,7 @@ export async function pipeline(
         use_external_data_format,
         model_file_name,
         session_options,
+        env: sessionEnv,
     };
 
     // Determine which components to load based on the expected files
@@ -204,7 +219,7 @@ export async function pipeline(
         modelPromise,
     ]);
 
-    const results = { task, model: model_loaded };
+    const results = { task, model: model_loaded, sessionEnv };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
 

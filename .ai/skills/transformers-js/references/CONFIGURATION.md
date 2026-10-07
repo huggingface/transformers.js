@@ -34,21 +34,22 @@ env.cacheDir = '/path/to/cache/directory/';
 | `version` | `string` | This version of Transformers.js. |
 | `backends` | `object` | Exposes backend environment settings that users can override. |
 | `logLevel` | `number` | The logging level. Use LogLevel enum values. Defaults to LogLevel.WARNING. |
-| `allowRemoteModels` | `boolean` | Whether to allow loading of remote files, defaults to `true`. If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc. |
-| `remoteHost` | `string` | Host URL to load models from. Defaults to the Hugging Face Hub. |
-| `remotePathTemplate` | `string` | Path template to fill in and append to `remoteHost` when loading models. |
-| `allowLocalModels` | `boolean` | Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise. If set to `false`, it will skip the local file check and try to load the model from the remote host. |
-| `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `useFS` | `boolean` | Whether to use the file system to load files. By default, it is `true` if available. |
 | `useBrowserCache` | `boolean` | Whether to use Cache API to cache models. By default, it is `true` if available. |
 | `useFSCache` | `boolean` | Whether to use the file system to cache files. By default, it is `true` if available. |
-| `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 | `useCustomCache` | `boolean` | Whether to use a custom cache system (defined by `customCache`), defaults to `false`. |
 | `customCache` | `CacheInterface\|null` | The custom cache to use. Defaults to `null`. This must be an object that implements the `match` and `put` functions of the Web Cache API. For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache. |
 | `useWasmCache` | `boolean` | Whether to pre-load and cache WASM binaries and the WASM factory (.mjs) for ONNX Runtime. Defaults to `true` when cache is available. This can improve performance and enables offline usage by avoiding repeated downloads. |
 | `cacheKey` | `string` | The cache key to use for storing models and WASM binaries. Defaults to `transformers-cache`. |
 | `experimental_useCrossOriginStorage` | `boolean` | Whether to use the Cross-Origin Storage API to cache model files across origins, allowing different sites to share the same cached model weights. Defaults to `false`. Requires the Cross-Origin Storage Chrome extension: https://chromewebstore.google.com/detail/cross-origin-storage/denpnpcgjgikjpoglpjefakmdcbmlgih. The `experimental_` prefix indicates that the underlying browser API is not yet standardized and may change or be removed without a major version bump. For more information, see https://github.com/WICG/cross-origin-storage. |
+| `allowRemoteModels` | `boolean` | Whether to allow loading of remote files, defaults to `true`. If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc. |
+| `remoteHost` | `string` | Host URL to load models from. Defaults to the Hugging Face Hub. |
+| `remotePathTemplate` | `string` | Path template to fill in and append to `remoteHost` when loading models. |
+| `allowLocalModels` | `boolean` | Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise. If set to `false`, it will skip the local file check and try to load the model from the remote host. |
+| `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `fetch` | `(input: string \| URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
+| `hfToken` | `string\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. |
+| `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 <!-- @generated:end id=typedef:TransformersEnvironment -->
 
 ## Log levels
@@ -166,8 +167,8 @@ Static class for cache and file management operations.
 - `get_files(modelId, [options])` → `Promise<string[]>` — Get all files (model, tokenizer, processor) needed for a model.
 - `get_pipeline_files(task, modelId, [options])` → `Promise<string[]>` — Get all files needed for a specific pipeline task.
 - `get_model_files(modelId, [options])` → `Promise<string[]>` — Get model files needed for a specific model.
-- `get_tokenizer_files(modelId)` → `Promise<string[]>` — Get tokenizer files needed for a specific model.
-- `get_processor_files(modelId)` → `Promise<string[]>` — Get processor files needed for a specific model.
+- `get_tokenizer_files(modelId, [options])` → `Promise<string[]>` — Get tokenizer files needed for a specific model.
+- `get_processor_files(modelId, [options])` → `Promise<string[]>` — Get processor files needed for a specific model.
 - `get_available_dtypes(modelId, [options])` → `Promise<string[]>` — Detects which quantization levels (dtypes) are available for a model by checking which ONNX files exist on the hub or locally.
 - `is_cached(modelId, [options])` → `Promise<boolean>` — Quickly checks if a model is fully cached by verifying `config.json` is present, then confirming all required files are cached.
 - `is_cached_files(modelId, [options])` → `Promise<CacheCheckResult>` — Checks if all files for a given model are already cached, with per-file detail.

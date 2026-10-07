@@ -28,6 +28,18 @@ export class CrossOriginStorage {
     #hashCache = null;
 
     /**
+     * @param {Object} [options]
+     * @param {(input: string | URL, init?: any) => Promise<any>} [options.fetch=globalThis.fetch] Fetch implementation used for LFS pointer lookups.
+     * @param {(url: string) => Headers|undefined} [options.getHeaders] Request headers for LFS pointer lookups.
+     * @param {boolean} [options.allowNetwork=true] Whether pointer lookups may access the network.
+     */
+    constructor({ fetch = globalThis.fetch?.bind(globalThis), getHeaders = undefined, allowNetwork = true } = {}) {
+        this.fetch = fetch;
+        this.getHeaders = getHeaders;
+        this.allowNetwork = allowNetwork;
+    }
+
+    /**
      * Returns (and lazily opens) the hash cache, reusing the same promise across concurrent callers.
      * @returns {Promise<Cache>}
      */
@@ -222,14 +234,14 @@ export class CrossOriginStorage {
      * @returns {Promise<string|null>} The hex-encoded SHA-256 hash, or `null` if unavailable.
      */
     _getLfsFileHash = async (url) => {
-        if (!url.includes('/resolve/')) {
+        if (!this.allowNetwork || !this.fetch || !url.includes('/resolve/')) {
             return null;
         }
 
         const rawUrl = url.replace('/resolve/', '/raw/');
 
         try {
-            const text = await fetch(rawUrl).then((r) => r.text());
+            const text = await this.fetch(rawUrl, { headers: this.getHeaders?.(rawUrl) }).then((r) => r.text());
             const match = text.match(/^oid sha256:([0-9a-f]+)$/m);
             return match ? match[1] : null;
         } catch {

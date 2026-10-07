@@ -10,7 +10,7 @@
 
 import { isNullishDimension } from './core.js';
 import { getFile } from './hub.js';
-import { apis } from '../env.js';
+import { apis, resolveEnv } from '../env.js';
 import { Tensor } from './tensor.js';
 import { saveBlob } from './io.js';
 
@@ -108,6 +108,7 @@ export class RawImage {
     /**
      * Helper method for reading an image from a variety of input types.
      * @param {RawImage|string|URL|Blob|HTMLCanvasElement|OffscreenCanvas} input
+     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
      * @returns {Promise<RawImage>} The image object.
      *
      * **Example:** Read image from a URL.
@@ -121,11 +122,11 @@ export class RawImage {
      * // }
      * ```
      */
-    static async read(input) {
+    static async read(input, sessionEnv = {}) {
         if (input instanceof RawImage) {
             return input;
         } else if (typeof input === 'string' || input instanceof URL) {
-            return await this.fromURL(input);
+            return await this.fromURL(input, sessionEnv);
         } else if (input instanceof Blob) {
             return await this.fromBlob(input);
         } else if (
@@ -158,10 +159,18 @@ export class RawImage {
     /**
      * Read an image from a URL or file path.
      * @param {string|URL} url The URL or file path to read the image from.
+     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
      * @returns {Promise<RawImage>} The image object.
      */
-    static async fromURL(url) {
-        const response = await getFile(url);
+    static async fromURL(url, sessionEnv = {}) {
+        const env = resolveEnv(sessionEnv);
+        const response = await getFile(url, {
+            useFS: env.useFS,
+            fetch: env.fetch,
+            version: env.version,
+            hfToken: env.hfToken,
+            remoteHost: env.remoteHost,
+        });
         if (response.status !== 200) {
             throw new Error(`Unable to read image from "${url}" (${response.status} ${response.statusText})`);
         }

@@ -9,7 +9,6 @@ import { RawAudio } from '../utils/audio.js';
 import { logger } from '../utils/logger.js';
 
 import { AutoModel } from '../models/auto/modeling_auto.js';
-import { env } from '../env.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -95,7 +94,7 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(await (await env.fetch(speaker_embeddings)).arrayBuffer());
+            speaker_embeddings = new Float32Array(await (await this.env.fetch(speaker_embeddings)).arrayBuffer());
         }
 
         if (speaker_embeddings instanceof Float32Array) {
@@ -198,7 +197,10 @@ export class TextToAudioPipeline
         // Load vocoder, if not provided
         if (!this.vocoder) {
             logger.info('No vocoder specified, using default HifiGan vocoder.');
-            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, { dtype: 'fp32' });
+            this.vocoder = await AutoModel.from_pretrained(this.DEFAULT_VOCODER_ID, {
+                dtype: 'fp32',
+                env: this.sessionEnv,
+            });
         }
 
         // Run tokenization

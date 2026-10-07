@@ -1,7 +1,8 @@
-import { apis, env } from '../env.js';
+import { apis, env, resolveEnv } from '../env.js';
 import { FileCache } from './cache/FileCache.js';
 import { logger } from './logger.js';
 import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
+import { getFetchHeaders } from './hub/utils.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -16,10 +17,15 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
 /**
  * Retrieves an appropriate caching backend based on the environment configuration.
  * Attempts to use custom cache, browser cache, or file system cache in that order of priority.
+ * @param {string|null} [file_cache_dir=null] Deprecated per-call cache directory. Takes precedence over `options.env.cacheDir` and global `env.cacheDir`.
+ * @param {Object} [options] Cache lookup options.
+ * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
+ * @param {boolean} [options.allowRemote] Whether cache lookup may perform remote requests.
  * @returns {Promise<CacheInterface | null>}
- * @param file_cache_dir {string|null} Path to a directory where downloaded model files should be cached when using the file system cache.
  */
-export async function getCache(file_cache_dir = null) {
+export async function getCache(file_cache_dir = null, options = {}) {
+    const resolvedEnv = resolveEnv(options.env);
+
     // First, check if the a caching backend is available
     // If no caching mechanism available, will download the file every time
     let cache = null;
@@ -40,7 +46,16 @@ export async function getCache(file_cache_dir = null) {
     }
 
     if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
-        cache = new CrossOriginStorage();
+        cache = new CrossOriginStorage({
+            fetch: resolvedEnv.fetch,
+            getHeaders: (url) =>
+                getFetchHeaders(url, {
+                    version: resolvedEnv.version,
+                    hfToken: resolvedEnv.hfToken,
+                    remoteHost: resolvedEnv.remoteHost,
+                }),
+            allowNetwork: (options.allowRemote ?? true) && resolvedEnv.allowRemoteModels,
+        });
     }
 
     if (!cache && env.useBrowserCache) {
@@ -64,8 +79,8 @@ export async function getCache(file_cache_dir = null) {
             throw Error('File System Cache is not available in this environment.');
         }
 
-        // If `cache_dir` is not specified, use the default cache directory
-        cache = new FileCache(file_cache_dir ?? env.cacheDir);
+        // If `cache_dir` is not specified, fall back to the (session-scoped or global) `cacheDir`.
+        cache = new FileCache(file_cache_dir ?? resolvedEnv.cacheDir);
     }
 
     return cache;

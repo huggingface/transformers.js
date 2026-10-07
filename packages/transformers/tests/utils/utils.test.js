@@ -1,4 +1,5 @@
 import { AutoProcessor } from "../../src/transformers.js";
+import { resolveEnv } from "../../src/env.js";
 import { hamming, hanning, mel_filter_bank } from "../../src/utils/audio.js";
 import { getFile } from "../../src/utils/hub.js";
 import { toAbsoluteURL } from "../../src/utils/hub/utils.js";
@@ -55,10 +56,35 @@ describe("Utilities", () => {
   });
 
   describe("Hub utilities", () => {
+    it("only applies documented session environment overrides", () => {
+      const customFetch = () => {};
+      const resolved = resolveEnv({
+        fetch: customFetch,
+        remoteHost: "https://private-hub.example/",
+        cacheDir: "/session-cache/",
+        useFS: !resolveEnv().useFS,
+        useFSCache: !resolveEnv().useFSCache,
+        logLevel: 10,
+      });
+
+      expect(resolved.fetch).toBe(customFetch);
+      expect(resolved.remoteHost).toBe("https://private-hub.example/");
+      expect(resolved.cacheDir).toBe("/session-cache/");
+      expect(resolved.useFS).toBe(resolveEnv().useFS);
+      expect(resolved.useFSCache).toBe(resolveEnv().useFSCache);
+      expect(resolved.logLevel).toBe(resolveEnv().logLevel);
+    });
+
     it("Read data from blob", async () => {
       const blob = new Blob(["Hello, world!"], { type: "text/plain" });
       const blobUrl = URL.createObjectURL(blob);
-      const data = await getFile(blobUrl);
+      const env = resolveEnv();
+      const data = await getFile(blobUrl, {
+        useFS: env.useFS,
+        fetch: env.fetch,
+        version: env.version,
+        hfToken: env.hfToken,
+      });
       expect(await data.text()).toBe("Hello, world!");
     });
 

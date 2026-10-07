@@ -1,4 +1,6 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { buildResourcePaths, getFetchHeaders } from "../../src/utils/hub.js";
+import { makePretrainedOptionsKey } from "../../src/utils/hub/utils.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -6,6 +8,54 @@ import fs from "node:fs";
 // TODO: Set cache folder to a temp directory
 
 describe("Hub", () => {
+  describe("Session env", () => {
+    it("should use scoped resource path options", () => {
+      const paths = buildResourcePaths("org/model", "config.json", {
+        revision: "refs/pr/1",
+        localModelPath: "/scoped-models/",
+        remoteHost: "https://models.example.com/",
+        remotePathTemplate: "{model}/at/{revision}/",
+      });
+
+      expect(paths.localPath).toBe("/scoped-models/org/model/config.json");
+      expect(paths.remoteURL).toBe("https://models.example.com/org/model/at/refs%2Fpr%2F1/config.json");
+    });
+
+    it("should use scoped Hugging Face token for request headers", () => {
+      const headers = getFetchHeaders("https://huggingface.co/org/model/resolve/main/config.json", {
+        version: "test-version",
+        hfToken: "scoped-token",
+      });
+
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+
+    it("should authenticate only the configured custom Hub origin", () => {
+      const options = {
+        version: "test-version",
+        hfToken: "scoped-token",
+        remoteHost: "https://private-hub.example/api/",
+      };
+
+      const hubHeaders = getFetchHeaders("https://private-hub.example/api/org/model/config.json", options);
+      const externalHeaders = getFetchHeaders("https://cdn.example/org/model/config.json", options);
+
+      expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
+      expect(externalHeaders.has("Authorization")).toBe(false);
+    });
+
+    it("should fingerprint credentials in memoization keys", () => {
+      const token = "hf_secret-token-value";
+      const first = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
+      const repeated = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
+      const other = makePretrainedOptionsKey("org/model", { env: { hfToken: "hf_other-token" } });
+
+      expect(first).toBe(repeated);
+      expect(first).not.toBe(other);
+      expect(first).not.toContain(token);
+    });
+  });
+
   describe("Loading models", () => {
     it(
       "should load a model from the local cache",
