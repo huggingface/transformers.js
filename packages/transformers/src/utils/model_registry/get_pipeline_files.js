@@ -15,6 +15,7 @@ import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
  * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+ * @param {string} [options.revision='main'] - Model revision
  * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported

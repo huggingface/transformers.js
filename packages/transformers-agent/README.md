@@ -83,7 +83,7 @@ console.log(agent.history);
 agent.clearHistory();
 ```
 
-The message shape follows Chromium's Prompt API direction: content is either a string or typed text, image, audio, tool-call, and tool-response parts. Model adapters currently support text and tool content; unsupported multimodal content fails explicitly.
+The message shape follows Chromium's Prompt API direction: content is either a string or typed text, image, audio, tool-call, and tool-response parts. Text and tool content are supported; unsupported multimodal content fails explicitly.
 
 ## Open-Loop Tools
 

@@ -1,9 +1,6 @@
 import type { Model } from '../Model';
-import type { ModelAdapter } from '../adapters';
 import type { ToolList } from '../Tool';
 import type { ToolCall, ToolResponse } from './tools';
-
-export type { ModelAdapter, ModelAdapterContext, ParseResult, ParsedToolCall } from '../adapters/types';
 
 export type Prompt = string | Message[];
 
@@ -63,5 +60,4 @@ export interface AgentConfig {
     temperature?: number;
     enableThinking?: boolean;
     initialPrompts?: Array<Message>;
-    adapter?: ModelAdapter;
 }

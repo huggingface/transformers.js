@@ -118,7 +118,7 @@ Transformers.js exposes powerful local-model controls, but building an agent sti
 
 - a `Model` object that makes the local model lifecycle explicit: model id, device, dtype, cache checks, download size, progress, and initialization
 - an `Agent` object that owns the initial prompts, tools, and serializable history across repeated turns
-- model adapters that isolate model-specific chat-template formats, tool-call syntax, special tokens, and cache behavior
+- minimal message formatting for model-specific chat-template inputs, with tokenizer response templates handling outputs
 - a tool API that can be adapted into the function schema format expected by model chat templates
 - an open-loop tool API where each `prompt()` is one model turn and applications own execution, approval, and follow-up prompts
 - browser and Node.js support without assuming a hosted model, API key, server-side session, or remote provider

@@ -4,6 +4,7 @@ import type { ModelConfig } from './types';
 
 export class Model {
     readonly modelId: string;
+    readonly revision: string;
     readonly device: DeviceType;
     readonly dtype: DataType | Record<string, DataType>;
     private _isInitialized = false;
@@ -30,12 +31,14 @@ export class Model {
 
     constructor(config: ModelConfig) {
         this.modelId = config.modelId;
+        this.revision = config.revision ?? 'main';
         this.device = config.device ?? 'webgpu';
         this.dtype = config.dtype ?? 'q4f16';
     }
 
     async isCached(): Promise<boolean> {
         return await ModelRegistry.is_pipeline_cached('text-generation', this.modelId, {
+            revision: this.revision,
             device: this.device,
             dtype: this.dtype,
         });
@@ -56,9 +59,11 @@ export class Model {
             return;
         }
 
+        const options = { revision: this.revision };
         const [tokenizer, model] = await Promise.all([
-            AutoTokenizer.from_pretrained(this.modelId),
+            AutoTokenizer.from_pretrained(this.modelId, options),
             AutoModelForCausalLM.from_pretrained(this.modelId, {
+                ...options,
                 device: this.device,
                 dtype: this.dtype,
                 progress_callback: progressCallback,
@@ -78,6 +83,7 @@ export class Model {
 
     private async getCacheSizes(): Promise<[number, number]> {
         const files: Array<string> = await ModelRegistry.get_pipeline_files('text-generation', this.modelId, {
+            revision: this.revision,
             device: this.device,
             dtype: this.dtype,
         });
@@ -87,7 +93,9 @@ export class Model {
 
         await Promise.all(
             files.map(async (file) => {
-                const metadata = await ModelRegistry.get_file_metadata(this.modelId, file);
+                const metadata = await ModelRegistry.get_file_metadata(this.modelId, file, {
+                    revision: this.revision,
+                });
                 const size = metadata.size ?? 0;
                 totalSize += size;
                 if (metadata.fromCache) {

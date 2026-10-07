@@ -1,5 +1,5 @@
 import { TextStreamer } from '@huggingface/transformers';
-import { ModelAdapterBase, ModelAdapterRegistry } from './adapters';
+import { formatMessages, formatTools, getModelFamily } from './messageFormatting';
 import type { Model } from './Model';
 import type { ToolList } from './Tool';
 import type {
@@ -7,13 +7,22 @@ import type {
     LanguageModelMessageContent,
     Message,
     MessageContent,
-    ModelAdapter,
     Prompt,
     ToolCall,
     Usage,
 } from './types';
 
 type ModelMessage = Message & { thinking?: string };
+type ResponseEvent =
+    | { type: 'region_open'; field: string }
+    | { type: 'region_chunk'; field: string; text: string; dirty: boolean }
+    | { type: 'region_close'; field: string; value: unknown };
+type ParsedAssistantMessage = {
+    thinking?: unknown;
+    content?: unknown;
+    tool_calls?: unknown;
+};
+type ResponseStreamState = { dirtyFields: Set<string> };
 
 export class Agent {
     readonly model: Model;
@@ -21,7 +30,6 @@ export class Agent {
     readonly maxNewTokens: number;
     readonly temperature: number | undefined;
     readonly enableThinking: boolean;
-    readonly adapter: ModelAdapter;
 
     private _history: Message[] = [];
     private _modelHistory: ModelMessage[] = [];
@@ -29,7 +37,6 @@ export class Agent {
     private _latestUsage: Usage | null = null;
     private itemIdCounter = 0;
     private promptActive = false;
-    private readonly adapterRegistry = new ModelAdapterRegistry();
 
     get history(): ReadonlyArray<Message> {
         return this.cloneMessages(this._history);
@@ -50,7 +57,6 @@ export class Agent {
         this.maxNewTokens = config.maxNewTokens ?? 1024;
         this.temperature = config.temperature;
         this.enableThinking = config.enableThinking ?? false;
-        this.adapter = config.adapter ?? this.resolveAdapter();
         this.clearHistory();
     }
 
@@ -96,41 +102,19 @@ export class Agent {
         const modelHistoryLength = this._modelHistory.length;
         try {
             this.appendPrompt(input);
-            const conversation = this.adapter.formatMessages(this._modelHistory);
-            let previewRaw = '';
-            let streamedThinking = '';
-            let streamedText = '';
+            const conversation = formatMessages(this._modelHistory, this.getModelFamily());
+            const generated = await this.generateAssistantMessage(conversation, onChunk);
 
-            const generated = await this.generateAssistantMessage(
-                conversation,
-                onChunk
-                    ? (delta) => {
-                          previewRaw += delta;
-                          const parsed = this.adapter.parseAssistantContent(previewRaw, this.createPreviewIdFactory());
-                          streamedThinking = this.emitContentDelta(
-                              'thinking',
-                              streamedThinking,
-                              parsed.thinkingText,
-                              onChunk,
-                          );
-                          streamedText = this.emitContentDelta('text', streamedText, parsed.visibleText, onChunk);
-                      }
-                    : undefined,
-            );
+            const { thinking, content, toolCalls } = this.readAssistantMessage(generated.message);
+            const result = this.createAssistantContent(thinking, content, toolCalls);
 
-            const parsed = this.adapter.parseAssistantContent(generated.modelContent, (prefix) =>
-                this.nextItemId(prefix),
-            );
-            const toolCalls = parsed.toolCalls.map((call) => this.toPublicToolCall(call));
-            const result = this.createAssistantContent(parsed.thinkingText, parsed.visibleText, toolCalls);
-
-            if (parsed.visibleText || toolCalls.length > 0) {
-                const assistantMessage = this.createAssistantMessage(parsed.visibleText, toolCalls);
+            if (content || toolCalls.length > 0) {
+                const assistantMessage = this.createAssistantMessage(content, toolCalls);
                 this.validateHistory([...this._history, assistantMessage]);
                 this._history.push(assistantMessage);
                 this._modelHistory.push({
                     ...this.cloneMessage(assistantMessage),
-                    thinking: parsed.thinkingText || undefined,
+                    thinking: thinking || undefined,
                 });
             }
 
@@ -149,20 +133,6 @@ export class Agent {
         } finally {
             this.promptActive = false;
         }
-    }
-
-    private emitContentDelta(
-        type: 'thinking' | 'text',
-        previous: string,
-        current: string,
-        onChunk?: (chunk: LanguageModelMessageContent) => void,
-    ): string {
-        if (!current.startsWith(previous)) {
-            throw new Error(`The model adapter produced non-incremental streaming ${type}.`);
-        }
-        const delta = current.slice(previous.length);
-        if (delta) onChunk?.({ type, value: delta });
-        return current;
     }
 
     private appendPrompt(input: Prompt): void {
@@ -231,26 +201,38 @@ export class Agent {
         return part.type === 'text' ? { ...part } : this.cloneSerializable(part);
     }
 
-    private toPublicToolCall(call: { id: string; name: string; args: Record<string, unknown> }): ToolCall {
-        return { callID: call.id, name: call.name, arguments: this.cloneSerializable(call.args) };
-    }
-
     private async generateAssistantMessage(
         conversation: Array<Record<string, unknown>>,
-        onDelta?: (text: string) => void,
-    ): Promise<{ modelContent: string; usage: Usage }> {
+        onChunk?: (chunk: LanguageModelMessageContent) => void,
+    ): Promise<{ message: ParsedAssistantMessage; usage: Usage }> {
         let completionTokens = 0;
         let firstTokenAt: number | undefined;
         let streamedRawText = '';
         const tokenizer = this.model.tokenizer;
         const model = this.model.model;
+        const tools = formatTools(this.tools);
+        const rawInput = tokenizer.apply_chat_template(
+            conversation as never,
+            {
+                tools,
+                add_generation_prompt: true,
+                tokenize: false,
+                enable_thinking: this.enableThinking,
+            } as never,
+        );
+        const prompt = String(rawInput);
+        const parser = onChunk ? tokenizer.get_response_parser({ prefix: prompt, tools }) : null;
+        const responseStreamState: ResponseStreamState = { dirtyFields: new Set() };
+        if (parser) this.emitResponseEvents(parser.initial_events as ResponseEvent[], responseStreamState, onChunk);
         const streamer = new TextStreamer(tokenizer, {
             skip_prompt: true,
             skip_special_tokens: false,
             callback_function: (text: string) => {
                 if (text) firstTokenAt ??= performance.now();
                 streamedRawText += text;
-                onDelta?.(text);
+                if (parser) {
+                    this.emitResponseEvents(parser.feed(text) as ResponseEvent[], responseStreamState, onChunk);
+                }
             },
             token_callback_function: (tokens: bigint[]) => {
                 if (tokens.length > 0) firstTokenAt ??= performance.now();
@@ -258,16 +240,6 @@ export class Agent {
             },
         });
 
-        const rawInput = tokenizer.apply_chat_template(
-            conversation as never,
-            {
-                tools: this.adapter.formatTools(this.tools),
-                add_generation_prompt: true,
-                tokenize: false,
-                enable_thinking: this.enableThinking,
-            } as never,
-        );
-        const prompt = this.adapter.preparePromptForGeneration(String(rawInput));
         const input = (
             tokenizer as unknown as (
                 text: string[],
@@ -307,8 +279,12 @@ export class Agent {
                     : 0
                 : firstTokenAt - generationStartedAt;
         const modelRawText = this.decodeGeneratedContinuation(sequences, promptTokens) ?? streamedRawText;
+        if (parser) {
+            const [, finalEvents] = parser.finalize();
+            this.emitResponseEvents(finalEvents as ResponseEvent[], responseStreamState, onChunk);
+        }
         return {
-            modelContent: this.adapter.normalizeAssistantContent(modelRawText),
+            message: tokenizer.parse_response(modelRawText, { prefix: prompt, tools }) as ParsedAssistantMessage,
             usage: {
                 promptTokens,
                 completionTokens,
@@ -318,6 +294,71 @@ export class Agent {
                 generationTimeMs,
                 totalTimeMs: generationEndedAt - generationStartedAt,
             },
+        };
+    }
+
+    private emitResponseEvents(
+        events: ResponseEvent[],
+        state: ResponseStreamState,
+        onChunk?: (chunk: LanguageModelMessageContent) => void,
+    ): void {
+        for (const event of events) {
+            if (event.type === 'region_open') {
+                state.dirtyFields.delete(event.field);
+                continue;
+            }
+            if (event.type === 'region_chunk') {
+                if (event.dirty) {
+                    state.dirtyFields.add(event.field);
+                } else {
+                    this.emitResponseText(event.field, event.text, onChunk);
+                }
+                continue;
+            }
+            if (state.dirtyFields.delete(event.field) && typeof event.value === 'string') {
+                this.emitResponseText(event.field, event.value, onChunk);
+            }
+        }
+    }
+
+    private emitResponseText(
+        field: string,
+        text: string,
+        onChunk?: (chunk: LanguageModelMessageContent) => void,
+    ): void {
+        if (!text) return;
+        if (field === 'thinking') onChunk?.({ type: 'thinking', value: text });
+        if (field === 'content') onChunk?.({ type: 'text', value: text });
+    }
+
+    private readAssistantMessage(message: ParsedAssistantMessage): {
+        thinking: string;
+        content: string;
+        toolCalls: ToolCall[];
+    } {
+        const toolCalls: ToolCall[] = [];
+        if (Array.isArray(message.tool_calls)) {
+            for (const value of message.tool_calls) {
+                if (!value || typeof value !== 'object') continue;
+                const call = value as Record<string, unknown>;
+                const fn = call.function;
+                if (!fn || typeof fn !== 'object') continue;
+                const { name, arguments: args } = fn as Record<string, unknown>;
+                if (typeof name !== 'string') continue;
+                toolCalls.push({
+                    callID: typeof call.id === 'string' ? call.id : this.nextItemId('toolcall'),
+                    name,
+                    arguments:
+                        args && typeof args === 'object' && !Array.isArray(args)
+                            ? this.cloneSerializable(args as Record<string, unknown>)
+                            : {},
+                });
+            }
+        }
+        return {
+            thinking: typeof message.thinking === 'string' ? message.thinking : '',
+            content: typeof message.content === 'string' ? message.content : '',
+            toolCalls,
         };
     }
 
@@ -338,11 +379,6 @@ export class Agent {
         ).decode;
         if (typeof decode !== 'function') return null;
         return decode.call(this.model.tokenizer, Array.from(generated.data), { skip_special_tokens: false });
-    }
-
-    private createPreviewIdFactory(): (prefix: string) => string {
-        let offset = 0;
-        return (prefix) => `${prefix}_${this.itemIdCounter + ++offset}`;
     }
 
     private validateHistory(messages: ReadonlyArray<Message>): void {
@@ -391,13 +427,9 @@ export class Agent {
         return `${prefix}_${++this.itemIdCounter}`;
     }
 
-    private resolveAdapter = (): ModelAdapter =>
-        this.adapterRegistry.resolve({
-            modelId: this.model.modelId,
-            modelType: this.tryReadString(this.readModelConfig(), 'model_type'),
-            chatTemplate: this.tryReadString(this.model.tokenizer, 'chat_template'),
-            enableThinking: this.enableThinking,
-        }) ?? new ModelAdapterBase();
+    private getModelFamily() {
+        return getModelFamily(this.model.modelId, this.tryReadString(this.readModelConfig(), 'model_type'));
+    }
 
     private readModelConfig(): Record<string, unknown> {
         const config = (this.model.model as unknown as Record<string, unknown>)?.config;

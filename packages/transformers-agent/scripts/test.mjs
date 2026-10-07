@@ -13,17 +13,22 @@ const transformersStub = join(tempDir, "transformers-stub.mjs");
 try {
   await writeFile(
     transformersStub,
-    "export class DynamicCache {}\nexport class TextStreamer { constructor(_tokenizer, options) { Object.assign(this, options); } }\n",
+    [
+      "export class DynamicCache {}",
+      "export class TextStreamer { constructor(_tokenizer, options) { Object.assign(this, options); } }",
+      "export class AutoTokenizer { static calls = []; static async from_pretrained(...args) { this.calls.push(args); return {}; } }",
+      "export class AutoModelForCausalLM { static calls = []; static async from_pretrained(...args) { this.calls.push(args); return {}; } }",
+      "export class ModelRegistry {",
+      "  static calls = [];",
+      "  static async is_pipeline_cached(...args) { this.calls.push(['is_pipeline_cached', ...args]); return true; }",
+      "  static async get_pipeline_files(...args) { this.calls.push(['get_pipeline_files', ...args]); return ['model.onnx']; }",
+      "  static async get_file_metadata(...args) { this.calls.push(['get_file_metadata', ...args]); return { size: 10, fromCache: true }; }",
+      "}",
+    ].join("\n"),
   );
   await writeFile(
     entryPoint,
-    [
-      resolve("tests/Agent.test.ts"),
-      resolve("tests/ModelAdapterBase.test.ts"),
-      resolve("tests/ModelAdapterGranite.test.ts"),
-      resolve("tests/ModelAdapterGemma4.test.ts"),
-      resolve("tests/ModelAdapterQwen3.test.ts"),
-    ]
+    [resolve("tests/Agent.test.ts"), resolve("tests/Model.test.ts"), resolve("tests/MessageFormatting.test.ts")]
       .map((path) => `import ${JSON.stringify(path)};`)
       .join("\n"),
   );

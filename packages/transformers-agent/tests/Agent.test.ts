@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Agent } from "../src/Agent";
 import { Tool } from "../src/Tool";
-import { ModelAdapterBase } from "../src/adapters/ModelAdapterBase";
 import type { Model } from "../src/Model";
 
 test("returns tool calls without executing them and accepts an external response", async () => {
   const outputs = ['<think>Check the weather service.</think><tool_call>{"name":"get_weather","args":{"location":"London"}}</tool_call>', "It is sunny in London."];
   const conversations: Array<Array<Record<string, unknown>>> = [];
+  const parseRequests: Array<{ prefix: string; tools: unknown[] }> = [];
   let generateCount = 0;
   let executeCount = 0;
 
@@ -18,6 +18,21 @@ test("returns tool calls without executing them and accepts an external response
     },
     decode() {
       return outputs[generateCount - 1];
+    },
+    parse_response(response: string, options: { prefix: string; tools: unknown[] }) {
+      parseRequests.push(options);
+      return response.startsWith("<think>")
+        ? {
+            role: "assistant",
+            thinking: "Check the weather service.",
+            tool_calls: [
+              {
+                type: "function",
+                function: { name: "get_weather", arguments: { location: "London" } },
+              },
+            ],
+          }
+        : { role: "assistant", content: response };
     },
   });
   const model = {
@@ -49,7 +64,6 @@ test("returns tool calls without executing them and accepts an external response
   });
   const agent = new Agent({
     model,
-    adapter: new ModelAdapterBase(),
     tools: [weatherTool],
     enableThinking: true,
   });
@@ -58,6 +72,22 @@ test("returns tool calls without executing them and accepts an external response
   const first = await agent.prompt("What is the weather in London?");
   assert.equal(generateCount, 1);
   assert.equal(executeCount, 0);
+  assert.equal(parseRequests[0].prefix, "rendered prompt");
+  assert.deepEqual(parseRequests[0].tools, [
+    {
+      type: "function",
+      function: {
+        name: "get_weather",
+        description: "Get current weather.",
+        parameters: {
+          type: "object",
+          properties: { location: { type: "string" } },
+          required: ["location"],
+          additionalProperties: false,
+        },
+      },
+    },
+  ]);
   assert.deepEqual(first, [
     {
       type: "thinking",
@@ -162,6 +192,16 @@ test("streams incremental thinking and text content and closes without a done ch
     decode() {
       return "<think>Check first.</think>Check that result.";
     },
+    parse_response() {
+      return { role: "assistant", thinking: "Check first.", content: "Check that result." };
+    },
+    get_response_parser() {
+      return createResponseParser((text) => {
+        if (text === "<think>Check") return [chunk("thinking", "Check")];
+        if (text === " first.</think>") return [chunk("thinking", " first.")];
+        return [chunk("content", text)];
+      });
+    },
   });
   const model = {
     modelId: "test-model",
@@ -182,7 +222,7 @@ test("streams incremental thinking and text content and closes without a done ch
       },
     },
   } as unknown as Model;
-  const agent = new Agent({ model, adapter: new ModelAdapterBase() });
+  const agent = new Agent({ model });
 
   const chunks = [];
   for await (const chunk of agent.promptStreaming("Check this")) chunks.push(chunk);
@@ -205,6 +245,20 @@ test("does not reconcile streamed deltas against a different final decode", asyn
     decode() {
       return "<think>Final thinking.</think>Final response.";
     },
+    parse_response() {
+      return { role: "assistant", thinking: "Final thinking.", content: "Final response." };
+    },
+    get_response_parser() {
+      return createResponseParser(
+        (text) => {
+          if (text === "<think>Streamed thinking.</think>") {
+            return [chunk("thinking", "Streamed thinking.")];
+          }
+          return [chunk("content", text, true)];
+        },
+        [{ type: "region_close", field: "content", value: "Streamed response." }],
+      );
+    },
   });
   const model = {
     modelId: "test-model",
@@ -222,7 +276,7 @@ test("does not reconcile streamed deltas against a different final decode", asyn
       },
     },
   } as unknown as Model;
-  const agent = new Agent({ model, adapter: new ModelAdapterBase() });
+  const agent = new Agent({ model });
 
   const chunks = [];
   for await (const chunk of agent.promptStreaming("Check this")) chunks.push(chunk);
@@ -245,4 +299,16 @@ function assertUsage(usage: ReturnType<Agent["getLatestUsage"]>) {
   assert.ok(usage.timeToFirstTokenMs >= 0);
   assert.ok(usage.generationTimeMs >= usage.timeToFirstTokenMs);
   assert.ok(usage.totalTimeMs >= usage.generationTimeMs);
+}
+
+function chunk(field: string, text: string, dirty = false) {
+  return { type: "region_chunk" as const, field, text, dirty };
+}
+
+function createResponseParser(feed: (text: string) => ReturnType<typeof chunk>[], finalEvents: Array<{ type: "region_close"; field: string; value: unknown }> = []) {
+  return {
+    initial_events: [],
+    feed,
+    finalize: () => [{ role: "assistant" }, finalEvents],
+  };
 }
