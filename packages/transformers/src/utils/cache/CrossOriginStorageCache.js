@@ -57,7 +57,7 @@ export class CrossOriginStorage {
             return undefined;
         }
         try {
-            const handle = await navigator.crossOriginStorage.requestFileHandle(makeHashDescriptor(hashValue));
+            const handle = await navigator.crossOriginStorage.getFileHandle(makeHashDescriptor(hashValue));
             const blob = await handle.getFile();
             return new Response(blob, {
                 headers: {
@@ -110,7 +110,7 @@ export class CrossOriginStorage {
      * @returns {Promise<void>}
      */
     _storeBlobInCOS = async (blob, hashHex) => {
-        const handle = await navigator.crossOriginStorage.requestFileHandle(makeHashDescriptor(hashHex), {
+        const handle = await navigator.crossOriginStorage.getFileHandle(makeHashDescriptor(hashHex), {
             create: true,
             origins: '*',
         });
