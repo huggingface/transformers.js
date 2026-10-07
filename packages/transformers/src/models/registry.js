@@ -98,6 +98,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
 
     ['style_text_to_speech_2', 'StyleTextToSpeech2Model'],
     ['openai_privacy_filter', 'OpenAIPrivacyFilterModel'],
+    ['embedding_gemma2', 'EmbeddingGemma2Model'],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
@@ -636,6 +637,7 @@ const CUSTOM_MAPPING = [
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
+    ['EmbeddingGemma2Model', ALL_MODEL_FILES.EmbeddingGemma2Model, MODEL_TYPES.MultimodalEncoder],
 
     [
         'VoxtralRealtimeForConditionalGeneration',
