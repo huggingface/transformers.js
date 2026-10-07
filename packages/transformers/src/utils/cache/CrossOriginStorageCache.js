@@ -38,9 +38,12 @@ export class CrossOriginStorage {
 
     /**
      * Returns whether the `navigator.crossOriginStorage` API is available in the current environment.
+     * Checks for `getFileHandle()` itself, so that an implementation exposing
+     * `navigator.crossOriginStorage` without the method falls back to the next cache.
      * @returns {boolean}
      */
-    static isAvailable = () => typeof navigator !== 'undefined' && 'crossOriginStorage' in navigator;
+    static isAvailable = () =>
+        typeof navigator !== 'undefined' && typeof navigator.crossOriginStorage?.getFileHandle === 'function';
 
     /**
      * Looks up a cached response for the given URL by resolving its SHA-256 hash and requesting
