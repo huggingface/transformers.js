@@ -5,20 +5,21 @@
  */
 
 import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
+import { tryCache } from '../cache.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
 
 /**
  * @typedef {Object} FileClearStatus
  * @property {string} file - The file path
- * @property {boolean} deleted - Whether the file was successfully deleted
- * @property {boolean} wasCached - Whether the file was cached before deletion
+ * @property {boolean} deleted - Whether all discovered cache aliases for the file were successfully deleted
+ * @property {boolean} wasCached - Whether any current or obsolete cache alias existed before deletion
  */
 
 /**
  * @typedef {Object} CacheClearResult
- * @property {number} filesDeleted - Number of files successfully deleted
- * @property {number} filesCached - Number of files that were in cache
+ * @property {number} filesDeleted - Number of logical files whose discovered cache aliases were all successfully deleted
+ * @property {number} filesCached - Number of logical files with at least one current or obsolete cache alias
  * @property {FileClearStatus[]} files - Array of files with their deletion status
  */
 
@@ -51,15 +52,19 @@ async function clear_files_from_cache(modelId, files, options = {}) {
     const results = await Promise.all(
         files.map(async (filename) => {
             const resource = context.resolve(modelId, filename, cache);
-            const cached = await context.match(cache, resource);
-            const wasCached = !!cached;
-
-            let deleted = false;
-            if (wasCached) {
-                deleted = await cache.delete(cached.key);
+            const keys = new Set([...resource.cacheKeys, ...resource.obsoleteCacheKeys]);
+            let wasCached = false;
+            let allDeleted = true;
+            // Loading only accepts current aliases; explicit clearing must also
+            // remove stale entries that have never been replaced.
+            for (const key of keys) {
+                if ((await tryCache(cache, key)) === undefined) continue;
+                wasCached = true;
+                const deleted = await cache.delete(key);
+                allDeleted = deleted && allDeleted;
             }
 
-            return { file: filename, deleted, wasCached };
+            return { file: filename, deleted: wasCached && allDeleted, wasCached };
         }),
     );
 

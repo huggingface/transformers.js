@@ -15,7 +15,7 @@ const { env } = await import("../../src/env.js");
 const { getModelJSON, getModelFile, buildResourcePaths, checkCachedResource } = await import("../../src/utils/hub.js");
 const { get_file_metadata } = await import("../../src/utils/model_registry/get_file_metadata.js");
 const { is_cached_files, is_pipeline_cached_files } = await import("../../src/utils/model_registry/is_cached.js");
-const { clear_cache } = await import("../../src/utils/model_registry/clear_cache.js");
+const { clear_cache, clear_pipeline_cache } = await import("../../src/utils/model_registry/clear_cache.js");
 const { FileCache } = await import("../../src/utils/cache/FileCache.js");
 
 const MODEL = "test/asset-loading";
@@ -95,6 +95,81 @@ describe("Internal asset loading", () => {
     expect((await is_pipeline_cached_files("text-generation", MODEL)).allCached).toBe(true);
     expect((await clear_cache(MODEL)).filesDeleted).toBe(2);
     expect(cache.entries.size).toBe(0);
+  });
+
+  describe.each([
+    ["clear_cache", (options) => clear_cache(MODEL, options)],
+    ["clear_pipeline_cache", (options) => clear_pipeline_cache("text-generation", MODEL, options)],
+  ])("%s cache aliases", (_name, clear) => {
+    it.each([`${REMOTE}tokenizer_config.json`, `/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json?__transformersjs_cache_version=1`, `/models/${MODEL}/tokenizer_config.json?__transformersjs_cache_version=1`])("clears a stale-only entry at %s before any replacement is loaded", async (key) => {
+      cache.entries.set(key, jsonResponse({ stale: true }));
+      expect((await is_cached_files(MODEL)).files[0].cached).toBe(false);
+
+      expect(await clear()).toEqual({
+        filesDeleted: 1,
+        filesCached: 1,
+        files: [
+          { file: "tokenizer_config.json", deleted: true, wasCached: true },
+          { file: "onnx/model.onnx", deleted: false, wasCached: false },
+        ],
+      });
+      expect(cache.entries.size).toBe(0);
+      expect(cache.put).not.toHaveBeenCalled();
+      expect(env.fetch).not.toHaveBeenCalled();
+    });
+
+    it("removes every current and obsolete alias but counts each logical file once", async () => {
+      const resource = buildResourcePaths(MODEL, "tokenizer_config.json", {}, cache);
+      const aliases = [...resource.cacheKeys, ...resource.obsoleteCacheKeys];
+      for (const key of aliases) cache.entries.set(key, jsonResponse({ cached: true }));
+      const unrelated = `${REMOTE}tokenizer.json`;
+      cache.entries.set(unrelated, jsonResponse({ unrelated: true }));
+
+      const result = await clear();
+      expect(result.filesCached).toBe(1);
+      expect(result.filesDeleted).toBe(1);
+      expect(result.files[0]).toEqual({ file: "tokenizer_config.json", deleted: true, wasCached: true });
+      expect([...cache.entries.keys()]).toEqual([unrelated]);
+      expect(cache.delete).toHaveBeenCalledTimes(new Set(aliases).size);
+      expect(env.fetch).not.toHaveBeenCalled();
+    });
+
+    it("does not report a file as deleted if one alias cannot be removed", async () => {
+      const oldKey = `${REMOTE}tokenizer_config.json`;
+      cache.entries.set(oldKey, jsonResponse({ stale: true }));
+      cache.entries.set(VERSIONED, jsonResponse({ updated: true }));
+      cache.delete.mockImplementation(async (key) => key !== oldKey && cache.entries.delete(key));
+
+      const result = await clear();
+      expect(result.filesCached).toBe(1);
+      expect(result.filesDeleted).toBe(0);
+      expect(result.files[0]).toEqual({ file: "tokenizer_config.json", deleted: false, wasCached: true });
+      expect([...cache.entries.keys()]).toEqual([oldKey]);
+    });
+
+    it("removes stale-only filesystem entries for the requested revision", async () => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), "transformers-clear-assets-"));
+      try {
+        const fileCache = new FileCache(directory);
+        env.customCache = fileCache;
+        const oldKey = `${MODEL}/v1/tokenizer_config.json`;
+        const earlierKey = `transformersjs_assets_v1/${oldKey}`;
+        const otherRevision = `${MODEL}/tokenizer_config.json`;
+        await fileCache.put(oldKey, jsonResponse({ stale: true }));
+        await fileCache.put(earlierKey, jsonResponse({ stale: true }));
+        await fileCache.put(otherRevision, jsonResponse({ unrelated: true }));
+
+        const result = await clear({ revision: "v1" });
+        expect(result.filesCached).toBe(1);
+        expect(result.filesDeleted).toBe(1);
+        expect(await fileCache.match(oldKey)).toBeUndefined();
+        expect(await fileCache.match(earlierKey)).toBeUndefined();
+        expect(await fileCache.match(otherRevision)).toBeDefined();
+        expect(env.fetch).not.toHaveBeenCalled();
+      } finally {
+        await fs.rm(directory, { recursive: true, force: true });
+      }
+    });
   });
 
   it("keeps the existing path and cache helpers consistent without accepting stale aliases", async () => {
