@@ -126,28 +126,51 @@ export function createTokenConstraint(
                 target.set(safe.mask);
                 allowed += safe.count;
             }
-            const nodes: TrieNode[] = [stringCapacity === undefined ? tokenizer.trie : tokenizer.stringExceptionalTrie];
-            const states: unknown[] = [state];
-            while (nodes.length > 0) {
-                const node = nodes.pop()!;
-                const current = states.pop()!;
-                for (const tokenId of node.tokenIds) {
+            if (machine.prefersTokenScan?.(state)) {
+                for (let tokenId = 0; tokenId < tokenizer.data.tokens.length; ++tokenId) {
                     if (tokenId === tokenizer.data.eosTokenId) continue;
+                    const bytes = tokenizer.data.tokens[tokenId];
+                    let next = state;
+                    for (const byte of bytes) {
+                        next = machine.transition(next, byte);
+                        if (!machine.viable(next)) break;
+                    }
                     if (
-                        tokenizer.data.specialTokenIds.has(tokenId) &&
-                        !machine.allowsSpecial?.(state, current, tokenizer.data.tokens[tokenId])
+                        !machine.viable(next) ||
+                        (tokenizer.data.specialTokenIds.has(tokenId) && !machine.allowsSpecial?.(state, next, bytes))
                     )
                         continue;
                     setBit(target, tokenId);
-                    tokenStates[tokenId] = current;
+                    tokenStates[tokenId] = next;
                     tokenStamps[tokenId] = stamp;
                     allowed++;
                 }
-                for (let index = 0; index < node.childNodes.length; ++index) {
-                    const next = machine.transition(current, node.childBytes[index]);
-                    if (!machine.viable(next)) continue;
-                    nodes.push(node.childNodes[index]);
-                    states.push(next);
+            } else {
+                const nodes: TrieNode[] = [
+                    stringCapacity === undefined ? tokenizer.trie : tokenizer.stringExceptionalTrie,
+                ];
+                const states: unknown[] = [state];
+                while (nodes.length > 0) {
+                    const node = nodes.pop()!;
+                    const current = states.pop()!;
+                    for (const tokenId of node.tokenIds) {
+                        if (tokenId === tokenizer.data.eosTokenId) continue;
+                        if (
+                            tokenizer.data.specialTokenIds.has(tokenId) &&
+                            !machine.allowsSpecial?.(state, current, tokenizer.data.tokens[tokenId])
+                        )
+                            continue;
+                        setBit(target, tokenId);
+                        tokenStates[tokenId] = current;
+                        tokenStamps[tokenId] = stamp;
+                        allowed++;
+                    }
+                    for (let index = 0; index < node.childNodes.length; ++index) {
+                        const next = machine.transition(current, node.childBytes[index]);
+                        if (!machine.viable(next)) continue;
+                        nodes.push(node.childNodes[index]);
+                        states.push(next);
+                    }
                 }
             }
             if (allowed > 0 && cacheKey !== undefined) {
