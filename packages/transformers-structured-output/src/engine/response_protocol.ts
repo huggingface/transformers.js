@@ -52,10 +52,11 @@ export function withResponseProtocol(
         byte: number,
     ): ProtocolState => {
         const next = advanceMatch(matcher, progress, byte);
-        if (next.complete === 'after') return phase === 'ending' ? { phase: 'finished' } : payload(structured.initial);
-        if (next.complete === 'before' && phase === 'content')
+        if (next === MATCH_COMPLETE_AFTER)
+            return phase === 'ending' ? { phase: 'finished' } : payload(structured.initial);
+        if (next === MATCH_COMPLETE_BEFORE && phase === 'content')
             return payload(structured.transition(structured.initial, byte));
-        return next.progress === undefined ? { phase: 'dead' } : { phase, progress: next.progress };
+        return typeof next === 'object' ? { phase, progress: next } : { phase: 'dead' };
     };
     const transition = (state: ProtocolState, byte: number): ProtocolState => {
         switch (state.phase) {
@@ -98,30 +99,39 @@ export function withResponseProtocol(
             case 'afterTool': {
                 if (isFramingWhitespace(byte)) return state;
                 const tool = advanceMatch(protocol.toolOpen!, state.tool, byte);
-                if (tool.complete === 'after') return { phase: 'tool', closeState: 0 };
-                if (tool.complete === 'before') return transition({ phase: 'tool', closeState: 0 }, byte);
-                return tool.progress === undefined
-                    ? { phase: 'dead' }
-                    : { phase: 'afterTool', tool: tool.progress, canEnd: false };
+                if (tool === MATCH_COMPLETE_AFTER) return { phase: 'tool', closeState: 0 };
+                if (tool === MATCH_COMPLETE_BEFORE) return transition({ phase: 'tool', closeState: 0 }, byte);
+                if (typeof tool !== 'object') return { phase: 'dead' };
+                return tool === state.tool && !state.canEnd ? state : { phase: 'afterTool', tool, canEnd: false };
             }
             case 'start': {
                 const thinking = state.thinking && advanceMatch(protocol.thinkingOpen!, state.thinking, byte);
-                if (thinking?.complete === 'after') return { phase: 'thinking', closeState: 0 };
-                if (thinking?.complete === 'before') return transition({ phase: 'thinking', closeState: 0 }, byte);
+                if (thinking === MATCH_COMPLETE_AFTER) return { phase: 'thinking', closeState: 0 };
+                if (thinking === MATCH_COMPLETE_BEFORE) return transition({ phase: 'thinking', closeState: 0 }, byte);
                 const content = state.content && advanceMatch(protocol.contentOpen!, state.content, byte);
-                if (content?.complete === 'after') return payload(structured.initial);
-                if (content?.complete === 'before') return payload(structured.transition(structured.initial, byte));
+                if (content === MATCH_COMPLETE_AFTER) return payload(structured.initial);
+                if (content === MATCH_COMPLETE_BEFORE) return payload(structured.transition(structured.initial, byte));
                 const tool = state.tool && advanceMatch(protocol.toolOpen!, state.tool, byte);
-                if (tool?.complete === 'after') return { phase: 'tool', closeState: 0 };
-                if (tool?.complete === 'before') return transition({ phase: 'tool', closeState: 0 }, byte);
+                if (tool === MATCH_COMPLETE_AFTER) return { phase: 'tool', closeState: 0 };
+                if (tool === MATCH_COMPLETE_BEFORE) return transition({ phase: 'tool', closeState: 0 }, byte);
                 const next = state.structured === undefined ? undefined : structured.transition(state.structured, byte);
                 const direct = next !== undefined && structured.viable(next) ? next : undefined;
                 const framingWhitespace = state.framingWhitespace && isFramingWhitespace(byte);
-                const thinkingProgress = thinking?.progress ?? (framingWhitespace ? state.thinking : undefined);
-                const contentProgress = content?.progress ?? (framingWhitespace ? state.content : undefined);
-                const toolProgress = tool?.progress ?? (framingWhitespace ? state.tool : undefined);
+                const thinkingProgress =
+                    typeof thinking === 'object' ? thinking : framingWhitespace ? state.thinking : undefined;
+                const contentProgress =
+                    typeof content === 'object' ? content : framingWhitespace ? state.content : undefined;
+                const toolProgress = typeof tool === 'object' ? tool : framingWhitespace ? state.tool : undefined;
                 if (thinkingProgress === undefined && contentProgress === undefined && toolProgress === undefined)
                     return direct === undefined ? { phase: 'dead' } : payload(direct);
+                if (
+                    direct === state.structured &&
+                    thinkingProgress === state.thinking &&
+                    contentProgress === state.content &&
+                    toolProgress === state.tool &&
+                    framingWhitespace === state.framingWhitespace
+                )
+                    return state;
                 return {
                     phase: 'start',
                     structured: direct,
@@ -205,11 +215,45 @@ export function withResponseProtocol(
             }
             return state.phase === 'content' || state.phase === 'ending';
         },
+        prefersTokenScan: (state) =>
+            state.phase === 'thinking' ||
+            state.phase === 'tool' ||
+            (state.phase === 'start' && matcherIsBroad(protocol.toolOpen, state.tool)),
         stringCapacity: (state) =>
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
             if (state.phase === 'thinking') return `thinking:${state.closeState}`;
             if (state.phase === 'tool') return `tool:${state.closeState}`;
+            if (state.phase === 'start') {
+                const structuredKey = state.structured === undefined ? null : structured.maskKey?.(state.structured);
+                const thinkingKey = matcherMaskKey(protocol.thinkingOpen, state.thinking);
+                const contentKey = matcherMaskKey(protocol.contentOpen, state.content);
+                const toolKey = matcherMaskKey(protocol.toolOpen, state.tool);
+                if (
+                    structuredKey === undefined ||
+                    thinkingKey === undefined ||
+                    contentKey === undefined ||
+                    toolKey === undefined
+                )
+                    return undefined;
+                return JSON.stringify([
+                    'start',
+                    state.framingWhitespace,
+                    structuredKey,
+                    thinkingKey,
+                    contentKey,
+                    toolKey,
+                ]);
+            }
+            if (state.phase === 'afterTool') {
+                const toolKey = matcherMaskKey(protocol.toolOpen, state.tool);
+                return toolKey === undefined ? undefined : JSON.stringify(['afterTool', state.canEnd, toolKey]);
+            }
+            if (state.phase === 'content' || state.phase === 'ending') {
+                const matcher = state.phase === 'content' ? protocol.contentOpen : protocol.contentClose;
+                const key = matcherMaskKey(matcher, state.progress);
+                return key === undefined ? undefined : JSON.stringify([state.phase, key]);
+            }
             if (state.phase !== 'structured') return undefined;
             const key = structured.maskKey?.(state.state);
             return key === undefined ? undefined : `structured:${key}`;
@@ -224,15 +268,33 @@ function isFramingWhitespace(byte: number): boolean {
 function initialMatch(matcher: Matcher): MatchProgress {
     return { state: matcher.machine.initial, accepted: matcher.machine.accepting(matcher.machine.initial) };
 }
+function matcherMaskKey(matcher: Matcher | undefined, progress: MatchProgress | undefined): string | null | undefined {
+    if (progress === undefined) return null;
+    const key = matcher?.machine.maskKey?.(progress.state);
+    return key === undefined ? undefined : `${progress.accepted ? 1 : 0}:${key}`;
+}
+function matcherIsBroad(matcher: Matcher | undefined, progress: MatchProgress | undefined): boolean {
+    if (matcher === undefined || progress === undefined) return false;
+    let viableBytes = 0;
+    for (let byte = 0; byte < 256; ++byte) {
+        const next = matcher.machine.transition(progress.state, byte);
+        if (matcher.machine.viable(next) && ++viableBytes >= 32) return true;
+    }
+    return false;
+}
+const MATCH_COMPLETE_AFTER = Symbol('match-complete-after');
+const MATCH_COMPLETE_BEFORE = Symbol('match-complete-before');
+
 function advanceMatch(
     matcher: Matcher,
     progress: MatchProgress,
     byte: number,
-): { progress?: MatchProgress; complete?: 'before' | 'after' } {
+): MatchProgress | typeof MATCH_COMPLETE_AFTER | typeof MATCH_COMPLETE_BEFORE | undefined {
     const next = matcher.machine.transition(progress.state, byte);
-    if (!matcher.machine.viable(next)) return progress.accepted ? { complete: 'before' } : {};
+    if (!matcher.machine.viable(next)) return progress.accepted ? MATCH_COMPLETE_BEFORE : undefined;
     const accepted = matcher.machine.accepting(next);
-    return accepted && matcher.eager ? { complete: 'after' } : { progress: { state: next, accepted } };
+    if (accepted && matcher.eager) return MATCH_COMPLETE_AFTER;
+    return next === progress.state && accepted === progress.accepted ? progress : { state: next, accepted };
 }
 const LITERAL_COMPLETE_AFTER = -1;
 const LITERAL_COMPLETE_BEFORE = -2;

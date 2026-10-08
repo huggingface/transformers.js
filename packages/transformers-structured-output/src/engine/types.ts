@@ -9,6 +9,7 @@ export interface ConstraintState<State> {
     viable(state: State): boolean;
     accepting(state: State): boolean;
     allowsSpecial?(state: State, next: State, bytes: Uint8Array): boolean;
+    prefersTokenScan?(state: State): boolean;
     stringCapacity?(state: State): number | undefined;
     maskKey?(state: State): string | undefined;
 }
