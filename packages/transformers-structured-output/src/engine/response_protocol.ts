@@ -8,6 +8,7 @@ export type ProtocolConfig = {
     thinkingClose?: Uint8Array[];
     toolOpen?: Matcher;
     toolClose?: Uint8Array[];
+    toolStringDelimiters?: Uint8Array[];
     contentOpen?: Matcher;
     contentClose?: Matcher;
     startAnchors?: Uint8Array[];
@@ -188,7 +189,11 @@ export function withResponseProtocol(
                 return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
             if (state.phase === 'tool') {
-                return next.phase !== 'tool' || next.closeBuffer.length > state.closeBuffer.length;
+                return (
+                    protocol.toolStringDelimiters?.some((delimiter) => bytesEqual(bytes, delimiter)) ||
+                    next.phase !== 'tool' ||
+                    next.closeBuffer.length > state.closeBuffer.length
+                );
             }
             if (state.phase === 'structured') return next.phase === 'ending' || next.phase === 'finished';
             if (state.phase === 'start' || state.phase === 'afterTool') {
@@ -282,6 +287,10 @@ export function responseProtocol(source: TokenizerSource): ProtocolConfig | unde
         );
     const toolOpen = toolCalls && anchorMatcher(toolCalls, 'open', 'open_pattern');
     const toolClose = toolCalls && literalAnchor(toolCalls.close, 'response_template.fields.tool_calls.close');
+    const stringDelimiters = asRecord(toolCalls?.content_args)?.string_delims;
+    const toolStringDelimiters = Array.isArray(stringDelimiters)
+        ? literalAnchor(stringDelimiters.flat(), 'response_template.fields.tool_calls.content_args.string_delims')
+        : undefined;
     if (toolCalls !== undefined && (toolOpen === undefined || toolClose === undefined))
         throw new Error(
             'Response-area-aware constraints require supported tool_calls open and literal close delimiters.',
@@ -294,6 +303,7 @@ export function responseProtocol(source: TokenizerSource): ProtocolConfig | unde
         thinkingClose,
         toolOpen,
         toolClose,
+        toolStringDelimiters,
         contentOpen,
         contentClose: anchorMatcher(content, 'close', 'close_pattern'),
         startAnchors: literalAnchor(template?.start_anchor, 'response_template.start_anchor'),

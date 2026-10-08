@@ -84,6 +84,59 @@ function schemaAccepts(schema, text) {
 }
 
 describe("StructuredOutputProcessor", () => {
+  it("allows Gemma special string delimiters inside tool arguments, but not final text", () => {
+    const encoder = new TextEncoder();
+    const quoteTokenId = 256;
+    const eosTokenId = 257;
+    const gemmaTokenizer = {
+      tokens: [...Array.from({ length: 256 }, (_, tokenId) => [tokenId]), encoder.encode('<|"|>'), []],
+      eos_token_id: eosTokenId,
+      special_token_ids: [quoteTokenId, eosTokenId],
+      response_template: {
+        start_anchor: ["<|turn>model\n", "<tool_response|>"],
+        fields: {
+          thinking: { open: "<|channel>thought\n", close: "<channel|>", content: "text" },
+          tool_calls: {
+            open_pattern: String.raw`<\|tool_call>call:(?P<name>\w+)`,
+            close: "<tool_call|>",
+            content: "json",
+            content_args: { unquoted_keys: true, string_delims: [['<|"|>', '<|"|>']] },
+          },
+          content: { close: "<turn|>", content: "text" },
+        },
+      },
+    };
+    const processor = new StructuredOutputProcessor(gemmaTokenizer, { type: "regex", regex: "Weather good, temperature 20 °C" });
+    const inputIds = [0n];
+    const scores = () => new Tensor("float32", new Float32Array(eosTokenId + 1).fill(1), [1, eosTokenId + 1]);
+    const append = (ids) => {
+      for (const id of ids) {
+        const mask = scores();
+        processor([inputIds], mask);
+        expect(isAllowed(mask, id)).toBe(true);
+        inputIds.push(BigInt(id));
+      }
+    };
+    append(encoder.encode("<|tool_call>call:get_weather{location:"));
+    append([quoteTokenId]);
+    append(encoder.encode("London"));
+    append([quoteTokenId]);
+    append(encoder.encode(",unit:"));
+    append([quoteTokenId]);
+    append(encoder.encode("celsius"));
+    append([quoteTokenId]);
+    append(encoder.encode("}<tool_call|>"));
+    const completedCall = scores();
+    processor([inputIds], completedCall);
+    expect(isAllowed(completedCall, eosTokenId)).toBe(true);
+
+    const finalProcessor = new StructuredOutputProcessor(gemmaTokenizer, { type: "regex", regex: "Weather good, temperature 20 °C" });
+    const finalScores = scores();
+    finalProcessor([[0n]], finalScores);
+    expect(isAllowed(finalScores, quoteTokenId)).toBe(false);
+    expect(isAllowed(finalScores, "W".charCodeAt(0))).toBe(true);
+  });
+
   it("derives token bytes through the configured decoder", () => {
     const tokenizerJson = {
       version: "1.0",

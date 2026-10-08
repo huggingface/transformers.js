@@ -89,7 +89,11 @@ function _json(text, args) {
     }
 
     if (unquoted_keys) {
-        working = working.replace(compile_pattern(String.raw`(?<=[{,])(\w+):`).regex, '"$1":');
+        // Consume quoted strings unchanged so key-like text inside values is never rewritten.
+        working = working.replace(
+            /"(?:\\.|[^"\\])*"|(?<=[{,])(\s*)(\w+)\s*:/g,
+            (match, whitespace, key) => (key === undefined ? match : `${whitespace}"${key}":`),
+        );
     }
 
     for (let i = 0; i < captured.length; ++i) {
