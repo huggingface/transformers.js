@@ -60,6 +60,37 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
         const input = inputIds[0];
+        this.syncInput(input);
+        const logitsVocabSize = logits.dims.at(-1);
+        const mask = this.fillMask(logitsVocabSize);
+        applyMask(logits, mask, this.state.constraint.vocabSize);
+        const repeatedWhitespace = this.state.constraint.repeatedWhitespace();
+        if (repeatedWhitespace !== undefined) {
+            discourageRepeatedWhitespace(logits, repeatedWhitespace.tokenIds, repeatedWhitespace.count);
+        }
+        return logits;
+    }
+
+    onTokensSampled(tokenIds: number[], inputIds: bigint[][]): void {
+        assertSingleSequence(tokenIds.length);
+        assertSingleSequence(inputIds.length);
+        if (this.state.processedInputLength === undefined) return;
+        const input = inputIds[0];
+        this.syncInput(input.slice(0, -1));
+        this.state.constraint.commit(tokenIds[0]);
+        this.state.processedInputLength = input.length;
+    }
+
+    getRuntimeProcessor(inputIds: bigint[][]) {
+        assertSingleSequence(inputIds.length);
+        this.syncInput(inputIds[0]);
+        return {
+            op: 'token-mask' as const,
+            getMask: (vocabSize: number) => this.fillMask(vocabSize, true),
+        };
+    }
+
+    private syncInput(input: readonly bigint[]): void {
         if (this.state.processedInputLength === undefined) {
             this.state.constraint.initializePrompt(input, { enable_thinking: this.state.enableThinking });
         }
@@ -72,21 +103,28 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
             }
         }
         this.state.processedInputLength = input.length;
-        const logitsVocabSize = logits.dims.at(-1);
-        if (logitsVocabSize === undefined || !Number.isInteger(logitsVocabSize) || logitsVocabSize <= 0) {
+    }
+
+    private fillMask(vocabSize: number | undefined, enforceWhitespaceLimit = false): Uint32Array {
+        if (vocabSize === undefined || !Number.isInteger(vocabSize) || vocabSize <= 0) {
             throw new Error('StructuredOutputProcessor requires logits with a vocabulary dimension.');
         }
-        const words = Math.ceil(logitsVocabSize / 32);
+        const words = Math.ceil(vocabSize / 32);
         if (this.state.mask?.length !== words) this.state.mask = new Uint32Array(words);
         if (!this.state.constraint.fillMask(this.state.mask)) {
             throw new Error('The constraint reached a dead end before producing a valid output.');
         }
-        applyMask(logits, this.state.mask, this.state.constraint.vocabSize);
         const repeatedWhitespace = this.state.constraint.repeatedWhitespace();
-        if (repeatedWhitespace !== undefined) {
-            discourageRepeatedWhitespace(logits, repeatedWhitespace.tokenIds, repeatedWhitespace.count);
+        if (
+            enforceWhitespaceLimit &&
+            repeatedWhitespace !== undefined &&
+            repeatedWhitespace.count >= MAX_CONSECUTIVE_WHITESPACE_TOKENS
+        ) {
+            for (const tokenId of repeatedWhitespace.tokenIds) {
+                this.state.mask[tokenId >>> 5] &= ~(1 << (tokenId & 31));
+            }
         }
-        return logits;
+        return this.state.mask;
     }
 }
 
