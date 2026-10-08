@@ -83,7 +83,13 @@ class RegexParser {
         if (character === '(') {
             this.index++;
             if (this.source.startsWith('?:', this.index)) this.index += 2;
-            else if (this.peek() === '?') this.fail('only non-capturing special groups are supported');
+            else if (this.peek() === '?') {
+                // Captures do not affect the accepted language. Response templates
+                // use Python names (e.g. Gemma's tool name); also accept JS names.
+                const capture = /^\?(?:P<|<)[A-Za-z_]\w*>/.exec(this.source.slice(this.index));
+                if (capture === null) this.fail('unsupported special group');
+                this.index += capture[0].length;
+            }
             const result = this.alternation();
             if (this.peek() !== ')') this.fail('unterminated group');
             this.index++;
@@ -151,6 +157,9 @@ class RegexParser {
             return { expression: byteSet(bytes), bytes };
         }
         if (code === 'b' && !inClass) this.fail('word boundaries are unsupported');
+        if (!inClass && (/[1-9]/.test(code) || (code === 'k' && this.peek() === '<'))) {
+            this.fail('backreferences are unsupported');
+        }
         let value: number;
         if (code === 'x') value = this.hex(2);
         else if (code === 'u') value = this.hex(4);

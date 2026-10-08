@@ -20,6 +20,22 @@ const thinkingTokenizer = {
   },
 };
 
+const toolTokenizer = {
+  ...thinkingTokenizer,
+  response_template: {
+    ...thinkingTokenizer.response_template,
+    fields: {
+      ...thinkingTokenizer.response_template.fields,
+      tool_calls: {
+        open: "<tool_call>",
+        close: "</tool_call>",
+        repeats: true,
+        content: "json",
+      },
+    },
+  },
+};
+
 function logits() {
   return new Tensor("float32", new Float32Array(EOS_TOKEN_ID + 1).fill(1), [1, EOS_TOKEN_ID + 1]);
 }
@@ -151,6 +167,118 @@ describe("StructuredOutputProcessor", () => {
     processor([inputIds], final);
 
     expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it("allows a tool-call-only generation before a constrained final response", async () => {
+    const responseFormat = { type: "regex", regex: "The answer is \\d+\\." };
+    const first = new StructuredOutputProcessor(toolTokenizer, responseFormat);
+    const firstIds = await consume(first, '<think>I should calculate this.</think>\n\n<tool_call>{"name":"add","arguments":{"a":4,"b":5}}</tool_call>');
+    const afterToolCall = logits();
+
+    first([firstIds], afterToolCall);
+
+    expect(isAllowed(afterToolCall, EOS_TOKEN_ID)).toBe(true);
+
+    const second = new StructuredOutputProcessor(toolTokenizer, responseFormat);
+    const secondIds = await consume(second, "<think>The tool returned 9.</think>The answer is 9.");
+    const afterContent = logits();
+    second([secondIds], afterContent);
+
+    expect(isAllowed(afterContent, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it.each(["(?P<name>\\w+)", "(?<name>\\w+)"])("accepts Gemma tool openers with named captures: %s", async (capture) => {
+    const gemmaTokenizer = {
+      ...tokenizer,
+      response_template: {
+        start_anchor: ["<|turn>model\n", "<tool_response|>"],
+        fields: {
+          thinking: { open: "<|channel>thought\n", close: "<channel|>", content: "text" },
+          tool_calls: {
+            open_pattern: `<\\|tool_call>call:${capture}`,
+            close: "<tool_call|>",
+            repeats: true,
+            content: "json",
+          },
+          content: { close: ["<turn|>", "<|tool_response>", "<eos>"], content: "text" },
+        },
+      },
+    };
+    const responseFormat = { type: "regex", regex: "The answer is \\d+\\." };
+    const first = new StructuredOutputProcessor(gemmaTokenizer, responseFormat);
+    const firstIds = await consume(first, "<|channel>thought\nUse add.<channel|><|tool_call>call:add{a:4,b:5}<tool_call|>");
+    const afterTool = logits();
+    first([firstIds], afterTool);
+    expect(isAllowed(afterTool, EOS_TOKEN_ID)).toBe(true);
+
+    const second = new StructuredOutputProcessor(gemmaTokenizer, responseFormat);
+    const secondIds = await consume(second, "<|channel>thought\nThe tool returned 9.<channel|>The answer is ");
+    const content = logits();
+    second([secondIds], content);
+    expect(isAllowed(content, "9".charCodeAt(0))).toBe(true);
+    expect(isAllowed(content, "x".charCodeAt(0))).toBe(false);
+    const finalIds = await consume(second, "9.<turn|>");
+    const final = logits();
+    second([finalIds], final);
+    expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it.each(["(?P<name>a)(?P=name)", "(?<name>a)\\k<name>", "(a)\\1", "(?<=a)b", "(?P<>a)"])("rejects unsupported capture-dependent or malformed patterns: %s", (regex) => {
+    expect(() => new StructuredOutputProcessor(tokenizer, { type: "regex", regex })).toThrow(/unsupported|backreferences/);
+  });
+
+  it("applies constraints only to content when a template has tools but no thinking", async () => {
+    const toolsOnlyTokenizer = {
+      ...toolTokenizer,
+      response_template: {
+        ...toolTokenizer.response_template,
+        fields: {
+          content: toolTokenizer.response_template.fields.content,
+          tool_calls: toolTokenizer.response_template.fields.tool_calls,
+        },
+      },
+    };
+    const toolCall = new StructuredOutputProcessor(toolsOnlyTokenizer, { type: "regex", regex: "ok" });
+    const inputIds = await consume(toolCall, '<tool_call>{"unconstrained":true}</tool_call>');
+    const final = logits();
+
+    toolCall([inputIds], final);
+
+    expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+  });
+
+  it("allows an EOS token that closes a tool-call-only response", async () => {
+    const encoder = new TextEncoder();
+    const eosTokenId = 256;
+    const eosClosingTokenizer = {
+      tokens: [...Array.from({ length: 256 }, (_, tokenId) => [tokenId]), encoder.encode("</tool_call>")],
+      eos_token_id: eosTokenId,
+      special_token_ids: [eosTokenId],
+      response_template: {
+        start_anchor: "<assistant>",
+        fields: {
+          content: { close: "</content>", content: "text" },
+          tool_calls: { open: "<tool_call>", close: "</tool_call>", content: "json" },
+        },
+      },
+    };
+    const processor = new StructuredOutputProcessor(eosClosingTokenizer, { type: "regex", regex: "ok" });
+    const inputIds = await consume(processor, '<tool_call>{"unconstrained":true}');
+    const scores = new Tensor("float32", new Float32Array(eosTokenId + 1).fill(1), [1, eosTokenId + 1]);
+
+    processor([inputIds], scores);
+
+    expect(isAllowed(scores, eosTokenId)).toBe(true);
+  });
+
+  it("does not allow EOS inside a repeated tool-call opener", async () => {
+    const processor = new StructuredOutputProcessor(toolTokenizer, { type: "regex", regex: "ok" });
+    const inputIds = await consume(processor, '<tool_call>{"first":true}</tool_call><');
+    const scores = logits();
+
+    processor([inputIds], scores);
+
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
   });
 
   it.each(["direct", "nested", "extended"])("forwards disabled thinking context through a %s processor list", async (kind) => {

@@ -107,6 +107,18 @@ export function createTokenConstraint(
             if (machine.accepting(state)) {
                 setBit(target, tokenizer.data.eosTokenId);
                 allowed++;
+            } else {
+                const eosBytes = tokenizer.data.tokens[tokenizer.data.eosTokenId];
+                let eosState = state;
+                for (const byte of eosBytes) eosState = machine.transition(eosState, byte);
+                if (
+                    eosBytes.length > 0 &&
+                    machine.accepting(eosState) &&
+                    machine.allowsSpecial?.(state, eosState, eosBytes)
+                ) {
+                    setBit(target, tokenizer.data.eosTokenId);
+                    allowed++;
+                }
             }
             const stringCapacity = machine.stringCapacity?.(state);
             if (stringCapacity !== undefined) {
@@ -148,7 +160,14 @@ export function createTokenConstraint(
                 throw new RangeError(`Token ${tokenId} is outside the tokenizer vocabulary.`);
             }
             if (tokenId === tokenizer.data.eosTokenId) {
-                if (!machine.accepting(state)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
+                if (!machine.accepting(state)) {
+                    const bytes = tokenizer.data.tokens[tokenId];
+                    let next = state;
+                    for (const byte of bytes) next = machine.transition(next, byte);
+                    if (!machine.accepting(next) || !machine.allowsSpecial?.(state, next, bytes)) {
+                        throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
+                    }
+                }
                 return true;
             }
             let next: unknown;

@@ -14,7 +14,19 @@ import { pick } from '../utils/core.js';
  */
 
 function isChat(x) {
-    return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+    return (
+        Array.isArray(x) &&
+        x.every(
+            (message) =>
+                message !== null &&
+                typeof message === 'object' &&
+                'role' in message &&
+                ('content' in message ||
+                    (message.role === 'assistant' &&
+                        Array.isArray(message.tool_calls) &&
+                        message.tool_calls.length > 0)),
+        )
+    );
 }
 
 /**

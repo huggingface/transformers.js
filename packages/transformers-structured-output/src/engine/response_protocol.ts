@@ -4,15 +4,26 @@ import type { ConstraintState, TokenizerSource } from './types';
 type Matcher = { machine: ConstraintState<unknown>; eager: boolean };
 type MatchProgress = { state: unknown; accepted: boolean };
 export type ProtocolConfig = {
-    thinkingOpen: Matcher;
-    thinkingClose: Uint8Array[];
+    thinkingOpen?: Matcher;
+    thinkingClose?: Uint8Array[];
+    toolOpen?: Matcher;
+    toolClose?: Uint8Array[];
     contentOpen?: Matcher;
     contentClose?: Matcher;
     startAnchors?: Uint8Array[];
 };
 type ProtocolState =
-    | { phase: 'start'; structured?: unknown; thinking?: MatchProgress; content?: MatchProgress }
+    | {
+          phase: 'start';
+          structured?: unknown;
+          thinking?: MatchProgress;
+          content?: MatchProgress;
+          tool?: MatchProgress;
+          framingWhitespace: boolean;
+      }
     | { phase: 'thinking'; closeBuffer: Uint8Array }
+    | { phase: 'tool'; closeBuffer: Uint8Array }
+    | { phase: 'afterTool'; tool: MatchProgress; canEnd: boolean }
     | { phase: 'content' | 'ending'; progress: MatchProgress }
     | { phase: 'structured'; state: unknown }
     | { phase: 'dead' | 'finished' };
@@ -23,16 +34,15 @@ export function withResponseProtocol(
 ): ConstraintState<ProtocolState> {
     const payload = (state: unknown): ProtocolState =>
         structured.viable(state) ? { phase: 'structured', state } : { phase: 'dead' };
-    const afterThinking = (): ProtocolState =>
-        protocol.contentOpen === undefined
-            ? payload(structured.initial)
-            : { phase: 'content', progress: initialMatch(protocol.contentOpen) };
-    const initial: ProtocolState = {
+    const start = (allowThinking: boolean): ProtocolState => ({
         phase: 'start',
         structured: protocol.contentOpen === undefined ? structured.initial : undefined,
-        thinking: initialMatch(protocol.thinkingOpen),
+        thinking: allowThinking && protocol.thinkingOpen ? initialMatch(protocol.thinkingOpen) : undefined,
         content: protocol.contentOpen === undefined ? undefined : initialMatch(protocol.contentOpen),
-    };
+        tool: protocol.toolOpen === undefined ? undefined : initialMatch(protocol.toolOpen),
+        framingWhitespace: true,
+    });
+    const initial = start(true);
     const framed = (
         phase: 'content' | 'ending',
         progress: MatchProgress,
@@ -63,24 +73,64 @@ export function withResponseProtocol(
             case 'ending':
                 return framed('ending', state.progress, protocol.contentClose!, byte);
             case 'thinking': {
-                const close = advanceLiteralSearch(protocol.thinkingClose, state.closeBuffer, byte);
-                if (close.complete === 'after') return afterThinking();
-                if (close.complete === 'before') return transition(afterThinking(), byte);
+                const close = advanceLiteralSearch(protocol.thinkingClose!, state.closeBuffer, byte);
+                if (close.complete === 'after') return start(false);
+                if (close.complete === 'before') return transition(start(false), byte);
                 return { phase: 'thinking', closeBuffer: close.buffer };
             }
+            case 'tool': {
+                const close = advanceLiteralSearch(protocol.toolClose!, state.closeBuffer, byte);
+                if (close.complete === 'after')
+                    return protocol.toolOpen === undefined
+                        ? { phase: 'finished' }
+                        : { phase: 'afterTool', tool: initialMatch(protocol.toolOpen), canEnd: true };
+                if (close.complete === 'before') {
+                    const after: ProtocolState =
+                        protocol.toolOpen === undefined
+                            ? { phase: 'finished' }
+                            : { phase: 'afterTool', tool: initialMatch(protocol.toolOpen), canEnd: true };
+                    return transition(after, byte);
+                }
+                return { phase: 'tool', closeBuffer: close.buffer };
+            }
+            case 'afterTool': {
+                if (isFramingWhitespace(byte)) return state;
+                const tool = advanceMatch(protocol.toolOpen!, state.tool, byte);
+                if (tool.complete === 'after') return { phase: 'tool', closeBuffer: new Uint8Array() };
+                if (tool.complete === 'before')
+                    return transition({ phase: 'tool', closeBuffer: new Uint8Array() }, byte);
+                return tool.progress === undefined
+                    ? { phase: 'dead' }
+                    : { phase: 'afterTool', tool: tool.progress, canEnd: false };
+            }
             case 'start': {
-                const thinking = state.thinking && advanceMatch(protocol.thinkingOpen, state.thinking, byte);
+                const thinking = state.thinking && advanceMatch(protocol.thinkingOpen!, state.thinking, byte);
                 if (thinking?.complete === 'after') return { phase: 'thinking', closeBuffer: new Uint8Array() };
                 if (thinking?.complete === 'before')
                     return transition({ phase: 'thinking', closeBuffer: new Uint8Array() }, byte);
                 const content = state.content && advanceMatch(protocol.contentOpen!, state.content, byte);
                 if (content?.complete === 'after') return payload(structured.initial);
                 if (content?.complete === 'before') return payload(structured.transition(structured.initial, byte));
+                const tool = state.tool && advanceMatch(protocol.toolOpen!, state.tool, byte);
+                if (tool?.complete === 'after') return { phase: 'tool', closeBuffer: new Uint8Array() };
+                if (tool?.complete === 'before')
+                    return transition({ phase: 'tool', closeBuffer: new Uint8Array() }, byte);
                 const next = state.structured === undefined ? undefined : structured.transition(state.structured, byte);
                 const direct = next !== undefined && structured.viable(next) ? next : undefined;
-                if (thinking?.progress === undefined && content?.progress === undefined)
+                const framingWhitespace = state.framingWhitespace && isFramingWhitespace(byte);
+                const thinkingProgress = thinking?.progress ?? (framingWhitespace ? state.thinking : undefined);
+                const contentProgress = content?.progress ?? (framingWhitespace ? state.content : undefined);
+                const toolProgress = tool?.progress ?? (framingWhitespace ? state.tool : undefined);
+                if (thinkingProgress === undefined && contentProgress === undefined && toolProgress === undefined)
                     return direct === undefined ? { phase: 'dead' } : payload(direct);
-                return { phase: 'start', structured: direct, thinking: thinking?.progress, content: content?.progress };
+                return {
+                    phase: 'start',
+                    structured: direct,
+                    thinking: thinkingProgress,
+                    content: contentProgress,
+                    tool: toolProgress,
+                    framingWhitespace,
+                };
             }
         }
     };
@@ -103,38 +153,47 @@ export function withResponseProtocol(
                     const next = transition(state, bytes[i]);
                     atContentBoundary =
                         state.phase !== 'structured' &&
-                        next.phase === 'structured' &&
-                        next.state === structured.initial;
+                        ((next.phase === 'structured' && next.state === structured.initial) ||
+                            (state.phase === 'thinking' &&
+                                next.phase === 'start' &&
+                                next.structured === structured.initial));
                     state = next;
                 }
             }
             if (state.phase === 'dead')
                 throw new Error('The prompt prefill does not satisfy the response protocol or constraint.');
             if (context?.enable_thinking !== false) return state;
-            if (
-                state.phase === 'thinking' ||
-                (state.phase === 'start' && state.structured === undefined && state.content === undefined)
-            ) {
+            if (state.phase === 'thinking') {
                 throw new Error('Thinking is disabled but the prompt prefills an unfinished thinking region.');
             }
             if (state.phase !== 'start') return state;
-            if (state.structured !== undefined) return payload(state.structured);
-            if (state.content !== undefined) return { phase: 'content', progress: state.content };
+            const withoutThinking = { ...state, thinking: undefined };
+            if (
+                withoutThinking.structured !== undefined ||
+                withoutThinking.content !== undefined ||
+                withoutThinking.tool !== undefined
+            )
+                return withoutThinking;
             throw new Error('The prompt is incompatible with disabled thinking.');
         },
         transition,
         viable: (state) => state.phase !== 'dead',
         accepting: (state) =>
-            state.phase === 'finished' || (state.phase === 'structured' && structured.accepting(state.state)),
+            state.phase === 'finished' ||
+            (state.phase === 'afterTool' && state.canEnd) ||
+            (state.phase === 'structured' && structured.accepting(state.state)),
         allowsSpecial: (state, next, bytes) => {
             if (bytes.length === 0) return false;
             if (state.phase === 'thinking') {
                 return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
+            if (state.phase === 'tool') {
+                return next.phase !== 'tool' || next.closeBuffer.length > state.closeBuffer.length;
+            }
             if (state.phase === 'structured') return next.phase === 'ending' || next.phase === 'finished';
-            if (state.phase === 'start') {
+            if (state.phase === 'start' || state.phase === 'afterTool') {
                 // Only protocol branches justify special tokens, never the payload branch.
-                let candidate: ProtocolState = { ...state, structured: undefined };
+                let candidate: ProtocolState = state.phase === 'start' ? { ...state, structured: undefined } : state;
                 for (const byte of bytes) candidate = transition(candidate, byte);
                 return candidate.phase !== 'dead';
             }
@@ -144,6 +203,7 @@ export function withResponseProtocol(
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
             if (state.phase === 'thinking') return `thinking:${Array.from(state.closeBuffer).join(',')}`;
+            if (state.phase === 'tool') return `tool:${Array.from(state.closeBuffer).join(',')}`;
             if (state.phase !== 'structured') return undefined;
             const key = structured.maskKey?.(state.state);
             return key === undefined ? undefined : `structured:${key}`;
@@ -198,27 +258,42 @@ export function responseProtocol(source: TokenizerSource): ProtocolConfig | unde
     const template = asRecord(asRecord(source)?.response_template);
     const fields = asRecord(template?.fields);
     const thinking = asRecord(fields?.thinking);
+    const toolCalls = asRecord(fields?.tool_calls);
     const content = asRecord(fields?.content);
-    if (thinking === undefined || content === undefined) return undefined;
+    if (content === undefined || (thinking === undefined && toolCalls === undefined)) return undefined;
     if (template?.start_anchor_pattern !== undefined) {
         throw new Error(
-            'Thinking-aware constraints do not support start_anchor_pattern; use start_anchor with a literal string or list of strings.',
+            'Response-area-aware constraints do not support start_anchor_pattern; use start_anchor with a literal string or list of strings.',
         );
     }
-    if (thinking.close_pattern !== undefined)
+    if (thinking?.close_pattern !== undefined)
         throw new Error(
-            'Thinking-aware constraints do not support a thinking close_pattern; use close with a literal string or list of strings.',
+            'Response-area-aware constraints do not support a thinking close_pattern; use close with a literal string or list of strings.',
         );
-    const thinkingOpen = anchorMatcher(thinking, 'open', 'open_pattern');
-    const thinkingClose = literalAnchor(thinking.close, 'response_template.fields.thinking.close');
-    if (thinkingOpen === undefined || thinkingClose === undefined)
-        throw new Error('Thinking-aware constraints require supported thinking open and literal close delimiters.');
+    if (toolCalls?.close_pattern !== undefined)
+        throw new Error(
+            'Response-area-aware constraints do not support a tool_calls close_pattern; use close with a literal string or list of strings.',
+        );
+    const thinkingOpen = thinking && anchorMatcher(thinking, 'open', 'open_pattern');
+    const thinkingClose = thinking && literalAnchor(thinking.close, 'response_template.fields.thinking.close');
+    if (thinking !== undefined && (thinkingOpen === undefined || thinkingClose === undefined))
+        throw new Error(
+            'Response-area-aware constraints require supported thinking open and literal close delimiters.',
+        );
+    const toolOpen = toolCalls && anchorMatcher(toolCalls, 'open', 'open_pattern');
+    const toolClose = toolCalls && literalAnchor(toolCalls.close, 'response_template.fields.tool_calls.close');
+    if (toolCalls !== undefined && (toolOpen === undefined || toolClose === undefined))
+        throw new Error(
+            'Response-area-aware constraints require supported tool_calls open and literal close delimiters.',
+        );
     const contentOpen = anchorMatcher(content, 'open', 'open_pattern');
     if ((content.open !== undefined || content.open_pattern !== undefined) && contentOpen === undefined)
-        throw new Error('Thinking-aware constraints require a supported content opener.');
+        throw new Error('Response-area-aware constraints require a supported content opener.');
     return {
         thinkingOpen,
         thinkingClose,
+        toolOpen,
+        toolClose,
         contentOpen,
         contentClose: anchorMatcher(content, 'close', 'close_pattern'),
         startAnchors: literalAnchor(template?.start_anchor, 'response_template.start_anchor'),
