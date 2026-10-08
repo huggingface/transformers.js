@@ -210,6 +210,36 @@ export function withResponseProtocol(
         maskKey: (state) => {
             if (state.phase === 'thinking') return `thinking:${state.closeState}`;
             if (state.phase === 'tool') return `tool:${state.closeState}`;
+            if (state.phase === 'start') {
+                const structuredKey = state.structured === undefined ? null : structured.maskKey?.(state.structured);
+                const thinkingKey = matcherMaskKey(protocol.thinkingOpen, state.thinking);
+                const contentKey = matcherMaskKey(protocol.contentOpen, state.content);
+                const toolKey = matcherMaskKey(protocol.toolOpen, state.tool);
+                if (
+                    structuredKey === undefined ||
+                    thinkingKey === undefined ||
+                    contentKey === undefined ||
+                    toolKey === undefined
+                )
+                    return undefined;
+                return JSON.stringify([
+                    'start',
+                    state.framingWhitespace,
+                    structuredKey,
+                    thinkingKey,
+                    contentKey,
+                    toolKey,
+                ]);
+            }
+            if (state.phase === 'afterTool') {
+                const toolKey = matcherMaskKey(protocol.toolOpen, state.tool);
+                return toolKey === undefined ? undefined : JSON.stringify(['afterTool', state.canEnd, toolKey]);
+            }
+            if (state.phase === 'content' || state.phase === 'ending') {
+                const matcher = state.phase === 'content' ? protocol.contentOpen : protocol.contentClose;
+                const key = matcherMaskKey(matcher, state.progress);
+                return key === undefined ? undefined : JSON.stringify([state.phase, key]);
+            }
             if (state.phase !== 'structured') return undefined;
             const key = structured.maskKey?.(state.state);
             return key === undefined ? undefined : `structured:${key}`;
@@ -223,6 +253,11 @@ function isFramingWhitespace(byte: number): boolean {
 
 function initialMatch(matcher: Matcher): MatchProgress {
     return { state: matcher.machine.initial, accepted: matcher.machine.accepting(matcher.machine.initial) };
+}
+function matcherMaskKey(matcher: Matcher | undefined, progress: MatchProgress | undefined): string | null | undefined {
+    if (progress === undefined) return null;
+    const key = matcher?.machine.maskKey?.(progress.state);
+    return key === undefined ? undefined : `${progress.accepted ? 1 : 0}:${key}`;
 }
 function advanceMatch(
     matcher: Matcher,
