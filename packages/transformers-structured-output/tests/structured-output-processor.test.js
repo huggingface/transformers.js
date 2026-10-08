@@ -44,6 +44,10 @@ function isAllowed(scores, tokenId) {
   return Number.isFinite(scores.data[tokenId]);
 }
 
+function maskAllows(mask, tokenId) {
+  return (mask[tokenId >>> 5] & (1 << (tokenId & 31))) !== 0;
+}
+
 const inputIdsByConstraint = new WeakMap();
 
 async function consume(processor, text) {
@@ -186,6 +190,26 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(false);
     expect(isAllowed(scores, "c".charCodeAt(0))).toBe(true);
     expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+  });
+
+  it("exposes a stateful token-mask runtime processor", () => {
+    const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "ab" });
+    const runtime = processor.processors[0].getRuntimeProcessor([[0n]]);
+
+    const initial = runtime.getMask(EOS_TOKEN_ID + 1);
+    expect(maskAllows(initial, "a".charCodeAt(0))).toBe(true);
+    expect(maskAllows(initial, "b".charCodeAt(0))).toBe(false);
+
+    processor.processors[0].onTokensSampled(["a".charCodeAt(0)], [[0n, BigInt("a".charCodeAt(0))]]);
+    const next = runtime.getMask(EOS_TOKEN_ID + 1);
+    expect(maskAllows(next, "a".charCodeAt(0))).toBe(false);
+    expect(maskAllows(next, "b".charCodeAt(0))).toBe(true);
+
+    processor.processors[0].onTokensSampled(
+      ["b".charCodeAt(0)],
+      [[0n, BigInt("a".charCodeAt(0)), BigInt("b".charCodeAt(0))]],
+    );
+    expect(maskAllows(runtime.getMask(EOS_TOKEN_ID + 1), EOS_TOKEN_ID)).toBe(true);
   });
 
   it("allows optional thinking before applying a JSON schema", async () => {
