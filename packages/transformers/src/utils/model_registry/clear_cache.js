@@ -4,8 +4,7 @@
  * Provides functions to clear cached model files from the cache system.
  */
 
-import { getCache } from '../cache.js';
-import { buildResourcePaths, checkCachedResource } from '../hub.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
 
@@ -34,7 +33,8 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  * @returns {Promise<CacheClearResult>}
  */
 async function clear_files_from_cache(modelId, files, options = {}) {
-    const cache = await getCache(options?.cache_dir);
+    const context = new AssetLoadingContext(options);
+    const cache = await context.getCache();
 
     if (!cache) {
         return {
@@ -50,20 +50,13 @@ async function clear_files_from_cache(modelId, files, options = {}) {
 
     const results = await Promise.all(
         files.map(async (filename) => {
-            const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, options, cache);
-
-            const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
+            const resource = context.resolve(modelId, filename, cache);
+            const cached = await context.match(cache, resource);
             const wasCached = !!cached;
 
             let deleted = false;
             if (wasCached) {
-                // Try proposedCacheKey first (remote URL for browser Cache API, request path for FileCache),
-                // then fall back to localPath in case the entry was cached under the local key instead.
-                const deletedWithProposed = await cache.delete(proposedCacheKey);
-                const deletedWithLocal =
-                    !deletedWithProposed && proposedCacheKey !== localPath ? await cache.delete(localPath) : false;
-
-                deleted = deletedWithProposed || deletedWithLocal;
+                deleted = await cache.delete(cached.key);
             }
 
             return { file: filename, deleted, wasCached };
