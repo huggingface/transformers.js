@@ -285,6 +285,19 @@ function stream_all(template, chunks, options = { prefix: "" }) {
 
 describe("Response templates", () => {
   describe("Parsing", () => {
+    it.each([
+      '{location: "London", unit: "celsius"}',
+      '{\n  location : "London",\n  unit : "celsius"\n}',
+    ])("gemma4 tool arguments with whitespace: %s", (argumentsText) => {
+      const model_out = `<|tool_call>call:get_weather${argumentsText}<tool_call|>`;
+      const expected = {
+        role: "assistant",
+        tool_calls: [{ type: "function", function: { name: "get_weather", arguments: { location: "London", unit: "celsius" } } }],
+      };
+      expect(parse_response(model_out, gemma4_template, { prefix: "" })).toEqual(expected);
+      expect(stream_all(gemma4_template, chunk_fixed(model_out, 1)).message).toEqual(expected);
+    });
+
     it("cohere", () => {
       expect(parse_response(COHERE_OUTPUT, cohere_template, { prefix: "" })).toEqual({
         role: "assistant",
