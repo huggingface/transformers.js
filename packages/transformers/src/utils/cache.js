@@ -20,30 +20,41 @@ import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
  * @param file_cache_dir {string|null} Path to a directory where downloaded model files should be cached when using the file system cache.
  */
 export async function getCache(file_cache_dir = null) {
+    return getCacheForEnvironment(env, file_cache_dir);
+}
+
+/**
+ * Resolve the existing cache backend using captured resource-loading settings.
+ * @private
+ * @param {Pick<import('../env.js').TransformersEnvironment, 'useCustomCache'|'customCache'|'experimental_useCrossOriginStorage'|'useBrowserCache'|'cacheKey'|'useFSCache'|'cacheDir'>} settings
+ * @param {string|null} [file_cache_dir=null]
+ * @returns {Promise<CacheInterface|null>}
+ */
+export async function getCacheForEnvironment(settings, file_cache_dir = null) {
     // First, check if the a caching backend is available
     // If no caching mechanism available, will download the file every time
     let cache = null;
-    if (env.useCustomCache) {
+    if (settings.useCustomCache) {
         // Allow the user to specify a custom cache system.
-        if (!env.customCache) {
+        if (!settings.customCache) {
             throw Error('`env.useCustomCache=true`, but `env.customCache` is not defined.');
         }
 
         // Check that the required methods are defined:
-        if (!env.customCache.match || !env.customCache.put) {
+        if (!settings.customCache.match || !settings.customCache.put) {
             throw new Error(
                 '`env.customCache` must be an object which implements the `match` and `put` functions of the Web Cache API. ' +
                     'For more information, see https://developer.mozilla.org/en-US/docs/Web/API/Cache',
             );
         }
-        cache = env.customCache;
+        cache = settings.customCache;
     }
 
-    if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
+    if (!cache && settings.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
         cache = new CrossOriginStorage();
     }
 
-    if (!cache && env.useBrowserCache) {
+    if (!cache && settings.useBrowserCache) {
         if (typeof caches === 'undefined') {
             throw Error('Browser cache is not available in this environment.');
         }
@@ -53,19 +64,19 @@ export async function getCache(file_cache_dir = null) {
             // incognito mode, the following error is thrown: `DOMException: Failed to execute 'open' on 'CacheStorage':
             // An attempt was made to break through the security policy of the user agent.`
             // So, instead of crashing, we just ignore the error and continue without using the cache.
-            cache = await caches.open(env.cacheKey);
+            cache = await caches.open(settings.cacheKey);
         } catch (e) {
             logger.warn('An error occurred while opening the browser cache:', e);
         }
     }
 
-    if (!cache && env.useFSCache) {
+    if (!cache && settings.useFSCache) {
         if (!apis.IS_FS_AVAILABLE) {
             throw Error('File System Cache is not available in this environment.');
         }
 
         // If `cache_dir` is not specified, use the default cache directory
-        cache = new FileCache(file_cache_dir ?? env.cacheDir);
+        cache = new FileCache(file_cache_dir ?? settings.cacheDir);
     }
 
     return cache;
