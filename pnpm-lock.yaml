@@ -56,6 +56,10 @@ importers:
         version: 5.9.3
 
   packages/transformers-agent:
+    dependencies:
+      '@huggingface/transformers-structured-output':
+        specifier: workspace:*
+        version: link:../transformers-structured-output
     devDependencies:
       '@huggingface/transformers':
         specifier: workspace:*

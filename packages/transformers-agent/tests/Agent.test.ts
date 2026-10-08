@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { StructuredOutputProcessor } from "@huggingface/transformers-structured-output";
 import { Agent } from "../src/Agent";
 import { Tool } from "../src/Tool";
 import type { Model } from "../src/Model";
@@ -184,6 +185,124 @@ test("returns tool calls without executing them and accepts an external response
   assert.equal(agent.getLatestUsage(), null);
 });
 
+test("applies Prompt API response constraints per turn across a tool follow-up", async () => {
+  const outputs = ["tool", '{"answer":9}', "plain"];
+  const conversations: Array<Array<Record<string, unknown>>> = [];
+  const generateOptions: Array<Record<string, unknown>> = [];
+  let generateCount = 0;
+  const tokenizer = Object.assign(() => ({ input_ids: { dims: [1, 2], size: 2 } }), {
+    apply_chat_template(conversation: Array<Record<string, unknown>>) {
+      conversations.push(conversation);
+      return "rendered prompt";
+    },
+    decode() {
+      return outputs[generateCount - 1];
+    },
+    parse_response(response: string) {
+      if (response === "tool") {
+        return {
+          role: "assistant",
+          thinking: "Use the calculator.",
+          tool_calls: [{ type: "function", function: { name: "add", arguments: { a: 4, b: 5 } } }],
+        };
+      }
+      return { role: "assistant", content: response };
+    },
+  });
+  const model = {
+    modelId: "test-model",
+    isInitialized: true,
+    tokenizer,
+    model: {
+      config: {},
+      async generate(options: Record<string, unknown>) {
+        generateOptions.push(options);
+        generateCount += 1;
+        return { dims: [1, 3], slice: () => ({ data: [1] }) };
+      },
+    },
+  } as unknown as Model;
+  const agent = new Agent({
+    model,
+    enableThinking: true,
+    initialPrompts: [{ role: "system", content: "You are a calculator." }],
+  });
+  const Processor = StructuredOutputProcessor as unknown as {
+    instances: Array<{
+      tokenizer: unknown;
+      responseFormat: unknown;
+      contexts: unknown[];
+    }>;
+  };
+  const processorStart = Processor.instances.length;
+
+  const first = await agent.prompt("What is 4+5?", {
+    responseConstraint: /The answer is \d+\./,
+  });
+  const call = first.find((part) => part.type === "tool-call");
+  if (!call) throw new Error("Expected a tool call.");
+
+  const schema = {
+    type: "object" as const,
+    properties: { answer: { type: "integer" } },
+    required: ["answer"],
+    additionalProperties: false,
+  };
+  const second = await agent.prompt(
+    [
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool-response",
+            value: {
+              callID: call.value.callID,
+              name: call.value.name,
+              result: [{ type: "object", value: { answer: 9 } }],
+            },
+          },
+        ],
+      },
+    ],
+    { responseConstraint: schema, omitResponseConstraintInput: true },
+  );
+  const third = await agent.prompt("Answer normally.");
+
+  const processors = Processor.instances.slice(processorStart);
+  assert.equal(processors.length, 2);
+  assert.notEqual(processors[0], processors[1]);
+  assert.equal(processors[0].tokenizer, tokenizer);
+  assert.deepEqual(processors[0].responseFormat, { type: "regex", regex: "The answer is \\d+\\." });
+  assert.deepEqual(processors[1].responseFormat, { type: "json_schema", json_schema: schema });
+  assert.deepEqual(
+    processors.map((processor) => processor.contexts),
+    [[{ enable_thinking: true }], [{ enable_thinking: true }]],
+  );
+  assert.equal(generateOptions[0].logits_processor, processors[0]);
+  assert.equal(generateOptions[1].logits_processor, processors[1]);
+  assert.equal("logits_processor" in generateOptions[2], false);
+  assert.equal(conversations[0][0].role, "system");
+  assert.match(String(conversations[0][0].content), /^You are a calculator\./);
+  assert.match(String(conversations[0][0].content), /regular expression: The answer is \\d\+\\\./);
+  assert.equal(conversations[0][1].role, "user");
+  assert.equal(
+    conversations[1].some((message) => String(message.content).includes("Respond ONLY")),
+    false,
+  );
+  assert.equal(
+    conversations[2].some((message) => String(message.content).includes("Respond ONLY")),
+    false,
+  );
+  assert.deepEqual(second, [{ type: "text", value: '{"answer":9}' }]);
+  assert.deepEqual(third, [{ type: "text", value: "plain" }]);
+  assert.equal(
+    agent.history.some((message) => typeof message.content === "string" && message.content.includes("Respond ONLY")),
+    false,
+  );
+  await assert.rejects(agent.prompt("Invalid options", { omitResponseConstraintInput: true }), /requires responseConstraint/);
+  assert.throws(() => agent.promptStreaming("Invalid options", { omitResponseConstraintInput: true }), /requires responseConstraint/);
+});
+
 test("streams incremental thinking and text content and closes without a done chunk", async () => {
   const tokenizer = Object.assign(() => ({ input_ids: { dims: [1, 2], size: 2 } }), {
     apply_chat_template() {
@@ -223,9 +342,11 @@ test("streams incremental thinking and text content and closes without a done ch
     },
   } as unknown as Model;
   const agent = new Agent({ model });
+  const Processor = StructuredOutputProcessor as unknown as { instances: unknown[] };
+  const processorStart = Processor.instances.length;
 
   const chunks = [];
-  for await (const chunk of agent.promptStreaming("Check this")) chunks.push(chunk);
+  for await (const chunk of agent.promptStreaming("Check this", { responseConstraint: /Check that result\./, omitResponseConstraintInput: true })) chunks.push(chunk);
 
   assert.deepEqual(chunks, [
     { type: "thinking", value: "Check" },
@@ -234,6 +355,7 @@ test("streams incremental thinking and text content and closes without a done ch
     { type: "text", value: " that" },
     { type: "text", value: " result." },
   ]);
+  assert.equal(Processor.instances.length, processorStart + 1);
   assertUsage(agent.getLatestUsage());
 });
 

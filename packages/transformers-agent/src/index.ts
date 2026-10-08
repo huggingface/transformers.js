@@ -5,6 +5,8 @@ export type {
     ModelConfig,
     AgentConfig,
     Prompt,
+    PromptOptions,
+    ResponseConstraint,
     ToolCall,
     ToolResponse,
     ToolSuccess,

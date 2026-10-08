@@ -76,40 +76,24 @@ function formatGemmaMessages(messages: ReadonlyArray<Message>): Array<Record<str
 
         const { responses, consumedMessages } = collectFollowingToolResponses(messages, i, toolCalls);
         const text = stringifyTextContent(message.content);
-        if (thinking) {
-            formatted.push({
-                role: 'assistant',
-                content: [
-                    `<|channel>thought\n${thinking}<channel|>`,
-                    ...toolCalls.map(
-                        (call) => `<|tool_call>call:${call.name}{${formatGemmaObject(call.arguments)}}<tool_call|>`,
-                    ),
-                    ...responses.map(
-                        (response) =>
-                            `<|tool_response>response:${response.name}{${formatGemmaObject(
-                                toolResponseValue(response),
-                            )}}<tool_response|>`,
-                    ),
-                    text ?? '',
-                ].join(''),
-            });
-        } else {
-            formatted.push({
-                role: 'assistant',
-                ...(text !== undefined ? { content: text } : {}),
-                tool_calls: toolCalls.map((call) => ({
-                    function: { name: call.name, arguments: call.arguments },
-                })),
-                ...(responses.length > 0
-                    ? {
-                          tool_responses: responses.map((response) => ({
-                              name: response.name,
-                              response: toolResponseValue(response),
-                          })),
-                      }
-                    : {}),
-            });
-        }
+        // Keep tool metadata structured even when reasoning is present. Raw content
+        // makes Gemma's template close the turn and append a new model opener.
+        formatted.push({
+            role: 'assistant',
+            ...(thinking ? { reasoning_content: thinking } : {}),
+            ...(text !== undefined ? { content: text } : {}),
+            tool_calls: toolCalls.map((call) => ({
+                function: { name: call.name, arguments: call.arguments },
+            })),
+            ...(responses.length > 0
+                ? {
+                      tool_responses: responses.map((response) => ({
+                          name: response.name,
+                          response: toolResponseValue(response),
+                      })),
+                  }
+                : {}),
+        });
         i += consumedMessages;
     }
     return formatted;
@@ -184,22 +168,4 @@ function assertSupportedToolResult(response: Extract<ToolResponse, { result: unk
             throw new Error('Object tool responses must be JSON-serializable.');
         }
     }
-}
-
-function formatGemmaObject(value: unknown): string {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return `value:${formatGemmaValue(value)}`;
-    }
-    return Object.entries(value as Record<string, unknown>)
-        .map(([key, entry]) => `${key}:${formatGemmaValue(entry)}`)
-        .join(',');
-}
-
-function formatGemmaValue(value: unknown): string {
-    if (typeof value === 'string') return `<|"|>${value}<|"|>`;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    if (value === null) return 'null';
-    if (Array.isArray(value)) return `[${value.map(formatGemmaValue).join(',')}]`;
-    if (typeof value === 'object') return `{${formatGemmaObject(value)}}`;
-    return `<|"|>${String(value)}<|"|>`;
 }

@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DIST_FOLDER = "dist";
-export const EXTERNAL_MODULES = ["@huggingface/transformers"];
+export const EXTERNAL_MODULES = ["@huggingface/transformers", "@huggingface/transformers-structured-output"];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.join(__dirname, "../..");

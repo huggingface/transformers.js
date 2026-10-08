@@ -51,6 +51,35 @@ console.log(agent.getLatestUsage());
 
 `prompt()` returns a `Promise<LanguageModelMessageContent[]>`. Model reasoning is returned as `{ type: "thinking", value }`, separately from visible `{ type: "text", value }` output and tool calls. After a turn completes, `getLatestUsage()` returns its token counts, `tokensPerSecond`, `timeToFirstTokenMs`, `generationTimeMs`, and `totalTimeMs`. TPS measures completion tokens over model generation time; total time also includes local prompt preparation and response parsing. It returns `null` before the first completed turn and after `clearHistory()`.
 
+### Structured Output
+
+`prompt()` and `promptStreaming()` accept Prompt API-compatible response constraints. Pass a JSON Schema or `RegExp` through `responseConstraint`:
+
+```ts
+const result = await agent.prompt("What is 4+5?", {
+  responseConstraint: /The answer is \d+\./,
+});
+
+console.log(result.find((part) => part.type === "text")?.value);
+// The answer is 9.
+```
+
+By default, the agent adds a transient system instruction describing the constraint in addition to enforcing it during token generation. Set `omitResponseConstraintInput: true` to keep that instruction out of the model input while retaining constrained decoding:
+
+```ts
+const result = await agent.prompt("Return the answer as JSON.", {
+  responseConstraint: {
+    type: "object",
+    properties: { answer: { type: "integer" } },
+    required: ["answer"],
+    additionalProperties: false,
+  },
+  omitResponseConstraintInput: true,
+});
+```
+
+A response constraint applies only to that `prompt()` or `promptStreaming()` call. In an open-loop tool flow, pass the same constraint to both the initial prompt and the follow-up containing the tool response. Thinking and tool-call response regions remain unconstrained; the constraint applies when the model emits final content.
+
 ### Streaming
 
 `promptStreaming()` returns a `ReadableStream<LanguageModelMessageContent>`. Thinking and text chunks are incremental deltas, not cumulative snapshots. Structured output such as a tool call is emitted as an individual content chunk. The stream closes when the turn completes; there is no `done` chunk.

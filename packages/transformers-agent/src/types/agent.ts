@@ -1,8 +1,15 @@
 import type { Model } from '../Model';
 import type { ToolList } from '../Tool';
+import type { ResponseFormat } from '@huggingface/transformers-structured-output';
 import type { ToolCall, ToolResponse } from './tools';
 
 export type Prompt = string | Message[];
+export type ResponseConstraint = Extract<ResponseFormat, { type: 'json_schema' }>['json_schema'] | RegExp;
+
+export interface PromptOptions {
+    responseConstraint?: ResponseConstraint;
+    omitResponseConstraintInput?: boolean;
+}
 
 export type MessageContent = TextContent | ImageContent | AudioContent | ToolCallContent | ToolResponseContent;
 

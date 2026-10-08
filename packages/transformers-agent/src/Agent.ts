@@ -1,4 +1,5 @@
 import { TextStreamer } from '@huggingface/transformers';
+import { StructuredOutputProcessor, type ResponseFormat } from '@huggingface/transformers-structured-output';
 import { formatMessages, formatTools, getModelFamily } from './messageFormatting';
 import type { Model } from './Model';
 import type { ToolList } from './Tool';
@@ -8,6 +9,8 @@ import type {
     Message,
     MessageContent,
     Prompt,
+    PromptOptions,
+    ResponseConstraint,
     ToolCall,
     Usage,
 } from './types';
@@ -60,14 +63,16 @@ export class Agent {
         this.clearHistory();
     }
 
-    async prompt(input: Prompt): Promise<LanguageModelMessageContent[]> {
-        return this.generateTurn(input);
+    async prompt(input: Prompt, options: PromptOptions = {}): Promise<LanguageModelMessageContent[]> {
+        this.validatePromptOptions(options);
+        return this.generateTurn(input, options);
     }
 
-    promptStreaming(input: Prompt): ReadableStream<LanguageModelMessageContent> {
+    promptStreaming(input: Prompt, options: PromptOptions = {}): ReadableStream<LanguageModelMessageContent> {
+        this.validatePromptOptions(options);
         return new ReadableStream({
             start: (controller) => {
-                void this.generateTurn(input, (chunk) => controller.enqueue(chunk)).then(
+                void this.generateTurn(input, options, (chunk) => controller.enqueue(chunk)).then(
                     () => controller.close(),
                     (error) => controller.error(error),
                 );
@@ -87,6 +92,7 @@ export class Agent {
 
     private async generateTurn(
         input: Prompt,
+        options: PromptOptions,
         onChunk?: (chunk: LanguageModelMessageContent) => void,
     ): Promise<LanguageModelMessageContent[]> {
         if (this.promptActive) {
@@ -102,8 +108,12 @@ export class Agent {
         const modelHistoryLength = this._modelHistory.length;
         try {
             this.appendPrompt(input);
-            const conversation = formatMessages(this._modelHistory, this.getModelFamily());
-            const generated = await this.generateAssistantMessage(conversation, onChunk);
+            const modelHistory =
+                options.responseConstraint !== undefined && !options.omitResponseConstraintInput
+                    ? this.withResponseConstraintInput(options.responseConstraint)
+                    : this._modelHistory;
+            const conversation = formatMessages(modelHistory, this.getModelFamily());
+            const generated = await this.generateAssistantMessage(conversation, options.responseConstraint, onChunk);
 
             const { thinking, content, toolCalls } = this.readAssistantMessage(generated.message);
             const result = this.createAssistantContent(thinking, content, toolCalls);
@@ -146,6 +156,45 @@ export class Agent {
         this.validateHistory([...this._history, ...messages]);
         this._history.push(...messages);
         this._modelHistory.push(...this.cloneMessages(messages));
+    }
+
+    private responseFormat(constraint: ResponseConstraint): ResponseFormat {
+        return constraint instanceof RegExp
+            ? { type: 'regex', regex: constraint.source }
+            : { type: 'json_schema', json_schema: constraint };
+    }
+
+    private responseConstraintMessage(constraint: ResponseConstraint): Message {
+        if (constraint instanceof RegExp) {
+            return {
+                role: 'system',
+                content: `Respond ONLY with text matching this regular expression: ${constraint.source}`,
+            };
+        }
+        return {
+            role: 'system',
+            content: `Respond ONLY with raw JSON matching this JSON Schema:\n\n${JSON.stringify(constraint, null, 2)}\n\nDO NOT include Markdown code blocks, explanations, or any other text.`,
+        };
+    }
+
+    private withResponseConstraintInput(constraint: ResponseConstraint): ModelMessage[] {
+        const history = this.cloneMessages(this._modelHistory) as ModelMessage[];
+        const instruction = this.responseConstraintMessage(constraint).content as string;
+        const system = history[0];
+        if (system?.role !== 'system') {
+            history.unshift({ role: 'system', content: instruction });
+        } else if (typeof system.content === 'string') {
+            system.content = `${system.content}\n\n${instruction}`;
+        } else {
+            system.content.push({ type: 'text', value: `\n\n${instruction}` });
+        }
+        return history;
+    }
+
+    private validatePromptOptions(options: PromptOptions): void {
+        if (options.omitResponseConstraintInput && options.responseConstraint === undefined) {
+            throw new TypeError('omitResponseConstraintInput requires responseConstraint.');
+        }
     }
 
     private createAssistantMessage(response: string, toolCalls: ToolCall[]): Message {
@@ -203,6 +252,7 @@ export class Agent {
 
     private async generateAssistantMessage(
         conversation: Array<Record<string, unknown>>,
+        responseConstraint?: ResponseConstraint,
         onChunk?: (chunk: LanguageModelMessageContent) => void,
     ): Promise<{ message: ParsedAssistantMessage; usage: Usage }> {
         let completionTokens = 0;
@@ -253,6 +303,11 @@ export class Agent {
             return_dict: true,
         });
         const promptTokens = input.input_ids?.dims?.[1] ?? input.input_ids?.size ?? 0;
+        const logitsProcessor =
+            responseConstraint === undefined
+                ? undefined
+                : new StructuredOutputProcessor(tokenizer, this.responseFormat(responseConstraint));
+        logitsProcessor?.setGenerationContext({ enable_thinking: this.enableThinking });
         const generationStartedAt = performance.now();
         const output = (await model.generate({
             ...input,
@@ -260,6 +315,7 @@ export class Agent {
             ...(this.temperature !== undefined
                 ? { temperature: this.temperature, do_sample: true }
                 : { do_sample: false }),
+            ...(logitsProcessor ? { logits_processor: logitsProcessor } : {}),
             streamer,
         })) as { sequences?: unknown } | unknown;
         const generationEndedAt = performance.now();

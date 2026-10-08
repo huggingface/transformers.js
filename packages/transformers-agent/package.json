@@ -37,7 +37,10 @@
   },
   "homepage": "https://github.com/huggingface/transformers.js#readme",
   "peerDependencies": {
-    "@huggingface/transformers": "^4.0.0"
+    "@huggingface/transformers": "^4.3.1"
+  },
+  "dependencies": {
+    "@huggingface/transformers-structured-output": "workspace:*"
   },
   "devDependencies": {
     "@huggingface/transformers": "workspace:*",

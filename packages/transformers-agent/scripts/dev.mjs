@@ -37,7 +37,7 @@ log.section("TYPES");
 log.info("Generating initial type declarations...");
 
 await new Promise((resolve, reject) => {
-  const tscBuild = spawn("tsc", ["--build"], {
+  const tscBuild = spawn("tsc", ["--build", "--force"], {
     cwd: ROOT_DIR,
     stdio: "pipe",
     shell: true,

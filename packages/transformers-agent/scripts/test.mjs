@@ -9,6 +9,7 @@ const tempDir = await mkdtemp(join(tmpdir(), "transformers-agent-tests-"));
 const outfile = join(tempDir, "tests.mjs");
 const entryPoint = join(tempDir, "entry.mjs");
 const transformersStub = join(tempDir, "transformers-stub.mjs");
+const structuredOutputStub = join(tempDir, "structured-output-stub.mjs");
 
 try {
   await writeFile(
@@ -27,6 +28,21 @@ try {
     ].join("\n"),
   );
   await writeFile(
+    structuredOutputStub,
+    [
+      "export class StructuredOutputProcessor {",
+      "  static instances = [];",
+      "  constructor(tokenizer, responseFormat) {",
+      "    this.tokenizer = tokenizer;",
+      "    this.responseFormat = responseFormat;",
+      "    this.contexts = [];",
+      "    StructuredOutputProcessor.instances.push(this);",
+      "  }",
+      "  setGenerationContext(context) { this.contexts.push(context); }",
+      "}",
+    ].join("\n"),
+  );
+  await writeFile(
     entryPoint,
     [resolve("tests/Agent.test.ts"), resolve("tests/Model.test.ts"), resolve("tests/MessageFormatting.test.ts")]
       .map((path) => `import ${JSON.stringify(path)};`)
@@ -41,7 +57,10 @@ try {
     platform: "node",
     target: "node20",
     external: ["node:*"],
-    alias: { "@huggingface/transformers": transformersStub },
+    alias: {
+      "@huggingface/transformers": transformersStub,
+      "@huggingface/transformers-structured-output": structuredOutputStub,
+    },
     logLevel: "silent",
   });
 

@@ -28,8 +28,8 @@ test("keeps Qwen tool arguments structured", () => {
   });
 });
 
-test("formats structured tool responses for Gemma4", () => {
-  const messages: Message[] = [
+test("formats structured tool responses for Gemma4, including turns with reasoning", () => {
+  const messages: Array<Message & { thinking?: string }> = [
     {
       role: "assistant",
       content: [
@@ -75,6 +75,22 @@ test("formats structured tool responses for Gemma4", () => {
           response: { location: "London", temperature: 20, weather: "sunny" },
         },
       ],
+    },
+  ]);
+
+  messages[0].thinking = "Check the weather service.";
+  const [withReasoning] = formatMessages(messages, "gemma4");
+  assert.equal(withReasoning.reasoning_content, "Check the weather service.");
+  assert.equal(withReasoning.content, undefined);
+  assert.deepEqual(withReasoning.tool_calls, [
+    {
+      function: { name: "get_weather", arguments: { location: "London" } },
+    },
+  ]);
+  assert.deepEqual(withReasoning.tool_responses, [
+    {
+      name: "get_weather",
+      response: { location: "London", temperature: 20, weather: "sunny" },
     },
   ]);
 });

@@ -15,10 +15,16 @@
     "lib": ["esnext", "webworker"],
     "baseUrl": ".",
     "paths": {
-      "@huggingface/transformers": ["../transformers/types/transformers"]
+      "@huggingface/transformers": ["../transformers/types/transformers"],
+      "@huggingface/transformers-structured-output": [
+        "../transformers-structured-output/src/index"
+      ]
     }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../transformers" }]
+  "references": [
+    { "path": "../transformers" },
+    { "path": "../transformers-structured-output" }
+  ]
 }
