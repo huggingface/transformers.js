@@ -143,7 +143,6 @@ export function withResponseProtocol(
             }
             return state.phase === 'content' || state.phase === 'ending';
         },
-        prefersTokenScan: (state) => state.phase === 'thinking',
         stringCapacity: (state) =>
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
