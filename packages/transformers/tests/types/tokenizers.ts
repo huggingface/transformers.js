@@ -1,8 +1,6 @@
-import type {
-  PreTrainedTokenizer,
-  BatchEncoding,
-} from "../../src/tokenization_utils.js";
+import type { PreTrainedTokenizer, BatchEncoding } from "../../src/tokenization_utils.js";
 import type { Tensor } from "../../src/utils/tensor.js";
+import type { ResponseParser } from "../../src/utils/chat_parsing/response_parser.js";
 
 import type { Expect, Equal, ExpectError } from "./_base.ts";
 
@@ -90,4 +88,34 @@ type IsAssignable<T, U> = T extends U ? true : false;
     return_dict: false,
   });
   type T1 = Expect<Equal<typeof output, number[]>>;
+}
+
+// Response parsing preserves batch shape and exposes an incremental parser.
+{
+  const output = tokenizer.parse_response("first", { prefix: "" });
+  type T0 = Expect<Equal<typeof output, Record<string, any>>>;
+}
+
+{
+  const output = tokenizer.parse_response([1, 2, 3], { prefix: [1, 2] });
+  type T0 = Expect<Equal<typeof output, Record<string, any>>>;
+}
+
+{
+  const output = tokenizer.parse_response(["first", "second"], { prefix: "" });
+  type T0 = Expect<Equal<typeof output, Record<string, any>[]>>;
+}
+
+{
+  const output = tokenizer.parse_response([[1, 2], [3]], { prefix: "" });
+  type T0 = Expect<Equal<typeof output, Record<string, any>[]>>;
+}
+
+{
+  const parser = tokenizer.get_response_parser({ prefix: "" });
+  type T0 = Expect<Equal<typeof parser, ResponseParser>>;
+  const events = parser.feed("text");
+  type T1 = Expect<Equal<(typeof events)[number]["type"], "region_open" | "region_chunk" | "region_close">>;
+  const [message] = parser.finalize();
+  type T2 = Expect<Equal<typeof message, Record<string, any>>>;
 }
