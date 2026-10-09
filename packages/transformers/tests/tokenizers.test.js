@@ -1,4 +1,5 @@
 import { AutoTokenizer } from "../src/models/auto/tokenization_auto.js";
+import { PreTrainedTokenizer } from "../src/tokenization_utils.js";
 import { MAX_TOKENIZER_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "./init.js";
 import { collect_tests } from "./test_utils.js";
 
@@ -556,7 +557,7 @@ describe("Response templates", () => {
     start_anchor: "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>",
     fields: {
       content: { open: "<|START_RESPONSE|>", close: "<|END_RESPONSE|>", content: "text" },
-      thinking: { open: "<|START_THINKING|>", close: "<|END_THINKING|>", content: "text" },
+      reasoning_content: { open: "<|START_THINKING|>", close: "<|END_THINKING|>", content: "text" },
       tool_calls: {
         open: "<|START_ACTION|>",
         close: "<|END_ACTION|>",
@@ -570,7 +571,7 @@ describe("Response templates", () => {
     defaults: { role: "assistant" },
     start_anchor: "<|im_start|>assistant\n",
     fields: {
-      thinking: { open: "<think>", close: "</think>", content: "text" },
+      reasoning_content: { open: "<think>", close: "</think>", content: "text" },
       tool_calls: {
         open_pattern: String.raw`<tool_call>\s*<function=(?P<name>\w+)>`,
         close: "</tool_call>",
@@ -586,12 +587,12 @@ describe("Response templates", () => {
   const out_b = model_out("tool_b", '{"y": "2"}');
   const parsed_a = {
     role: "assistant",
-    thinking: "Think tool_a.",
+    reasoning_content: "Think tool_a.",
     tool_calls: [{ type: "function", function: { name: "tool_a", arguments: { x: "1" } } }],
   };
   const parsed_b = {
     role: "assistant",
-    thinking: "Think tool_b.",
+    reasoning_content: "Think tool_b.",
     tool_calls: [{ type: "function", function: { name: "tool_b", arguments: { y: "2" } } }],
   };
 
@@ -625,9 +626,9 @@ describe("Response templates", () => {
   });
 
   it("accepts an explicit template", () => {
-    const thinking = { start_anchor: "<a>", fields: { thinking: { open: "<|START_THINKING|>", close: "<|END_THINKING|>" } } };
-    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: { version: 1, ...thinking } })).toEqual({ thinking: "Think tool_a." });
-    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: thinking })).toEqual({ thinking: "Think tool_a." });
+    const reasoning = { start_anchor: "<a>", fields: { reasoning_content: { open: "<|START_THINKING|>", close: "<|END_THINKING|>" } } };
+    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: { version: 1, ...reasoning } })).toEqual({ reasoning_content: "Think tool_a." });
+    expect(tokenizer.parse_response(out_a, { prefix: "", response_template: reasoning })).toEqual({ reasoning_content: "Think tool_a." });
   });
 
   it("requires a prefix and a template", () => {
@@ -641,7 +642,7 @@ describe("Response templates", () => {
     const prefix = "<|im_start|>assistant\n<think>\n";
     const options = { response_template: qwen3_template };
     const from_str = tokenizer.parse_response("hi</think>", { ...options, prefix });
-    expect(from_str).toEqual({ role: "assistant", thinking: "hi" });
+    expect(from_str).toEqual({ role: "assistant", reasoning_content: "hi" });
     expect(tokenizer.parse_response("hi</think>", { ...options, prefix: tokenizer.encode(prefix) })).toEqual(from_str);
   });
 
@@ -650,8 +651,8 @@ describe("Response templates", () => {
     const options = { response_template: qwen3_template };
     const responses = ["thinking A</think>", "thinking B</think>"];
     const expected = [
-      { role: "assistant", thinking: "thinking A" },
-      { role: "assistant", thinking: "thinking B" },
+      { role: "assistant", reasoning_content: "thinking A" },
+      { role: "assistant", reasoning_content: "thinking B" },
     ];
     expect(tokenizer.parse_response(responses, { ...options, prefix })).toEqual(expected);
     expect(tokenizer.parse_response(responses, { ...options, prefix: [prefix, prefix] })).toEqual(expected);
@@ -663,16 +664,54 @@ describe("Response templates", () => {
   it("creates incremental parsers", () => {
     const tools = [{ type: "function", function: { name: "set_alarm", parameters: { type: "object", properties: { hour: { type: "integer" } } } } }];
     const parser = tokenizer.get_response_parser({ response_template: qwen3_template, prefix: tokenizer.encode("<|im_start|>assistant\n<think>\n"), tools });
-    expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["thinking"]);
+    expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["reasoning_content"]);
     parser.feed("body</think><tool_call>\n<function=set_alarm>\n");
     parser.feed("<parameter=hour>\n7\n</parameter>\n</function>\n</tool_call>");
     expect(parser.finalize()[0]).toEqual({
       role: "assistant",
-      thinking: "body",
+      reasoning_content: "body",
       tool_calls: [{ type: "function", function: { name: "set_alarm", arguments: { hour: 7 } } }],
     });
     expect(() => tokenizer.get_response_parser({ prefix: ["a", "b"] })).toThrow("must be a single sequence");
   });
+
+  it("passes tools to one-shot response parsing for argument coercion", () => {
+    const tools = [{ type: "function", function: { name: "set_alarm", parameters: { type: "object", properties: { hour: { type: "integer" } } } } }];
+    const output = "<tool_call><function=set_alarm><parameter=hour>7</parameter></function></tool_call>";
+    expect(tokenizer.parse_response(output, { response_template: qwen3_template, prefix: "", tools }).tool_calls[0].function.arguments).toEqual({ hour: 7 });
+  });
+});
+
+it("round-trips parsed reasoning and tool calls through a local chat template", () => {
+  const local = Object.assign(Object.create(PreTrainedTokenizer.prototype), {
+    config: {},
+    _compiled_template_cache: new Map(),
+    chat_template: "{% for message in messages %}<|im_start|>{{ message.role }}\n" + "{% if message.reasoning_content %}<think>{{ message.reasoning_content }}</think>{% endif %}" + "{% if message.content %}{{ message.content }}{% endif %}" + "{% if message.tool_calls %}{% for tool_call in message.tool_calls %}<tool_call>{{ tool_call.function | tojson }}</tool_call>{% endfor %}{% endif %}" + "<|im_end|>\n{% endfor %}",
+    response_template: {
+      defaults: { role: "assistant" },
+      start_anchor: "<|im_start|>assistant\n",
+      fields: {
+        reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+        tool_calls: {
+          open: "<tool_call>",
+          close: "</tool_call>",
+          repeats: true,
+          content: "json",
+          transform: { type: "function", function: "{content}" },
+        },
+      },
+    },
+  });
+  const parsed = local.parse_response('<think>Check the weather.</think><tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call>', { prefix: "" });
+  const rendered = local.apply_chat_template([{ role: "user", content: "Weather?" }, parsed], { tokenize: false });
+
+  expect(parsed).toEqual({
+    role: "assistant",
+    reasoning_content: "Check the weather.",
+    tool_calls: [{ type: "function", function: { name: "get_weather", arguments: { city: "Paris" } } }],
+  });
+  expect(rendered).toContain("<think>Check the weather.</think>");
+  expect(rendered).toContain('<tool_call>{"name": "get_weather", "arguments": {"city": "Paris"}}</tool_call>');
 });
 
 describe("Chat templates", () => {

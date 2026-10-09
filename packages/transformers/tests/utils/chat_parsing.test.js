@@ -7,7 +7,7 @@ const cohere_template = {
   start_anchor: "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>",
   fields: {
     content: { open: "<|START_RESPONSE|>", close: "<|END_RESPONSE|>", content: "text" },
-    thinking: { open: "<|START_THINKING|>", close: "<|END_THINKING|>", content: "text" },
+    reasoning_content: { open: "<|START_THINKING|>", close: "<|END_THINKING|>", content: "text" },
     tool_calls: {
       open: "<|START_ACTION|>",
       close: "<|END_ACTION|>",
@@ -22,7 +22,7 @@ const ernie_template = {
   defaults: { role: "assistant" },
   start_anchor: "Assistant:",
   fields: {
-    thinking: { open_pattern: String.raw`(?:^|<think>\s*)`, close: "</think>", content: "text" },
+    reasoning_content: { open_pattern: String.raw`(?:^|<think>\s*)`, close: "</think>", content: "text" },
     content: { open: "<response>\n", close_pattern: String.raw`\n?</response>`, content: "text" },
     tool_calls: {
       open: "<tool_call>",
@@ -38,7 +38,7 @@ const gpt_oss_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|start|>assistant",
   fields: {
-    thinking: { open: "<|channel|>analysis<|message|>", close: "<|end|>", content: "text" },
+    reasoning_content: { open: "<|channel|>analysis<|message|>", close: "<|end|>", content: "text" },
     content: { open: "<|channel|>final<|message|>", close: ["<|end|>", "<|return|>"], content: "text" },
     tool_calls: {
       open_pattern: String.raw`<\|channel\|>commentary to=functions\.(?P<name>\w+).*?<\|message\|>`,
@@ -54,7 +54,7 @@ const smollm_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|im_start|>assistant\n",
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open: "<tool_call>",
       close: "</tool_call>",
@@ -70,7 +70,7 @@ const qwen3_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|im_start|>assistant\n",
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open_pattern: String.raw`<tool_call>\s*<function=(?P<name>\w+)>`,
       close: "</tool_call>",
@@ -92,7 +92,7 @@ const gemma4_template = {
   // model continues from there, so we accept either anchor and truncate past the latest one.
   start_anchor: ["<|turn>model\n", "<tool_response|>"],
   fields: {
-    thinking: { open: "<|channel>thought\n", close: "<channel|>", content: "text" },
+    reasoning_content: { open: "<|channel>thought\n", close: "<channel|>", content: "text" },
     tool_calls: {
       open_pattern: String.raw`<\|tool_call>call:(?P<name>\w+)`,
       close: "<tool_call|>",
@@ -124,7 +124,7 @@ const granite33_template = {
   defaults: { role: "assistant" },
   start_anchor_pattern: String.raw`<\|start_of_role\|>assistant(?:\s+\[[^\n]*\])?<\|end_of_role\|>`,
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open: "<|tool_call|>",
       close: "<|end_of_text|>",
@@ -144,7 +144,7 @@ const granite4_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|start_of_role|>assistant<|end_of_role|>",
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open: "<tool_call>",
       close: "</tool_call>",
@@ -160,7 +160,7 @@ const lfm_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|im_start|>assistant\n",
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open: "<|tool_call_start|>",
       close: "<|tool_call_end|>",
@@ -178,7 +178,7 @@ const inkling_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|message_model|>",
   fields: {
-    thinking: {
+    reasoning_content: {
       open_pattern: String.raw`(?:<\|message_model\|>)?[^<]*<\|content_thinking\|>`,
       close: "<|end_message|>",
       repeats: true,
@@ -208,7 +208,7 @@ const qwen_serve_template = {
   defaults: { role: "assistant" },
   start_anchor: "<|im_start|>assistant\n",
   fields: {
-    thinking: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
     tool_calls: {
       open_pattern: String.raw`\s*<tool_call>`,
       close: "</tool_call>",
@@ -288,7 +288,7 @@ describe("Response templates", () => {
     it("cohere", () => {
       expect(parse_response(COHERE_OUTPUT, cohere_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "I should call a tool.",
+        reasoning_content: "I should call a tool.",
         tool_calls: [{ type: "function", function: { name: "simple_tool", arguments: { temperature_format: "Celsius" } } }],
       });
     });
@@ -297,7 +297,7 @@ describe("Response templates", () => {
       const model_out = "The user is asking about the weather in Paris today. Let me check the available tools.\n" + "</think>\n\n" + '<tool_call>\n{"name": "get_current_temperature", "arguments": {"location": "Paris"}}\n</tool_call>\n</s>';
       expect(parse_response(model_out, ernie_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "The user is asking about the weather in Paris today. Let me check the available tools.",
+        reasoning_content: "The user is asking about the weather in Paris today. Let me check the available tools.",
         tool_calls: [{ type: "function", function: { name: "get_current_temperature", arguments: { location: "Paris" } } }],
       });
     });
@@ -307,7 +307,7 @@ describe("Response templates", () => {
       expect(parse_response(model_out, ernie_template, { prefix: "" })).toEqual({
         role: "assistant",
         content: "Hello! I'm doing well, thank you for asking.",
-        thinking: 'The user just greeted me with "Hi! How are you?"\n\nKeep the tone warm.',
+        reasoning_content: 'The user just greeted me with "Hi! How are you?"\n\nKeep the tone warm.',
       });
     });
 
@@ -315,7 +315,7 @@ describe("Response templates", () => {
       const model_out = "<|channel|>analysis<|message|>We need to call get_current_weather.<|end|>" + "<|start|>assistant<|channel|>commentary to=functions.get_current_weather <|constrain|>json<|message|>" + '{\n  "location": "San Francisco, CA"\n}';
       expect(parse_response(model_out, gpt_oss_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "We need to call get_current_weather.",
+        reasoning_content: "We need to call get_current_weather.",
         tool_calls: [{ type: "function", function: { name: "get_current_weather", arguments: { location: "San Francisco, CA" } } }],
       });
     });
@@ -325,7 +325,7 @@ describe("Response templates", () => {
       expect(parse_response(model_out, gpt_oss_template, { prefix: "" })).toEqual({
         role: "assistant",
         content: "2",
-        thinking: "User asks a simple math question: 2+2 = 4. Provide answer.",
+        reasoning_content: "User asks a simple math question: 2+2 = 4. Provide answer.",
       });
     });
 
@@ -333,7 +333,7 @@ describe("Response templates", () => {
       const model_out = '<think>\nOkay, the user said, "Hello! How are you?"\n</think>\n\n' + '<tool_call>{"name": "greet_user", "arguments": {"greeting": "Hello!"}}</tool_call>';
       expect(parse_response(model_out, smollm_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: 'Okay, the user said, "Hello! How are you?"',
+        reasoning_content: 'Okay, the user said, "Hello! How are you?"',
         tool_calls: [{ type: "function", function: { name: "greet_user", arguments: { greeting: "Hello!" } } }],
       });
     });
@@ -351,7 +351,7 @@ describe("Response templates", () => {
       expect(parse_response(model_out, smollm_template, { prefix: "" })).toEqual({
         role: "assistant",
         content: "Some content about gravity.",
-        thinking: "Let me explain gravity.",
+        reasoning_content: "Let me explain gravity.",
       });
     });
 
@@ -375,7 +375,7 @@ describe("Response templates", () => {
       const model_out = "<|channel>thought\nI should check the available tools.<channel|>" + '<|tool_call>call:get_current_temperature{detail_level:0,location:<|"|>Paris, France<|"|>,' + 'unit:<|"|>celsius<|"|>}<tool_call|><|tool_response>';
       expect(parse_response(model_out, gemma4_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "I should check the available tools.",
+        reasoning_content: "I should check the available tools.",
         tool_calls: [
           {
             type: "function",
@@ -392,7 +392,7 @@ describe("Response templates", () => {
       const model_out = "<|channel>thought\nLet me call the tool.<channel|>" + '<|tool_call>call:foo{bool_value:true,list_value:[<|"|>foo<|"|>,<|"|>bar<|"|>],' + 'null_value:null,number_value:1,string_value:<|"|>foo<|"|>,' + 'struct_value:{foo:<|"|>bar<|"|>}}<tool_call|>';
       expect(parse_response(model_out, gemma4_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "Let me call the tool.",
+        reasoning_content: "Let me call the tool.",
         tool_calls: [
           {
             type: "function",
@@ -435,7 +435,7 @@ describe("Response templates", () => {
       const model_out = "<think>I should answer briefly.</think><response>Paris.</response><|end_of_text|>";
       expect(parse_response(model_out, granite33_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "I should answer briefly.",
+        reasoning_content: "I should answer briefly.",
         content: "Paris.",
       });
     });
@@ -444,7 +444,7 @@ describe("Response templates", () => {
       const model_out = '<think>Use two tools.</think><tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call>\n<tool_call>{"name":"get_time","arguments":{"utc":true}}</tool_call><|end_of_text|>';
       expect(parse_response(model_out, granite4_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "Use two tools.",
+        reasoning_content: "Use two tools.",
         tool_calls: [
           { type: "function", function: { name: "get_weather", arguments: { city: "Paris" } } },
           { type: "function", function: { name: "get_time", arguments: { utc: true } } },
@@ -456,7 +456,7 @@ describe("Response templates", () => {
       const model_out = '<think>Use two tools.</think><|tool_call_start|>[get_weather(city="Paris", options={"units": "C", "days": [1, 2]}), set_alarm(hour=7, enabled=True, note=None)]<|tool_call_end|>Checking now.<|im_end|>';
       expect(parse_response(model_out, lfm_template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "Use two tools.",
+        reasoning_content: "Use two tools.",
         tool_calls: [
           { type: "function", function: { name: "get_weather", arguments: { city: "Paris", options: { units: "C", days: [1, 2] } } } },
           { type: "function", function: { name: "set_alarm", arguments: { hour: 7, enabled: true, note: null } } },
@@ -510,7 +510,7 @@ describe("Response templates", () => {
       const prefix = "<|message_system|><|content_text|>Thinking effort level: 0.9<|end_message|><|message_model|>";
       expect(parse_response(model_out, inkling_template, { prefix })).toEqual({
         role: "assistant",
-        thinking: "Consider the weather. Tokyo, probably.",
+        reasoning_content: "Consider the weather. Tokyo, probably.",
         content: "Checking the weather now.",
         tool_calls: [{ type: "function", function: { name: "get_weather", arguments: { city: "Tokyo", units: "C" } } }],
       });
@@ -578,16 +578,16 @@ describe("Response templates", () => {
         defaults: { role: "assistant" },
         start_anchor: "<|assistant|>",
         fields: {
-          thinking: { open: "<think>", close: "</think>", repeats: true, join: " " },
+          reasoning_content: { open: "<think>", close: "</think>", repeats: true, join: " " },
           content: { repeats: true, join: " " },
         },
       };
       expect(parse_response("<think>first</think>middle<think>second</think>done", template, { prefix: "" })).toEqual({
         role: "assistant",
-        thinking: "first second",
+        reasoning_content: "first second",
         content: "middle done",
       });
-      expect(parse_response("<think>only</think>", template, { prefix: "" })).toEqual({ role: "assistant", thinking: "only" });
+      expect(parse_response("<think>only</think>", template, { prefix: "" })).toEqual({ role: "assistant", reasoning_content: "only" });
     });
 
     it("join validation", () => {
@@ -765,11 +765,11 @@ describe("Response templates", () => {
           .filter((e) => e.type === "region_chunk" && e.field === field)
           .map((e) => e.text)
           .join("");
-      expect(chunks("thinking")).toEqual("I should call a tool.");
-      expect(events.find((e) => e.type === "region_close" && e.field === "thinking").value).toEqual("I should call a tool.");
+      expect(chunks("reasoning_content")).toEqual("I should call a tool.");
+      expect(events.find((e) => e.type === "region_close" && e.field === "reasoning_content").value).toEqual("I should call a tool.");
       // `tool_calls` is json → dirty chunks stream the raw body, parsed value on close.
       expect(chunks("tool_calls")).toEqual('[{"tool_call_id": "0", "tool_name": "simple_tool", "parameters": {"a": 1}}]');
-      expect(new Set(events.filter((e) => e.type === "region_chunk").map((e) => `${e.field}:${e.dirty}`))).toEqual(new Set(["thinking:false", "tool_calls:true"]));
+      expect(new Set(events.filter((e) => e.type === "region_chunk").map((e) => `${e.field}:${e.dirty}`))).toEqual(new Set(["reasoning_content:false", "tool_calls:true"]));
     });
 
     it("marks structured regions as dirty", () => {
@@ -777,7 +777,7 @@ describe("Response templates", () => {
         defaults: { role: "assistant" },
         start_anchor: "<|assistant|>",
         fields: {
-          thinking: { open: "<t>", close: "</t>", content: "text" },
+          reasoning_content: { open: "<t>", close: "</t>", content: "text" },
           score: { open: "<n>", close: "</n>", content: "int" },
           json_call: { open: "<j>", close: "</j>", content: "json" },
           xml_call: {
@@ -797,10 +797,10 @@ describe("Response templates", () => {
         chunks[e.field] = (chunks[e.field] ?? "") + e.text;
         (dirty[e.field] ??= new Set()).add(e.dirty);
       }
-      for (const field of ["thinking", "score"]) expect(dirty[field]).toEqual(new Set([false]));
+      for (const field of ["reasoning_content", "score"]) expect(dirty[field]).toEqual(new Set([false]));
       for (const field of ["json_call", "xml_call", "kv_call"]) expect(dirty[field]).toEqual(new Set([true]));
       expect(chunks).toEqual({
-        thinking: "hello world",
+        reasoning_content: "hello world",
         score: "42",
         json_call: '{"a": 1, "b": 2}',
         xml_call: "<name=foo><age=10>",
@@ -810,16 +810,16 @@ describe("Response templates", () => {
 
     it("marks wrapper-stripped text as dirty until close", () => {
       const { message, events } = stream_all(granite33_template, chunk_fixed("<think>reason</think><response>answer</response><|end_of_text|>", 1));
-      expect(message).toEqual({ role: "assistant", thinking: "reason", content: "answer" });
+      expect(message).toEqual({ role: "assistant", reasoning_content: "reason", content: "answer" });
       expect(new Set(events.filter((e) => e.type === "region_chunk" && e.field === "content").map((e) => e.dirty))).toEqual(new Set([true]));
     });
 
     it("streams prefixless regex delimiters without waiting for the end of the stream", () => {
       const parser = new ResponseParser(qwen_serve_template, { prefix: "<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n" });
       expect(parser.feed("<think>\nhmm\n</think>\n\n")).toEqual([
-        { type: "region_open", field: "thinking" },
-        { type: "region_chunk", field: "thinking", text: "\nhmm\n", dirty: false },
-        { type: "region_close", field: "thinking", value: "hmm" },
+        { type: "region_open", field: "reasoning_content" },
+        { type: "region_chunk", field: "reasoning_content", text: "\nhmm\n", dirty: false },
+        { type: "region_close", field: "reasoning_content", value: "hmm" },
       ]);
       // Trailing whitespace may still start a delimiter, so it is held back
       expect(parser.feed("The capital ")).toEqual([
@@ -828,7 +828,7 @@ describe("Response templates", () => {
       ]);
       // A regex delimiter that ends at the buffer edge could still grow, so it closes on the next input
       expect(parser.feed("is Paris.<|im_end|>")).toEqual([{ type: "region_chunk", field: "content", text: " is Paris.", dirty: false }]);
-      expect(parser.finalize()).toEqual([{ role: "assistant", thinking: "hmm", content: "The capital is Paris." }, [{ type: "region_close", field: "content", value: "The capital is Paris." }]]);
+      expect(parser.finalize()).toEqual([{ role: "assistant", reasoning_content: "hmm", content: "The capital is Paris." }, [{ type: "region_close", field: "content", value: "The capital is Paris." }]]);
     });
 
     it("long regex open pattern streams character by character", () => {
@@ -858,22 +858,22 @@ describe("Response templates", () => {
       const prompt = "<|im_start|>system\nYou are helpful<|im_end|>\n" + "<|im_start|>user\nHi<|im_end|>\n" + "<|im_start|>assistant\n<think>\n";
       const parser = new ResponseParser(qwen3_template, { prefix: prompt });
       expect(parser.initial_events.map((e) => [e.type, e.field])).toEqual([
-        ["region_open", "thinking"],
-        ["region_chunk", "thinking"],
+        ["region_open", "reasoning_content"],
+        ["region_chunk", "reasoning_content"],
       ]);
       const events = parser.feed("Let me think...</think>");
       const [message] = parser.finalize();
-      expect(message).toEqual({ role: "assistant", thinking: "Let me think..." });
+      expect(message).toEqual({ role: "assistant", reasoning_content: "Let me think..." });
       expect(events.map((e) => e.type)).toEqual(["region_chunk", "region_close"]);
-      expect(events[1].field).toEqual("thinking");
+      expect(events[1].field).toEqual("reasoning_content");
     });
 
     it("prefix is truncated to the last anchor", () => {
       const prompt = "<|im_start|>system\nA<|im_end|>\n" + "<|im_start|>user\nB<|im_end|>\n" + "<|im_start|>assistant\nEarlier reply<|im_end|>\n" + "<|im_start|>user\nFollowup<|im_end|>\n" + "<|im_start|>assistant\n<think>\n";
       const parser = new ResponseParser(qwen3_template, { prefix: prompt });
-      expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["thinking"]);
+      expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["reasoning_content"]);
       parser.feed("done</think>");
-      expect(parser.finalize()[0]).toEqual({ role: "assistant", thinking: "done" });
+      expect(parser.finalize()[0]).toEqual({ role: "assistant", reasoning_content: "done" });
     });
 
     it("rejects templates without an anchor at load time", () => {
@@ -888,9 +888,9 @@ describe("Response templates", () => {
 
     it("falls back to the whole prefix when the anchor is not found", () => {
       const parser = new ResponseParser(qwen3_template, { prefix: "<think>\n" });
-      expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["thinking"]);
+      expect(parser.initial_events.filter((e) => e.type === "region_open").map((e) => e.field)).toEqual(["reasoning_content"]);
       parser.feed("hi</think>");
-      expect(parser.finalize()[0]).toEqual({ role: "assistant", thinking: "hi" });
+      expect(parser.finalize()[0]).toEqual({ role: "assistant", reasoning_content: "hi" });
     });
 
     it("streaming with a prefix matches the one-shot parse", () => {
@@ -915,7 +915,7 @@ describe("Response templates", () => {
       expect(parse_response("Hello there!", template, { prefix: "" })).toEqual(clean);
       // An anchor inside the response is treated as content, never as a history boundary.
       const gpt_oss_gen = "<|channel|>analysis<|message|>thinking<|end|><|start|>assistant<|channel|>final<|message|>answer";
-      expect(parse_response(gpt_oss_gen, gpt_oss_template, { prefix: "" })).toEqual({ role: "assistant", thinking: "thinking", content: "answer" });
+      expect(parse_response(gpt_oss_gen, gpt_oss_template, { prefix: "" })).toEqual({ role: "assistant", reasoning_content: "thinking", content: "answer" });
     });
 
     it("surfaces regions opened and closed inside the prefix", () => {
@@ -947,7 +947,7 @@ describe("Response templates", () => {
       const parser = new ResponseParser(qwen3_template, { prefix: "<|im_start|>assistant\n<thi" });
       expect(parser.initial_events).toEqual([]);
       expect(parser.feed("nk>real body</think>").map((e) => e.type)).toContain("region_open");
-      expect(parser.finalize()[0]).toEqual({ role: "assistant", thinking: "real body" });
+      expect(parser.finalize()[0]).toEqual({ role: "assistant", reasoning_content: "real body" });
     });
   });
 

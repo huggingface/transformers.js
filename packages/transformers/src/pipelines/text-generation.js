@@ -14,7 +14,7 @@ import { pick } from '../utils/core.js';
  */
 
 function isChat(x) {
-    return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+    return Array.isArray(x) && x.every((x) => x !== null && typeof x === 'object' && 'role' in x);
 }
 
 /**
@@ -57,7 +57,7 @@ function isChat(x) {
  * For all generation parameters, see `GenerationConfig`.
  *
  * For chat inputs, if the tokenizer defines a `response_template`, the generated assistant message is
- * parsed with it (e.g., into `thinking`, `content` and `tool_calls` fields).
+ * parsed with it (e.g., into `reasoning_content`, `content` and `tool_calls` fields).
  *
  * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
@@ -211,7 +211,7 @@ export class TextGenerationPipeline
                 // Chat templates often pre-write part of the assistant message (e.g. an opening <think> tag),
                 // so the parser needs to see the prompt as `prefix`.
                 const message = response_template
-                    ? this.tokenizer.parse_response(decoded[i], { prefix: prompts?.[textIndex] ?? '' })
+                    ? this.tokenizer.parse_response(decoded[i], { prefix: prompts?.[textIndex] ?? '', tools })
                     : { role: 'assistant', content: decoded[i] };
                 generated_text = /** @type {Chat} */ ([.../** @type {Chat[]} */ (texts)[textIndex], message]);
             }

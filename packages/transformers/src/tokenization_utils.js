@@ -94,9 +94,19 @@ const SPECIAL_TOKEN_ATTRIBUTES = [
  */
 
 /**
- * @typedef {Object} Message
+ * @typedef {{ name: string, arguments: Record<string, any>, [key: string]: any }} ToolCallFunction
+ */
+
+/**
+ * @typedef {{ type: 'function' | (string & {}), function: ToolCallFunction, [key: string]: any }} ToolCall
+ */
+
+/**
+ * @typedef {{ role: 'user' | 'assistant' | 'system' | (string & {}), content?: string | MessageContent[], reasoning_content?: string, tool_calls?: ToolCall[], [key: string]: any }} Message
  * @property {'user' | 'assistant' | 'system' | (string & {})} role The role of the message.
- * @property {string | MessageContent[]} content The content of the message. Can be a simple string or an array of content objects.
+ * @property {string | MessageContent[]} [content] The content of the message. Can be a simple string or an array of content objects.
+ * @property {string} [reasoning_content] Optional reasoning produced by an assistant message.
+ * @property {ToolCall[]} [tool_calls] Optional tool calls produced by an assistant message.
  */
 
 /**
@@ -642,7 +652,7 @@ export class PreTrainedTokenizer
      * const prompt = tokenizer.apply_chat_template(messages, { add_generation_prompt: true, tokenize: false });
      * // ... generate, then decode the new tokens with `skip_special_tokens: false`
      * const message = tokenizer.parse_response(generated_text, { prefix: prompt });
-     * // { role: 'assistant', thinking: '...', content: '...' }
+     * // { role: 'assistant', reasoning_content: '...', content: '...' }
      * ```
      *
      * @template {string|string[]|number[]|bigint[]|number[][]|Tensor} T
@@ -818,7 +828,7 @@ export class PreTrainedTokenizer
     }
 
     /**
-     * Converts a list of message objects with `"role"` and `"content"` keys to a list of token
+     * Converts a list of message objects with a `"role"` key and optional content to a list of token
      * ids. This method is intended for use with chat models, and will read the tokenizer's chat_template attribute to
      * determine the format and control tokens to use when converting.
      *
@@ -844,8 +854,7 @@ export class PreTrainedTokenizer
      * // [1, 733, 16289, 28793, 22557, 28725, 910, 460, 368, 28804, 733, 28748, 16289, 28793, 28737, 28742, 28719, 2548, 1598, 28723, 1602, 541, 315, 1316, 368, 3154, 28804, 2, 28705, 733, 16289, 28793, 315, 28742, 28715, 737, 298, 1347, 805, 910, 10706, 5752, 1077, 3791, 28808, 733, 28748, 16289, 28793]
      * ```
      *
-     * @param {Message[]} conversation A list of message objects with `"role"` and `"content"` keys,
-     * representing the chat history so far.
+     * @param {Message[]} conversation A list of message objects representing the chat history so far.
      * @template {boolean} [TTokenize=true]
      * @template {boolean} [TReturnTensor=true]
      * @template {boolean} [TReturnDict=true]

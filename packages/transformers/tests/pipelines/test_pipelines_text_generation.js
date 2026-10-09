@@ -129,25 +129,32 @@ export default () => {
           // opening <think> block), the pipeline must pass the prompt to `parse_response` as
           // `prefix` so that generated text is correctly routed into the prefilled region.
           const { chat_template, response_template } = pipe.tokenizer;
-          pipe.tokenizer.chat_template = "{% for message in messages %}" + "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}" + "{% endfor %}" + "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<think>\n' }}{% endif %}";
+          pipe.tokenizer.chat_template = "{% for message in messages %}" + "{{ '<|im_start|>' + message['role'] + '\n' + (message['content'] | default('')) + '<|im_end|>' + '\n' }}" + "{% endfor %}" + "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<think>\n' }}{% endif %}";
           pipe.tokenizer.response_template = {
             defaults: { role: "assistant" },
             start_anchor: "<|im_start|>assistant\n",
             fields: {
-              thinking: { open: "<think>", close: "</think>", content: "text" },
+              reasoning_content: { open: "<think>", close: "</think>", content: "text" },
               content: { close: "<|im_end|>", content: "text" },
             },
           };
+          const tools = [{ type: "function", function: { name: "set_alarm", parameters: { type: "object", properties: { hour: { type: "integer" } } } } }];
+          const spy = jest.spyOn(pipe.tokenizer, "parse_response");
           try {
-            const output = await pipe(chat_input, { max_new_tokens: 3 });
+            const output = await pipe(chat_input, { max_new_tokens: 3, tools });
             const message = output[0].generated_text.at(-1);
             // The tiny model never emits </think>, so everything it generates stays inside the
-            // `thinking` region opened by the chat template in the prompt.
+            // reasoning region opened by the chat template in the prompt.
             expect(message.role).toBe("assistant");
             expect(message).not.toHaveProperty("content");
-            expect(typeof message.thinking).toBe("string");
-            expect(message.thinking.length).toBeGreaterThan(0);
+            expect(typeof message.reasoning_content).toBe("string");
+            expect(message.reasoning_content.length).toBeGreaterThan(0);
+            expect(spy.mock.calls.at(-1)[1].tools).toBe(tools);
+
+            // Parsed assistant messages without content remain valid chat history.
+            await expect(pipe(output[0].generated_text, { max_new_tokens: 1, tools })).resolves.toBeDefined();
           } finally {
+            spy.mockRestore();
             Object.assign(pipe.tokenizer, { chat_template, response_template });
           }
         },
