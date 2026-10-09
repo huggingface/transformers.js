@@ -3,17 +3,16 @@ import type { ConstraintState, TokenizerSource } from './types';
 
 type Matcher = { machine: ConstraintState<unknown>; eager: boolean };
 type MatchProgress = { state: unknown; accepted: boolean };
-type LiteralSearch = { transitions: Int32Array; lengths: Uint32Array };
 export type ProtocolConfig = {
     thinkingOpen: Matcher;
-    thinkingClose: LiteralSearch;
+    thinkingClose: Uint8Array[];
     contentOpen?: Matcher;
     contentClose?: Matcher;
     startAnchors?: Uint8Array[];
 };
 type ProtocolState =
     | { phase: 'start'; structured?: unknown; thinking?: MatchProgress; content?: MatchProgress }
-    | { phase: 'thinking'; closeState: number }
+    | { phase: 'thinking'; closeBuffer: Uint8Array }
     | { phase: 'content' | 'ending'; progress: MatchProgress }
     | { phase: 'structured'; state: unknown }
     | { phase: 'dead' | 'finished' };
@@ -64,15 +63,16 @@ export function withResponseProtocol(
             case 'ending':
                 return framed('ending', state.progress, protocol.contentClose!, byte);
             case 'thinking': {
-                const close = advanceLiteralSearch(protocol.thinkingClose, state.closeState, byte);
-                if (close === LITERAL_COMPLETE_AFTER) return afterThinking();
-                if (close === LITERAL_COMPLETE_BEFORE) return transition(afterThinking(), byte);
-                return close === state.closeState ? state : { phase: 'thinking', closeState: close };
+                const close = advanceLiteralSearch(protocol.thinkingClose, state.closeBuffer, byte);
+                if (close.complete === 'after') return afterThinking();
+                if (close.complete === 'before') return transition(afterThinking(), byte);
+                return { phase: 'thinking', closeBuffer: close.buffer };
             }
             case 'start': {
                 const thinking = state.thinking && advanceMatch(protocol.thinkingOpen, state.thinking, byte);
-                if (thinking?.complete === 'after') return { phase: 'thinking', closeState: 0 };
-                if (thinking?.complete === 'before') return transition({ phase: 'thinking', closeState: 0 }, byte);
+                if (thinking?.complete === 'after') return { phase: 'thinking', closeBuffer: new Uint8Array() };
+                if (thinking?.complete === 'before')
+                    return transition({ phase: 'thinking', closeBuffer: new Uint8Array() }, byte);
                 const content = state.content && advanceMatch(protocol.contentOpen!, state.content, byte);
                 if (content?.complete === 'after') return payload(structured.initial);
                 if (content?.complete === 'before') return payload(structured.transition(structured.initial, byte));
@@ -129,10 +129,7 @@ export function withResponseProtocol(
         allowsSpecial: (state, next, bytes) => {
             if (bytes.length === 0) return false;
             if (state.phase === 'thinking') {
-                return (
-                    next.phase !== 'thinking' ||
-                    protocol.thinkingClose.lengths[next.closeState] > protocol.thinkingClose.lengths[state.closeState]
-                );
+                return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
             if (state.phase === 'structured') return next.phase === 'ending' || next.phase === 'finished';
             if (state.phase === 'start') {
@@ -146,7 +143,7 @@ export function withResponseProtocol(
         stringCapacity: (state) =>
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
-            if (state.phase === 'thinking') return `thinking:${state.closeState}`;
+            if (state.phase === 'thinking') return `thinking:${Array.from(state.closeBuffer).join(',')}`;
             if (state.phase !== 'structured') return undefined;
             const key = structured.maskKey?.(state.state);
             return key === undefined ? undefined : `structured:${key}`;
@@ -171,55 +168,30 @@ function advanceMatch(
     const accepted = matcher.machine.accepting(next);
     return accepted && matcher.eager ? { complete: 'after' } : { progress: { state: next, accepted } };
 }
-const LITERAL_COMPLETE_AFTER = -1;
-const LITERAL_COMPLETE_BEFORE = -2;
-
-function advanceLiteralSearch(search: LiteralSearch, state: number, byte: number): number {
-    return search.transitions[state * 256 + byte];
-}
-
-function compileLiteralSearch(literals: Uint8Array[]): LiteralSearch {
-    const prefixes = [new Uint8Array()];
-    const stateByPrefix = new Map<string, number>([['', 0]]);
-    for (const literal of literals) {
-        for (let length = 1; length <= literal.length; ++length) {
-            const prefix = literal.slice(0, length);
-            const key = bytesKey(prefix);
-            if (!stateByPrefix.has(key)) {
-                stateByPrefix.set(key, prefixes.length);
-                prefixes.push(prefix);
-            }
+function advanceLiteralSearch(
+    literals: Uint8Array[],
+    buffer: Uint8Array,
+    byte: number,
+): { buffer: Uint8Array; complete?: 'before' | 'after' } {
+    if (
+        literals.some((literal) => bytesEqual(buffer, literal)) &&
+        !literals.some((literal) => startsWithBytes(literal, appendByte(buffer, byte)))
+    ) {
+        return { buffer: new Uint8Array(), complete: 'before' };
+    }
+    const candidate = appendByte(buffer, byte);
+    let next = new Uint8Array();
+    for (let start = 0; start < candidate.length; ++start) {
+        const suffix = candidate.subarray(start);
+        if (literals.some((literal) => startsWithBytes(literal, suffix))) {
+            next = suffix.slice();
+            break;
         }
     }
-
-    const transitions = new Int32Array(prefixes.length * 256);
-    const lengths = Uint32Array.from(prefixes, (prefix) => prefix.length);
-    for (let state = 0; state < prefixes.length; ++state) {
-        const prefix = prefixes[state];
-        const complete = literals.some((literal) => bytesEqual(prefix, literal));
-        for (let byte = 0; byte < 256; ++byte) {
-            const candidate = appendByte(prefix, byte);
-            if (complete && !literals.some((literal) => startsWithBytes(literal, candidate))) {
-                transitions[state * 256 + byte] = LITERAL_COMPLETE_BEFORE;
-                continue;
-            }
-            let next = 0;
-            for (let start = 0; start < candidate.length; ++start) {
-                const found = stateByPrefix.get(bytesKey(candidate.subarray(start)));
-                if (found !== undefined) {
-                    next = found;
-                    break;
-                }
-            }
-            const nextPrefix = prefixes[next];
-            const nextComplete = literals.some((literal) => bytesEqual(nextPrefix, literal));
-            const canExtend =
-                nextComplete &&
-                literals.some((literal) => literal.length > nextPrefix.length && startsWithBytes(literal, nextPrefix));
-            transitions[state * 256 + byte] = nextComplete && !canExtend ? LITERAL_COMPLETE_AFTER : next;
-        }
-    }
-    return { transitions, lengths };
+    const complete = literals.some((literal) => bytesEqual(next, literal));
+    const canExtend =
+        complete && literals.some((literal) => literal.length > next.length && startsWithBytes(literal, next));
+    return { buffer: next, complete: complete && !canExtend ? 'after' : undefined };
 }
 
 export function responseProtocol(source: TokenizerSource): ProtocolConfig | undefined {
@@ -246,7 +218,7 @@ export function responseProtocol(source: TokenizerSource): ProtocolConfig | unde
         throw new Error('Thinking-aware constraints require a supported content opener.');
     return {
         thinkingOpen,
-        thinkingClose: compileLiteralSearch(thinkingClose),
+        thinkingClose,
         contentOpen,
         contentClose: anchorMatcher(content, 'close', 'close_pattern'),
         startAnchors: literalAnchor(template?.start_anchor, 'response_template.start_anchor'),
@@ -285,9 +257,6 @@ function appendByte(bytes: Uint8Array, byte: number): Uint8Array {
     result.set(bytes);
     result[bytes.length] = byte;
     return result;
-}
-function bytesKey(bytes: Uint8Array): string {
-    return Array.from(bytes).join(',');
 }
 function startsWithBytes(value: Uint8Array, prefix: Uint8Array): boolean {
     if (prefix.length > value.length) return false;
