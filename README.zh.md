@@ -1,5 +1,3 @@
-
-
 <p align="center">
     <br/>
     <picture>
@@ -19,35 +17,35 @@
 </p>
 
 <p align="center">
-    <b>English</b> · <a href="README.zh.md">简体中文</a>
+    <a href="README.md">English</a> · <b>简体中文</b>
 </p>
 
 <h3 align="center">
-  <p>State-of-the-art Machine Learning for the Web</p>
+  <p>面向 Web 的最前沿机器学习框架</p>
 </h3>
 
-Run 🤗 Transformers directly in your browser, with no need for a server!
+直接在浏览器中运行 🤗 Transformers，完全无需服务器！
 
-Transformers.js is designed to be functionally equivalent to Hugging Face's [transformers](https://github.com/huggingface/transformers) python library, meaning you can run the same pretrained models using a very similar API. These models support common tasks in different modalities, such as:
-  - 📝 **Natural Language Processing**: text classification, named entity recognition, question answering, language modeling, summarization, translation, multiple choice, and text generation.
-  - 🖼️ **Computer Vision**: image classification, object detection, segmentation, and depth estimation.
-  - 🗣️ **Audio**: automatic speech recognition, audio classification, and text-to-speech.
-  - 🐙 **Multimodal**: embeddings, zero-shot audio classification, zero-shot image classification, and zero-shot object detection.
+Transformers.js 旨在功能上等同于 Hugging Face 的 [transformers](https://github.com/huggingface/transformers) Python 库，这意味着你可以使用极其相似的 API 运行相同的预训练模型。这些模型支持跨多种模态的常见任务，例如：
+  - 📝 **自然语言处理 (NLP)**：文本分类、命名实体识别、问答、语言建模、文本摘要、翻译、多项选择和文本生成。
+  - 🖼️ **计算机视觉 (CV)**：图像分类、目标检测、图像分割和深度估计。
+  - 🗣️ **音频处理 (Audio)**：自动语音识别、音频分类和文本转语音 (TTS)。
+  - 🐙 **多模态 (Multimodal)**：特征嵌入 (Embeddings)、零样本音频分类、零样本图像分类和零样本目标检测。
 
-Transformers.js uses [ONNX Runtime](https://onnxruntime.ai/) to run models in the browser. The best part about it, is that you can easily [convert](#convert-your-models-to-onnx) your pretrained PyTorch, TensorFlow, or JAX models to ONNX using [🤗 Optimum](https://github.com/huggingface/optimum#onnx--onnx-runtime).
+Transformers.js 使用 [ONNX Runtime](https://onnxruntime.ai/) 在浏览器中运行模型。最棒的是，你可以使用 [🤗 Optimum](https://github.com/huggingface/optimum#onnx--onnx-runtime) 轻松地将预训练的 PyTorch、TensorFlow 或 JAX 模型[转换为 ONNX 格式](#将模型转换为-onnx)。
 
-For more information, check out the full [documentation](https://huggingface.co/docs/transformers.js).
-
-
-## Installation
+了解更多信息，请查阅[完整官方文档](https://huggingface.co/docs/transformers.js)。
 
 
-To install via [NPM](https://www.npmjs.com/package/@huggingface/transformers), run:
+## 安装指南
+
+
+通过 [NPM](https://www.npmjs.com/package/@huggingface/transformers) 安装：
 ```bash
 npm i @huggingface/transformers
 ```
 
-Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN or static hosting. For example, using [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), you can import the library with:
+此外，你也可以在原生 JS 中无需任何打包工具直接通过 CDN 或静态托管引入。例如使用 [ES Modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules)：
 ```html
 <script type="module">
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1';
@@ -55,15 +53,15 @@ Alternatively, you can use it in vanilla JS, without any bundler, by using a CDN
 ```
 
 
-## Quick tour
+## 快速上手
 
 
-It's super simple to translate from existing code! Just like the python library, we support the `pipeline` API. Pipelines group together a pretrained model with preprocessing of inputs and postprocessing of outputs, making it the easiest way to run models with the library.
+从现有的 Python 代码迁移极其简单！正如 Python 原版库一样，我们同样支持 `pipeline` API。Pipelines 将预训练模型与输入预处理及输出后处理整合在一起，是使用本库运行模型的最简便方式。
 
 <table>
 <tr>
-<th width="440px" align="center"><b>Python (original)</b></th>
-<th width="440px" align="center"><b>Javascript (ours)</b></th>
+<th width="440px" align="center"><b>Python (官方原版)</b></th>
+<th width="440px" align="center"><b>Javascript (本库)</b></th>
 </tr>
 <tr>
 <td>
@@ -71,7 +69,7 @@ It's super simple to translate from existing code! Just like the python library,
 ```python
 from transformers import pipeline
 
-# Allocate a pipeline for sentiment-analysis
+# 创建情感分析 pipeline
 pipe = pipeline('sentiment-analysis')
 
 out = pipe('I love transformers!')
@@ -84,7 +82,7 @@ out = pipe('I love transformers!')
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
-// Allocate a pipeline for sentiment-analysis
+// 创建情感分析 pipeline
 const pipe = await pipeline('sentiment-analysis');
 
 const out = await pipe('I love transformers!');
@@ -96,152 +94,141 @@ const out = await pipe('I love transformers!');
 </table>
 
 
-You can also use a different model by specifying the model id or path as the second argument to the `pipeline` function. For example:
+你还可以通过将模型 ID 或本地路径作为 `pipeline` 函数的第二个参数来指定不同的模型。例如：
 ```javascript
-// Use a different model for sentiment-analysis
+// 使用指定的其他模型进行情感分析
 const pipe = await pipeline('sentiment-analysis', 'Xenova/bert-base-multilingual-uncased-sentiment');
 ```
 
-By default, when running in the browser, the model will be run on your CPU (via WASM). If you would like
-to run the model on your GPU (via WebGPU), you can do this by setting `device: 'webgpu'`, for example:
+默认情况下，在浏览器中运行时模型将在 CPU 上执行（通过 WASM）。如果你希望在 GPU 上运行模型（通过 WebGPU），只需设置 `device: 'webgpu'` 即可，例如：
 ```javascript
-// Run the model on WebGPU
+// 在 WebGPU 上运行模型
 const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
   device: 'webgpu',
 });
 ```
 
-For more information, check out the [WebGPU guide](https://huggingface.co/docs/transformers.js/guides/webgpu).
+更多信息请参阅 [WebGPU 指南](https://huggingface.co/docs/transformers.js/guides/webgpu)。
 
 > [!WARNING]
-> The WebGPU API is still experimental in many browsers, so if you run into any issues,
-> please file a [bug report](https://github.com/huggingface/transformers.js/issues/new?title=%5BWebGPU%5D%20Error%20running%20MODEL_ID_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml).
+> WebGPU API 在许多浏览器中仍处于实验阶段，如果遇到任何问题，请提交 [Bug 反馈](https://github.com/huggingface/transformers.js/issues/new?title=%5BWebGPU%5D%20Error%20running%20MODEL_ID_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml)。
 
-In resource-constrained environments, such as web browsers, it is advisable to use a quantized version of
-the model to lower bandwidth and optimize performance. This can be achieved by adjusting the `dtype` option,
-which allows you to select the appropriate data type for your model. While the available options may vary
-depending on the specific model, typical choices include `"fp32"` (default for WebGPU), `"fp16"`, `"q8"`
-(default for WASM), and `"q4"`. For more information, check out the [quantization guide](https://huggingface.co/docs/transformers.js/guides/dtypes).
+在资源受限的环境中（例如 Web 浏览器），建议使用量化版本的模型以降低网络带宽并优化运行性能。这可以通过调整 `dtype` 选项来实现，该选项允许你为模型选择合适的数据类型。虽然可用选项可能因具体模型而异，但典型选择包括 `"fp32"`（WebGPU 默认）、`"fp16"`、`"q8"`（WASM 默认）和 `"q4"`。更多信息请参阅[量化指南](https://huggingface.co/docs/transformers.js/guides/dtypes)。
 ```javascript
-// Run the model at 4-bit quantization
+// 以 4 位量化 (4-bit) 运行模型
 const pipe = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
   dtype: 'q4',
 });
 ```
 
-Ready to dive in? Explore our wide variety of demo applications and templates [here](https://github.com/huggingface/transformers.js-examples). You can also launch your own project instantly using the official Transformers.js [template](https://huggingface.co/new-space?template=static-templates%2Ftransformers.js) on Hugging Face!
+准备好开始探索了吗？欢迎在[此处](https://github.com/huggingface/transformers.js-examples)体验丰富的示例应用和模板项目。你也可以在 Hugging Face 上使用官方 Transformers.js [模板](https://huggingface.co/new-space?template=static-templates%2Ftransformers.js)立即启动自己的项目！
 
 
 
-## Custom usage
+## 自定义使用
 
 
 
-By default, Transformers.js uses [hosted pretrained models](https://huggingface.co/models?library=transformers.js) and [precompiled WASM binaries](https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/), which should work out-of-the-box. You can customize this as follows:
+默认情况下，Transformers.js 使用[云端托管的预训练模型](https://huggingface.co/models?library=transformers.js)和[预编译的 WASM 二进制文件](https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/)，开箱即用。你可以按如下方式自定义配置：
 
-### Settings
+### 环境配置项 (Settings)
 
 ```javascript
 import { env } from '@huggingface/transformers';
 
-// Specify a custom location for models (defaults to '/models/').
+// 指定自定义的模型存放路径（默认为 '/models/'）:
 env.localModelPath = '/path/to/models/';
 
-// Disable the loading of remote models from the Hugging Face Hub:
+// 禁用从 Hugging Face Hub 加载远程模型:
 env.allowRemoteModels = false;
 
-// Set location of .wasm files. Defaults to use a CDN.
+// 设置 .wasm 文件的位置（默认使用 CDN）:
 env.backends.onnx.wasm.wasmPaths = '/path/to/files/';
 ```
 
-For a full list of available settings, check out the [API Reference](https://huggingface.co/docs/transformers.js/api/env).
+如需获取所有可用配置项的完整列表，请查看 [API 参考文档](https://huggingface.co/docs/transformers.js/api/env).
 
-### Convert your models to ONNX
+### 将模型转换为 ONNX
 
-We recommend using [Optimum](https://github.com/huggingface/optimum-onnx) to convert your PyTorch models to ONNX in a single command. For the full list of supported architectures, check out the [Optimum documentation](https://huggingface.co/docs/optimum-onnx/onnx/overview).
-
-
-## Supported tasks/models
-
-Here is the list of all tasks and architectures currently supported by Transformers.js. If you don't see your task/model listed here or it is not yet supported, feel free to open a feature request [here](https://github.com/huggingface/transformers.js/issues/new/choose).
-
-To find compatible models on the Hub, select the "transformers.js" library tag in the filter menu (or visit [this link](https://huggingface.co/models?library=transformers.js)). You can refine your search by selecting the task you're interested in (e.g., [text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)).
+我们推荐使用 [Optimum](https://github.com/huggingface/optimum-onnx) 通过单条命令将 PyTorch 模型转换为 ONNX。如需查看支持架构的完整列表，请参阅 [Optimum 官方文档](https://huggingface.co/docs/optimum-onnx/onnx/overview)。
 
 
-### Tasks
+## 支持的任务与模型
 
-#### Natural Language Processing
+以下是 Transformers.js 当前支持的所有任务和模型架构列表。如果你在此处未找到所需任务/模型或尚未支持，欢迎在[此处](https://github.com/huggingface/transformers.js/issues/new/choose)提交功能请求。
 
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Fill-Mask](https://huggingface.co/tasks/fill-mask)                     | `fill-mask`   | Masking some of the words in a sentence and predicting which words should replace those masks. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FillMaskPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=fill-mask&library=transformers.js) |
-| [Question Answering](https://huggingface.co/tasks/question-answering)   | `question-answering`   | Retrieve the answer to a question from a given text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.QuestionAnsweringPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=question-answering&library=transformers.js) |
-| [Sentence Similarity](https://huggingface.co/tasks/sentence-similarity) | `sentence-similarity`  | Determining how similar two texts are. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=sentence-similarity&library=transformers.js) |
-| [Summarization](https://huggingface.co/tasks/summarization)             |  `summarization`  | Producing a shorter version of a document while preserving its important information. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.SummarizationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=summarization&library=transformers.js) |
-| [Table Question Answering](https://huggingface.co/tasks/table-question-answering) |  `table-question-answering`  | Answering a question about information from a given table. | ❌ |
-| [Text Classification](https://huggingface.co/tasks/text-classification)      | `text-classification` or `sentiment-analysis`  | Assigning a label or class to a given text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js) |
-| [Text Generation](https://huggingface.co/tasks/text-generation#completion-generation-models)          | `text-generation`  | Producing new text by predicting the next word in a sequence. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextGenerationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers.js) |
-| [Text-to-text Generation](https://huggingface.co/tasks/text-generation#text-to-text-generation-models)  | `text2text-generation`  | Converting one text sequence into another text sequence. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.Text2TextGenerationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text2text-generation&library=transformers.js) |
-| [Token Classification](https://huggingface.co/tasks/token-classification)     | `token-classification` or `ner`  | Assigning a label to each token in a text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TokenClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=token-classification&library=transformers.js) |
-| [Translation](https://huggingface.co/tasks/translation)              |  `translation`  | Converting text from one language to another. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TranslationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=translation&library=transformers.js) |
-| [Zero-Shot Classification](https://huggingface.co/tasks/zero-shot-classification) | `zero-shot-classification`  | Classifying text into classes that are unseen during training.  | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=zero-shot-classification&library=transformers.js) |
-| [Feature Extraction](https://huggingface.co/tasks/feature-extraction)         |  `feature-extraction`  | Transforming raw data into numerical features that can be processed while preserving the information in the original dataset. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=feature-extraction&library=transformers.js) |
-
-#### Vision
-
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Background Removal](https://huggingface.co/tasks/image-segmentation#background-removal)       | `background-removal`   | Isolating the main subject of an image by removing or making the background transparent. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.BackgroundRemovalPipeline)<br>[(models)](https://huggingface.co/models?other=background-removal&library=transformers.js) |
-| [Depth Estimation](https://huggingface.co/tasks/depth-estimation)         |  `depth-estimation`  | Predicting the depth of objects present in an image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DepthEstimationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=depth-estimation&library=transformers.js) |
-| [Image Classification](https://huggingface.co/tasks/image-classification)                | `image-classification`   | Assigning a label or class to an entire image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-classification&library=transformers.js) |
-| [Image Segmentation](https://huggingface.co/tasks/image-segmentation)       | `image-segmentation`   | Divides an image into segments where each pixel is mapped to an object. This task has multiple variants such as instance segmentation, panoptic segmentation and semantic segmentation. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageSegmentationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-segmentation&library=transformers.js) |
-| [Image-to-Image](https://huggingface.co/tasks/image-to-image)      |  `image-to-image` | Transforming a source image to match the characteristics of a target image or a target image domain. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToImagePipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-to-image&library=transformers.js) |
-| [Mask Generation](https://huggingface.co/tasks/mask-generation)            |  `mask-generation`  | Generate masks for the objects in an image. | ❌ |
-| [Object Detection](https://huggingface.co/tasks/object-detection)            | `object-detection`   | Identify objects of certain defined classes within an image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ObjectDetectionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=object-detection&library=transformers.js) |
-| [Video Classification](https://huggingface.co/tasks/video-classification) |  n/a  | Assigning a label or class to an entire video. | ❌ |
-| [Unconditional Image Generation](https://huggingface.co/tasks/unconditional-image-generation)      |  n/a   | Generating images with no condition in any context (like a prompt text or another image). | ❌ |
-| [Image Feature Extraction](https://huggingface.co/tasks/image-feature-extraction)         |  `image-feature-extraction`  | Transforming raw data into numerical features that can be processed while preserving the information in the original image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageFeatureExtractionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-feature-extraction&library=transformers.js) |
-
-#### Audio
-
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Audio Classification](https://huggingface.co/tasks/audio-classification)         |  `audio-classification`  | Assigning a label or class to a given audio. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AudioClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=audio-classification&library=transformers.js) |
-| [Audio-to-Audio](https://huggingface.co/tasks/audio-to-audio)         |  n/a  | Generating audio from an input audio source. | ❌ |
-| [Automatic Speech Recognition](https://huggingface.co/tasks/automatic-speech-recognition)         | `automatic-speech-recognition`  | Transcribing a given audio into text. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AutomaticSpeechRecognitionPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=automatic-speech-recognition&library=transformers.js) |
-| [Text-to-Speech](https://huggingface.co/tasks/text-to-speech)         | `text-to-speech` or `text-to-audio` | Generating natural-sounding speech given text input. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextToAudioPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=text-to-audio&library=transformers.js) |
+若要在 Hub 上查找兼容模型，请在筛选菜单中选择 "transformers.js" 库标签（或访问[此链接](https://huggingface.co/models?library=transformers.js)）。你可以通过选择感兴趣的任务进一步缩小搜索范围（例如：[文本分类 text-classification](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js)）。
 
 
-#### Tabular
+### 支持任务
 
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Tabular Classification](https://huggingface.co/tasks/tabular-classification)         |  n/a  | Classifying a target category (a group) based on set of attributes. | ❌ |
-| [Tabular Regression](https://huggingface.co/tasks/tabular-regression)         |  n/a  | Predicting a numerical value given a set of attributes. | ❌ |
+#### 自然语言处理 (NLP)
 
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [掩码语言建模 (Fill-Mask)](https://huggingface.co/tasks/fill-mask) | `fill-mask` | 掩盖句子中的某些词语并预测应替换这些掩码的词语。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FillMaskPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=fill-mask&library=transformers.js) |
+| [问答 (Question Answering)](https://huggingface.co/tasks/question-answering) | `question-answering` | 从给定的文本中检索问题的答案。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.QuestionAnsweringPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=question-answering&library=transformers.js) |
+| [句子相似度 (Sentence Similarity)](https://huggingface.co/tasks/sentence-similarity) | `sentence-similarity` | 判断两个文本之间的相似程度。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=sentence-similarity&library=transformers.js) |
+| [文本摘要 (Summarization)](https://huggingface.co/tasks/summarization) | `summarization` | 生成文档的精简版本，同时保留其核心重要信息。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.SummarizationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=summarization&library=transformers.js) |
+| [表格问答 (Table Question Answering)](https://huggingface.co/tasks/table-question-answering) | `table-question-answering` | 回答给定表格中信息的相关问题。 | ❌ |
+| [文本分类 (Text Classification)](https://huggingface.co/tasks/text-classification) | `text-classification` 或 `sentiment-analysis` | 为给定文本分配标签或类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=text-classification&library=transformers.js) |
+| [文本生成 (Text Generation)](https://huggingface.co/tasks/text-generation#completion-generation-models) | `text-generation` | 通过预测序列中的下一个词来生成新文本。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextGenerationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=text-generation&library=transformers.js) |
+| [文本到文本生成 (Text-to-text Generation)](https://huggingface.co/tasks/text-generation#text-to-text-generation-models) | `text2text-generation` | 将一个文本序列转换为另一个文本序列。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.Text2TextGenerationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=text2text-generation&library=transformers.js) |
+| [Token 分类 (Token Classification)](https://huggingface.co/tasks/token-classification) | `token-classification` 或 `ner` | 为文本中的每个 token 分配标签。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TokenClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=token-classification&library=transformers.js) |
+| [机器翻译 (Translation)](https://huggingface.co/tasks/translation) | `translation` | 将文本从一种语言翻译为另一种语言。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TranslationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=translation&library=transformers.js) |
+| [零样本分类 (Zero-Shot Classification)](https://huggingface.co/tasks/zero-shot-classification) | `zero-shot-classification` | 将文本分类为训练期间未见过的类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=zero-shot-classification&library=transformers.js) |
+| [特征提取 (Feature Extraction)](https://huggingface.co/tasks/feature-extraction) | `feature-extraction` | 将原始数据转换为可处理的数值特征，同时保留原始数据集的信息。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.FeatureExtractionPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=feature-extraction&library=transformers.js) |
 
-#### Multimodal
+#### 计算机视觉 (CV)
 
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Document Question Answering](https://huggingface.co/tasks/document-question-answering)         | `document-question-answering`  | Answering questions on document images. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DocumentQuestionAnsweringPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=document-question-answering&library=transformers.js) |
-| [Image-to-Text](https://huggingface.co/tasks/image-to-text)         |  `image-to-text`  | Output text from a given image. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToTextPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=image-to-text&library=transformers.js) |
-| [Text-to-Image](https://huggingface.co/tasks/text-to-image)         |  `text-to-image`  | Generates images from input text.  | ❌ |
-| [Visual Question Answering](https://huggingface.co/tasks/visual-question-answering)         |  `visual-question-answering`  | Answering open-ended questions based on an image. | ❌ |
-| [Zero-Shot Audio Classification](https://huggingface.co/learn/audio-course/chapter4/classification_models#zero-shot-audio-classification) | `zero-shot-audio-classification`  | Classifying audios into classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotAudioClassificationPipeline)<br>[(models)](https://huggingface.co/models?other=zero-shot-audio-classification&library=transformers.js) |
-| [Zero-Shot Image Classification](https://huggingface.co/tasks/zero-shot-image-classification) | `zero-shot-image-classification`  | Classifying images into classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotImageClassificationPipeline)<br>[(models)](https://huggingface.co/models?pipeline_tag=zero-shot-image-classification&library=transformers.js) |
-| [Zero-Shot Object Detection](https://huggingface.co/tasks/zero-shot-object-detection) | `zero-shot-object-detection`  | Identify objects of classes that are unseen during training. | ✅ [(docs)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotObjectDetectionPipeline)<br>[(models)](https://huggingface.co/models?other=zero-shot-object-detection&library=transformers.js) |
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [背景去除 (Background Removal)](https://huggingface.co/tasks/image-segmentation#background-removal) | `background-removal` | 通过删除或透明化背景来分离图像的主要主体。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.BackgroundRemovalPipeline)<br>[(模型)](https://huggingface.co/models?other=background-removal&library=transformers.js) |
+| [深度估计 (Depth Estimation)](https://huggingface.co/tasks/depth-estimation) | `depth-estimation` | 预测图像中存在的物体的深度。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DepthEstimationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=depth-estimation&library=transformers.js) |
+| [图像分类 (Image Classification)](https://huggingface.co/tasks/image-classification) | `image-classification` | 为整个图像分配标签或类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=image-classification&library=transformers.js) |
+| [图像分割 (Image Segmentation)](https://huggingface.co/tasks/image-segmentation) | `image-segmentation` | 将图像划分为段，其中每个像素都映射到一个对象。此任务有多种变体，如实例分割、全景分割和语义分割。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageSegmentationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=image-segmentation&library=transformers.js) |
+| [图像到图像 (Image-to-Image)](https://huggingface.co/tasks/image-to-image) | `image-to-image` | 转换源图像以匹配目标图像或目标图像域的特征。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToImagePipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=image-to-image&library=transformers.js) |
+| [掩码生成 (Mask Generation)](https://huggingface.co/tasks/mask-generation) | `mask-generation` | 为图像中的对象生成掩码。 | ❌ |
+| [目标检测 (Object Detection)](https://huggingface.co/tasks/object-detection) | `object-detection` | 识别图像中某些定义类别的对象。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ObjectDetectionPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=object-detection&library=transformers.js) |
+| [视频分类 (Video Classification)](https://huggingface.co/tasks/video-classification) | n/a | 为整个视频分配标签或类别。 | ❌ |
+| [无条件图像生成 (Unconditional Image Generation)](https://huggingface.co/tasks/unconditional-image-generation) | n/a | 在任何上下文中无条件生成图像（如提示文本或其他图像）。 | ❌ |
+| [图像特征提取 (Image Feature Extraction)](https://huggingface.co/tasks/image-feature-extraction) | `image-feature-extraction` | 将原始图像数据转换为数值特征，同时保留原始图像中的信息。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageFeatureExtractionPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=image-feature-extraction&library=transformers.js) |
 
+#### 音频处理 (Audio)
 
-#### Reinforcement Learning
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [音频分类 (Audio Classification)](https://huggingface.co/tasks/audio-classification) | `audio-classification` | 为给定的音频分配标签或类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AudioClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=audio-classification&library=transformers.js) |
+| [音频到音频 (Audio-to-Audio)](https://huggingface.co/tasks/audio-to-audio) | n/a | 从输入的音频源生成音频。 | ❌ |
+| [自动语音识别 (Automatic Speech Recognition)](https://huggingface.co/tasks/automatic-speech-recognition) | `automatic-speech-recognition` | 将给定的音频转录为文本。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.AutomaticSpeechRecognitionPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=automatic-speech-recognition&library=transformers.js) |
+| [文本转语音 (Text-to-Speech)](https://huggingface.co/tasks/text-to-speech) | `text-to-speech` 或 `text-to-audio` | 根据文本输入生成自然发音的语音。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.TextToAudioPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=text-to-audio&library=transformers.js) |
 
-| Task                     | ID | Description | Supported? |
-|--------------------------|----|-------------|------------|
-| [Reinforcement Learning](https://huggingface.co/tasks/reinforcement-learning)   |  n/a  | Learning from actions by interacting with an environment through trial and error and receiving rewards (negative or positive) as feedback. | ✅ |
+#### 表格数据 (Tabular)
 
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [表格分类 (Tabular Classification)](https://huggingface.co/tasks/tabular-classification) | n/a | 根据一组属性对目标类别（组）进行分类。 | ❌ |
+| [表格回归 (Tabular Regression)](https://huggingface.co/tasks/tabular-regression) | n/a | 在给定一组属性的情况下预测数值。 | ❌ |
 
+#### 多模态 (Multimodal)
 
-### Models
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [文档问答 (Document Question Answering)](https://huggingface.co/tasks/document-question-answering) | `document-question-answering` | 回答文档图像上的问题。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.DocumentQuestionAnsweringPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=document-question-answering&library=transformers.js) |
+| [图像到文本 (Image-to-Text)](https://huggingface.co/tasks/image-to-text) | `image-to-text` | 从给定的图像输出文本描述。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ImageToTextPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=image-to-text&library=transformers.js) |
+| [文本到图像 (Text-to-Image)](https://huggingface.co/tasks/text-to-image) | `text-to-image` | 从输入文本生成图像。 | ❌ |
+| [视觉问答 (Visual Question Answering)](https://huggingface.co/tasks/visual-question-answering) | `visual-question-answering` | 根据图像回答开放式问题。 | ❌ |
+| [零样本音频分类 (Zero-Shot Audio Classification)](https://huggingface.co/learn/audio-course/chapter4/classification_models#zero-shot-audio-classification) | `zero-shot-audio-classification` | 将音频分类为训练期间未见过的类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotAudioClassificationPipeline)<br>[(模型)](https://huggingface.co/models?other=zero-shot-audio-classification&library=transformers.js) |
+| [零样本图像分类 (Zero-Shot Image Classification)](https://huggingface.co/tasks/zero-shot-image-classification) | `zero-shot-image-classification` | 将图像分类为训练期间未见过的类别。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotImageClassificationPipeline)<br>[(模型)](https://huggingface.co/models?pipeline_tag=zero-shot-image-classification&library=transformers.js) |
+| [零样本目标检测 (Zero-Shot Object Detection)](https://huggingface.co/tasks/zero-shot-object-detection) | `zero-shot-object-detection` | 识别训练期间未见过的类别的对象。 | ✅ [(文档)](https://huggingface.co/docs/transformers.js/api/pipelines#module_pipelines.ZeroShotObjectDetectionPipeline)<br>[(模型)](https://huggingface.co/models?other=zero-shot-object-detection&library=transformers.js) |
+
+#### 强化学习 (Reinforcement Learning)
+
+| 任务 | ID | 描述 | 是否支持？ |
+|---|---|---|---|
+| [强化学习 (Reinforcement Learning)](https://huggingface.co/tasks/reinforcement-learning) | n/a | 通过与环境试错互动并通过奖励反馈（负向或正向）学习行动策略。 | ✅ |
+
+### 模型架构
 
 1. **[AFMoE](https://huggingface.co/docs/transformers/model_doc/afmoe)** (from Arcee AI, Prime Intellect, and DatologyAI) released with the paper [Arcee Trinity Large Technical Report](https://huggingface.co/papers/2602.17004), by Varun Singh, Lucas Krauss, Sami Jaghouar, Matej Sirovatka, Charles Goddard, Fares Obied, Jack Min Ong, Jannik Straube, Fern, Aria Harley, Conner Stewart, Colin Kealty, Maziyar Panahi, Simon Kirsten, Anushka Deshpande, Anneketh Vij, Arthur Bresnu, Pranav Veldurthi, Raghav Ravishankar, Hardik Bishnoi, Mark McQuade, Johannes Hagemann, Lucas Atkins.
 1. **[ALBERT](https://huggingface.co/docs/transformers/model_doc/albert)** (from Google Research and the Toyota Technological Institute at Chicago) released with the paper [ALBERT: A Lite BERT for Self-supervised Learning of Language Representations](https://huggingface.co/papers/1909.11942), by Zhenzhong Lan, Mingda Chen, Sebastian Goodman, Kevin Gimpel, Piyush Sharma, Radu Soricut.
@@ -456,4 +443,6 @@ To find compatible models on the Hub, select the "transformers.js" library tag i
 1. **[YOLOS](https://huggingface.co/docs/transformers/model_doc/yolos)** (from Huazhong University of Science & Technology) released with the paper [You Only Look at One Sequence: Rethinking Transformer in Vision through Object Detection](https://huggingface.co/papers/2106.00666) by Yuxin Fang, Bencheng Liao, Xinggang Wang, Jiemin Fang, Jiyang Qi, Rui Wu, Jianwei Niu, Wenyu Liu.
 1. **[Youtu-LLM](https://huggingface.co/docs/transformers/model_doc/youtu)** (from the Tencent Youtu Team) released with the paper [Youtu-LLM: Unlocking the Native Agentic Potential for Lightweight Large Language Models](https://huggingface.co/papers/2512.24618) by Junru Lu, Jiarui Qin, Lingfeng Qiao, Yinghui Li, Xinyi Dai, Bo Ke, Jianfeng He, Ruizhi Qiao, Di Yin, Xing Sun, Yunsheng Wu, Yinsong Liu, Shuangyin Liu, Mingkong Tang, Haodong Lin, Jiayi Kuang, Fanxu Meng, Xiaojuan Tang, Yunjia Xi, Junjie Huang, Haotong Yang, Zhenyi Shen, Yangning Li, Qianwen Zhang, Yifei Yu, Siyu An, Junnan Dong, Qiufeng Wang, Jie Wang, Keyu Chen, Wei Wen, Taian Guo, Zhifeng Shen, Daohai Yu, Jiahao Li, Ke Li, Zongyi Li, Xiaoyu Tan.
 1. **Zaya** (from Zyphra) released with the paper [ZAYA1-8B Technical Report](https://huggingface.co/papers/2605.05365) by Robert Washbourne, Rishi Iyer, Tomas Figliolia, Henry Zheng, Ryan Lorig-Roach, Sungyeon Yang, Pritish Yuvraj, Quentin Anthony, Yury Tokpanov, Xiao Yang, Ganesh Nanduru, Stephen Ebert, Praneeth Medepalli, Skyler Szot, Srivatsan Rajagopal, Alex Ong, Bhavana Mehta, Beren Millidge.
+---
 
+> 💡 **文档维护说明**：本中文文档由社区志愿者（@JasonYeYuhe）翻译维护，最后同步更新于 2026年10月09日。如发现内容与官方英文原版存在差异或新特性滞后，欢迎提交 PR 共同完善！
