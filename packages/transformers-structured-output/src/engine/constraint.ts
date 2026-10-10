@@ -1,5 +1,6 @@
 import { compileJsonSchema } from './json';
 import { compileRegex } from './regex';
+import { responseProtocol, withResponseProtocol } from './response_protocol';
 import { extractTokenizer, type TokenizerData } from './tokenizer';
 import type { ConstraintState, JSONSchema, TokenizerSource } from './types';
 
@@ -19,6 +20,7 @@ type CachedTokenizer = {
     booleanSchemaMaskCaches: [MaskCache, MaskCache];
     jsonObjectMaskCache: MaskCache;
     regexMaskCaches: Map<string, MaskCache>;
+    protocolMaskCaches: Map<string, MaskCache>;
 };
 type ResponseFormat =
     | { type: 'json_object' }
@@ -27,6 +29,7 @@ type ResponseFormat =
 
 export type TokenConstraint = {
     vocabSize: number;
+    initializePrompt(tokenIds: readonly bigint[], context?: { enable_thinking?: boolean }): void;
     fillMask(target: Uint32Array): boolean;
     commit(tokenId: number): boolean;
     repeatedWhitespace(): { tokenIds: readonly number[]; count: number } | undefined;
@@ -51,8 +54,15 @@ export function createTokenConstraint(
     responseFormat: ResponseFormat,
 ): TokenConstraint {
     const tokenizer = cachedTokenizer(tokenizerSource);
-    const machine = createMachine(responseFormat, tokenizer);
-    const maskCache = cacheFor(tokenizer, responseFormat);
+    const structuredMachine = createMachine(responseFormat, tokenizer);
+    const protocol = responseProtocol(tokenizerSource);
+    const machine = protocol === undefined ? structuredMachine : withResponseProtocol(structuredMachine, protocol);
+    // Close-plus-payload tokens make even thinking masks grammar-dependent. Include both
+    // the protocol and grammar in the cache identity, but keep protocol masks separate.
+    const maskCache =
+        protocol === undefined
+            ? cacheFor(tokenizer, responseFormat)
+            : protocolCache(tokenizer, tokenizerSource, responseFormat);
     let state = machine.initial;
     // Post-transition states discovered during the trie walk, so commit() can
     // reuse them. Entries are only valid when their stamp matches the current
@@ -66,6 +76,22 @@ export function createTokenConstraint(
 
     return {
         vocabSize: tokenizer.data.tokens.length,
+        initializePrompt(tokenIds, context) {
+            if (machine.initialize === undefined) return;
+            const promptIds = protocol?.startAnchors === undefined ? [] : tokenIds;
+            const length = promptIds.reduce(
+                (total, tokenId) => total + tokenizer.data.tokens[Number(tokenId)].length,
+                0,
+            );
+            const bytes = new Uint8Array(length);
+            let offset = 0;
+            for (const tokenId of promptIds) {
+                const token = tokenizer.data.tokens[Number(tokenId)];
+                bytes.set(token, offset);
+                offset += token.length;
+            }
+            state = machine.initialize(bytes, context);
+        },
         fillMask(target) {
             const words = Math.ceil(tokenizer.data.tokens.length / 32);
             if (target.length < words) throw new RangeError(`Mask target requires at least ${words} words.`);
@@ -94,7 +120,12 @@ export function createTokenConstraint(
                 const node = nodes.pop()!;
                 const current = states.pop()!;
                 for (const tokenId of node.tokenIds) {
-                    if (tokenizer.data.specialTokenIds.has(tokenId)) continue;
+                    if (tokenId === tokenizer.data.eosTokenId) continue;
+                    if (
+                        tokenizer.data.specialTokenIds.has(tokenId) &&
+                        !machine.allowsSpecial?.(state, current, tokenizer.data.tokens[tokenId])
+                    )
+                        continue;
                     setBit(target, tokenId);
                     tokenStates[tokenId] = current;
                     tokenStamps[tokenId] = stamp;
@@ -120,9 +151,6 @@ export function createTokenConstraint(
                 if (!machine.accepting(state)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
                 return true;
             }
-            if (tokenizer.data.specialTokenIds.has(tokenId)) {
-                throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
-            }
             let next: unknown;
             if (tokenStamps[tokenId] === stamp && stamp > 0) {
                 next = tokenStates[tokenId];
@@ -131,7 +159,12 @@ export function createTokenConstraint(
                 for (const byte of tokenizer.data.tokens[tokenId]) next = machine.transition(next, byte);
             }
             stamp++;
-            if (!machine.viable(next)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
+            if (
+                !machine.viable(next) ||
+                (tokenizer.data.specialTokenIds.has(tokenId) &&
+                    !machine.allowsSpecial?.(state, next, tokenizer.data.tokens[tokenId]))
+            )
+                throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
             consecutiveWhitespace =
                 tracksJsonWhitespace && next === state && isJsonWhitespace(tokenizer.data.tokens[tokenId])
                     ? consecutiveWhitespace + 1
@@ -202,10 +235,23 @@ function cachedTokenizer(source: TokenizerSource): CachedTokenizer {
             booleanSchemaMaskCaches: [new MaskCache(), new MaskCache()],
             jsonObjectMaskCache: new MaskCache(),
             regexMaskCaches: new Map(),
+            protocolMaskCaches: new Map(),
         };
         tokenizerCache.set(source as object, cached);
     }
     return cached;
+}
+
+function protocolCache(tokenizer: CachedTokenizer, source: TokenizerSource, format: ResponseFormat): MaskCache {
+    const key = JSON.stringify([(source as { response_template?: unknown }).response_template, format]);
+    let cache = tokenizer.protocolMaskCaches.get(key);
+    if (cache === undefined) {
+        cache = new MaskCache();
+        if (tokenizer.protocolMaskCaches.size >= 16)
+            tokenizer.protocolMaskCaches.delete(tokenizer.protocolMaskCaches.keys().next().value!);
+        tokenizer.protocolMaskCaches.set(key, cache);
+    }
+    return cache;
 }
 
 function cacheFor(tokenizer: CachedTokenizer, responseFormat: ResponseFormat): MaskCache | undefined {

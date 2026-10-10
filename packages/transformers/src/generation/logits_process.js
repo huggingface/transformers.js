@@ -15,9 +15,21 @@ import { Tensor } from '../utils/tensor.js';
 import { max, log_softmax } from '../utils/maths.js';
 
 /**
+ * Request-specific chat-template settings supplied before token generation.
+ * @typedef {Object} GenerationContext
+ * @property {boolean} [enable_thinking] Whether the chat request explicitly enables thinking.
+ */
+
+/**
  * Abstract base class for all logit processors that can be applied during generation.
  */
 export class LogitsProcessor extends Callable {
+    /**
+     * Initialize request-specific context before the first generation step.
+     * @param {GenerationContext} context The settings used to render the chat prompt.
+     */
+    setGenerationContext(context) {}
+
     /**
      * Apply the processor to the input logits.
      *
@@ -34,7 +46,7 @@ export class LogitsProcessor extends Callable {
 /**
  * Abstract base class for all logit warpers that can be applied during generation with multinomial sampling.
  */
-export class LogitsWarper extends Callable {
+export class LogitsWarper extends LogitsProcessor {
     /**
      * Apply the processor to the input logits.
      *
@@ -54,6 +66,14 @@ export class LogitsWarper extends Callable {
  * batch of logits.
  */
 export class LogitsProcessorList extends Callable {
+    /**
+     * Forward request context to every contained processor, including nested lists.
+     * @param {GenerationContext} context The settings used to render the chat prompt.
+     */
+    setGenerationContext(context) {
+        for (const processor of this.processors) processor.setGenerationContext?.(context);
+    }
+
     /**
      * Constructs a new instance of `LogitsProcessorList`.
      */
