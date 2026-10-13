@@ -37,6 +37,7 @@
 
 // Environment variables
 export { env, LogLevel } from './env.js';
+export { getAvailableDevices } from './backends/onnx.js';
 
 // Pipelines
 export * from './pipelines.js';

@@ -145,6 +145,23 @@ if (ORT_SYMBOL in globalThis) {
     defaultDevices = ['wasm'];
 }
 
+/**
+ * Returns the devices supported by the current environment, sorted by
+ * priority/performance. Useful for feature-detect-then-fallback logic, e.g.
+ * try `webgpu` and fall back to `wasm` (see https://github.com/huggingface/transformers.js/issues/1643).
+ *
+ * **Example:**
+ * ```javascript
+ * import { getAvailableDevices } from '@huggingface/transformers';
+ * const devices = getAvailableDevices(); // e.g. ['webgpu', 'wasm'] in a browser, ['cpu'] in Node.js
+ * ```
+ *
+ * @returns {import("../utils/devices.js").DeviceType[]} The supported devices for the current environment.
+ */
+export function getAvailableDevices() {
+    return [...supportedDevices];
+}
+
 // @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
 
