@@ -22,12 +22,31 @@ export class FileCache {
     }
 
     /**
+     * Translate cache identity to storage layout. Keep version markers out of
+     * filenames and preserve the existing layout for unversioned entries.
+     * @private
+     * @param {string} request
+     * @returns {string}
+     */
+    getFilePath(request) {
+        const hashIndex = request.indexOf('#');
+        const key = hashIndex < 0 ? request : request.slice(0, hashIndex);
+        const version = key.match(/[?&]__transformersjs_cache_version=(\d+)(?:&|$)/)?.[1];
+        if (!version) return path.join(this.path, request);
+        const unversioned = key.replace(/([?&])__transformersjs_cache_version=\d+(&?)/, (_, separator, next) =>
+            next ? separator : '',
+        );
+        const hash = hashIndex < 0 ? '' : request.slice(hashIndex);
+        return path.join(this.path, `transformersjs_assets_v${version}`, unversioned + hash);
+    }
+
+    /**
      * Checks whether the given request is in the cache.
      * @param {string} request
      * @returns {Promise<FileResponse | undefined>}
      */
     async match(request) {
-        let filePath = path.join(this.path, request);
+        let filePath = this.getFilePath(request);
         let file = new FileResponse(filePath);
 
         if (file.exists) {
@@ -46,7 +65,7 @@ export class FileCache {
      * @returns {Promise<void>}
      */
     async put(request, response, progress_callback = undefined) {
-        const filePath = path.join(this.path, request);
+        const filePath = this.getFilePath(request);
 
         // Include both PID and a random suffix so that concurrent put() call within the same process
         // (e.g., multiple pipelines loading the same file in parallel) each get their own temp file
@@ -109,7 +128,7 @@ export class FileCache {
      * @returns {Promise<boolean>} A Promise that resolves to `true` if the cache entry was deleted, `false` otherwise.
      */
     async delete(request) {
-        let filePath = path.join(this.path, request);
+        let filePath = this.getFilePath(request);
 
         try {
             await fs.promises.unlink(filePath);

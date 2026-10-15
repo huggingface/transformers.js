@@ -4,6 +4,7 @@ import { jest } from "@jest/globals";
 const mockGetFileMetadata = jest.fn();
 jest.unstable_mockModule("../../src/utils/model_registry/get_file_metadata.js", () => ({
   get_file_metadata: mockGetFileMetadata,
+  getFileMetadata: mockGetFileMetadata,
 }));
 
 // Mock get_config so config-loading failures can be simulated
