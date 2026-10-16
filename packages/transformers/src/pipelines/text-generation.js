@@ -178,6 +178,12 @@ export class TextGenerationPipeline
             ...tokenizer_kwargs,
         });
 
+        // Give protocol-aware processors the same chat-template setting used to build the prompt.
+        const logits_processor = generation_kwargs.logits_processor;
+        if (isChatInput && typeof logits_processor?.setGenerationContext === 'function') {
+            logits_processor.setGenerationContext({ enable_thinking: tokenizer_encode_kwargs?.enable_thinking });
+        }
+
         const outputTokenIds = /** @type {Tensor} */ (
             await this.model.generate({
                 ...text_inputs,

@@ -10,25 +10,47 @@
  */
 
 /** Python's Unicode `\w` (UTS #18). */
-const WORD = String.raw`\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}`;
-const W = `[${WORD}]`;
+const UNICODE_WORD_CHARS = String.raw`\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}`;
+const UNICODE_WORD_CLASS = `[${UNICODE_WORD_CHARS}]`;
+const UNICODE_NON_WORD_CLASS = `[^${UNICODE_WORD_CHARS}]`;
+const ANY_CODE_POINT = String.raw`[\s\S]`;
 
 /** Python escapes whose JavaScript equivalent differs, outside and inside character classes. */
-const ESCAPES = {
-    w: W,
-    W: `[^${WORD}]`,
-    d: String.raw`\p{Nd}`,
-    D: String.raw`\P{Nd}`,
-    b: `(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))`,
-    B: `(?:(?<=${W})(?=${W})|(?<!${W})(?!${W}))`,
-    A: String.raw`(?<![\s\S])`,
-    Z: String.raw`(?![\s\S])`,
-};
-const CLASS_ESCAPES = { w: WORD, d: String.raw`\p{Nd}`, D: String.raw`\P{Nd}`, b: String.raw`\x08` };
+// Keep the rewrite-table structure aligned with tokenizers.js's src/utils/core.ts.
+// The values target Python regex, rather than Oniguruma (notably \w and \Z).
+const ESCAPE_REWRITES = new Map([
+    ['w', UNICODE_WORD_CLASS],
+    ['W', UNICODE_NON_WORD_CLASS],
+    ['d', String.raw`\p{Nd}`],
+    ['D', String.raw`\P{Nd}`],
+    ['s', String.raw`\p{White_Space}`],
+    ['S', String.raw`\P{White_Space}`],
+    [
+        'b',
+        `(?:(?<=${UNICODE_WORD_CLASS})(?!${UNICODE_WORD_CLASS})|(?<!${UNICODE_WORD_CLASS})(?=${UNICODE_WORD_CLASS}))`,
+    ],
+    [
+        'B',
+        `(?:(?<=${UNICODE_WORD_CLASS})(?=${UNICODE_WORD_CLASS})|(?<!${UNICODE_WORD_CLASS})(?!${UNICODE_WORD_CLASS}))`,
+    ],
+    ['A', String.raw`(?<![\s\S])`],
+    ['Z', String.raw`(?![\s\S])`],
+    ['a', String.raw`\x07`],
+]);
+const CLASS_ESCAPE_REWRITES = new Map([
+    ['w', UNICODE_WORD_CHARS],
+    ['d', String.raw`\p{Nd}`],
+    ['D', String.raw`\P{Nd}`],
+    ['s', String.raw`\p{White_Space}`],
+    ['S', String.raw`\P{White_Space}`],
+    ['b', String.raw`\x08`],
+    ['a', String.raw`\x07`],
+]);
+const CLASS_COMPLEMENT_ALTERNATIVES = new Map([['W', UNICODE_NON_WORD_CLASS]]);
 /** Escapes that mean the same in both languages. */
-const NATIVE_ESCAPES = new Set('sSntrfv0');
+const NATIVE_ESCAPES = new Set('ntrfv0');
 /** Characters that must be escaped to be literal in a `u`-mode regular expression. */
-const SYNTAX_CHARACTERS = new Set('^$\\.*+?()[]{}|/');
+const JS_SYNTAX_CHARS = '^$\\.*+?()[]{}|/';
 const HEX_LENGTHS = { x: 2, u: 4, U: 8 };
 
 const QUANTIFIER = /\{(\d*)(,?)(\d*)\}/y;
@@ -40,7 +62,7 @@ const GROUP = /\((?:\?(?:(:|=|!|<=|<!)|P?<(\w+)>|P=(\w+)\)))?/y;
  * @returns {{ source: string, partial: string, flags: string, names: string[] }} The JavaScript source,
  * its partial-matching variant, the flags to compile both with, and the names of all named groups.
  */
-function translate(pattern) {
+function rewrite_python_to_js(pattern) {
     // Global inline flags must lead the pattern, as in Python.
     const leading = /^(?:\(\?[a-zA-Z]+\))*/.exec(pattern)[0];
     let flags = 'su';
@@ -53,7 +75,7 @@ function translate(pattern) {
 
     /** Return a literal character, escaped where JavaScript requires it. */
     const literal = (character, in_class) =>
-        SYNTAX_CHARACTERS.has(character) || (in_class && character === '-') ? `\\${character}` : character;
+        JS_SYNTAX_CHARS.includes(character) || (in_class && character === '-') ? `\\${character}` : character;
 
     /** Read the character at `i`, which may be a surrogate pair. */
     const next_character = () => {
@@ -67,8 +89,7 @@ function translate(pattern) {
         ++i;
         if (i >= pattern.length) throw new Error('bad escape (end of pattern)');
         const e = next_character();
-        if (in_class && e === 'W') throw new Error(String.raw`\W inside a character class is not supported`);
-        const replacement = (in_class ? CLASS_ESCAPES : ESCAPES)[e];
+        const replacement = (in_class ? CLASS_ESCAPE_REWRITES : ESCAPE_REWRITES).get(e);
         if (replacement !== undefined) return replacement;
         if (NATIVE_ESCAPES.has(e)) return `\\${e}`;
         if (e in HEX_LENGTHS) {
@@ -86,24 +107,52 @@ function translate(pattern) {
 
     /** Read the character class at `i`. */
     function character_class() {
-        let out = pattern[i++];
-        if (pattern[i] === '^') out += pattern[i++];
+        ++i;
+        const negated = pattern[i] === '^';
+        if (negated) ++i;
+        let fragment = '';
+        const alternatives = [];
+        let tail = '';
         if (pattern[i] === ']') {
             // A leading `]` is literal in Python
-            out += '\\]';
+            fragment += '\\]';
+            tail = 'scalar';
             ++i;
         }
         while (pattern[i] !== ']') {
             if (i >= pattern.length) throw new Error('unterminated character set');
             if (pattern[i] === '\\') {
-                out += escape(true);
+                const e = pattern[i + 1];
+                const complement = CLASS_COMPLEMENT_ALTERNATIVES.get(e);
+                const set_valued = complement !== undefined || (e !== undefined && 'wWdDsS'.includes(e));
+                if (set_valued && tail === 'range') throw new Error('bad character range');
+                if (complement !== undefined) {
+                    alternatives.push(complement);
+                    i += 2;
+                } else {
+                    fragment += escape(true);
+                }
+                tail = tail === 'range' ? 'complete_range' : set_valued ? 'set' : 'scalar';
             } else {
                 const character = next_character();
-                out += character === '[' ? '\\[' : character;
+                if (character === '-' && tail && tail !== 'complete_range' && pattern[i] !== ']') {
+                    if (tail === 'set') throw new Error('bad character range');
+                    fragment += '-';
+                    tail = 'range';
+                } else {
+                    fragment +=
+                        character === '[' || character === '-' || character === '^' ? `\\${character}` : character;
+                    tail = tail === 'range' ? 'complete_range' : 'scalar';
+                }
             }
         }
         ++i;
-        return `${out}]`;
+        if (alternatives.length === 0) return `[${negated ? '^' : ''}${fragment}]`;
+        if (fragment) alternatives.unshift(`[${fragment}]`);
+        // As in tokenizers.js, test membership separately from the single consuming atom.
+        // This lifts complements such as \W out of a class without ambiguous union branches.
+        const union = alternatives.join('|');
+        return `(?:(?${negated ? '!' : '='}(?:${union}))${ANY_CODE_POINT})`;
     }
 
     /** Translate up to the end of the current group, returning `[source, partial]`. */
@@ -210,7 +259,7 @@ const cache = new Map();
 export function compile_pattern(pattern) {
     let compiled = cache.get(pattern);
     if (!compiled) {
-        const { source, partial, flags, names } = translate(pattern);
+        const { source, partial, flags, names } = rewrite_python_to_js(pattern);
         compiled = {
             regex: new RegExp(source, `${flags}g`),
             sticky: new RegExp(source, `${flags}y`),

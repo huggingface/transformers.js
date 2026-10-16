@@ -16,6 +16,7 @@ export type ResponseFormat =
 
 type GenerationState = {
     constraint: TokenConstraint;
+    enableThinking?: boolean;
     processedInputLength?: number;
     mask?: Uint32Array;
 };
@@ -24,6 +25,8 @@ const WHITESPACE_REPETITION_PENALTY = 1.2;
 const MAX_CONSECUTIVE_WHITESPACE_TOKENS = 4;
 
 export class StructuredOutputProcessor extends LogitsProcessorList {
+    private readonly state: GenerationState;
+
     /**
      * Precomputes the tokenizer-derived data structures used by every
      * constraint. The first processor per tokenizer otherwise pays this cost
@@ -36,10 +39,10 @@ export class StructuredOutputProcessor extends LogitsProcessorList {
 
     constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat) {
         super();
-        const state: GenerationState = {
+        this.state = {
             constraint: createTokenConstraint(tokenizer, responseFormat),
         };
-        this.push(new ConstraintLogitsProcessor(state));
+        this.push(new ConstraintLogitsProcessor(this.state));
     }
 }
 
@@ -48,9 +51,18 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
         super();
     }
 
+    setGenerationContext({ enable_thinking }: { enable_thinking?: boolean }): void {
+        if (this.state.processedInputLength !== undefined)
+            throw new Error('Generation context must be set before generation starts.');
+        this.state.enableThinking = enable_thinking;
+    }
+
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
         const input = inputIds[0];
+        if (this.state.processedInputLength === undefined) {
+            this.state.constraint.initializePrompt(input, { enable_thinking: this.state.enableThinking });
+        }
         const start = this.state.processedInputLength ?? input.length;
         for (let i = start; i < input.length; ++i) {
             if (this.state.constraint.commit(Number(input[i]))) {

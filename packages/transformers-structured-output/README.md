@@ -29,6 +29,14 @@ await model.generate({
 
 Constraints currently support a single generated sequence at a time. Generation throws when the logical batch size is not `1` rather than sharing mutable grammar state across sequences.
 
+When the tokenizer defines `response_template.fields.thinking` and `response_template.fields.content`, thinking is treated as an optional protocol region. The processor allows either the thinking opener or constrained content at the start of the response, leaves the thinking body unconstrained, and applies the requested constraint when final content begins. The pipeline forwards the thinking setting automatically; direct `model.generate()` callers can set it through `processor.setGenerationContext()` before generation, or leave thinking optional. Prompt-prefilled thinking openers and explicit final-content openers are supported.
+
+In a text-generation pipeline, `tokenizer_encode_kwargs: { enable_thinking: false }` is forwarded to the processor automatically. In that case the thinking branch is disabled and the constraint applies to the first content token. With `enable_thinking: true` (or with no explicit setting), the processor allows an optional thinking region before the constrained answer.
+
+Context is forwarded through `LogitsProcessorList`, including nested lists and lists populated with `extend()`. When using `model.generate()` directly, thinking remains optional unless you call `processor.setGenerationContext({ enable_thinking: false })` before generation. Setting context after generation has started raises an error. Prompt prefills are validated before this policy is applied: completed thinking blocks are accepted, but invalid answer prefills and unfinished thinking blocks with thinking explicitly disabled raise errors.
+
+Thinking close delimiters and prompt start anchors must be literals (or a list of literals). Thinking and content openers and content closers may be literals or patterns supported by the constraint regex engine; unsupported patterns, thinking close patterns, and pattern start anchors raise an error rather than silently constraining the reasoning text or skipping prompt replay. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
+
 ## Supported constraints
 
 The JSON engine implements a practical JSON Schema 2020-12 profile. This includes deep `const` and `enum`, exact decimal bounds and `multipleOf`, tuple and homogeneous arrays, `contains`, deep `uniqueItems`, object property and dependency assertions, `allOf`/`anyOf`/`oneOf`/`not`, conditionals, local `$ref`, recursive `$defs`, draft-07 compatibility, and root-level `x-guidance` separators. String `pattern` and recognized `format` assertions are rejected because they cannot be enforced incrementally; unknown format names remain annotations. External and dynamic references and unevaluated-property/item assertions also remain unsupported.
