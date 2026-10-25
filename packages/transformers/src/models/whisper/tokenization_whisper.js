@@ -6,7 +6,7 @@ import { Tensor } from '../../utils/tensor.js';
 import { mergeArrays } from '../../utils/core.js';
 
 const PUNCTUATION_REGEX = '\\p{P}\\u0021-\\u002F\\u003A-\\u0040\\u005B-\\u0060\\u007B-\\u007E';
-const PUNCTUATION_ONLY_REGEX = new RegExp(`^[${PUNCTUATION_REGEX}]+$`, 'gu');
+const PUNCTUATION_ONLY_REGEX = new RegExp(`^[${PUNCTUATION_REGEX}]+$`, 'u');
 
 /**
  * Small tolerance (in seconds) for timestamp ordering in chunk overlap matching.
