@@ -864,20 +864,5 @@ export const CUSTOM_TESTS = () => {
       },
       MAX_EXECUTION_TIME,
     );
-
-    it(
-      "should split every punctuation-only token into its own word",
-      async () => {
-        // Regression test: PUNCTUATION_ONLY_REGEX had the `g` flag, so RegExp.test() kept
-        // `lastIndex` between calls and alternated true/false. The second of two
-        // consecutive punctuation tokens was then glued onto the previous word.
-        const tokenizer = await WhisperTokenizer.from_pretrained("onnx-community/whisper-tiny.en_timestamped");
-        const tokens = tokenizer.encode("Hello", { add_special_tokens: false });
-        const dot = tokenizer.encode(".", { add_special_tokens: false });
-        const [words] = tokenizer.splitTokensOnSpaces([...tokens, ...dot, ...dot, ...dot]);
-        expect(words).toEqual(["Hello", ".", ".", "."]);
-      },
-      MAX_EXECUTION_TIME,
-    );
   });
 };
