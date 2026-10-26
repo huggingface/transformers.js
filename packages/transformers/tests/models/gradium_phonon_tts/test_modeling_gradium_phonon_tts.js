@@ -8,6 +8,12 @@ import { create_tokenizer } from "./tokenizer_fixture.js";
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME } from "../../init.js";
 
 const MODEL_ID = "onnx-community/phonon-31m-en-ONNX";
+// Voices are app-level: flat float32 files in the model repo, read here as an app would.
+const hub_voice_url = (id = "default") => `https://huggingface.co/${MODEL_ID}/resolve/main/voices/${id}.bin`;
+const hub_voice = async (id) => {
+  const data = new Float32Array(await (await fetch(hub_voice_url(id))).arrayBuffer());
+  return new Tensor("float32", data, [1, 512, data.length / 512]);
+};
 
 const dtype_config = { dtype: "fp32" };
 const phonon = {
@@ -17,7 +23,6 @@ const phonon = {
   frame_rate: 12.5,
   temperature: 0.3,
   eos_threshold: 4,
-  default_voice: "https://example.com/default.bin",
   conditions: { num_speakers: { default: "2" }, duration_delta: { default: 0.5 } },
   flow_lm: { num_layers: 1, num_heads: 1, head_dim: 2 },
   mimi_decoder: { num_layers: 1, num_heads: 1, head_dim: 2, conv_states: { "past_conv.test": [1, 2, 1] } },
@@ -33,6 +38,7 @@ const voice_file = (values = [0.25, -0.5]) => new Response(new Float32Array(valu
 
 function fake_pipeline(eos = 5) {
   const steps = [];
+  const offsets = [];
   const state = () => ({ "present.0.key": new ORTTensor("float32", [0], [1]), "present.0.value": new ORTTensor("float32", [0], [1]) });
   const flow = {
     inputNames: ["text_ids", "voice_latents", "latent", "noise", "num_speakers", "duration_delta", "past_key_values.0.key", "past_key_values.0.value"],
@@ -46,9 +52,10 @@ function fake_pipeline(eos = 5) {
   };
   const decoder = {
     inputNames: ["latent", "past_offset", "past_conv.test", "past_key_values.0.key", "past_key_values.0.value"],
-    run: jest.fn(async () => ({
+    // One decoder call per chunk: two samples per latent frame.
+    run: jest.fn(async (inputs) => (offsets.push(inputs.past_offset.data[0]), {
       ...state(),
-      audio: new ORTTensor("float32", [0.25, -0.5], [1, 2]),
+      audio: new ORTTensor("float32", Array.from({ length: inputs.latent.dims[1] }, () => [0.25, -0.5]).flat(), [1, 2 * inputs.latent.dims[1]]),
       present_offset: new ORTTensor("int64", [1n], [1]),
       "present_conv.test": new ORTTensor("float32", [0], [1]),
     })),
@@ -61,7 +68,9 @@ function fake_pipeline(eos = 5) {
   // Voice-conditioning runs are the only flow runs with voice frames.
   const voice_runs = () => flow.run.mock.calls.map(([inputs], i) => ({ inputs, i })).filter(({ inputs }) => inputs.voice_latents.dims[2] > 0);
   const prefix = async (n = 0) => (await flow.run.mock.results[voice_runs()[n].i].value)["present.0.key"];
-  return { pipe, model, flow, decoder, fetch, steps, voice_runs, prefix };
+  // Latent frames of each decoder call.
+  const decoded_frames = () => decoder.run.mock.calls.map(([inputs]) => inputs.latent.dims[1]);
+  return { pipe, model, flow, decoder, fetch, steps, offsets, voice_runs, prefix, decoded_frames };
 }
 
 // Python PocketTTSProcessor.split_text -> apply_chat_template -> encode, using
@@ -114,13 +123,9 @@ export default () => {
       }
     });
 
-    // On WebGPU, every output fed back into a graph stays on the GPU between frames.
-    it.each([
-      ["flow_lm", ["present.0.key", "present.0.value", "latent_out"]],
-      ["mimi_decoder", ["present.0.key", "present.0.value", "present_conv.test"]],
-      ["unknown_session", []],
-    ])("lists the WebGPU feedback outputs for %s", (session_name, expected) => {
-      expect([...getCacheNames(config(), { prefix: "present", session_name })]).toEqual(expected);
+    // On WebGPU, the flow model's KV cache (the only state fed back between calls) stays on the GPU.
+    it("uses the flow model's KV cache as the standard cache names", () => {
+      expect([...getCacheNames(config(), { prefix: "present", session_name: "flow_lm" })]).toEqual(["present.0.key", "present.0.value"]);
     });
 
     describe("text preparation", () => {
@@ -167,16 +172,18 @@ export default () => {
     });
 
     describe("generation", () => {
-      it("streams frames with the checkpoint's default voice and frees each call's prefix", async () => {
-        const { pipe, decoder, fetch, steps, voice_runs, prefix } = fake_pipeline();
+      it("decodes each chunk in one decoder call and frees each call's prefix", async () => {
+        const { pipe, fetch, steps, offsets, voice_runs, prefix, decoded_frames } = fake_pipeline();
         try {
-          const result = await pipe("Hello.", { temperature: 0 });
-          // EOS on the first frame, then a 3-frame tail for short texts.
-          expect(decoder.run).toHaveBeenCalledTimes(4);
+          const result = await pipe("Hello.", { speaker_embeddings: url, temperature: 0 });
+          // EOS on the first frame, then a 3-frame tail for short texts: four latents, decoded at once.
+          expect(decoded_frames()).toEqual([4]);
           expect(Array.from(result.audio)).toEqual([0.25, -0.5, 0.25, -0.5, 0.25, -0.5, 0.25, -0.5]);
+          expect(steps).toHaveLength(4);
           expect(steps.every(({ noise }) => noise.every((value) => value === 0))).toBe(true);
-          expect(fetch).toHaveBeenCalledWith(phonon.default_voice, expect.anything());
-          await pipe("Hello.");
+          // The decoder starts every chunk from an empty streaming state.
+          expect(offsets).toEqual([0n]);
+          await pipe("Hello.", { speaker_embeddings: url });
           // Nothing is cached: every call loads and conditions its voice.
           expect(fetch).toHaveBeenCalledTimes(2);
           expect(voice_runs()).toHaveLength(2);
@@ -185,12 +192,37 @@ export default () => {
           await pipe.dispose();
         }
       });
+      it("requires speaker embeddings", async () => {
+        const { pipe, flow } = fake_pipeline();
+        try {
+          await expect(pipe("Hello.")).rejects.toThrow("Speaker embeddings must be provided for Phonon models.");
+          expect(flow.run).not.toHaveBeenCalled();
+        } finally {
+          await pipe.dispose();
+        }
+      });
+      it("yields one waveform per chunk from generate_speech", async () => {
+        const { pipe, model, decoded_frames } = fake_pipeline();
+        const voice = new Tensor("float32", [0.5, 0.25], [1, 2, 1]);
+        try {
+          const chunks = await pipe.processor("Hello. ".repeat(10));
+          expect(chunks.length).toBeGreaterThan(1);
+          const parts = [];
+          for await (const pcm of model.generate_speech({ chunks, speaker_embeddings: voice, temperature: 0 })) parts.push(pcm);
+          expect(parts).toHaveLength(chunks.length);
+          expect(decoded_frames()).toHaveLength(chunks.length);
+          expect(parts.map((pcm) => pcm.length)).toEqual(decoded_frames().map((frames) => 2 * frames));
+        } finally {
+          voice.dispose();
+          await pipe.dispose();
+        }
+      });
       it("takes conditioning defaults from the config and forwards overrides", async () => {
         const { pipe, steps } = fake_pipeline();
         try {
-          await pipe("Hello.");
+          await pipe("Hello.", { speaker_embeddings: url });
           expect(steps[0]).toMatchObject({ num_speakers: 2n, duration_delta: 0.5 });
-          await pipe("Hello.", { num_speakers: 0, duration_delta: -1 });
+          await pipe("Hello.", { speaker_embeddings: url, num_speakers: 0, duration_delta: -1 });
           expect(steps.at(-1)).toMatchObject({ num_speakers: 0n, duration_delta: -1 });
         } finally {
           await pipe.dispose();
@@ -253,28 +285,28 @@ export default () => {
         const { pipe, flow, fetch } = fake_pipeline();
         fetch.mockResolvedValueOnce(new Response("not found", { status: 404, statusText: "Not Found" }));
         try {
-          await expect(pipe("Hello.", { speaker_embeddings: url })).rejects.toThrow("Unable to load Phonon voice: 404 Not Found");
+          await expect(pipe("Hello.", { speaker_embeddings: url })).rejects.toThrow("Unable to load speaker embeddings: 404 Not Found.");
           expect(flow.run).not.toHaveBeenCalled();
           await pipe("Try again.", { speaker_embeddings: url });
           expect(fetch).toHaveBeenCalledTimes(2);
         } finally { await pipe.dispose(); }
       });
       it("uses the shorter EOS tail for more than four words", async () => {
-        const { pipe, decoder } = fake_pipeline();
+        const { pipe, decoded_frames } = fake_pipeline();
         try {
-          await pipe("One two three four five.");
-          expect(decoder.run).toHaveBeenCalledTimes(2);
+          await pipe("One two three four five.", { speaker_embeddings: url });
+          expect(decoded_frames()).toEqual([2]);
         } finally {
           await pipe.dispose();
         }
       });
       it("stops at the frame budget and warns when EOS never arrives", async () => {
-        const { pipe, decoder } = fake_pipeline(-5);
+        const { pipe, decoded_frames } = fake_pipeline(-5);
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
         try {
           const ids = pipe.tokenizer.encode("Hi.", { add_special_tokens: false });
-          await pipe("Hi.", { temperature: 0 });
-          expect(decoder.run).toHaveBeenCalledTimes(Math.ceil((ids.length / 3 + 2) * 12.5));
+          await pipe("Hi.", { speaker_embeddings: url, temperature: 0 });
+          expect(decoded_frames()).toEqual([Math.ceil((ids.length / 3 + 2) * 12.5)]);
           expect(warn).toHaveBeenCalledWith(expect.stringContaining("truncated"));
         } finally {
           await pipe.dispose();
@@ -307,74 +339,64 @@ export default () => {
         expect(flow_lm.inputNames).toEqual(expect.arrayContaining(["text_ids", "voice_latents", "latent", "noise", "num_speakers", "duration_delta"]));
         expect(flow_lm.outputNames).toEqual(expect.arrayContaining(["latent_out", "eos_logit"]));
         expect(mimi_decoder.inputNames).toEqual(expect.arrayContaining(["latent", "past_offset", ...Object.keys(tts.model.config.phonon.mimi_decoder.conv_states)]));
-        expect(mimi_decoder.outputNames).toEqual(expect.arrayContaining(["audio", "present_offset"]));
-        for (const [session_name, session] of Object.entries({ flow_lm, mimi_decoder })) {
-          for (const name of getCacheNames(tts.model.config, { prefix: "present", session_name })) {
-            expect(session.outputNames).toContain(name);
-          }
-          const state_names = session.outputNames.filter((name) => name.startsWith("present"));
-          expect(state_names.length).toBeGreaterThan(0);
-          for (const name of state_names) {
-            expect(session.inputNames).toContain(name.replace("present.", "past_key_values.").replace("present_", "past_"));
-          }
-        }
+        expect(mimi_decoder.outputNames).toEqual(expect.arrayContaining(["audio"]));
+        // The flow model's KV cache is the state fed back between calls.
+        const cache = [...getCacheNames(tts.model.config, { prefix: "present", session_name: "flow_lm" })];
+        expect(cache).toEqual(flow_lm.outputNames.filter((name) => name.startsWith("present.")));
+        for (const name of cache) expect(flow_lm.inputNames).toContain(name.replace("present.", "past_key_values."));
       });
 
       it("discovers all complete mixed-precision variants", async () => {
         expect(await ModelRegistry.get_available_dtypes(MODEL_ID)).toEqual(["fp32", "q4", "q4f16"]);
       }, MAX_TEST_EXECUTION_TIME);
 
-      it("streams finite 24 kHz frames, stops on EOS and repeats deterministically", async () => {
-        const text = "Hello from Phonon.";
-        const { frame_rate } = tts.model.config.phonon;
-        const speaker_embeddings = await tts.model.load_voice();
-        const chunks = await tts.processor(text);
-        const frames = [];
-        for await (const pcm of tts.model.generate_speech({ chunks, speaker_embeddings, temperature: 0 })) frames.push(pcm);
-        // The pipeline's default voice is the same file, so it returns the concatenated stream.
-        const output = await tts(text, { temperature: 0 });
-        const max_frames = Math.ceil((chunks[0].input_ids.length / 3 + 2) * frame_rate);
-        expect(frames.length).toBeGreaterThan(1);
-        expect(frames.length).toBeLessThan(max_frames);
-        expect(output.sampling_rate).toBe(24000);
-        expect(output.audio.length).toBe(frames.length * 1920);
-        expect(output.audio.every(Number.isFinite)).toBe(true);
-        expect(output.audio.some((sample) => Math.abs(sample) > 0.01)).toBe(true);
-        for (const [index, pcm] of frames.entries()) {
-          expect(pcm.length).toBe(1920);
-          expect(output.audio.slice(index * 1920, (index + 1) * 1920)).toEqual(pcm);
+      it("generates finite 24 kHz audio per chunk, stops on EOS and repeats deterministically", async () => {
+        const text = "Hello from Phonon. This is a second sentence.";
+        const { frame_rate, samples_per_frame } = tts.model.config.phonon;
+        const speaker_embeddings = await hub_voice();
+        try {
+          const chunks = await tts.processor(text, { max_tokens: 10 });
+          expect(chunks.length).toBeGreaterThan(1);
+          const parts = [];
+          for await (const pcm of tts.model.generate_speech({ chunks, speaker_embeddings, temperature: 0 })) parts.push(pcm);
+          expect(parts).toHaveLength(chunks.length);
+          for (const [i, pcm] of parts.entries()) {
+            const max_frames = Math.ceil((chunks[i].input_ids.length / 3 + 2) * frame_rate);
+            expect(pcm.length % samples_per_frame).toBe(0);
+            expect(pcm.length / samples_per_frame).toBeGreaterThan(1);
+            expect(pcm.length / samples_per_frame).toBeLessThan(max_frames);
+            expect(pcm.every(Number.isFinite)).toBe(true);
+            expect(pcm.some((sample) => Math.abs(sample) > 0.01)).toBe(true);
+          }
+          const output = await tts("Hello from Phonon.", { speaker_embeddings, temperature: 0 });
+          expect(output.sampling_rate).toBe(24000);
+          expect(output.audio.length % samples_per_frame).toBe(0);
+          expect((await tts("Hello from Phonon.", { speaker_embeddings, temperature: 0 })).audio).toEqual(output.audio);
+        } finally {
+          speaker_embeddings.dispose();
         }
-        expect((await tts(text, { temperature: 0 })).audio).toEqual(output.audio);
       }, MAX_TEST_EXECUTION_TIME);
 
-      it("uses real custom-voice prefixes and recovers from an early stream exit", async () => {
-        const voice = await tts.model.load_voice();
+      it("takes voices as URLs, arrays and tensors, and recovers from an early generator exit", async () => {
+        const url = hub_voice_url("LMDIYE0Oa377Qh6Z");
+        const voice = await hub_voice("LMDIYE0Oa377Qh6Z");
         try {
-          const chunks = await tts.processor("Hello.");
-          for await (const pcm of tts.model.generate_speech({ chunks, speaker_embeddings: voice, temperature: 0 })) {
-            expect(pcm.length).toBe(1920);
+          expect(voice.dims).toEqual([1, 512, 125]);
+          for await (const pcm of tts.model.generate_speech({ chunks: await tts.processor("Hello."), speaker_embeddings: voice, temperature: 0 })) {
+            expect(pcm.length).toBeGreaterThan(0);
             break;
           }
-          const output = await tts(["Hello.", "Goodbye."], { speaker_embeddings: voice, temperature: 0 });
-          expect(output).toHaveLength(2);
-          expect(output.every((audio) => audio.audio.length > 0 && audio.audio.every(Number.isFinite))).toBe(true);
-          expect(voice.data.length).toBeGreaterThan(0);
-        } finally { voice.dispose(); }
-      }, MAX_TEST_EXECUTION_TIME);
-
-      it("loads flat voices from URLs and repo-relative paths", async () => {
-        const path = "voices/LMDIYE0Oa377Qh6Z.bin";
-        const url = `https://huggingface.co/${MODEL_ID}/resolve/main/${path}`;
-        expect((await tts.model.load_voice(path)).dims).toEqual([1, 512, 125]);
-        const outputs = [];
-        for (const speaker_embeddings of [path, url, new URL(url)]) {
-          const output = await tts("Hello.", { speaker_embeddings, temperature: 0 });
-          expect(output.audio.length).toBeGreaterThan(0);
-          expect(output.audio.every(Number.isFinite)).toBe(true);
-          outputs.push(output.audio);
+          const outputs = [];
+          for (const speaker_embeddings of [url, new URL(url), voice, new Float32Array(voice.data)]) {
+            outputs.push((await tts("Hello.", { speaker_embeddings, temperature: 0 })).audio);
+          }
+          for (const audio of outputs.slice(1)) expect(audio).toEqual(outputs[0]);
+          const batch = await tts(["Hello.", "Goodbye."], { speaker_embeddings: voice, temperature: 0 });
+          expect(batch).toHaveLength(2);
+          expect(batch.every(({ audio }) => audio.length > 0 && audio.every(Number.isFinite))).toBe(true);
+        } finally {
+          voice.dispose();
         }
-        expect(outputs[1]).toEqual(outputs[0]);
-        expect(outputs[2]).toEqual(outputs[0]);
       }, MAX_TEST_EXECUTION_TIME);
     });
   });

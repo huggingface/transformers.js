@@ -167,8 +167,8 @@ const output = await transcriber(url, { chunk_length_s: 30, stride_length_s: 5 }
 Text-to-audio generation pipeline using any `AutoModelForTextToWaveform` or `AutoModelForTextToSpectrogram`.
 This pipeline generates an audio file from an input text and optional other conditional inputs.
 
-**Example:** Phonon speech with a custom voice. Omit `speaker_embeddings` to use the checkpoint's default voice.
-To stream audio frames as they are generated, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
+**Example:** Phonon speech with one of the voices in the model repo.
+To receive audio chunk by chunk, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 

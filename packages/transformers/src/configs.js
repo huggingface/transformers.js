@@ -301,6 +301,12 @@ function getNormalizedConfig(config) {
                 encoder_dim_kv: config.head_dim,
             };
             break;
+        case 'gradium_phonon_tts': {
+            // Only the flow model's KV cache is fed back between calls (see `cache_sessions`).
+            const { num_layers, num_heads, head_dim } = /** @type {any} */ (config).phonon?.flow_lm ?? {};
+            init_normalized_config = { num_layers, num_heads, dim_kv: head_dim };
+            break;
+        }
         case 'vision-encoder-decoder':
             // @ts-expect-error TS2339
             const decoderConfig = getNormalizedConfig(config.decoder);
@@ -442,24 +448,6 @@ export function getCacheNames(config, options) {
             names.add(`${pkv_prefix}.${i}.value`);
             names.add(`${pkv_prefix}.${i}.conv_state`);
             names.add(`${pkv_prefix}.${i}.shift_state`);
-        }
-        return names;
-    } else if (config.model_type === 'gradium_phonon_tts') {
-        // Every output fed back into a graph: KV caches, the decoder's convolution states,
-        // and the flow model's latent (which also feeds the decoder).
-        const phonon = /** @type {any} */ (config).phonon;
-        const graph = phonon[options?.session_name];
-        if (!graph) return names;
-        for (let i = 0; i < graph.num_layers; ++i) {
-            names.add(`present.${i}.key`);
-            names.add(`present.${i}.value`);
-        }
-        if (options.session_name === 'flow_lm') {
-            names.add('latent_out');
-        } else {
-            for (const name of Object.keys(graph.conv_states ?? {})) {
-                names.add(name.replace('past_', 'present_'));
-            }
         }
         return names;
     } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {

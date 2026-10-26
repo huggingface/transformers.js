@@ -27,8 +27,8 @@ import { env } from '../env.js';
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
  * @property {Tensor|Float32Array|string|URL} [speaker_embeddings=null] The speaker embeddings (if the model requires it).
- * Phonon voices are flat float32 data in `[1, voice_dim, frames]` order, given as a URL, a path relative to the model repo
- * (e.g. `voices/LMDIYE0Oa377Qh6Z.bin`), an array or a tensor; omit it to use the checkpoint's default voice.
+ * Phonon voices are flat float32 data in `[1, voice_dim, frames]` order, given as a URL (e.g. a `voices/*.bin` file
+ * of the model repo), an array or a tensor.
  * @property {number} [num_inference_steps] The number of denoising steps (if the model supports it).
  * More denoising steps usually lead to higher quality audio but slower inference.
  * @property {number} [speed] The speed of the generated audio (if the model supports it).
@@ -80,8 +80,8 @@ import { env } from '../env.js';
  * // }
  * ```
  *
- * **Example:** Phonon speech with a custom voice. Omit `speaker_embeddings` to use the checkpoint's default voice.
- * To stream audio frames as they are generated, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
+ * **Example:** Phonon speech with one of the voices in the model repo.
+ * To receive audio chunk by chunk, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -212,15 +212,11 @@ export class TextToAudioPipeline
         // @ts-expect-error TS2339
         const { sample_rate, voice_dim } = this.model.config.phonon;
         const texts = Array.isArray(text_inputs) ? text_inputs : [text_inputs];
+        if (!speaker_embeddings) {
+            throw new Error('Speaker embeddings must be provided for Phonon models.');
+        }
+        const embeddings = /** @type {Tensor} */ (await this._prepare_speaker_embeddings(speaker_embeddings, 1));
         const inputs = await Promise.all(texts.map((text) => this.processor(text)));
-        // Paths and URLs (or the default voice) load through the model, so repo-relative voices
-        // follow the model's revision and cache settings. Arrays and tensors take the shared path.
-        const embeddings = /** @type {Tensor} */ (
-            speaker_embeddings == null || typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL
-                ? // @ts-expect-error TS2339
-                  await this.model.load_voice(speaker_embeddings ?? undefined)
-                : await this._prepare_speaker_embeddings(speaker_embeddings, 1)
-        );
         if (embeddings.type !== 'float32' || !embeddings.size || embeddings.size % voice_dim !== 0) {
             throw new Error(`Phonon speaker_embeddings must be float32 data in [1, ${voice_dim}, frames] order.`);
         }
@@ -228,7 +224,7 @@ export class TextToAudioPipeline
 
         const results = [];
         for (const chunks of inputs) {
-            const frames = [];
+            const parts = [];
             // @ts-expect-error TS2339
             const stream = this.model.generate_speech({
                 chunks,
@@ -237,12 +233,12 @@ export class TextToAudioPipeline
                 num_speakers,
                 duration_delta,
             });
-            for await (const frame of stream) frames.push(frame);
-            const audio = new Float32Array(frames.reduce((length, frame) => length + frame.length, 0));
+            for await (const pcm of stream) parts.push(pcm);
+            const audio = new Float32Array(parts.reduce((length, pcm) => length + pcm.length, 0));
             let offset = 0;
-            for (const frame of frames) {
-                audio.set(frame, offset);
-                offset += frame.length;
+            for (const pcm of parts) {
+                audio.set(pcm, offset);
+                offset += pcm.length;
             }
             results.push(new RawAudio(audio, sample_rate));
         }
