@@ -73,6 +73,8 @@ export function createTokenConstraint(
     let stamp = 0;
     let consecutiveWhitespace = 0;
     const tracksJsonWhitespace = responseFormat.type !== 'regex';
+    const eosBytes = tokenizer.data.tokens[tokenizer.data.eosTokenId];
+    const acceptsEos = (current: unknown) => machine.acceptsEnd?.(current, eosBytes) ?? machine.accepting(current);
 
     return {
         vocabSize: tokenizer.data.tokens.length,
@@ -104,7 +106,7 @@ export function createTokenConstraint(
                 return true;
             }
             let allowed = 0;
-            if (machine.accepting(state)) {
+            if (acceptsEos(state)) {
                 setBit(target, tokenizer.data.eosTokenId);
                 allowed++;
             }
@@ -148,7 +150,7 @@ export function createTokenConstraint(
                 throw new RangeError(`Token ${tokenId} is outside the tokenizer vocabulary.`);
             }
             if (tokenId === tokenizer.data.eosTokenId) {
-                if (!machine.accepting(state)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
+                if (!acceptsEos(state)) throw new Error(`Token ${tokenId} does not satisfy the constraint.`);
                 return true;
             }
             let next: unknown;

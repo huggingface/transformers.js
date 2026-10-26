@@ -81,7 +81,7 @@ export function withResponseProtocol(
             case 'thinking': {
                 const close = advanceLiteralSearch(protocol.thinkingClose, state.closeBuffer, byte);
                 if (close.complete === 'after') return afterThinking();
-                if (close.complete === 'before') return transition(afterThinking(), byte);
+                if (close.replay !== undefined) return close.replay.reduce(transition, afterThinking());
                 return { phase: 'thinking', closeBuffer: close.buffer };
             }
             case 'start': {
@@ -100,12 +100,27 @@ export function withResponseProtocol(
             }
         }
     };
+    // A special token must start by advancing a delimiter; any bytes after a completed delimiter
+    // may continue into the payload (`</think>{`), but its first byte may not.
+    const advancesDelimiter = (state: ProtocolState, byte: number): boolean => {
+        const next = transition(state, byte);
+        return next.phase !== 'dead' && (next.phase !== 'structured' || next.state === structured.initial);
+    };
+    const accepting = (state: ProtocolState): boolean =>
+        state.phase === 'finished' || (state.phase === 'structured' && structured.accepting(state.state));
     return {
         initial,
         initialize: (bytes, context) => {
             const start = protocol.startAnchor === undefined ? -1 : lastMatchEnd(protocol.startAnchor.machine, bytes);
             let state: ProtocolState = initial;
             if (start >= 0) for (let i = start; i < bytes.length; ++i) state = transition(state, bytes[i]);
+            // Without a generation prompt, the last anchor opens an earlier turn that has since closed.
+            if (
+                state.phase === 'dead' &&
+                protocol.contentClose !== undefined &&
+                lastMatchEnd(protocol.contentClose.machine, bytes.subarray(start)) >= 0
+            )
+                state = initial;
             if (state.phase === 'dead')
                 throw new Error('The prompt prefill does not satisfy the response protocol or constraint.');
             if (context?.enable_thinking !== false) return state;
@@ -123,8 +138,15 @@ export function withResponseProtocol(
         },
         transition,
         viable: (state) => state.phase !== 'dead',
-        accepting: (state) =>
-            state.phase === 'finished' || (state.phase === 'structured' && structured.accepting(state.state)),
+        accepting,
+        // The end token may itself complete the content closer, e.g. Qwen3's `\s*<|im_end|>` once a
+        // newline has started it.
+        acceptsEnd: (state, bytes) => {
+            if (accepting(state)) return true;
+            let next = state;
+            for (const byte of bytes) next = transition(next, byte);
+            return next.phase === 'finished' || (next.phase === 'ending' && next.progress.accepted);
+        },
         allowsSpecial: (state, next, bytes) => {
             if (bytes.length === 0) return false;
             if (state.phase === 'thinking') {
@@ -134,10 +156,11 @@ export function withResponseProtocol(
             if (state.phase === 'start') {
                 // Only protocol branches justify special tokens, never the payload branch.
                 let candidate: ProtocolState = { ...state, structured: undefined };
+                if (!advancesDelimiter(candidate, bytes[0])) return false;
                 for (const byte of bytes) candidate = transition(candidate, byte);
                 return candidate.phase !== 'dead';
             }
-            return state.phase === 'content' || state.phase === 'ending';
+            return state.phase === 'ending' || advancesDelimiter(state, bytes[0]);
         },
         stringCapacity: (state) =>
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
@@ -172,14 +195,18 @@ function advanceLiteralSearch(
     literals: Uint8Array[],
     buffer: Uint8Array,
     byte: number,
-): { buffer: Uint8Array; complete?: 'before' | 'after' } {
-    if (
-        literals.some((literal) => bytesEqual(buffer, literal)) &&
-        !literals.some((literal) => startsWithBytes(literal, appendByte(buffer, byte)))
-    ) {
-        return { buffer: new Uint8Array(), complete: 'before' };
-    }
+): { buffer: Uint8Array; complete?: 'after'; replay?: Uint8Array } {
     const candidate = appendByte(buffer, byte);
+    if (!literals.some((literal) => startsWithBytes(literal, candidate))) {
+        // A longer alternative stopped matching: keep the longest delimiter it already passed
+        // (`</think>` of `</think>\n\n`) and replay the bytes after it.
+        const completed = literals.reduce<Uint8Array | undefined>(
+            (best, literal) =>
+                startsWithBytes(buffer, literal) && literal.length > (best?.length ?? 0) ? literal : best,
+            undefined,
+        );
+        if (completed !== undefined) return { buffer: new Uint8Array(), replay: candidate.subarray(completed.length) };
+    }
     let next = new Uint8Array();
     for (let start = 0; start < candidate.length; ++start) {
         const suffix = candidate.subarray(start);
