@@ -35,13 +35,7 @@ A processor tracks the state of one generation. Create a new `StructuredOutputPr
 
 When the tokenizer defines `response_template.fields.reasoning_content` and `response_template.fields.content`, thinking is treated as an optional region before the answer. The processor allows either the thinking opener or constrained content at the start of the response, leaves the thinking body unconstrained, and applies the requested constraint when final content begins. The prompt is replayed from the last `start_anchor` (or `start_anchor_pattern`) match, so prefilled thinking blocks and content openers are taken into account. Up to four whitespace characters are allowed between a closed thinking block (or content opener) and the constrained answer, matching templates that emit `</think>\n\n` before the answer.
 
-If the prompt was rendered with thinking disabled, pass the same setting to the processor so the constraint applies to the first content token:
-
-```js
-const processor = new StructuredOutputProcessor(tokenizer, responseFormat, { enable_thinking: false });
-```
-
-Without `enable_thinking: false`, thinking stays optional. Prompt prefills are validated: completed thinking blocks are accepted, but invalid answer prefills, and unfinished thinking blocks with thinking disabled, raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
+The prompt decides whether thinking is possible: a template that renders disabled thinking as an empty, closed thinking block (Qwen3's `<think>\n\n</think>\n\n`) makes the constraint apply from the first generated token. Prompt prefills are validated: completed thinking blocks are accepted, and invalid answer prefills raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
 
 Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine. If the response template uses anything else, the processor logs a warning once and falls back to constraining the response from its first token.
 

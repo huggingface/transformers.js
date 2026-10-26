@@ -1,2 +1,2 @@
 export { StructuredOutputProcessor } from './StructuredOutputProcessor';
-export type { ResponseFormat, StructuredOutputOptions } from './StructuredOutputProcessor';
+export type { ResponseFormat } from './StructuredOutputProcessor';

@@ -29,7 +29,7 @@ type ResponseFormat =
 
 export type TokenConstraint = {
     vocabSize: number;
-    initializePrompt(tokenIds: readonly bigint[], context?: { enable_thinking?: boolean }): void;
+    initializePrompt(tokenIds: readonly bigint[]): void;
     fillMask(target: Uint32Array): boolean;
     commit(tokenId: number): boolean;
     repeatedWhitespace(): { tokenIds: readonly number[]; count: number } | undefined;
@@ -78,7 +78,7 @@ export function createTokenConstraint(
 
     return {
         vocabSize: tokenizer.data.tokens.length,
-        initializePrompt(tokenIds, context) {
+        initializePrompt(tokenIds) {
             if (machine.initialize === undefined) return;
             const promptIds = protocol?.startAnchor === undefined ? [] : tokenIds;
             const length = promptIds.reduce(
@@ -92,7 +92,7 @@ export function createTokenConstraint(
                 bytes.set(token, offset);
                 offset += token.length;
             }
-            state = machine.initialize(bytes, context);
+            state = machine.initialize(bytes);
         },
         fillMask(target) {
             const words = Math.ceil(tokenizer.data.tokens.length / 32);

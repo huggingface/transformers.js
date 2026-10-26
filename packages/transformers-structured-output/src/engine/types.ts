@@ -4,7 +4,7 @@ export type TokenizerSource = object | ((...args: unknown[]) => unknown);
 
 export interface ConstraintState<State> {
     readonly initial: State;
-    initialize?(bytes: Uint8Array, context?: { enable_thinking?: boolean }): State;
+    initialize?(bytes: Uint8Array): State;
     transition(state: State, byte: number): State;
     viable(state: State): boolean;
     accepting(state: State): boolean;

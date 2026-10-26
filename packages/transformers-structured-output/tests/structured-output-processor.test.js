@@ -209,14 +209,6 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
   });
 
-  it("applies constraints from the first token when thinking is disabled", () => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "json_object" }, { enable_thinking: false });
-    const scores = logits();
-    processor([[0n]], scores);
-    expect(isAllowed(scores, "<".charCodeAt(0))).toBe(false);
-    expect(isAllowed(scores, "{".charCodeAt(0))).toBe(true);
-  });
-
   it("waits for an explicit content opener after thinking", async () => {
     const explicitContentTokenizer = {
       ...thinkingTokenizer,
@@ -387,8 +379,8 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(scores, "<".charCodeAt(0))).toBe(false);
   });
 
-  it("replays completed disabled-thinking prefills before applying constraints", () => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: false });
+  it("replays a prefilled empty thinking block before applying constraints", () => {
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
     const input = Array.from(new TextEncoder().encode("<assistant><think>\n</think>"), BigInt);
     const scores = logits();
     processor([input], scores);
@@ -396,8 +388,8 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(scores, "<".charCodeAt(0))).toBe(false);
   });
 
-  it.each([false, true])("ignores prompt framing whitespace after a completed thinking block (thinking=%s)", (enable_thinking) => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking });
+  it("ignores prompt framing whitespace after a completed thinking block", () => {
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
     const input = Array.from(new TextEncoder().encode("<assistant><think>\n\n</think>\n\n"), BigInt);
     const scores = logits();
     processor([input], scores);
@@ -430,12 +422,6 @@ describe("StructuredOutputProcessor", () => {
 
     const invalid = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
     expect(() => invalid([Array.from(encoder.encode("<assistant><think></think>\n\nx"), BigInt)], logits())).toThrow("prompt prefill");
-  });
-
-  it("rejects unfinished thinking prefills when thinking is explicitly disabled", () => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: false });
-    const input = Array.from(new TextEncoder().encode("<assistant><think>"), BigInt);
-    expect(() => processor([input], logits())).toThrow("unfinished thinking");
   });
 
   it("does not share close-plus-content masks across different grammars", () => {

@@ -110,7 +110,7 @@ export function withResponseProtocol(
         state.phase === 'finished' || (state.phase === 'structured' && structured.accepting(state.state));
     return {
         initial,
-        initialize: (bytes, context) => {
+        initialize: (bytes) => {
             const start = protocol.startAnchor === undefined ? -1 : lastMatchEnd(protocol.startAnchor.machine, bytes);
             let state: ProtocolState = initial;
             if (start >= 0) for (let i = start; i < bytes.length; ++i) state = transition(state, bytes[i]);
@@ -123,18 +123,7 @@ export function withResponseProtocol(
                 state = initial;
             if (state.phase === 'dead')
                 throw new Error('The prompt prefill does not satisfy the response protocol or constraint.');
-            if (context?.enable_thinking !== false) return state;
-            if (
-                state.phase === 'thinking' ||
-                (state.phase === 'start' && state.structured === undefined && state.content === undefined)
-            ) {
-                throw new Error('Thinking is disabled but the prompt prefills an unfinished thinking region.');
-            }
-            if (state.phase !== 'start') return state;
-            if (state.structured !== undefined) return payload(state.structured);
-            if (state.content !== undefined)
-                return { phase: 'content', progress: state.content, opener: protocol.contentOpen! };
-            throw new Error('The prompt is incompatible with disabled thinking.');
+            return state;
         },
         transition,
         viable: (state) => state.phase !== 'dead',
