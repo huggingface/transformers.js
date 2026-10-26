@@ -256,6 +256,27 @@ export default () => {
           },
           MAX_TEST_EXECUTION_TIME,
         );
+        it(
+          "transcribe w/ return_timestamps='word' keeps consecutive punctuation with its word",
+          async () => {
+            // Regression test: PUNCTUATION_ONLY_REGEX had the `g` flag, so RegExp.test() kept
+            // `lastIndex` between calls and returned false for the second of two consecutive
+            // punctuation-only tokens. In this clip the model emits " done" + "!" + "!", and
+            // "!!" came out as a separate word instead of " done!!".
+            const audio = await load_cached_audio("whisper_2");
+            const options = { return_timestamps: "word", chunk_length_s: 30 };
+
+            const output = await pipe(audio, options);
+            expect(output.chunks.some(({ text }) => text === "!!")).toBe(false);
+            const done = output.chunks.find(({ text }) => text === " done!!");
+            expect(done).toBeDefined();
+            expect(done.timestamp).toBeCloseToNested([47.52, 47.98], 1);
+
+            // Running the same transcription again must give the same result.
+            expect(await pipe(audio, options)).toEqual(output);
+          },
+          MAX_TEST_EXECUTION_TIME,
+        );
       });
 
       afterAll(async () => {
