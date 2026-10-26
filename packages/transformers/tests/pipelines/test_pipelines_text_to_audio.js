@@ -1,4 +1,4 @@
-import { pipeline, TextToAudioPipeline } from "../../src/transformers.js";
+import { pipeline, TextToAudioPipeline, ModelRegistry, Tensor } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -33,5 +33,31 @@ export default () => {
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Text to Audio (SpeechT5)", () => {
+    it(
+      "includes the processor in the pipeline files",
+      async () => {
+        const files = await ModelRegistry.get_pipeline_files(PIPELINE_ID, "Xenova/speecht5_tts", DEFAULT_MODEL_OPTIONS);
+        expect(files).toContain("preprocessor_config.json");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it("returns the vocoder's 1D waveform as audio", async () => {
+      const waveform = new Tensor("float32", Float32Array.from({ length: 256 }, (_, i) => i / 256), [256]);
+      const model = {
+        config: { model_type: "speecht5" },
+        generate_speech: async () => ({ waveform }),
+      };
+      const tokenizer = () => ({ input_ids: new Tensor("int64", new BigInt64Array([4n, 5n, 2n]), [1, 3]) });
+      const processor = { feature_extractor: { config: { sampling_rate: 16000 } } };
+      const pipe = new TextToAudioPipeline({ task: PIPELINE_ID, model, tokenizer, processor, vocoder: {} });
+
+      const output = await pipe("hello", { speaker_embeddings: new Float32Array(512) });
+      expect(output.audio).toEqual(waveform.data);
+      expect(output.sampling_rate).toEqual(16000);
+    });
   });
 };

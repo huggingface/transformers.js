@@ -281,6 +281,7 @@ export class TextToAudioPipeline
         const { waveform } = await this.model.generate_speech(input_ids, speaker_embeddings, { vocoder: this.vocoder });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        return this._postprocess_waveform(text_inputs, waveform, sampling_rate);
+        // The vocoder returns a 1D waveform for the single generated sequence.
+        return this._postprocess_waveform(text_inputs, waveform.view(1, -1), sampling_rate);
     }
 }
