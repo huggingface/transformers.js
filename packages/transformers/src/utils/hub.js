@@ -109,6 +109,23 @@ export function getFetchOptions(env) {
 }
 
 /**
+ * Builds the options used by {@link buildResourcePaths} from loading options and a resolved environment.
+ *
+ * @param {{ cache_dir?: string|null, revision?: string }} options The loading options.
+ * @param {import('../env.js').TransformersEnvironment} env The resolved environment.
+ * @returns {ModelLoadingOptions} Options for locating model files.
+ */
+export function getPathOptions(options, env) {
+    return {
+        cache_dir: options.cache_dir ?? null,
+        revision: options.revision ?? 'main',
+        localModelPath: env.localModelPath,
+        remoteHost: env.remoteHost,
+        remotePathTemplate: env.remotePathTemplate,
+    };
+}
+
+/**
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
@@ -533,13 +550,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     const revision = options.revision ?? 'main';
     const cacheDir = options.cache_dir ?? null;
     const localFilesOnly = options.local_files_only ?? false;
-    const pathOptions = {
-        cache_dir: cacheDir,
-        revision,
-        localModelPath: env.localModelPath,
-        remoteHost: env.remoteHost,
-        remotePathTemplate: env.remotePathTemplate,
-    };
+    const pathOptions = getPathOptions(options, env);
     const loadingOptions = {
         allowLocalModels: env.allowLocalModels,
         allowRemoteModels: env.allowRemoteModels,

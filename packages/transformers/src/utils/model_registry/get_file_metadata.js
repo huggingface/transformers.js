@@ -4,7 +4,14 @@
 
 import { resolveEnv } from '../../env.js';
 import { getCache } from '../cache.js';
-import { buildResourcePaths, checkCachedResource, getFetchHeaders, getFile } from '../hub.js';
+import {
+    buildResourcePaths,
+    checkCachedResource,
+    getFetchHeaders,
+    getFetchOptions,
+    getFile,
+    getPathOptions,
+} from '../hub.js';
 import { handleError, isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 
@@ -58,20 +65,8 @@ export function get_file_metadata(path_or_repo_id, filename, options = {}) {
 
 async function _get_file_metadata(path_or_repo_id, filename, options) {
     const env = resolveEnv(options.env);
-    const fetchOptions = {
-        useFS: env.useFS,
-        fetch: env.fetch,
-        version: env.version,
-        hfToken: env.hfToken,
-        remoteHost: env.remoteHost,
-    };
-    const pathOptions = {
-        cache_dir: options.cache_dir ?? null,
-        revision: options.revision ?? 'main',
-        localModelPath: env.localModelPath,
-        remoteHost: env.remoteHost,
-        remotePathTemplate: env.remotePathTemplate,
-    };
+    const fetchOptions = getFetchOptions(env);
+    const pathOptions = getPathOptions(options, env);
     /** @type {import('../cache.js').CacheInterface | null} */
     const cache = await getCache(options?.cache_dir, { env: options.env });
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(

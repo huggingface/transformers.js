@@ -6,7 +6,7 @@
 
 import { getCache } from '../cache.js';
 import { resolveEnv } from '../../env.js';
-import { buildResourcePaths, checkCachedResource } from '../hub.js';
+import { buildResourcePaths, checkCachedResource, getPathOptions } from '../hub.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
 
@@ -37,13 +37,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 async function clear_files_from_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir, { env: options.env });
     const env = resolveEnv(options.env);
-    const pathOptions = {
-        cache_dir: options.cache_dir ?? null,
-        revision: options.revision ?? 'main',
-        localModelPath: env.localModelPath,
-        remoteHost: env.remoteHost,
-        remotePathTemplate: env.remotePathTemplate,
-    };
+    const pathOptions = getPathOptions(options, env);
 
     if (!cache) {
         return {

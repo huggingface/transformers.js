@@ -1,6 +1,6 @@
 import { getCache } from '../cache.js';
 import { resolveEnv } from '../../env.js';
-import { buildResourcePaths, checkCachedResource } from '../hub.js';
+import { buildResourcePaths, checkCachedResource, getPathOptions } from '../hub.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
 
@@ -27,13 +27,7 @@ import { get_pipeline_files } from './get_pipeline_files.js';
 async function check_files_cache(modelId, files, options = {}) {
     const cache = await getCache(options?.cache_dir, { env: options.env });
     const env = resolveEnv(options.env);
-    const pathOptions = {
-        cache_dir: options.cache_dir ?? null,
-        revision: options.revision ?? 'main',
-        localModelPath: env.localModelPath,
-        remoteHost: env.remoteHost,
-        remotePathTemplate: env.remotePathTemplate,
-    };
+    const pathOptions = getPathOptions(options, env);
 
     if (!cache) {
         const fileStatuses = files.map((filename) => ({ file: filename, cached: false }));
@@ -64,13 +58,7 @@ async function is_file_cached(modelId, filename, options = {}) {
     const cache = await getCache(options?.cache_dir, { env: options.env });
     if (!cache) return false;
     const env = resolveEnv(options.env);
-    const pathOptions = {
-        cache_dir: options.cache_dir ?? null,
-        revision: options.revision ?? 'main',
-        localModelPath: env.localModelPath,
-        remoteHost: env.remoteHost,
-        remotePathTemplate: env.remotePathTemplate,
-    };
+    const pathOptions = getPathOptions(options, env);
     const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, pathOptions, cache);
     return !!(await checkCachedResource(cache, localPath, proposedCacheKey));
 }
