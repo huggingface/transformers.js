@@ -3,7 +3,8 @@ import { AutoImageProcessor, Lfm3VlImageProcessor, RawImage } from "../../../src
 import { MAX_PROCESSOR_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "../../init.js";
 
 export default () => {
-  describe("Lfm3VlImageProcessor", () => {
+  // TODO: Enable once onnx-community/LFM3-VL-2B-ONNX is public.
+  describe.skip("Lfm3VlImageProcessor", () => {
     const model_id = "onnx-community/LFM3-VL-2B-ONNX";
 
     /** @type {Lfm3VlImageProcessor} */
