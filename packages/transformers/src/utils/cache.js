@@ -2,7 +2,6 @@ import { apis, env, resolveEnv } from '../env.js';
 import { FileCache } from './cache/FileCache.js';
 import { logger } from './logger.js';
 import { CrossOriginStorage } from './cache/CrossOriginStorageCache.js';
-import { getFetchHeaders } from './hub/utils.js';
 
 /**
  * @typedef {Object} CacheInterface
@@ -20,7 +19,6 @@ import { getFetchHeaders } from './hub/utils.js';
  * @param {string|null} [file_cache_dir=null] Deprecated per-call cache directory. Takes precedence over `options.env.cacheDir` and global `env.cacheDir`.
  * @param {Object} [options] Cache lookup options.
  * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
- * @param {boolean} [options.allowRemote] Whether cache lookup may perform remote requests.
  * @returns {Promise<CacheInterface | null>}
  */
 export async function getCache(file_cache_dir = null, options = {}) {
@@ -46,16 +44,7 @@ export async function getCache(file_cache_dir = null, options = {}) {
     }
 
     if (!cache && env.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
-        cache = new CrossOriginStorage({
-            fetch: resolvedEnv.fetch,
-            getHeaders: (url) =>
-                getFetchHeaders(url, {
-                    version: resolvedEnv.version,
-                    hfToken: resolvedEnv.hfToken,
-                    remoteHost: resolvedEnv.remoteHost,
-                }),
-            allowNetwork: (options.allowRemote ?? true) && resolvedEnv.allowRemoteModels,
-        });
+        cache = new CrossOriginStorage({ fetch: resolvedEnv.fetch });
     }
 
     if (!cache && env.useBrowserCache) {

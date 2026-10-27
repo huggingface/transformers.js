@@ -1,5 +1,7 @@
 /// <reference path="./cross-origin-storage.d.ts" />
 
+import { env } from '../../env.js';
+
 const HASH_ALGORITHM = 'SHA-256';
 
 /**
@@ -29,14 +31,10 @@ export class CrossOriginStorage {
 
     /**
      * @param {Object} [options]
-     * @param {(input: string | URL, init?: any) => Promise<any>} [options.fetch=globalThis.fetch] Fetch implementation used for LFS pointer lookups.
-     * @param {(url: string) => Headers|undefined} [options.getHeaders] Request headers for LFS pointer lookups.
-     * @param {boolean} [options.allowNetwork=true] Whether pointer lookups may access the network.
+     * @param {(input: string | URL, init?: any) => Promise<any>} [options.fetch] Fetch implementation used for LFS pointer lookups. Defaults to `env.fetch`.
      */
-    constructor({ fetch = globalThis.fetch?.bind(globalThis), getHeaders = undefined, allowNetwork = true } = {}) {
-        this.fetch = fetch;
-        this.getHeaders = getHeaders;
-        this.allowNetwork = allowNetwork;
+    constructor(options = {}) {
+        this.fetch = options.fetch ?? env.fetch;
     }
 
     /**
@@ -234,14 +232,14 @@ export class CrossOriginStorage {
      * @returns {Promise<string|null>} The hex-encoded SHA-256 hash, or `null` if unavailable.
      */
     _getLfsFileHash = async (url) => {
-        if (!this.allowNetwork || !this.fetch || !url.includes('/resolve/')) {
+        if (!url.includes('/resolve/')) {
             return null;
         }
 
         const rawUrl = url.replace('/resolve/', '/raw/');
 
         try {
-            const text = await this.fetch(rawUrl, { headers: this.getHeaders?.(rawUrl) }).then((r) => r.text());
+            const text = await this.fetch(rawUrl).then((r) => r.text());
             const match = text.match(/^oid sha256:([0-9a-f]+)$/m);
             return match ? match[1] : null;
         } catch {

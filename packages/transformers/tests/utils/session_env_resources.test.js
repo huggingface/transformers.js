@@ -24,8 +24,8 @@ describe("Session-scoped resource loading", () => {
       globalThis.caches = originalCaches;
     });
 
-    it("should not fetch an LFS pointer when remote access is disabled", async () => {
-      const fetch = jest.fn();
+    it("should pass the session fetch to cross-origin storage", async () => {
+      const fetch = jest.fn(async () => new Response("version https://git-lfs.github.com/spec/v1\noid sha256:abc123\n"));
       const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
       const originalExperimental = env.experimental_useCrossOriginStorage;
       const originalUseBrowserCache = env.useBrowserCache;
@@ -42,13 +42,10 @@ describe("Session-scoped resource loading", () => {
       env.useCustomCache = false;
 
       try {
-        const cache = await getCache(null, {
-          env: { fetch, allowRemoteModels: false },
-          allowRemote: true,
-        });
+        const cache = await getCache(null, { env: { fetch } });
 
         await expect(cache.match("https://huggingface.co/org/model/resolve/main/model.onnx")).resolves.toBeUndefined();
-        expect(fetch).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledWith("https://huggingface.co/org/model/raw/main/model.onnx");
       } finally {
         env.experimental_useCrossOriginStorage = originalExperimental;
         env.useBrowserCache = originalUseBrowserCache;
@@ -68,7 +65,7 @@ describe("Session-scoped resource loading", () => {
 
       await cache.match("https://huggingface.co/org/model/resolve/main/model.onnx");
 
-      expect(fetch).toHaveBeenCalledWith("https://huggingface.co/org/model/raw/main/model.onnx", expect.any(Object));
+      expect(fetch).toHaveBeenCalledWith("https://huggingface.co/org/model/raw/main/model.onnx");
     });
   });
 

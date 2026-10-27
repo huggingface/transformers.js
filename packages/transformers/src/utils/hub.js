@@ -582,7 +582,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
             name: path_or_repo_id,
             file: filename,
         });
-        pending = getCache(cacheDir, { env: options.env, allowRemote: !localFilesOnly }).then((cache) => {
+        pending = getCache(cacheDir, { env: options.env }).then((cache) => {
             const paths = buildResourcePaths(path_or_repo_id, filename, pathOptions, cache);
             return loadResourceFile(path_or_repo_id, filename, {
                 fatal,

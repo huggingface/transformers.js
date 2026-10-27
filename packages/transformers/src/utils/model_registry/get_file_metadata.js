@@ -73,10 +73,7 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
         remotePathTemplate: env.remotePathTemplate,
     };
     /** @type {import('../cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir, {
-        env: options.env,
-        allowRemote: !options.local_files_only,
-    });
+    const cache = await getCache(options?.cache_dir, { env: options.env });
     const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
         path_or_repo_id,
         filename,
