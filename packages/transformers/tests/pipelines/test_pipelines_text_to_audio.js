@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import { pipeline, TextToAudioPipeline, ModelRegistry, Tensor } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -35,6 +36,14 @@ export default () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 
+  it.each(["vits", "musicgen", "supertonic"])("dispatches %s by model type when a processor is present", async (model_type) => {
+    const pipe = new TextToAudioPipeline({ model: { config: { model_type } }, processor: {} });
+    const method = model_type === "supertonic" ? "_call_supertonic" : "_call_text_to_waveform";
+    const call = jest.spyOn(pipe, method).mockResolvedValue("audio");
+    expect(await pipe("Hello.", {})).toBe("audio");
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
   describe("Text to Audio (SpeechT5)", () => {
     it(
       "includes the processor in the pipeline files",
@@ -46,7 +55,11 @@ export default () => {
     );
 
     it("returns the vocoder's 1D waveform as audio", async () => {
-      const waveform = new Tensor("float32", Float32Array.from({ length: 256 }, (_, i) => i / 256), [256]);
+      const waveform = new Tensor(
+        "float32",
+        Float32Array.from({ length: 256 }, (_, i) => i / 256),
+        [256],
+      );
       const model = {
         config: { model_type: "speecht5" },
         generate_speech: async () => ({ waveform }),

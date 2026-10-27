@@ -4,7 +4,7 @@
 
 import { Pipeline } from './_base.js';
 
-import { Tensor } from '../utils/tensor.js';
+import { Tensor, cat } from '../utils/tensor.js';
 import { RawAudio } from '../utils/audio.js';
 import { logger } from '../utils/logger.js';
 
@@ -33,8 +33,7 @@ import { env } from '../env.js';
  * More denoising steps usually lead to higher quality audio but slower inference.
  * @property {number} [speed] The speed of the generated audio (if the model supports it).
  * @property {number} [temperature] Phonon flow noise variance (as in Python transformers); 0 = deterministic.
- * @property {number} [num_speakers] Phonon speaker conditioning index (`0 | 1 | 2`), not a count. Defaults to the model config.
- * @property {number} [duration_delta] Phonon duration conditioning. Defaults to the model config.
+ * @property {number} [max_new_tokens] Maximum audio frames per Phonon text chunk.
  *
  * @typedef {TextToAudioPipelineConstructorArgs & TextToAudioPipelineCallback & Disposable} TextToAudioPipelineType
  */
@@ -81,7 +80,7 @@ import { env } from '../env.js';
  * ```
  *
  * **Example:** Phonon speech with one of the voices in the model repo.
- * To receive audio chunk by chunk, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
+ * For direct use, prepare prompts with `PocketTTSProcessor`, then call `model.generate()` to get `audio_values`.
  * ```javascript
  * import { pipeline } from '@huggingface/transformers';
  *
@@ -163,16 +162,15 @@ export class TextToAudioPipeline
     }
 
     async _call(text_inputs, options) {
-        if (this.model.config.model_type === 'gradium_phonon_tts') {
-            return this._call_phonon(text_inputs, options);
-        }
-        // If this.processor is not set, we are using an `AutoModelForTextToWaveform` model
-        if (this.processor) {
-            return this._call_text_to_spectrogram(text_inputs, options);
-        } else if (this.model.config.model_type === 'supertonic') {
-            return this._call_supertonic(text_inputs, options);
-        } else {
-            return this._call_text_to_waveform(text_inputs);
+        switch (this.model.config.model_type) {
+            case 'gradium_phonon_tts':
+                return this._call_phonon(text_inputs, options);
+            case 'speecht5':
+                return this._call_text_to_spectrogram(text_inputs, options);
+            case 'supertonic':
+                return this._call_supertonic(text_inputs, options);
+            default:
+                return this._call_text_to_waveform(text_inputs);
         }
     }
 
@@ -208,39 +206,46 @@ export class TextToAudioPipeline
      * @param {TextToAudioPipelineOptions} [options]
      * @private
      */
-    async _call_phonon(text_inputs, { speaker_embeddings, temperature, num_speakers, duration_delta } = {}) {
-        // @ts-expect-error TS2339
-        const { sample_rate, voice_dim } = this.model.config.phonon;
-        const texts = Array.isArray(text_inputs) ? text_inputs : [text_inputs];
-        if (!speaker_embeddings) {
-            throw new Error('Speaker embeddings must be provided for Phonon models.');
+    async _call_phonon(text_inputs, { speaker_embeddings, temperature, max_new_tokens } = {}) {
+        const model =
+            /** @type {import('../models/gradium_phonon_tts/modeling_gradium_phonon_tts.js').GradiumPhononTTSForConditionalGeneration} */ (
+                this.model
+            );
+        const processor = /** @type {import('../models/pocket_tts/processing_pocket_tts.js').PocketTTSProcessor} */ (
+            /** @type {unknown} */ (this.processor)
+        );
+        const { audio_prompt_dim } = /** @type {any} */ (model.config);
+        if (!speaker_embeddings) throw new Error('Speaker embeddings must be provided for Phonon models.');
+        const embeddings = await this._prepare_speaker_embeddings(speaker_embeddings, 1);
+        if (embeddings.type !== 'float32' || !embeddings.size || embeddings.size % audio_prompt_dim !== 0) {
+            throw new Error(
+                `Phonon speaker_embeddings must be float32 data in [1, ${audio_prompt_dim}, frames] order.`,
+            );
         }
-        const embeddings = /** @type {Tensor} */ (await this._prepare_speaker_embeddings(speaker_embeddings, 1));
-        const inputs = await Promise.all(texts.map((text) => this.processor(text)));
-        if (embeddings.type !== 'float32' || !embeddings.size || embeddings.size % voice_dim !== 0) {
-            throw new Error(`Phonon speaker_embeddings must be float32 data in [1, ${voice_dim}, frames] order.`);
-        }
-        const voice = embeddings.view(1, voice_dim, -1);
-
+        // Voice files use channel-first storage; upstream accepts [frames, audio_prompt_dim].
+        const voice = embeddings.view(audio_prompt_dim, -1).transpose(1, 0);
         const results = [];
-        for (const chunks of inputs) {
+        for (const text of Array.isArray(text_inputs) ? text_inputs : [text_inputs]) {
             const parts = [];
-            // @ts-expect-error TS2339
-            const stream = this.model.generate_speech({
-                chunks,
-                speaker_embeddings: voice,
-                temperature,
-                num_speakers,
-                duration_delta,
-            });
-            for await (const pcm of stream) parts.push(pcm);
-            const audio = new Float32Array(parts.reduce((length, pcm) => length + pcm.length, 0));
-            let offset = 0;
-            for (const pcm of parts) {
-                audio.set(pcm, offset);
-                offset += pcm.length;
+            for (const chunk of processor.split_text(text)) {
+                const prompt = processor.apply_chat_template(
+                    [{ role: 'user', content: [{ type: 'audio' }, { type: 'text', text: chunk }] }],
+                    { add_generation_prompt: true },
+                );
+                const inputs = await processor(prompt, { audio_prompt_latents: [voice] });
+                const { audio_values } = await model.generate({
+                    ...inputs,
+                    temperature,
+                    max_new_tokens,
+                });
+                parts.push(audio_values.view(-1));
             }
-            results.push(new RawAudio(audio, sample_rate));
+            results.push(
+                new RawAudio(
+                    /** @type {Float32Array} */ (cat(parts).data),
+                    processor.config.feature_extractor.sampling_rate,
+                ),
+            );
         }
         return Array.isArray(text_inputs) ? results : results[0];
     }

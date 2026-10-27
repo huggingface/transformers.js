@@ -121,8 +121,9 @@ export const MODEL_SESSION_CONFIG = {
         }),
     },
     [MODEL_TYPES.GradiumPhononTTS]: {
-        sessions: () => ({ flow_lm: 'flow_lm', mimi_decoder: 'mimi_decoder' }),
-        cache_sessions: { flow_lm: true },
+        sessions: (config, options) => ({ model: options.model_file_name ?? 'model', mimi_decoder: 'mimi_decoder' }),
+        cache_sessions: { model: true },
+        optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Chatterbox]: {
         sessions: () => ({

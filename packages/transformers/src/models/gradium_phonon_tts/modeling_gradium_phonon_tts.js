@@ -1,198 +1,121 @@
 /**
  * @module models
  */
-
-import { PreTrainedModel } from '../modeling_utils.js';
+import { PreTrainedModel, addPastKeyValues, getPastKeyValues } from '../modeling_utils.js';
 import { Tensor, full, randn } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
 import { logger } from '../../utils/logger.js';
 
-const i64 = (values, dims) => new Tensor('int64', BigInt64Array.from(values, BigInt), dims);
-const dispose_state = (state) => {
-    for (const tensor of Object.values(state ?? {})) tensor.dispose();
-};
+/** Base class for Gradium Phonon TTS models. */
+export class GradiumPhononTTSPreTrainedModel extends PreTrainedModel {}
 
-function empty_cache({ num_layers, num_heads, head_dim }) {
-    return Object.fromEntries(
-        Array.from({ length: num_layers }, (_, i) =>
-            ['key', 'value'].map((key) => [`past_key_values.${i}.${key}`, full([1, num_heads, 0, head_dim], 0)]),
-        ).flat(),
-    );
-}
-
-// Feed the flow model's present KV outputs back under the next step's past input names.
-function next_state(outputs) {
-    return Object.fromEntries(
-        Object.entries(outputs)
-            .filter(([name]) => name.startsWith('present.'))
-            .map(([name, value]) => [name.replace('present.', 'past_key_values.'), value]),
-    );
-}
-
-/**
- * The Phonon flow model and audio decoder. The flow model generates one latent per 80 ms frame,
- * then the decoder turns all latents of a chunk into 24 kHz PCM in a single call. Unlike Python,
- * which returns latents for the processor to decode, this returns PCM directly (without end-of-pause trimming).
- * Hub decoder suffixes identify the variant: `mimi_decoder_q4.onnx` is fp32,
- * while `mimi_decoder_q4f16.onnx` is fp16 (only the flow model is quantized).
- */
-export class GradiumPhononTTSForConditionalGeneration extends PreTrainedModel {
-    // Python keeps these as config values; the checkpoint stores them under `phonon.conditions`.
-    get default_conditions() {
-        // @ts-expect-error TS2339
-        const { num_speakers, duration_delta } = this.config.phonon.conditions;
-        return { num_speakers: Number(num_speakers.default), duration_delta: Number(duration_delta.default) };
-    }
-
-    async _run_flow(past, { text = [], voice = null, latent = null, noise = null, num_speakers, duration_delta }) {
-        // @ts-expect-error TS2339
-        const cfg = this.config.phonon;
-        const inputs = {
-            text_ids: i64(text, [1, text.length]),
-            voice_latents: voice ?? full([1, cfg.voice_dim, 0], 0),
-            latent: latent ?? full([1, 0, cfg.latent_dim], 0),
-            noise: noise ?? full([1, cfg.latent_dim], 0),
-            num_speakers: i64([num_speakers], [1]),
-            duration_delta: full([1], duration_delta),
-        };
-        try {
-            return await sessionRun(this.sessions.flow_lm, { ...inputs, ...past });
-        } finally {
-            // The voice and latent belong to the caller; everything else (including noise) is consumed here.
-            for (const value of Object.values(inputs)) {
-                if (value !== voice && value !== latent) value.dispose();
-            }
-        }
-    }
-
-    // Conditions the flow model on a voice. The returned prefix is owned and freed by `generate_speech`.
-    async _prepare_voice(voice) {
-        // @ts-expect-error TS2339
-        const cache = empty_cache(this.config.phonon.flow_lm);
-        try {
-            const outputs = await this._run_flow(cache, { voice, ...this.default_conditions });
-            outputs.latent_out.dispose();
-            outputs.eos_logit.dispose();
-            return next_state(outputs);
-        } finally {
-            dispose_state(cache);
-        }
-    }
-
+/** Gradium Phonon speech generation from text and precomputed voice latents. */
+export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPreTrainedModel {
     /**
-     * Generate speech for prepared text chunks as 24 kHz PCM, one waveform per chunk.
+     * Generate a waveform for one prompt prepared by `PocketTTSProcessor`.
+     * Runs both the speech generator and the Mimi decoder, trimming unused frames before decoding.
+     * The exported graph fixes the block size and number of flow-solver steps.
      *
-     * The voice prefix is conditioned once per call, shared across all chunks, and freed when the
-     * generator finishes, throws, or is exited early. Nothing is cached between calls, and
-     * `speaker_embeddings` remains owned by the caller.
-     *
-     * @param {Object} options Generation inputs and conditioning controls.
-     * @param {{ input_ids: number[], frames_after_eos: number }[]} options.chunks Text chunks to speak, in order,
-     * as returned by `PocketTTSProcessor`. `frames_after_eos` is the number of frames generated after end of speech.
-     * @param {Tensor} options.speaker_embeddings Voice latents of shape `[1, voice_dim, frames]`.
-     * @param {number} [options.temperature] Flow noise variance (as in Python transformers); 0 = deterministic.
-     * @param {number} [options.num_speakers] Speaker conditioning index (`0 | 1 | 2`), not a count.
-     * @param {number} [options.duration_delta] Duration conditioning value.
-     * @returns {AsyncGenerator<Float32Array>} The PCM of each chunk, in order.
-     *
-     * **Example:** Play each text chunk (one or more sentences) as soon as it is ready. Voices are flat float32 files in `[1, 512, frames]` order.
-     * ```javascript
-     * import { AutoProcessor, GradiumPhononTTSForConditionalGeneration, Tensor } from '@huggingface/transformers';
-     * const id = 'onnx-community/phonon-31m-en-ONNX';
-     * const processor = await AutoProcessor.from_pretrained(id);
-     * const model = await GradiumPhononTTSForConditionalGeneration.from_pretrained(id, { dtype: 'q4' });
-     * const voice = await fetch(`https://huggingface.co/${id}/resolve/main/voices/default.bin`);
-     * const data = new Float32Array(await voice.arrayBuffer());
-     * const speaker_embeddings = new Tensor('float32', data, [1, 512, data.length / 512]);
-     * const chunks = await processor('Hello from Phonon. This is the second sentence.');
-     * for await (const pcm of model.generate_speech({ chunks, speaker_embeddings })) {
-     *   console.log(pcm.length); // mono samples at 24 kHz, one text chunk at a time
-     * }
-     * ```
+     * @param {Object} options Processor outputs and generation options.
+     * @param {Tensor} options.input_ids Prompt tokens, including audio placeholders, of shape `[1, sequence_length]`.
+     * @param {Tensor} [options.attention_mask] Mask of non-padding prompt tokens.
+     * @param {Tensor} [options.audio_prompt_latents] Voice latents of shape `[1, frames, audio_prompt_dim]`.
+     * @param {Tensor} [options.audio_prompt_latents_mask] Mask of non-padding voice frames.
+     * @param {Tensor|number} [options.frames_after_eos=1] Frames to retain after the EOS frame.
+     * @param {Object} [options.generation_config] Generation defaults to override.
+     * @param {number} [options.max_new_tokens] Maximum number of audio frames.
+     * @param {number} [options.max_length] Maximum prompt-plus-audio sequence length.
+     * @param {number} [options.temperature] Noise variance; zero is deterministic.
+     * @param {boolean} [options.do_sample] Whether to sample Gaussian noise.
+     * @param {number} [options.num_flow_steps] Solver steps per frame (fixed by the export).
+     * @param {number} [options.eos_threshold] End-of-speech logit threshold.
+     * @param {number} [options.min_frames_before_eos] Frames before EOS may be detected.
+     * @returns {Promise<{audio_values: Tensor}>} Waveform of shape `[1, 1, samples]`. The caller owns the returned tensor.
      */
-    async *generate_speech({
-        chunks,
-        speaker_embeddings,
-        // @ts-expect-error TS2339
-        temperature = this.config.phonon.temperature,
-        num_speakers = this.default_conditions.num_speakers,
-        duration_delta = this.default_conditions.duration_delta,
+    async generate({
+        input_ids,
+        attention_mask = full(input_ids.dims, 1n),
+        audio_prompt_latents = full([1, 0, /** @type {any} */ (this.config).audio_prompt_dim], 0),
+        audio_prompt_latents_mask = full(audio_prompt_latents.dims.slice(0, 2), 1n),
+        frames_after_eos = 1,
+        generation_config,
+        ...kwargs
     }) {
-        const conditions = { num_speakers, duration_delta };
-        const prefix = await this._prepare_voice(speaker_embeddings);
-        try {
-            for (const { input_ids, frames_after_eos } of chunks) {
-                const latents = await this._generate_latents(
-                    input_ids,
-                    frames_after_eos,
-                    prefix,
-                    temperature,
-                    conditions,
-                );
-                yield await this._decode(latents);
-            }
-        } finally {
-            dispose_state(prefix);
+        const config = /** @type {any} */ (this.config);
+        const options = {
+            do_sample: true,
+            temperature: 0.3,
+            num_flow_steps: 1,
+            eos_threshold: config.eos_threshold,
+            min_frames_before_eos: 0,
+            ...this.generation_config,
+            ...generation_config,
+            ...Object.fromEntries(Object.entries(kwargs).filter(([, value]) => value != null)),
+        };
+        const { model, mimi_decoder } = this.sessions;
+        const block_size = model.inputMetadata.find(({ name }) => name === 'noise').shape[1];
+        if (options.num_flow_steps !== 1) {
+            throw new Error('This ONNX export supports num_flow_steps=1; other values require re-export.');
         }
-    }
-
-    // Runs the flow model for one chunk; returns its latents as `[1, frames, latent_dim]`.
-    async _generate_latents(input_ids, frames_after_eos, prefix, temperature, conditions) {
-        // @ts-expect-error TS2339
-        const cfg = this.config.phonon;
-        const latents = [];
-        let state = null,
-            latent = null;
+        if (input_ids.dims.length !== 2 || input_ids.dims[0] !== 1) {
+            throw new Error('This Phonon ONNX export supports one prompt per generate() call.');
+        }
+        const prompt_length = Number(attention_mask.sum().item());
+        const text_length = prompt_length - Number(audio_prompt_latents_mask.sum().item()) - 1;
+        const max_frames =
+            options.max_new_tokens ??
+            (options.max_length != null
+                ? options.max_length - prompt_length
+                : Math.ceil((text_length / 3 + 2) * config.frame_rate));
+        const tail = frames_after_eos instanceof Tensor ? Number(frames_after_eos.item()) : frames_after_eos;
+        if (!Number.isInteger(max_frames) || max_frames < 1 || !Number.isInteger(tail) || tail < 0) {
+            throw new Error('The frame budget must be a positive integer and frames_after_eos a non-negative integer.');
+        }
+        if (!Number.isFinite(options.temperature) || options.temperature < 0) {
+            throw new Error('temperature must be a finite non-negative number.');
+        }
+        let inputs = { input_ids, attention_mask, audio_prompt_latents, audio_prompt_latents_mask };
+        const empty_inputs = {
+            input_ids: new Tensor('int64', [], [1, 0]),
+            attention_mask: new Tensor('int64', [], [1, 0]),
+            audio_prompt_latents: full([1, 0, config.audio_prompt_dim], 0),
+            audio_prompt_latents_mask: new Tensor('int64', [], [1, 0]),
+        };
+        const cache = addPastKeyValues(this, {}, null);
+        let audio_latents,
+            num_frames = 0,
+            stop_frame = null;
         try {
-            const prompt = await this._run_flow(prefix, { text: input_ids, ...conditions });
-            state = next_state(prompt);
-            prompt.latent_out.dispose();
-            prompt.eos_logit.dispose();
-            latent = full([1, 1, cfg.latent_dim], NaN);
-            let countdown = null;
-            // Frame budget of the original runtime; the EOS countdown follows Python's PocketTTSGenerationMixin.
-            const max_frames = Math.ceil((input_ids.length / 3 + 2) * cfg.frame_rate);
-            for (let frame = 0; frame < max_frames; ++frame) {
+            while (num_frames < Math.min(stop_frame ?? max_frames, max_frames)) {
                 const noise =
-                    temperature === 0
-                        ? full([1, cfg.latent_dim], 0)
-                        : randn([1, cfg.latent_dim]).mul_(Math.sqrt(temperature));
-                const step = await this._run_flow(state, { latent, noise, ...conditions });
-                dispose_state(state);
-                state = next_state(step);
-                latent.dispose();
-                latent = step.latent_out;
-                latents.push(new Float32Array(latent.data));
-                const eos = step.eos_logit.data[0];
-                step.eos_logit.dispose();
-                if (countdown === null && eos > cfg.eos_threshold) countdown = frames_after_eos;
-                if (countdown !== null && countdown-- === 0) break;
+                    options.do_sample && options.temperature > 0
+                        ? randn([1, block_size, config.latent_dim]).mul_(Math.sqrt(options.temperature))
+                        : full([1, block_size, config.latent_dim], 0);
+                const outputs = await sessionRun(model, { ...inputs, ...cache, noise });
+                getPastKeyValues(outputs, cache);
+                audio_latents?.dispose();
+                audio_latents = outputs.audio_latents;
+                if (stop_frame === null) {
+                    const eos = outputs.eos_logits.data.findIndex(
+                        (value, i) => num_frames + i >= options.min_frames_before_eos && value > options.eos_threshold,
+                    );
+                    if (eos !== -1) stop_frame = num_frames + eos + tail + 1;
+                }
+                num_frames += block_size;
+                inputs = empty_inputs;
             }
-            if (countdown === null) {
-                logger.warn('Phonon reached its safety frame limit before completing speech; audio may be truncated.');
+            num_frames = Math.min(num_frames, stop_frame ?? max_frames, max_frames);
+            if (stop_frame === null && options.max_new_tokens == null && options.max_length == null) {
+                logger.warn('Phonon reached its safety frame limit; audio may be truncated.');
             }
+            const { audio_values } = await sessionRun(mimi_decoder, {
+                audio_latents,
+                num_frames: new Tensor('int64', [BigInt(num_frames)], []),
+            });
+            return { audio_values };
         } finally {
-            dispose_state(state);
-            latent?.dispose();
-        }
-        const data = new Float32Array(latents.length * cfg.latent_dim);
-        latents.forEach((values, i) => data.set(values, i * cfg.latent_dim));
-        return new Tensor('float32', data, [1, latents.length, cfg.latent_dim]);
-    }
-
-    // Decodes a whole chunk at once: one decoder call from an empty streaming state.
-    async _decode(latents) {
-        // @ts-expect-error TS2339
-        const { mimi_decoder } = this.config.phonon;
-        const inputs = { latent: latents, past_offset: i64([0], [1]), ...empty_cache(mimi_decoder) };
-        for (const [name, dims] of Object.entries(mimi_decoder.conv_states)) inputs[name] = full(dims, 0);
-        try {
-            const outputs = await sessionRun(this.sessions.mimi_decoder, inputs);
-            const pcm = new Float32Array(outputs.audio.data);
-            dispose_state(outputs);
-            return pcm;
-        } finally {
-            dispose_state(inputs);
+            await cache.dispose();
+            audio_latents?.dispose();
         }
     }
 }

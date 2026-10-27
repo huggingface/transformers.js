@@ -1,5 +1,11 @@
+/**
+ * @module processors
+ */
 import { Processor } from '../../processing_utils.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
+import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
+import { getModelJSON } from '../../utils/hub.js';
+import { Tensor, full } from '../../utils/tensor.js';
 
 // Until tokenizers.js implements Unigram byte fallback, expand unknown pieces
 // before they are converted to IDs. Limit the workaround to this processor.
@@ -16,12 +22,20 @@ function encode(tokenizer, text) {
 }
 
 /**
- * Text processor for PocketTTS-style models such as Gradium Phonon. Port of Python's `PocketTTSProcessor`
- * text preparation: `split_text()` and the per-input `frames_after_eos` of its `__call__`.
+ * Prepares Pocket TTS prompts and precomputed voices, and splits long text.
  */
 export class PocketTTSProcessor extends Processor {
+    static classes = ['tokenizer_class'];
     static tokenizer_class = AutoTokenizer;
-    static uses_processor_config = true;
+
+    /** @type {typeof Processor.from_pretrained} */
+    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
+        const [config, tokenizer] = await Promise.all([
+            getModelJSON(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME, true, options),
+            this.tokenizer_class.from_pretrained(pretrained_model_name_or_path, options),
+        ]);
+        return new this(config, { tokenizer }, null);
+    }
 
     /**
      * Split text into sentence-aligned chunks of at most `max_tokens` tokens, as Python's `PocketTTSProcessor.split_text`.
@@ -64,41 +78,59 @@ export class PocketTTSProcessor extends Processor {
             sentence.length > max_tokens ? split_after(sentence, clause_ends) : [sentence],
         );
         const chunks = [];
-        let chunk = [];
-        let chunk_length = 0;
-        const push = () => {
-            const decoded = chunk.join(' ').trim();
-            if (decoded) chunks.push(decoded);
-        };
+        let chunk = '',
+            chunk_length = 0;
         for (const segment of segments) {
             if (chunk_length && chunk_length + segment.length > max_tokens) {
-                push();
-                chunk = [];
+                chunks.push(chunk.trim());
+                chunk = '';
                 chunk_length = 0;
             }
             // Python joins decoded pieces with spaces before re-encoding a chunk,
             // even when the original text had no space after punctuation.
-            chunk.push(this.tokenizer.decode(segment));
+            chunk += (chunk ? ' ' : '') + this.tokenizer.decode(segment);
             chunk_length += segment.length;
         }
-        if (chunk_length) push();
+        if (chunk) chunks.push(chunk.trim());
         return chunks;
     }
 
     /**
-     * Prepare text as generation inputs, one per `split_text()` chunk. Unlike Python's `__call__`, which takes
-     * chat conversations, this takes plain text; each chunk is encoded as Python's chat template encodes it.
-     * @param {string} text The text to speak.
+     * Prepare a rendered chat prompt and a precomputed voice for generation.
+     * The current ONNX export accepts one prompt and one voice per call.
+     * @param {string} text Prompt from `apply_chat_template(..., { add_generation_prompt: true })`.
      * @param {Object} [options]
-     * @param {number} [options.max_tokens=50] Maximum number of tokens per chunk.
-     * @returns {Promise<{ input_ids: number[], frames_after_eos: number }[]>} Inputs for `generate_speech()`.
+     * @param {Tensor[]} [options.audio_prompt_latents] One voice tensor of shape `[frames, audio_prompt_dim]`.
+     * @returns {Promise<Object>} `input_ids`, `attention_mask`, voice latents and masks, and `frames_after_eos`.
      */
-    async _call(text, { max_tokens = 50 } = {}) {
+    async _call(text, { audio_prompt_latents = [] } = {}) {
+        if (typeof text !== 'string' || !text.endsWith('<|audio_bos|>')) {
+            throw new Error('Prepare one prompt with apply_chat_template and add_generation_prompt=true.');
+        }
+        const placeholders = text.match(/<\|audio_prompt\|>/g) ?? [];
+        if (placeholders.length !== audio_prompt_latents.length || placeholders.length > 1) {
+            throw new Error('Pass one audio_prompt_latents tensor per voice placeholder (at most one).');
+        }
+        const voice = audio_prompt_latents[0];
+        if (voice && (voice.type !== 'float32' || voice.dims.length !== 2 || !voice.size)) {
+            throw new Error('audio_prompt_latents must contain a float32 tensor of shape [frames, audio_prompt_dim].');
+        }
+        const prompt = text.replace('<|audio_prompt|>', '<|audio_prompt|>'.repeat(voice?.dims[0] ?? 0));
+        const ids = encode(this.tokenizer, prompt);
+        const num_words = this.tokenizer.decode(ids, { skip_special_tokens: true }).trim().split(/\s+/u).length;
         const { short_text_max_words = 4, frames_after_eos_short_text = 4, frames_after_eos = 2 } = this.config;
-        return this.split_text(text, max_tokens).map((chunk) => ({
-            input_ids: encode(this.tokenizer, chunk),
-            frames_after_eos:
-                chunk.split(/\s+/u).length <= short_text_max_words ? frames_after_eos_short_text : frames_after_eos,
-        }));
+        return {
+            input_ids: new Tensor('int64', ids, [1, ids.length]),
+            attention_mask: full([1, ids.length], 1n),
+            ...(voice && {
+                audio_prompt_latents: voice.view(1, ...voice.dims),
+                audio_prompt_latents_mask: full([1, voice.dims[0]], 1n),
+            }),
+            frames_after_eos: new Tensor(
+                'int64',
+                [num_words <= short_text_max_words ? frames_after_eos_short_text : frames_after_eos],
+                [1],
+            ),
+        };
     }
 }

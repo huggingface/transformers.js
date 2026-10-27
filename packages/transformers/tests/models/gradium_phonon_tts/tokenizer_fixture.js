@@ -35,6 +35,11 @@ export const TOKENIZER_JSON = {
   model: { type: "Unigram", unk_id: 0, byte_fallback: true, vocab: [["<unk>", 0], ["▁", -1], ...Array.from({ length: 95 }, (_, i) => [String.fromCharCode(32 + i), -1]), ...Array.from({ length: 256 }, (_, i) => [`<0x${i.toString(16).toUpperCase().padStart(2, "0")}>`, -10])] },
 };
 
+export const AUDIO_TOKENS = ["<|audio_bos|>", "<|audio_prompt|>", "<|audio_latent|>"];
+export const AUDIO_TOKEN_IDS = AUDIO_TOKENS.map((_, i) => TOKENIZER_JSON.model.vocab.length + i);
+TOKENIZER_JSON.added_tokens.push(...AUDIO_TOKENS.map((content, i) => ({ id: AUDIO_TOKEN_IDS[i], content, single_word: false, lstrip: false, rstrip: false, normalized: false, special: true })));
+export const CHAT_TEMPLATE = "{{ '<|audio_prompt|>' if messages[0]['content'] is not string else '' }}{{ messages[0]['content'][1]['text'] if messages[0]['content'] is not string else messages[0]['content'] }}{{ '<|audio_bos|>' if add_generation_prompt else '' }}";
+
 export function create_tokenizer() {
   return new PreTrainedTokenizer(TOKENIZER_JSON, { tokenizer_class: "PreTrainedTokenizer", unk_token: "<unk>", clean_up_tokenization_spaces: false });
 }

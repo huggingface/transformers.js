@@ -168,7 +168,7 @@ Text-to-audio generation pipeline using any `AutoModelForTextToWaveform` or `Aut
 This pipeline generates an audio file from an input text and optional other conditional inputs.
 
 **Example:** Phonon speech with one of the voices in the model repo.
-To receive audio chunk by chunk, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
+For direct use, prepare prompts with `PocketTTSProcessor`, then call `model.generate()` to get `audio_values`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
 
