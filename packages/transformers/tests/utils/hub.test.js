@@ -39,9 +39,13 @@ describe("Hub", () => {
 
       const hubHeaders = getFetchHeaders("https://private-hub.example/api/org/model/config.json", options);
       const externalHeaders = getFetchHeaders("https://cdn.example/org/model/config.json", options);
+      const downgradedHeaders = getFetchHeaders("http://private-hub.example/api/org/model/config.json", options);
+      const otherPortHeaders = getFetchHeaders("https://private-hub.example:8443/api/org/model/config.json", options);
 
       expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
       expect(externalHeaders.has("Authorization")).toBe(false);
+      expect(downgradedHeaders.has("Authorization")).toBe(false);
+      expect(otherPortHeaders.has("Authorization")).toBe(false);
     });
 
     it("should fingerprint credentials in memoization keys", () => {

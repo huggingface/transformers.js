@@ -58,21 +58,13 @@ export function getFetchHeaders(urlOrPath, options) {
         const IS_CI = !!process.env?.TESTING_REMOTELY;
         headers.set('User-Agent', `transformers.js/${options.version}; is_ci/${IS_CI};`);
 
-        let requestURL;
-        let configuredHubURL;
-        try {
-            requestURL = new URL(urlOrPath);
-            configuredHubURL = options.remoteHost ? new URL(options.remoteHost) : null;
-        } catch (_) {
-            // Local paths do not receive authorization headers.
-        }
-        const isOfficialHubURL =
-            requestURL?.origin === 'https://huggingface.co' || requestURL?.origin === 'https://hf.co';
-        const isConfiguredHubURL =
-            configuredHubURL &&
-            ['http:', 'https:'].includes(configuredHubURL.protocol) &&
-            requestURL?.origin === configuredHubURL.origin;
-        if ((isOfficialHubURL || isConfiguredHubURL) && options.hfToken) {
+        // A custom Hub endpoint must match by origin, so the token isn't sent over a downgraded protocol or to another port.
+        const isHubURL =
+            isValidUrl(urlOrPath, ['https:'], ['huggingface.co', 'hf.co']) ||
+            (isValidUrl(options.remoteHost, ['http:', 'https:']) &&
+                isValidUrl(urlOrPath) &&
+                new URL(urlOrPath).origin === new URL(options.remoteHost).origin);
+        if (isHubURL && options.hfToken) {
             headers.set('Authorization', `Bearer ${options.hfToken}`);
         }
     }
