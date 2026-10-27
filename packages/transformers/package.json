@@ -24,7 +24,7 @@
   "scripts": {
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "format:check": "prettier --check . --ignore-path ../../.prettierignore",
-    "typegen": "tsc --build",
+    "typegen": "tsc --build --force",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
