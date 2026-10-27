@@ -5,7 +5,7 @@ import { env } from "../../src/env.js";
 import { getCache } from "../../src/utils/cache.js";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
 import { getFetchHeaders, getFetchOptions } from "../../src/utils/hub.js";
-import { Pipeline, getSessionEnv } from "../../src/pipelines/_base.js";
+import { Pipeline, getSessionEnv, prepareImages, prepareAudios } from "../../src/pipelines/_base.js";
 
 describe("Session-scoped resource loading", () => {
   describe("Cross-origin storage", () => {
@@ -148,6 +148,45 @@ describe("Session-scoped resource loading", () => {
       expect(getSessionEnv(pipe)).toBe(sessionEnv);
       expect(Object.values(pipe)).not.toContain(sessionEnv);
       expect(JSON.stringify(Object.keys(pipe))).not.toMatch(/env/i);
+    });
+  });
+
+  describe("Pipeline inputs", () => {
+    const sessionEnv = {
+      remoteHost: "https://private-hub.example/",
+      hfToken: "scoped-token",
+    };
+
+    it("should download image URL inputs with the session fetch and token", async () => {
+      const fetch = jest.fn(async () => ({ status: 404, statusText: "Not Found" }));
+
+      await expect(prepareImages(new Pipeline({ task: "test", model: null, sessionEnv: { ...sessionEnv, fetch } }), "https://private-hub.example/image.png")).rejects.toThrow('Unable to read image from "https://private-hub.example/image.png"');
+
+      expect(fetch).toHaveBeenCalledWith("https://private-hub.example/image.png", expect.any(Object));
+      expect(fetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+
+    it("should download audio URL inputs with the session fetch and token", async () => {
+      const originalAudioContext = globalThis.AudioContext;
+      globalThis.AudioContext = class {
+        constructor({ sampleRate }) {
+          this.sampleRate = sampleRate;
+        }
+        async decodeAudioData() {
+          return { numberOfChannels: 1, length: 2, getChannelData: () => new Float32Array([0.25, 0.5]) };
+        }
+      };
+      const fetch = jest.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(8) }));
+
+      try {
+        const [audio] = await prepareAudios(new Pipeline({ task: "test", model: null, sessionEnv: { ...sessionEnv, fetch } }), "https://private-hub.example/audio.wav", 16000);
+
+        expect(audio).toEqual(new Float32Array([0.25, 0.5]));
+        expect(fetch).toHaveBeenCalledWith("https://private-hub.example/audio.wav", expect.any(Object));
+        expect(fetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer scoped-token");
+      } finally {
+        globalThis.AudioContext = originalAudioContext;
+      }
     });
   });
 });
