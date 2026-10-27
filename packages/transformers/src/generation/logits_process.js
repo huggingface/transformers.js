@@ -309,11 +309,6 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
             // suppress <|notimestamps|> which is handled by without_timestamps
             batch_logits_data[this.no_timestamps_token_id] = -Infinity;
 
-            if (input_ids[i].length === this.begin_index) {
-                batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
-                continue;
-            }
-
             // timestamps have to appear in pairs, except directly before eos_token; mask logits accordingly
             const seq = input_ids[i].slice(this.begin_index);
             const last_was_timestamp = seq.length >= 1 && seq[seq.length - 1] >= this.timestamp_begin;
@@ -330,9 +325,13 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
             }
 
             // apply the `max_initial_timestamp` option
-            if (input_ids[i].length === this.begin_index && this.max_initial_timestamp_index !== null) {
-                const last_allowed = this.timestamp_begin + this.max_initial_timestamp_index;
-                batch_logits_data.subarray(last_allowed + 1).fill(-Infinity);
+            if (input_ids[i].length === this.begin_index) {
+                batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
+
+                if (this.max_initial_timestamp_index != null) {
+                    const last_allowed = this.timestamp_begin + this.max_initial_timestamp_index;
+                    batch_logits_data.subarray(last_allowed + 1).fill(-Infinity);
+                }
             }
 
             // if sum of probability over timestamps is above any other token, sample timestamp

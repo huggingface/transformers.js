@@ -2,6 +2,12 @@ import {
   // Pipelines
   pipeline,
   TextGenerationPipeline,
+
+  // Logits processors
+  WhisperTimeStampLogitsProcessor,
+
+  // Other
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -108,5 +114,51 @@ describe("Logits Processors", () => {
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("WhisperTimeStampLogitsProcessor", () => {
+  // Small synthetic vocabulary: [0..8] text tokens, 9 = <|endoftext|>, 10 = <|notimestamps|>, [11..18] timestamp tokens
+  const eos_token_id = 9;
+  const no_timestamps_token_id = 10;
+  const timestamp_begin = no_timestamps_token_id + 1;
+  const vocab_size = 19;
+  const init_tokens = [1, 2, 3]; // begin_index = 3
+
+  const create_logits = () => new Tensor("float32", new Float32Array(vocab_size).fill(0), [1, vocab_size]);
+  const finite_ids = (data) => Array.from(data, (x, i) => (Number.isFinite(x) ? i : -1)).filter((i) => i >= 0);
+
+  it("should apply `max_initial_timestamp_index` at the first decoding step", () => {
+    const max_initial_timestamp_index = 2;
+    const processor = new WhisperTimeStampLogitsProcessor({ eos_token_id, no_timestamps_token_id, max_initial_timestamp_index }, init_tokens);
+
+    const logits = processor([init_tokens.map(BigInt)], create_logits());
+
+    // Only the first `max_initial_timestamp_index + 1` timestamp tokens may be sampled at the first step
+    const last_allowed = timestamp_begin + max_initial_timestamp_index;
+    expect(finite_ids(logits.data)).toEqual([timestamp_begin, timestamp_begin + 1, last_allowed]);
+  });
+
+  it("should not restrict the initial timestamp when `max_initial_timestamp_index` is unset", () => {
+    const processor = new WhisperTimeStampLogitsProcessor({ eos_token_id, no_timestamps_token_id, max_initial_timestamp_index: null }, init_tokens);
+
+    const logits = processor([init_tokens.map(BigInt)], create_logits());
+
+    // All timestamp tokens remain available (text tokens are still suppressed at the first step)
+    const all_timestamps = Array.from({ length: vocab_size - timestamp_begin }, (_, i) => timestamp_begin + i);
+    expect(finite_ids(logits.data)).toEqual(all_timestamps);
+  });
+
+  it("should only apply `max_initial_timestamp_index` at the first decoding step", () => {
+    const max_initial_timestamp_index = 2;
+    const processor = new WhisperTimeStampLogitsProcessor({ eos_token_id, no_timestamps_token_id, max_initial_timestamp_index }, init_tokens);
+
+    // One text token has already been sampled after the prompt
+    const logits = processor([[...init_tokens, 5].map(BigInt)], create_logits());
+
+    const last_allowed = timestamp_begin + max_initial_timestamp_index;
+    for (let i = last_allowed + 1; i < vocab_size; ++i) {
+      expect(logits.data[i]).toBe(0);
+    }
   });
 });

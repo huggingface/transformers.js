@@ -77,10 +77,10 @@ export class WhisperGenerationConfig extends GenerationConfig {
 
     /**
      * Used to set the maximum value of the initial timestamp. This is used to prevent the model from
-     * predicting timestamps that are too far in the future.
-     * @type {number}
+     * predicting timestamps that are too far in the future. If `null`, no restriction is applied.
+     * @type {number|null}
      */
-    max_initial_timestamp_index = 1;
+    max_initial_timestamp_index = null;
 }
 
 /**
