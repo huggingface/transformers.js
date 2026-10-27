@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 
@@ -57,7 +57,7 @@ export class ImageToTextPipeline
 {
     async _call(images, generate_kwargs = {}) {
         const isBatched = Array.isArray(images);
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         const { pixel_values } = await this.processor(preparedImages);
 

@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 
@@ -59,7 +59,7 @@ export class DocumentQuestionAnsweringPipeline
         }
 
         // Preprocess image
-        const preparedImage = (await prepareImages(image, getSessionEnv(this)))[0];
+        const preparedImage = (await prepareImages(image))[0];
         const { pixel_values } = await this.processor(preparedImage);
 
         // Run tokenization

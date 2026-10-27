@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 import { RawImage } from '../utils/image.js';
 
 import { interpolate_4d } from '../utils/tensor.js';
@@ -60,7 +60,7 @@ export class DepthEstimationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => DepthEstimationPipelineType} */ (Pipeline)
 {
     async _call(images) {
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         const inputs = await this.processor(preparedImages);
         const { predicted_depth } = await this.model(inputs);

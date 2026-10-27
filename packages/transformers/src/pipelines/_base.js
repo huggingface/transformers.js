@@ -1,13 +1,11 @@
 import { PreTrainedTokenizer } from '../tokenization_utils.js';
 import { PreTrainedModel } from '../models/modeling_utils.js';
 import { Processor } from '../processing_utils.js';
-import { resolveEnv } from '../env.js';
 
 import { Callable } from '../utils/generic.js';
 
-import { decode_audio } from '../utils/audio.js';
+import { read_audio } from '../utils/audio.js';
 import { RawImage } from '../utils/image.js';
-import { getFile, getFetchOptions } from '../utils/hub.js';
 
 /**
  * Session-scopable environment overrides of each pipeline. Kept off the instance so that they
@@ -27,16 +25,6 @@ export function getSessionEnv(pipeline) {
 }
 
 /**
- * Download a pipeline input given as a path/URL, using the pipeline's environment.
- * @param {string|URL} url The path/URL of the input.
- * @param {Partial<import('../env.js').TransformersEnvironmentSession>} sessionEnv Session-scopable environment overrides.
- * @returns {Promise<import('../utils/hub/FileResponse.js').FileResponse|Response>} The response.
- */
-async function fetchInput(url, sessionEnv) {
-    return await getFile(url, getFetchOptions(resolveEnv(sessionEnv)));
-}
-
-/**
  * @typedef {string | RawImage | URL | Blob | HTMLCanvasElement | OffscreenCanvas} ImageInput
  * @typedef {ImageInput|ImageInput[]} ImagePipelineInputs
  */
@@ -44,27 +32,15 @@ async function fetchInput(url, sessionEnv) {
 /**
  * Prepare images for further tasks.
  * @param {ImagePipelineInputs} images images to prepare.
- * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<RawImage[]>} returns processed images.
  */
-export async function prepareImages(images, sessionEnv = {}) {
+export async function prepareImages(images) {
     if (!Array.isArray(images)) {
         images = [images];
     }
 
     // Possibly convert any non-images to images
-    return await Promise.all(
-        images.map(async (x) => {
-            if (typeof x === 'string' || x instanceof URL) {
-                const response = await fetchInput(x, sessionEnv);
-                if (response.status !== 200) {
-                    throw new Error(`Unable to read image from "${x}" (${response.status} ${response.statusText})`);
-                }
-                return await RawImage.fromBlob(await response.blob());
-            }
-            return await RawImage.read(x);
-        }),
-    );
+    return await Promise.all(images.map((x) => RawImage.read(x)));
 }
 
 /**
@@ -76,19 +52,17 @@ export async function prepareImages(images, sessionEnv = {}) {
  * Prepare audios for further tasks.
  * @param {AudioPipelineInputs} audios audios to prepare.
  * @param {number} sampling_rate sampling rate of the audios.
- * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv={}] Session-scopable environment overrides.
  * @returns {Promise<Float32Array[]>} The preprocessed audio data.
  */
-export async function prepareAudios(audios, sampling_rate, sessionEnv = {}) {
+export async function prepareAudios(audios, sampling_rate) {
     if (!Array.isArray(audios)) {
         audios = [audios];
     }
 
     return await Promise.all(
-        audios.map(async (x) => {
+        audios.map((x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                const response = await fetchInput(x, sessionEnv);
-                return await decode_audio(await response.arrayBuffer(), sampling_rate);
+                return read_audio(x, sampling_rate);
             } else if (x instanceof Float64Array) {
                 return new Float32Array(x);
             }

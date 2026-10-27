@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 
@@ -63,7 +63,7 @@ export class ImageFeatureExtractionPipeline
 {
     /** @type {ImageFeatureExtractionPipelineCallback} */
     async _call(images, { pool = null } = {}) {
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
         const { pixel_values } = await this.processor(preparedImages);
         const outputs = await this.model({ pixel_values });
 

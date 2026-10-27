@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, get_bounding_box, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages, get_bounding_box } from './_base.js';
 
 /**
  * @typedef {import('./_base.js').ImagePipelineConstructorArgs} ImagePipelineConstructorArgs
@@ -67,7 +67,7 @@ export class ObjectDetectionPipeline
         if (isBatched && images.length !== 1) {
             throw Error('Object detection pipeline currently only supports a batch size of 1.');
         }
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         const imageSizes = percentage ? null : preparedImages.map((x) => [x.height, x.width]);
 

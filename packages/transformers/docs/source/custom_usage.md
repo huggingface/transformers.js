@@ -31,7 +31,7 @@ const privatePipe = await pipeline(
 );
 ```
 
-Fields that a loader's `options.env` does not override are read from the global `env` when they are needed, so later changes to the global `env` still apply. Pipelines also use their `options.env` when they download image or audio inputs given as URLs.
+Fields that a loader's `options.env` does not override are read from the global `env` when they are needed, so later changes to the global `env` still apply. `options.env` applies to loading models and their files only. Pipeline inputs given as URLs (images, audio, speaker embeddings) are downloaded with the global `env`. If an input needs a custom fetch or token, download it yourself and pass the result (for example, a `Blob`, `RawImage` or `Float32Array`) to the pipeline.
 
 In Node.js, `env.remoteHost` defaults to `HF_ENDPOINT` when set, otherwise `https://huggingface.co/`. `env.hfToken` defaults to `HF_TOKEN`, falling back to `HF_ACCESS_TOKEN`. Both variables are read when they are needed, not when the library is imported, so they can be loaded afterwards (for example, with `dotenv`). Explicit global assignments replace those defaults, and an `options.env` value takes precedence for that loader. Tokens are sent only to the configured Hub origin (and the official Hugging Face Hub origins), never to arbitrary image or audio URLs. Browser environments do not send token authorization headers.
 

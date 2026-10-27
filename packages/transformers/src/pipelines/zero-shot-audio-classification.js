@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareAudios, getSessionEnv } from './_base.js';
+import { Pipeline, prepareAudios } from './_base.js';
 
 import { softmax } from '../utils/maths.js';
 
@@ -75,7 +75,7 @@ export class ZeroShotAudioClassificationPipeline
         });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate, getSessionEnv(this));
+        const preparedAudios = await prepareAudios(audio, sampling_rate);
 
         const toReturn = [];
         for (const aud of preparedAudios) {

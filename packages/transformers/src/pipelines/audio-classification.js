@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareAudios, getSessionEnv } from './_base.js';
+import { Pipeline, prepareAudios } from './_base.js';
 
 import { Tensor, topk } from '../utils/tensor.js';
 import { softmax } from '../utils/maths.js';
@@ -73,7 +73,7 @@ export class AudioClassificationPipeline
 {
     async _call(audio, { top_k = 5 } = {}) {
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        const preparedAudios = await prepareAudios(audio, sampling_rate, getSessionEnv(this));
+        const preparedAudios = await prepareAudios(audio, sampling_rate);
 
         // @ts-expect-error TS2339
         const id2label = this.model.config.id2label;

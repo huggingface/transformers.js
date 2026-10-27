@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { Tensor, topk } from '../utils/tensor.js';
 import { softmax } from '../utils/maths.js';
@@ -85,7 +85,7 @@ export class ImageClassificationPipeline
     extends /** @type {new (options: ImagePipelineConstructorArgs) => ImageClassificationPipelineType} */ (Pipeline)
 {
     async _call(images, { top_k = 5 } = {}) {
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         const { pixel_values } = await this.processor(preparedImages);
         const output = await this.model({ pixel_values });

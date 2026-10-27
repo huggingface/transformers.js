@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { softmax } from '../utils/maths.js';
 
@@ -62,7 +62,7 @@ export class ZeroShotImageClassificationPipeline
 {
     async _call(images, candidate_labels, { hypothesis_template = 'This is a photo of {}' } = {}) {
         const isBatched = Array.isArray(images);
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         // Insert label into hypothesis template
         const texts = candidate_labels.map((x) => hypothesis_template.replace('{}', x));

@@ -3,7 +3,7 @@
  */
 
 import { ImageSegmentationPipeline } from './image-segmentation.js';
-import { prepareImages, getSessionEnv } from './_base.js';
+import { prepareImages } from './_base.js';
 import { RawImage } from '../utils/image.js';
 
 /**
@@ -47,7 +47,7 @@ export class BackgroundRemovalPipeline
     )
 {
     async _call(images, options = {}) {
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
 
         // @ts-expect-error TS2339
         const masks = await super._call(images, options);

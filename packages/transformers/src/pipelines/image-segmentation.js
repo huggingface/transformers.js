@@ -2,7 +2,7 @@
  * @module pipelines
  */
 
-import { Pipeline, prepareImages, getSessionEnv } from './_base.js';
+import { Pipeline, prepareImages } from './_base.js';
 
 import { RawImage } from '../utils/image.js';
 
@@ -82,7 +82,7 @@ export class ImageSegmentationPipeline
             throw Error('Image segmentation pipeline currently only supports a batch size of 1.');
         }
 
-        const preparedImages = await prepareImages(images, getSessionEnv(this));
+        const preparedImages = await prepareImages(images);
         const imageSizes = preparedImages.map((x) => [x.height, x.width]);
 
         const inputs = await this.processor(preparedImages);
