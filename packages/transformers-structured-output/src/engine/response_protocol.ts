@@ -241,10 +241,11 @@ function buildProtocol(
     thinking: Record<string, unknown>,
     content: Record<string, unknown>,
 ): ProtocolConfig {
-    if (thinking.close_pattern !== undefined)
-        throw new Error('Thinking-aware constraints do not support a reasoning_content close_pattern.');
     const thinkingOpen = anchorMatcher(thinking, 'open', 'open_pattern');
-    const thinkingClose = literalAnchor(thinking.close, 'response_template.fields.reasoning_content.close');
+    const thinkingClose =
+        thinking.close_pattern === undefined
+            ? literalAnchor(thinking.close, 'response_template.fields.reasoning_content.close')
+            : literalClosePattern(thinking.close_pattern);
     if (thinkingOpen === undefined || thinkingClose === undefined)
         throw new Error('Thinking-aware constraints require reasoning_content open and literal close delimiters.');
     const contentOpen = anchorMatcher(content, 'open', 'open_pattern');
@@ -284,6 +285,65 @@ function anchorMatcher(field: Record<string, unknown>, literalKey: string, patte
         }
     }
     return undefined;
+}
+/**
+ * Reduces a reasoning_content close_pattern to its literal closer when every top-level
+ * alternative starts with the same literal and one of them may close right after it (Granite 3.3:
+ * `</think>\\s*<response>|</think>(?=…)|</think>\\s*\\Z`). The constrained answer follows that
+ * literal directly, so the parser closes on such an alternative.
+ */
+function literalClosePattern(pattern: unknown): Uint8Array[] {
+    const unsupported = new Error(
+        `Thinking-aware constraints do not support the reasoning_content close_pattern ${JSON.stringify(pattern)}.`,
+    );
+    if (typeof pattern !== 'string') throw unsupported;
+    const alternatives = splitAlternatives(pattern).map(leadingLiteral);
+    const literal = alternatives[0].literal;
+    if (literal.length === 0 || alternatives.some((alternative) => alternative.literal !== literal)) throw unsupported;
+    if (!alternatives.some(({ rest }) => ['', '\\s*', '\\Z', '\\s*\\Z'].includes(rest) || rest.startsWith('(?=')))
+        throw unsupported;
+    return [new TextEncoder().encode(literal)];
+}
+function splitAlternatives(pattern: string): string[] {
+    const alternatives: string[] = [];
+    let depth = 0;
+    let inClass = false;
+    let start = 0;
+    for (let i = 0; i < pattern.length; ++i) {
+        const char = pattern[i];
+        if (char === '\\') ++i;
+        else if (inClass) inClass = char !== ']';
+        else if (char === '[') inClass = true;
+        else if (char === '(') ++depth;
+        else if (char === ')') --depth;
+        else if (char === '|' && depth === 0) {
+            alternatives.push(pattern.slice(start, i));
+            start = i + 1;
+        }
+    }
+    alternatives.push(pattern.slice(start));
+    return alternatives;
+}
+function leadingLiteral(alternative: string): { literal: string; rest: string } {
+    let literal = '';
+    let i = 0;
+    while (i < alternative.length) {
+        const char = alternative[i];
+        if (char === '\\') {
+            const escaped = alternative[i + 1];
+            if (escaped === undefined || /[0-9A-Za-z]/.test(escaped)) break;
+            literal += escaped;
+            i += 2;
+        } else if ('^$.*+?()[]{}|'.includes(char)) {
+            break;
+        } else {
+            literal += char;
+            ++i;
+        }
+    }
+    // A quantifier applies to the last literal character, which is then optional or repeated.
+    if ('*+?{'.includes(alternative[i] ?? '') && literal.length > 0) return { literal: '', rest: alternative };
+    return { literal, rest: alternative.slice(i) };
 }
 function compileMatcher(source: string, eager: boolean): Matcher {
     return { machine: compileRegex(source) as ConstraintState<unknown>, eager, source };
