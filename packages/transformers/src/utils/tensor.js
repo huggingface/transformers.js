@@ -16,6 +16,7 @@ import { TensorOpRegistry } from '../ops/registry.js';
 import { DataTypeMap } from './dtypes.js';
 
 import { random } from './random.js';
+import { selectWebGPURows } from './webgpu.js';
 
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
@@ -1447,6 +1448,86 @@ export function cat(tensors, dim = 0) {
         }
     }
     return new Tensor(resultType, result, resultDims);
+}
+
+/**
+ * Select entries from a tensor along dimension 0 using an index array.
+ * Equivalent to `torch.index_select(tensor, 0, indices)`.
+ * @param {Tensor} tensor The source tensor.
+ * @param {number[]} indices Array of row indices to select.
+ * @param {DataArray} data The materialized tensor data.
+ * @returns {Tensor} A new tensor with selected rows.
+ */
+function _index_select_from_data(tensor, indices, data) {
+    const [, ...restDims] = tensor.dims;
+    const rowSize = restDims.length > 0 ? restDims.reduce((a, b) => a * b, 1) : 1;
+    const newBatchSize = indices.length;
+
+    let out;
+    if (!Array.isArray(data)) {
+        // @ts-ignore
+        out = new data.constructor(newBatchSize * rowSize);
+        for (let i = 0; i < newBatchSize; ++i) {
+            const srcOffset = indices[i] * rowSize;
+            const dstOffset = i * rowSize;
+            out.set(data.subarray(srcOffset, srcOffset + rowSize), dstOffset);
+        }
+    } else {
+        out = new Array(newBatchSize * rowSize);
+        for (let i = 0; i < newBatchSize; ++i) {
+            const srcOffset = indices[i] * rowSize;
+            const dstOffset = i * rowSize;
+            for (let j = 0; j < rowSize; ++j) {
+                out[dstOffset + j] = data[srcOffset + j];
+            }
+        }
+    }
+
+    return new Tensor(tensor.type, out, [newBatchSize, ...restDims]);
+}
+
+/**
+ * Select tensor rows along the batch dimension.
+ * @param {Tensor} tensor The source CPU tensor.
+ * @param {number[]} indices The row indices to select.
+ * @returns {Tensor} A new tensor containing the selected rows.
+ */
+export function index_select(tensor, indices) {
+    if (tensor.location !== 'cpu' && tensor.location !== 'cpu-pinned') {
+        throw new Error(
+            `index_select only supports CPU tensors. Got location: ${tensor.location}. ` +
+                'Use index_select_async to handle GPU tensors.',
+        );
+    }
+
+    return _index_select_from_data(tensor, indices, tensor.data);
+}
+
+/**
+ * Async row selection. Aligned WebGPU tensors stay on the GPU; other device
+ * tensors are downloaded to the CPU without releasing caller-owned resources.
+ * @param {Tensor} tensor The source tensor.
+ * @param {number[]} indices Array of row indices to select.
+ * @returns {Promise<Tensor>} A new tensor with selected rows.
+ */
+export async function index_select_async(tensor, indices) {
+    if (tensor.location === 'cpu' || tensor.location === 'cpu-pinned') {
+        return index_select(tensor, indices);
+    }
+
+    if (tensor.location === 'gpu-buffer') {
+        const selected = await selectWebGPURows(tensor.ort_tensor, indices);
+        if (selected) return new Tensor(selected);
+    }
+
+    // Download GPU/ML data without releasing resources owned by the caller.
+    const ort_tensor = tensor.ort_tensor;
+    if (!ort_tensor?.getData) {
+        throw new Error(`Tensor does not support getData() for location: ${tensor.location}.`);
+    }
+
+    const data = await ort_tensor.getData(false);
+    return _index_select_from_data(tensor, indices, data);
 }
 
 /**

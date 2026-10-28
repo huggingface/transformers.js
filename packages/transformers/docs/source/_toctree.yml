@@ -27,6 +27,8 @@
 - sections:
     - local: guides/webgpu
       title: Running models on WebGPU
+    - local: guides/beam-search
+      title: Beam search
     - local: guides/dtypes
       title: Using quantized models (dtypes)
     - local: guides/private
@@ -69,6 +71,8 @@
           title: Stopping Criteria
         - local: api/generation/streamers
           title: Streamers
+        - local: api/generation/beam_search
+          title: Beam search
         - local: api/generation/cache
           title: Cache
       title: Generation

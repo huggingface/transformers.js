@@ -16,8 +16,8 @@ export class WhisperGenerationConfig extends GenerationConfig {
     return_token_timestamps = null;
 
     /**
-     * The number of audio frames available in this chunk. This is only used generating word-level timestamps.
-     * @type {number}
+     * Valid mel frames (10 ms each), shared or one count per input. Used for word-level timestamps.
+     * @type {number|number[]}
      */
     num_frames = null;
 
