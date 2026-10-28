@@ -1,5 +1,6 @@
 import { createInferenceSession, runInferenceSession, isONNXProxy } from '../backends/onnx.js';
 import { Tensor } from '../utils/tensor.js';
+import { apis } from '../env.js';
 
 /**
  * Asynchronously creates a wrapper function for running an ONNX inference session.
@@ -33,10 +34,20 @@ const wrap = async (session_bytes, session_options, names) => {
 
 // In-memory registry of initialized ONNX operators
 export class TensorOpRegistry {
-    static session_options = {
-        // TODO: Allow for multiple execution providers
-        // executionProviders: ['webgpu'],
-    };
+    /**
+     * Options for the auxiliary operator sessions. These graphs are tiny and run
+     * as part of a larger model pipeline, so they default to the WASM execution
+     * provider in web environments instead of letting ORT pick its own default
+     * (which may probe a GPU adapter even when the main model is pinned to WASM).
+     * Override for full control, e.g. `TensorOpRegistry.session_options = { executionProviders: ['webgpu'] }`.
+     *
+     * Read when each operator session is created (lazily, on first use of the
+     * operator), so setting it after a pipeline has already run an operator only
+     * affects the operators that are still uninitialised.
+     *
+     * @type {import('onnxruntime-common').InferenceSession.SessionOptions}
+     */
+    static session_options = apis.IS_WEB_ENV ? { executionProviders: ['wasm'] } : {};
 
     static get nearest_interpolate_4d() {
         if (!this._nearest_interpolate_4d) {
