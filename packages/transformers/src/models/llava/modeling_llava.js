@@ -8,6 +8,15 @@ export class LlavaPreTrainedModel extends PreTrainedModel {
  * The LLAVA model which consists of a vision backbone and a language model.
  */
 export class LlavaForConditionalGeneration extends LlavaPreTrainedModel {
+    _multimodal_generation_config() {
+        if (!['llava', 'idefics3', 'smolvlm'].includes(this.config.model_type)) return null;
+        return {
+            modality_input_names: ['pixel_values'],
+            modality_output_name: 'image_features',
+            batch_axes: { position_ids: 0, rope_deltas: 0 },
+        };
+    }
+
     _merge_input_ids_with_image_features(kwargs) {
         const vision_hidden_size = kwargs.image_features.dims.at(-1);
         const reshaped_image_hidden_states = kwargs.image_features.view(-1, vision_hidden_size);

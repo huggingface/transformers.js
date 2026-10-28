@@ -5,7 +5,7 @@ import {
     setNumLogitsToKeep,
 } from '../modeling_utils.js';
 import { sessionRun } from '../session.js';
-import { stack, Tensor, ones_like, zeros } from '../../utils/tensor.js';
+import { stack, Tensor, ones_like, zeros, cat } from '../../utils/tensor.js';
 import { max } from '../../utils/maths.js';
 
 export class Qwen2VLPreTrainedModel extends PreTrainedModel {
@@ -22,6 +22,15 @@ export class Qwen2VLPreTrainedModel extends PreTrainedModel {
     ];
 }
 export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
+    _multimodal_generation_config() {
+        if (!['qwen2_vl', 'qwen2_vl_text'].includes(this.config.model_type)) return null;
+        return {
+            modality_input_names: ['pixel_values'],
+            modality_output_name: 'image_features',
+            batch_axes: { position_ids: 1, rope_deltas: 0 },
+        };
+    }
+
     // NOTE: This is used as the base class for all Qwen VL models and their CausalLM variants.
     // CausalLM variants (e.g., Qwen2VLForCausalLM) extend this class but load only
     // embed_tokens + decoder_model_merged (no vision_encoder) via MultimodalLanguageModelOnly type.
@@ -272,6 +281,32 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     }
 
     async encode_image({ pixel_values, image_grid_thw }) {
+        // Qwen2VL exports trace a single image grid. Encode each original image
+        // once, before beam expansion, preserving flattened patch order.
+        if (['qwen2_vl', 'qwen2_vl_text'].includes(this.config.model_type) && image_grid_thw.dims[0] > 1) {
+            const features = [];
+            let offset = 0;
+            try {
+                for (let i = 0; i < image_grid_thw.dims[0]; ++i) {
+                    const grid = image_grid_thw.slice([i, i + 1]);
+                    const length = Number(grid.data[0] * grid.data[1] * grid.data[2]);
+                    features.push(
+                        (
+                            await sessionRun(this.sessions['vision_encoder'], {
+                                pixel_values: pixel_values.slice([offset, offset + length]),
+                                [this.image_grid_thw_name]: grid,
+                            })
+                        ).image_features,
+                    );
+                    offset += length;
+                }
+                if (offset !== pixel_values.dims[0])
+                    throw new Error('Image grids do not match the number of pixel patches.');
+                return cat(features, 0);
+            } finally {
+                for (const feature of features) feature.dispose();
+            }
+        }
         const features = (
             await sessionRun(this.sessions['vision_encoder'], {
                 pixel_values,
@@ -292,6 +327,46 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
         setNumLogitsToKeep(this, model_inputs, 1n);
 
+        // Full-history image grids and new-query pixel patches have different
+        // indexing contracts. Do not silently scatter old image features into a
+        // new image chunk; this continuation needs explicit prepared embeddings.
+        if (this._multimodal_generation_config() && model_inputs.pixel_values && !model_inputs.inputs_embeds) {
+            const pastLength = model_inputs.past_key_values?.get_seq_length() ?? 0;
+            // @ts-ignore Model-specific configuration field.
+            const imageToken = this.config.image_token_id;
+            if (
+                pastLength >= model_inputs.input_ids.dims[1] &&
+                model_inputs.input_ids.data.some((id) => id == imageToken)
+            ) {
+                throw new Error(
+                    'Qwen2VL cached raw-image prompts require full input_ids history; supply prepared inputs_embeds for query-only image chunks.',
+                );
+            }
+            if (pastLength && pastLength < model_inputs.input_ids.dims[1]) {
+                for (const row of model_inputs.input_ids.tolist()) {
+                    if (
+                        row.slice(0, pastLength).some((id) => id == imageToken) &&
+                        row.slice(pastLength).some((id) => id == imageToken)
+                    ) {
+                        throw new Error(
+                            'Qwen2VL cannot append raw images after an image-containing cache; supply prepared inputs_embeds and matching position_ids/rope_deltas.',
+                        );
+                    }
+                }
+            }
+        }
+
+        // Caller-supplied prefill positions still need the image-dependent offset
+        // on subsequent decode steps, after raw image grids have been cleared.
+        if (model_inputs.position_ids && !model_inputs.rope_deltas && model_inputs.image_grid_thw) {
+            [, model_inputs.rope_deltas] = this.get_rope_index(
+                model_inputs.input_ids,
+                model_inputs.image_grid_thw,
+                null,
+                model_inputs.attention_mask,
+            );
+        }
+
         // Overwritten -- in specific circumstances we don't want to forward image inputs to the model
         if (!model_inputs.attention_mask || model_inputs.position_ids) {
             return model_inputs;
@@ -311,8 +386,8 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 model_inputs.attention_mask,
             );
         } else {
-            model_inputs.pixel_values = null;
-            // model_inputs.pixel_values_videos = null;
+            // Keep supplied image data until the unprocessed query is sliced.
+            // Shared preparation encodes it only if that query has image tokens.
 
             const past_length = model_inputs.past_key_values.get_seq_length();
 

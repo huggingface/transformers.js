@@ -27,7 +27,7 @@ export class LlavaProcessor extends Processor {
                 text = [text];
             }
             for (let i = 0; i < text.length; ++i) {
-                text[i] = text[i].replace(image_token, image_token.repeat(num_image_tokens));
+                text[i] = text[i].replaceAll(image_token, image_token.repeat(num_image_tokens));
             }
         }
 

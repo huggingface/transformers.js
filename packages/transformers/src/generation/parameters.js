@@ -9,6 +9,13 @@
  * method initializes it with `bos_token_id` and a batch size of 1. For decoder-only models `inputs`
  * should be in the format of `input_ids`. For encoder-decoder models *inputs* can represent any of
  * `input_ids`, `input_values`, `input_features`, or `pixel_values`.
+ * @property {import('../utils/tensor.js').Tensor} [inputs_embeds=null] Prepared prefill embeddings for models that accept them.
+ * For multimodal generation these must already include merged modality features. Supply the original
+ * `input_ids` for token history and length accounting, and the matching `attention_mask`. Embeddings
+ * are used only for prefill by the supported merged-modality families (Llava, Idefics3,
+ * SmolVLM, Qwen2VL images, and Ultravox); the caller retains ownership of this tensor.
+ * @property {import('../utils/tensor.js').Tensor} [rope_deltas=null] Qwen2VL per-example rotary position offsets,
+ * with shape `[batch_size, 1]`. Retain these when continuing from a cache without the original image grid.
  * @property {import('./configuration_utils.js').GenerationConfig} [generation_config=null] (`GenerationConfig`, *optional*):
  * The generation configuration to use as the base parameters for the generation call.
  * `**kwargs` passed to generate that match attributes of `generation_config` will override them.

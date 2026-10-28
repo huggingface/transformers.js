@@ -9,7 +9,8 @@
 import { Tensor } from './utils/tensor.js';
 
 /**
- * A cache class that stores past key values as named tensors.
+ * A cache class that owns past key values as named tensors.
+ * Replacing or disposing entries invalidates their tensor objects on every device.
  */
 class _DynamicCache {
     /**
@@ -51,14 +52,14 @@ class _DynamicCache {
     }
 
     /**
-     * Update the cache in-place with new entries, disposing replaced GPU tensors.
+     * Update the cache in-place with new entries, disposing replaced tensors.
      * @param {Record<string, Tensor>} newEntries The new name → Tensor mappings.
      */
     update(newEntries) {
         for (const key in newEntries) {
             const oldValue = this[key];
             const newValue = newEntries[key];
-            if (oldValue && oldValue !== newValue && oldValue.location === 'gpu-buffer') {
+            if (oldValue && oldValue !== newValue) {
                 oldValue.dispose();
             }
             this[key] = newValue;
@@ -66,16 +67,14 @@ class _DynamicCache {
     }
 
     /**
-     * Dispose all contained tensors whose data resides on the GPU.
+     * Dispose all contained tensors, including downloaded tensors that retain GPU resources.
      * Returns a promise that resolves when all disposals are complete.
      * @returns {Promise<void>} Promise that resolves when all GPU tensors are disposed.
      */
     async dispose() {
         const promises = [];
         for (const t of /** @type {Tensor[]} */ (Object.values(this))) {
-            if (t.location === 'gpu-buffer') {
-                promises.push(t.dispose());
-            }
+            promises.push(t.dispose());
         }
         await Promise.all(promises);
     }

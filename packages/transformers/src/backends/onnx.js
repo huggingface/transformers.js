@@ -320,6 +320,15 @@ export async function runInferenceSession(session, ortFeed) {
 }
 
 /**
+ * Return the tensor constructor used by the active execution backend.
+ * @returns {typeof import('onnxruntime-common').Tensor}
+ * @internal
+ */
+export function getTensorConstructor() {
+    return ONNX.Tensor;
+}
+
+/**
  * Check if an object is an ONNX tensor.
  * @param {any} x The object to check
  * @returns {boolean} Whether the object is an ONNX tensor.
