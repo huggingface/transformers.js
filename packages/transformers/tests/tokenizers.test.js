@@ -495,13 +495,18 @@ describe("Edge cases", () => {
     MAX_TEST_EXECUTION_TIME,
   );
 
-  it("many added tokens", async () => {
-    const tokenizer = await AutoTokenizer.from_pretrained("onnx-community/orpheus-3b-0.1-ft-ONNX");
+  describe("many added tokens", () => {
+    let tokenizer;
+    beforeAll(async () => {
+      tokenizer = await AutoTokenizer.from_pretrained("onnx-community/orpheus-3b-0.1-ft-ONNX");
+    }, MAX_TOKENIZER_LOAD_TIME);
 
-    const text = "hello world!";
-    const token_ids = tokenizer.encode(text);
-    expect(token_ids).toEqual([128000, 15339, 1917, 0]);
-  }, 5000); // NOTE: 5 seconds
+    it("encodes within 5 seconds", () => {
+      const text = "hello world!";
+      const token_ids = tokenizer.encode(text);
+      expect(token_ids).toEqual([128000, 15339, 1917, 0]);
+    }, 5000); // NOTE: 5 seconds
+  });
 });
 
 describe("Memory leak tests", () => {

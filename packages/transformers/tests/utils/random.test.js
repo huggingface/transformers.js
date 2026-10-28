@@ -69,6 +69,22 @@ describe("random (Mersenne Twister 19937, Python-compatible)", () => {
     });
   });
 
+  describe("negative integer seeds", () => {
+    it.each([
+      [-42, [0.6394267984578837, 0.025010755222666936, 0.27502931836911926, 0.22321073814882275, 0.7364712141640124, 0.6766994874229113, 0.8921795677048454, 0.08693883262941615, 0.4219218196852704, 0.029797219438070344]],
+      [-(2 ** 40 + 17), [0.6614192930187859, 0.24151842637090726, 0.6909905728254405, 0.11131596896699081, 0.8184932948202619, 0.4957890371902045, 0.3754628980018908, 0.6967482542555166, 0.5464037278028259, 0.4648564722045134]],
+    ])("should match Python's stream for seed(%s)", (seed, expected) => {
+      random.seed(seed);
+      expect(Array.from({ length: expected.length }, () => random.random())).toEqual(expected);
+
+      const rng = new random.Random(seed);
+      expect(Array.from({ length: expected.length }, () => rng.random())).toEqual(expected);
+
+      rng.seed(seed);
+      expect(Array.from({ length: expected.length }, () => rng.random())).toEqual(expected);
+    });
+  });
+
   describe("determinism", () => {
     it("should produce the same sequence when re-seeded with the same value", () => {
       random.seed(42);

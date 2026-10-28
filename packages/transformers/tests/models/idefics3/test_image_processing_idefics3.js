@@ -54,7 +54,8 @@ export default () => {
         // Test that the order of the pixel attention mask matches the python implementation
         expect(pixel_attention_mask.data.reduce((a, b, i) => a + i * b, 0)).toEqual(228217205216);
       },
-      MAX_TEST_EXECUTION_TIME,
+      // Batched image processing can exceed 60 seconds on shared CI runners.
+      2 * MAX_TEST_EXECUTION_TIME,
     );
 
     it(
@@ -66,7 +67,8 @@ export default () => {
         expect(rows).toEqual([[2]]);
         expect(cols).toEqual([[4]]);
       },
-      MAX_TEST_EXECUTION_TIME,
+      // Multi-patch image processing can exceed 60 seconds on shared CI runners.
+      2 * MAX_TEST_EXECUTION_TIME,
     );
 
     it(
