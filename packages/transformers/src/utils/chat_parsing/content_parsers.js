@@ -36,14 +36,7 @@ export function to_float(text) {
 }
 
 function _text(text, args) {
-    let value = (args.strip ?? true) ? text.trim() : text;
-    if (args.strip_prefix && value.startsWith(args.strip_prefix)) {
-        value = value.slice(args.strip_prefix.length);
-    }
-    if (args.strip_suffix && value.endsWith(args.strip_suffix)) {
-        value = value.slice(0, -args.strip_suffix.length);
-    }
-    return (args.strip ?? true) ? value.trim() : value;
+    return (args.strip ?? true) ? text.trim() : text;
 }
 
 function _int(text, args) {

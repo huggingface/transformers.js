@@ -375,10 +375,7 @@ export class ResponseParser {
             this._opened = true;
         }
         this._body += text;
-        const dirty =
-            !STREAMABLE_PARSERS.has(field.content) ||
-            Boolean(field.content_args.strip_prefix) ||
-            Boolean(field.content_args.strip_suffix);
+        const dirty = !STREAMABLE_PARSERS.has(field.content);
         events.push({ type: 'region_chunk', field: this._current, text, dirty });
     }
 

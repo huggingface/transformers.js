@@ -56,7 +56,11 @@ const GRANITE_3_3_RESPONSE_TEMPLATE = {
   defaults: { role: "assistant" },
   start_anchor_pattern: "<\\|start_of_role\\|>assistant(?:\\s+\\[[^\\n]*\\])?<\\|end_of_role\\|>",
   fields: {
-    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: {
+      open: "<think>",
+      close_pattern: String.raw`</think>\s*<response>|</think>(?=\s*[^\s<]|\s*<\|)|</think>\s*\Z`,
+      content: "text",
+    },
     tool_calls: {
       open: "<|tool_call|>",
       close: "<|end_of_text|>",
@@ -64,11 +68,7 @@ const GRANITE_3_3_RESPONSE_TEMPLATE = {
       transform_each: true,
       transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
     },
-    content: {
-      close: "<|end_of_text|>",
-      content: "text",
-      content_args: { strip_prefix: "<response>", strip_suffix: "</response>" },
-    },
+    content: { close_pattern: String.raw`(?:</response>)?\s*<\|end_of_text\|>`, content: "text" },
   },
 };
 
@@ -464,7 +464,8 @@ describe("StructuredOutputProcessor", () => {
   });
 
   it.each([
-    ["a reasoning_content close_pattern", { reasoning_content: { open: "<think>", close_pattern: "</think>\\s*", content: "text" } }, "close_pattern"],
+    ["a reasoning_content close_pattern without a literal closer", { reasoning_content: { open: "<think>", close_pattern: "\\s*</think>", content: "text" } }, "close_pattern"],
+    ["a reasoning_content close_pattern that needs more after its closer", { reasoning_content: { open: "<think>", close_pattern: "</think>\\s*<answer>", content: "text" } }, "close_pattern"],
     ["an unsupported content opener", { content: { open_pattern: "(?P<x>a)", content: "text" } }, "open_pattern"],
     ["a `^` assertion inside an opener", { reasoning_content: { open_pattern: "(?:^|<think>\\s*)", close: "</think>", content: "text" } }, "open_pattern"],
   ])("falls back to the plain constraint for %s", (_, fields, warning) => {
@@ -569,6 +570,16 @@ describe("StructuredOutputProcessor", () => {
       processor([prompt("<|start_of_role|>assistant [thinking]<|end_of_role|><think>")], scores);
       expect(isAllowed(scores, "x".charCodeAt(0))).toBe(true);
       expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+    });
+
+    it("Granite 3.3: constrains the answer after the literal closer of its close_pattern", () => {
+      const processor = new StructuredOutputProcessor(withTemplate(GRANITE_3_3_RESPONSE_TEMPLATE), { type: "json_object" });
+      const inputIds = prompt("<|start_of_role|>assistant [thinking]<|end_of_role|><think>");
+      feed(processor, inputIds, "reasoning</think>");
+      const scores = logits();
+      processor([inputIds], scores);
+      expect(isAllowed(scores, "{".charCodeAt(0))).toBe(true);
+      expect(isAllowed(scores, "<".charCodeAt(0))).toBe(false);
     });
   });
 

@@ -123,7 +123,11 @@ const granite33_template = {
   defaults: { role: "assistant" },
   start_anchor_pattern: String.raw`<\|start_of_role\|>assistant(?:\s+\[[^\n]*\])?<\|end_of_role\|>`,
   fields: {
-    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: {
+      open: "<think>",
+      close_pattern: String.raw`</think>\s*<response>|</think>(?=\s*[^\s<]|\s*<\|)|</think>\s*\Z`,
+      content: "text",
+    },
     tool_calls: {
       open: "<|tool_call|>",
       close: "<|end_of_text|>",
@@ -131,11 +135,7 @@ const granite33_template = {
       transform_each: true,
       transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
     },
-    content: {
-      close: "<|end_of_text|>",
-      content: "text",
-      content_args: { strip_prefix: "<response>", strip_suffix: "</response>" },
-    },
+    content: { close_pattern: String.raw`(?:</response>)?\s*<\|end_of_text\|>`, content: "text" },
   },
 };
 
@@ -439,6 +439,10 @@ describe("Response templates", () => {
       });
     });
 
+    it("granite 3.3 answer without thinking", () => {
+      expect(parse_response("Paris.<|end_of_text|>", granite33_template, { prefix: "" })).toEqual({ role: "assistant", content: "Paris." });
+    });
+
     it("granite 4 tool calls", () => {
       const model_out = '<think>Use two tools.</think><tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call>\n<tool_call>{"name":"get_time","arguments":{"utc":true}}</tool_call><|end_of_text|>';
       expect(parse_response(model_out, granite4_template, { prefix: "" })).toEqual({
@@ -493,15 +497,6 @@ describe("Response templates", () => {
       expect(parse_response(continued, lfm_template, { prefix: "" }).tool_calls[0].function.arguments.query).toBe("ab");
       const named = String.raw`<|tool_call_start|>[search(query="\N{LATIN CAPITAL LETTER A}")]<|tool_call_end|>`;
       expect(() => parse_response(named, lfm_template, { prefix: "" })).toThrow("named unicode escapes are not supported");
-    });
-
-    it("treats empty text wrappers as no-ops", () => {
-      const template = {
-        start_anchor: "<assistant>",
-        fields: { content: { content: "text", content_args: { strip_prefix: "", strip_suffix: "" } } },
-      };
-      expect(parse_response("answer", template, { prefix: "" })).toEqual({ content: "answer" });
-      expect(stream_all(template, ["answer"]).events.find((event) => event.type === "region_chunk")?.dirty).toBe(false);
     });
 
     it("inkling multi-block message", () => {
@@ -807,10 +802,12 @@ describe("Response templates", () => {
       });
     });
 
-    it("marks wrapper-stripped text as dirty until close", () => {
+    it("streams the granite 3.3 answer without its response wrapper", () => {
       const { message, events } = stream_all(granite33_template, chunk_fixed("<think>reason</think><response>answer</response><|end_of_text|>", 1));
       expect(message).toEqual({ role: "assistant", reasoning_content: "reason", content: "answer" });
-      expect(new Set(events.filter((e) => e.type === "region_chunk" && e.field === "content").map((e) => e.dirty))).toEqual(new Set([true]));
+      const chunks = events.filter((e) => e.type === "region_chunk" && e.field === "content");
+      expect(chunks.map((e) => e.text).join("")).toBe("answer");
+      expect(chunks.every((e) => !e.dirty)).toBe(true);
     });
 
     it("streams prefixless regex delimiters without waiting for the end of the stream", () => {
