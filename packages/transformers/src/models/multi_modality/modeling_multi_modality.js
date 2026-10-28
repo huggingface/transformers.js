@@ -37,8 +37,11 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
         //     //  && model_inputs.input_ids.dims[1] === 1
         // }
 
+        // Check cached tokens.
+        const has_past_tokens = (model_inputs.past_key_values?.get_seq_length() ?? 0) > 0;
+
         let output_1;
-        if (mode === 'text' || !model_inputs.past_key_values) {
+        if (mode === 'text' || !has_past_tokens) {
             const session = this.sessions['prepare_inputs_embeds'];
             const prep_inputs = pick(model_inputs, session.inputNames);
             output_1 = await sessionRun(session, prep_inputs);
@@ -71,7 +74,8 @@ export class MultiModalityCausalLM extends MultiModalityPreTrainedModel {
     }
 
     prepare_inputs_for_generation(input_ids, model_inputs, generation_config) {
-        const has_past_key_values = !!model_inputs.past_key_values;
+        // Check cached tokens, not cache presence (see forward()).
+        const has_past_key_values = (model_inputs.past_key_values?.get_seq_length() ?? 0) > 0;
 
         setNumLogitsToKeep(this, model_inputs, 1n);
 
