@@ -303,6 +303,12 @@ function getNormalizedConfig(config) {
                 encoder_dim_kv: config.head_dim,
             };
             break;
+        case 'gradium_phonon_tts': {
+            // Only the flow model's KV cache is fed back between calls (see `cache_sessions`).
+            const { num_layers, num_heads, head_dim } = /** @type {any} */ (config).phonon?.flow_lm ?? {};
+            init_normalized_config = { num_layers, num_heads, dim_kv: head_dim };
+            break;
+        }
         case 'vision-encoder-decoder':
             // @ts-expect-error TS2339
             const decoderConfig = getNormalizedConfig(config.decoder);

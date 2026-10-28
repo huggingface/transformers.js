@@ -17,6 +17,7 @@ export const MODEL_TYPES = {
     Chatterbox: 15,
     VoxtralRealtime: 16,
     MultimodalEncoder: 17,
+    GradiumPhononTTS: 18,
 };
 
 export const MODEL_SESSION_CONFIG = {
@@ -118,6 +119,10 @@ export const MODEL_SESSION_CONFIG = {
             latent_denoiser: 'latent_denoiser',
             voice_decoder: 'voice_decoder',
         }),
+    },
+    [MODEL_TYPES.GradiumPhononTTS]: {
+        sessions: () => ({ flow_lm: 'flow_lm', mimi_decoder: 'mimi_decoder' }),
+        cache_sessions: { flow_lm: true },
     },
     [MODEL_TYPES.Chatterbox]: {
         sessions: () => ({

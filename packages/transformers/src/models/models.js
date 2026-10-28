@@ -67,6 +67,7 @@ export * from './gpt_neox/modeling_gpt_neox.js';
 export * from './gpt_oss/modeling_gpt_oss.js';
 export * from './gpt2/modeling_gpt2.js';
 export * from './gptj/modeling_gptj.js';
+export * from './gradium_phonon_tts/modeling_gradium_phonon_tts.js';
 export * from './granite/modeling_granite.js';
 export * from './granitemoehybrid/modeling_granitemoehybrid.js';
 export * from './granite_speech/modeling_granite_speech.js';

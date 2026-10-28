@@ -167,6 +167,18 @@ const output = await transcriber(url, { chunk_length_s: 30, stride_length_s: 5 }
 Text-to-audio generation pipeline using any `AutoModelForTextToWaveform` or `AutoModelForTextToSpectrogram`.
 This pipeline generates an audio file from an input text and optional other conditional inputs.
 
+**Example:** Phonon speech with one of the voices in the model repo.
+To receive audio chunk by chunk, use `GradiumPhononTTSForConditionalGeneration.generate_speech()`.
+```javascript
+import { pipeline } from '@huggingface/transformers';
+
+const tts = await pipeline('text-to-speech', 'onnx-community/phonon-31m-en-ONNX', { dtype: 'q4' });
+const speaker_embeddings = 'https://huggingface.co/onnx-community/phonon-31m-en-ONNX/resolve/main/voices/LMDIYE0Oa377Qh6Z.bin';
+const audio = await tts('Hello from Phonon!', { speaker_embeddings });
+await audio.save('phonon.wav');
+await tts.dispose();
+```
+
 **Example:** Generate audio from text with `onnx-community/Supertonic-TTS-ONNX`.
 ```javascript
 import { pipeline } from '@huggingface/transformers';
