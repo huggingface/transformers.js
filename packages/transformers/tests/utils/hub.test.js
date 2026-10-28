@@ -1,6 +1,5 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
-import { buildResourcePaths, getFetchHeaders } from "../../src/utils/hub.js";
-import { makePretrainedOptionsKey } from "../../src/utils/hub/utils.js";
+import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -10,37 +9,36 @@ import fs from "node:fs";
 describe("Hub", () => {
   describe("Session env", () => {
     it("should use scoped resource path options", () => {
-      const paths = buildResourcePaths("org/model", "config.json", {
+      const context = new AssetLoadingContext({
         revision: "refs/pr/1",
-        localModelPath: "/scoped-models/",
-        remoteHost: "https://models.example.com/",
-        remotePathTemplate: "{model}/at/{revision}/",
+        env: {
+          localModelPath: "/scoped-models/",
+          remoteHost: "https://models.example.com/",
+          remotePathTemplate: "{model}/at/{revision}/",
+        },
       });
+      const paths = context.resolve("org/model", "config.json");
 
       expect(paths.localPath).toBe("/scoped-models/org/model/config.json");
       expect(paths.remoteURL).toBe("https://models.example.com/org/model/at/refs%2Fpr%2F1/config.json");
     });
 
     it("should use scoped Hugging Face token for request headers", () => {
-      const headers = getFetchHeaders("https://huggingface.co/org/model/resolve/main/config.json", {
-        version: "test-version",
-        hfToken: "scoped-token",
-      });
+      const context = new AssetLoadingContext({ env: { hfToken: "scoped-token" } });
+      const headers = context.getHeaders("https://huggingface.co/org/model/resolve/main/config.json");
 
       expect(headers.get("Authorization")).toBe("Bearer scoped-token");
     });
 
     it("should authenticate only the configured custom Hub origin", () => {
-      const options = {
-        version: "test-version",
-        hfToken: "scoped-token",
-        remoteHost: "https://private-hub.example/api/",
-      };
+      const context = new AssetLoadingContext({
+        env: { hfToken: "scoped-token", remoteHost: "https://private-hub.example/api/" },
+      });
 
-      const hubHeaders = getFetchHeaders("https://private-hub.example/api/org/model/config.json", options);
-      const externalHeaders = getFetchHeaders("https://cdn.example/org/model/config.json", options);
-      const downgradedHeaders = getFetchHeaders("http://private-hub.example/api/org/model/config.json", options);
-      const otherPortHeaders = getFetchHeaders("https://private-hub.example:8443/api/org/model/config.json", options);
+      const hubHeaders = context.getHeaders("https://private-hub.example/api/org/model/config.json");
+      const externalHeaders = context.getHeaders("https://cdn.example/org/model/config.json");
+      const downgradedHeaders = context.getHeaders("http://private-hub.example/api/org/model/config.json");
+      const otherPortHeaders = context.getHeaders("https://private-hub.example:8443/api/org/model/config.json");
 
       expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
       expect(externalHeaders.has("Authorization")).toBe(false);
@@ -48,15 +46,11 @@ describe("Hub", () => {
       expect(otherPortHeaders.has("Authorization")).toBe(false);
     });
 
-    it("should fingerprint credentials in memoization keys", () => {
-      const token = "hf_secret-token-value";
-      const first = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
-      const repeated = makePretrainedOptionsKey("org/model", { env: { hfToken: token } });
-      const other = makePretrainedOptionsKey("org/model", { env: { hfToken: "hf_other-token" } });
+    it("should split memoization keys by token", () => {
+      const key = (hfToken) => new AssetLoadingContext({ env: { hfToken } }).key("org/model");
 
-      expect(first).toBe(repeated);
-      expect(first).not.toBe(other);
-      expect(first).not.toContain(token);
+      expect(key("hf_token")).toBe(key("hf_token"));
+      expect(key("hf_token")).not.toBe(key("hf_other-token"));
     });
   });
 

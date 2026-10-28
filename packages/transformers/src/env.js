@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 
-const VERSION = '4.3.1';
+const VERSION = '4.3.2';
 
 const HAS_SELF = typeof self !== 'undefined';
 
@@ -165,12 +165,11 @@ const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.
 
 // `remoteHost` and `hfToken` fall back to environment variables, which are read on access (not at import)
 // so that variables loaded after importing the library (e.g., with `dotenv`) are still picked up.
+// Assigning `undefined` restores that fallback (e.g., when restoring a `{ ...env }` snapshot).
 // NOTE: We keep `HF_ACCESS_TOKEN` for backwards compatibility (as a fallback).
 const readEnvVar = (name) => globalThis.process?.env?.[name];
 let remoteHost;
-let remoteHostAssigned = false;
 let hfToken;
-let hfTokenAssigned = false;
 
 const SESSION_ENV_KEYS = Object.freeze([
     'allowRemoteModels',
@@ -281,11 +280,10 @@ export const env = {
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     get remoteHost() {
-        return remoteHostAssigned ? remoteHost : (readEnvVar('HF_ENDPOINT') ?? 'https://huggingface.co/');
+        return remoteHost !== undefined ? remoteHost : (readEnvVar('HF_ENDPOINT') ?? 'https://huggingface.co/');
     },
     set remoteHost(value) {
         remoteHost = value;
-        remoteHostAssigned = true;
     },
     remotePathTemplate: '{model}/resolve/{revision}/',
 
@@ -310,11 +308,10 @@ export const env = {
     /////////////////// Custom fetch /////////////////////
     fetch: DEFAULT_FETCH,
     get hfToken() {
-        return hfTokenAssigned ? hfToken : (readEnvVar('HF_TOKEN') ?? readEnvVar('HF_ACCESS_TOKEN'));
+        return hfToken !== undefined ? hfToken : (readEnvVar('HF_TOKEN') ?? readEnvVar('HF_ACCESS_TOKEN'));
     },
     set hfToken(value) {
         hfToken = value;
-        hfTokenAssigned = true;
     },
 
     //////////////////////////////////////////////////////

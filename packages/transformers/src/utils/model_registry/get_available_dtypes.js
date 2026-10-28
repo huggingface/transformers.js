@@ -1,6 +1,7 @@
 import { getSessionsConfig } from '../../models/session_config.js';
 import { DEFAULT_DTYPE_SUFFIX_MAPPING } from '../dtypes.js';
-import { get_file_metadata } from './get_file_metadata.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
+import { get_file_metadata_with_context } from './get_file_metadata.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
 
@@ -37,17 +38,8 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * @throws {Error} On network or server failures.
  */
 export async function get_available_dtypes(modelId, options = {}) {
-    const {
-        config: providedConfig = null,
-        model_file_name = null,
-        revision = 'main',
-        cache_dir = null,
-        local_files_only = false,
-    } = options;
-    const sessionEnv = options.env ?? {};
-
-    let config = providedConfig;
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, env: sessionEnv });
+    const { model_file_name = null } = options;
+    const config = await get_config(modelId, options);
 
     const subfolder = 'onnx';
 
@@ -58,8 +50,8 @@ export async function get_available_dtypes(modelId, options = {}) {
     // Get all base names for model session files
     const baseNames = Object.values(sessions);
 
-    // For each dtype, check if all session files exist
-    const metadataOptions = { revision, cache_dir, local_files_only, env: sessionEnv };
+    // For each dtype, check if all session files exist, sharing one loading context (and cache) across probes
+    const context = new AssetLoadingContext(options);
 
     // Probe all (dtype, baseName) combinations in parallel
     const probeResults = await Promise.all(
@@ -68,7 +60,7 @@ export async function get_available_dtypes(modelId, options = {}) {
             const allExist = await Promise.all(
                 baseNames.map(async (baseName) => {
                     const filename = `${subfolder}/${baseName}${suffix}.onnx`;
-                    const metadata = await get_file_metadata(modelId, filename, metadataOptions);
+                    const metadata = await get_file_metadata_with_context(modelId, filename, context);
                     return metadata.exists;
                 }),
             );

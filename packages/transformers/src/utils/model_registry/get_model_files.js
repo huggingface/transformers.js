@@ -3,7 +3,7 @@ import { selectDevice } from '../devices.js';
 import { resolveExternalDataFormat, getExternalDataChunkNames } from '../model-loader.js';
 import { getSessionsConfig } from '../../models/session_config.js';
 import { AutoConfig } from '../../configs.js';
-import { makePretrainedOptionsKey } from '../hub/utils.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
 import { memoizePromise } from '../memoize_promise.js';
 import { resolve_model_type } from './resolve_model_type.js';
 
@@ -29,17 +29,15 @@ import { resolve_model_type } from './resolve_model_type.js';
  * @returns {Promise<PretrainedConfig>}
  */
 export function get_config(modelId, options = {}) {
-    const { config = null, cache_dir = null, local_files_only = false, revision = 'main' } = options;
-    const sessionEnv = options.env ?? {};
+    const { config = null, cache_dir = null, local_files_only = false, revision = 'main', env = {} } = options;
+    const load_options = { config, cache_dir, local_files_only, revision, env };
     // When a pre-loaded config is provided, skip memoization — no fetch occurs
     // and there is no meaningful key to deduplicate on.
     if (config !== null) {
-        return AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, env: sessionEnv });
+        return AutoConfig.from_pretrained(modelId, load_options);
     }
-    const key = makePretrainedOptionsKey(modelId, { cache_dir, local_files_only, revision, env: sessionEnv });
-    return memoizePromise(key, () =>
-        AutoConfig.from_pretrained(modelId, { config, cache_dir, local_files_only, revision, env: sessionEnv }),
-    );
+    const key = new AssetLoadingContext(load_options).key(modelId, 'config');
+    return memoizePromise(key, () => AutoConfig.from_pretrained(modelId, load_options));
 }
 
 /**
@@ -62,19 +60,8 @@ export function get_config(modelId, options = {}) {
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_model_files(modelId, options = {}) {
-    const {
-        config: providedConfig = null,
-        cache_dir = null,
-        local_files_only = false,
-        revision = 'main',
-        dtype: overrideDtype = null,
-        device: overrideDevice = null,
-        model_file_name = null,
-    } = options;
-    const sessionEnv = options.env ?? {};
-
-    let config = providedConfig;
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision, env: sessionEnv });
+    const { dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = options;
+    const config = await get_config(modelId, options);
 
     const files = [
         // Add config.json (always loaded)

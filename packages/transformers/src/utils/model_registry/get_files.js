@@ -21,28 +21,8 @@ import { get_processor_files } from './get_processor_files.js';
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  */
 export async function get_files(modelId, options = {}) {
-    const {
-        config = null,
-        cache_dir = null,
-        local_files_only = false,
-        revision = 'main',
-        dtype = null,
-        device = null,
-        model_file_name = null,
-        include_tokenizer = true,
-        include_processor = true,
-    } = options;
-    const sessionEnv = options.env ?? {};
-    const files = await get_model_files(modelId, {
-        config,
-        cache_dir,
-        local_files_only,
-        revision,
-        dtype,
-        device,
-        model_file_name,
-        env: sessionEnv,
-    });
+    const { include_tokenizer = true, include_processor = true } = options;
+    const files = await get_model_files(modelId, options);
 
     if (include_tokenizer) {
         const tokenizerFiles = await get_tokenizer_files(modelId, options);

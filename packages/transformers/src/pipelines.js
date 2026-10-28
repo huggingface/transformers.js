@@ -134,8 +134,7 @@ export async function pipeline(
         }
     }
 
-    // Determine which files the model needs
-    const expected_files = await get_pipeline_files(task, model, {
+    const load_options = {
         config,
         cache_dir,
         local_files_only,
@@ -144,7 +143,10 @@ export async function pipeline(
         dtype,
         model_file_name,
         env: sessionEnv,
-    });
+    };
+
+    // Determine which files the model needs
+    const expected_files = await get_pipeline_files(task, model, load_options);
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
@@ -152,9 +154,7 @@ export async function pipeline(
         try {
             /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
             const metadata = await Promise.all(
-                expected_files.map(async (file) =>
-                    get_file_metadata(model, file, { cache_dir, local_files_only, revision, env: sessionEnv }),
-                ),
+                expected_files.map(async (file) => get_file_metadata(model, file, load_options)),
             );
             metadata.forEach((m, i) => {
                 if (m.exists) {
@@ -171,20 +171,13 @@ export async function pipeline(
     }
 
     const pretrainedOptions = {
+        ...load_options,
         progress_callback: progress_callback
             ? new DefaultProgressCallback(progress_callback, files_loading)
             : undefined,
-        config,
-        cache_dir,
-        local_files_only,
-        revision,
-        device,
-        dtype,
         subfolder,
         use_external_data_format,
-        model_file_name,
         session_options,
-        env: sessionEnv,
     };
 
     // Determine which components to load based on the expected files

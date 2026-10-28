@@ -2,17 +2,8 @@
  * @file File metadata utilities for cache-aware operations
  */
 
-import { resolveEnv } from '../../env.js';
-import { getCache } from '../cache.js';
-import {
-    buildResourcePaths,
-    checkCachedResource,
-    getFetchHeaders,
-    getFetchOptions,
-    getFile,
-    getPathOptions,
-} from '../hub.js';
-import { handleError, isValidUrl, makePretrainedOptionsKey } from '../hub/utils.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
+import { handleError, isValidUrl } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 
 /**
@@ -30,18 +21,19 @@ import { memoizePromise } from '../memoize_promise.js';
  * 5. Range requests typically aren't compressed, and content-range header shows true uncompressed size
  *
  * @param {URL|string} urlOrPath The URL/path of the file.
+ * @param {AssetLoadingContext} context Captured resource-loading settings.
  * @returns {Promise<Response|null>} A promise that resolves to a Response object or null if not supported.
  * @private
  */
-async function fetch_file_head(urlOrPath, fetchOptions) {
+async function fetch_file_head(urlOrPath, context) {
     // Range requests only make sense for HTTP URLs
     if (!isValidUrl(urlOrPath, ['http:', 'https:'])) {
         return null;
     }
 
-    const headers = getFetchHeaders(urlOrPath, fetchOptions);
-    headers.set('Range', 'bytes=0-0');
-    return fetchOptions.fetch(urlOrPath, { method: 'GET', headers, cache: 'no-store' });
+    return /** @type {Response} */ (
+        await context.read(urlOrPath, { method: 'GET', headers: { Range: 'bytes=0-0' }, cache: 'no-store' })
+    );
 }
 
 /**
@@ -59,25 +51,28 @@ async function fetch_file_head(urlOrPath, fetchOptions) {
  * @throws {Error} On network or server failures.
  */
 export function get_file_metadata(path_or_repo_id, filename, options = {}) {
-    const key = makePretrainedOptionsKey(path_or_repo_id, options, filename);
-    return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, options));
+    return get_file_metadata_with_context(path_or_repo_id, filename, new AssetLoadingContext(options));
 }
 
-async function _get_file_metadata(path_or_repo_id, filename, options) {
-    const env = resolveEnv(options.env);
-    const fetchOptions = getFetchOptions(env);
-    const pathOptions = getPathOptions(options, env);
+/**
+ * Like `get_file_metadata`, but reuses an existing loading context (and its cache).
+ * @param {string} path_or_repo_id @param {string} filename @param {AssetLoadingContext} context
+ * @private
+ */
+export function get_file_metadata_with_context(path_or_repo_id, filename, context) {
+    const key = context.key(path_or_repo_id, 'metadata', filename);
+    return memoizePromise(key, () => _get_file_metadata(path_or_repo_id, filename, context));
+}
+
+/** @param {string} path_or_repo_id @param {string} filename @param {AssetLoadingContext} context @private */
+async function _get_file_metadata(path_or_repo_id, filename, context) {
     /** @type {import('../cache.js').CacheInterface | null} */
-    const cache = await getCache(options?.cache_dir, { env: options.env });
-    const { localPath, remoteURL, proposedCacheKey, validModelId } = buildResourcePaths(
-        path_or_repo_id,
-        filename,
-        pathOptions,
-        cache,
-    );
+    const cache = await context.getCache();
+    const resource = context.resolve(path_or_repo_id, filename, cache);
+    const { localPath, remoteURL, validModelId } = resource;
 
     // Check cache first - if cached, we can get metadata from the cached response
-    const cachedResponse = await checkCachedResource(cache, localPath, proposedCacheKey);
+    const cachedResponse = (await context.match(cache, resource))?.response;
     if (cachedResponse !== undefined && typeof cachedResponse !== 'string') {
         const size = cachedResponse.headers.get('content-length');
         const contentType = cachedResponse.headers.get('content-type');
@@ -90,11 +85,11 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     }
 
     // Check local file system
-    if (env.allowLocalModels) {
+    if (context.settings.allowLocalModels) {
         const isURL = isValidUrl(localPath, ['http:', 'https:']);
         if (!isURL) {
             try {
-                const response = await getFile(localPath, fetchOptions);
+                const response = await context.read(localPath);
                 if (typeof response !== 'string' && response.status !== 404) {
                     const size = response.headers.get('content-length');
                     const contentType = response.headers.get('content-type');
@@ -113,10 +108,10 @@ async function _get_file_metadata(path_or_repo_id, filename, options) {
     }
 
     // Check remote if allowed - use Range request for efficiency
-    if (env.allowRemoteModels && !options.local_files_only && validModelId) {
+    if (context.settings.allowRemoteModels && !context.options.local_files_only && validModelId) {
         // A Range request reads the metadata without downloading the file.
         // Transport failures propagate: they mean "could not check", not "missing".
-        const rangeResponse = await fetch_file_head(remoteURL, fetchOptions);
+        const rangeResponse = await fetch_file_head(remoteURL, context);
 
         if (rangeResponse && rangeResponse.status >= 200 && rangeResponse.status < 300) {
             let size;

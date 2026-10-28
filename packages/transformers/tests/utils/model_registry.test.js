@@ -4,6 +4,7 @@ import { jest } from "@jest/globals";
 const mockGetFileMetadata = jest.fn();
 jest.unstable_mockModule("../../src/utils/model_registry/get_file_metadata.js", () => ({
   get_file_metadata: mockGetFileMetadata,
+  get_file_metadata_with_context: mockGetFileMetadata,
 }));
 
 // Mock get_config so config-loading failures can be simulated
@@ -182,9 +183,12 @@ describe("get_available_dtypes", () => {
       env,
     });
 
+    const contexts = new Set(mockGetFileMetadata.mock.calls.map((call) => call[2]));
+    expect(contexts.size).toBe(1);
     for (const call of mockGetFileMetadata.mock.calls) {
       expect(call[0]).toBe("test/model");
-      expect(call[2]).toMatchObject({ revision: "v2", env });
+      expect(call[2].options).toMatchObject({ revision: "v2" });
+      expect(call[2].settings).toMatchObject(env);
     }
   });
 

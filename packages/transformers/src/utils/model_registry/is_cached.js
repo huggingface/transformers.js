@@ -1,6 +1,4 @@
-import { getCache } from '../cache.js';
-import { resolveEnv } from '../../env.js';
-import { buildResourcePaths, checkCachedResource, getPathOptions } from '../hub.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
 import { get_files } from './get_files.js';
 import { get_pipeline_files } from './get_pipeline_files.js';
 
@@ -25,9 +23,8 @@ import { get_pipeline_files } from './get_pipeline_files.js';
  * @returns {Promise<CacheCheckResult>}
  */
 async function check_files_cache(modelId, files, options = {}) {
-    const cache = await getCache(options?.cache_dir, { env: options.env });
-    const env = resolveEnv(options.env);
-    const pathOptions = getPathOptions(options, env);
+    const context = new AssetLoadingContext(options);
+    const cache = await context.getCache();
 
     if (!cache) {
         const fileStatuses = files.map((filename) => ({ file: filename, cached: false }));
@@ -37,8 +34,8 @@ async function check_files_cache(modelId, files, options = {}) {
 
     const fileStatuses = await Promise.all(
         files.map(async (filename) => {
-            const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, pathOptions, cache);
-            const cached = await checkCachedResource(cache, localPath, proposedCacheKey);
+            const resource = context.resolve(modelId, filename, cache);
+            const cached = await context.match(cache, resource);
             return { file: filename, cached: !!cached };
         }),
     );
@@ -55,12 +52,10 @@ async function check_files_cache(modelId, files, options = {}) {
  * @returns {Promise<boolean>}
  */
 async function is_file_cached(modelId, filename, options = {}) {
-    const cache = await getCache(options?.cache_dir, { env: options.env });
+    const context = new AssetLoadingContext(options);
+    const cache = await context.getCache();
     if (!cache) return false;
-    const env = resolveEnv(options.env);
-    const pathOptions = getPathOptions(options, env);
-    const { localPath, proposedCacheKey } = buildResourcePaths(modelId, filename, pathOptions, cache);
-    return !!(await checkCachedResource(cache, localPath, proposedCacheKey));
+    return !!(await context.match(cache, context.resolve(modelId, filename, cache)));
 }
 
 /**

@@ -2,9 +2,8 @@ import { jest } from "@jest/globals";
 
 import { CrossOriginStorage } from "../../src/utils/cache/CrossOriginStorageCache.js";
 import { env } from "../../src/env.js";
-import { getCache } from "../../src/utils/cache.js";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
-import { getFetchHeaders, getFetchOptions } from "../../src/utils/hub.js";
+import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 import { Pipeline, getSessionEnv, prepareImages, prepareAudios } from "../../src/pipelines/_base.js";
 
 describe("Session-scoped resource loading", () => {
@@ -42,7 +41,7 @@ describe("Session-scoped resource loading", () => {
       env.useCustomCache = false;
 
       try {
-        const cache = await getCache(null, { env: { fetch } });
+        const cache = await new AssetLoadingContext({ env: { fetch } }).getCache();
 
         await expect(cache.match("https://huggingface.co/org/model/resolve/main/model.onnx")).resolves.toBeUndefined();
         expect(fetch).toHaveBeenCalledWith("https://huggingface.co/org/model/raw/main/model.onnx");
@@ -90,14 +89,14 @@ describe("Session-scoped resource loading", () => {
     });
 
     it("should use the session-scoped cacheDir for the file system cache", async () => {
-      const cache = await getCache(null, { env: { cacheDir: "/session-cache/" } });
+      const cache = await new AssetLoadingContext({ env: { cacheDir: "/session-cache/" } }).getCache();
 
       expect(cache).toBeInstanceOf(FileCache);
       expect(/** @type {FileCache} */ (cache).path).toBe("/session-cache/");
     });
 
     it("should let cache_dir override the session cacheDir", async () => {
-      const cache = await getCache("/legacy-cache/", { env: { cacheDir: "/session-cache/" } });
+      const cache = await new AssetLoadingContext({ cache_dir: "/legacy-cache/", env: { cacheDir: "/session-cache/" } }).getCache();
 
       expect(/** @type {FileCache} */ (cache).path).toBe("/legacy-cache/");
     });
@@ -126,7 +125,28 @@ describe("Session-scoped resource loading", () => {
 
       expect(env.hfToken).toBe("late-token");
       expect(env.remoteHost).toBe("https://late-hub.example/");
-      expect(getFetchHeaders("https://late-hub.example/org/model", getFetchOptions(env)).get("Authorization")).toBe("Bearer late-token");
+      expect(new AssetLoadingContext().getHeaders("https://late-hub.example/org/model").get("Authorization")).toBe("Bearer late-token");
+    });
+
+    it("should restore the environment-variable fallback when assigned undefined", () => {
+      env.hfToken = "assigned-token";
+      env.remoteHost = "https://assigned-hub.example/";
+      env.hfToken = undefined;
+      env.remoteHost = undefined;
+      process.env.HF_TOKEN = "late-token";
+      process.env.HF_ENDPOINT = "https://late-hub.example/";
+
+      expect(env.hfToken).toBe("late-token");
+      expect(env.remoteHost).toBe("https://late-hub.example/");
+    });
+
+    it("should keep reading HF_TOKEN after an env snapshot without a token is restored", () => {
+      const snapshot = { ...env };
+      env.hfToken = "assigned-token";
+      Object.assign(env, snapshot);
+      process.env.HF_TOKEN = "late-token";
+
+      expect(env.hfToken).toBe("late-token");
     });
 
     it("should fall back to HF_ACCESS_TOKEN and the official Hub", () => {
@@ -173,7 +193,7 @@ describe("Session-scoped resource loading", () => {
           return { numberOfChannels: 1, length: 2, getChannelData: () => new Float32Array([0.25, 0.5]) };
         }
       };
-      const fetch = jest.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(8) }));
+      const fetch = jest.fn(async () => new Response(new ArrayBuffer(8)));
 
       try {
         const [audio] = await prepareAudios(new Pipeline({ task: "test", model: null, sessionEnv: { ...sessionEnv, fetch } }), "https://private-hub.example/audio.wav", 16000);

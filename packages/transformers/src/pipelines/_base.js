@@ -1,13 +1,12 @@
 import { PreTrainedTokenizer } from '../tokenization_utils.js';
 import { PreTrainedModel } from '../models/modeling_utils.js';
 import { Processor } from '../processing_utils.js';
-import { resolveEnv } from '../env.js';
 
 import { Callable } from '../utils/generic.js';
 
 import { decode_audio } from '../utils/audio.js';
 import { RawImage } from '../utils/image.js';
-import { getFile, getFetchOptions } from '../utils/hub.js';
+import { getFile } from '../utils/hub.js';
 
 /**
  * Session-scopable environment overrides of each pipeline. Kept off the instance so that they
@@ -30,10 +29,16 @@ export function getSessionEnv(pipeline) {
  * Download a pipeline input given as a path/URL, using the pipeline's environment.
  * @param {object} pipeline The pipeline the input is for.
  * @param {string|URL} url The path/URL of the input.
+ * @param {string} kind The kind of input (used in the error message).
  * @returns {Promise<import('../utils/hub/FileResponse.js').FileResponse|Response>} The response.
+ * @private
  */
-async function fetchInput(pipeline, url) {
-    return await getFile(url, getFetchOptions(resolveEnv(getSessionEnv(pipeline))));
+export async function fetchInput(pipeline, url, kind) {
+    const response = await getFile(url, { env: getSessionEnv(pipeline) });
+    if (response.status !== 200) {
+        throw new Error(`Unable to read ${kind} from "${url}" (${response.status} ${response.statusText})`);
+    }
+    return response;
 }
 
 /**
@@ -56,10 +61,7 @@ export async function prepareImages(pipeline, images) {
     return await Promise.all(
         images.map(async (x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                const response = await fetchInput(pipeline, x);
-                if (response.status !== 200) {
-                    throw new Error(`Unable to read image from "${x}" (${response.status} ${response.statusText})`);
-                }
+                const response = await fetchInput(pipeline, x, 'image');
                 return await RawImage.fromBlob(await response.blob());
             }
             return await RawImage.read(x);
@@ -87,7 +89,7 @@ export async function prepareAudios(pipeline, audios, sampling_rate) {
     return await Promise.all(
         audios.map(async (x) => {
             if (typeof x === 'string' || x instanceof URL) {
-                const response = await fetchInput(pipeline, x);
+                const response = await fetchInput(pipeline, x, 'audio');
                 return await decode_audio(await response.arrayBuffer(), sampling_rate);
             } else if (x instanceof Float64Array) {
                 return new Float32Array(x);

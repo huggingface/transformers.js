@@ -305,14 +305,7 @@ export class PreTrainedModel extends Callable {
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
 
-        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, {
-            progress_callback,
-            config,
-            cache_dir,
-            local_files_only,
-            revision,
-            env: sessionEnv,
-        });
+        config = options.config = await AutoConfig.from_pretrained(pretrained_model_name_or_path, options);
 
         const { typeConfig, textOnly, modelType } = resolveTypeConfig(modelName, config);
 
@@ -334,16 +327,7 @@ export class PreTrainedModel extends Callable {
             const files_loading = {};
 
             try {
-                const expected_files = await get_model_files(pretrained_model_name_or_path, {
-                    config,
-                    dtype,
-                    device,
-                    model_file_name,
-                    cache_dir,
-                    local_files_only,
-                    revision,
-                    env: sessionEnv,
-                });
+                const expected_files = await get_model_files(pretrained_model_name_or_path, options);
 
                 const metadata = await Promise.all(
                     expected_files.map((file) => get_file_metadata(pretrained_model_name_or_path, file, options)),
