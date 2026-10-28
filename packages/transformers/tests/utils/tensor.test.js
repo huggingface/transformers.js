@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, mean_pooling, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -347,6 +347,40 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("mean_pooling", () => {
+    it("should average only the attended tokens", () => {
+      // 2 sequences of 3 tokens, embedDim 2; the second sequence has one padding token.
+      const hidden = new Tensor("float32", [1, 2, 3, 4, 5, 6, 10, 20, 30, 40, 99, 99], [2, 3, 2]);
+      const mask = new Tensor("int64", [1n, 1n, 1n, 1n, 1n, 0n], [2, 3]);
+      const target = new Tensor("float32", [3, 4, 20, 30], [2, 2]);
+      expect(mean_pooling(hidden, mask)).toEqual(target);
+    });
+
+    it("should match a per-dimension reference implementation exactly", () => {
+      const [batchSize, seqLength, embedDim] = [3, 7, 16];
+      const hidden = rand([batchSize, seqLength, embedDim]);
+      const lengths = [7, 1, 4];
+      const maskData = new BigInt64Array(batchSize * seqLength);
+      lengths.forEach((n, i) => maskData.fill(1n, i * seqLength, i * seqLength + n));
+      const mask = new Tensor("int64", maskData, [batchSize, seqLength]);
+
+      const expected = new Float32Array(batchSize * embedDim);
+      for (let i = 0; i < batchSize; ++i) {
+        for (let k = 0; k < embedDim; ++k) {
+          let sum = 0;
+          let count = 0;
+          for (let j = 0; j < seqLength; ++j) {
+            const attn = Number(maskData[i * seqLength + j]);
+            count += attn;
+            sum += hidden.data[(i * seqLength + j) * embedDim + k] * attn;
+          }
+          expected[i * embedDim + k] = sum / count;
+        }
+      }
+      expect(mean_pooling(hidden, mask).data).toEqual(expected);
+    });
+  });
+
   describe("layer_norm", () => {
     it("should calculate layer norm", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
@@ -461,7 +495,10 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
     it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
-      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
+      for (const [divisor, values] of [
+        [1e20, [1, 3]],
+        [-1e20, [-1, -3]],
+      ]) {
         const tensor = new Tensor(type, values, [2]);
         expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
         expect(Array.from(tensor.data)).toEqual(values);
