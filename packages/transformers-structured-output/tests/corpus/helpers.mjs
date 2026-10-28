@@ -20,7 +20,7 @@ function allowed(logits, tokenId) {
   return Number.isFinite(logits.data[tokenId]);
 }
 
-export function compileJsonSchema(schema) {
+function compileJsonSchema(schema) {
   return new StructuredOutputProcessor(tokenizer, { type: "json_schema", json_schema: schema });
 }
 

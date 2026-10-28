@@ -461,7 +461,10 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
     it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
-      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
+      for (const [divisor, values] of [
+        [1e20, [1, 3]],
+        [-1e20, [-1, -3]],
+      ]) {
         const tensor = new Tensor(type, values, [2]);
         expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
         expect(Array.from(tensor.data)).toEqual(values);

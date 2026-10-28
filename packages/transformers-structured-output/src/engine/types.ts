@@ -1,4 +1,4 @@
-export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
+type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
 export type JSONSchema = boolean | { [key: string]: JSONValue };
 export type TokenizerSource = object | ((...args: unknown[]) => unknown);
 

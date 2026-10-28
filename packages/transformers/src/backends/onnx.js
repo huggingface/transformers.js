@@ -150,7 +150,7 @@ if (ORT_SYMBOL in globalThis) {
  * A new array is returned on each call, so modifying it does not affect device selection.
  * @returns {import("../utils/devices.js").DeviceType[]} The supported devices.
  */
-export function getSupportedDevices() {
+function getSupportedDevices() {
     return [...supportedDevices];
 }
 

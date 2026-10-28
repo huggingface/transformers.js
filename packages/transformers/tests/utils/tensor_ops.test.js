@@ -256,7 +256,10 @@ describe("Tensor operations", () => {
       const dim = new Tensor("int64", [BigInt(axis)], []);
       await expect(rfft(input, dim)).rejects.toThrow("out of bounds");
     });
-    it.each([[0, -2], [1, -1]])("should produce the same result for axes %s and %s", async (positive, negative) => {
+    it.each([
+      [0, -2],
+      [1, -1],
+    ])("should produce the same result for axes %s and %s", async (positive, negative) => {
       const input = new Tensor("float32", [0, 1, 2, 3, 4, 5], [2, 3]);
       const dim = new Tensor("int64", [BigInt(negative)], []);
       const expected = await rfft(input, new Tensor("int64", [BigInt(positive)], []));
