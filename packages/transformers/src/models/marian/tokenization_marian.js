@@ -1,5 +1,4 @@
 import { PreTrainedTokenizer } from '../../tokenization_utils.js';
-import { mergeArrays } from '../../utils/core.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -15,7 +14,7 @@ export class MarianTokenizer extends PreTrainedTokenizer {
     constructor(tokenizerJSON, tokenizerConfig) {
         super(tokenizerJSON, tokenizerConfig);
 
-        this.languageRegex = /^(>>\w+<<)\s*/g;
+        this.languageRegex = /^(>>\w+<<)\s*/;
 
         this.supported_language_codes = Array.from(this.get_vocab().keys()).filter((x) => this.languageRegex.test(x));
 
@@ -25,32 +24,52 @@ export class MarianTokenizer extends PreTrainedTokenizer {
     }
 
     /**
-     * Encodes a single text. Overriding this method is necessary since the language codes
-     * must be removed before encoding with sentencepiece model.
-     * @see https://github.com/huggingface/transformers/blob/12d51db243a00726a548a43cc333390ebae731e3/src/transformers/models/marian/tokenization_marian.py#L204-L213
+     * Splits the language code (e.g., `>>fr<<`) off the start of the text, since it
+     * must be removed before encoding with the sentencepiece model.
+     * @see https://github.com/huggingface/transformers/blob/v4.57.1/src/transformers/models/marian/tokenization_marian.py#L185-L196
      *
-     * @param {string|null} text The text to encode.
-     * @returns {string[]|null} The encoded tokens.
+     * @param {string} text The text to split.
+     * @returns {[string|null, string]} The language code (or `null` if the text does not start with one) and the remaining text.
+     * @private
      */
-    _encode_text(text) {
-        if (text === null) return null;
-
-        // Check if text starts with language code:
-        const [matchInfo, ...remainder] = text.trim().split(this.languageRegex);
-
-        if (remainder.length === 0) {
-            // No language code, encode normally
-            return super._encode_text(matchInfo);
-        } else if (remainder.length === 2) {
-            // Text starts with language code, so we do not encode it with sentencepiece.
-            const [language, text] = remainder;
-
-            if (!this.supported_language_codes.includes(language)) {
-                logger.warn(
-                    `Unsupported language code "${language}" detected, which may lead to unexpected behavior. Should be one of: ${JSON.stringify(this.supported_language_codes)}`,
-                );
-            }
-            return mergeArrays([language], super._encode_text(text));
+    _split_language_code(text) {
+        const match = text.match(this.languageRegex);
+        if (match === null) {
+            return [null, text];
         }
+        const language = match[1];
+        if (!this.supported_language_codes.includes(language)) {
+            logger.warn(
+                `Unsupported language code "${language}" detected, which may lead to unexpected behavior. Should be one of: ${JSON.stringify(this.supported_language_codes)}`,
+            );
+        }
+        return [language, text.slice(match[0].length)];
+    }
+
+    /**
+     * @type {PreTrainedTokenizer['_encode_plus']}
+     * @protected
+     */
+    _encode_plus(text, options) {
+        const [language, remainder] = this._split_language_code(text);
+        const encoded = super._encode_plus(remainder, options);
+        if (language !== null) {
+            encoded.input_ids.unshift(this.convert_tokens_to_ids(language) ?? this.unk_token_id);
+            encoded.attention_mask.unshift(1);
+            encoded.token_type_ids?.unshift(0);
+        }
+        return encoded;
+    }
+
+    /** @type {PreTrainedTokenizer['encode']} */
+    encode(text, options) {
+        return this._encode_plus(text, options).input_ids;
+    }
+
+    /** @type {PreTrainedTokenizer['tokenize']} */
+    tokenize(text, options) {
+        const [language, remainder] = this._split_language_code(text);
+        const tokens = super.tokenize(remainder, options);
+        return language === null ? tokens : [language, ...tokens];
     }
 }

@@ -114,6 +114,14 @@ export const M2M_100_TEST_STRINGS = {
   CHINESE_TEXT: "生活就像一盒巧克力。",
 };
 
+export const MARIAN_TEST_STRINGS = {
+  LANGUAGE_CODE: ">>fr<< The weather is nice today.",
+  LANGUAGE_CODE_WITH_REGION: ">>es_MX<< Hello world",
+  LANGUAGE_CODE_WITHOUT_SPACE: ">>fr<<Hello",
+  LANGUAGE_CODE_NOT_AT_START: "Hello >>fr<< world",
+  UNKNOWN_LANGUAGE_CODE: ">>xx<< Hello",
+};
+
 // Test strings adapted from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize
 export const NORMALIZATION_TEST_STRINGS = {
   DEFAULT_EXAMPLE: "\u0041\u006d\u00e9\u006c\u0069\u0065 | \u0041\u006d\u0065\u0301\u006c\u0069\u0065",
