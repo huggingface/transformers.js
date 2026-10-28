@@ -459,10 +459,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             }
         }
 
-        // Skip decoder_input_ids in the cross-attention weights
+        // Skip the cross-attention rows of the decoder_input_ids, except the last one: row `i` is
+        // computed while predicting token `i + 1`, so the last prompt row belongs to the first
+        // generated token (as in openai/whisper's timing.py).
+        const num_skipped_rows = Math.max(num_input_ids - 1, 0);
         const croppedWeights =
-            num_input_ids > 0
-                ? smoothedWeights.slice(null, null, [num_input_ids, smoothedWeights.dims[2]], null)
+            num_skipped_rows > 0
+                ? smoothedWeights.slice(null, null, [num_skipped_rows, smoothedWeights.dims[2]], null)
                 : smoothedWeights;
 
         // Average the different cross-attention heads.
@@ -497,14 +500,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 }
             }
 
-            // Pad with num_input_ids zeros at the start (for prefix tokens),
-            // then DTW jump_times, then duplicate last value (for eos token)
-            const padded = new Array(num_input_ids).fill(0);
+            // Prompt tokens get 0; each generated token gets the time of the row that predicted it.
+            const padded = new Array(num_skipped_rows + 1).fill(0);
             padded.push(...jump_times);
-            if (jump_times.length > 0) {
-                padded.push(jump_times.at(-1));
-            }
-            timestamps[batch_idx].data.set(padded);
+            timestamps[batch_idx].data.set(padded.slice(0, timestampsShape[1]));
         }
 
         return timestamps;
