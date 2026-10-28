@@ -51,6 +51,9 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
         const input = inputIds[0];
+        if (this.state.processedInputLength === undefined) {
+            this.state.constraint.initializePrompt(input);
+        }
         const start = this.state.processedInputLength ?? input.length;
         for (let i = start; i < input.length; ++i) {
             if (this.state.constraint.commit(Number(input[i]))) {
