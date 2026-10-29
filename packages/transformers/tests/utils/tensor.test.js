@@ -359,9 +359,13 @@ describe("Tensor operations", () => {
     it("should match a per-dimension reference implementation exactly", () => {
       const [batchSize, seqLength, embedDim] = [3, 7, 16];
       const hidden = rand([batchSize, seqLength, embedDim]);
-      const lengths = [7, 1, 4];
-      const maskData = new BigInt64Array(batchSize * seqLength);
-      lengths.forEach((n, i) => maskData.fill(1n, i * seqLength, i * seqLength + n));
+      // Trailing padding, padding between tokens, and weights other than 1.
+      // prettier-ignore
+      const maskData = new BigInt64Array([
+        1n, 1n, 1n, 1n, 1n, 1n, 1n,
+        1n, 0n, 0n, 0n, 0n, 0n, 0n,
+        1n, 0n, 2n, 3n, 0n, 1n, 0n,
+      ]);
       const mask = new Tensor("int64", maskData, [batchSize, seqLength]);
 
       const expected = new Float32Array(batchSize * embedDim);
@@ -378,6 +382,18 @@ describe("Tensor operations", () => {
         }
       }
       expect(mean_pooling(hidden, mask).data).toEqual(expected);
+    });
+
+    it("should return NaN for a sequence with no attended tokens", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      const mask = new Tensor("int64", [0n, 0n], [1, 2]);
+      expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([NaN, NaN]);
+    });
+
+    it("should ignore non-finite values at padding positions", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4, NaN, Infinity], [1, 3, 2]);
+      const mask = new Tensor("int64", [1n, 1n, 0n], [1, 3]);
+      expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([2, 3]);
     });
   });
 
@@ -495,10 +511,7 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
     it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
-      for (const [divisor, values] of [
-        [1e20, [1, 3]],
-        [-1e20, [-1, -3]],
-      ]) {
+      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
         const tensor = new Tensor(type, values, [2]);
         expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
         expect(Array.from(tensor.data)).toEqual(values);

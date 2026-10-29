@@ -1255,15 +1255,15 @@ export function mean_pooling(last_hidden_state, attention_mask) {
     const [batchSize, seqLength, embedDim] = last_hidden_state.dims;
 
     // Walk the sequence in the outer loop, so each mask value is read once per
-    // token and each token's embedding is read contiguously. The sums are
-    // accumulated in float64 in the same order as a per-dimension loop would,
-    // so the result is identical.
+    // token and each token's embedding is read contiguously. Each dimension is
+    // summed in float64, token by token in sequence order.
     const sums = new Float64Array(embedDim);
     for (let i = 0; i < batchSize; ++i) {
         sums.fill(0);
         let count = 0;
         for (let j = 0; j < seqLength; ++j) {
             const attn = Number(attentionMaskData[i * seqLength + j]);
+            // Skip padding: a non-finite hidden value there no longer turns the mean into NaN.
             if (attn === 0) continue;
             count += attn;
             const offset = (i * seqLength + j) * embedDim;
