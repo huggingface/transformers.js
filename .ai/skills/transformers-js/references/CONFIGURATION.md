@@ -166,8 +166,8 @@ Static class for cache and file management operations.
 - `get_files(modelId, [options])` → `Promise<string[]>` — Get all files (model, tokenizer, processor) needed for a model.
 - `get_pipeline_files(task, modelId, [options])` → `Promise<string[]>` — Get all files needed for a specific pipeline task.
 - `get_model_files(modelId, [options])` → `Promise<string[]>` — Get model files needed for a specific model.
-- `get_tokenizer_files(modelId)` → `Promise<string[]>` — Get tokenizer files needed for a specific model.
-- `get_processor_files(modelId)` → `Promise<string[]>` — Get processor files needed for a specific model.
+- `get_tokenizer_files(modelId, [options])` → `Promise<string[]>` — Get tokenizer files needed for a specific model.
+- `get_processor_files(modelId, [options])` → `Promise<string[]>` — Get processor files needed for a specific model.
 - `get_available_dtypes(modelId, [options])` → `Promise<string[]>` — Detects which quantization levels (dtypes) are available for a model by checking which ONNX files exist on the hub or locally.
 - `is_cached(modelId, [options])` → `Promise<boolean>` — Quickly checks if a model is fully cached by verifying `config.json` is present, then confirming all required files are cached.
 - `is_cached_files(modelId, [options])` → `Promise<CacheCheckResult>` — Checks if all files for a given model are already cached, with per-file detail.
