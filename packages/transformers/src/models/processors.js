@@ -13,6 +13,7 @@ export * from './idefics3/processing_idefics3.js';
 export * from './janus/processing_janus.js';
 export * from './jina_clip/processing_jina_clip.js';
 export * from './lfm2_vl/processing_lfm2_vl.js';
+export * from './lfm3_vl/processing_lfm3_vl.js';
 export * from './llava/processing_llava.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './moonshine/processing_moonshine.js';

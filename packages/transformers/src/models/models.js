@@ -86,6 +86,8 @@ export * from './lfm2/modeling_lfm2.js';
 export * from './lighton_ocr/modeling_lighton_ocr.js';
 export * from './lfm2_moe/modeling_lfm2_moe.js';
 export * from './lfm2_vl/modeling_lfm2_vl.js';
+export * from './lfm3/modeling_lfm3.js';
+export * from './lfm3_vl/modeling_lfm3_vl.js';
 export * from './llama/modeling_llama.js';
 export * from './llama4/modeling_llama4.js';
 export * from './llava/modeling_llava.js';

@@ -1,6 +1,6 @@
 {
   "name": "@huggingface/transformers",
-  "version": "4.3.1",
+  "version": "4.3.2",
   "description": "State-of-the-art Machine Learning for the web. Run 🤗 Transformers directly in your browser, with no need for a server!",
   "main": "./dist/transformers.node.cjs",
   "types": "./types/transformers.d.ts",
@@ -24,7 +24,7 @@
   "scripts": {
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "format:check": "prettier --check . --ignore-path ../../.prettierignore",
-    "typegen": "tsc --build",
+    "typegen": "tsc --build --force",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs && pnpm typegen",
     "test": "node --experimental-vm-modules --expose-gc node_modules/jest/bin/jest.js --verbose --logHeapUsage",
