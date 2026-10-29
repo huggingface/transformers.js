@@ -6,7 +6,7 @@ In this tutorial, we'll be building a simple [Svelte](https://svelte.dev/) appli
 
 Useful links:
 
-- [Demo on Hugging Face Spaces](https://huggingface.co/spaces/Xenova/svelte-translator)
+- [SvelteKit server-side example](https://github.com/huggingface/transformers.js-examples/tree/main/sveltekit), if you want to run Transformers.js on the server instead of in the browser
 
 ## Prerequisites
 
