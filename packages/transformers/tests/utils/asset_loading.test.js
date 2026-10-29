@@ -13,7 +13,7 @@ jest.unstable_mockModule("../../src/utils/model_registry/get_pipeline_files.js",
 
 const { env } = await import("../../src/env.js");
 const { getModelJSON, getModelFile } = await import("../../src/utils/hub.js");
-const { get_file_metadata } = await import("../../src/utils/model_registry/get_file_metadata.js");
+const { get_file_metadata, get_file_metadata_with_context } = await import("../../src/utils/model_registry/get_file_metadata.js");
 const { is_cached_files, is_pipeline_cached_files } = await import("../../src/utils/model_registry/is_cached.js");
 const { clear_cache, clear_pipeline_cache } = await import("../../src/utils/model_registry/clear_cache.js");
 const { FileCache } = await import("../../src/utils/cache/FileCache.js");
@@ -399,7 +399,7 @@ describe("Internal asset loading", () => {
     env.fetch = jest.fn();
     env.customCache = memoryCache();
 
-    expect(await get_file_metadata(MODEL, "config.json", context)).toEqual({ exists: true, size: 42, contentType: "text/plain;charset=UTF-8", fromCache: false });
+    expect(await get_file_metadata_with_context(MODEL, "config.json", context)).toEqual({ exists: true, size: 42, contentType: "text/plain;charset=UTF-8", fromCache: false });
     expect(fetch).toHaveBeenCalledWith(`${REMOTE}config.json`, expect.objectContaining({ method: "GET" }));
     expect(env.fetch).not.toHaveBeenCalled();
     expect(cache.match).toHaveBeenCalled();

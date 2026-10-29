@@ -1,4 +1,4 @@
-import { env } from '../../env.js';
+import { resolveEnv } from '../../env.js';
 import { getCacheForEnvironment, tryCache } from '../cache.js';
 import { FileCache } from '../cache/FileCache.js';
 import { FileResponse } from './FileResponse.js';
@@ -11,8 +11,9 @@ const ASSET_CACHE_VERSIONS = new Map([['tokenizer_config.json', 1]]);
 
 // Settings that cannot change which file a load returns. Every other setting
 // splits loading keys, so a setting missing here costs a duplicate download
-// rather than merging two different loads.
-const KEY_IGNORED_SETTINGS = new Set(['version', 'backends', 'logLevel', 'useWasmCache']);
+// rather than merging two different loads. `hfToken` is keyed separately as
+// the token actually sent (none outside Node).
+const KEY_IGNORED_SETTINGS = new Set(['version', 'backends', 'logLevel', 'useWasmCache', 'hfToken']);
 
 const OBJECT_IDS = new WeakMap();
 let nextObjectId = 0;
@@ -40,15 +41,16 @@ function versionedKey(key, version) {
 }
 
 /**
- * Internal resource-loading dependency. Shallow-copies the environment at the
- * loading boundary; public pretrained options stay intact.
+ * Internal resource-loading dependency. Shallow-copies the environment, with
+ * any session overrides from `options.env` applied, at the loading boundary;
+ * public pretrained options stay intact.
  * @private
  */
 export class AssetLoadingContext {
     /** @param {import('../hub.js').PretrainedOptions} [options] */
     constructor(options = {}) {
         /** @type {import('../../env.js').TransformersEnvironment} */
-        this.settings = { ...env };
+        this.settings = resolveEnv(options.env);
         this.options = {
             revision: options.revision ?? 'main',
             cache_dir: options.cache_dir ?? null,
@@ -58,7 +60,8 @@ export class AssetLoadingContext {
         this.userAgent = isNode
             ? `transformers.js/${this.settings.version}; is_ci/${!!process.env?.TESTING_REMOTELY};`
             : null;
-        this.token = isNode ? (process.env?.HF_TOKEN ?? process.env?.HF_ACCESS_TOKEN) : null;
+        // Authorization headers are never sent outside Node, since that would expose the token to the client.
+        this.token = isNode ? this.settings.hfToken : null;
         /** @type {Promise<import('../cache.js').CacheInterface|null>|undefined} */
         this.cache = undefined;
     }
@@ -71,10 +74,25 @@ export class AssetLoadingContext {
     getHeaders(urlOrPath) {
         const headers = new Headers();
         if (this.userAgent) headers.set('User-Agent', this.userAgent);
-        if (this.token && isValidUrl(urlOrPath, ['http:', 'https:'], ['huggingface.co', 'hf.co'])) {
+        if (this.token && this.isHubURL(urlOrPath)) {
             headers.set('Authorization', `Bearer ${this.token}`);
         }
         return headers;
+    }
+
+    /**
+     * A custom Hub endpoint must match by origin, so the token isn't sent over a
+     * downgraded protocol or to another port.
+     * @param {URL|string} urlOrPath
+     */
+    isHubURL(urlOrPath) {
+        const { remoteHost } = this.settings;
+        return (
+            isValidUrl(urlOrPath, ['https:'], ['huggingface.co', 'hf.co']) ||
+            (isValidUrl(remoteHost, ['http:', 'https:']) &&
+                isValidUrl(urlOrPath) &&
+                new URL(urlOrPath).origin === new URL(remoteHost).origin)
+        );
     }
 
     /**
@@ -184,7 +202,9 @@ export class AssetLoadingContext {
                 .filter(([name]) => !KEY_IGNORED_SETTINGS.has(name))
                 .map(([name, value]) => [
                     name,
-                    (value !== null && typeof value === 'object') || typeof value === 'function' ? objectId(value) : value,
+                    (value !== null && typeof value === 'object') || typeof value === 'function'
+                        ? objectId(value)
+                        : value,
                 ]),
         );
         return makePretrainedOptionsKey(modelId, this.options, settings, this.userAgent, this.token, ...parts);

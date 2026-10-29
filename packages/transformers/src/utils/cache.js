@@ -51,7 +51,7 @@ export async function getCacheForEnvironment(settings, file_cache_dir = null) {
     }
 
     if (!cache && settings.experimental_useCrossOriginStorage && CrossOriginStorage.isAvailable()) {
-        cache = new CrossOriginStorage();
+        cache = new CrossOriginStorage({ fetch: settings.fetch });
     }
 
     if (!cache && settings.useBrowserCache) {

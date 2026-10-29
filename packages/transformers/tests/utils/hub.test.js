@@ -1,6 +1,5 @@
 import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
-import { FileCache } from "../../src/utils/cache/FileCache.js";
-import { buildResourcePaths } from "../../src/utils/hub.js";
+import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
@@ -8,22 +7,50 @@ import fs from "node:fs";
 // TODO: Set cache folder to a temp directory
 
 describe("Hub", () => {
-  describe("Resource paths", () => {
-    it("should version tokenizer metadata browser cache keys", () => {
-      const tokenizerConfig = buildResourcePaths("onnx-community/model", "tokenizer_config.json");
-      const tokenizer = buildResourcePaths("onnx-community/model", "tokenizer.json");
+  describe("Session env", () => {
+    it("should use scoped resource path options", () => {
+      const context = new AssetLoadingContext({
+        revision: "refs/pr/1",
+        env: {
+          localModelPath: "/scoped-models/",
+          remoteHost: "https://models.example.com/",
+          remotePathTemplate: "{model}/at/{revision}/",
+        },
+      });
+      const paths = context.resolve("org/model", "config.json");
 
-      expect(tokenizerConfig.proposedCacheKey).toBe(`${tokenizerConfig.remoteURL}?transformersjs_metadata_v=2`);
-      expect(tokenizer.proposedCacheKey).toBe(tokenizer.remoteURL);
+      expect(paths.localPath).toBe("/scoped-models/org/model/config.json");
+      expect(paths.remoteURL).toBe("https://models.example.com/org/model/at/refs%2Fpr%2F1/config.json");
     });
 
-    it("should version tokenizer metadata filesystem cache keys", () => {
-      const cache = new FileCache("cache");
-      const tokenizerConfig = buildResourcePaths("onnx-community/model", "tokenizer_config.json", {}, cache);
-      const tokenizer = buildResourcePaths("onnx-community/model", "tokenizer.json", {}, cache);
+    it("should use scoped Hugging Face token for request headers", () => {
+      const context = new AssetLoadingContext({ env: { hfToken: "scoped-token" } });
+      const headers = context.getHeaders("https://huggingface.co/org/model/resolve/main/config.json");
 
-      expect(tokenizerConfig.proposedCacheKey).toBe("transformersjs_metadata_v2/onnx-community/model/tokenizer_config.json");
-      expect(tokenizer.proposedCacheKey).toBe("onnx-community/model/tokenizer.json");
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+
+    it("should authenticate only the configured custom Hub origin", () => {
+      const context = new AssetLoadingContext({
+        env: { hfToken: "scoped-token", remoteHost: "https://private-hub.example/api/" },
+      });
+
+      const hubHeaders = context.getHeaders("https://private-hub.example/api/org/model/config.json");
+      const externalHeaders = context.getHeaders("https://cdn.example/org/model/config.json");
+      const downgradedHeaders = context.getHeaders("http://private-hub.example/api/org/model/config.json");
+      const otherPortHeaders = context.getHeaders("https://private-hub.example:8443/api/org/model/config.json");
+
+      expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
+      expect(externalHeaders.has("Authorization")).toBe(false);
+      expect(downgradedHeaders.has("Authorization")).toBe(false);
+      expect(otherPortHeaders.has("Authorization")).toBe(false);
+    });
+
+    it("should split memoization keys by token", () => {
+      const key = (hfToken) => new AssetLoadingContext({ env: { hfToken } }).key("org/model");
+
+      expect(key("hf_token")).toBe(key("hf_token"));
+      expect(key("hf_token")).not.toBe(key("hf_other-token"));
     });
   });
 

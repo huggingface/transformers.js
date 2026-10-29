@@ -9,7 +9,7 @@ import { DefaultProgressCallback, dispatchCallback } from './core.js';
 import { FileResponse } from './hub/FileResponse.js';
 import { AssetLoadingContext } from './hub/AssetLoadingContext.js';
 import { handleError, isValidUrl, ModelFileNotFoundError, readResponse, toAbsoluteURL } from './hub/utils.js';
-import { get_file_metadata } from './model_registry/get_file_metadata.js';
+import { get_file_metadata_with_context } from './model_registry/get_file_metadata.js';
 import { logger } from './logger.js';
 
 export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
@@ -28,6 +28,7 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * @property {import('../configs.js').PretrainedConfig} [config=null] Configuration to use for the model instead of an automatically loaded configuration. Configuration can be automatically loaded when:
  * - The model is provided by the library and loaded with the *model ID* string of a pretrained model.
  * - The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env={}] Session-scopable environment overrides.
  * @property {string} [cache_dir=null] Path to a directory where downloaded model files should be cached if the standard cache should not be used.
  * @property {boolean} [local_files_only=false] Whether to only look at local files (e.g., not try downloading the model).
  * @property {string} [revision='main'] The model revision to use. This can be a branch name, tag name, or commit ID.
@@ -53,10 +54,11 @@ export { MAX_EXTERNAL_DATA_CHUNKS } from './hub/constants.js';
  * Helper function to get a file, using either the Fetch API or FileSystem API.
  *
  * @param {URL|string} urlOrPath The URL/path of the file to get.
+ * @param {PretrainedOptions} [options] Loading options. Only `options.env` affects how the file is fetched.
  * @returns {Promise<FileResponse|Response>} A promise that resolves to a FileResponse object (if the file is retrieved using the FileSystem API), or a Response object (if the file is retrieved using the Fetch API).
  */
-export async function getFile(urlOrPath) {
-    return new AssetLoadingContext().read(urlOrPath);
+export async function getFile(urlOrPath, options = {}) {
+    return new AssetLoadingContext(options).read(urlOrPath);
 }
 
 /**
@@ -313,7 +315,7 @@ async function loadResourceFile(
                 } else {
                     // Try to get size from metadata (useful when content-length is missing during download)
                     try {
-                        const metadata = await get_file_metadata(path_or_repo_id, filename, context);
+                        const metadata = await get_file_metadata_with_context(path_or_repo_id, filename, context);
                         if (metadata.size) {
                             expectedSize = metadata.size;
                         }
