@@ -4,7 +4,7 @@
 
 import { Pipeline } from './_base.js';
 
-import { Tensor } from '../utils/tensor.js';
+import { Tensor, cat } from '../utils/tensor.js';
 import { RawAudio } from '../utils/audio.js';
 import { logger } from '../utils/logger.js';
 
@@ -27,9 +27,13 @@ import { env } from '../env.js';
  *
  * @typedef {Object} TextToAudioPipelineOptions Parameters specific to text-to-audio pipelines.
  * @property {Tensor|Float32Array|string|URL} [speaker_embeddings=null] The speaker embeddings (if the model requires it).
+ * Phonon voices are flat float32 data in `[1, voice_dim, frames]` order, given as a URL (e.g. a `voices/*.bin` file
+ * of the model repo), an array or a tensor.
  * @property {number} [num_inference_steps] The number of denoising steps (if the model supports it).
  * More denoising steps usually lead to higher quality audio but slower inference.
  * @property {number} [speed] The speed of the generated audio (if the model supports it).
+ * @property {number} [temperature] Phonon flow noise variance (as in Python transformers); 0 = deterministic.
+ * @property {number} [max_new_tokens] Maximum audio frames per Phonon text chunk.
  *
  * @typedef {TextToAudioPipelineConstructorArgs & TextToAudioPipelineCallback & Disposable} TextToAudioPipelineType
  */
@@ -74,6 +78,18 @@ import { env } from '../env.js';
  * //   sampling_rate: 16000
  * // }
  * ```
+ *
+ * **Example:** Phonon speech with one of the voices in the model repo.
+ * For direct use, prepare prompts with `PocketTTSProcessor`, then call `model.generate()` to get `audio_values`.
+ * ```javascript
+ * import { pipeline } from '@huggingface/transformers';
+ *
+ * const tts = await pipeline('text-to-speech', 'onnx-community/phonon-31m-en-ONNX', { dtype: 'q4' });
+ * const speaker_embeddings = 'https://huggingface.co/onnx-community/phonon-31m-en-ONNX/resolve/main/voices/LMDIYE0Oa377Qh6Z.bin';
+ * const audio = await tts('Hello from Phonon!', { speaker_embeddings });
+ * await audio.save('phonon.wav');
+ * await tts.dispose();
+ * ```
  */
 export class TextToAudioPipeline
     extends /** @type {new (options: TextToAudioPipelineConstructorArgs) => TextToAudioPipelineType} */ (Pipeline)
@@ -95,7 +111,11 @@ export class TextToAudioPipeline
         // Load speaker embeddings as Float32Array from path/URL
         if (typeof speaker_embeddings === 'string' || speaker_embeddings instanceof URL) {
             // Load from URL with fetch
-            speaker_embeddings = new Float32Array(await (await env.fetch(speaker_embeddings)).arrayBuffer());
+            const response = await env.fetch(speaker_embeddings);
+            if (!response.ok) {
+                throw new Error(`Unable to load speaker embeddings: ${response.status} ${response.statusText}.`);
+            }
+            speaker_embeddings = new Float32Array(await response.arrayBuffer());
         }
 
         if (speaker_embeddings instanceof Float32Array) {
@@ -142,13 +162,15 @@ export class TextToAudioPipeline
     }
 
     async _call(text_inputs, options) {
-        // If this.processor is not set, we are using an `AutoModelForTextToWaveform` model
-        if (this.processor) {
-            return this._call_text_to_spectrogram(text_inputs, options);
-        } else if (this.model.config.model_type === 'supertonic') {
-            return this._call_supertonic(text_inputs, options);
-        } else {
-            return this._call_text_to_waveform(text_inputs);
+        switch (this.model.config.model_type) {
+            case 'gradium_phonon_tts':
+                return this._call_phonon(text_inputs, options);
+            case 'speecht5':
+                return this._call_text_to_spectrogram(text_inputs, options);
+            case 'supertonic':
+                return this._call_supertonic(text_inputs, options);
+            default:
+                return this._call_text_to_waveform(text_inputs);
         }
     }
 
@@ -177,6 +199,55 @@ export class TextToAudioPipeline
         });
 
         return this._postprocess_waveform(text_inputs, waveform, sampling_rate, durations);
+    }
+
+    /**
+     * @param {string|string[]} text_inputs
+     * @param {TextToAudioPipelineOptions} [options]
+     * @private
+     */
+    async _call_phonon(text_inputs, { speaker_embeddings, temperature, max_new_tokens } = {}) {
+        const model =
+            /** @type {import('../models/gradium_phonon_tts/modeling_gradium_phonon_tts.js').GradiumPhononTTSForConditionalGeneration} */ (
+                this.model
+            );
+        const processor = /** @type {import('../models/pocket_tts/processing_pocket_tts.js').PocketTTSProcessor} */ (
+            /** @type {unknown} */ (this.processor)
+        );
+        const { audio_prompt_dim } = /** @type {any} */ (model.config);
+        if (!speaker_embeddings) throw new Error('Speaker embeddings must be provided for Phonon models.');
+        const embeddings = await this._prepare_speaker_embeddings(speaker_embeddings, 1);
+        if (embeddings.type !== 'float32' || !embeddings.size || embeddings.size % audio_prompt_dim !== 0) {
+            throw new Error(
+                `Phonon speaker_embeddings must be float32 data in [1, ${audio_prompt_dim}, frames] order.`,
+            );
+        }
+        // Voice files use channel-first storage; upstream accepts [frames, audio_prompt_dim].
+        const voice = embeddings.view(audio_prompt_dim, -1).transpose(1, 0);
+        const results = [];
+        for (const text of Array.isArray(text_inputs) ? text_inputs : [text_inputs]) {
+            const parts = [];
+            for (const chunk of processor.split_text(text)) {
+                const prompt = processor.apply_chat_template(
+                    [{ role: 'user', content: [{ type: 'audio' }, { type: 'text', text: chunk }] }],
+                    { add_generation_prompt: true },
+                );
+                const inputs = await processor(prompt, { audio_prompt_latents: [voice] });
+                const { audio_values } = await model.generate({
+                    ...inputs,
+                    temperature,
+                    max_new_tokens,
+                });
+                parts.push(audio_values.view(-1));
+            }
+            results.push(
+                new RawAudio(
+                    /** @type {Float32Array} */ (cat(parts).data),
+                    processor.config.feature_extractor.sampling_rate,
+                ),
+            );
+        }
+        return Array.isArray(text_inputs) ? results : results[0];
     }
 
     async _call_text_to_waveform(text_inputs) {
@@ -215,6 +286,7 @@ export class TextToAudioPipeline
         const { waveform } = await this.model.generate_speech(input_ids, speaker_embeddings, { vocoder: this.vocoder });
 
         const sampling_rate = this.processor.feature_extractor.config.sampling_rate;
-        return this._postprocess_waveform(text_inputs, waveform, sampling_rate);
+        // The vocoder returns a 1D waveform for the single generated sequence.
+        return this._postprocess_waveform(text_inputs, waveform.view(1, -1), sampling_rate);
     }
 }
