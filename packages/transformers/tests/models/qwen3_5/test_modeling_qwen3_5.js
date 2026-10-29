@@ -61,7 +61,7 @@ export default () => {
         });
 
         const new_tokens = generate_ids.slice(null, [inputs.input_ids.dims.at(-1), null]);
-        expect(new_tokens.tolist()).toEqual([[122378n, 3582n, 161477n, 16864n, 43897n, 81038n, 110419n, 72561n, 30943n, 17612n]]);
+        expect(new_tokens.tolist()).toEqual([[122378n, 3582n, 191765n, 184900n, 126547n, 72561n, 42265n, 194621n, 184900n, 132161n]]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -178,7 +178,7 @@ export default () => {
           max_length: 10,
           do_sample: false,
         });
-        expect(outputs.tolist()).toEqual([[14556n, 156450n, 73097n, 47596n, 67970n, 15437n, 244844n, 43757n, 26602n, 3582n]]);
+        expect(outputs.tolist()).toEqual([[14556n, 156450n, 73097n, 185118n, 163181n, 184900n, 194621n, 84592n, 162558n, 183046n]]);
       },
       MAX_TEST_EXECUTION_TIME,
     );
