@@ -19,8 +19,9 @@
  * `sharedAssets`, `chatTemplate`, the registry hooks, the host services passed to `load()`, loaded
  * models with `forward()` and `dispose()`, and the `forward` capability. Everything marked
  * "Experimental" below is being developed together with a first external runtime and may change
- * in a minor release: the normalized-session contract, causal generation, provider-owned
- * `generate()`, model-owned pipeline steps, and the random-access `artifactProvider`.
+ * in a minor release: the normalized-session contract (including `getSessionConfig()`), causal
+ * generation, provider-owned `generate()`, model-owned pipeline steps, and the random-access
+ * `artifactProvider`.
  *
  * @module backends/inference
  */
@@ -84,7 +85,8 @@ export const MODEL_PIPELINE_STEP_TASKS = Object.freeze({
  * Transformers.js model classes.
  *
  * Experimental: the session roles and file names passed to `constructSessions()` come from the
- * built-in ONNX session configuration. A portable execution manifest is planned to replace them.
+ * provider's `getSessionConfig()`, or from the built-in ONNX session configuration when the
+ * provider does not define it. A portable execution manifest is planned to replace them.
  *
  * @typedef {Object} SessionProviderCapabilitiesV1
  * @property {1} version
@@ -103,6 +105,17 @@ export const MODEL_PIPELINE_STEP_TASKS = Object.freeze({
  * @property {Readonly<Record<string, unknown>>} [config]
  * @property {(inputs: Record<string, import('../utils/tensor.js').Tensor>) => Promise<Record<string, import('../utils/tensor.js').Tensor>>} run
  * @property {() => Promise<unknown>|unknown} release
+ */
+
+/**
+ * Session roles for one model architecture, returned by `getSessionConfig()`.
+ *
+ * Experimental: see {@link SessionProviderCapabilitiesV1}.
+ *
+ * @typedef {Object} InferenceSessionConfig
+ * @property {Record<string, string>} sessions Session role to base file name.
+ * @property {Record<string, boolean>} [cache_sessions] Session roles that produce key-value cache (`present.*`) outputs.
+ * @property {Record<string, string>} [optional_configs] Additional config files to load, keyed by name.
  */
 
 /**
@@ -163,6 +176,7 @@ export const MODEL_PIPELINE_STEP_TASKS = Object.freeze({
  * @property {StaticBackendCapabilities} [capabilities]
  * @property {SessionProviderCapabilitiesV1} [sessionProvider] Experimental: Declares support for normalized built-in model sessions.
  * @property {(names: Record<string, string>, options: InferenceBackendLoadOptions, cacheSessions?: Record<string, boolean>) => Promise<Record<string, InferenceSession>>} [constructSessions] Experimental: Required with `sessionProvider`.
+ * @property {(modelType: string, config: Object, options: Object & {textOnly: boolean}) => InferenceSessionConfig|null} [getSessionConfig] Experimental: Maps an architecture to session roles and base file names passed to `constructSessions()`. Returns `null` when the provider cannot run the architecture. Defaults to the built-in session configuration.
  * @property {(options: Object) => ReadonlyArray<string>|Promise<ReadonlyArray<string>>} [listModelArtifacts] Lists backend-owned files required for the selected load options.
  * @property {(file: string, options: Object) => Promise<{size?: number, fromCache?: boolean}|null>} [getModelArtifactMetadata] Returns backend-owned cache metadata for an artifact.
  * @property {(file: string, options: Object) => Promise<boolean>} [deleteModelArtifact] Deletes an artifact from backend-owned cache storage.

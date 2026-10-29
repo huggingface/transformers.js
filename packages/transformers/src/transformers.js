@@ -85,6 +85,7 @@ export { getModelId, isInferenceBackend, isSessionInferenceProvider } from './ba
  * @typedef {import('./backends/inference.js').SessionProviderCapabilitiesV1} SessionProviderCapabilitiesV1
  * @typedef {import('./backends/inference.js').PipelineStepsCapabilitiesV1} PipelineStepsCapabilitiesV1
  * @typedef {import('./backends/inference.js').InferenceSession} InferenceSession
+ * @typedef {import('./backends/inference.js').InferenceSessionConfig} InferenceSessionConfig
  * @typedef {import('./generation/runtime.js').CausalGenerationCapabilitiesV1} CausalGenerationCapabilitiesV1
  * @typedef {import('./generation/runtime.js').AutoregressiveSessionV1} AutoregressiveSessionV1
  * @typedef {import('./generation/runtime.js').PlanAutoregressiveSessionV1} PlanAutoregressiveSessionV1

@@ -33,7 +33,7 @@ The contract has two tiers. Build on the stable tier. Use the experimental tier 
 
 **Experimental.** These parts are being developed together with a first external runtime. They are exported and typed, and they work today, but their shape may change in a minor release:
 
-- the normalized-session contract (`sessionProvider` and `constructSessions()`);
+- the normalized-session contract (`sessionProvider`, `constructSessions()`, and `getSessionConfig()`);
 - causal text generation (`capabilities.causalGeneration` and `createAutoregressiveSession()`);
 - provider-owned `generate()` for encoder-decoder and speech-recognition models;
 - model-owned pipeline steps (`capabilities.pipelineSteps`, `preprocess()`, and `postprocess()`);
@@ -271,7 +271,7 @@ Always load model artifacts with `options.getModelFile()`. Do not construct a Hu
 
 Use `options.fetch` instead of `globalThis.fetch` for network requests that are not model artifacts. Check `options.signal` before and after expensive asynchronous work. If loading fails, release every session or buffer that was already created before rethrowing the error.
 
-These options are the complete public host surface. The built-in ONNX provider additionally receives a private host object with the Transformers.js environment, logger, and cache because it is a first-party package; third-party providers do not, and should not model their integration on it.
+These options are the complete public host surface. The built-in ONNX provider is additionally configured with a private host object with the Transformers.js environment, logger, and cache because it is a first-party package; third-party providers do not, and should not model their integration on it.
 
 ## 5. Describe supported configurations
 
@@ -470,7 +470,7 @@ export class MySessionProvider {
 
 Transformers.js selects the semantic model class from `config.json`, determines the required session roles, and calls `constructSessions()`. The roles and base file names in `names` come from the built-in session configuration for the model architecture, for example `{ model: 'encoder_model', decoder_model_merged: 'decoder_model_merged' }` for an encoder-decoder model.
 
-To map an architecture to different roles or file names, implement the optional `getSessionConfig(modelType, config, options)` method. It returns the `sessions` mapping plus the optional `cache_sessions` and `optional_configs` entries, or `null` when the provider cannot run that architecture:
+To map an architecture to different roles or file names, implement the optional `getSessionConfig(modelType, config, options)` method. It returns the `sessions` mapping plus the optional `cache_sessions` and `optional_configs` entries, or `null` when the provider cannot run that architecture. `options` contains the pretrained loading options plus `textOnly`, which is `true` when a multimodal architecture is loaded for a text-only task and only its text sessions are needed:
 
 ```js
 getSessionConfig(modelType, config, options) {
