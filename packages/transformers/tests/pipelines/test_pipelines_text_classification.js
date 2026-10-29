@@ -104,4 +104,53 @@ export default () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
   });
+
+  describe("Text Classification (single logit)", () => {
+    // A cross-encoder has one logit per input. Expected scores are from the Python pipeline
+    // with cross-encoder/ms-marco-TinyBERT-L2-v2.
+    const model_id = "Xenova/ms-marco-TinyBERT-L-2-v2";
+    const texts = ["How many people live in Berlin? Berlin is well known for its museums.", "purple elephant"];
+
+    /** @type {TextClassificationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, DEFAULT_MODEL_OPTIONS);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "applies sigmoid",
+      async () => {
+        const output = await pipe(texts);
+        const target = [
+          { label: "LABEL_0", score: 0.00010145680425921455 },
+          { label: "LABEL_0", score: 0.06936494261026382 },
+        ];
+        expect(output).toBeCloseToNested(target, 5);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "regression",
+      async () => {
+        const problem_type = pipe.model.config.problem_type;
+        pipe.model.config.problem_type = "regression";
+
+        const output = await pipe(texts);
+        const target = [
+          { label: "LABEL_0", score: -9.195775985717773 },
+          { label: "LABEL_0", score: -2.5964856147766113 },
+        ];
+        expect(output).toBeCloseToNested(target, 4);
+
+        // Reset problem type
+        pipe.model.config.problem_type = problem_type;
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
 };
