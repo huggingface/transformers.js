@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, mean_pooling, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -344,6 +344,56 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [0.4472, 0.8944, 0.5547, 0.8321], [2, 2]);
       const normalized = t1.normalize();
       expect(normalized).toBeCloseToNested(target);
+    });
+  });
+
+  describe("mean_pooling", () => {
+    it("should average only the attended tokens", () => {
+      // 2 sequences of 3 tokens, embedDim 2; the second sequence has one padding token.
+      const hidden = new Tensor("float32", [1, 2, 3, 4, 5, 6, 10, 20, 30, 40, 99, 99], [2, 3, 2]);
+      const mask = new Tensor("int64", [1n, 1n, 1n, 1n, 1n, 0n], [2, 3]);
+      const target = new Tensor("float32", [3, 4, 20, 30], [2, 2]);
+      expect(mean_pooling(hidden, mask)).toEqual(target);
+    });
+
+    it("should match a per-dimension reference implementation exactly", () => {
+      const [batchSize, seqLength, embedDim] = [3, 7, 16];
+      const hidden = rand([batchSize, seqLength, embedDim]);
+      // Trailing padding, padding between tokens, and weights other than 1.
+      // prettier-ignore
+      const maskData = new BigInt64Array([
+        1n, 1n, 1n, 1n, 1n, 1n, 1n,
+        1n, 0n, 0n, 0n, 0n, 0n, 0n,
+        1n, 0n, 2n, 3n, 0n, 1n, 0n,
+      ]);
+      const mask = new Tensor("int64", maskData, [batchSize, seqLength]);
+
+      const expected = new Float32Array(batchSize * embedDim);
+      for (let i = 0; i < batchSize; ++i) {
+        for (let k = 0; k < embedDim; ++k) {
+          let sum = 0;
+          let count = 0;
+          for (let j = 0; j < seqLength; ++j) {
+            const attn = Number(maskData[i * seqLength + j]);
+            count += attn;
+            sum += hidden.data[(i * seqLength + j) * embedDim + k] * attn;
+          }
+          expected[i * embedDim + k] = sum / count;
+        }
+      }
+      expect(mean_pooling(hidden, mask).data).toEqual(expected);
+    });
+
+    it("should return NaN for a sequence with no attended tokens", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
+      const mask = new Tensor("int64", [0n, 0n], [1, 2]);
+      expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([NaN, NaN]);
+    });
+
+    it("should ignore non-finite values at padding positions", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4, NaN, Infinity], [1, 3, 2]);
+      const mask = new Tensor("int64", [1n, 1n, 0n], [1, 3]);
+      expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([2, 3]);
     });
   });
 
