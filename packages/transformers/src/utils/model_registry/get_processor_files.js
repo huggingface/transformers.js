@@ -6,15 +6,16 @@ import { get_file_metadata } from './get_file_metadata.js';
  * Auto-detects if the model has a processor by checking if preprocessor_config.json exists.
  *
  * @param {string} modelId The model id (e.g., "Xenova/detr-resnet-50")
+ * @param {import('../hub.js').PretrainedOptions} [options] An object containing optional parameters.
  * @returns {Promise<string[]>} Array of processor file names (empty if no processor)
  */
-export async function get_processor_files(modelId) {
+export async function get_processor_files(modelId, options = {}) {
     if (!modelId) {
         throw new Error('modelId is required');
     }
 
     // Check if preprocessor_config.json exists
-    const metadata = await get_file_metadata(modelId, IMAGE_PROCESSOR_NAME, {});
+    const metadata = await get_file_metadata(modelId, IMAGE_PROCESSOR_NAME, options);
 
     return metadata.exists ? [IMAGE_PROCESSOR_NAME] : [];
 }

@@ -1,5 +1,7 @@
 /// <reference path="./cross-origin-storage.d.ts" />
 
+import { env } from '../../env.js';
+
 const HASH_ALGORITHM = 'SHA-256';
 
 /**
@@ -26,6 +28,14 @@ const makeHashDescriptor = (value) => ({ algorithm: HASH_ALGORITHM, value });
 export class CrossOriginStorage {
     /** @type {Promise<Cache> | null} */
     #hashCache = null;
+
+    /**
+     * @param {Object} [options]
+     * @param {(input: string | URL, init?: any) => Promise<any>} [options.fetch] Fetch implementation used for LFS pointer lookups. Defaults to `env.fetch`.
+     */
+    constructor(options = {}) {
+        this.fetch = options.fetch ?? env.fetch;
+    }
 
     /**
      * Returns (and lazily opens) the hash cache, reusing the same promise across concurrent callers.
@@ -229,7 +239,7 @@ export class CrossOriginStorage {
         const rawUrl = url.replace('/resolve/', '/raw/');
 
         try {
-            const text = await fetch(rawUrl).then((r) => r.text());
+            const text = await this.fetch(rawUrl).then((r) => r.text());
             const match = text.match(/^oid sha256:([0-9a-f]+)$/m);
             return match ? match[1] : null;
         } catch {

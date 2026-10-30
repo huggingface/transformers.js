@@ -96,6 +96,8 @@ class RegexParser {
         }
         if (character === '\\') return this.escape(false).expression;
         if ('*+?{})'.includes(character)) this.fail(`unexpected ${JSON.stringify(character)}`);
+        if (character === '^' || character === '$')
+            this.fail('anchors are only supported at the start or end of the pattern');
         this.index += character.length;
         return literal(character);
     }

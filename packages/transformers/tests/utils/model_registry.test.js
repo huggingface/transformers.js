@@ -4,6 +4,7 @@ import { jest } from "@jest/globals";
 const mockGetFileMetadata = jest.fn();
 jest.unstable_mockModule("../../src/utils/model_registry/get_file_metadata.js", () => ({
   get_file_metadata: mockGetFileMetadata,
+  get_file_metadata_with_context: mockGetFileMetadata,
 }));
 
 // Mock get_config so config-loading failures can be simulated
@@ -165,19 +166,29 @@ describe("get_available_dtypes", () => {
     expect(dtypes).not.toContain("fp16");
   });
 
-  it("should pass revision and cache_dir to get_file_metadata", async () => {
+  it("should pass session env to get_file_metadata", async () => {
     setupExistingFiles("onnx/model.onnx");
+
+    const fetch = jest.fn();
+    const env = {
+      remoteHost: "https://models.example.com/",
+      allowRemoteModels: false,
+      fetch,
+      hfToken: "test-token",
+    };
 
     await get_available_dtypes("test/model", {
       config: ENCODER_ONLY_CONFIG,
       revision: "v2",
-      cache_dir: "/tmp/cache",
+      env,
     });
 
-    // Verify that metadata calls received the correct options
+    const contexts = new Set(mockGetFileMetadata.mock.calls.map((call) => call[2]));
+    expect(contexts.size).toBe(1);
     for (const call of mockGetFileMetadata.mock.calls) {
       expect(call[0]).toBe("test/model");
-      expect(call[2]).toMatchObject({ revision: "v2", cache_dir: "/tmp/cache" });
+      expect(call[2].options).toMatchObject({ revision: "v2" });
+      expect(call[2].settings).toMatchObject(env);
     }
   });
 

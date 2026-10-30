@@ -14,7 +14,7 @@ import { pick } from '../utils/core.js';
  */
 
 function isChat(x) {
-    return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+    return Array.isArray(x) && x.every((x) => x !== null && typeof x === 'object' && 'role' in x);
 }
 
 /**
@@ -55,6 +55,9 @@ function isChat(x) {
  * Language generation pipeline using compatible causal language models.
  * This pipeline predicts the words that will follow a specified text prompt.
  * For all generation parameters, see `GenerationConfig`.
+ *
+ * For chat inputs, if the tokenizer defines a `response_template`, the generated assistant message is
+ * parsed with it (e.g., into `reasoning_content`, `content` and `tool_calls` fields).
  *
  * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
@@ -183,17 +186,14 @@ export class TextGenerationPipeline
             })
         );
 
-        const decoded = this.tokenizer.batch_decode(outputTokenIds, {
-            skip_special_tokens: true,
-        });
+        // Response templates often delimit regions with special tokens, so keep them when parsing
+        const response_template = this.tokenizer.response_template;
+        const skip_special_tokens = !response_template;
+        const decoded = this.tokenizer.batch_decode(outputTokenIds, { skip_special_tokens });
 
-        let promptLengths;
+        let prompts;
         if (!return_full_text && text_inputs.input_ids.dims.at(-1) > 0) {
-            promptLengths = this.tokenizer
-                .batch_decode(text_inputs.input_ids, {
-                    skip_special_tokens: true,
-                })
-                .map((x) => x.length);
+            prompts = this.tokenizer.batch_decode(text_inputs.input_ids, { skip_special_tokens });
         }
 
         /** @type {TextGenerationOutput[]} */
@@ -201,17 +201,21 @@ export class TextGenerationPipeline
         for (let i = 0; i < decoded.length; ++i) {
             const textIndex = Math.floor((i / outputTokenIds.dims[0]) * texts.length);
 
-            if (promptLengths) {
+            if (prompts) {
                 // Trim the decoded text to only include the generated part
-                decoded[i] = decoded[i].slice(promptLengths[textIndex]);
+                decoded[i] = decoded[i].slice(prompts[textIndex].length);
             }
-            toReturn[textIndex].push(
-                /** @type {TextGenerationSingle} */ ({
-                    generated_text: isChatInput
-                        ? [.../** @type {Chat[]} */ (texts)[textIndex], { role: 'assistant', content: decoded[i] }]
-                        : decoded[i],
-                }),
-            );
+            /** @type {string|Chat} */
+            let generated_text = decoded[i];
+            if (isChatInput) {
+                // Chat templates often pre-write part of the assistant message (e.g. an opening <think> tag),
+                // so the parser needs to see the prompt as `prefix`.
+                const message = response_template
+                    ? this.tokenizer.parse_response(decoded[i], { prefix: prompts?.[textIndex] ?? '', tools })
+                    : { role: 'assistant', content: decoded[i] };
+                generated_text = /** @type {Chat} */ ([.../** @type {Chat[]} */ (texts)[textIndex], message]);
+            }
+            toReturn[textIndex].push(/** @type {TextGenerationSingle} */ ({ generated_text }));
         }
         return !isBatched && toReturn.length === 1 ? toReturn[0] : toReturn;
     }
