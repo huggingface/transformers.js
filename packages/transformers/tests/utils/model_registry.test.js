@@ -191,7 +191,6 @@ describe("get_available_dtypes", () => {
       expect(validDtypes).toContain(dtype);
     }
   });
-
   describe("missing or inaccessible models", () => {
     it("should throw when the model does not exist (Hub responds 401)", async () => {
       mockGetConfig.mockRejectedValue(new ModelFileNotFoundError('Unauthorized access to file: "https://huggingface.co/test/missing/resolve/main/config.json".', { status: 401 }));
