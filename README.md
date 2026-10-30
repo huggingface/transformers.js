@@ -18,6 +18,9 @@
     <a href="https://huggingface.co/docs/transformers.js/index"><img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers.js/index.svg?down_color=red&down_message=offline&up_message=online"></a>
 </p>
 
+<p align="center">
+    <b>English</b> · <a href="README.zh.md">简体中文</a>
+</p>
 
 <h3 align="center">
   <p>State-of-the-art Machine Learning for the Web</p>
