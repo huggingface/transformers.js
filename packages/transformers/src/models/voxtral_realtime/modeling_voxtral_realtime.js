@@ -183,6 +183,37 @@ function addAudioEmbeddings(s, inputs_embeds, current_len) {
 }
 
 /**
+ * Logits that put all probability on the end-of-sequence token, for a decoding step
+ * whose audio has run out.
+ *
+ * The decoder's input at every position is the sum of an audio embedding and a text
+ * embedding; it was never trained on a text embedding alone, and what it samples from
+ * one is arbitrary (a word-piece suffix such as "ished", or punctuation). The Python
+ * implementation never runs such a step: it stops as soon as the chunk generator is
+ * exhausted. Here the loop can only learn that the stream has ended once it needs the
+ * next chunk, so the step is answered with `</s>` instead of being decoded.
+ * @param {PreTrainedModel} model
+ * @param {number} seq_len Number of positions in the current step.
+ * @returns {Tensor} Logits of shape `[1, seq_len, vocab_size]`.
+ * @private
+ */
+function endOfSequenceLogits(model, seq_len) {
+    const config = /** @type {any} */ (model.config);
+    const { vocab_size } = config.text_config;
+    // Same precedence as `_prepare_generation_config`: the generation config, then the text config.
+    const eos = model.generation_config?.eos_token_id ?? config.text_config.eos_token_id ?? config.eos_token_id;
+    const eos_token_id = Array.isArray(eos) ? eos[0] : eos;
+    if (eos_token_id == null) {
+        throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
+    }
+    const data = new Float32Array(seq_len * vocab_size).fill(-Infinity);
+    for (let i = 0; i < seq_len; ++i) {
+        data[i * vocab_size + eos_token_id] = 0;
+    }
+    return new Tensor('float32', data, [1, seq_len, vocab_size]);
+}
+
+/**
  * Stopping criterion that triggers when the audio stream is exhausted
  * and all buffered audio embeddings have been consumed.
  * @private
@@ -210,6 +241,11 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         if (enc) {
             // Fill audio buffer and embed tokens with audio
             await fillAudioBuffer(enc, enc.audio_consumed + current_len);
+            if (enc.audio_embed_total_tokens - enc.audio_consumed < current_len) {
+                // The stream ended before this step: end the sequence rather than decode
+                // positions that have no audio embedding.
+                return { logits: endOfSequenceLogits(this, current_len) };
+            }
         }
 
         const { inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], { input_ids });

@@ -1,3 +1,5 @@
+import { jest } from "@jest/globals";
+
 import { VoxtralRealtimeForConditionalGeneration, VoxtralRealtimeProcessor, Tensor } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
@@ -111,7 +113,8 @@ export default () => {
             28478n,
             28478n,
             28478n,
-            98356n,
+            /* </s>: the audio ran out */
+            2n,
           ],
         ]);
       },
@@ -140,7 +143,32 @@ export default () => {
         });
 
         // Same output as without delays — generation is deterministic
-        expect(outputs.tolist()).toEqual([[1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 98356n]]);
+        expect(outputs.tolist()).toEqual([[1n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 32n, 28478n, 28478n, 28478n, 28478n, 28478n, 28478n, 2n]]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "ends with </s> when the audio runs out, without decoding a step that has no audio",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+        const decoder_run = jest.spyOn(model.sessions["decoder_model_merged"], "run");
+
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+        });
+
+        // 1 s of audio is 44 audio tokens. The prefill consumes 39 of them and samples the first token,
+        // the next five tokens consume one each, and the step after that has no audio left: it must end
+        // the sequence rather than decode the text embedding alone.
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated).toHaveLength(7);
+        expect(generated.at(-1)).toBe(2n);
+        expect(decoder_run).toHaveBeenCalledTimes(generated.length - 1);
+        decoder_run.mockRestore();
       },
       MAX_TEST_EXECUTION_TIME,
     );
