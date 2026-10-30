@@ -66,7 +66,7 @@ export default () => {
         expect(outputs.bpe_logits.dims).toEqual([images.length, /* 27 */ max_token_length, /* 99 */ num_bpe_labels]);
         expect(outputs.wp_logits.dims).toEqual([images.length, /* 27 */ max_token_length, /* 99 */ num_wordpiece_labels]);
 
-        const decoded = processor.batch_decode(outputs.logits);
+        const decoded = processor.decode_logits(outputs.logits);
         const target = image_ids.reduce((acc, image_id) => {
           for (const key in TARGETS[image_id]) (acc[key] ??= []).push(...TARGETS[image_id][key]);
           return acc;

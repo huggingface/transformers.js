@@ -5,6 +5,19 @@ import { Tensor, cat, interpolate_4d, stack } from '../../utils/tensor.js';
  * @typedef {import('../../utils/image.js').RawImage} RawImage
  */
 
+
+/**
+ * @typedef {Object} Lfm2VlImageProcessorResult
+ * @property {Tensor} pixel_values
+ * @property {import("../../image_processors_utils.js").HeightWidth[]} original_sizes
+ * @property {import("../../image_processors_utils.js").HeightWidth[]} reshaped_input_sizes
+ * @property {Tensor} pixel_attention_mask
+ * @property {Tensor} spatial_shapes
+ * @property {number[]} [image_rows]
+ * @property {number[]} [image_cols]
+ * @property {number[][]} [image_sizes]
+ */
+
 /**
  * Returns the closest integer to `number` that is divisible by `factor`.
  * @param {number} number
@@ -186,8 +199,12 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         };
     }
 
-    /** @param {RawImage|RawImage[]|RawImage[][]} images */
-    // @ts-expect-error
+    /**
+     * @param {RawImage|RawImage[]|RawImage[][]} images
+     * @param {Object} [options]
+     * @param {boolean} [options.return_row_col_info]
+     * @returns {Promise<Lfm2VlImageProcessorResult>}
+     */
     async _call(images, { return_row_col_info = null } = {}) {
         /** @type {RawImage[][]} */
         let batched_images;
@@ -209,13 +226,15 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
         const all_rows = [];
         /** @type {number[]} */
         const all_cols = [];
-        /** @type {number[][]} */
+        /** @type {import("../../image_processors_utils.js").HeightWidth[]} */
         const all_image_sizes = [];
+        /** @type {import("../../image_processors_utils.js").HeightWidth[]} */
+        const all_original_sizes = [];
 
         for (const image_batch of batched_images) {
             const preprocessed = await Promise.all(image_batch.map((x) => this.preprocess(x, { do_pad: false })));
 
-            for (const { pixel_values } of preprocessed) {
+            for (const { pixel_values, original_size } of preprocessed) {
                 const [, height, width] = pixel_values.dims;
                 const img = pixel_values.unsqueeze_(0);
 
@@ -281,10 +300,10 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
                 all_rows.push(num_rows);
                 all_cols.push(num_cols);
                 all_image_sizes.push([new_height, new_width]);
+                all_original_sizes.push(original_size);
             }
         }
 
-        /** @type {Record<string, any>} */
         const result = {
             pixel_values: cat(all_pixel_values, 0),
             pixel_attention_mask: stack(all_pixel_masks, 0),
@@ -292,6 +311,8 @@ export class Lfm2VlImageProcessor extends ImageProcessor {
                 all_spatial_shapes.length,
                 2,
             ]),
+            original_sizes: all_original_sizes,
+            reshaped_input_sizes: all_image_sizes
         };
 
         if (return_row_col_info ?? this.return_row_col_info) {

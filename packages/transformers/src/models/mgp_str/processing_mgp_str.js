@@ -107,8 +107,8 @@ export class MgpstrProcessor extends Processor {
     }
 
     /**
-     * Convert a list of lists of token ids into a list of strings by calling decode.
-     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} sequences List of tokenized input ids.
+     * Convert model prediction logits into decoded text using char, bpe, and wp decoders.
+     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} logits Model prediction logits as a tuple of [char_logits, bpe_logits, wp_logits].
      * @returns {{generated_text: string[], scores: number[], char_preds: string[], bpe_preds: string[], wp_preds: string[]}}
      * Dictionary of all the outputs of the decoded results.
      * - generated_text: The final results after fusion of char, bpe, and wp.
