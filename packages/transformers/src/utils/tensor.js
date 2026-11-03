@@ -528,7 +528,19 @@ export class Tensor {
      * @returns The summed tensor
      */
     sum(dim = null, keepdim = false) {
-        return this.norm(1, dim, keepdim);
+        const this_data = this.data;
+        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        const fn = (/** @type {any} */ a, /** @type {any} */ b) => a + b;
+        const zero = is_bigint ? 0n : 0;
+
+        if (dim === null) {
+            // @ts-ignore
+            const val = this_data.reduce(fn, zero);
+            return new Tensor(this.type, [val], []);
+        }
+
+        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        return new Tensor(type, result, resultDims);
     }
 
     /**
@@ -550,18 +562,12 @@ export class Tensor {
         const this_data = this.data;
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
 
-        if (is_bigint && p !== 1) {
+        if (is_bigint) {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
         }
 
-        let fn, zero;
-        if (is_bigint) {
-            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
-            zero = 0n;
-        } else {
-            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
-            zero = 0;
-        }
+        const fn = (/** @type {number} */ a, /** @type {number} */ b) => a + Math.abs(b) ** p;
+        const zero = 0;
 
         if (dim === null) {
             // @ts-ignore

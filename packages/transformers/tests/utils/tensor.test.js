@@ -313,6 +313,18 @@ describe("Tensor operations", () => {
       const result = t1.sum(1);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should keep the sign of negative values", () => {
+      const t1 = new Tensor("float32", [-1, 2, -3, 4], [2, 2]);
+      expect(t1.sum().item()).toBeCloseTo(2);
+      expect(t1.sum(1)).toBeCloseToNested(new Tensor("float32", [1, 1], [2]));
+    });
+
+    it("should sum int64 tensors", () => {
+      const t1 = new Tensor("int64", [-1n, 2n, 3n, 4n], [2, 2]);
+      expect(t1.sum().item()).toEqual(8n);
+      expect(t1.sum(0).tolist()).toEqual([2n, 6n]);
+    });
   });
 
   describe("norm", () => {
@@ -329,6 +341,17 @@ describe("Tensor operations", () => {
       const result = t1.norm(2, 0);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should use absolute values for the L1 norm", () => {
+      const t1 = new Tensor("float32", [-3, 4, 1, -2], [2, 2]);
+      expect(t1.norm(1).item()).toBeCloseTo(10);
+      expect(t1.norm(1, 1)).toBeCloseToNested(new Tensor("float32", [7, 3], [2]));
+    });
+
+    it("should use absolute values for odd p", () => {
+      const t1 = new Tensor("float32", [-3, 4], [2]);
+      expect(t1.norm(3).item()).toBeCloseTo(Math.cbrt(91));
+    });
   });
 
   describe("normalize", () => {
@@ -343,6 +366,13 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [1, 2, 2, 3], [2, 2]);
       const target = new Tensor("float32", [0.4472, 0.8944, 0.5547, 0.8321], [2, 2]);
       const normalized = t1.normalize();
+      expect(normalized).toBeCloseToNested(target);
+    });
+
+    it("should L1-normalize vectors with negative values", () => {
+      const t1 = new Tensor("float32", [-3, 4, 1, -1], [2, 2]);
+      const target = new Tensor("float32", [-3 / 7, 4 / 7, 0.5, -0.5], [2, 2]);
+      const normalized = t1.normalize(1, 1);
       expect(normalized).toBeCloseToNested(target);
     });
   });
