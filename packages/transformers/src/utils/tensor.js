@@ -792,6 +792,19 @@ export class Tensor {
      */
     clamp_(min, max) {
         const this_data = this.data;
+        // BigInt values cannot go through Math.min/Math.max (ToNumber
+        // throws on BigInt), so clamp with comparisons instead. Numeric
+        // bounds are truncated toward zero, matching the C++ integer cast
+        // PyTorch uses for its bounds.
+        if (this_data instanceof BigInt64Array || this_data instanceof BigUint64Array) {
+            const lo = typeof min === 'bigint' ? min : BigInt(Math.trunc(min));
+            const hi = typeof max === 'bigint' ? max : BigInt(Math.trunc(max));
+            for (let i = 0; i < this_data.length; ++i) {
+                const v = this_data[i];
+                this_data[i] = v < lo ? lo : v > hi ? hi : v;
+            }
+            return this;
+        }
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = Math.min(Math.max(this_data[i], min), max);
         }
@@ -813,6 +826,11 @@ export class Tensor {
      */
     round_() {
         const this_data = this.data;
+        // Integer tensors are already integral; Math.round would throw on
+        // BigInt values (and is a no-op on the other integer dtypes).
+        if (this_data instanceof BigInt64Array || this_data instanceof BigUint64Array) {
+            return this;
+        }
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = Math.round(this_data[i]);
         }

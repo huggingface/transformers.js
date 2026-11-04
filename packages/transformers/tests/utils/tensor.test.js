@@ -631,12 +631,44 @@ describe("Tensor operations", () => {
       const result = t1.clamp(-1, 2);
       expect(result).toEqual(target);
     });
+
+    it("should clamp int64 values between bigint bounds", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([-5n, 0n, 9n]), [3]);
+      const target = new Tensor("int64", BigInt64Array.from([-1n, 0n, 2n]), [3]);
+
+      const result = t1.clamp(-1n, 2n);
+      expect(result).toEqual(target);
+    });
+
+    it("should clamp int64 values between numeric bounds", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([-5n, 0n, 9n]), [3]);
+      const target = new Tensor("int64", BigInt64Array.from([-1n, 0n, 2n]), [3]);
+
+      const result = t1.clamp(-1, 2);
+      expect(result).toEqual(target);
+    });
+
+    it("should clamp uint64 values between bigint bounds", () => {
+      const t1 = new Tensor("uint64", BigUint64Array.from([0n, 4n, 9n]), [3]);
+      const target = new Tensor("uint64", BigUint64Array.from([1n, 2n, 2n]), [3]);
+
+      const result = t1.clamp(1n, 2n);
+      expect(result).toEqual(target);
+    });
   });
 
   describe("round", () => {
     it("should round elements to the nearest integer", () => {
       const t1 = new Tensor("float32", [0.1, 1.4, 2.5, 3.9, -1.2], [5]);
       const target = new Tensor("float32", [0, 1, 3, 4, -1], [5]);
+
+      const result = t1.round();
+      expect(result).toEqual(target);
+    });
+
+    it("should leave int64 tensors unchanged", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([-3n, 0n, 7n]), [3]);
+      const target = new Tensor("int64", BigInt64Array.from([-3n, 0n, 7n]), [3]);
 
       const result = t1.round();
       expect(result).toEqual(target);
