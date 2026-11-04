@@ -249,6 +249,23 @@ describe("Tensor operations", () => {
       const target2 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       expect(t1.mean(-1)).toBeCloseToNested(target2);
     });
+
+    it("should promote uint8 means to float32", () => {
+      const t2 = new Tensor("uint8", Uint8Array.from([200, 100]), [2]);
+      const target = new Tensor("float32", [150], []);
+      expect(t2.mean()).toEqual(target);
+    });
+
+    it("should promote uint8 means over a dimension to float32", () => {
+      const t2 = new Tensor("uint8", Uint8Array.from([200, 100, 1, 2]), [2, 2]);
+      const target = new Tensor("float32", [150, 1.5], [2]);
+      expect(t2.mean(1)).toEqual(target);
+    });
+
+    it("should throw a clear error for mean on int64 tensors", () => {
+      const t2 = new Tensor("int64", BigInt64Array.from([1n, 2n]), [2]);
+      expect(() => t2.mean()).toThrow("Expected a floating point tensor as input. Got int64");
+    });
   });
 
   describe("std_mean", () => {
@@ -313,6 +330,34 @@ describe("Tensor operations", () => {
       const result = t1.sum(1);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should promote uint8 sums to int64 instead of wrapping", () => {
+      const t1 = new Tensor("uint8", Uint8Array.from([200, 100]), [2]);
+      const target = new Tensor("int64", [300n], []);
+      const result = t1.sum();
+      expect(result).toEqual(target);
+    });
+
+    it("should promote int32 sums to int64 without wrapping", () => {
+      const t1 = new Tensor("int32", Int32Array.from([2147483647, 1]), [2]);
+      const target = new Tensor("int64", [2147483648n], []);
+      const result = t1.sum();
+      expect(result).toEqual(target);
+    });
+
+    it("should promote uint8 sums over a dimension to int64", () => {
+      const t1 = new Tensor("uint8", Uint8Array.from([200, 100, 1, 2]), [2, 2]);
+      const target = new Tensor("int64", [300n, 3n], [2]);
+      const result = t1.sum(1);
+      expect(result).toEqual(target);
+    });
+
+    it("should promote bool sums to int64", () => {
+      const t1 = new Tensor("bool", Uint8Array.from([1, 1, 0, 1]), [2, 2]);
+      const target = new Tensor("int64", [3n], []);
+      const result = t1.sum();
+      expect(result).toEqual(target);
+    });
   });
 
   describe("norm", () => {
@@ -328,6 +373,27 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [6.7082, 8.9443], [2]);
       const result = t1.norm(2, 0);
       expect(result).toBeCloseToNested(target);
+    });
+
+    it("should promote uint8 L2 norms to float32", () => {
+      const t1 = new Tensor("uint8", Uint8Array.from([3, 4]), [2]);
+      const target = new Tensor("float32", [5], []);
+      const result = t1.norm();
+      expect(result).toEqual(target);
+    });
+
+    it("should promote uint8 L2 norms over a dimension to float32", () => {
+      const t1 = new Tensor("uint8", Uint8Array.from([3, 4, 6, 8]), [2, 2]);
+      const target = new Tensor("float32", [5, 10], [2]);
+      const result = t1.norm(2, 1);
+      expect(result).toEqual(target);
+    });
+
+    it("should promote uint8 L1 norms (sum) to int64", () => {
+      const t1 = new Tensor("uint8", Uint8Array.from([200, 100]), [2]);
+      const target = new Tensor("int64", [300n], []);
+      const result = t1.norm(1);
+      expect(result).toEqual(target);
     });
   });
 

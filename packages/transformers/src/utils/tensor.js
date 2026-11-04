@@ -20,7 +20,23 @@ import { random } from './random.js';
 /**
  * @typedef {keyof typeof DataTypeMap} DataType
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
+ * @typedef {Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array | BigInt64Array | BigUint64Array} TypedArrayConstructor
  */
+
+/**
+ * Integer dtypes whose reductions cannot accumulate into their own arrays
+ * without wrapping. Following PyTorch, sums over these promote to `int64`
+ * and means/norms promote to float.
+ */
+const INTEGER_PROMOTING_TYPES = /** @type {DataType[]} */ ([
+    'int8',
+    'uint8',
+    'int16',
+    'uint16',
+    'int32',
+    'uint32',
+    'bool',
+]);
 
 /**
  * A typed multi-dimensional array.
@@ -549,6 +565,11 @@ export class Tensor {
 
         const this_data = this.data;
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        // Small integer dtypes cannot hold running sums in their own arrays
+        // (a Uint8Array accumulator wraps modulo 256), and PyTorch promotes
+        // integer sums to int64 and norms to float, so compute in a wider
+        // accumulator and promote the output dtype (#1849).
+        const is_integer = INTEGER_PROMOTING_TYPES.includes(this.type);
 
         if (is_bigint && p !== 1) {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
@@ -563,21 +584,44 @@ export class Tensor {
             zero = 0;
         }
 
+        const outType = /** @type {DataType} */ (
+            is_bigint ? this.type : is_integer ? (p === 1 ? 'int64' : 'float32') : this.type
+        );
+
         if (dim === null) {
+            // TypedArray#reduce accumulates in plain JS numbers, so no
+            // wrapping occurs here; only the output dtype needs promotion.
             // @ts-ignore
             let val = this_data.reduce(fn, zero);
             if (p !== 1) {
                 val = val ** (1 / p);
             }
-            return new Tensor(this.type, [val], []);
+            if (outType === 'int64' && !is_bigint) {
+                val = BigInt(Math.round(val));
+            }
+            return new Tensor(outType, [val], []);
         }
 
-        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        const [type, result, resultDims] = reduce_helper(
+            fn,
+            this,
+            dim,
+            keepdim,
+            null,
+            is_integer ? Float64Array : null,
+        );
 
         if (p !== 1) {
             for (let i = 0; i < result.length; ++i) {
                 result[i] = result[i] ** (1 / p);
             }
+        }
+        if (outType !== type) {
+            const data =
+                outType === 'int64'
+                    ? BigInt64Array.from(result, (v) => BigInt(Math.round(v)))
+                    : Float32Array.from(result);
+            return new Tensor(outType, data, resultDims);
         }
         return new Tensor(type, result, resultDims);
     }
@@ -1470,9 +1514,12 @@ export function stack(tensors, dim = 0) {
  * @param {number} dim the dimension to reduce.
  * @param {boolean} keepdim whether the output tensor has dim retained or not.
  * @param {any} [initialValue=null] the initial value to start the reduction with.
+ * @param {TypedArrayConstructor|null} [accumulatorCls=null] constructor used for the accumulator.
+ * Defaults to the input's own typed-array constructor. Pass a wider type (e.g. `Float64Array`)
+ * for integer inputs, where accumulating into the same-width array would wrap.
  * @returns {[DataType, any, number[]]} The reduced tensor data.
  */
-function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = null) {
+function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = null, accumulatorCls = null) {
     const inputData = input.data;
     const inputDims = input.dims;
 
@@ -1485,7 +1532,7 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
 
     // Create a new array to store the accumulated values
     // @ts-ignore
-    const result = new inputData.constructor(inputData.length / inputDims[dim]);
+    const result = new (accumulatorCls ?? inputData.constructor)(inputData.length / inputDims[dim]);
     if (initialValue !== null) {
         result.fill(initialValue);
     }
@@ -1581,22 +1628,34 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
 export function mean(input, dim = null, keepdim = false) {
     const inputDims = input.dims;
     const inputData = /** @type {Float32Array} */ (input.data);
+    const is_bigint = inputData instanceof BigInt64Array || inputData instanceof BigUint64Array;
+    // Integer dtypes cannot accumulate into their own arrays without
+    // wrapping, and PyTorch promotes integer means to float (#1849).
+    const is_integer = INTEGER_PROMOTING_TYPES.includes(input.type);
+
+    if (is_bigint) {
+        throw Error(`Expected a floating point tensor as input. Got ${input.type}`);
+    }
+
+    const outType = /** @type {DataType} */ (is_integer ? 'float32' : input.type);
 
     if (dim === null) {
         // None to reduce over all dimensions.
+        // TypedArray#reduce accumulates in plain JS numbers, so no wrapping occurs here.
         const val = inputData.reduce((a, b) => a + b, 0);
-        return new Tensor(
-            input.type,
-            [val / inputData.length],
-            [
-                /* scalar */
-            ],
-        );
+        return new Tensor(outType, [val / inputData.length], []);
     }
     dim = safeIndex(dim, inputDims.length);
 
     // Compute sum
-    const [type, result, resultDims] = reduce_helper((a, b) => a + b, input, dim, keepdim);
+    const [type, result, resultDims] = reduce_helper(
+        (a, b) => a + b,
+        input,
+        dim,
+        keepdim,
+        null,
+        is_integer ? Float64Array : null,
+    );
 
     // Divide by number of elements in the dimension
     if (inputDims[dim] !== 1) {
@@ -1605,6 +1664,9 @@ export function mean(input, dim = null, keepdim = false) {
         }
     }
 
+    if (outType !== type) {
+        return new Tensor(outType, Float32Array.from(result), resultDims);
+    }
     return new Tensor(type, result, resultDims);
 }
 
