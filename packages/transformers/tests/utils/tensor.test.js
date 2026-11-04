@@ -655,6 +655,19 @@ describe("Tensor operations", () => {
       const result = t1.clamp(1n, 2n);
       expect(result).toEqual(target);
     });
+
+    it("should treat an infinite bound as unbounded for int64", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([-5n, 0n, 9n]), [3]);
+
+      // `clamp(-Infinity, 2)` only bounds the upper side (as in torch.clamp).
+      expect(t1.clamp(-Infinity, 2)).toEqual(
+        new Tensor("int64", BigInt64Array.from([-5n, 0n, 2n]), [3]),
+      );
+      expect(t1.clamp(-1, Infinity)).toEqual(
+        new Tensor("int64", BigInt64Array.from([-1n, 0n, 9n]), [3]),
+      );
+      expect(t1.clamp(-Infinity, Infinity)).toEqual(t1);
+    });
   });
 
   describe("round", () => {

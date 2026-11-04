@@ -795,13 +795,14 @@ export class Tensor {
         // BigInt values cannot go through Math.min/Math.max (ToNumber
         // throws on BigInt), so clamp with comparisons instead. Numeric
         // bounds are truncated toward zero, matching the C++ integer cast
-        // PyTorch uses for its bounds.
+        // PyTorch uses for its bounds. `±Infinity` means "no bound on that
+        // side" (as in `torch.clamp`), since it has no BigInt counterpart.
         if (this_data instanceof BigInt64Array || this_data instanceof BigUint64Array) {
-            const lo = typeof min === 'bigint' ? min : BigInt(Math.trunc(min));
-            const hi = typeof max === 'bigint' ? max : BigInt(Math.trunc(max));
+            const lo = bigint_bound(min);
+            const hi = bigint_bound(max);
             for (let i = 0; i < this_data.length; ++i) {
                 const v = this_data[i];
-                this_data[i] = v < lo ? lo : v > hi ? hi : v;
+                this_data[i] = lo !== null && v < lo ? lo : hi !== null && v > hi ? hi : v;
             }
             return this;
         }
@@ -1091,6 +1092,26 @@ export class Tensor {
  * @template {[number]|number[]} DIM
  * @returns {NestArray<T, DIM["length"]>} The reshaped array.
  */
+/**
+ * Converts a `clamp` bound to a `bigint` for the `int64` / `uint64` path.
+ * Numeric bounds are truncated toward zero, matching the C++ integer cast
+ * PyTorch applies to clamp bounds. `±Infinity` has no `bigint` counterpart
+ * and means "unbounded on that side" (as in `torch.clamp`), so it maps to
+ * `null`; anything else non-integral (e.g. `NaN`) keeps throwing from the
+ * `BigInt` conversion.
+ * @param {number|bigint} bound The lower or upper bound passed to `clamp`.
+ * @returns {bigint|null} The bound as a BigInt, or `null` if unbounded.
+ */
+function bigint_bound(bound) {
+    if (typeof bound === 'bigint') {
+        return bound;
+    }
+    if (bound === Infinity || bound === -Infinity) {
+        return null;
+    }
+    return BigInt(Math.trunc(bound));
+}
+
 function reshape(data, dimensions) {
     const totalElements = data.length;
     const dimensionSize = dimensions.length === 0 ? 1 : dimensions.reduce((a, b) => a * b);
