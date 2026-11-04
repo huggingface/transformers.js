@@ -274,6 +274,20 @@ describe("Tensor operations", () => {
       const result = t2.min(1);
       expect(result).toEqual(target);
     });
+
+    it("should return the minimum over a dimension for int64 tensors", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([5n, 3n, -8n, 1n]), [2, 2]);
+      const target = new Tensor("int64", BigInt64Array.from([3n, -8n]), [2]);
+      const result = t1.min(1);
+      expect(result).toEqual(target);
+    });
+
+    it("should return the minimum over a dimension for uint64 tensors", () => {
+      const t1 = new Tensor("uint64", BigUint64Array.from([5n, 3n, 8n, 1n]), [2, 2]);
+      const target = new Tensor("uint64", BigUint64Array.from([3n, 1n]), [2]);
+      const result = t1.min(1);
+      expect(result).toEqual(target);
+    });
   });
 
   describe("max", () => {
@@ -288,6 +302,20 @@ describe("Tensor operations", () => {
       const t2 = new Tensor("float32", [1, 2, 4, 5, 9, 3], [3, 2]);
       const target = new Tensor("float32", [9, 5], [2]);
       const result = t2.max(0);
+      expect(result).toEqual(target);
+    });
+
+    it("should return the maximum over a dimension for int64 tensors", () => {
+      const t1 = new Tensor("int64", BigInt64Array.from([5n, 3n, -8n, 1n]), [2, 2]);
+      const target = new Tensor("int64", BigInt64Array.from([5n, 1n]), [2]);
+      const result = t1.max(1);
+      expect(result).toEqual(target);
+    });
+
+    it("should return the maximum over a dimension for uint64 tensors", () => {
+      const t1 = new Tensor("uint64", BigUint64Array.from([5n, 3n, 8n, 1n]), [2, 2]);
+      const target = new Tensor("uint64", BigUint64Array.from([5n, 8n]), [2]);
+      const result = t1.max(1);
       expect(result).toEqual(target);
     });
   });

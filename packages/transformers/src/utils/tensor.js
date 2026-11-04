@@ -855,7 +855,18 @@ export class Tensor {
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.min(a, b), this, dim, keepdim, Infinity);
+        // BigInt values cannot go through Math.min, and the reduction's
+        // initial value must be a representable element of the backing
+        // array (`Infinity` throws on BigInt arrays), so use the largest
+        // value of the dtype as the identity and a comparison-based fold.
+        const is_bigint = this.data instanceof BigInt64Array || this.data instanceof BigUint64Array;
+        const callbackfn = is_bigint ? (a, b) => (b < a ? b : a) : (a, b) => Math.min(a, b);
+        const initialValue = is_bigint
+            ? this.data instanceof BigUint64Array
+                ? 2n ** 64n - 1n
+                : 2n ** 63n - 1n
+            : Infinity;
+        const [type, result, resultDims] = reduce_helper(callbackfn, this, dim, keepdim, initialValue);
         return new Tensor(type, result, resultDims);
     }
 
@@ -877,7 +888,14 @@ export class Tensor {
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.max(a, b), this, dim, keepdim, -Infinity);
+        // BigInt values cannot go through Math.max, and the reduction's
+        // initial value must be a representable element of the backing
+        // array (`-Infinity` throws on BigInt arrays), so use the smallest
+        // value of the dtype as the identity and a comparison-based fold.
+        const is_bigint = this.data instanceof BigInt64Array || this.data instanceof BigUint64Array;
+        const callbackfn = is_bigint ? (a, b) => (b > a ? b : a) : (a, b) => Math.max(a, b);
+        const initialValue = is_bigint ? (this.data instanceof BigUint64Array ? 0n : -(2n ** 63n)) : -Infinity;
+        const [type, result, resultDims] = reduce_helper(callbackfn, this, dim, keepdim, initialValue);
         return new Tensor(type, result, resultDims);
     }
 
