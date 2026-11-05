@@ -715,25 +715,34 @@ export class Tensor {
      * @returns {Tensor} The tensor with the same data but different shape
      */
     view(...dims) {
-        // TODO: validate dims
+        const total = this.data.length;
         let inferredIndex = -1;
+        let knownProduct = 1;
         for (let i = 0; i < dims.length; ++i) {
             if (dims[i] === -1) {
                 if (inferredIndex !== -1) {
                     throw new Error('Only one dimension can be inferred');
                 }
                 inferredIndex = i;
+            } else {
+                if (!Number.isInteger(dims[i]) || dims[i] < 0) {
+                    throw new Error(
+                        `Invalid dimension ${dims[i]} in view; dimensions must be non-negative integers (or a single -1 to infer)`,
+                    );
+                }
+                knownProduct *= dims[i];
             }
         }
 
         const this_data = this.data;
         if (inferredIndex !== -1) {
             // Some dimension must be inferred
-            const productOther = dims.reduce((product, curr, index) => {
-                return index !== inferredIndex ? product * curr : product;
-            }, 1);
-
-            dims[inferredIndex] = this_data.length / productOther;
+            if (knownProduct === 0 || total % knownProduct !== 0) {
+                throw new Error(`shape '[${dims.join(', ')}]' is invalid for input of size ${total}`);
+            }
+            dims[inferredIndex] = total / knownProduct;
+        } else if (knownProduct !== total) {
+            throw new Error(`shape '[${dims.join(', ')}]' is invalid for input of size ${total}`);
         }
         return new Tensor(this.type, this_data, dims); // NOTE: uses same underlying storage
     }

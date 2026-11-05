@@ -461,7 +461,10 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
     it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
-      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
+      for (const [divisor, values] of [
+        [1e20, [1, 3]],
+        [-1e20, [-1, -3]],
+      ]) {
         const tensor = new Tensor(type, values, [2]);
         expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
         expect(Array.from(tensor.data)).toEqual(values);
@@ -592,6 +595,26 @@ describe("Tensor operations", () => {
     it("should throw if multiple inferred dimensions are used", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       expect(() => t1.view(-1, -1)).toThrow();
+    });
+
+    it("should throw if the requested shape does not match the number of elements", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.view(4, 2)).toThrow("shape '[4, 2]' is invalid for input of size 6");
+    });
+
+    it("should throw if the inferred dimension is not a whole number", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.view(4, -1)).toThrow("shape '[4, -1]' is invalid for input of size 6");
+    });
+
+    it("should throw on non-integer dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.view(2.5, 4)).toThrow("Invalid dimension 2.5");
+    });
+
+    it("should throw on negative dimensions other than -1", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => t1.view(-2, 3)).toThrow("Invalid dimension -2");
     });
   });
 
