@@ -1394,11 +1394,32 @@ function safeIndex(index, size, dimension = null, boundsCheck = true) {
  * @returns {Tensor} The concatenated tensor.
  */
 export function cat(tensors, dim = 0) {
-    dim = safeIndex(dim, tensors[0].dims.length);
+    if (tensors.length === 0) {
+        throw new Error('cat expects a non-empty list of tensors');
+    }
+    const rank = tensors[0]?.dims.length;
+    dim = safeIndex(dim, rank);
 
-    // TODO do validation of shapes
-
+    // Every tensor must agree on the dimensions that are not being
+    // concatenated. Without this, a mismatched input silently produced a tensor
+    // whose data no longer matches its dims (the copy loop indexes the result
+    // with the *first* tensor's dims and leaves the rest zero-filled), which is
+    // much harder to debug than torch's upfront error.
     const resultDims = tensors[0].dims.slice();
+    for (let t = 1; t < tensors.length; ++t) {
+        const dims = tensors[t].dims;
+        if (dims.length !== rank) {
+            throw new Error(`Tensors must have the same number of dimensions: got ${rank} and ${dims.length}`);
+        }
+        for (let d = 0; d < rank; ++d) {
+            if (d !== dim && dims[d] !== resultDims[d]) {
+                throw new Error(
+                    `Sizes of tensors must match except in dimension ${dim}. Expected size ${resultDims[d]} but got size ${dims[d]} for tensor number ${t} in the list`,
+                );
+            }
+        }
+    }
+
     resultDims[dim] = tensors.reduce((a, b) => a + b.dims[dim], 0);
 
     // Create a new array to store the accumulated values
