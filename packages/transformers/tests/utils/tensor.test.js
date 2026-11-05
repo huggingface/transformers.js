@@ -216,6 +216,31 @@ describe("Tensor operations", () => {
       const target_6 = new Tensor("float32", [0, 12, 4, 16, 8, 20, 1, 13, 5, 17, 9, 21, 2, 14, 6, 18, 10, 22, 3, 15, 7, 19, 11, 23], [4, 3, 2]);
       expect(permuted_6).toEqual(target_6);
     });
+
+    it("should support negative dims (PyTorch-compatible)", () => {
+      const x = new Tensor("float32", [0, 1, 2, 3, 4, 5], [2, 3]);
+
+      // permute(-1, -2) is equivalent to permute(1, 0)
+      const permuted = x.permute(-1, -2);
+      const target = new Tensor("float32", [0, 3, 1, 4, 2, 5], [3, 2]);
+      expect(permuted).toEqual(target);
+
+      // transpose(-1, -2) is the common "swap last two dims" idiom
+      const transposed = x.transpose(-1, -2);
+      expect(transposed).toEqual(target);
+
+      // Negative and non-negative dims can be mixed
+      const mixed = x.permute(-1, 0);
+      expect(mixed).toEqual(target);
+    });
+
+    it("should reject invalid permute dims", () => {
+      const x = new Tensor("float32", [0, 1, 2, 3, 4, 5], [2, 3]);
+      expect(() => x.permute(0)).toThrow();
+      expect(() => x.permute(0, 2)).toThrow();
+      expect(() => x.permute(0, 0)).toThrow();
+      expect(() => x.permute(-3, -2)).toThrow();
+    });
   });
 
   describe("map", () => {

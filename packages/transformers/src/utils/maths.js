@@ -97,6 +97,17 @@ export function interpolate_data(
  * @returns {[T, number[]]} The permuted array and the new shape.
  */
 export function permute_data(array, dims, axes) {
+    // Normalize negative axes, matching torch.permute (e.g. -1 refers to the last dim),
+    // then validate that they form a permutation of the tensor's dimensions.
+    axes = axes.map((a) => (a < 0 ? a + dims.length : a));
+    if (
+        axes.length !== dims.length ||
+        new Set(axes).size !== axes.length ||
+        axes.some((a) => a < 0 || a >= dims.length)
+    ) {
+        throw new Error(`axes must be a permutation of the tensor's dimensions: received [${axes}] for dims [${dims}]`);
+    }
+
     // Calculate the new shape of the permuted array
     // and the stride of the original array
     const shape = new Array(axes.length);
