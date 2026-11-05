@@ -7,7 +7,7 @@
  * @module utils/tensor
  */
 
-import { interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
+import { bankers_round, interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
 
 import { Tensor as ONNXTensor, isONNXTensor } from '../backends/onnx.js';
 
@@ -814,7 +814,9 @@ export class Tensor {
     round_() {
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] = Math.round(this_data[i]);
+            // BigInt tensors already hold integers. Floats round ties to even,
+            // matching torch.round and Python's built-in round().
+            this_data[i] = typeof this_data[i] === 'bigint' ? this_data[i] : bankers_round(this_data[i]);
         }
         return this;
     }

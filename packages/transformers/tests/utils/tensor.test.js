@@ -607,8 +607,24 @@ describe("Tensor operations", () => {
 
   describe("round", () => {
     it("should round elements to the nearest integer", () => {
-      const t1 = new Tensor("float32", [0.1, 1.4, 2.5, 3.9, -1.2], [5]);
-      const target = new Tensor("float32", [0, 1, 3, 4, -1], [5]);
+      const t1 = new Tensor("float32", [0.1, 1.4, 2.3, 3.9, -1.2], [5]);
+      const target = new Tensor("float32", [0, 1, 2, 4, -1], [5]);
+
+      const result = t1.round();
+      expect(result).toEqual(target);
+    });
+
+    it("should round ties to the nearest even integer (PyTorch-compatible)", () => {
+      const t1 = new Tensor("float32", [0.5, 1.5, 2.5, 3.5, -1.5, -2.5], [6]);
+      const target = new Tensor("float32", [0, 2, 2, 4, -2, -2], [6]);
+
+      const result = t1.round();
+      expect(result).toEqual(target);
+    });
+
+    it("should leave integer tensors unchanged", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      const target = new Tensor("int64", [1n, 2n, 3n], [3]);
 
       const result = t1.round();
       expect(result).toEqual(target);
