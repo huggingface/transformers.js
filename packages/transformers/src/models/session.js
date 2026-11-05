@@ -20,6 +20,8 @@ import { logger } from '../utils/logger.js';
  * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
  * @param {boolean} [cache_config=false] Whether to compute cache shapes for GPU-pinned outputs.
  * @param {string} [session_name] The name of the session (used to determine cache shapes).
+ * @param {string[]} [gpu_outputs] Names of outputs to keep on the GPU, as they are only
+ *   consumed by another session.
  * @returns {Promise<{buffer_or_path: Uint8Array|string, session_options: Object, session_config: Object}>} A Promise that resolves to the data needed to create an InferenceSession object.
  * @private
  */
@@ -29,6 +31,7 @@ async function getSession(
     options,
     cache_config = false,
     session_name = undefined,
+    gpu_outputs = undefined,
 ) {
     let custom_config = options.config?.['transformers.js_config'] ?? {};
 
@@ -123,6 +126,20 @@ async function getSession(
         }
     }
 
+    // NOTE: Skipped in Node.js since, unlike the KV cache above, these outputs may be downloaded (e.g., to merge them
+    // with image features), which crashes onnxruntime-node's WebGPU EP (tested with 1.30.0).
+    if (gpu_outputs?.length && selectedDevice === 'webgpu' && !isONNXProxy() && !apis.IS_NODE_ENV) {
+        // Avoid a GPU->CPU readback at every generation step for outputs that are only fed into another
+        // session, e.g. text embeddings passed to the decoder.
+        const existing = session_options.preferredOutputLocation;
+        if (typeof existing !== 'string') {
+            session_options.preferredOutputLocation = {
+                ...Object.fromEntries(gpu_outputs.map((name) => [name, 'gpu-buffer'])),
+                ...existing,
+            };
+        }
+    }
+
     const buffer_or_path = await bufferOrPathPromise;
     const session_config = {
         dtype: selectedDtype,
@@ -139,10 +156,18 @@ async function getSession(
  * @param {import('../utils/hub.js').PretrainedModelOptions} options Additional options for loading the model.
  * @param {Record<string, true>} [cache_sessions] A map from session name to `true`, indicating which
  *   sessions should have GPU-pinned KV cache outputs.
+ * @param {Record<string, string[]>} [gpu_output_sessions] A map from session name to the names of outputs
+ *   that should stay on the GPU.
  * @returns {Promise<Record<string, any>>} A Promise that resolves to a dictionary of InferenceSession objects.
  * @private
  */
-export async function constructSessions(pretrained_model_name_or_path, names, options, cache_sessions = undefined) {
+export async function constructSessions(
+    pretrained_model_name_or_path,
+    names,
+    options,
+    cache_sessions = undefined,
+    gpu_output_sessions = undefined,
+) {
     return Object.fromEntries(
         await Promise.all(
             Object.keys(names).map(async (name) => {
@@ -153,6 +178,7 @@ export async function constructSessions(pretrained_model_name_or_path, names, op
                     options,
                     cache_config,
                     name,
+                    gpu_output_sessions?.[name],
                 );
                 const session = await createInferenceSession(buffer_or_path, session_options, session_config);
                 return [name, session];

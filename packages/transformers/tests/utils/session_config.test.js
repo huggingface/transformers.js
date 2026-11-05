@@ -19,4 +19,17 @@ describe("MODEL_SESSION_CONFIG", () => {
     }
     expect(missing).toEqual([]);
   });
+
+  it("should only keep session outputs on the GPU for model types that pass them straight to another session", () => {
+    // `gpu_output_sessions` outputs are returned as GPU tensors on WebGPU, so they are only safe for model types whose
+    // forward (`generic_text_to_text_forward`) downloads them when needed. Models that read or modify `inputs_embeds`
+    // on the CPU directly (e.g., Gemma3n, Voxtral Realtime, Chatterbox) must not use it.
+    const enabled = Object.entries(MODEL_TYPES)
+      .filter(([, type]) => MODEL_SESSION_CONFIG[type]?.gpu_output_sessions)
+      .map(([name]) => name);
+    expect(enabled).toEqual(["ImageTextToText", "AudioTextToText"]);
+    for (const name of enabled) {
+      expect(MODEL_SESSION_CONFIG[MODEL_TYPES[name]].gpu_output_sessions).toEqual({ embed_tokens: ["inputs_embeds"] });
+    }
+  });
 });
