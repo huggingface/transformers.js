@@ -685,6 +685,22 @@ describe("Tensor operations", () => {
       const t2 = t1.to("int64");
       expect(t2).toEqual(target);
     });
+    it("float32 to int64 truncates toward zero (negative values)", () => {
+      const t1 = new Tensor("float32", [-1.5, -0.5, 1.5, 2.5], [4]);
+
+      const target = new Tensor("int64", [-1n, 0n, 1n, 2n], [4]);
+
+      const t2 = t1.to("int64");
+      expect(t2).toEqual(target);
+    });
+    it("float32 to int32 truncates toward zero (negative values)", () => {
+      const t1 = new Tensor("float32", [-1.5, -0.5, 1.5, 2.5], [4]);
+
+      const target = new Tensor("int32", [-1, 0, 1, 2], [4]);
+
+      const t2 = t1.to("int32");
+      expect(t2).toEqual(target);
+    });
     it("int64 to float32 (bigint to number)", () => {
       const t1 = new Tensor("int64", [1n, 2n, 3n, 4n, 5n, 6n], [2, 3]);
 
