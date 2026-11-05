@@ -52,6 +52,20 @@ function encode_result(type, data) {
 }
 
 /**
+ * Writes float32 values back into a `float16` tensor's bit-pattern storage.
+ * For non-float16 tensors this is a no-op (the data is written in place by
+ * the caller).
+ *
+ * @param {Tensor} tensor The tensor to write into.
+ * @param {Float32Array} data The computed values.
+ * @returns {void}
+ */
+function encode_into(tensor, data) {
+    if (tensor.type !== 'float16') return;
+    tensor.data.set(encode_result('float16', data));
+}
+
+/**
  * A typed multi-dimensional array.
  *
  * **Example:**
@@ -247,10 +261,11 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     sigmoid_() {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = 1 / (1 + Math.exp(-this_data[i]));
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -271,10 +286,11 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     map_(callback) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = callback(this_data[i], i, this_data);
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -293,10 +309,12 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     mul_(val) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] *= val;
+            this_data[i] *= operand;
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -315,10 +333,12 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     div_(val) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] /= val;
+            this_data[i] /= operand;
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -337,10 +357,12 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     add_(val) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] += val;
+            this_data[i] += operand;
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -359,10 +381,12 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     sub_(val) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] -= val;
+            this_data[i] -= operand;
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -384,10 +408,10 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     remainder_(val) {
-        const this_data = this.data;
+        const this_data = /** @type {any} */ (decode_float16(this));
         // `%` cannot mix bigint and number operands, so cast the divisor to match the element type.
         // (Typed as `any` since TypeScript cannot apply `%` to `any` and `number | bigint`.)
-        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        const is_bigint = this.data instanceof BigInt64Array || this.data instanceof BigUint64Array;
         const divisor = /** @type {any} */ (is_bigint ? BigInt(val) : Number(val));
         if ((divisor === 0 || divisor === 0n) && (this.type.includes('int') || this.type === 'bool')) {
             throw new RangeError('Division by zero');
@@ -402,6 +426,7 @@ export class Tensor {
             const needs_shift = (remainder < 0 && divisor > 0) || (remainder > 0 && divisor < 0);
             this_data[i] = needs_shift ? remainder + divisor : remainder;
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -789,10 +814,11 @@ export class Tensor {
      * @returns {Tensor} `this`, with every element negated.
      */
     neg_() {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = -this_data[i];
         }
+        encode_into(this, this_data);
         return this;
     }
 
@@ -811,9 +837,10 @@ export class Tensor {
      */
     gt(val) {
         const mask = new Uint8Array(this.data.length);
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            mask[i] = this_data[i] > val ? 1 : 0;
+            mask[i] = this_data[i] > operand ? 1 : 0;
         }
         return new Tensor('bool', mask, this.dims);
     }
@@ -825,9 +852,10 @@ export class Tensor {
      */
     lt(val) {
         const mask = new Uint8Array(this.data.length);
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const operand = this.type === 'float16' ? Number(val) : val;
         for (let i = 0; i < this_data.length; ++i) {
-            mask[i] = this_data[i] < val ? 1 : 0;
+            mask[i] = this_data[i] < operand ? 1 : 0;
         }
         return new Tensor('bool', mask, this.dims);
     }
@@ -837,10 +865,11 @@ export class Tensor {
      * @type {Tensor['clamp']}
      */
     clamp_(min, max) {
-        const this_data = this.data;
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = Math.min(Math.max(this_data[i], min), max);
         }
+        encode_into(this, this_data);
         return this;
     }
 

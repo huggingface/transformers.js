@@ -773,6 +773,55 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("float16 elementwise ops (bit-pattern storage)", () => {
+    // Builds on the float16 reductions tests above: elementwise arithmetic on a
+    // float16 tensor must decode the IEEE 754 half bit patterns, compute, and
+    // re-encode, instead of mutating the raw uint16 storage.
+    const half = (...words) => new Uint16Array(words);
+    const data = () => half(0x3c00, 0x4000, 0xbc00); // [1.0, 2.0, -1.0]
+
+    it("add/sub/mul/div decode and re-encode", () => {
+      const t = new Tensor("float16", data(), [3]);
+      expect(t.add(1).tolist()).toEqual([2.0, 3.0, 0.0]);
+      expect(t.sub(1).tolist()).toEqual([0.0, 1.0, -2.0]);
+      expect(t.mul(2).tolist()).toEqual([2.0, 4.0, -2.0]);
+      expect(t.div(2).tolist()).toEqual([0.5, 1.0, -0.5]);
+    });
+
+    it("in-place arithmetic decodes and re-encodes", () => {
+      const t = new Tensor("float16", data(), [3]);
+      t.add_(1);
+      expect(t.tolist()).toEqual([2.0, 3.0, 0.0]);
+      t.mul_(2);
+      expect(t.tolist()).toEqual([4.0, 6.0, 0.0]);
+    });
+
+    it("neg decodes and re-encodes", () => {
+      expect(new Tensor("float16", data(), [3]).neg().tolist()).toEqual([
+        -1.0, -2.0, 1.0,
+      ]);
+    });
+
+    it("gt/lt compare decoded values", () => {
+      const t = new Tensor("float16", data(), [3]);
+      expect(t.gt(0).tolist()).toEqual([1, 1, 0]);
+      expect(t.lt(0).tolist()).toEqual([0, 0, 1]);
+    });
+
+    it("clamp/sigmoid/map decode and re-encode", () => {
+      const t = new Tensor("float16", data(), [3]);
+      expect(t.clone().clamp(0, 2).tolist()).toEqual([1.0, 2.0, 0.0]);
+      expect(t.sigmoid().tolist()[0]).toBeCloseTo(0.731, 2);
+      expect(t.map((v) => v * 10).tolist()).toEqual([10.0, 20.0, -10.0]);
+    });
+
+    it("remainder computes on decoded values", () => {
+      const t = new Tensor("float16", data(), [3]).remainder(0.8);
+      expect(t.tolist()[0]).toBeCloseTo(0.2, 3);
+      expect(t.tolist()[2]).toBeCloseTo(0.6, 3);
+    });
+  });
+
   describe("repeat", () => {
     it("should repeat a 1D tensor", () => {
       const t1 = new Tensor("float32", [1, 2, 3], [3]);
