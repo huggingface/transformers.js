@@ -424,6 +424,45 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("int64 arithmetic", () => {
+    it("should add scalar constants to int64 tensors", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      const target = new Tensor("int64", [3n, 4n, 5n], [3]);
+
+      expect(t1.add(2n)).toEqual(target);
+      expect(t1.add(2)).toEqual(target);
+    });
+
+    it("should subtract scalar constants from int64 tensors", () => {
+      const t1 = new Tensor("int64", [5n, 6n, 7n], [3]);
+      const target = new Tensor("int64", [3n, 4n, 5n], [3]);
+
+      expect(t1.sub(2n)).toEqual(target);
+      expect(t1.sub(2)).toEqual(target);
+    });
+
+    it("should multiply int64 tensors by scalar constants", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      const target = new Tensor("int64", [2n, 4n, 6n], [3]);
+
+      expect(t1.mul(2n)).toEqual(target);
+      expect(t1.mul(2)).toEqual(target);
+    });
+
+    it("should divide int64 tensors by scalar constants, truncating in-dtype", () => {
+      const t1 = new Tensor("int64", [3n, 8n, 9n], [3]);
+      const target = new Tensor("int64", [1n, 4n, 4n], [3]);
+
+      expect(t1.div(2n)).toEqual(target);
+      expect(t1.div(2)).toEqual(target);
+    });
+
+    it("should reject non-integer scalar constants for int64 tensors", () => {
+      const t1 = new Tensor("int64", [1n, 2n, 3n], [3]);
+      expect(() => t1.add(1.5)).toThrow(RangeError);
+    });
+  });
+
   describe("remainder", () => {
     it.each(["uint8", "uint16", "uint32", "uint64", "bool"])("should reject negative divisors for %s without mutating the input", (type) => {
       const values = type === "uint64" ? [1n, 0n] : [1, 0];

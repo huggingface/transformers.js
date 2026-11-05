@@ -23,6 +23,21 @@ import { random } from './random.js';
  */
 
 /**
+ * Cast a scalar operand to `bigint` when the tensor's data is a 64-bit integer
+ * typed array, so scalar arithmetic stays inside the tensor's dtype (mixing
+ * bigint and number operands would otherwise throw a TypeError). Fractional
+ * operands raise a clear RangeError via `BigInt()`.
+ *
+ * @param {number|bigint} val The scalar operand.
+ * @param {import('./maths.js').AnyTypedArray | any[]} data The tensor's underlying data.
+ * @returns {number|bigint} The operand, converted to `bigint` for 64-bit integer tensors.
+ */
+function cast_scalar_for_data(val, data) {
+    const is_bigint = data instanceof BigInt64Array || data instanceof BigUint64Array;
+    return is_bigint ? /** @type {any} */ (BigInt(val)) : val;
+}
+
+/**
  * A typed multi-dimensional array.
  *
  * **Example:**
@@ -251,7 +266,7 @@ export class Tensor {
 
     /**
      * Return a new Tensor with every element multiplied by a constant.
-     * @param {number} val The value to multiply by.
+     * @param {number|bigint} val The value to multiply by.
      * @returns {Tensor} The new tensor.
      */
     mul(val) {
@@ -260,20 +275,21 @@ export class Tensor {
 
     /**
      * Multiply the tensor by a constant in place.
-     * @param {number} val The value to multiply by.
+     * @param {number|bigint} val The value to multiply by.
      * @returns {Tensor} Returns `this`.
      */
     mul_(val) {
         const this_data = this.data;
+        const operand = cast_scalar_for_data(val, this_data);
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] *= val;
+            this_data[i] *= operand;
         }
         return this;
     }
 
     /**
      * Return a new Tensor with every element divided by a constant.
-     * @param {number} val The value to divide by.
+     * @param {number|bigint} val The value to divide by.
      * @returns {Tensor} The new tensor.
      */
     div(val) {
@@ -282,20 +298,21 @@ export class Tensor {
 
     /**
      * Divide the tensor by a constant in place.
-     * @param {number} val The value to divide by.
+     * @param {number|bigint} val The value to divide by.
      * @returns {Tensor} Returns `this`.
      */
     div_(val) {
         const this_data = this.data;
+        const operand = cast_scalar_for_data(val, this_data);
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] /= val;
+            this_data[i] /= operand;
         }
         return this;
     }
 
     /**
      * Return a new Tensor with every element added by a constant.
-     * @param {number} val The value to add by.
+     * @param {number|bigint} val The value to add by.
      * @returns {Tensor} The new tensor.
      */
     add(val) {
@@ -304,20 +321,21 @@ export class Tensor {
 
     /**
      * Add the tensor by a constant in place.
-     * @param {number} val The value to add by.
+     * @param {number|bigint} val The value to add by.
      * @returns {Tensor} Returns `this`.
      */
     add_(val) {
         const this_data = this.data;
+        const operand = cast_scalar_for_data(val, this_data);
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] += val;
+            this_data[i] += operand;
         }
         return this;
     }
 
     /**
      * Return a new Tensor with every element subtracted by a constant.
-     * @param {number} val The value to subtract by.
+     * @param {number|bigint} val The value to subtract by.
      * @returns {Tensor} The new tensor.
      */
     sub(val) {
@@ -326,13 +344,14 @@ export class Tensor {
 
     /**
      * Subtract the tensor by a constant in place.
-     * @param {number} val The value to subtract by.
+     * @param {number|bigint} val The value to subtract by.
      * @returns {Tensor} Returns `this`.
      */
     sub_(val) {
         const this_data = this.data;
+        const operand = cast_scalar_for_data(val, this_data);
         for (let i = 0; i < this_data.length; ++i) {
-            this_data[i] -= val;
+            this_data[i] -= operand;
         }
         return this;
     }
