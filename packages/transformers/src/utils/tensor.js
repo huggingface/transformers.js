@@ -1327,19 +1327,18 @@ export function layer_norm(input, normalized_shape, { eps = 1e-5 } = {}) {
  * @private
  */
 function calc_squeeze_dims(dims, dim) {
-    dims = dims.slice();
     if (dim === null) {
-        dims = dims.filter((d) => d !== 1);
-    } else if (typeof dim === 'number') {
-        if (dims[dim] === 1) {
-            dims.splice(dim, 1);
-        }
-    } else if (Array.isArray(dim)) {
-        dims = dims.filter((x, i) => {
-            return x !== 1 || !dim.includes(i);
-        });
+        return dims.filter((d) => d !== 1);
     }
-    return dims;
+
+    // Negative dims count from the end, matching `torch.squeeze`. They used to
+    // be read as raw array indices (`dims[-1]` is `undefined`), so squeezing
+    // the last dimension of a tensor was a silent no-op, and a negative entry
+    // in the array form never matched any position either.
+    const squeezeDims = new Set(
+        (Array.isArray(dim) ? dim : [dim]).map((d) => safeIndex(d, dims.length)),
+    );
+    return dims.filter((d, i) => !(d === 1 && squeezeDims.has(i)));
 }
 
 /**

@@ -540,6 +540,27 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
       expect(result).toEqual(target);
     });
+    it("should count negative dimensions from the end", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+      expect(t1.squeeze(-1).dims).toEqual([1, 3]);
+      expect(t1.squeeze(-3).dims).toEqual([3, 1]);
+      // `-2` is the size-3 dimension, so it is a no-op like `torch.squeeze(-2)`.
+      expect(t1.squeeze(-2).dims).toEqual([1, 3, 1]);
+    });
+    it("should accept negative dimensions in the array form", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+      expect(t1.squeeze([0, -1]).dims).toEqual([3]);
+    });
+    it("should throw on an out-of-range dimension", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+      expect(() => t1.squeeze(3)).toThrow("IndexError");
+      expect(() => t1.squeeze(-4)).toThrow("IndexError");
+    });
+    it("should not modify the original tensor dims in place", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+      t1.squeeze(-1);
+      expect(t1.dims).toEqual([1, 3, 1]);
+    });
   });
 
   describe("unsqueeze", () => {
