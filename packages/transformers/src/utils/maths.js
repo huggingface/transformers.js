@@ -1100,3 +1100,57 @@ export const uint16_to_float32 = (function () {
         return out;
     };
 })();
+
+/**
+ * Converts a number to the IEEE 754 half-precision (float16) bit pattern,
+ * stored in a `Uint16Array`. Rounds to nearest, ties to even, matching the
+ * decode direction of @see {@link uint16_to_float32}. Values with a magnitude
+ * above the float16 maximum overflow to infinity, and values below the
+ * subnormal range flush to (signed) zero.
+ *
+ * @param {number} value The float value to encode.
+ * @returns {number} The 16-bit float16 bit pattern.
+ */
+export function float32_to_uint16(value) {
+    if (Number.isNaN(value)) return 0x7e00; // canonical quiet NaN
+
+    const sign = value < 0 || Object.is(value, -0) ? 0x8000 : 0;
+    value = Math.abs(value);
+    if (!Number.isFinite(value)) return sign | 0x7c00; // ±Infinity
+    if (value === 0) return sign; // ±0
+
+    // Decompose |value| = m * 2^e with 1 <= m < 2 (exact powers of two give m === 1).
+    let e = Math.floor(Math.log2(value));
+    let m = value / 2 ** e;
+    if (m >= 2) {
+        ++e;
+        m /= 2;
+    } else if (m < 1) {
+        --e;
+        m *= 2;
+    }
+
+    if (e > 15) return sign | 0x7c00; // overflow -> ±Infinity
+
+    // Round a scaled fraction to the nearest integer, ties to even.
+    const round_half_even = (x) => {
+        const floor = Math.floor(x);
+        const diff = x - floor;
+        return diff > 0.5 || (diff === 0.5 && floor % 2 === 1) ? floor + 1 : floor;
+    };
+
+    if (e < -14) {
+        // Subnormal: value = mant * 2^-24 with 0 <= mant < 1024.
+        const mant = round_half_even(m * 2 ** (e + 24));
+        if (mant === 1024) return sign | (1 << 10); // rounds up to the smallest normal
+        return sign | mant;
+    }
+
+    // Normal: 10-bit fraction, rounding up may carry into the exponent.
+    const mant = round_half_even((m - 1) * 1024);
+    if (mant === 1024) {
+        if (e === 15) return sign | 0x7c00; // overflow -> ±Infinity
+        return sign | ((e + 1 + 15) << 10);
+    }
+    return sign | ((e + 15) << 10) | mant;
+}

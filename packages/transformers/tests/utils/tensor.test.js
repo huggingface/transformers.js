@@ -711,6 +711,68 @@ describe("Tensor operations", () => {
     });
   });
 
+  describe("float16 tensors (bit-pattern storage)", () => {
+    // ONNX Runtime stores float16 data as the IEEE 754 half bit pattern inside a
+    // Uint16Array. These tests exercise the accessors and reductions that must
+    // decode that storage instead of comparing raw bit patterns numerically.
+    // Exact half bit patterns used below:
+    //   1.0 -> 0x3c00, 2.5 -> 0x4100, 3.0 -> 0x4200, -2.5 -> 0xc100,
+    //   0.5 -> 0x3800, 4.0 -> 0x4400
+    const half = (...words) => new Uint16Array(words);
+    const data = () => half(0x3c00, 0xc100, 0x4200, 0x3800); // [1.0, -2.5, 3.0, 0.5]
+
+    it("tolist decodes float16 values", () => {
+      const t = new Tensor("float16", data(), [4]);
+      expect(t.tolist()).toEqual([1.0, -2.5, 3.0, 0.5]);
+    });
+
+    it("item decodes a scalar float16 value", () => {
+      const t = new Tensor("float16", half(0xc100), []);
+      expect(t.item()).toBe(-2.5);
+    });
+
+    it("min/max/mean over all dimensions decode and keep the dtype", () => {
+      const t = new Tensor("float16", data(), [4]);
+      expect(t.min().tolist()).toBe(-2.5);
+      expect(t.max().tolist()).toBe(3.0);
+      expect(t.mean().tolist()).toBeCloseTo(0.5, 5);
+      expect(t.min().data instanceof Uint16Array).toBe(true);
+    });
+
+    it("min/max over a dimension decode and re-encode", () => {
+      const t = new Tensor("float16", half(0x3c00, 0x4100, 0x4200, 0x4400), [2, 2]); // [[1, 2.5], [3, 4]]
+      expect(t.min(1).tolist()).toEqual([1.0, 3.0]);
+      expect(t.max(1).tolist()).toEqual([2.5, 4.0]);
+    });
+
+    it("argmin/argmax compare decoded values", () => {
+      const t = new Tensor("float16", data(), [4]);
+      expect(t.argmin().item()).toBe(1n); // -2.5, not the largest bit pattern
+      expect(t.argmax().item()).toBe(2n); // 3.0, not the largest raw uint16
+    });
+
+    it("norm and normalize operate on decoded values", () => {
+      const t = new Tensor("float16", half(0x3c00, 0x4200), [2]); // [1, 3]
+      expect(t.norm().item()).toBeCloseTo(Math.sqrt(10), 2);
+      const m = new Tensor("float16", half(0x3c00, 0x4100, 0x4200, 0x4400), [2, 2]); // [[1, 2.5], [3, 4]]
+      const normalized = m.normalize_();
+      const rows = normalized.tolist();
+      expect(rows[0][0]).toBeCloseTo(1 / Math.sqrt(1 + 2.5 ** 2), 2);
+      expect(rows[0][1]).toBeCloseTo(2.5 / Math.sqrt(1 + 2.5 ** 2), 2);
+      expect(rows[1][0]).toBeCloseTo(3 / 5, 2);
+      expect(rows[1][1]).toBeCloseTo(4 / 5, 2);
+      expect(normalized.data instanceof Uint16Array).toBe(true);
+    });
+
+    it("std_mean over a dimension decodes values", () => {
+      const t = new Tensor("float16", half(0x3c00, 0x4100, 0x4200, 0x4400), [2, 2]); // [[1, 2.5], [3, 4]]
+      const [std, mean] = std_mean(t, 1);
+      expect(mean.tolist()).toEqual([1.75, 3.5]);
+      expect(std.tolist()[0]).toBeCloseTo(Math.sqrt(1.125), 3);
+      expect(std.tolist()[1]).toBeCloseTo(Math.sqrt(0.5), 3);
+    });
+  });
+
   describe("repeat", () => {
     it("should repeat a 1D tensor", () => {
       const t1 = new Tensor("float32", [1, 2, 3], [3]);

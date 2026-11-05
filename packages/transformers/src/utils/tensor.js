@@ -7,7 +7,7 @@
  * @module utils/tensor
  */
 
-import { interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
+import { float32_to_uint16, interpolate_data, max, min, permute_data, uint16_to_float32 } from './maths.js';
 
 import { Tensor as ONNXTensor, isONNXTensor } from '../backends/onnx.js';
 
@@ -21,6 +21,35 @@ import { random } from './random.js';
  * @typedef {keyof typeof DataTypeMap} DataType
  * @typedef {import('./maths.js').AnyTypedArray | any[]} DataArray
  */
+
+/**
+ * ONNX Runtime stores `float16` data as the IEEE 754 half bit pattern inside a
+ * `Uint16Array`, so raw values cannot be compared or reduced numerically.
+ * This decodes a tensor's data to real numbers when its dtype is `float16`.
+ *
+ * @param {Tensor} tensor The tensor whose data to decode.
+ * @returns {Float32Array | import('./maths.js').AnyTypedArray} The decoded data.
+ */
+function decode_float16(tensor) {
+    return tensor.type === 'float16' ? uint16_to_float32(tensor.data) : tensor.data;
+}
+
+/**
+ * Encodes a numeric reduction result back to the tensor's dtype, so that
+ * `float16` tensors keep their bit-pattern storage.
+ *
+ * @param {string} type The tensor's dtype.
+ * @param {Float32Array | import('./maths.js').AnyTypedArray} data The computed values.
+ * @returns {Float32Array | import('./maths.js').AnyTypedArray} Data suitable for `new Tensor(type, ...)`.
+ */
+function encode_result(type, data) {
+    if (type !== 'float16') return data;
+    const out = new Uint16Array(data.length);
+    for (let i = 0; i < data.length; ++i) {
+        out[i] = float32_to_uint16(data[i]);
+    }
+    return out;
+}
 
 /**
  * A typed multi-dimensional array.
@@ -190,7 +219,7 @@ export class Tensor {
      * @throws {Error} If the tensor has more than one element.
      */
     item() {
-        const this_data = this.data;
+        const this_data = /** @type {import('./maths.js').AnyTypedArray} */ (decode_float16(this));
         if (this_data.length !== 1) {
             throw new Error(`a Tensor with ${this_data.length} elements cannot be converted to Scalar`);
         }
@@ -202,7 +231,7 @@ export class Tensor {
      * @returns {any[]}
      */
     tolist() {
-        return reshape(this.data, this.dims);
+        return reshape(decode_float16(this), this.dims);
     }
 
     /**
@@ -565,21 +594,27 @@ export class Tensor {
 
         if (dim === null) {
             // @ts-ignore
-            let val = this_data.reduce(fn, zero);
+            let val = decode_float16(this).reduce(fn, zero);
             if (p !== 1) {
                 val = val ** (1 / p);
             }
-            return new Tensor(this.type, [val], []);
+            const valData = this.type === 'float16' ? Uint16Array.of(float32_to_uint16(val)) : [val];
+            return new Tensor(this.type, valData, []);
         }
 
-        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        const [type, result, resultDims] = reduce_helper(
+            fn,
+            { data: decode_float16(this), dims: this.dims, type: this.type },
+            dim,
+            keepdim,
+        );
 
         if (p !== 1) {
             for (let i = 0; i < result.length; ++i) {
                 result[i] = result[i] ** (1 / p);
             }
         }
-        return new Tensor(type, result, resultDims);
+        return new Tensor(type, encode_result(type, result), resultDims);
     }
 
     /**
@@ -593,8 +628,9 @@ export class Tensor {
 
         const norm = this.norm(p, dim, true);
 
-        const this_data = this.data;
-        const norm_data = norm.data;
+        const is_float16 = this.type === 'float16';
+        const this_data = /** @type {Float32Array} */ (decode_float16(this));
+        const norm_data = /** @type {Float32Array} */ (decode_float16(norm));
         for (let i = 0; i < this_data.length; ++i) {
             // Calculate the index in the resulting array
             let resultIndex = 0;
@@ -611,6 +647,16 @@ export class Tensor {
 
             // Divide by normalized value
             this_data[i] /= norm_data[resultIndex];
+        }
+
+        if (is_float16) {
+            // `decode_float16` returned a decoded copy, so write the values back
+            // to the bit-pattern storage.
+            const encoded = new Uint16Array(this_data.length);
+            for (let i = 0; i < this_data.length; ++i) {
+                encoded[i] = float32_to_uint16(this_data[i]);
+            }
+            this.data.set(encoded);
         }
 
         return this;
@@ -846,17 +892,24 @@ export class Tensor {
     min(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
-            const val = min(this.data)[0];
+            const val = min(decode_float16(this))[0];
+            const valData = this.type === 'float16' ? Uint16Array.of(float32_to_uint16(val)) : [val];
             return new Tensor(
                 this.type,
-                [val],
+                valData,
                 [
                     /* scalar */
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.min(a, b), this, dim, keepdim, Infinity);
-        return new Tensor(type, result, resultDims);
+        const [type, result, resultDims] = reduce_helper(
+            (a, b) => Math.min(a, b),
+            { data: decode_float16(this), dims: this.dims, type: this.type },
+            dim,
+            keepdim,
+            Infinity,
+        );
+        return new Tensor(type, encode_result(type, result), resultDims);
     }
 
     /**
@@ -868,17 +921,24 @@ export class Tensor {
     max(dim = null, keepdim = false) {
         if (dim === null) {
             // None to reduce over all dimensions.
-            const val = max(this.data)[0];
+            const val = max(decode_float16(this))[0];
+            const valData = this.type === 'float16' ? Uint16Array.of(float32_to_uint16(val)) : [val];
             return new Tensor(
                 this.type,
-                [val],
+                valData,
                 [
                     /* scalar */
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.max(a, b), this, dim, keepdim, -Infinity);
-        return new Tensor(type, result, resultDims);
+        const [type, result, resultDims] = reduce_helper(
+            (a, b) => Math.max(a, b),
+            { data: decode_float16(this), dims: this.dims, type: this.type },
+            dim,
+            keepdim,
+            -Infinity,
+        );
+        return new Tensor(type, encode_result(type, result), resultDims);
     }
 
     /**
@@ -892,7 +952,7 @@ export class Tensor {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
         }
-        const index = min(this.data)[1];
+        const index = min(decode_float16(this))[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
 
@@ -907,7 +967,7 @@ export class Tensor {
         if (dim !== null) {
             throw new Error('`dim !== null` not yet implemented.');
         }
-        const index = max(this.data)[1];
+        const index = max(decode_float16(this))[1];
         return new Tensor('int64', [BigInt(index)], []);
     }
 
@@ -1523,7 +1583,7 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
  * @returns {Tensor[]} A tuple of (std, mean) tensors.
  */
 export function std_mean(input, dim = null, correction = 1, keepdim = false) {
-    const inputData = /** @type {Float32Array} */ (input.data);
+    const inputData = /** @type {Float32Array} */ (decode_float16(input));
     const inputDims = input.dims;
 
     if (dim === null) {
@@ -1532,16 +1592,18 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
         const mean = sum / inputData.length;
         const std = Math.sqrt(inputData.reduce((a, b) => a + (b - mean) ** 2, 0) / (inputData.length - correction));
 
+        const meanData = input.type === 'float16' ? Uint16Array.of(float32_to_uint16(mean)) : [mean];
         const meanTensor = new Tensor(
             input.type,
-            [mean],
+            meanData,
             [
                 /* scalar */
             ],
         );
+        const stdData = input.type === 'float16' ? Uint16Array.of(float32_to_uint16(std)) : [std];
         const stdTensor = new Tensor(
             input.type,
-            [std],
+            stdData,
             [
                 /* scalar */
             ],
@@ -1551,12 +1613,12 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
     }
     dim = safeIndex(dim, inputDims.length);
     const meanTensor = mean(input, dim, keepdim);
-    const meanTensorData = meanTensor.data;
+    const meanTensorData = /** @type {Float32Array} */ (decode_float16(meanTensor));
 
     // Compute squared sum
     const [type, result, resultDims] = reduce_helper(
         (a, b, i, j) => a + (b - meanTensorData[j]) ** 2,
-        input,
+        { data: inputData, dims: inputDims, type: input.type },
         dim,
         keepdim,
     );
@@ -1566,7 +1628,7 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
         result[i] = Math.sqrt(result[i] / (inputDims[dim] - correction));
     }
 
-    const stdTensor = new Tensor(type, result, resultDims);
+    const stdTensor = new Tensor(type, encode_result(type, result), resultDims);
 
     return [stdTensor, meanTensor];
 }
@@ -1580,14 +1642,15 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
  */
 export function mean(input, dim = null, keepdim = false) {
     const inputDims = input.dims;
-    const inputData = /** @type {Float32Array} */ (input.data);
+    const inputData = /** @type {Float32Array} */ (decode_float16(input));
 
     if (dim === null) {
         // None to reduce over all dimensions.
-        const val = inputData.reduce((a, b) => a + b, 0);
+        const val = inputData.reduce((a, b) => a + b, 0) / inputData.length;
+        const valData = input.type === 'float16' ? Uint16Array.of(float32_to_uint16(val)) : [val];
         return new Tensor(
             input.type,
-            [val / inputData.length],
+            valData,
             [
                 /* scalar */
             ],
@@ -1596,7 +1659,12 @@ export function mean(input, dim = null, keepdim = false) {
     dim = safeIndex(dim, inputDims.length);
 
     // Compute sum
-    const [type, result, resultDims] = reduce_helper((a, b) => a + b, input, dim, keepdim);
+    const [type, result, resultDims] = reduce_helper(
+        (a, b) => a + b,
+        { data: inputData, dims: inputDims, type: input.type },
+        dim,
+        keepdim,
+    );
 
     // Divide by number of elements in the dimension
     if (inputDims[dim] !== 1) {
@@ -1605,7 +1673,7 @@ export function mean(input, dim = null, keepdim = false) {
         }
     }
 
-    return new Tensor(type, result, resultDims);
+    return new Tensor(type, encode_result(type, result), resultDims);
 }
 
 function dimsToStride(dims) {
