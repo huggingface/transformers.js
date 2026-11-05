@@ -1017,9 +1017,16 @@ export class Tensor {
             } else {
                 map_fn = BigInt;
             }
-        } else if (this.type === 'float16' && type == 'float32' && this.data instanceof Uint16Array) {
-            // Certain runtimes do not support Float16Array, so the values are stored in Uint16Array
-            return new Tensor(type, uint16_to_float32(this.data), this.dims);
+        }
+
+        // Certain runtimes do not support Float16Array, so `float16` values are
+        // stored as IEEE-754 half *bit patterns* in a `Uint16Array`. They must be
+        // decoded before any numeric conversion — only the `float16 -> float32`
+        // path used to do it, so every other target read the bit patterns as
+        // numbers: `1.0` (0x3c00) came back as 15360 for `float64`/`int32`, and
+        // wrapped to 0 for `uint8`/`bool`.
+        if (this.type === 'float16' && this.data instanceof Uint16Array) {
+            return new Tensor('float32', uint16_to_float32(this.data), this.dims).to(type);
         }
 
         return new Tensor(

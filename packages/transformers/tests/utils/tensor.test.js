@@ -709,6 +709,31 @@ describe("Tensor operations", () => {
       const t2 = t1.to("int8");
       expect(t2).toEqual(target);
     });
+    it("float16 to float64 (half bit patterns to number)", () => {
+      // 1.0, 2.5 and -1.0 in IEEE-754 half precision
+      const t1 = new Tensor("float16", new Uint16Array([0x3c00, 0x4100, 0xbc00]), [3]);
+
+      const target = new Tensor("float64", [1, 2.5, -1], [3]);
+
+      const t2 = t1.to("float64");
+      expect(t2).toEqual(target);
+    });
+    it("float16 to int32 (half bit patterns to number)", () => {
+      const t1 = new Tensor("float16", new Uint16Array([0x3c00, 0x4100, 0xbc00]), [3]);
+
+      const target = new Tensor("int32", [1, 2, -1], [3]);
+
+      const t2 = t1.to("int32");
+      expect(t2).toEqual(target);
+    });
+    it("float16 to int64 (half bit patterns to bigint)", () => {
+      const t1 = new Tensor("float16", new Uint16Array([0x3c00, 0x4100, 0xbc00]), [3]);
+
+      const target = new Tensor("int64", [1n, 2n, -1n], [3]);
+
+      const t2 = t1.to("int64");
+      expect(t2).toEqual(target);
+    });
   });
 
   describe("repeat", () => {
