@@ -23,6 +23,13 @@ import { random } from './random.js';
  */
 
 /**
+ * Matches the integer and bool tensor dtypes, whose typed arrays cannot hold
+ * fractional values (e.g. the output of sigmoid).
+ * @type {RegExp}
+ */
+const INTEGER_DTYPE_RE = /^(int|uint)\d+$|^bool$/;
+
+/**
  * A typed multi-dimensional array.
  *
  * **Example:**
@@ -207,17 +214,37 @@ export class Tensor {
 
     /**
      * Return a new Tensor with the sigmoid function applied to each element.
+     *
+     * Integer (and bool) dtypes are promoted to `float32`, matching PyTorch:
+     * an integer tensor cannot represent the fractional result, and writing it
+     * back in place would silently truncate every value to 0.
      * @returns {Tensor} The tensor with the sigmoid function applied.
      */
     sigmoid() {
-        return this.clone().sigmoid_();
+        if (!INTEGER_DTYPE_RE.test(this.type)) {
+            return this.clone().sigmoid_();
+        }
+        const this_data = this.data;
+        const out = new Float32Array(this_data.length);
+        for (let i = 0; i < this_data.length; ++i) {
+            out[i] = 1 / (1 + Math.exp(-Number(this_data[i])));
+        }
+        return new Tensor('float32', out, this.dims);
     }
 
     /**
      * Applies the sigmoid function to the tensor in place.
      * @returns {Tensor} Returns `this`.
+     * @throws {Error} If the tensor has an integer or bool dtype (the result
+     * cannot be stored in place; use `sigmoid()`, which promotes to `float32`).
      */
     sigmoid_() {
+        if (INTEGER_DTYPE_RE.test(this.type)) {
+            throw new Error(
+                `sigmoid_ cannot be applied in place to an integer tensor (${this.type}). ` +
+                    'Use sigmoid() instead, which promotes the result to float32.',
+            );
+        }
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = 1 / (1 + Math.exp(-this_data[i]));

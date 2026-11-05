@@ -366,6 +366,30 @@ describe("Tensor operations", () => {
       const result = t1.sigmoid();
       expect(result).toBeCloseToNested(target);
     });
+    it("should promote integer dtypes to float32 (matching torch)", () => {
+      const t1 = new Tensor("int32", [1, 2, 3], [3]);
+      const result = t1.sigmoid();
+      expect(result.type).toBe("float32");
+      expect(result.tolist()[0]).toBeCloseTo(1 / (1 + Math.exp(-1)), 5);
+      expect(result.tolist()[1]).toBeCloseTo(1 / (1 + Math.exp(-2)), 5);
+      expect(result.tolist()[2]).toBeCloseTo(1 / (1 + Math.exp(-3)), 5);
+    });
+    it("should promote bool dtypes to float32 (matching torch)", () => {
+      const result = new Tensor("bool", [1, 0], [2]).sigmoid();
+      expect(result.type).toBe("float32");
+      expect(result.tolist()[0]).toBeCloseTo(1 / (1 + Math.exp(-1)), 5);
+      expect(result.tolist()[1]).toBeCloseTo(0.5, 5);
+    });
+    it("should promote int64 dtypes to float32 (matching torch)", () => {
+      const result = new Tensor("int64", [-5n, 5n], [2]).sigmoid();
+      expect(result.type).toBe("float32");
+      expect(result.tolist()[0]).toBeCloseTo(1 / (1 + Math.exp(5)), 5);
+      expect(result.tolist()[1]).toBeCloseTo(1 / (1 + Math.exp(-5)), 5);
+    });
+    it("should throw on in-place sigmoid of an integer tensor", () => {
+      const t1 = new Tensor("int32", [1, 2, 3], [3]);
+      expect(() => t1.sigmoid_()).toThrow(/in place/);
+    });
   });
 
   describe("tolist", () => {
