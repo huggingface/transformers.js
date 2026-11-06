@@ -830,4 +830,47 @@ describe("Tensor operations", () => {
       expect(t2).toEqual(target);
     });
   });
+
+  describe("min/max over a dimension on integer dtypes", () => {
+    // The reduction starts from ±Infinity, which an integer typed array cannot
+    // store: `fill(Infinity)` truncates to 0, so `min` returned 0 whenever a
+    // slice was all-positive and `max` returned 0 whenever it was all-negative.
+    it("should find the minimum of an all-positive integer slice", () => {
+      const t = new Tensor("int32", [5, 6, 7, 8], [2, 2]);
+      expect(Array.from(t.min(1).data)).toEqual([5, 7]);
+      expect(Array.from(t.min(0).data)).toEqual([5, 6]);
+    });
+
+    it("should find the maximum of an all-negative integer slice", () => {
+      const t = new Tensor("int8", [-5, -6, -7, -8], [2, 2]);
+      expect(Array.from(t.max(1).data)).toEqual([-5, -7]);
+    });
+
+    it("should work for the unsigned and small integer dtypes", () => {
+      const u8 = new Tensor("uint8", [200, 201, 202, 203], [2, 2]);
+      expect(Array.from(u8.min(1).data)).toEqual([200, 202]);
+      expect(Array.from(u8.max(1).data)).toEqual([201, 203]);
+
+      const i16 = new Tensor("int16", [-5, 6, 7, 8], [2, 2]);
+      expect(Array.from(i16.min(1).data)).toEqual([-5, 7]);
+      expect(Array.from(i16.max(1).data)).toEqual([6, 8]);
+
+      const bool = new Tensor("bool", [0, 1, 1, 1], [2, 2]);
+      expect(Array.from(bool.min(1).data)).toEqual([0, 1]);
+      expect(Array.from(bool.max(1).data)).toEqual([1, 1]);
+    });
+
+    it("should keep the reduced dimension for integer dtypes with keepdim", () => {
+      const t = new Tensor("int32", [5, 6, 7, 8], [2, 2]);
+      const reduced = t.min(1, true);
+      expect(reduced.dims).toEqual([2, 1]);
+      expect(Array.from(reduced.data)).toEqual([5, 7]);
+    });
+
+    it("should leave floating point reductions unchanged", () => {
+      const t = new Tensor("float32", [5.5, 6.5, -7.5, -8.5], [2, 2]);
+      expect(Array.from(t.min(1).data)).toEqual([5.5, -8.5]);
+      expect(Array.from(t.max(1).data)).toEqual([6.5, -7.5]);
+    });
+  });
 });

@@ -1486,8 +1486,18 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
     // Create a new array to store the accumulated values
     // @ts-ignore
     const result = new inputData.constructor(inputData.length / inputDims[dim]);
+
+    // An infinite sentinel (the identity passed by `min`/`max`) has no
+    // representation in an integer typed array: `fill` truncates it to `0`, so
+    // `min` over an all-positive slice and `max` over an all-negative slice
+    // would both return `0`. Seed each slice from its first element instead.
+    let filled = null;
     if (initialValue !== null) {
-        result.fill(initialValue);
+        if (canRepresent(result, initialValue)) {
+            result.fill(initialValue);
+        } else {
+            filled = new Uint8Array(result.length);
+        }
     }
 
     // Iterate over the data array
@@ -1505,6 +1515,16 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
             num = Math.floor(num / size);
         }
 
+        if (filled) {
+            // The first element of each slice seeds the accumulator, so no
+            // identity value is needed.
+            if (filled[resultIndex] === 0) {
+                filled[resultIndex] = 1;
+                result[resultIndex] = inputData[i];
+                continue;
+            }
+        }
+
         // Accumulate the value at the current index
         result[resultIndex] = callbackfn(result[resultIndex], inputData[i], i, resultIndex);
     }
@@ -1512,6 +1532,30 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
     if (!keepdim) resultDims.splice(dim, 1);
 
     return [input.type, result, resultDims];
+}
+
+/**
+ * Whether `result` can hold `value` without changing it. Integer typed arrays
+ * turn non-finite numbers into `0` and wrap out-of-range integers, so their
+ * identity values must come from the dtype itself.
+ *
+ * @param {any} result The accumulator array.
+ * @param {any} value The value to store.
+ * @returns {boolean} `true` if storing `value` preserves it.
+ */
+function canRepresent(result, value) {
+    if (typeof value !== 'number') {
+        // BigInt sentinels are only used with BigInt arrays.
+        return typeof result[0] === 'bigint' || result.length === 0;
+    }
+    if (result instanceof Float32Array || result instanceof Float64Array) {
+        return true;
+    }
+    if (!Number.isFinite(value) || !Number.isInteger(value)) {
+        return false;
+    }
+    const probe = new result.constructor([value]);
+    return probe[0] === value;
 }
 
 /**
