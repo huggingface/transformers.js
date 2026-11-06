@@ -110,3 +110,54 @@ describe("Logits Processors", () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 });
+
+describe("WhisperTimeStampLogitsProcessor", () => {
+  it("limits the first timestamp by max_initial_timestamp_index", async () => {
+    const { WhisperTimeStampLogitsProcessor } = await import("../../src/generation/logits_process.js");
+    const { Tensor } = await import("../../src/utils/tensor.js");
+
+    const no_timestamps_token_id = 100;
+    const max_initial_timestamp_index = 1;
+    const processor = new WhisperTimeStampLogitsProcessor(
+      { eos_token_id: 2, no_timestamps_token_id, max_initial_timestamp_index },
+      [1, 2, 3],
+    );
+
+    // First decoding step: no token has been generated yet, so the processor
+    // masks text tokens and must also cap the timestamps it allows.
+    const vocab_size = 200;
+    const logits = new Tensor("float32", new Float32Array(vocab_size), [1, vocab_size]);
+    processor._call([[1n, 2n, 3n]], logits);
+
+    const timestamp_begin = no_timestamps_token_id + 1;
+    const last_allowed = timestamp_begin + max_initial_timestamp_index;
+    for (let i = 0; i < timestamp_begin; ++i) {
+      expect(logits.data[i]).toBe(-Infinity);
+    }
+    for (let i = timestamp_begin; i <= last_allowed; ++i) {
+      expect(logits.data[i]).not.toBe(-Infinity);
+    }
+    for (let i = last_allowed + 1; i < vocab_size; ++i) {
+      expect(logits.data[i]).toBe(-Infinity);
+    }
+  });
+
+  it("keeps every timestamp when max_initial_timestamp_index is null", async () => {
+    const { WhisperTimeStampLogitsProcessor } = await import("../../src/generation/logits_process.js");
+    const { Tensor } = await import("../../src/utils/tensor.js");
+
+    const no_timestamps_token_id = 100;
+    const processor = new WhisperTimeStampLogitsProcessor(
+      { eos_token_id: 2, no_timestamps_token_id, max_initial_timestamp_index: null },
+      [1, 2, 3],
+    );
+
+    const vocab_size = 200;
+    const logits = new Tensor("float32", new Float32Array(vocab_size), [1, vocab_size]);
+    processor._call([[1n, 2n, 3n]], logits);
+
+    for (let i = no_timestamps_token_id + 1; i < vocab_size; ++i) {
+      expect(logits.data[i]).not.toBe(-Infinity);
+    }
+  });
+});

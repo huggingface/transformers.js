@@ -311,6 +311,12 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
 
             if (input_ids[i].length === this.begin_index) {
                 batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
+
+                // apply the `max_initial_timestamp` option
+                if (this.max_initial_timestamp_index !== null) {
+                    const last_allowed = this.timestamp_begin + this.max_initial_timestamp_index;
+                    batch_logits_data.subarray(last_allowed + 1).fill(-Infinity);
+                }
                 continue;
             }
 
@@ -327,12 +333,6 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
                     // cannot be normal text tokens
                     batch_logits_data.subarray(0, this.eos_token_id).fill(-Infinity);
                 }
-            }
-
-            // apply the `max_initial_timestamp` option
-            if (input_ids[i].length === this.begin_index && this.max_initial_timestamp_index !== null) {
-                const last_allowed = this.timestamp_begin + this.max_initial_timestamp_index;
-                batch_logits_data.subarray(last_allowed + 1).fill(-Infinity);
             }
 
             // if sum of probability over timestamps is above any other token, sample timestamp
