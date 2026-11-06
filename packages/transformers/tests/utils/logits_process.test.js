@@ -110,3 +110,27 @@ describe("Logits Processors", () => {
     }, MAX_MODEL_DISPOSE_TIME);
   });
 });
+
+describe("Logits warpers", () => {
+  it("rejects a non-positive temperature", async () => {
+    const { TemperatureLogitsWarper } = await import("../../src/generation/logits_process.js");
+
+    for (const temperature of [0, -1, Number.NaN, Number.NEGATIVE_INFINITY]) {
+      // A temperature of 0 (or less) would make the warper divide by zero and
+      // hand invalid scores to the sampler, so it must be rejected up front.
+      expect(() => new TemperatureLogitsWarper(temperature)).toThrow(/strictly positive/);
+    }
+  });
+
+  it("explains the greedy alternative when the temperature is 0", async () => {
+    const { TemperatureLogitsWarper } = await import("../../src/generation/logits_process.js");
+
+    expect(() => new TemperatureLogitsWarper(0)).toThrow(/do_sample=false/);
+  });
+
+  it("still accepts a positive temperature", async () => {
+    const { TemperatureLogitsWarper } = await import("../../src/generation/logits_process.js");
+
+    expect(new TemperatureLogitsWarper(0.7).temperature).toBeCloseTo(0.7);
+  });
+});

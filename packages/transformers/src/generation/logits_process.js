@@ -684,12 +684,13 @@ export class TemperatureLogitsWarper extends LogitsWarper {
     constructor(temperature) {
         super();
 
-        if (typeof temperature !== 'number' || temperature <= 0) {
+        if (typeof temperature !== 'number' || !(temperature > 0)) {
             let errorMessage = `\`temperature\` (=${temperature}) must be a strictly positive float, otherwise your next token scores will be invalid.`;
 
             if (temperature === 0) {
                 errorMessage += " If you're looking for greedy decoding strategies, set `do_sample=false`.";
             }
+            throw new Error(errorMessage);
         }
         this.temperature = temperature;
     }
