@@ -345,6 +345,15 @@ describe("Tensor operations", () => {
       const normalized = t1.normalize();
       expect(normalized).toBeCloseToNested(target);
     });
+
+    it("should not produce NaN for an all-zero slice", () => {
+      // torch.nn.functional.normalize clamps the denominator to `eps`, so a
+      // zero vector stays zero instead of turning into NaN.
+      const t1 = new Tensor("float32", [3, 0, 4, 0], [2, 2]);
+      const target = new Tensor("float32", [0.6, 0, 0.8, 0], [2, 2]);
+      const normalized = t1.normalize(2, 0);
+      expect(normalized).toBeCloseToNested(target);
+    });
   });
 
   describe("layer_norm", () => {

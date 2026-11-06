@@ -586,9 +586,12 @@ export class Tensor {
      * Performs `L_p` normalization of inputs over specified dimension. Operates in place.
      * @param {number} [p=2] The exponent value in the norm formulation
      * @param {number} [dim=1] The dimension to reduce
+     * @param {number} [eps=1e-12] A lower bound on the denominator, as in
+     * `torch.nn.functional.normalize`. Without it, an all-zero slice would be
+     * divided by a zero norm and produce `NaN`.
      * @returns {Tensor} `this` for operation chaining.
      */
-    normalize_(p = 2.0, dim = 1) {
+    normalize_(p = 2.0, dim = 1, eps = 1e-12) {
         dim = safeIndex(dim, this.dims.length);
 
         const norm = this.norm(p, dim, true);
@@ -609,8 +612,10 @@ export class Tensor {
                 num = Math.floor(num / size);
             }
 
-            // Divide by normalized value
-            this_data[i] /= norm_data[resultIndex];
+            // Divide by the norm, clamped to `eps` so that an all-zero slice
+            // normalizes to zeros instead of `NaN` (like PyTorch).
+            const denom = norm_data[resultIndex];
+            this_data[i] /= denom < eps ? eps : denom;
         }
 
         return this;
@@ -620,10 +625,12 @@ export class Tensor {
      * Performs `L_p` normalization of inputs over specified dimension.
      * @param {number} [p=2] The exponent value in the norm formulation
      * @param {number} [dim=1] The dimension to reduce
+     * @param {number} [eps=1e-12] A lower bound on the denominator, as in
+     * `torch.nn.functional.normalize`.
      * @returns {Tensor} The normalized tensor.
      */
-    normalize(p = 2.0, dim = 1) {
-        return this.clone().normalize_(p, dim);
+    normalize(p = 2.0, dim = 1, eps = 1e-12) {
+        return this.clone().normalize_(p, dim, eps);
     }
 
     /**
