@@ -112,52 +112,72 @@ describe("Logits Processors", () => {
 });
 
 describe("WhisperTimeStampLogitsProcessor", () => {
-  it("limits the first timestamp by max_initial_timestamp_index", async () => {
+  // Small synthetic vocabulary: [0..99] text tokens, 100 = <|notimestamps|>, [101..199] timestamps
+  const no_timestamps_token_id = 100;
+  const timestamp_begin = no_timestamps_token_id + 1;
+  const vocab_size = 200;
+  const init_tokens = [1, 2, 3];
+
+  const create_processor = async (config) => {
     const { WhisperTimeStampLogitsProcessor } = await import("../../src/generation/logits_process.js");
-    const { Tensor } = await import("../../src/utils/tensor.js");
-
-    const no_timestamps_token_id = 100;
-    const max_initial_timestamp_index = 1;
-    const processor = new WhisperTimeStampLogitsProcessor(
-      { eos_token_id: 2, no_timestamps_token_id, max_initial_timestamp_index },
-      [1, 2, 3],
+    return new WhisperTimeStampLogitsProcessor(
+      { eos_token_id: 2, no_timestamps_token_id, ...config },
+      init_tokens,
     );
+  };
 
-    // First decoding step: no token has been generated yet, so the processor
-    // masks text tokens and must also cap the timestamps it allows.
-    const vocab_size = 200;
+  const run = async (config, input_ids) => {
+    const processor = await create_processor(config);
+    const { Tensor } = await import("../../src/utils/tensor.js");
     const logits = new Tensor("float32", new Float32Array(vocab_size), [1, vocab_size]);
-    processor._call([[1n, 2n, 3n]], logits);
+    processor._call([input_ids], logits);
+    return logits.data;
+  };
 
-    const timestamp_begin = no_timestamps_token_id + 1;
-    const last_allowed = timestamp_begin + max_initial_timestamp_index;
-    for (let i = 0; i < timestamp_begin; ++i) {
-      expect(logits.data[i]).toBe(-Infinity);
-    }
-    for (let i = timestamp_begin; i <= last_allowed; ++i) {
-      expect(logits.data[i]).not.toBe(-Infinity);
-    }
-    for (let i = last_allowed + 1; i < vocab_size; ++i) {
-      expect(logits.data[i]).toBe(-Infinity);
-    }
+  const allowed_timestamps = (data) =>
+    Array.from(data)
+      .map((x, i) => (Number.isFinite(x) ? i : -1))
+      .filter((i) => i >= timestamp_begin);
+
+  it("limits the first timestamp by max_initial_timestamp_index", async () => {
+    // First decoding step: no token has been generated yet, so the processor masks
+    // text tokens and must also cap the timestamps it allows.
+    const data = await run({ max_initial_timestamp_index: 1 }, [1n, 2n, 3n]);
+
+    expect(allowed_timestamps(data)).toEqual([timestamp_begin, timestamp_begin + 1]);
   });
 
   it("keeps every timestamp when max_initial_timestamp_index is null", async () => {
-    const { WhisperTimeStampLogitsProcessor } = await import("../../src/generation/logits_process.js");
-    const { Tensor } = await import("../../src/utils/tensor.js");
+    const data = await run({ max_initial_timestamp_index: null }, [1n, 2n, 3n]);
 
-    const no_timestamps_token_id = 100;
-    const processor = new WhisperTimeStampLogitsProcessor(
-      { eos_token_id: 2, no_timestamps_token_id, max_initial_timestamp_index: null },
-      [1, 2, 3],
+    expect(allowed_timestamps(data)).toHaveLength(vocab_size - timestamp_begin);
+  });
+
+  it("keeps every timestamp when the config omits max_initial_timestamp_index", async () => {
+    // Python reads the option with `getattr(..., None)`, so a missing key means "no cap".
+    // Guarding with `!== null` instead of `!= null` would compute `subarray(NaN)` and mask
+    // every logit in the row, including the text tokens.
+    const data = await run({}, [1n, 2n, 3n]);
+
+    expect(allowed_timestamps(data)).toHaveLength(vocab_size - timestamp_begin);
+  });
+
+  it("does not cap later decoding steps", async () => {
+    const data = await run(
+      { max_initial_timestamp_index: 1 },
+      [1n, 2n, 3n, BigInt(timestamp_begin + 50), 5n],
     );
 
-    const vocab_size = 200;
-    const logits = new Tensor("float32", new Float32Array(vocab_size), [1, vocab_size]);
-    processor._call([[1n, 2n, 3n]], logits);
+    // Past the first step the cap must not apply: a timestamp far beyond
+    // `timestamp_begin + max_initial_timestamp_index` stays available.
+    expect(data[timestamp_begin + 60]).not.toBe(-Infinity);
+  });
 
-    for (let i = no_timestamps_token_id + 1; i < vocab_size; ++i) {
-      expect(logits.data[i]).not.toBe(-Infinity);
-    }
+  it("defaults to no restriction", async () => {
+    const { WhisperGenerationConfig } = await import(
+      "../../src/models/whisper/generation_whisper.js"
+    );
+
+    expect(new WhisperGenerationConfig({}).max_initial_timestamp_index).toBeNull();
   });
 });

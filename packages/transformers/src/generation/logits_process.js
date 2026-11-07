@@ -312,8 +312,10 @@ export class WhisperTimeStampLogitsProcessor extends LogitsProcessor {
             if (input_ids[i].length === this.begin_index) {
                 batch_logits_data.subarray(0, this.timestamp_begin).fill(-Infinity);
 
-                // apply the `max_initial_timestamp` option
-                if (this.max_initial_timestamp_index !== null) {
+                // apply the `max_initial_timestamp` option. `!= null` (not `!== null`) so that a
+                // config without the key behaves like Python's `getattr(..., None)` instead of
+                // computing `subarray(NaN)` and masking every logit.
+                if (this.max_initial_timestamp_index != null) {
                     const last_allowed = this.timestamp_begin + this.max_initial_timestamp_index;
                     batch_logits_data.subarray(last_allowed + 1).fill(-Infinity);
                 }

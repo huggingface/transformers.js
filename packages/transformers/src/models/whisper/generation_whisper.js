@@ -77,10 +77,16 @@ export class WhisperGenerationConfig extends GenerationConfig {
 
     /**
      * Used to set the maximum value of the initial timestamp. This is used to prevent the model from
-     * predicting timestamps that are too far in the future.
-     * @type {number}
+     * predicting timestamps that are too far in the future. If `null`, no restriction is applied.
+     *
+     * Matches the Python reference, which reads it with `getattr(generate_config,
+     * "max_initial_timestamp_index", None)`: models that do not set the key are not restricted. The
+     * previous default of `1` was a port artifact (openai-whisper's `max_initial_timestamp = 1.0`
+     * is in *seconds*, i.e. index 50) and, now that the cap can actually be reached, would have
+     * pinned every unrestricted model's first timestamp to 0.02 s.
+     * @type {number|null}
      */
-    max_initial_timestamp_index = 1;
+    max_initial_timestamp_index = null;
 }
 
 /**
