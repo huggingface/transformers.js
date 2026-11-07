@@ -15,7 +15,8 @@ import { Template } from '@huggingface/jinja';
 import { Callable } from './utils/generic.js';
 
 import { isIntegralNumber, mergeArrays } from './utils/core.js';
-import { getModelJSON } from './utils/hub.js';
+import { getModelJSON, getModelText } from './utils/hub.js';
+import { CHAT_TEMPLATE_NAME } from './utils/constants.js';
 import { max } from './utils/maths.js';
 import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
@@ -33,9 +34,19 @@ import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.
  */
 export async function loadTokenizer(pretrained_model_name_or_path, options) {
     const tokenizerFiles = await get_tokenizer_files(pretrained_model_name_or_path);
-    return await Promise.all(
-        tokenizerFiles.map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
+    const [tokenizerJSON, tokenizerConfig, chat_template] = await Promise.all(
+        tokenizerFiles.map((file) =>
+            file === CHAT_TEMPLATE_NAME
+                ? getModelText(pretrained_model_name_or_path, file, true, options)
+                : getModelJSON(pretrained_model_name_or_path, file, true, options),
+        ),
     );
+    if (chat_template) {
+        // As in Python transformers, a `chat_template.jinja` file takes precedence
+        // over any template defined in `tokenizer_config.json`.
+        return [tokenizerJSON, { ...tokenizerConfig, chat_template }];
+    }
+    return [tokenizerJSON, tokenizerConfig];
 }
 
 /**

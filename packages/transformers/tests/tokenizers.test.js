@@ -694,6 +694,16 @@ describe("Chat templates", () => {
     // TODO: Add test for token_ids once bug in transformers is fixed.
   });
 
+  it("should load the chat template from chat_template.jinja", async () => {
+    // This repo stores its chat template in `chat_template.jinja`, not in `tokenizer_config.json`.
+    const tokenizer = await AutoTokenizer.from_pretrained("LiquidAI/LFM3-1.7B");
+
+    const chat = [{ role: "user", content: "Hi" }];
+
+    const text = tokenizer.apply_chat_template(chat, { tokenize: false, add_generation_prompt: true });
+    expect(text).toEqual("<|startoftext|><|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>");
+  });
+
   it("should throw an error when no chat template is detected", async () => {
     const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt-4o");
 
