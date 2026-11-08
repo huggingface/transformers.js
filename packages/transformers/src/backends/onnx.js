@@ -325,7 +325,15 @@ export async function runInferenceSession(session, ortFeed) {
  * @returns {boolean} Whether the object is an ONNX tensor.
  */
 export function isONNXTensor(x) {
-    return x instanceof ONNX.Tensor;
+    return (
+        x instanceof ONNX.Tensor ||
+        (x !== null &&
+            typeof x === 'object' &&
+            typeof x.type === 'string' &&
+            Array.isArray(x.dims) &&
+            typeof x.location === 'string' &&
+            typeof x.dispose === 'function')
+    );
 }
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;

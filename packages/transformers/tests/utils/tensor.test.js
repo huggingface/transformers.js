@@ -4,6 +4,26 @@ import { init } from "../init.js";
 init();
 
 describe("Tensor operations", () => {
+  describe("cross-runtime tensors", () => {
+    it("should wrap tensor-shaped objects from another ONNX Runtime copy", () => {
+      let disposed = false;
+      const foreignTensor = {
+        data: new Float32Array([1]),
+        dims: [1],
+        location: "gpu-buffer",
+        type: "float32",
+        dispose() {
+          disposed = true;
+        },
+      };
+
+      const tensor = new Tensor(foreignTensor);
+      expect(tensor.ort_tensor).toBe(foreignTensor);
+      tensor.dispose();
+      expect(disposed).toBe(true);
+    });
+  });
+
   describe("cat", () => {
     it("should concatenate on dim=0", () => {
       const t1 = new Tensor("float32", [1, 2, 3], [1, 3]);
