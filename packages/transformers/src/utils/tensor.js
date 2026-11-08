@@ -549,13 +549,28 @@ export class Tensor {
 
         const this_data = this.data;
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        const is_integer = !['float16', 'float32', 'float64'].includes(this.type);
 
         if (is_bigint && p !== 1) {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
         }
 
+        let input = this;
+        let output_type = this.type;
+        if (is_integer && !is_bigint) {
+            if (p === 1) {
+                // Match PyTorch's integer sum promotion and avoid typed-array overflow.
+                input = new Tensor('int64', BigInt64Array.from(this_data, (value) => BigInt(value)), this.dims);
+                output_type = 'int64';
+            } else {
+                // Norms other than L1 are computed in floating point.
+                input = new Tensor('float32', Float32Array.from(this_data), this.dims);
+                output_type = 'float32';
+            }
+        }
+
         let fn, zero;
-        if (is_bigint) {
+        if (is_bigint || (is_integer && p === 1)) {
             fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
             zero = 0n;
         } else {
@@ -565,21 +580,21 @@ export class Tensor {
 
         if (dim === null) {
             // @ts-ignore
-            let val = this_data.reduce(fn, zero);
+            let val = input.data.reduce(fn, zero);
             if (p !== 1) {
                 val = val ** (1 / p);
             }
-            return new Tensor(this.type, [val], []);
+            return new Tensor(output_type, [val], []);
         }
 
-        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        const [type, result, resultDims] = reduce_helper(fn, input, dim, keepdim);
 
         if (p !== 1) {
             for (let i = 0; i < result.length; ++i) {
                 result[i] = result[i] ** (1 / p);
             }
         }
-        return new Tensor(type, result, resultDims);
+        return new Tensor(output_type, result, resultDims);
     }
 
     /**
@@ -1581,12 +1596,15 @@ export function std_mean(input, dim = null, correction = 1, keepdim = false) {
 export function mean(input, dim = null, keepdim = false) {
     const inputDims = input.dims;
     const inputData = /** @type {Float32Array} */ (input.data);
+    const is_integer = !['float16', 'float32', 'float64'].includes(input.type);
+    const reductionInput = is_integer ? new Tensor('float32', Float32Array.from(inputData), inputDims) : input;
+    const outputType = is_integer ? 'float32' : input.type;
 
     if (dim === null) {
         // None to reduce over all dimensions.
-        const val = inputData.reduce((a, b) => a + b, 0);
+        const val = reductionInput.data.reduce((a, b) => a + b, 0);
         return new Tensor(
-            input.type,
+            outputType,
             [val / inputData.length],
             [
                 /* scalar */
@@ -1596,7 +1614,7 @@ export function mean(input, dim = null, keepdim = false) {
     dim = safeIndex(dim, inputDims.length);
 
     // Compute sum
-    const [type, result, resultDims] = reduce_helper((a, b) => a + b, input, dim, keepdim);
+    const [type, result, resultDims] = reduce_helper((a, b) => a + b, reductionInput, dim, keepdim);
 
     // Divide by number of elements in the dimension
     if (inputDims[dim] !== 1) {
@@ -1605,7 +1623,7 @@ export function mean(input, dim = null, keepdim = false) {
         }
     }
 
-    return new Tensor(type, result, resultDims);
+    return new Tensor(outputType, result, resultDims);
 }
 
 function dimsToStride(dims) {

@@ -313,6 +313,11 @@ describe("Tensor operations", () => {
       const result = t1.sum(1);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should promote integer sums to int64", () => {
+      const t = new Tensor("uint8", [200, 100], [2]);
+      expect(t.sum()).toEqual(new Tensor("int64", [300n], []));
+    });
   });
 
   describe("norm", () => {
@@ -328,6 +333,18 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [6.7082, 8.9443], [2]);
       const result = t1.norm(2, 0);
       expect(result).toBeCloseToNested(target);
+    });
+
+    it("should compute integer norms in float32", () => {
+      const t = new Tensor("uint8", [3, 4], [2]);
+      expect(t.norm()).toBeCloseToNested(new Tensor("float32", [5], []));
+    });
+  });
+
+  describe("mean", () => {
+    it("should promote integer means to float32", () => {
+      const t = new Tensor("uint8", [1, 2, 3, 4], [2, 2]);
+      expect(t.mean(1)).toBeCloseToNested(new Tensor("float32", [1.5, 3.5], [2]));
     });
   });
 
