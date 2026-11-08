@@ -329,6 +329,13 @@ describe("Tensor operations", () => {
       const result = t1.norm(2, 0);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should use absolute values for odd-order norms", () => {
+      const t = new Tensor("float32", [-3, 4], [2]);
+      expect(t.norm(1)).toBeCloseToNested(new Tensor("float32", [7], []));
+      expect(t.norm(3).item()).toBeCloseTo(91 ** (1 / 3), 5);
+      expect(t.sum()).toEqual(new Tensor("float32", [1], []));
+    });
   });
 
   describe("normalize", () => {

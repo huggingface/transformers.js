@@ -528,7 +528,7 @@ export class Tensor {
      * @returns The summed tensor
      */
     sum(dim = null, keepdim = false) {
-        return this.norm(1, dim, keepdim);
+        return this.norm(1, dim, keepdim, true);
     }
 
     /**
@@ -539,7 +539,7 @@ export class Tensor {
      * @param {boolean} [keepdim=false] Whether the output tensors have dim retained or not.
      * @returns {Tensor} The norm of the tensor.
      */
-    norm(p = 'fro', dim = null, keepdim = false) {
+    norm(p = 'fro', dim = null, keepdim = false, signed = false) {
         if (p === 'fro') {
             // NOTE: Since we only support integer dims, Frobenius norm produces the same result as p=2.
             p = 2;
@@ -556,10 +556,10 @@ export class Tensor {
 
         let fn, zero;
         if (is_bigint) {
-            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
+            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + (signed ? b : b < 0n ? -b : b);
             zero = 0n;
         } else {
-            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
+            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + (signed ? b : Math.abs(b)) ** p;
             zero = 0;
         }
 
