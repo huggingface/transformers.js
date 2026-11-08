@@ -73,7 +73,7 @@ export class Random {
                 n = Date.now() >>> 0;
             }
         }
-        if (Number.isSafeInteger(n)) n = Math.abs(n);
+        if (Number.isInteger(n)) n = Math.abs(n);
         const mt = this._mt;
         const u = (a, b) => Math.imul(a, b) >>> 0,
             key = [];
