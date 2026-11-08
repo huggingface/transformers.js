@@ -1486,7 +1486,11 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
     // Create a new array to store the accumulated values
     // @ts-ignore
     const result = new inputData.constructor(inputData.length / inputDims[dim]);
-    if (initialValue !== null) {
+    const useFirstValue =
+        (initialValue === Infinity || initialValue === -Infinity) &&
+        !(inputData instanceof Float32Array || inputData instanceof Float64Array);
+    const seen = useFirstValue ? new Uint8Array(result.length) : null;
+    if (initialValue !== null && !useFirstValue) {
         result.fill(initialValue);
     }
 
@@ -1505,8 +1509,14 @@ function reduce_helper(callbackfn, input, dim, keepdim = false, initialValue = n
             num = Math.floor(num / size);
         }
 
-        // Accumulate the value at the current index
-        result[resultIndex] = callbackfn(result[resultIndex], inputData[i], i, resultIndex);
+        // Seed integer reductions from the first value because integer arrays cannot
+        // represent Infinity/-Infinity sentinels without converting them to zero.
+        if (seen !== null && seen[resultIndex] === 0) {
+            result[resultIndex] = inputData[i];
+            seen[resultIndex] = 1;
+        } else {
+            result[resultIndex] = callbackfn(result[resultIndex], inputData[i], i, resultIndex);
+        }
     }
 
     if (!keepdim) resultDims.splice(dim, 1);

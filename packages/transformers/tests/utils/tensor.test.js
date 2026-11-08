@@ -274,6 +274,12 @@ describe("Tensor operations", () => {
       const result = t2.min(1);
       expect(result).toEqual(target);
     });
+
+    it("should reduce integer tensors without using an unrepresentable sentinel", () => {
+      const t = new Tensor("int32", [5, 6, 7, 8], [2, 2]);
+
+      expect(t.min(1).data).toEqual(new Int32Array([5, 7]));
+    });
   });
 
   describe("max", () => {
@@ -289,6 +295,12 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [9, 5], [2]);
       const result = t2.max(0);
       expect(result).toEqual(target);
+    });
+
+    it("should reduce negative integer tensors without using an unrepresentable sentinel", () => {
+      const t = new Tensor("int8", [-5, -6, -7, -8], [2, 2]);
+
+      expect(t.max(1).data).toEqual(new Int8Array([-5, -7]));
     });
   });
 
