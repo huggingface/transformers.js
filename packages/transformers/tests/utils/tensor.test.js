@@ -709,6 +709,13 @@ describe("Tensor operations", () => {
       const t2 = t1.to("int8");
       expect(t2).toEqual(target);
     });
+    it("should decode float16 bit patterns before converting", () => {
+      const t1 = new Tensor("float16", new Uint16Array([0x3c00, 0x4100, 0xbc00]), [3]);
+
+      expect(Array.from(t1.to("float64").data)).toEqual([1, 2.5, -1]);
+      expect(Array.from(t1.to("int32").data)).toEqual([1, 2, -1]);
+      expect(Array.from(t1.to("int64").data)).toEqual([1n, 2n, -1n]);
+    });
   });
 
   describe("repeat", () => {

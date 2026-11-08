@@ -1017,15 +1017,18 @@ export class Tensor {
             } else {
                 map_fn = BigInt;
             }
-        } else if (this.type === 'float16' && type == 'float32' && this.data instanceof Uint16Array) {
-            // Certain runtimes do not support Float16Array, so the values are stored in Uint16Array
-            return new Tensor(type, uint16_to_float32(this.data), this.dims);
         }
+
+        // Certain runtimes do not support Float16Array, so float16 values are stored
+        // as IEEE-754 half-precision bit patterns in a Uint16Array. Decode them
+        // before converting to any other dtype.
+        const sourceData =
+            this.type === 'float16' && this.data instanceof Uint16Array ? uint16_to_float32(this.data) : this.data;
 
         return new Tensor(
             type,
             // @ts-ignore - TypeScript can't verify .from() across union of TypedArray constructors
-            DataTypeMap[type].from(this.data, map_fn),
+            DataTypeMap[type].from(sourceData, map_fn),
             this.dims,
         );
     }
