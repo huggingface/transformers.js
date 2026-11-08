@@ -7,4 +7,6 @@ const requireFromHere = createRequire(import.meta.url ?? __filename);
 // Disable POSIX telemetry before loading the native binding.
 process.env.ORT_DISABLE_TELEMETRY = '1';
 
-export default requireFromHere('onnxruntime-node');
+export default function loadONNXNode() {
+    return requireFromHere('onnxruntime-node');
+}
