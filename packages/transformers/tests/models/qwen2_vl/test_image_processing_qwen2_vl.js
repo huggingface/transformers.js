@@ -30,5 +30,31 @@ export default () => {
       },
       MAX_TEST_EXECUTION_TIME,
     );
+
+    it(
+      "keeps multiple images as separate patch grids",
+      async () => {
+        const image = await load_cached_image("white_image");
+        const { pixel_values, image_grid_thw, original_sizes, reshaped_input_sizes } = await processor([
+          image,
+          image,
+        ]);
+
+        expect(pixel_values.dims).toEqual([512, 1176]);
+        expect(image_grid_thw.tolist()).toEqual([
+          [1n, 16n, 16n],
+          [1n, 16n, 16n],
+        ]);
+        expect(original_sizes).toEqual([
+          [224, 224],
+          [224, 224],
+        ]);
+        expect(reshaped_input_sizes).toEqual([
+          [224, 224],
+          [224, 224],
+        ]);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 };
