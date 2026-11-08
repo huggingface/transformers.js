@@ -593,6 +593,20 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       expect(() => t1.view(-1, -1)).toThrow();
     });
+
+    it("should reject shapes whose element count does not match", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      expect(() => t1.view(4, 2)).toThrow("shape '[4, 2]' is invalid for input of size 6");
+      expect(() => t1.view(4, -1)).toThrow("shape '[4, -1]' is invalid for input of size 6");
+    });
+
+    it("should reject invalid shape dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      expect(() => t1.view(2.5, 4)).toThrow("dimensions must be integers");
+      expect(() => t1.view(-2, 3)).toThrow("dimensions must be integers");
+    });
   });
 
   describe("clamp", () => {
