@@ -1296,7 +1296,7 @@ export function layer_norm(input, normalized_shape, { eps = 1e-5 } = {}) {
 
     const [batchSize, featureDim] = input.dims;
 
-    if (normalized_shape.length !== 1 && normalized_shape[0] !== featureDim) {
+    if (normalized_shape.length !== 1 || normalized_shape[0] !== featureDim) {
         throw new Error('`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.');
     }
 

@@ -356,6 +356,24 @@ describe("Tensor operations", () => {
       const norm = layer_norm(t1, [t1.dims.at(-1)]);
       expect(norm).toBeCloseToNested(target);
     });
+
+    it("should reject normalized shapes with the wrong length", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 4]);
+
+      expect(() => layer_norm(t1, [4, 1])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
+
+    it("should reject normalized shapes with the wrong value", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 4]);
+
+      expect(() => layer_norm(t1, [3])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
+
+    it("should reject empty normalized shapes", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 4]);
+
+      expect(() => layer_norm(t1, [])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
   });
 
   describe("sigmoid", () => {
