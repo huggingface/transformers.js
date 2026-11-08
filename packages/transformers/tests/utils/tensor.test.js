@@ -274,6 +274,11 @@ describe("Tensor operations", () => {
       const result = t2.min(1);
       expect(result).toEqual(target);
     });
+
+    it("should reduce int64 values over a dimension", () => {
+      const t = new Tensor("int64", [5n, 3n, 8n, 1n], [2, 2]);
+      expect(t.min(1)).toEqual(new Tensor("int64", [3n, 1n], [2]));
+    });
   });
 
   describe("max", () => {
@@ -289,6 +294,11 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [9, 5], [2]);
       const result = t2.max(0);
       expect(result).toEqual(target);
+    });
+
+    it("should reduce int64 values over a dimension", () => {
+      const t = new Tensor("int64", [5n, 3n, 8n, 1n], [2, 2]);
+      expect(t.max(0)).toEqual(new Tensor("int64", [8n, 3n], [2]));
     });
   });
 

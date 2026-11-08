@@ -855,7 +855,14 @@ export class Tensor {
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.min(a, b), this, dim, keepdim, Infinity);
+        const isBigInt = this.data instanceof BigInt64Array || this.data instanceof BigUint64Array;
+        const initialValue = isBigInt
+            ? this.data instanceof BigInt64Array
+                ? (1n << 63n) - 1n
+                : (1n << 64n) - 1n
+            : Infinity;
+        const callback = isBigInt ? (a, b) => (b < a ? b : a) : (a, b) => Math.min(a, b);
+        const [type, result, resultDims] = reduce_helper(callback, this, dim, keepdim, initialValue);
         return new Tensor(type, result, resultDims);
     }
 
@@ -877,7 +884,10 @@ export class Tensor {
                 ],
             );
         }
-        const [type, result, resultDims] = reduce_helper((a, b) => Math.max(a, b), this, dim, keepdim, -Infinity);
+        const isBigInt = this.data instanceof BigInt64Array || this.data instanceof BigUint64Array;
+        const initialValue = isBigInt ? (this.data instanceof BigInt64Array ? -(1n << 63n) : 0n) : -Infinity;
+        const callback = isBigInt ? (a, b) => (b > a ? b : a) : (a, b) => Math.max(a, b);
+        const [type, result, resultDims] = reduce_helper(callback, this, dim, keepdim, initialValue);
         return new Tensor(type, result, resultDims);
     }
 
