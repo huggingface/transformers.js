@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, mean_pooling, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -559,6 +559,15 @@ describe("Tensor operations", () => {
 
       const result = t1.flatten();
       expect(result).toEqual(target);
+    });
+  });
+
+  describe("mean_pooling", () => {
+    it("should return zero for rows with no selected tokens", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 4]);
+      const mask = new Tensor("int64", new BigInt64Array([0n, 0n]), [1, 2]);
+
+      expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([0, 0, 0, 0]);
     });
   });
 

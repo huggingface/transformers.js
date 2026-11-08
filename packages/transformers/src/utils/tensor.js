@@ -1273,7 +1273,7 @@ export function mean_pooling(last_hidden_state, attention_mask) {
                 sum += lastHiddenStateData[offset2 + j * embedDim] * attn;
             }
 
-            const avg = sum / count;
+            const avg = sum / Math.max(count, 1e-9);
             returnedData[outIndex++] = avg;
         }
     }
