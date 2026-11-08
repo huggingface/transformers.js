@@ -1013,7 +1013,7 @@ export class Tensor {
         } else if (!is_source_bigint && is_dest_bigint) {
             // TypeError: Cannot convert [x] to a BigInt
             if (['float16', 'float32', 'float64'].includes(this.type)) {
-                map_fn = (x) => BigInt(Math.floor(x));
+                map_fn = (x) => BigInt(Math.trunc(x));
             } else {
                 map_fn = BigInt;
             }
