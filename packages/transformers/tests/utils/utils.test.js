@@ -137,6 +137,15 @@ describe("Utilities", () => {
       expect(resized.height).toBe(16);
     });
 
+    it("Preserves uniform pixels when resizing in Node", async () => {
+      const uniform = new RawImage(new Uint8ClampedArray(10 * 10 * 3).fill(200), 10, 10, 3);
+      for (const resample of ["nearest", "bilinear", "bicubic"]) {
+        const resized = await uniform.resize(20, 20, { resample });
+        expect(Math.min(...resized.data)).toBe(200);
+        expect(Math.max(...resized.data)).toBe(200);
+      }
+    });
+
     it("Can resize with aspect ratio", async () => {
       const resized = await image.resize(32, null);
       expect(resized.width).toBe(32);
