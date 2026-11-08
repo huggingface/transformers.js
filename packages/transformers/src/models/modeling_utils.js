@@ -1435,7 +1435,8 @@ async function generic_text_to_text_forward(
 
         // 2. Possibly, merge text and modality values
         const modality_values = pick(kwargs, modality_input_names);
-        if (Object.keys(modality_values).length > 0) {
+        const has_modality_values = Object.values(modality_values).some((value) => value != null);
+        if (has_modality_values) {
             if (input_ids.dims[1] !== 1) {
                 const modality_features = await encode_function({
                     // Pass the modality values under its expected key.
