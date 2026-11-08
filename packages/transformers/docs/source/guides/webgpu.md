@@ -85,4 +85,9 @@ console.log(output);
 
 ## Reporting bugs and providing feedback
 
+### Low-level GPU tensor interop
+
+> [!WARNING]
+> Session I/O tensors in a WebGPU build are created by the active `onnxruntime-web` backend. CPU tensors constructed directly through Transformers.js may wrap a different ONNX Runtime `Tensor` class. If you use low-level GPU-buffer helpers such as `fromGpuBuffer`, obtain them from the same ONNX Runtime instance that owns the session; do not infer the constructor from an arbitrary CPU tensor. Mixing the two classes can make `instanceof` checks fail and can lead to recursive disposal errors. See [#1840](https://github.com/huggingface/transformers.js/issues/1840) and [#1842](https://github.com/huggingface/transformers.js/issues/1842) for the background and current API limitations.
+
 Due to the experimental nature of WebGPU, especially in non-Chromium browsers, you may experience issues when trying to run a model (even if it can run in WASM). If you do, please open [an issue on GitHub](https://github.com/huggingface/transformers.js/issues/new?title=[WebGPU]%20Error%20running%20MODEL_GOES_HERE&assignees=&labels=bug,webgpu&projects=&template=1_bug-report.yml) and we'll do our best to address it. Thanks!
