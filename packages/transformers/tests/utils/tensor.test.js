@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, mean_pooling, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -344,6 +344,25 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [0.4472, 0.8944, 0.5547, 0.8321], [2, 2]);
       const normalized = t1.normalize();
       expect(normalized).toBeCloseToNested(target);
+    });
+  });
+
+  describe("mean_pooling", () => {
+    it("should average the token embeddings selected by the attention mask", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 4]);
+      const mask = new Tensor("int64", new BigInt64Array([1n, 0n]), [1, 2]);
+
+      const pooled = mean_pooling(hidden, mask);
+      expect(Array.from(pooled.data)).toEqual([1, 2, 3, 4]);
+      expect(pooled.dims).toEqual([1, 4]);
+    });
+
+    it("should return zeros instead of NaN when the mask selects no token", () => {
+      const hidden = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 4]);
+      const mask = new Tensor("int64", new BigInt64Array([0n, 0n]), [1, 2]);
+
+      const pooled = mean_pooling(hidden, mask);
+      expect(Array.from(pooled.data)).toEqual([0, 0, 0, 0]);
     });
   });
 

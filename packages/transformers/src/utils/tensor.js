@@ -1273,7 +1273,10 @@ export function mean_pooling(last_hidden_state, attention_mask) {
                 sum += lastHiddenStateData[offset2 + j * embedDim] * attn;
             }
 
-            const avg = sum / count;
+            // An all-padding sequence has a zero mask sum; clamping the
+            // denominator to `1e-9` (as sentence-transformers does) keeps the
+            // pooled vector at 0 instead of turning it into NaN.
+            const avg = sum / Math.max(count, 1e-9);
             returnedData[outIndex++] = avg;
         }
     }
