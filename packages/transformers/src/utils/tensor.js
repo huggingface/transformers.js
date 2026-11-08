@@ -1093,6 +1093,13 @@ function reshape(data, dimensions) {
  * @returns {Tensor} The permuted tensor.
  */
 export function permute(tensor, axes) {
+    if (axes.length !== tensor.dims.length) {
+        throw new Error(`permute expects ${tensor.dims.length} dimensions, but got ${axes.length}`);
+    }
+    axes = axes.map((axis) => safeIndex(axis, tensor.dims.length));
+    if (new Set(axes).size !== axes.length) {
+        throw new Error('permute expects each dimension to appear exactly once');
+    }
     const [permutedData, shape] = permute_data(tensor.data, tensor.dims, axes);
     return new Tensor(tensor.type, permutedData, shape);
 }

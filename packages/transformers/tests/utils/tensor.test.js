@@ -215,6 +215,10 @@ describe("Tensor operations", () => {
       const permuted_6 = x.permute(2, 1, 0);
       const target_6 = new Tensor("float32", [0, 12, 4, 16, 8, 20, 1, 13, 5, 17, 9, 21, 2, 14, 6, 18, 10, 22, 3, 15, 7, 19, 11, 23], [4, 3, 2]);
       expect(permuted_6).toEqual(target_6);
+
+      expect(x.permute(-1, 0, 1)).toEqual(target_5);
+      expect(() => x.permute(0, 0, 1)).toThrow("each dimension to appear exactly once");
+      expect(() => x.permute(0, 1, 3)).toThrow("out of bounds");
     });
   });
 
