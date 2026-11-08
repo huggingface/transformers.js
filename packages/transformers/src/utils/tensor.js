@@ -210,7 +210,11 @@ export class Tensor {
      * @returns {Tensor} The tensor with the sigmoid function applied.
      */
     sigmoid() {
-        return this.clone().sigmoid_();
+        return (
+            this.type === 'float16' || this.type === 'float32' || this.type === 'float64'
+                ? this.clone()
+                : this.to('float32')
+        ).sigmoid_();
     }
 
     /**
@@ -218,6 +222,9 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     sigmoid_() {
+        if (this.type !== 'float16' && this.type !== 'float32' && this.type !== 'float64') {
+            throw new Error(`sigmoid_ expects a floating point tensor, but got ${this.type}`);
+        }
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] = 1 / (1 + Math.exp(-this_data[i]));

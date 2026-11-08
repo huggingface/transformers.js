@@ -366,6 +366,20 @@ describe("Tensor operations", () => {
       const result = t1.sigmoid();
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should promote integer tensors to float32", () => {
+      const tensor = new Tensor("int32", [1, 2, 3], [3]);
+      const target = new Tensor("float32", [1 / (1 + Math.exp(-1)), 1 / (1 + Math.exp(-2)), 1 / (1 + Math.exp(-3))], [3]);
+
+      expect(tensor.sigmoid().type).toBe("float32");
+      expect(tensor.sigmoid()).toBeCloseToNested(target);
+    });
+
+    it("should reject in-place sigmoid on integer tensors", () => {
+      const tensor = new Tensor("int32", [1, 2, 3], [3]);
+
+      expect(() => tensor.sigmoid_()).toThrow("sigmoid_ expects a floating point tensor");
+    });
   });
 
   describe("tolist", () => {
