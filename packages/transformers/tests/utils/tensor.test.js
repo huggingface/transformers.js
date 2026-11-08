@@ -422,6 +422,15 @@ describe("Tensor operations", () => {
       const result = t1.sub(2);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should cast scalar operands for int64 tensors", () => {
+      const t = new Tensor("int64", [1n, 2n, 3n], [3]);
+
+      expect(t.add(2)).toEqual(new Tensor("int64", [3n, 4n, 5n], [3]));
+      expect(t.sub(2n)).toEqual(new Tensor("int64", [-1n, 0n, 1n], [3]));
+      expect(t.mul(2)).toEqual(new Tensor("int64", [2n, 4n, 6n], [3]));
+      expect(t.div(2)).toEqual(new Tensor("int64", [0n, 1n, 1n], [3]));
+    });
   });
 
   describe("remainder", () => {

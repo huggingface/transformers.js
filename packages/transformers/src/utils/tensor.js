@@ -264,6 +264,7 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     mul_(val) {
+        val = this.type === 'int64' || this.type === 'uint64' ? BigInt(val) : val;
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] *= val;
@@ -286,6 +287,7 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     div_(val) {
+        val = this.type === 'int64' || this.type === 'uint64' ? BigInt(val) : val;
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] /= val;
@@ -308,6 +310,7 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     add_(val) {
+        val = this.type === 'int64' || this.type === 'uint64' ? BigInt(val) : val;
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] += val;
@@ -330,6 +333,7 @@ export class Tensor {
      * @returns {Tensor} Returns `this`.
      */
     sub_(val) {
+        val = this.type === 'int64' || this.type === 'uint64' ? BigInt(val) : val;
         const this_data = this.data;
         for (let i = 0; i < this_data.length; ++i) {
             this_data[i] -= val;
