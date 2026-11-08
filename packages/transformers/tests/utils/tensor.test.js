@@ -534,6 +534,19 @@ describe("Tensor operations", () => {
       const target = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
       expect(result).toEqual(target);
     });
+    it("should support negative dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+
+      expect(t1.squeeze(-1).dims).toEqual([1, 3]);
+      expect(t1.squeeze(-3).dims).toEqual([3, 1]);
+      expect(t1.squeeze([0, -1]).dims).toEqual([3]);
+    });
+    it("should reject out-of-range dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3], [1, 3, 1]);
+
+      expect(() => t1.squeeze(3)).toThrow("IndexError: index 3 is out of bounds");
+      expect(() => t1.squeeze([-4])).toThrow("IndexError: index -4 is out of bounds");
+    });
     it("should remove multiple dimensions", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4], [1, 1, 2, 1, 2]);
       const result = t1.squeeze([0, 3]);

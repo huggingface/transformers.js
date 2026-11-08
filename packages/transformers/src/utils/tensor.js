@@ -1331,12 +1331,14 @@ function calc_squeeze_dims(dims, dim) {
     if (dim === null) {
         dims = dims.filter((d) => d !== 1);
     } else if (typeof dim === 'number') {
+        dim = safeIndex(dim, dims.length);
         if (dims[dim] === 1) {
             dims.splice(dim, 1);
         }
     } else if (Array.isArray(dim)) {
+        const normalizedDims = new Set(dim.map((d) => safeIndex(d, dims.length)));
         dims = dims.filter((x, i) => {
-            return x !== 1 || !dim.includes(i);
+            return x !== 1 || !normalizedDims.has(i);
         });
     }
     return dims;
