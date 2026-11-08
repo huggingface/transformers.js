@@ -25,16 +25,20 @@ export async function get_files(
         model_file_name = null,
         include_tokenizer = true,
         include_processor = true,
+        cache_dir = null,
+        local_files_only = false,
+        revision = 'main',
     } = {},
 ) {
-    const files = await get_model_files(modelId, { config, dtype, device, model_file_name });
+    const options = { config, dtype, device, model_file_name, cache_dir, local_files_only, revision };
+    const files = await get_model_files(modelId, options);
 
     if (include_tokenizer) {
-        const tokenizerFiles = await get_tokenizer_files(modelId);
+        const tokenizerFiles = await get_tokenizer_files(modelId, options);
         files.push(...tokenizerFiles);
     }
     if (include_processor) {
-        const processorFiles = await get_processor_files(modelId);
+        const processorFiles = await get_processor_files(modelId, options);
         files.push(...processorFiles);
     }
 

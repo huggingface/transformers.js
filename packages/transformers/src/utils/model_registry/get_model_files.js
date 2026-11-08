@@ -59,9 +59,17 @@ export function get_config(
  */
 export async function get_model_files(
     modelId,
-    { config = null, dtype: overrideDtype = null, device: overrideDevice = null, model_file_name = null } = {},
+    {
+        config = null,
+        dtype: overrideDtype = null,
+        device: overrideDevice = null,
+        model_file_name = null,
+        cache_dir = null,
+        local_files_only = false,
+        revision = 'main',
+    } = {},
 ) {
-    config = await get_config(modelId, { config });
+    config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
 
     const files = [
         // Add config.json (always loaded)

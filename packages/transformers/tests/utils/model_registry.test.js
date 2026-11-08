@@ -8,9 +8,10 @@ jest.unstable_mockModule("../../src/utils/model_registry/get_file_metadata.js", 
 
 // Mock get_config so config-loading failures can be simulated
 const mockGetConfig = jest.fn();
+const mockGetModelFiles = jest.fn();
 jest.unstable_mockModule("../../src/utils/model_registry/get_model_files.js", () => ({
   get_config: mockGetConfig,
-  get_model_files: jest.fn(),
+  get_model_files: mockGetModelFiles,
 }));
 
 // Import registry to populate MODEL_TYPE_MAPPING (side-effect import)
@@ -18,6 +19,7 @@ await import("../../src/models/registry.js");
 
 // Dynamic import after mock setup (required for ESM)
 const { get_available_dtypes } = await import("../../src/utils/model_registry/get_available_dtypes.js");
+const { get_files } = await import("../../src/utils/model_registry/get_files.js");
 const { ModelFileNotFoundError } = await import("../../src/utils/hub/utils.js");
 
 // A minimal config that mimics a BERT-like encoder-only model
@@ -62,8 +64,27 @@ describe("get_available_dtypes", () => {
   beforeEach(() => {
     mockGetFileMetadata.mockReset();
     mockGetConfig.mockReset();
+    mockGetModelFiles.mockReset();
     // Default: behave like the real get_config when a pre-loaded config is supplied
     mockGetConfig.mockImplementation((_modelId, { config } = {}) => Promise.resolve(config));
+  });
+
+  it("should pass hub options to model, tokenizer, and processor file discovery", async () => {
+    mockGetModelFiles.mockResolvedValue(["config.json"]);
+    setupExistingFiles();
+
+    const options = {
+      revision: "a1b2c3",
+      cache_dir: "/tmp/cache",
+      local_files_only: true,
+    };
+
+    await get_files("test/model", options);
+
+    expect(mockGetModelFiles).toHaveBeenCalledWith("test/model", expect.objectContaining(options));
+    for (const call of mockGetFileMetadata.mock.calls) {
+      expect(call[2]).toMatchObject(options);
+    }
   });
 
   it("should detect fp32 and q4 for an encoder-only model", async () => {
