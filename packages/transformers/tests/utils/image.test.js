@@ -10,6 +10,18 @@ const TEST_IMAGES = {
 };
 
 describe("Image utilities", () => {
+  describe("Resize", () => {
+    it("should preserve uniform pixel values at the image borders", async () => {
+      const image = new RawImage(new Uint8ClampedArray(10 * 10 * 3).fill(200), 10, 10, 3);
+
+      for (const resample of ["nearest", "bilinear", "bicubic"]) {
+        const resized = await image.resize(20, 20, { resample });
+        expect(Math.min(...resized.data)).toBe(200);
+        expect(Math.max(...resized.data)).toBe(200);
+      }
+    });
+  });
+
   describe("Resize output size", () => {
     it("should not upscale past the shortest edge when the longest edge already fits", () => {
       const processor = new ImageProcessor({ size: { shortest_edge: 800, longest_edge: 1333 } });
