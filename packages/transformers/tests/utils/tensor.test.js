@@ -560,6 +560,28 @@ describe("Tensor operations", () => {
       const result = t1.flatten();
       expect(result).toEqual(target);
     });
+
+    it("should flatten only the given dimension range", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]);
+
+      expect(t1.flatten(1, 1).dims).toEqual([2, 2, 2]);
+      expect(t1.flatten(0, 1).dims).toEqual([4, 2]);
+      expect(t1.flatten(1, -1).dims).toEqual([2, 4]);
+      expect(t1.flatten(-2, -2).dims).toEqual([2, 2, 2]);
+    });
+
+    it("should throw when start_dim comes after end_dim", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]);
+      expect(() => t1.flatten(2, 1)).toThrow(/start_dim cannot come after end_dim/);
+      expect(() => t1.flatten(-1, -2)).toThrow(/start_dim cannot come after end_dim/);
+    });
+
+    it("should throw when a dimension is out of range", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]);
+      expect(() => t1.flatten(3, 3)).toThrow();
+      expect(() => t1.flatten(0, 3)).toThrow();
+      expect(() => t1.flatten(-4, -1)).toThrow();
+    });
   });
 
   describe("neg", () => {
