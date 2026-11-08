@@ -1394,11 +1394,30 @@ function safeIndex(index, size, dimension = null, boundsCheck = true) {
  * @returns {Tensor} The concatenated tensor.
  */
 export function cat(tensors, dim = 0) {
-    dim = safeIndex(dim, tensors[0].dims.length);
+    if (tensors.length === 0) {
+        throw new Error('cat expects at least one tensor');
+    }
 
-    // TODO do validation of shapes
+    const firstDims = tensors[0].dims;
+    dim = safeIndex(dim, firstDims.length);
 
-    const resultDims = tensors[0].dims.slice();
+    for (let i = 1; i < tensors.length; ++i) {
+        const tensorDims = tensors[i].dims;
+        if (tensorDims.length !== firstDims.length) {
+            throw new Error(
+                `Tensors must have the same number of dimensions, but tensor number ${i} has ${tensorDims.length} dimensions and tensor number 0 has ${firstDims.length}`,
+            );
+        }
+        for (let axis = 0; axis < firstDims.length; ++axis) {
+            if (axis !== dim && tensorDims[axis] !== firstDims[axis]) {
+                throw new Error(
+                    `Sizes of tensors must match except in dimension ${dim}. Expected size ${firstDims[axis]} but got size ${tensorDims[axis]} for tensor number ${i}`,
+                );
+            }
+        }
+    }
+
+    const resultDims = firstDims.slice();
     resultDims[dim] = tensors.reduce((a, b) => a + b.dims[dim], 0);
 
     // Create a new array to store the accumulated values

@@ -50,7 +50,23 @@ describe("Tensor operations", () => {
       expect(concatenated).toEqual(target);
     });
 
-    // TODO add tests for errors
+    it("should reject mismatched non-concatenated dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const t2 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+
+      expect(() => cat([t1, t2], 0)).toThrow("Sizes of tensors must match except in dimension 0");
+    });
+
+    it("should reject tensors with different ranks", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+      const t2 = new Tensor("float32", [1, 2], [2]);
+
+      expect(() => cat([t1, t2], 0)).toThrow("same number of dimensions");
+    });
+
+    it("should reject an empty tensor list", () => {
+      expect(() => cat([])).toThrow("cat expects at least one tensor");
+    });
   });
 
   describe("slice", () => {
