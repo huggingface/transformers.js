@@ -582,6 +582,20 @@ describe("Tensor operations", () => {
       expect(() => t1.flatten(0, 3)).toThrow();
       expect(() => t1.flatten(-4, -1)).toThrow();
     });
+
+    it("should reshape a 0-dim tensor to a single element", () => {
+      // torch.flatten(torch.tensor(5.)) -> tensor([5.]), i.e. shape [1],
+      // so validating the bounds must not reject the default arguments.
+      const scalar = new Tensor("float32", [5], []);
+
+      expect(scalar.flatten().dims).toEqual([1]);
+      expect(Array.from(scalar.flatten().data)).toEqual([5]);
+      expect(scalar.flatten(0, 0).dims).toEqual([1]);
+      expect(scalar.flatten(-1, -1).dims).toEqual([1]);
+
+      expect(() => scalar.flatten(1, 1)).toThrow(/out of bounds/);
+      expect(() => scalar.flatten(0, 1)).toThrow(/out of bounds/);
+    });
   });
 
   describe("neg", () => {

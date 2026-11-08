@@ -691,6 +691,19 @@ export class Tensor {
         // which turns `flatten(3, 3)` on a 3D tensor into a tensor with six
         // dimensions and no matching data.
         const ndim = this.dims.length;
+        if (ndim === 0) {
+            // A 0-dim tensor has no axes to index, so `safeIndex` would reject
+            // every bound. torch instead reshapes it to `[1]` for the default
+            // bounds, and only rejects bounds that point at a non-existent axis.
+            for (const dim of [start_dim, end_dim]) {
+                if (dim !== 0 && dim !== -1) {
+                    throw new Error(`IndexError: index ${dim} is out of bounds for dimension with size 0`);
+                }
+            }
+            this.dims = [1];
+            return this;
+        }
+
         const start = safeIndex(start_dim, ndim);
         const end = safeIndex(end_dim, ndim);
         if (start > end) {
