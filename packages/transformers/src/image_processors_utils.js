@@ -843,7 +843,7 @@ export class ImageProcessor extends Callable {
             const longResizeFactor =
                 longest_edge === undefined
                     ? 1 // If `longest_edge` is not set, don't downscale
-                    : Math.min(longest_edge / newWidth, longest_edge / newHeight);
+                    : Math.min(1, longest_edge / newWidth, longest_edge / newHeight);
 
             // To avoid certain floating point precision issues, we round to 2 decimal places
             let finalWidth = Math.floor(Number((newWidth * longResizeFactor).toFixed(2)));

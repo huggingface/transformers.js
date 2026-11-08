@@ -1,4 +1,5 @@
 import { RawImage, rand } from "../../src/transformers.js";
+import { ImageProcessor } from "../../src/image_processors_utils.js";
 import { load_cached_image } from "../asset_cache.js";
 
 const TEST_IMAGES = {
@@ -9,6 +10,22 @@ const TEST_IMAGES = {
 };
 
 describe("Image utilities", () => {
+  describe("Resize output size", () => {
+    it("should not upscale past the shortest edge when the longest edge already fits", () => {
+      const processor = new ImageProcessor({ size: { shortest_edge: 800, longest_edge: 1333 } });
+      const image = new RawImage(new Uint8ClampedArray(640 * 480 * 3), 640, 480, 3);
+
+      expect(processor.get_resize_output_image_size(image, processor.size)).toEqual([1066, 800]);
+    });
+
+    it("should downscale when the shortest-edge resize exceeds the longest edge", () => {
+      const processor = new ImageProcessor({ size: { shortest_edge: 800, longest_edge: 1333 } });
+      const image = new RawImage(new Uint8ClampedArray(2000 * 1000 * 3), 2000, 1000, 3);
+
+      expect(processor.get_resize_output_image_size(image, processor.size)).toEqual([1333, 666]);
+    });
+  });
+
   describe("Padding", () => {
     it("should pad image", async () => {
       /** @type {RawImage} */
