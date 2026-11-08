@@ -686,8 +686,11 @@ export class Tensor {
      * @returns {Tensor} `this`, flattened along the specified dimensions.
      */
     flatten_(start_dim = 0, end_dim = -1) {
-        // TODO validate inputs
-        end_dim = (end_dim + this.dims.length) % this.dims.length;
+        start_dim = safeIndex(start_dim, this.dims.length);
+        end_dim = safeIndex(end_dim, this.dims.length);
+        if (start_dim > end_dim) {
+            throw new Error('flatten() has invalid args: start_dim cannot come after end_dim');
+        }
 
         let dimsToKeepBefore = this.dims.slice(0, start_dim);
         let dimsToFlatten = this.dims.slice(start_dim, end_dim + 1);

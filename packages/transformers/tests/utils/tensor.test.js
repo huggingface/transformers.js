@@ -560,6 +560,25 @@ describe("Tensor operations", () => {
       const result = t1.flatten();
       expect(result).toEqual(target);
     });
+    it("should normalize negative dimensions", () => {
+      const t1 = new Tensor(
+        "float32",
+        Array.from({ length: 24 }, (_, i) => i),
+        [2, 3, 4],
+      );
+
+      expect(t1.flatten(1, -1).dims).toEqual([2, 12]);
+    });
+    it("should reject reversed dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+
+      expect(() => t1.flatten(1, 0)).toThrow("flatten() has invalid args: start_dim cannot come after end_dim");
+    });
+    it("should reject out-of-range dimensions", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+
+      expect(() => t1.flatten(2, 2)).toThrow("IndexError: index 2 is out of bounds");
+    });
   });
 
   describe("neg", () => {
