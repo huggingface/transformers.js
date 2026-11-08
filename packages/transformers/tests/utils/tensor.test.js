@@ -613,6 +613,13 @@ describe("Tensor operations", () => {
       const result = t1.round();
       expect(result).toEqual(target);
     });
+    it("should use ties-to-even rounding and preserve int64 values", () => {
+      const t1 = new Tensor("float32", [0.5, 1.5, 2.5, 3.5, -1.5, -2.5], [6]);
+      const target = new Tensor("float32", [0, 2, 2, 4, -2, -2], [6]);
+
+      expect(t1.round()).toEqual(target);
+      expect(new Tensor("int64", [1n, 2n], [2]).round()).toEqual(new Tensor("int64", [1n, 2n], [2]));
+    });
   });
 
   describe("ones_like", () => {
