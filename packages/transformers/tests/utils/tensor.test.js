@@ -356,6 +356,20 @@ describe("Tensor operations", () => {
       const norm = layer_norm(t1, [t1.dims.at(-1)]);
       expect(norm).toBeCloseToNested(target);
     });
+
+    it("should reject a normalized_shape that does not match the feature dimension", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      expect(() => layer_norm(t1, [2])).toThrow(/normalized_shape/);
+      expect(() => layer_norm(t1, [6])).toThrow(/normalized_shape/);
+      expect(() => layer_norm(t1, [])).toThrow(/normalized_shape/);
+    });
+
+    it("should reject a multi-dimensional normalized_shape", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+
+      expect(() => layer_norm(t1, [3, 1])).toThrow(/normalized_shape/);
+    });
   });
 
   describe("sigmoid", () => {
