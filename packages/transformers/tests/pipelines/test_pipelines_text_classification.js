@@ -135,16 +135,17 @@ export default () => {
       async () => {
         const problem_type = pipe.model.config.problem_type;
         pipe.model.config.problem_type = "regression";
-
-        const output = await pipe(texts);
-        const target = [
-          { label: "LABEL_0", score: -9.195775985717773 },
-          { label: "LABEL_0", score: -2.5964856147766113 },
-        ];
-        expect(output).toBeCloseToNested(target, 4);
-
-        // Reset problem type
-        pipe.model.config.problem_type = problem_type;
+        try {
+          const output = await pipe(texts);
+          const target = [
+            { label: "LABEL_0", score: -9.195775985717773 },
+            { label: "LABEL_0", score: -2.5964856147766113 },
+          ];
+          expect(output).toBeCloseToNested(target, 4);
+        } finally {
+          // Reset problem type, also when the assertion fails
+          pipe.model.config.problem_type = problem_type;
+        }
       },
       MAX_TEST_EXECUTION_TIME,
     );
