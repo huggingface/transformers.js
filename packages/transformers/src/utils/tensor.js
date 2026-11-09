@@ -528,7 +528,24 @@ export class Tensor {
      * @returns The summed tensor
      */
     sum(dim = null, keepdim = false) {
-        return this.norm(1, dim, keepdim);
+        // NOTE: Summation is signed, so it cannot be expressed as `norm(1)`,
+        // which reduces over |x|. This used to delegate to `norm(1)` and only
+        // looked correct because that path summed the raw values.
+        const this_data = this.data;
+        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+
+        // @ts-ignore
+        const fn = (a, b) => a + b;
+        // @ts-ignore
+        const zero = is_bigint ? 0n : 0;
+
+        if (dim === null) {
+            // @ts-ignore
+            return new Tensor(this.type, [this_data.reduce(fn, zero)], []);
+        }
+
+        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        return new Tensor(type, result, resultDims);
     }
 
     /**

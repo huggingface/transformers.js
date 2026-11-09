@@ -313,6 +313,23 @@ describe("Tensor operations", () => {
       const result = t1.sum(1);
       expect(result).toBeCloseToNested(target);
     });
+
+    // Sums are signed, unlike the L1 norm of the same tensor. Keeping this
+    // separate from `norm(1)` is what makes the reduction torch-compatible.
+    it("should keep the sign of negative values", () => {
+      const t1 = new Tensor("float32", [1, -2, 3, -4, 5, -6], [2, 3]);
+      expect(t1.sum().item()).toEqual(-3);
+      expect(t1.sum(0).tolist()).toEqual([-3, 3, -3]);
+      expect(t1.sum(1).tolist()).toEqual([2, -5]);
+      expect(t1.norm(1).item()).toEqual(21);
+    });
+
+    it("should keep the sign of negative int64 values", () => {
+      const t1 = new Tensor("int64", [1n, -2n, 3n, -4n, 5n, -6n], [2, 3]);
+      expect(t1.sum().item()).toEqual(-3n);
+      expect(t1.sum(0).tolist()).toEqual([-3n, 3n, -3n]);
+      expect(t1.sum(1).tolist()).toEqual([2n, -5n]);
+    });
   });
 
   describe("norm", () => {
