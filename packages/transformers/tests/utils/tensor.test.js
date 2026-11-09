@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean, interpolate } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -829,5 +829,27 @@ describe("Tensor operations", () => {
       const target = new Tensor("int64", [1n, 2n, 3n, 1n, 2n, 3n], [6]);
       expect(t2).toEqual(target);
     });
+  });
+});
+
+describe("interpolate rank validation", () => {
+  it("should resize a channel-first 3D tensor", () => {
+    const input = new Tensor("float32", new Array(2 * 2 * 2).fill(1), [2, 2, 2]);
+    const output = interpolate(input, [4, 4]);
+
+    expect(output.dims).toEqual([2, 4, 4]);
+    expect(output.data).toHaveLength(2 * 4 * 4);
+  });
+
+  it("should reject a batched 4D tensor instead of dropping the batch axis", () => {
+    const input = new Tensor("float32", new Array(2 * 1 * 2 * 2).fill(1), [2, 1, 2, 2]);
+
+    expect(() => interpolate(input, [4, 4])).toThrow(/expects a channel-first 3D tensor/);
+  });
+
+  it("should reject a 2D tensor instead of inventing a channel axis", () => {
+    const input = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+
+    expect(() => interpolate(input, [4, 4])).toThrow(/expects a channel-first 3D tensor/);
   });
 });

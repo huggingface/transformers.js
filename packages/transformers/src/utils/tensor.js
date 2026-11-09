@@ -1106,6 +1106,13 @@ export function permute(tensor, axes) {
  * @returns {Tensor} The interpolated tensor.
  */
 export function interpolate(input, [out_height, out_width], mode = 'bilinear', align_corners = false) {
+    // `interpolate_data` only walks the last three dimensions, so a tensor with
+    // more (or fewer) dimensions would silently drop the leading axes and
+    // return data that no longer matches the reported shape.
+    if (input.dims.length !== 3) {
+        throw new Error(`interpolate() expects a channel-first 3D tensor [c, h, w], but the input has ${input.dims.length} dimension(s) [${input.dims.join(', ')}].`);
+    }
+
     // Input image dimensions
     const in_channels = input.dims.at(-3) ?? 1;
     const in_height = input.dims.at(-2);
