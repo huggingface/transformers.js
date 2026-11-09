@@ -352,6 +352,20 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [-3, 4], [2]);
       expect(t1.norm(3).item()).toBeCloseTo(Math.cbrt(91));
     });
+
+    it("should return the max absolute value for p=Infinity", () => {
+      const t1 = new Tensor("float32", [-3, 2, 1, -5], [2, 2]);
+      expect(t1.norm(Infinity).item()).toBeCloseTo(5);
+      expect(t1.norm(Infinity, 1)).toBeCloseToNested(new Tensor("float32", [3, 5], [2]));
+      expect(t1.norm(Infinity, 0, true)).toBeCloseToNested(new Tensor("float32", [3, 5], [1, 2]));
+    });
+
+    it("should return the min absolute value for p=-Infinity", () => {
+      const t1 = new Tensor("float32", [-3, 2, 1, -5], [2, 2]);
+      expect(t1.norm(-Infinity).item()).toBeCloseTo(1);
+      expect(t1.norm(-Infinity, 1)).toBeCloseToNested(new Tensor("float32", [2, 1], [2]));
+      expect(t1.norm(-Infinity, 0, true)).toBeCloseToNested(new Tensor("float32", [1, 2], [1, 2]));
+    });
   });
 
   describe("normalize", () => {

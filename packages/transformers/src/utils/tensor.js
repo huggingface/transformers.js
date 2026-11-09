@@ -566,6 +566,24 @@ export class Tensor {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
         }
 
+        if (p === Infinity || p === -Infinity) {
+            // Infinity norm is the max of the absolute values, -Infinity norm is the min (same as PyTorch).
+            const fn =
+                p === Infinity
+                    ? (/** @type {number} */ a, /** @type {number} */ b) => Math.max(a, Math.abs(b))
+                    : (/** @type {number} */ a, /** @type {number} */ b) => Math.min(a, Math.abs(b));
+            const init = p === Infinity ? 0 : Infinity;
+
+            if (dim === null) {
+                // @ts-ignore
+                const val = this_data.reduce(fn, init);
+                return new Tensor(this.type, [val], []);
+            }
+
+            const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim, init);
+            return new Tensor(type, result, resultDims);
+        }
+
         const fn = (/** @type {number} */ a, /** @type {number} */ b) => a + Math.abs(b) ** p;
         const zero = 0;
 
