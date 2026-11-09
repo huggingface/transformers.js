@@ -844,12 +844,26 @@ describe("interpolate rank validation", () => {
   it("should reject a batched 4D tensor instead of dropping the batch axis", () => {
     const input = new Tensor("float32", new Array(2 * 1 * 2 * 2).fill(1), [2, 1, 2, 2]);
 
-    expect(() => interpolate(input, [4, 4])).toThrow(/expects a channel-first 3D tensor/);
+    expect(() => interpolate(input, [4, 4])).toThrow(/expects a 2D \[h, w\] or channel-first 3D/);
   });
 
-  it("should reject a 2D tensor instead of inventing a channel axis", () => {
-    const input = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
+  it("should resize a 2D tensor as a single-channel image", () => {
+    // Segmentation post-processing resizes per-class masks, which are [h, w].
+    const input = new Tensor("float32", [0, 1, 2, 3], [2, 2]);
+    const output = interpolate(input, [4, 4], "bilinear", false);
 
-    expect(() => interpolate(input, [4, 4])).toThrow(/expects a channel-first 3D tensor/);
+    expect(output.dims).toEqual([1, 4, 4]);
+    expect(Array.from(output.data)).toEqual([
+      0, 0.25, 0.75, 1,
+      0.5, 0.75, 1.25, 1.5,
+      1.5, 1.75, 2.25, 2.5,
+      2, 2.25, 2.75, 3,
+    ]);
+  });
+
+  it("should reject a 1D tensor instead of producing NaN samples", () => {
+    const input = new Tensor("float32", [1, 2, 3, 4], [4]);
+
+    expect(() => interpolate(input, [4, 4])).toThrow(/expects a 2D \[h, w\] or channel-first 3D/);
   });
 });

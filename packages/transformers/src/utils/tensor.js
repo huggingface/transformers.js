@@ -1099,18 +1099,21 @@ export function permute(tensor, axes) {
 
 /**
  * Interpolates an Tensor to the given size.
- * @param {Tensor} input The input tensor to interpolate. Data must be channel-first (i.e., [c, h, w])
+ * @param {Tensor} input The input tensor to interpolate. Data must be channel-first (i.e., [c, h, w]) or a single-channel [h, w] tensor.
  * @param {number[]} size The output size of the image
  * @param {string} mode The interpolation mode
  * @param {boolean} align_corners Whether to align corners.
  * @returns {Tensor} The interpolated tensor.
  */
 export function interpolate(input, [out_height, out_width], mode = 'bilinear', align_corners = false) {
-    // `interpolate_data` only walks the last three dimensions, so a tensor with
-    // more (or fewer) dimensions would silently drop the leading axes and
-    // return data that no longer matches the reported shape.
-    if (input.dims.length !== 3) {
-        throw new Error(`interpolate() expects a channel-first 3D tensor [c, h, w], but the input has ${input.dims.length} dimension(s) [${input.dims.join(', ')}].`);
+    // `interpolate_data` walks at most the last three dimensions, so a 4D+ input
+    // would silently drop the leading axes and return data that no longer
+    // matches the reported shape. A 1D (or scalar) input is just as unsupported:
+    // the height would be `undefined` and every sample would come out as NaN.
+    // 2D input is a single-channel image and stays valid (`in_channels` falls
+    // back to 1 below); segmentation post-processing relies on it.
+    if (input.dims.length < 2 || input.dims.length > 3) {
+        throw new Error(`interpolate() expects a 2D [h, w] or channel-first 3D [c, h, w] tensor, but the input has ${input.dims.length} dimension(s) [${input.dims.join(', ')}].`);
     }
 
     // Input image dimensions
