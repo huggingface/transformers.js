@@ -329,6 +329,35 @@ describe("Tensor operations", () => {
       const result = t1.norm(2, 0);
       expect(result).toBeCloseToNested(target);
     });
+
+    it("should sum absolute values for the L1 norm", () => {
+      const t1 = new Tensor("float32", [1, -2, 3, -4], [2, 2]);
+
+      expect(t1.norm(1, 0)).toBeCloseToNested(new Tensor("float32", [4, 6], [2]));
+      expect(t1.norm(1, 1)).toBeCloseToNested(new Tensor("float32", [3, 7], [2]));
+      expect(t1.norm(1).item()).toBeCloseTo(10);
+    });
+
+    it("should return the largest absolute value for the infinity norm", () => {
+      const t1 = new Tensor("float32", [1, -2, 3, -4], [2, 2]);
+
+      expect(t1.norm(Infinity, 0)).toBeCloseToNested(new Tensor("float32", [3, 4], [2]));
+      expect(t1.norm(Infinity, 1)).toBeCloseToNested(new Tensor("float32", [2, 4], [2]));
+      expect(t1.norm(Infinity).item()).toBeCloseTo(4);
+    });
+
+    it("should return the smallest absolute value for the negative infinity norm", () => {
+      const t1 = new Tensor("float32", [1, -2, 3, -4], [2, 2]);
+
+      expect(t1.norm(-Infinity, 0)).toBeCloseToNested(new Tensor("float32", [1, 2], [2]));
+      expect(t1.norm(-Infinity, 1)).toBeCloseToNested(new Tensor("float32", [1, 3], [2]));
+      expect(t1.norm(-Infinity).item()).toBeCloseTo(1);
+    });
+
+    it("should not be affected by the sign for the L2 norm", () => {
+      const t1 = new Tensor("float32", [1, -2, 3, -4], [2, 2]);
+      expect(t1.norm()).toBeCloseToNested(new Tensor("float32", [Math.sqrt(30)], []));
+    });
   });
 
   describe("normalize", () => {

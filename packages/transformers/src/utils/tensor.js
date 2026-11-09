@@ -554,27 +554,38 @@ export class Tensor {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
         }
 
+        // `L_p` norms are taken over the *absolute* values. Summing the signed
+        // entries makes p=1 cancel positive and negative values, and raising
+        // |x| to Infinity before taking the Infinity-th root collapses every
+        // result to 1, so those two orders are reduced directly.
         let fn, zero;
         if (is_bigint) {
-            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
+            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + (b < 0n ? -b : b);
             zero = 0n;
+        } else if (p === Infinity) {
+            fn = (/** @type {number} */ a, /** @type {number} */ b) => Math.max(a, Math.abs(b));
+            zero = 0;
+        } else if (p === -Infinity) {
+            fn = (/** @type {number} */ a, /** @type {number} */ b) => Math.min(a, Math.abs(b));
+            zero = Infinity;
         } else {
-            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
+            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + Math.abs(b) ** p;
             zero = 0;
         }
+        const takeRoot = p !== 1 && p !== Infinity && p !== -Infinity;
 
         if (dim === null) {
             // @ts-ignore
             let val = this_data.reduce(fn, zero);
-            if (p !== 1) {
+            if (takeRoot) {
                 val = val ** (1 / p);
             }
             return new Tensor(this.type, [val], []);
         }
 
-        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim, p === -Infinity ? Infinity : null);
 
-        if (p !== 1) {
+        if (takeRoot) {
             for (let i = 0; i < result.length; ++i) {
                 result[i] = result[i] ** (1 / p);
             }
