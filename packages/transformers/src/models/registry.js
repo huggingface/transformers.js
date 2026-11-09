@@ -34,6 +34,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
     ['chinese_clip', 'ChineseCLIPModel'],
     ['siglip', 'SiglipModel'],
     ['jina_clip', 'JinaCLIPModel'],
+    ['layoutlmv3', 'LayoutLMv3Model'],
     ['mobilebert', 'MobileBertModel'],
     ['squeezebert', 'SqueezeBertModel'],
     ['wav2vec2', 'Wav2Vec2Model'],
@@ -221,6 +222,7 @@ const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['roberta', 'RobertaForSequenceClassification'],
     ['xlm', 'XLMForSequenceClassification'],
     ['xlm-roberta', 'XLMRobertaForSequenceClassification'],
+    ['layoutlmv3', 'LayoutLMv3ForSequenceClassification'],
     ['bart', 'BartForSequenceClassification'],
     ['mbart', 'MBartForSequenceClassification'],
     ['mobilebert', 'MobileBertForSequenceClassification'],
@@ -244,6 +246,7 @@ const MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING_NAMES = new Map([
     ['roberta', 'RobertaForTokenClassification'],
     ['xlm', 'XLMForTokenClassification'],
     ['xlm-roberta', 'XLMRobertaForTokenClassification'],
+    ['layoutlmv3', 'LayoutLMv3ForTokenClassification'],
     ['openai_privacy_filter', 'OpenAIPrivacyFilterForTokenClassification'],
 ]);
 

@@ -23,6 +23,7 @@ export * from './gpt_neox/tokenization_gpt_neox.js';
 export * from './gpt2/tokenization_gpt2.js';
 export * from './herbert/tokenization_herbert.js';
 export * from './llama/tokenization_llama.js';
+export * from './layoutlmv3/tokenization_layoutlmv3.js';
 export * from './m2m_100/tokenization_m2m_100.js';
 export * from './marian/tokenization_marian.js';
 export * from './mbart/tokenization_mbart.js';
