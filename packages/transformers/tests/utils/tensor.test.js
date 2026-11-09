@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean, interpolate } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -829,5 +829,25 @@ describe("Tensor operations", () => {
       const target = new Tensor("int64", [1n, 2n, 3n, 1n, 2n, 3n], [6]);
       expect(t2).toEqual(target);
     });
+  });
+});
+
+describe("interpolate", () => {
+  // A 2x2 image whose values are v(y, x) = 20 * y + 10 * x, so any bilinear
+  // sample can be checked against the expected linear interpolation.
+  const input = new Tensor("float32", [0, 10, 20, 30], [1, 2, 2]);
+
+  it("should align corner pixels when align_corners is true", () => {
+    const output = interpolate(input, [4, 4], "bilinear", true);
+
+    expect(output.dims).toEqual([1, 4, 4]);
+    const expected = [0, 10 / 3, 20 / 3, 10, 20 / 3, 10, 40 / 3, 50 / 3, 40 / 3, 50 / 3, 20, 70 / 3, 20, 70 / 3, 80 / 3, 30];
+    const actual = Array.from(output.data);
+    actual.forEach((value, i) => expect(value).toBeCloseTo(expected[i], 5));
+  });
+
+  it("should keep half-pixel alignment by default", () => {
+    const output = interpolate(input, [4, 4], "bilinear", false);
+    expect(Array.from(output.data)).toEqual([0, 2.5, 7.5, 10, 5, 7.5, 12.5, 15, 15, 17.5, 22.5, 25, 20, 22.5, 27.5, 30]);
   });
 });

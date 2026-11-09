@@ -21,11 +21,21 @@ export function interpolate_data(
     mode = 'bilinear',
     align_corners = false,
 ) {
-    // TODO use mode and align_corners
+    // TODO use mode
 
     // Output image dimensions
-    const x_scale = out_width / in_width;
-    const y_scale = out_height / in_height;
+    // When `align_corners` is set, the centres of the corner pixels of the
+    // input and output images are aligned (as in PyTorch); otherwise the
+    // pixel *areas* are aligned, which is what the half-pixel shift below
+    // implements.
+    const x_scale =
+        align_corners && out_width > 1
+            ? (in_width - 1) / (out_width - 1)
+            : out_width / in_width;
+    const y_scale =
+        align_corners && out_height > 1
+            ? (in_height - 1) / (out_height - 1)
+            : out_height / in_height;
 
     // Output image
     // @ts-ignore
@@ -41,8 +51,8 @@ export function interpolate_data(
             const outOffset = i * out_width + j;
 
             // Calculate input pixel coordinates
-            const x = (j + 0.5) / x_scale - 0.5;
-            const y = (i + 0.5) / y_scale - 0.5;
+            const x = align_corners ? j * x_scale : (j + 0.5) / x_scale - 0.5;
+            const y = align_corners ? i * y_scale : (i + 0.5) / y_scale - 0.5;
 
             // Calculate the four nearest input pixels
             // We also check if the input pixel coordinates are within the image bounds
