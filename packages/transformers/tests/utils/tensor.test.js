@@ -1,4 +1,4 @@
-import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean } from "../../src/transformers.js";
+import { Tensor, cat, stack, layer_norm, ones_like, zeros_like, full_like, rand, std_mean, quantize_embeddings } from "../../src/transformers.js";
 import { init } from "../init.js";
 
 init();
@@ -829,5 +829,37 @@ describe("Tensor operations", () => {
       const target = new Tensor("int64", [1n, 2n, 3n, 1n, 2n, 3n], [6]);
       expect(t2).toEqual(target);
     });
+  });
+});
+
+describe("quantize_embeddings", () => {
+  // Sign pattern 1,0,1,1,1,1,1,1 packs to 0b10111111 = 191 unsigned, -65 signed.
+  const signs = [1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+
+  it("should pack the most significant bit of signed binary embeddings", () => {
+    const input = new Tensor("float32", signs, [2, 8]);
+    const output = quantize_embeddings(input, "binary");
+
+    expect(output.type).toBe("int8");
+    expect(output.dims).toEqual([2, 1]);
+    // 191 - 256 = -65, i.e. the top bit must survive the signed conversion.
+    expect(Array.from(output.data)).toEqual([-65, -1]);
+  });
+
+  it("should keep unsigned binary embeddings unsigned", () => {
+    const input = new Tensor("float32", signs, [2, 8]);
+    const output = quantize_embeddings(input, "ubinary");
+
+    expect(output.type).toBe("uint8");
+    expect(output.dims).toEqual([2, 1]);
+    expect(Array.from(output.data)).toEqual([191, 255]);
+  });
+
+  it("should pack several bytes per row row-major", () => {
+    const input = new Tensor("float32", new Array(16).fill(1), [1, 16]);
+    const output = quantize_embeddings(input, "binary");
+
+    expect(output.dims).toEqual([1, 2]);
+    expect(Array.from(output.data)).toEqual([-1, -1]);
   });
 });

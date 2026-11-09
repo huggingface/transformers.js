@@ -1742,10 +1742,13 @@ export function quantize_embeddings(tensor, precision) {
     const signed = precision === 'binary';
     const dtype = signed ? 'int8' : 'uint8';
 
-    // Create a typed array to store the packed bits
-    const cls = signed ? Int8Array : Uint8Array;
+    // Create a typed array to store the packed bits. Bits are always packed
+    // into an unsigned buffer first: writing the most significant bit directly
+    // into an `Int8Array` already wraps to the negative range, so subtracting
+    // 128 afterwards would clear it again. Reinterpreting the finished buffer
+    // as signed preserves the two's complement value instead.
     const inputData = tensor.data;
-    const outputData = new cls(inputData.length / 8);
+    const outputData = new Uint8Array(inputData.length / 8);
 
     // Iterate over each number in the array
     for (let i = 0; i < inputData.length; ++i) {
@@ -1758,10 +1761,8 @@ export function quantize_embeddings(tensor, precision) {
 
         // Pack the bit into the typed array
         outputData[arrayIndex] |= bit << (7 - bitPosition);
-        if (signed && bitPosition === 0) {
-            outputData[arrayIndex] -= 128;
-        }
     }
 
-    return new Tensor(dtype, outputData, [tensor.dims[0], tensor.dims[1] / 8]);
+    const data = signed ? new Int8Array(outputData.buffer) : outputData;
+    return new Tensor(dtype, data, [tensor.dims[0], tensor.dims[1] / 8]);
 }
