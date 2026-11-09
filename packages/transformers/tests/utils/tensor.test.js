@@ -384,7 +384,9 @@ describe("Tensor operations", () => {
       expect(mean_pooling(hidden, mask).data).toEqual(expected);
     });
 
-    it("should return NaN for a sequence with no attended tokens", () => {
+    it("currently returns NaN (0/0) for a sequence with no attended tokens", () => {
+      // Documents current behavior, not a requirement: sentence-transformers
+      // returns zeros here, and this may change to match it.
       const hidden = new Tensor("float32", [1, 2, 3, 4], [1, 2, 2]);
       const mask = new Tensor("int64", [0n, 0n], [1, 2]);
       expect(Array.from(mean_pooling(hidden, mask).data)).toEqual([NaN, NaN]);
@@ -511,7 +513,10 @@ describe("Tensor operations", () => {
       expect(Array.from(tensor.remainder_(0).data)).toEqual([NaN, NaN, NaN]);
     });
     it.each(["float32", "float64"])("should preserve small %s remainders with large same-sign divisors", (type) => {
-      for (const [divisor, values] of [[1e20, [1, 3]], [-1e20, [-1, -3]]]) {
+      for (const [divisor, values] of [
+        [1e20, [1, 3]],
+        [-1e20, [-1, -3]],
+      ]) {
         const tensor = new Tensor(type, values, [2]);
         expect(Array.from(tensor.remainder(divisor).data)).toEqual(values);
         expect(Array.from(tensor.data)).toEqual(values);
