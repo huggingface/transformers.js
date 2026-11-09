@@ -119,6 +119,12 @@ async function getSession(
             for (const key of names) {
                 preferredOutputLocation[key] = 'gpu-buffer';
             }
+            // Multimodal text models feed the embedding session directly into
+            // the decoder. Keep that tensor on the GPU instead of downloading
+            // it to the CPU and uploading it again on every generation step.
+            if (session_name === 'embed_tokens') {
+                preferredOutputLocation.inputs_embeds = 'gpu-buffer';
+            }
             session_options.preferredOutputLocation = preferredOutputLocation;
         }
     }

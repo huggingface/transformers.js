@@ -62,7 +62,7 @@ export const MODEL_SESSION_CONFIG = {
             if (config.is_encoder_decoder) s['model'] = 'encoder_model';
             return s;
         },
-        cache_sessions: { decoder_model_merged: true },
+        cache_sessions: { embed_tokens: true, decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
@@ -72,7 +72,7 @@ export const MODEL_SESSION_CONFIG = {
             if (!textOnly) s['audio_encoder'] = 'audio_encoder';
             return s;
         },
-        cache_sessions: { decoder_model_merged: true },
+        cache_sessions: { embed_tokens: true, decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
@@ -85,7 +85,7 @@ export const MODEL_SESSION_CONFIG = {
             }
             return s;
         },
-        cache_sessions: { decoder_model_merged: true },
+        cache_sessions: { embed_tokens: true, decoder_model_merged: true },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.Phi3V]: {

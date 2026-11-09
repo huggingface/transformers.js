@@ -6,6 +6,11 @@ describe("MODEL_SESSION_CONFIG", () => {
     expect(cache_sessions?.decoder_model_merged).toBe(true);
   });
 
+  it.each([MODEL_TYPES.ImageTextToText, MODEL_TYPES.AudioTextToText, MODEL_TYPES.ImageAudioTextToText])("should keep multimodal text embeddings on the GPU", (modelType) => {
+    const { cache_sessions } = getSessionsConfig(modelType, {});
+    expect(cache_sessions?.embed_tokens).toBe(true);
+  });
+
   it("should declare cache_sessions for every generating model type", () => {
     // Every model type that loads a generation config runs an autoregressive decode loop,
     // so at least one of its sessions must have its KV-cache outputs marked as cacheable
