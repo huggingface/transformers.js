@@ -87,11 +87,11 @@ export class Tensor {
      * - `new Tensor(dataType, data, dims)`, e.g. `new Tensor('float32', new Float32Array([1, 2, 3]), [3])`.
      * - `new Tensor(ortTensor)`.
      *
-     * @param {[DataType, DataArray, number[]]|[ONNXTensor]} args
+     * @param {[DataType, DataArray, number[]]|[import('onnxruntime-common').Tensor]} args
      */
     constructor(...args) {
         if (isONNXTensor(args[0])) {
-            this.ort_tensor = /** @type {ONNXTensor} */ (args[0]);
+            this.ort_tensor = /** @type {import('onnxruntime-common').Tensor} */ (args[0]);
         } else {
             // Create new tensor
             this.ort_tensor = new ONNXTensor(

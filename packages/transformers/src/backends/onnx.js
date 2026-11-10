@@ -20,7 +20,6 @@ import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
 import { logger } from '../utils/logger.js';
-export { Tensor } from 'onnxruntime-common';
 
 /**
  * @typedef {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig} ONNXExecutionProviders
@@ -156,6 +155,14 @@ export function getSupportedDevices() {
 
 // @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
+
+/**
+ * The Tensor class of the ONNX Runtime in use. It is taken from that runtime rather than imported from
+ * `onnxruntime-common`, because ONNX Runtime's builds bundle their own copy of `onnxruntime-common`:
+ * with a second copy, tensors created here fail the runtime's `instanceof` checks (see `isONNXTensor`).
+ * @type {typeof import('onnxruntime-common').Tensor}
+ */
+export const Tensor = ONNX.Tensor;
 
 /**
  * Map a device to the execution providers to use for the given device.
@@ -325,7 +332,7 @@ export async function runInferenceSession(session, ortFeed) {
  * @returns {boolean} Whether the object is an ONNX tensor.
  */
 export function isONNXTensor(x) {
-    return x instanceof ONNX.Tensor;
+    return x instanceof Tensor;
 }
 /** @type {import('onnxruntime-common').Env} */
 const ONNX_ENV = ONNX?.env;
