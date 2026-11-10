@@ -99,11 +99,16 @@ export class TextClassificationPipeline
         // @ts-expect-error TS2339
         const { problem_type, id2label } = this.model.config;
 
+        // Same choice as the Python pipeline: raw scores for regression, sigmoid for multi-label
+        // and single-logit heads (e.g. cross-encoders), softmax otherwise.
+        const num_labels = outputs.logits.dims.at(-1);
         // TODO: Use softmax tensor function
         const function_to_apply =
-            problem_type === 'multi_label_classification'
-                ? (batch) => batch.sigmoid()
-                : (batch) => new Tensor('float32', softmax(batch.data), batch.dims); // single_label_classification (default)
+            problem_type === 'regression'
+                ? (batch) => batch
+                : problem_type === 'multi_label_classification' || num_labels === 1
+                  ? (batch) => batch.sigmoid()
+                  : (batch) => new Tensor('float32', softmax(batch.data), batch.dims); // single_label_classification (default)
 
         const toReturn = [];
         for (const batch of outputs.logits) {
