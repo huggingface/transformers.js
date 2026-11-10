@@ -1,4 +1,4 @@
-import { cat, mean, Tensor, stack, std_mean } from '../../utils/tensor.js';
+import { Tensor, std_mean } from '../../utils/tensor.js';
 import { PreTrainedModel } from '../modeling_utils.js';
 import { WhisperGenerationConfig } from './generation_whisper.js';
 import { whisper_language_to_code } from './common_whisper.js';
@@ -9,7 +9,6 @@ import {
     WhisperTimeStampLogitsProcessor,
 } from '../../generation/logits_process.js';
 import { medianFilter, dynamic_time_warping } from '../../utils/maths.js';
-import { mergeArrays } from '../../utils/core.js';
 import { ModelOutput } from '../modeling_outputs.js';
 import { logger } from '../../utils/logger.js';
 
@@ -116,21 +115,29 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         ...kwargs
     }) {
         generation_config = this._prepare_generation_config(generation_config, kwargs);
+        const public_attentions = generation_config.output_attentions;
 
         const init_tokens =
             kwargs.decoder_input_ids instanceof Tensor
                 ? prepareTensorForDecode(kwargs.decoder_input_ids)
                 : (kwargs.decoder_input_ids ?? this._retrieve_init_tokens(generation_config));
 
+        const prefix = /** @type {number[]} */ (Array.isArray(init_tokens[0]) ? init_tokens[0] : init_tokens);
+        const prefix_length = prefix.length;
+        const batch_size = /** @type {Tensor} */ (inputs ?? kwargs.input_features)?.dims[0] ?? 1;
+        const decoder_input_ids = Array.isArray(init_tokens[0])
+            ? /** @type {number[][]} */ (init_tokens)
+            : Array.from({ length: batch_size }, () => [...prefix]);
+
         if (generation_config.return_timestamps) {
             logits_processor ??= new LogitsProcessorList();
-            logits_processor.push(new WhisperTimeStampLogitsProcessor(generation_config, init_tokens));
+            logits_processor.push(new WhisperTimeStampLogitsProcessor(generation_config, prefix));
         }
 
         if (generation_config.begin_suppress_tokens) {
             logits_processor ??= new LogitsProcessorList();
             logits_processor.push(
-                new SuppressTokensAtBeginLogitsProcessor(generation_config.begin_suppress_tokens, init_tokens.length),
+                new SuppressTokensAtBeginLogitsProcessor(generation_config.begin_suppress_tokens, prefix_length),
             );
         }
 
@@ -146,6 +153,8 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 logger.warn("Token-level timestamps may not be reliable for task 'translate'.");
             }
 
+            kwargs.output_attentions = true;
+            kwargs.return_dict_in_generate = true;
             generation_config.output_attentions = true;
             generation_config.return_dict_in_generate = true;
         }
@@ -154,12 +163,24 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         // This matches Python's WhisperForConditionalGeneration.generate() which uses a seek loop
         // to handle audio that the model doesn't fully transcribe in a single pass.
         // Skip the seek loop when max_new_tokens is explicitly set (e.g., for prefix token tests).
-        if (generation_config.return_timestamps && !kwargs.max_new_tokens) {
+        if (generation_config.return_timestamps && !generation_config.max_new_tokens) {
+            if (
+                /** @type {Tensor} */ (inputs ?? kwargs.input_features)?.dims[0] !== 1 ||
+                generation_config.num_return_sequences !== 1
+            ) {
+                throw new Error(
+                    'Whisper seek generation supports only a single input and a single returned sequence. Set max_new_tokens for short-form batch/multiple returns.',
+                );
+            }
+            if (public_attentions)
+                throw new Error(
+                    'Whisper seek generation does not expose public per-step attentions; use short-form generation.',
+                );
             return this._generate_with_seek({
-                inputs,
+                inputs: inputs ?? kwargs.input_features,
                 generation_config,
                 logits_processor,
-                init_tokens,
+                init_tokens: prefix,
                 kwargs,
             });
         }
@@ -168,19 +189,41 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             inputs,
             generation_config,
             logits_processor,
-            decoder_input_ids: init_tokens,
             ...kwargs,
+            decoder_input_ids,
         });
 
         if (generation_config.return_token_timestamps) {
-            outputs['token_timestamps'] = this._extract_token_timestamps(
-                // @ts-expect-error TS2345
-                outputs,
-                generation_config.alignment_heads,
-                generation_config.num_frames,
-                0.02,
-                init_tokens.length,
-            );
+            let aligned = false;
+            outputs['num_beams'] = generation_config.num_beams;
+            try {
+                for (const step of outputs['cross_attentions'] ?? [])
+                    for (const tensor of step) await tensor.ort_tensor.getData(false);
+                outputs['token_timestamps'] = this._extract_token_timestamps(
+                    // @ts-expect-error TS2345
+                    outputs,
+                    generation_config.alignment_heads,
+                    Array.isArray(generation_config.num_frames)
+                        ? generation_config.num_frames.map((x) => Math.floor(x / 2))
+                        : generation_config.num_frames == null
+                          ? null
+                          : Math.floor(generation_config.num_frames / 2),
+                    0.02,
+                    prefix_length,
+                );
+                aligned = true;
+            } finally {
+                if (!public_attentions || !aligned) {
+                    for (const key of ['cross_attentions', 'decoder_attentions', 'encoder_attentions']) {
+                        for (const step of outputs[key] ?? []) for (const tensor of step) tensor.dispose();
+                        delete outputs[key];
+                    }
+                }
+                if (!aligned) {
+                    await outputs['past_key_values']?.dispose();
+                    for (const value of Object.values(outputs)) if (value instanceof Tensor) value.dispose();
+                }
+            }
         }
 
         return outputs;
@@ -200,8 +243,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         const return_token_timestamps = generation_config.return_token_timestamps;
 
         // input_features shape: [batch=1, n_mels, total_frames]
-        const input_features = inputs;
-        const total_frames = input_features.dims[2];
+        const input_features = inputs ?? kwargs.input_features;
+        const total_frames = Math.min(
+            input_features.dims[2],
+            (Array.isArray(generation_config.num_frames)
+                ? generation_config.num_frames[0]
+                : generation_config.num_frames) ?? Infinity,
+        );
 
         // The encoder downsamples by input_stride (=2 for whisper), so:
         //   num_segment_frames = input_stride * max_source_positions = 3000 mel frames per segment
@@ -218,7 +266,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         while (seek < total_frames) {
             // Slice input features for this segment
             const seek_end = Math.min(seek + num_segment_frames, total_frames);
-            const segment_input = input_features.slice(null, null, [seek, seek_end]);
+            // Keep the feature extractor's normalized silence padding. Valid audio
+            // frames bound seek/alignment, but replacing existing padded features
+            // with zeros changes the encoder input (zero is not log-mel silence).
+            const segment_input = input_features.slice(null, null, [
+                seek,
+                Math.min(seek + num_segment_frames, input_features.dims[2]),
+            ]);
 
             // Pad to full segment size if needed (whisper expects fixed-length input)
             let segment_features;
@@ -226,11 +280,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             if (segment_frames < num_segment_frames) {
                 const n_mels = input_features.dims[1];
                 const padded_data = new Float32Array(n_mels * num_segment_frames);
-                const src = /** @type {Float32Array} */ (segment_input.data);
+                const numeric_segment = segment_input.to('float32');
+                const src = /** @type {Float32Array} */ (numeric_segment.data);
                 // Copy each mel band row separately to handle the stride difference
                 for (let m = 0; m < n_mels; ++m) {
                     padded_data.set(src.subarray(m * segment_frames, (m + 1) * segment_frames), m * num_segment_frames);
                 }
+                if (numeric_segment !== segment_input) numeric_segment.dispose();
                 segment_features = new Tensor('float32', padded_data, [1, n_mels, num_segment_frames]);
             } else {
                 segment_features = segment_input;
@@ -245,105 +301,132 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 }
             }
 
-            const outputs = /** @type {any} */ (
-                await super.generate({
-                    inputs: segment_features,
+            /** @type {any} */
+            let outputs;
+            try {
+                outputs = await super.generate({
                     generation_config,
                     logits_processor,
-                    decoder_input_ids: init_tokens,
                     ...kwargs,
-                })
-            );
-
-            // Extract tokens (skip init_tokens prefix)
-            const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
-            const generated_tokens = raw_sequence[0].tolist().map(Number).slice(init_tokens.length);
-
-            // Extract token-level timestamps for this seek pass if needed
-            let seek_token_timestamps;
-            if (return_token_timestamps) {
-                outputs['token_timestamps'] = this._extract_token_timestamps(
-                    outputs,
-                    generation_config.alignment_heads,
-                    Math.floor((seek_end - seek) / input_stride),
-                    0.02,
-                    init_tokens.length,
-                );
-                const time_offset = (seek / input_stride) * 0.02;
-                seek_token_timestamps = outputs.token_timestamps[0]
-                    .tolist()
-                    .slice(init_tokens.length)
-                    .map((/** @type {number} */ t) => t + time_offset);
+                    decoder_input_ids: init_tokens,
+                    input_features: segment_features,
+                });
+            } finally {
+                segment_features.dispose();
+                if (segment_features !== segment_input) segment_input.dispose();
             }
 
-            // Remove trailing EOS
-            if (generated_tokens.length > 0 && generated_tokens.at(-1) === eos_token_id) {
-                generated_tokens.pop();
-            }
+            try {
+                // Extract tokens (skip init_tokens prefix)
+                const raw_sequence = outputs.sequences ?? outputs;
+                const generated_tokens = raw_sequence[0].tolist().map(Number).slice(init_tokens.length);
 
-            if (generated_tokens.length === 0) {
-                // No tokens generated — skip the rest of the audio
-                break;
-            }
-
-            // Determine seek advancement using the same logic as Python's _retrieve_segment:
-            // 1. Find consecutive timestamp token pairs (segment boundaries)
-            // 2. If the sequence ends with a single timestamp (no speech after it),
-            //    consume all remaining frames in this segment
-            // 3. Otherwise, seek to the last complete segment boundary
-            const is_timestamp = generated_tokens.map((t) => t >= timestamp_begin);
-
-            // Check for single_timestamp_ending: last token is timestamp, second-to-last is not
-            const single_timestamp_ending =
-                generated_tokens.length >= 2 &&
-                is_timestamp[generated_tokens.length - 1] &&
-                !is_timestamp[generated_tokens.length - 2];
-
-            // Find consecutive timestamp pairs (segment boundaries)
-            const segment_boundary_indices = [];
-            for (let i = 0; i < generated_tokens.length - 1; ++i) {
-                if (is_timestamp[i] && is_timestamp[i + 1]) {
-                    segment_boundary_indices.push(i + 1); // index of the second token in the pair
+                // Remove trailing EOS
+                if (generated_tokens.length > 0 && generated_tokens.at(-1) === eos_token_id) {
+                    generated_tokens.pop();
                 }
-            }
 
-            let segment_offset;
-            let tokens_to_keep = generated_tokens.length;
-            if (segment_boundary_indices.length > 0) {
-                if (single_timestamp_ending) {
-                    // Ends with a single timestamp after the last pair — no more speech
-                    segment_offset = seek_end - seek;
+                if (generated_tokens.length === 0) {
+                    // No tokens generated — skip the rest of the audio
+                    break;
+                }
+
+                // Determine seek advancement using the same logic as Python's _retrieve_segment:
+                // 1. Find consecutive timestamp token pairs (segment boundaries)
+                // 2. If the sequence ends with a single timestamp (no speech after it),
+                //    consume all remaining frames in this segment
+                // 3. Otherwise, seek to the last complete segment boundary
+                const is_timestamp = generated_tokens.map((t) => t >= timestamp_begin);
+
+                // Check for single_timestamp_ending: last token is timestamp, second-to-last is not
+                const single_timestamp_ending =
+                    generated_tokens.length >= 2 &&
+                    is_timestamp[generated_tokens.length - 1] &&
+                    !is_timestamp[generated_tokens.length - 2];
+
+                // Find consecutive timestamp pairs (segment boundaries)
+                const segment_boundary_indices = [];
+                for (let i = 0; i < generated_tokens.length - 1; ++i) {
+                    if (is_timestamp[i] && is_timestamp[i + 1]) {
+                        segment_boundary_indices.push(i + 1); // index of the second token in the pair
+                    }
+                }
+
+                let segment_offset;
+                let tokens_to_keep = generated_tokens.length;
+                if (segment_boundary_indices.length > 0) {
+                    if (single_timestamp_ending) {
+                        // Ends with a single timestamp after the last pair — no more speech
+                        segment_offset = seek_end - seek;
+                    } else {
+                        // Ends mid-segment — seek to the last pair's end timestamp
+                        // Discard tokens after the last pair (they're from an incomplete segment)
+                        // Keep up to the first token of the last pair (the end-of-segment timestamp),
+                        // excluding the second token (the start-of-next-segment marker)
+                        const last_boundary = segment_boundary_indices.at(-1);
+                        const last_ts_pos = generated_tokens[last_boundary - 1] - timestamp_begin;
+                        segment_offset = last_ts_pos * input_stride;
+                        tokens_to_keep = last_boundary;
+                    }
                 } else {
-                    // Ends mid-segment — seek to the last pair's end timestamp
-                    // Discard tokens after the last pair (they're from an incomplete segment)
-                    // Keep up to the first token of the last pair (the end-of-segment timestamp),
-                    // excluding the second token (the start-of-next-segment marker)
-                    const last_boundary = segment_boundary_indices.at(-1);
-                    const last_ts_pos = generated_tokens[last_boundary - 1] - timestamp_begin;
-                    segment_offset = last_ts_pos * input_stride;
-                    tokens_to_keep = last_boundary;
+                    // No consecutive pairs found — consume entire segment
+                    segment_offset = seek_end - seek;
                 }
-            } else {
-                // No consecutive pairs found — consume entire segment
-                segment_offset = seek_end - seek;
-            }
 
-            // Offset timestamp tokens by the current seek position so they're
-            // monotonically increasing across segments. Cap at the maximum valid
-            // timestamp token (30.00s = 1500 positions) to stay within the token vocab.
-            const timestamp_offset = Math.floor(seek / input_stride);
-            const max_timestamp_token = timestamp_begin + 1500;
-            for (let i = 0; i < tokens_to_keep; ++i) {
-                if (generated_tokens[i] >= timestamp_begin) {
-                    generated_tokens[i] = Math.min(generated_tokens[i] + timestamp_offset, max_timestamp_token);
+                // Align only the retained segment, before normalization and DTW.
+                // Every retained token uses the query that predicted it; do not
+                // include the next segment token in normalization.
+                let seek_token_timestamps;
+                if (return_token_timestamps) {
+                    outputs.num_beams = generation_config.num_beams;
+                    const valid_length = Math.min(
+                        Number(outputs.sequence_lengths?.data[0] ?? raw_sequence.dims[1]),
+                        init_tokens.length + tokens_to_keep,
+                    );
+                    outputs.sequence_lengths?.dispose();
+                    outputs.sequence_lengths = new Tensor('int64', [BigInt(valid_length)], [1]);
+                    for (const step of outputs.cross_attentions ?? [])
+                        for (const tensor of step) await tensor.ort_tensor.getData(false);
+                    outputs.token_timestamps = this._extract_token_timestamps(
+                        outputs,
+                        generation_config.alignment_heads,
+                        Math.floor(segment_offset / input_stride),
+                        0.02,
+                        init_tokens.length,
+                    );
+                    const time_offset = (seek / input_stride) * 0.02;
+                    seek_token_timestamps = outputs.token_timestamps[0]
+                        .tolist()
+                        .slice(init_tokens.length)
+                        .map((t) => t + time_offset);
                 }
-            }
 
-            allTokens.push(...generated_tokens.slice(0, tokens_to_keep));
-            if (seek_token_timestamps) {
-                allTokenTimestamps.push(...seek_token_timestamps.slice(0, tokens_to_keep));
+                // Offset timestamp tokens by the current seek position so they're
+                // monotonically increasing across segments. Cap at the maximum valid
+                // timestamp token (30.00s = 1500 positions) to stay within the token vocab.
+                const timestamp_offset = Math.floor(seek / input_stride);
+                const max_timestamp_token = timestamp_begin + 1500;
+                for (let i = 0; i < tokens_to_keep; ++i) {
+                    if (generated_tokens[i] >= timestamp_begin) {
+                        generated_tokens[i] = Math.min(generated_tokens[i] + timestamp_offset, max_timestamp_token);
+                    }
+                }
+
+                allTokens.push(...generated_tokens.slice(0, tokens_to_keep));
+                if (seek_token_timestamps) {
+                    allTokenTimestamps.push(...seek_token_timestamps.slice(0, tokens_to_keep));
+                }
+                if (segment_offset <= 0 || segment_offset > seek_end - seek)
+                    throw new Error('Whisper returned an invalid seek offset.');
+                seek += segment_offset;
+            } finally {
+                for (const key of ['cross_attentions', 'decoder_attentions', 'encoder_attentions']) {
+                    for (const step of outputs[key] ?? []) for (const tensor of step) tensor.dispose();
+                }
+                await outputs.past_key_values?.dispose();
+                if (outputs instanceof Tensor) outputs.dispose();
+                else for (const value of Object.values(outputs)) if (value instanceof Tensor) value.dispose();
             }
-            seek += segment_offset;
         }
 
         // Add EOS back
@@ -355,7 +438,11 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             // Return dict format with sequences and token_timestamps
             const sequences = new Tensor('int64', full_sequence.map(BigInt), [1, full_sequence.length]);
             // Pad token_timestamps to match full_sequence (init_tokens get 0.0)
-            const full_timestamps = [...new Array(init_tokens.length).fill(0), ...allTokenTimestamps, 0];
+            const full_timestamps = [
+                ...new Array(init_tokens.length).fill(0),
+                ...allTokenTimestamps,
+                allTokenTimestamps.at(-1) ?? 0,
+            ];
             const token_timestamps = new Tensor('float32', new Float32Array(full_timestamps), [
                 1,
                 full_timestamps.length,
@@ -371,9 +458,12 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
      * If `num_frames` is specified, the encoder-decoder cross-attentions will be cropped before applying DTW.
      * @param {Object} generate_outputs Outputs generated by the model
      * @param {Tensor[][]} generate_outputs.cross_attentions The cross attentions output by the model
+     * @param {Tensor} [generate_outputs.beam_indices] Global parent row for each generated token; padded with -1.
+     * @param {Tensor} [generate_outputs.sequence_lengths] Valid sequence lengths including the prefix and EOS.
+     * @param {number} [generate_outputs.num_beams] Beam count per input.
      * @param {Tensor} generate_outputs.sequences The sequences output by the model
      * @param {number[][]} alignment_heads Alignment heads of the model
-     * @param {number} [num_frames=null] Number of frames in the input audio.
+     * @param {number|number[]} [num_frames=null] Valid encoder frames (20 ms each), per input or shared.
      * @param {number} [time_precision=0.02] Precision of the timestamps in seconds
      * @param {number} [num_input_ids=0] Number of decoder input ids (prefix tokens) to skip in DTW
      * @returns {Tensor} tensor containing the timestamps in seconds for each predicted token
@@ -405,106 +495,81 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             median_filter_width = 7;
         }
 
-        // TODO: Improve batch processing
-        const batch = generate_outputs.cross_attentions;
-        // Create a list with `decoder_layers` elements, each a tensor of shape
-        // (batch size, attention_heads, output length, input length).
-        const cross_attentions = Array.from(
-            // @ts-expect-error TS2339
-            { length: this.config.decoder_layers },
-            // Concatenate the cross attentions for each layer across sequence length dimension.
-            (_, i) =>
-                cat(
-                    batch.map((x) => x[i]),
-                    2,
-                ),
-        );
-
-        const weights = stack(
-            alignment_heads.map(([l, h]) => {
-                if (l >= cross_attentions.length) {
-                    throw new Error(
-                        `Layer index ${l} is out of bounds for cross attentions (length ${cross_attentions.length}).`,
-                    );
-                }
-                return num_frames
-                    ? cross_attentions[l].slice(null, h, null, [0, num_frames])
-                    : cross_attentions[l].slice(null, h);
-            }),
-        ).permute(1, 0, 2, 3);
-
-        const [std, calculatedMean] = std_mean(weights, -2, 0, true);
-
-        // Normalize and smoothen the weights.
-        const smoothedWeights = weights.clone(); // [1, 8, seqLength, 1500]
-
-        for (let a = 0; a < smoothedWeights.dims[0]; ++a) {
-            const aTensor = smoothedWeights[a]; // [8, seqLength, 1500]
-
-            for (let b = 0; b < aTensor.dims[0]; ++b) {
-                const bTensor = aTensor[b]; // [seqLength, 1500]
-
-                const stdTensorData = std[a][b][0].data; // [1500]
-                const meanTensorData = calculatedMean[a][b][0].data; // [1500]
-
-                for (let c = 0; c < bTensor.dims[0]; ++c) {
-                    let cTensorData = bTensor[c].data; // [1500]
-                    for (let d = 0; d < cTensorData.length; ++d) {
-                        cTensorData[d] = (cTensorData[d] - meanTensorData[d]) / stdTensorData[d];
+        if (!alignment_heads.length) throw new Error('Timestamp alignment requires at least one attention head.');
+        const steps = generate_outputs.cross_attentions;
+        const shape = generate_outputs.sequences.dims;
+        const timestamps = new Tensor('float32', new Float32Array(shape[0] * shape[1]), shape);
+        const ancestry = generate_outputs.beam_indices?.tolist();
+        const lengths = generate_outputs.sequence_lengths?.tolist();
+        for (let result = 0; result < shape[0]; ++result) {
+            const valid = lengths ? Number(lengths[result]) : shape[1];
+            const generated = valid - num_input_ids;
+            // Each forward predicts one generated token, including EOS. The last
+            // prefill query predicts the first token (the convention in PR #1809).
+            const queries = Math.max(0, generated);
+            if (!queries) continue;
+            const firstRow = ancestry ? Number(ancestry[result][0]) : result;
+            const inputIndex = Math.floor(firstRow / (generate_outputs.num_beams ?? 1));
+            const requestedFrames = Array.isArray(num_frames) ? num_frames[inputIndex] : num_frames;
+            const frames = Math.min(steps[0][alignment_heads[0][0]].dims[3], requestedFrames ?? Infinity);
+            if (!Number.isInteger(frames) || frames <= 0)
+                throw new Error('Timestamp encoder frame count must be positive.');
+            const matrix = Array.from({ length: queries }, () => new Float32Array(frames));
+            for (const [layer, head] of alignment_heads) {
+                const weights = [];
+                for (let step = 0; step < queries; ++step) {
+                    const source = steps[step]?.[layer];
+                    if (!source || head >= source.dims[1])
+                        throw new Error('Missing timestamp alignment attention head or step.');
+                    const row = ancestry ? Number(ancestry[result][step]) : result;
+                    if (row < 0 || row >= source.dims[0]) throw new Error('Invalid timestamp beam ancestry.');
+                    // Preserve original prefill rows for normalization. Uncached later
+                    // forwards repeat the prefix: take only their final query.
+                    const firstQuery = step === 0 ? 0 : source.dims[2] - 1;
+                    for (let query = firstQuery; query < source.dims[2]; ++query) {
+                        const offset = ((row * source.dims[1] + head) * source.dims[2] + query) * source.dims[3];
+                        const selected = new Tensor(source.type, source.data.slice(offset, offset + frames), [frames]);
+                        const numeric = selected.to('float32');
+                        weights.push(Float32Array.from(numeric.data));
+                        if (numeric !== selected) numeric.dispose();
+                        selected.dispose();
                     }
-
-                    // Apply median filter.
-                    cTensorData.set(medianFilter(cTensorData, median_filter_width));
+                }
+                // Normalize before cropping prompt rows, matching PR #1809's
+                // single-beam algorithm while excluding other hypotheses and padding.
+                const allWeights = new Tensor('float32', Float32Array.from(weights.flatMap((row) => Array.from(row))), [
+                    weights.length,
+                    frames,
+                ]);
+                const [std, average] = std_mean(allWeights, 0, 0);
+                for (const row of weights) {
+                    for (let frame = 0; frame < frames; ++frame) {
+                        row[frame] = std.data[frame] > 0 ? (row[frame] - average.data[frame]) / std.data[frame] : 0;
+                    }
+                }
+                allWeights.dispose();
+                std.dispose();
+                average.dispose();
+                const skipped = weights.length - queries;
+                for (let token = 0; token < queries; ++token) {
+                    // Python leaves recordings too short for reflection padding unchanged.
+                    const filtered =
+                        frames <= Math.floor(median_filter_width / 2)
+                            ? weights[skipped + token]
+                            : medianFilter(weights[skipped + token], median_filter_width);
+                    for (let frame = 0; frame < frames; ++frame) matrix[token][frame] += filtered[frame];
                 }
             }
-        }
-
-        // Skip decoder_input_ids in the cross-attention weights
-        const croppedWeights =
-            num_input_ids > 0
-                ? smoothedWeights.slice(null, null, [num_input_ids, smoothedWeights.dims[2]], null)
-                : smoothedWeights;
-
-        // Average the different cross-attention heads.
-        const batchedMatrices = [mean(croppedWeights, 1)];
-
-        const timestampsShape = generate_outputs.sequences.dims;
-
-        const timestamps = new Tensor(
-            'float32',
-            new Float32Array(timestampsShape[0] * timestampsShape[1]),
-            timestampsShape,
-        );
-
-        // Perform dynamic time warping on each element of the batch.
-        for (let batch_idx = 0; batch_idx < timestampsShape[0]; ++batch_idx) {
-            // NOTE: Since we run only one batch at a time, we can squeeze to get the same dimensions
-            // as the python implementation
-            const matrix = batchedMatrices[batch_idx].neg().squeeze_(0);
-            const [text_indices, time_indices] = dynamic_time_warping(matrix.tolist());
-
-            const diffs = Array.from(
-                { length: text_indices.length - 1 },
-                (v, i) => text_indices[i + 1] - text_indices[i],
+            const [text, times] = dynamic_time_warping(
+                matrix.map((row) => Array.from(row, (value) => -Math.fround(value / alignment_heads.length))),
             );
-            const jumps = mergeArrays([1], diffs).map((x) => !!x); // convert to boolean
-
-            const jump_times = [];
-            for (let i = 0; i < jumps.length; ++i) {
-                if (jumps[i]) {
-                    // NOTE: No point in rounding here, since we set to Float32Array later
-                    jump_times.push(time_indices[i] * time_precision);
+            let last = 0;
+            for (let i = 0; i < text.length; ++i) {
+                if (i === 0 || text[i] !== text[i - 1]) {
+                    last = times[i] * time_precision;
+                    timestamps.data[result * shape[1] + num_input_ids + text[i]] = last;
                 }
             }
-
-            // Pad with num_input_ids zeros at the start (for prefix tokens),
-            // then DTW jump_times, then duplicate last value (for eos token)
-            const padded = new Array(num_input_ids).fill(0);
-            padded.push(...jump_times);
-            if (jump_times.length > 0) {
-                padded.push(jump_times.at(-1));
-            }
-            timestamps[batch_idx].data.set(padded);
         }
 
         return timestamps;
