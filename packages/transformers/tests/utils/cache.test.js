@@ -110,6 +110,15 @@ describe("Cache", () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it(
+        "should include a standalone chat template file",
+        async () => {
+          const files = await ModelRegistry.get_tokenizer_files("LiquidAI/LFM3-1.7B");
+          expect(files).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     describe("get_processor_files", () => {
