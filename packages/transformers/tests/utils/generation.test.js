@@ -10,10 +10,15 @@ import {
 
   // Other
   TextStreamer,
+  LogitsProcessor,
   DynamicCache,
   StoppingCriteria,
   random,
   full,
+  BeamSearchScorer,
+  BeamHypotheses,
+  PreTrainedModel,
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -613,5 +618,390 @@ describe("PKV caching", () => {
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+});
+
+describe("Beam cache reordering", () => {
+  it("preserves DynamicCache methods and reorders decoder rows within each batch", async () => {
+    const decoder = new Tensor("float32", [1, 2, 3, 4], [4, 1, 1, 1]);
+    const encoder = new Tensor("float32", [10, 10, 20, 20], [4, 1, 1, 1]);
+    const cache = new DynamicCache({
+      "past_key_values.0.decoder.key": decoder,
+      "past_key_values.0.encoder.key": encoder,
+    });
+    const reordered = await PreTrainedModel.prototype._reorder_cache(cache, [1, 1, 3, 2]);
+    expect(reordered).toBeInstanceOf(DynamicCache);
+    expect(reordered.get_seq_length()).toBe(1);
+    expect(Array.from(reordered["past_key_values.0.decoder.key"].data)).toEqual([2, 2, 4, 3]);
+    expect(reordered["past_key_values.0.encoder.key"]).toBe(encoder);
+    reordered.update({ "past_key_values.0.decoder.key": full([4, 1, 2, 1], 0.0) });
+    expect(reordered.get_seq_length()).toBe(2);
+    await reordered.dispose();
+  });
+});
+
+describe("Flattened beam caches", () => {
+  it("preserves all attention heads when cache batch and heads share an axis", async () => {
+    const key = "past_key_values.0.key";
+    const model = {
+      _get_cache_indices: PreTrainedModel.prototype._get_cache_indices,
+      config: { normalized_config: { num_heads: 2 } },
+      sessions: { model: { inputMetadata: [{ name: key, shape: ["batch_size x num_heads", 1, 1] }] } },
+    };
+    const cache = new DynamicCache({ [key]: new Tensor("float32", [10, 11, 20, 21, 30, 31, 40, 41], [8, 1, 1]) });
+    const reordered = await PreTrainedModel.prototype._reorder_cache.call(model, cache, [1, 1, 3, 2]);
+    expect(Array.from(reordered[key].data)).toEqual([20, 21, 20, 21, 40, 41, 30, 31]);
+    expect(reordered[key].dims).toEqual([8, 1, 1]);
+  });
+});
+
+describe("Beam search", () => {
+  describe(`encoder-decoder`, () => {
+    const model_id = "hf-internal-testing/tiny-random-T5ForConditionalGeneration";
+    const DUMMY_TEXT = "hello";
+
+    let model;
+    let tokenizer;
+    beforeAll(async () => {
+      model = await AutoModelForSeq2SeqLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "basic beam search (num_beams=4)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2); // at least BOS + 1 token
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6); // at most BOS + 5 tokens
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "diverse beam search (num_beam_groups=2)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_beam_groups: 2,
+          diversity_penalty: 0.5,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len] (1 return sequence)
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(2);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(6);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([
+      ["standard", {}],
+      ["diverse", { num_beam_groups: 2, diversity_penalty: 0.5 }],
+    ])(
+      "%s beam search keeps batch items independent",
+      async (_name, options) => {
+        tokenizer.padding_side = "left";
+        const texts = ["hello", "a longer input"];
+        const inputs = tokenizer(texts, { padding: true });
+        const config = { num_beams: 4, num_return_sequences: 2, max_new_tokens: 3, ...options };
+        const batched = await model.generate({ ...inputs, ...config, return_dict_in_generate: true });
+        expect(batched.past_key_values).toBeNull();
+        expect(batched.sequences.dims[0]).toBe(4);
+        for (let i = 0; i < texts.length; ++i) {
+          const single = await model.generate({ ...tokenizer(texts[i]), ...config });
+          const tail = (rows) => rows.map((row) => row.slice(-3));
+          expect(tail(batched.sequences.tolist().slice(i * 2, i * 2 + 2))).toEqual(tail(single.tolist()));
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([1, 4])(
+      "samples distinct first-step candidates reproducibly with top_k=%i",
+      async (top_k) => {
+        const config = { num_beams: 4, num_return_sequences: 4, do_sample: true, top_k, max_new_tokens: 1, eos_token_id: null };
+        random.seed(42);
+        const first = await model.generate({ ...tokenizer(DUMMY_TEXT), ...config });
+        random.seed(42);
+        const second = await model.generate({ ...tokenizer(DUMMY_TEXT), ...config });
+        expect(first.tolist()).toEqual(second.tolist());
+        expect(new Set(first.tolist().map((row) => row.at(-1))).size).toBe(4);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "passes log probabilities to beam logits processors",
+      async () => {
+        const normalizers = [];
+        class InspectScores extends LogitsProcessor {
+          _call(input_ids, scores) {
+            for (let i = 0; i < input_ids.length; ++i) {
+              normalizers.push(Array.from(scores[i].data).reduce((sum, score) => sum + Math.exp(score), 0));
+            }
+            return scores;
+          }
+        }
+        await model.generate({ ...tokenizer(DUMMY_TEXT), num_beams: 2, max_new_tokens: 2, logits_processor: [new InspectScores()] });
+        expect(normalizers.length).toBe(4);
+        for (const value of normalizers) expect(value).toBeCloseTo(1, 5);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "num_return_sequences > 1",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_return_sequences: 3,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [3, seq_len]
+        expect(outputs.dims[0]).toEqual(3);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam search and greedy both produce a sequence",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const greedy_outputs = await model.generate({
+          ...inputs,
+          max_new_tokens: 5,
+        });
+        const beam_outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Both should succeed and produce valid tensors
+        expect(greedy_outputs.dims[0]).toEqual(1);
+        expect(beam_outputs.dims[0]).toEqual(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam search rejects classifier-free guidance",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        await expect(
+          model.generate({
+            ...inputs,
+            num_beams: 4,
+            guidance_scale: 2,
+            max_new_tokens: 5,
+          }),
+        ).rejects.toThrow("Classifier-free guidance (guidance_scale > 1) is not supported with beam search.");
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe(`decoder-only`, () => {
+    const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
+    const DUMMY_TEXT = "hello";
+
+    let model;
+    let tokenizer;
+    beforeAll(async () => {
+      model = await AutoModelForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await AutoTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "basic beam search (num_beams=4)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        // seq_len = prompt_len + generated (up to max_new_tokens)
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3); // at least BOS + prompt + 1 token
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7); // at most BOS + prompt + 5 tokens
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "diverse beam search (num_beam_groups=2)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_beam_groups: 2,
+          diversity_penalty: 0.5,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "beam sampling (do_sample=true)",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          do_sample: true,
+          top_k: 10,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [1, seq_len]
+        expect(outputs.dims[0]).toEqual(1);
+        expect(outputs.dims[1]).toBeGreaterThanOrEqual(3);
+        expect(outputs.dims[1]).toBeLessThanOrEqual(7);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([
+      ["standard", {}],
+      ["diverse", { num_beam_groups: 2, diversity_penalty: 0.5 }],
+    ])(
+      "%s beam search keeps batch items independent",
+      async (_name, options) => {
+        tokenizer.padding_side = "left";
+        const texts = ["hello", "a longer input"];
+        const inputs = tokenizer(texts, { padding: true });
+        const config = { num_beams: 4, num_return_sequences: 2, max_new_tokens: 3, ...options };
+        const batched = await model.generate({ ...inputs, ...config, return_dict_in_generate: true });
+        expect(batched.past_key_values).toBeNull();
+        expect(batched.sequences.dims[0]).toBe(4);
+        for (let i = 0; i < texts.length; ++i) {
+          const single = await model.generate({ ...tokenizer(texts[i]), ...config });
+          const tail = (rows) => rows.map((row) => row.slice(-3));
+          expect(tail(batched.sequences.tolist().slice(i * 2, i * 2 + 2))).toEqual(tail(single.tolist()));
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it.each([1, 4])(
+      "samples distinct first-step candidates reproducibly with top_k=%i",
+      async (top_k) => {
+        const config = { num_beams: 4, num_return_sequences: 4, do_sample: true, top_k, max_new_tokens: 1, eos_token_id: null };
+        random.seed(42);
+        const first = await model.generate({ ...tokenizer(DUMMY_TEXT), ...config });
+        random.seed(42);
+        const second = await model.generate({ ...tokenizer(DUMMY_TEXT), ...config });
+        expect(first.tolist()).toEqual(second.tolist());
+        expect(new Set(first.tolist().map((row) => row.at(-1))).size).toBe(4);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "passes log probabilities to beam logits processors",
+      async () => {
+        const normalizers = [];
+        class InspectScores extends LogitsProcessor {
+          _call(input_ids, scores) {
+            for (let i = 0; i < input_ids.length; ++i) {
+              normalizers.push(Array.from(scores[i].data).reduce((sum, score) => sum + Math.exp(score), 0));
+            }
+            return scores;
+          }
+        }
+        await model.generate({ ...tokenizer(DUMMY_TEXT), num_beams: 2, max_new_tokens: 2, logits_processor: [new InspectScores()] });
+        expect(normalizers.length).toBe(4);
+        for (const value of normalizers) expect(value).toBeCloseTo(1, 5);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "num_return_sequences > 1",
+      async () => {
+        const inputs = tokenizer(DUMMY_TEXT);
+        const outputs = await model.generate({
+          ...inputs,
+          num_beams: 4,
+          num_return_sequences: 3,
+          max_new_tokens: 5,
+        });
+        // Output should have shape [3, seq_len]
+        expect(outputs.dims[0]).toEqual(3);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "expands a supplied cache and position IDs across beams",
+      async () => {
+        const { sequences, past_key_values } = await model.generate({ ...tokenizer(DUMMY_TEXT), max_new_tokens: 3, return_dict_in_generate: true });
+        const attention_mask = new Tensor("int64", new BigInt64Array(sequences.dims[1]).fill(1n), sequences.dims);
+        const position_ids = new Tensor(
+          "int64",
+          BigInt64Array.from({ length: sequences.dims[1] }, (_, i) => BigInt(i)),
+          sequences.dims,
+        );
+        const config = { input_ids: sequences, attention_mask, position_ids, num_beams: 3, max_new_tokens: 3 };
+        const expected = await model.generate(config);
+        const actual = await model.generate({ ...config, past_key_values });
+        expect(actual.tolist()).toEqual(expected.tolist());
+        expect(Object.values(past_key_values)[0].dims[0]).toBe(1);
+        await past_key_values.dispose();
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("error cases", () => {
+    it("num_return_sequences > num_beams throws", () => {
+      expect(() => {
+        new BeamSearchScorer(1, 4, { num_return_sequences: 5 });
+      }).toThrow("num_return_sequences (5) must be <= num_beams (4)");
+    });
   });
 });
