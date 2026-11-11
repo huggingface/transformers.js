@@ -98,6 +98,7 @@ const MODEL_MAPPING_NAMES_ENCODER_ONLY = new Map([
 
     ['style_text_to_speech_2', 'StyleTextToSpeech2Model'],
     ['openai_privacy_filter', 'OpenAIPrivacyFilterModel'],
+    ['embedding_gemma2', 'EmbeddingGemma2Model'],
 ]);
 
 const MODEL_MAPPING_NAMES_ENCODER_DECODER = new Map([
@@ -137,6 +138,7 @@ const MODEL_MAPPING_NAMES_DECODER_ONLY = new Map([
     ['afmoe', 'AfmoeModel'],
     ['lfm2', 'Lfm2Model'],
     ['lfm2_moe', 'Lfm2MoeModel'],
+    ['lfm3', 'Lfm3Model'],
     ['smollm3', 'SmolLM3Model'],
     ['exaone', 'ExaoneModel'],
     ['olmo', 'OlmoModel'],
@@ -275,6 +277,7 @@ export const MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = new Map([
     ['afmoe', 'AfmoeForCausalLM'],
     ['lfm2', 'Lfm2ForCausalLM'],
     ['lfm2_moe', 'Lfm2MoeForCausalLM'],
+    ['lfm3', 'Lfm3ForCausalLM'],
     ['smollm3', 'SmolLM3ForCausalLM'],
     ['exaone', 'ExaoneForCausalLM'],
     ['olmo', 'OlmoForCausalLM'],
@@ -399,6 +402,7 @@ const MODEL_FOR_IMAGE_TEXT_TO_TEXT_MAPPING_NAMES = new Map([
     ['qwen3_5', 'Qwen3_5ForConditionalGeneration'],
     ['qwen3_5_moe', 'Qwen3_5MoeForConditionalGeneration'],
     ['lfm2_vl', 'Lfm2VlForConditionalGeneration'],
+    ['lfm3_vl', 'Lfm3VlForConditionalGeneration'],
     ['idefics3', 'Idefics3ForConditionalGeneration'],
     ['smolvlm', 'SmolVLMForConditionalGeneration'],
     ['paligemma', 'PaliGemmaForConditionalGeneration'],
@@ -636,6 +640,7 @@ const CUSTOM_MAPPING = [
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
+    ['EmbeddingGemma2Model', ALL_MODEL_FILES.EmbeddingGemma2Model, MODEL_TYPES.MultimodalEncoder],
 
     [
         'VoxtralRealtimeForConditionalGeneration',

@@ -39,3 +39,22 @@ describe("Public exports", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("env.backends.onnx.getSupportedDevices", () => {
+  const { getSupportedDevices } = transformers.env.backends.onnx;
+
+  it("returns the supported devices for the current environment", () => {
+    const devices = getSupportedDevices();
+    expect(Array.isArray(devices)).toBe(true);
+    expect(devices.length).toBeGreaterThan(0);
+    expect(devices).toContain("cpu");
+  });
+
+  it("returns a new array on each call, so mutations do not leak", () => {
+    const devices = getSupportedDevices();
+    expect(devices).not.toBe(getSupportedDevices());
+
+    devices.length = 0;
+    expect(getSupportedDevices().length).toBeGreaterThan(0);
+  });
+});

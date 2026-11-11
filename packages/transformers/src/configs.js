@@ -76,6 +76,7 @@ function getNormalizedConfig(config) {
         case 'gemma3n':
         case 'gemma4':
         case 'lfm2_vl':
+        case 'lfm3_vl':
         case 'chatterbox':
         case 'lighton_ocr':
         case 'glm_ocr':
@@ -127,6 +128,7 @@ function getNormalizedConfig(config) {
         case 'afmoe':
         case 'lfm2':
         case 'lfm2_moe':
+        case 'lfm3':
         case 'smollm3':
         case 'olmo':
         case 'olmo2':
@@ -351,10 +353,10 @@ export function getCacheNames(config, options) {
     /** @type {Set<string>} */
     const names = new Set();
 
-    if (['lfm2', 'lfm2_moe'].includes(config.model_type)) {
+    if (['lfm2', 'lfm2_moe', 'lfm3'].includes(config.model_type)) {
         const { layer_types } = /** @type {any} */ (config);
         for (let i = 0; i < layer_types.length; ++i) {
-            if (layer_types[i] === 'full_attention') {
+            if (layer_types[i] === 'full_attention' || layer_types[i] === 'sliding_attention') {
                 names.add(`${pkv_prefix}.${i}.key`);
                 names.add(`${pkv_prefix}.${i}.value`);
             } else if (layer_types[i] === 'conv') {
@@ -444,7 +446,7 @@ export function getCacheNames(config, options) {
             names.add(`${pkv_prefix}.${i}.shift_state`);
         }
         return names;
-    } else if (['lfm2_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {
+    } else if (['lfm2_vl', 'lfm3_vl', 'qwen3_5', 'qwen3_5_moe', 'voxtral_realtime'].includes(config.model_type)) {
         let subConfig;
         if (config.model_type === 'voxtral_realtime' && options?.session_name === 'audio_encoder') {
             subConfig = /** @type {any} */ (config).audio_config;

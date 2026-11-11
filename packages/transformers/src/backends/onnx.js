@@ -161,6 +161,15 @@ if (ORT_SYMBOL in globalThis) {
 /** @type {typeof import('onnxruntime-common').Tensor} */
 export const Tensor = apis.IS_REACT_NATIVE_ENV ? ONNX.Tensor : CommonTensor;
 
+/*
+ * Get the list of devices supported in the current environment, sorted by priority/performance.
+ * A new array is returned on each call, so modifying it does not affect device selection.
+ * @returns {import("../utils/devices.js").DeviceType[]} The supported devices.
+ */
+export function getSupportedDevices() {
+    return [...supportedDevices];
+}
+
 // @ts-ignore
 const InferenceSession = ONNX.InferenceSession;
 
@@ -398,5 +407,6 @@ if (ONNX_ENV) {
     env.backends.onnx = {
         ...ONNX_ENV,
         setLogLevel,
+        getSupportedDevices,
     };
 }

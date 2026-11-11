@@ -421,7 +421,8 @@ export default () => {
           };
           expect(output).toBeCloseToNested(target, 1);
         },
-        MAX_TEST_EXECUTION_TIME,
+        // Word-level timestamp inference can exceed 60 seconds on shared CI runners.
+        2 * MAX_TEST_EXECUTION_TIME,
       );
     });
 

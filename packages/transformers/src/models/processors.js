@@ -1,5 +1,7 @@
 export * from './chatterbox/processing_chatterbox.js';
 export * from './cohere_asr/processing_cohere_asr.js';
+export * from './embedding_gemma2/processing_embedding_gemma2.js';
+export * from './embedding_gemma2/video_processing_embedding_gemma2.js';
 export * from './florence2/processing_florence2.js';
 export * from './gemma3/processing_gemma3.js';
 export * from './gemma3n/processing_gemma3n.js';
@@ -11,6 +13,7 @@ export * from './idefics3/processing_idefics3.js';
 export * from './janus/processing_janus.js';
 export * from './jina_clip/processing_jina_clip.js';
 export * from './lfm2_vl/processing_lfm2_vl.js';
+export * from './lfm3_vl/processing_lfm3_vl.js';
 export * from './llava/processing_llava.js';
 export * from './mgp_str/processing_mgp_str.js';
 export * from './moonshine/processing_moonshine.js';

@@ -1254,27 +1254,26 @@ export function mean_pooling(last_hidden_state, attention_mask) {
     const returnedData = new lastHiddenStateData.constructor(shape[0] * shape[1]);
     const [batchSize, seqLength, embedDim] = last_hidden_state.dims;
 
-    let outIndex = 0;
+    // Walk the sequence in the outer loop, so each mask value is read once per
+    // token and each token's embedding is read contiguously. Each dimension is
+    // summed in float64, token by token in sequence order.
+    const sums = new Float64Array(embedDim);
     for (let i = 0; i < batchSize; ++i) {
-        const offset = i * embedDim * seqLength;
-
-        for (let k = 0; k < embedDim; ++k) {
-            let sum = 0;
-            let count = 0;
-
-            const attnMaskOffset = i * seqLength;
-            const offset2 = offset + k;
-            // Pool over all words in sequence
-            for (let j = 0; j < seqLength; ++j) {
-                // index into attention mask
-                const attn = Number(attentionMaskData[attnMaskOffset + j]);
-
-                count += attn;
-                sum += lastHiddenStateData[offset2 + j * embedDim] * attn;
+        sums.fill(0);
+        let count = 0;
+        for (let j = 0; j < seqLength; ++j) {
+            const attn = Number(attentionMaskData[i * seqLength + j]);
+            // Skip padding: a non-finite hidden value there no longer turns the mean into NaN.
+            if (attn === 0) continue;
+            count += attn;
+            const offset = (i * seqLength + j) * embedDim;
+            for (let k = 0; k < embedDim; ++k) {
+                sums[k] += lastHiddenStateData[offset + k] * attn;
             }
-
-            const avg = sum / count;
-            returnedData[outIndex++] = avg;
+        }
+        const outOffset = i * embedDim;
+        for (let k = 0; k < embedDim; ++k) {
+            returnedData[outOffset + k] = sums[k] / count;
         }
     }
 

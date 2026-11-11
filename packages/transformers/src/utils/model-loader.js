@@ -83,17 +83,11 @@ export async function getModelDataFiles(
         const chunkNames = getExternalDataChunkNames(baseName, num_chunks);
         for (const path of chunkNames) {
             const fullPath = `${options.subfolder ?? ''}/${path}`;
+            // Push getModelFile's promise directly so a failed chunk rejects Promise.all (#1801).
             externalDataPromises.push(
-                new Promise(async (resolve, reject) => {
-                    const data = await getModelFile(
-                        pretrained_model_name_or_path,
-                        fullPath,
-                        true,
-                        options,
-                        return_path,
-                    );
-                    resolve(data instanceof Uint8Array ? { path, data } : path);
-                }),
+                getModelFile(pretrained_model_name_or_path, fullPath, true, options, return_path).then((data) =>
+                    data instanceof Uint8Array ? { path, data } : path,
+                ),
             );
         }
     } else if (session_options.externalData !== undefined) {

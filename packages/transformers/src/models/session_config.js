@@ -16,6 +16,7 @@ export const MODEL_TYPES = {
     Supertonic: 14,
     Chatterbox: 15,
     VoxtralRealtime: 16,
+    MultimodalEncoder: 17,
 };
 
 export const MODEL_SESSION_CONFIG = {
@@ -137,6 +138,14 @@ export const MODEL_SESSION_CONFIG = {
         },
         cache_sessions: { decoder_model_merged: true, audio_encoder: true },
         optional_configs: { generation_config: 'generation_config.json' },
+    },
+    [MODEL_TYPES.MultimodalEncoder]: {
+        // The vision and audio encoders are only loaded when the config has their `vision_config` / `audio_config`
+        sessions: (config, options) => ({
+            model: options.model_file_name ?? 'model',
+            ...(config.vision_config && { vision_encoder: 'vision_encoder' }),
+            ...(config.audio_config && { audio_encoder: 'audio_encoder' }),
+        }),
     },
     default: {
         sessions: (config, options) => ({ model: options.model_file_name ?? 'model' }),
