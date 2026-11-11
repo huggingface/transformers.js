@@ -11,10 +11,13 @@ async function devicesWith(runtime) {
   let devices;
   globalThis[ORT_SYMBOL] = runtime;
   try {
-    await jest.isolateModulesAsync(async () => {
-      const { deviceToExecutionProviders } = await import("../src/backends/onnx.js");
-      devices = { auto: deviceToExecutionProviders("auto"), defaults: deviceToExecutionProviders(null) };
-    });
+    // A fresh registry per case, so the import below evaluates the module again rather than returning the
+    // instance an earlier case left behind. `jest.resetModules()` rather than `jest.isolateModulesAsync()`:
+    // under Jest's ESM loader the latter re-registers the runtime's shared modules on the second case and
+    // dies with "Module cache already has entry …/onnxruntime-common/dist/esm/env-impl.js".
+    jest.resetModules();
+    const { deviceToExecutionProviders } = await import("../src/backends/onnx.js");
+    devices = { auto: deviceToExecutionProviders("auto"), defaults: deviceToExecutionProviders(null) };
   } finally {
     delete globalThis[ORT_SYMBOL];
   }
