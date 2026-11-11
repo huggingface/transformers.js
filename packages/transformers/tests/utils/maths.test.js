@@ -90,6 +90,40 @@ describe("Mathematical operations", () => {
       expect(output).toBeCloseToNested(target, 5);
     });
 
+    it.each([3, 9])("should preserve a single value with window size %i", (windowSize) => {
+      const input = Float32Array.of(42);
+      const output = medianFilter(input, windowSize);
+
+      expect(output).toEqual(Float32Array.of(42));
+      expect(output).not.toBe(input);
+    });
+
+    it("should repeatedly reflect a two-element input", () => {
+      expect(medianFilter(Float32Array.of(1, 10), 9)).toEqual(Float32Array.of(1, 10));
+    });
+
+    it.each([
+      [Float32Array.of(1, 10, 2), Float32Array.of(2, 10, 2)],
+      [Float64Array.of(1, 10, 2), Float64Array.of(2, 10, 2)],
+      [Int16Array.of(1, 10, 2), Int16Array.of(2, 10, 2)],
+      [BigInt64Array.of(1n, 10n, 2n), BigInt64Array.of(2n, 10n, 2n)],
+    ])("should repeatedly reflect oversized windows and preserve the input type (case %#)", (input, expected) => {
+      expect(medianFilter(input, 9)).toEqual(expected);
+      expect(medianFilter(input, 17)).toEqual(expected);
+    });
+
+    it("should preserve empty input", () => {
+      expect(medianFilter(new Float32Array(), 3)).toEqual(new Float32Array());
+    });
+
+    it("should preserve input for a unit window", () => {
+      const input = Float32Array.of(1, 10, 2);
+      const output = medianFilter(input, 1);
+
+      expect(output).toEqual(input);
+      expect(output).not.toBe(input);
+    });
+
     // TODO add tests for errors
   });
 
