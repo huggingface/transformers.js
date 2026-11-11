@@ -34,8 +34,9 @@ describe("getModelDataFiles", () => {
       { path: "model_q4.onnx_data", data },
       { path: "model_q4.onnx_data_1", data },
     ]);
-    // fatal=true so a missing chunk throws instead of resolving silently
-    expect(mockGetModelFile).toHaveBeenCalledWith("onnx-community/test-model", "onnx/model_q4.onnx_data", true, { subfolder: "onnx" }, expect.any(Boolean));
+    // fatal=true so a missing chunk throws instead of resolving silently; the last two are
+    // return_path and its complement as_blob, which follow the environment
+    expect(mockGetModelFile).toHaveBeenCalledWith("onnx-community/test-model", "onnx/model_q4.onnx_data", true, { subfolder: "onnx" }, expect.any(Boolean), expect.any(Boolean));
   });
 
   it("resolves to the file path when getModelFile returns a string", async () => {
