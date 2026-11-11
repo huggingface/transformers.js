@@ -13,6 +13,24 @@ import { mergeArrays } from '../../utils/core.js';
 import { ModelOutput } from '../modeling_outputs.js';
 import { logger } from '../../utils/logger.js';
 
+async function disposeTimestampGenerationOutputs(outputs) {
+    const disposed = new Set();
+    for (const name of ['cross_attentions', 'encoder_attentions', 'decoder_attentions']) {
+        const tokenAttentions = outputs[name];
+        if (!tokenAttentions) continue;
+
+        for (const attentions of tokenAttentions) {
+            for (const tensor of attentions) {
+                if (disposed.has(tensor)) continue;
+                tensor.dispose();
+                disposed.add(tensor);
+            }
+        }
+        outputs[name] = null;
+    }
+    await outputs.past_key_values?.dispose();
+}
+
 export class WhisperPreTrainedModel extends PreTrainedModel {
     requires_attention_mask = false;
     main_input_name = 'input_features';
@@ -173,14 +191,18 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         });
 
         if (generation_config.return_token_timestamps) {
-            outputs['token_timestamps'] = this._extract_token_timestamps(
-                // @ts-expect-error TS2345
-                outputs,
-                generation_config.alignment_heads,
-                generation_config.num_frames,
-                0.02,
-                init_tokens.length,
-            );
+            try {
+                outputs['token_timestamps'] = this._extract_token_timestamps(
+                    // @ts-expect-error TS2345
+                    outputs,
+                    generation_config.alignment_heads,
+                    generation_config.num_frames,
+                    0.02,
+                    init_tokens.length,
+                );
+            } finally {
+                await disposeTimestampGenerationOutputs(outputs);
+            }
         }
 
         return outputs;
@@ -262,18 +284,22 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             // Extract token-level timestamps for this seek pass if needed
             let seek_token_timestamps;
             if (return_token_timestamps) {
-                outputs['token_timestamps'] = this._extract_token_timestamps(
-                    outputs,
-                    generation_config.alignment_heads,
-                    Math.floor((seek_end - seek) / input_stride),
-                    0.02,
-                    init_tokens.length,
-                );
-                const time_offset = (seek / input_stride) * 0.02;
-                seek_token_timestamps = outputs.token_timestamps[0]
-                    .tolist()
-                    .slice(init_tokens.length)
-                    .map((/** @type {number} */ t) => t + time_offset);
+                try {
+                    outputs['token_timestamps'] = this._extract_token_timestamps(
+                        outputs,
+                        generation_config.alignment_heads,
+                        Math.floor((seek_end - seek) / input_stride),
+                        0.02,
+                        init_tokens.length,
+                    );
+                    const time_offset = (seek / input_stride) * 0.02;
+                    seek_token_timestamps = outputs.token_timestamps[0]
+                        .tolist()
+                        .slice(init_tokens.length)
+                        .map((/** @type {number} */ t) => t + time_offset);
+                } finally {
+                    await disposeTimestampGenerationOutputs(outputs);
+                }
             }
 
             // Remove trailing EOS
