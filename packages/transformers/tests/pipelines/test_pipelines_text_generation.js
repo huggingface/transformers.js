@@ -164,7 +164,7 @@ export default () => {
       "text input (single)",
       async () => {
         const output = await pipe("hello", { max_new_tokens: 3, return_full_text: false, do_sample: false });
-        expect(output).toEqual([{ generated_text: "\u0e1e\u0e22\u0e32\u0e1a\u0e32\u0e25Composition directives" }]);
+        expect(output).toEqual([{ generated_text: "\u0e1e\u0e22\u0e32\u0e1a\u0e32\u0e25Compositionznak" }]);
       },
       MAX_TEST_EXECUTION_TIME,
     );

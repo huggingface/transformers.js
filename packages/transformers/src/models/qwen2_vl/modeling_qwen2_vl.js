@@ -29,6 +29,9 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
 
     /**
      * Compute text-only 3D rope position IDs (all 3 dims get the same 1D positions).
+     *
+     * `mrope_position_deltas` is `max(position_ids) + 1 - sequence_length`, as in transformers'
+     * `get_rope_index`, so that `past_length + delta` is the position of the next token.
      * @param {Tensor} input_ids
      * @param {Tensor} attention_mask
      * @returns {[Tensor, Tensor]} [position_ids, mrope_position_deltas]
@@ -41,7 +44,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
             /** @type {bigint[]} */
             const mrope_position_deltas = Array.from(
                 { length: dims[0] },
-                (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n + BigInt(dims[1]),
+                (_, i) => max(data.subarray(dims[1] * i, dims[1] * (i + 1)))[0] + 1n - BigInt(dims[1]),
             );
 
             return [
@@ -51,7 +54,7 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
         } else {
             const [batch_size, seq_length] = input_ids.dims;
             const position_ids = BigInt64Array.from({ length: 3 * batch_size * seq_length }, (_, i) =>
-                BigInt(Math.floor((i % seq_length) / batch_size)),
+                BigInt(i % seq_length),
             );
 
             return [new Tensor('int64', position_ids, [3, ...input_ids.dims]), zeros([batch_size, 1])];
