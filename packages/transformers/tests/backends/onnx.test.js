@@ -40,6 +40,25 @@ describe("web-path serialization chains", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it("runs a creation that was queued before the earlier one failed", async () => {
+    let failFirst;
+    create.mockReset();
+    create.mockImplementationOnce(() => new Promise((_, reject) => (failFirst = reject)));
+    create.mockResolvedValue({ run: async () => ({}) });
+
+    // Queue both calls while the first is still pending, then make the first one fail.
+    const first = createInferenceSession("first", {}, {});
+    const second = createInferenceSession("second", {}, {});
+    await new Promise((r) => setTimeout(r, 0));
+    expect(create).toHaveBeenCalledTimes(1);
+    failFirst(new Error("cuda provider missing"));
+
+    await expect(first).rejects.toThrow("cuda provider missing");
+    await expect(second).resolves.toBeDefined();
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1][0]).toBe("second");
+  });
+
   it("keeps creations serialized in call order", async () => {
     const order = [];
     create.mockImplementation(async (name) => {
@@ -51,6 +70,25 @@ describe("web-path serialization chains", () => {
 
     await Promise.all([createInferenceSession("slow", {}, {}), createInferenceSession("fast", {}, {})]);
     expect(order).toEqual(["start:slow", "end:slow", "start:fast", "end:fast"]);
+  });
+
+  it("runs an inference that was queued before the earlier one failed", async () => {
+    let failFirst;
+    const run = jest
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => (failFirst = reject)))
+      .mockResolvedValue({ out: 2 });
+    const session = { run };
+
+    const first = runInferenceSession(session, {});
+    const second = runInferenceSession(session, {});
+    await new Promise((r) => setTimeout(r, 0));
+    expect(run).toHaveBeenCalledTimes(1);
+    failFirst(new Error("session already started"));
+
+    await expect(first).rejects.toThrow("session already started");
+    await expect(second).resolves.toEqual({ out: 2 });
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("a failed inference run does not fail the runs after it", async () => {

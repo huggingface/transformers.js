@@ -300,9 +300,9 @@ export async function createInferenceSession(buffer_or_path, session_options, se
  * `chain.then(fn)` and storing that back would make the chain itself reject the moment
  * one call failed; `.then(fn)` on a rejected promise skips `fn` entirely and forwards
  * the old error, so a single failed session creation broke every later one in the
- * process. The stored chain is therefore `result.catch(() => {})`: it settles when this
- * call settles, but never rejects, so the next call always runs and each caller still
- * receives its own rejection.
+ * process. The stored chain is therefore `result.then(noop, noop)`: a `Promise<void>` that
+ * settles when this call settles but never rejects, so the next call always runs. The
+ * caller still receives `result` itself, with its own value or rejection.
  * @template T
  * @param {Promise<any>} chain The current serialization chain.
  * @param {() => Promise<T>} fn The work to run once the chain has settled.
@@ -311,7 +311,8 @@ export async function createInferenceSession(buffer_or_path, session_options, se
  */
 function serializeOn(chain, fn, setChain) {
     const result = chain.then(fn);
-    setChain(result.catch(() => {}));
+    const noop = () => {};
+    setChain(result.then(noop, noop));
     return result;
 }
 
