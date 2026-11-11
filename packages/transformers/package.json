@@ -9,15 +9,18 @@
     "node": {
       "import": {
         "types": "./types/transformers.d.ts",
+        "react-native": "./dist/transformers.native.mjs",
         "default": "./dist/transformers.node.mjs"
       },
       "require": {
         "types": "./types/transformers.d.ts",
+        "react-native": "./dist/transformers.native.cjs",
         "default": "./dist/transformers.node.cjs"
       }
     },
     "default": {
       "types": "./types/transformers.d.ts",
+      "react-native": "./dist/transformers.native.mjs",
       "default": "./dist/transformers.web.js"
     }
   },
@@ -59,7 +62,9 @@
     "@huggingface/tokenizers": "^0.2.0",
     "onnxruntime-node": "1.30.0",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "native-universal-fs": "^0.2.0",
+    "onnxruntime-react-native": "1.24.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -68,7 +73,8 @@
     "esbuild": "^0.27.2",
     "jest": "^30.2.0",
     "jest-environment-node": "^30.2.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "path-browserify": "^1.0.1"
   },
   "files": [
     "src",
@@ -82,5 +88,6 @@
     "access": "public"
   },
   "jsdelivr": "./dist/transformers.min.js",
-  "unpkg": "./dist/transformers.min.js"
+  "unpkg": "./dist/transformers.min.js",
+  "react-native": "./dist/transformers.native.mjs"
 }

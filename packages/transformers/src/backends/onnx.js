@@ -17,10 +17,11 @@ import { env, apis, LogLevel } from '../env.js';
 // NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
 import ONNX_NODE from './onnx-node.js';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
+import * as ONNX_REACT_NATIVE from 'onnxruntime-react-native';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
 import { logger } from '../utils/logger.js';
-export { Tensor } from 'onnxruntime-common';
+import { Tensor as CommonTensor } from 'onnxruntime-common';
 
 /**
  * @typedef {import('onnxruntime-common').InferenceSession.ExecutionProviderConfig} ONNXExecutionProviders
@@ -36,6 +37,8 @@ const DEVICE_TO_EXECUTION_PROVIDER_MAPPING = Object.freeze({
     cuda: 'cuda', // CUDA
     dml: 'dml', // DirectML
     coreml: 'coreml', // CoreML
+    xnnpack: 'xnnpack', // XNNPACK
+    nnapi: 'nnapi', // NNAPI
 
     webnn: { name: 'webnn', deviceType: 'cpu' }, // WebNN (default)
     'webnn-npu': { name: 'webnn', deviceType: 'npu' }, // WebNN NPU
@@ -100,6 +103,10 @@ const ORT_SYMBOL = Symbol.for('onnxruntime');
 if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
+} else if (apis.IS_REACT_NATIVE_ENV) {
+    ONNX = /** @type {any} */ (ONNX_REACT_NATIVE).default ?? ONNX_REACT_NATIVE;
+    supportedDevices.push('xnnpack', 'cpu', 'nnapi', 'coreml');
+    defaultDevices = ['cpu'];
 } else if (apis.IS_NODE_ENV) {
     ONNX = ONNX_NODE;
 
@@ -146,6 +153,15 @@ if (ORT_SYMBOL in globalThis) {
 }
 
 /**
+ * Use the selected native runtime's Tensor constructor. React Native can ship an
+ * older onnxruntime-common than Node/web, and its tensors must share the same
+ * constructor identity as the native backend.
+ * @typedef {import('onnxruntime-common').Tensor} Tensor
+ */
+/** @type {typeof import('onnxruntime-common').Tensor} */
+export const Tensor = apis.IS_REACT_NATIVE_ENV ? ONNX.Tensor : CommonTensor;
+
+/*
  * Get the list of devices supported in the current environment, sorted by priority/performance.
  * A new array is returned on each call, so modifying it does not affect device selection.
  * @returns {import("../utils/devices.js").DeviceType[]} The supported devices.
@@ -171,7 +187,7 @@ export function deviceToExecutionProviders(device = null) {
         case 'auto':
             return supportedDevices;
         case 'gpu':
-            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu'].includes(x));
+            return supportedDevices.filter((x) => ['webgpu', 'cuda', 'dml', 'webnn-gpu', 'xnnpack', 'nnapi', 'coreml'].includes(x));
     }
 
     if (supportedDevices.includes(device)) {

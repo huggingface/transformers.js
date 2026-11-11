@@ -40,6 +40,7 @@ env.cacheDir = '/path/to/cache/directory/';
 | `allowLocalModels` | `boolean` | Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise. If set to `false`, it will skip the local file check and try to load the model from the remote host. |
 | `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `useFS` | `boolean` | Whether to use the file system to load files. By default, it is `true` if available. |
+| `rnUseCanvas` | `boolean` | Whether to use Canvas API in React Native for image processing. Defaults to `true`. |
 | `useBrowserCache` | `boolean` | Whether to use Cache API to cache models. By default, it is `true` if available. |
 | `useFSCache` | `boolean` | Whether to use the file system to cache files. By default, it is `true` if available. |
 | `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
