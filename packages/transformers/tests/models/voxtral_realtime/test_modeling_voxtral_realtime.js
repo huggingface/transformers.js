@@ -260,6 +260,47 @@ export default () => {
     );
 
     it(
+      "rejects a config without an eos_token_id before it touches the audio",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        // `generate` cannot end a step whose audio ran out without an end-of-sequence
+        // token, so it fails up front. That has to happen before the encoder state is
+        // created: one created and then abandoned would leave its KV cache and its
+        // `states` entry behind. Creating it is the first thing that reads the
+        // iterator, so an untouched iterator shows nothing was set up.
+        let iterated = false;
+        const input_features = {
+          [Symbol.asyncIterator]() {
+            iterated = true;
+            return (async function* () {})();
+          },
+        };
+
+        await expect(
+          model.generate({
+            input_ids: first_chunk.input_ids,
+            input_features,
+            generation_config: { eos_token_id: null },
+          }),
+        ).rejects.toThrow(/eos_token_id/);
+        expect(iterated).toBe(false);
+
+        // The model is still usable afterwards.
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+        });
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated).toHaveLength(7);
+        expect(generated.at(-1)).toBe(2n);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "forward without generate (no encoder state)",
       async () => {
         const input_ids = new Tensor("int64", [1n, 32n, 32n], [1, 3]);

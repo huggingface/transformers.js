@@ -320,6 +320,14 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             throw new Error('input_features (generator/iterable) must be provided');
         }
 
+        // Resolve the effective generation config before anything is allocated: a model with no
+        // `eos_token_id` cannot end a step whose audio ran out, and failing here keeps a call that
+        // cannot succeed from creating (and leaking) an encoder state.
+        const { eos_token_id } = this._prepare_generation_config(generation_config, kwargs);
+        if (eos_token_id == null) {
+            throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
+        }
+
         const enc_state = createEncoderState(this, input_features);
         states.set(this, enc_state);
 
@@ -332,10 +340,6 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         // generation config this call actually uses — `generate({ eos_token_id })` and
         // a per-call `generation_config` included. The logits `forward` returns for
         // that step are only a fallback for callers that bypass `generate`.
-        const { eos_token_id } = this._prepare_generation_config(generation_config, kwargs);
-        if (eos_token_id == null) {
-            throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
-        }
         const logits_processor = new LogitsProcessorList();
         if (userLogitsProcessor) {
             logits_processor.extend(userLogitsProcessor);
