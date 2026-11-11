@@ -305,7 +305,8 @@ const PYTHON_CALL_LIST_EDGE_CASES = [
   ['[f(s=b"x")]', null],
   ['[f(s=f"x")]', null],
   ["[f(n=1j)]", null],
-  [String.raw`[f(s="\N{BULLET}")]`, null],
+  ["[f(n=1e999)]", null],
+  ["[f(n=" + "-".repeat(20000) + "1)]", null],
   ["[f(n=007)]", null],
   ["[f(d={True: 1})]", null],
   ["[f(x={1, 2})]", null],
@@ -548,6 +549,20 @@ describe("Response templates", () => {
           expect(parse_content(text, "python-call-list", {})).toEqual(expected);
         }
       }
+    });
+
+    it("python-call-list differences from Python transformers", () => {
+      const parse = (text) => parse_content(text, "python-call-list", {});
+      // Python accepts named unicode escapes; JS rejects them (no Unicode name table).
+      expect(() => parse(String.raw`[f(s="\N{BULLET}")]`)).toThrow("named unicode escapes are not supported");
+      // Same bracket limit as Python's tokenizer (200 open brackets).
+      const nest = (n) => `[f(x=${"[".repeat(n)}${"]".repeat(n)})]`;
+      expect(parse(nest(198))).toEqual(f({ x: JSON.parse(nest(198).slice(5, -2)) }));
+      expect(() => parse(nest(199))).toThrow("too many nested brackets");
+      expect(() => parse("[".repeat(300) + "]".repeat(300))).toThrow("python-call-list");
+      // Sign chains are capped at 1000 (Python's limit depends on its parser stack).
+      expect(parse("[f(n=" + "-".repeat(1000) + "1)]")).toEqual(f({ n: 1 }));
+      expect(() => parse("[f(n=" + "-".repeat(1001) + "1)]")).toThrow("too many unary operators");
     });
 
     it("rejects positional arguments in python-call-list", () => {
