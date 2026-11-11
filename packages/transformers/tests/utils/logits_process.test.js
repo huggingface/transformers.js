@@ -2,6 +2,8 @@ import {
   // Pipelines
   pipeline,
   TextGenerationPipeline,
+  WhisperTimeStampLogitsProcessor,
+  full,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -16,6 +18,27 @@ const DEFAULT_MODEL_OPTIONS = {
 };
 
 describe("Logits Processors", () => {
+  describe("WhisperTimeStampLogitsProcessor", () => {
+    it("masks initial timestamps above max_initial_timestamp_index", () => {
+      const processor = new WhisperTimeStampLogitsProcessor(
+        {
+          eos_token_id: 2,
+          no_timestamps_token_id: 4,
+          max_initial_timestamp_index: 1,
+        },
+        [0],
+      );
+      const logits = full([1, 10], 0.0);
+
+      processor([[0]], logits);
+
+      expect(logits.data[5]).toBe(0);
+      expect(logits.data[6]).toBe(0);
+      expect(logits.data[7]).toBe(-Infinity);
+      expect(logits.data[9]).toBe(-Infinity);
+    });
+  });
+
   describe("text-generation", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
 

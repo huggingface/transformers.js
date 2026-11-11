@@ -1,4 +1,5 @@
-import { WhisperTokenizer, WhisperForConditionalGeneration, full } from "../../../src/transformers.js";
+import { WhisperTokenizer, WhisperForConditionalGeneration, full, Tensor } from "../../../src/transformers.js";
+import { jest } from "@jest/globals";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -139,6 +140,80 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+    });
+
+    describe("seek loop", () => {
+      const NO_TIMESTAMPS = 50363;
+      const TIMESTAMP_BEGIN = NO_TIMESTAMPS + 1;
+      const EOS = 50257;
+      const INIT = [50258, 50260, 50360];
+
+      /**
+       * Run the seek loop with generation mocked at the PreTrainedModel level.
+       * This exercises Whisper's real segmentation logic without loading audio or running a model.
+       * @param {number[]} tokens Tokens returned by each mocked decoding pass.
+       * @param {number} num_frames Number of real (unpadded) input frames.
+       */
+      const runSeek = async (tokens, num_frames = 3000) => {
+        const parent = Object.getPrototypeOf(WhisperForConditionalGeneration.prototype);
+        let passes = 0;
+        let segmentInputDims;
+        const generate = jest.spyOn(parent, "generate").mockImplementation(async ({ decoder_input_ids, inputs }) => {
+          ++passes;
+          if (passes > 50) {
+            throw new Error("seek loop did not terminate after 50 passes");
+          }
+          segmentInputDims = inputs.dims;
+          const ids = [...decoder_input_ids, ...tokens, EOS].map(BigInt);
+          return new Tensor("int64", BigInt64Array.from(ids), [1, ids.length]);
+        });
+
+        try {
+          const whisper = Object.create(WhisperForConditionalGeneration.prototype);
+          whisper.config = { max_source_positions: 1500 };
+          const output = await whisper._generate_with_seek({
+            inputs: new Tensor("float32", new Float32Array(80 * 3000), [1, 80, 3000]),
+            generation_config: {
+              no_timestamps_token_id: NO_TIMESTAMPS,
+              eos_token_id: EOS,
+              return_token_timestamps: false,
+              num_frames,
+            },
+            logits_processor: [],
+            init_tokens: INIT,
+            kwargs: {},
+          });
+          return { passes, output, segmentInputDims };
+        } finally {
+          generate.mockRestore();
+        }
+      };
+
+      it("does not decode padded input when num_frames is zero", async () => {
+        const { passes, output } = await runSeek([], 0);
+
+        expect(passes).toBe(0);
+        expect(output.tolist()).toEqual([[...INIT.map(BigInt), BigInt(EOS)]]);
+      });
+
+      it("uses the real frame count for padded short audio", async () => {
+        const { passes, segmentInputDims } = await runSeek([TIMESTAMP_BEGIN, 1654, TIMESTAMP_BEGIN + 250, TIMESTAMP_BEGIN + 1200], 500);
+
+        expect(passes).toBe(1);
+        expect(segmentInputDims).toEqual([1, 80, 3000]);
+      });
+
+      it("terminates when a complete segment has zero offset", async () => {
+        const { passes } = await runSeek([TIMESTAMP_BEGIN, 1654, TIMESTAMP_BEGIN, TIMESTAMP_BEGIN + 1200]);
+
+        expect(passes).toBe(1);
+      });
+
+      it("continues through ordinary multi-segment output", async () => {
+        const { passes } = await runSeek([TIMESTAMP_BEGIN, 1654, TIMESTAMP_BEGIN + 500, TIMESTAMP_BEGIN + 1200]);
+
+        expect(passes).toBe(3);
+      });
     });
 
     afterAll(async () => {
