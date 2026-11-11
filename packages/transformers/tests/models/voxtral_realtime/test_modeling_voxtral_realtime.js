@@ -174,6 +174,92 @@ export default () => {
     );
 
     it(
+      "ends with </s> even when min_new_tokens would mask it",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+          // Past the seven tokens this audio yields: the processor that masks </s>
+          // until then must not be able to keep generation decoding audio-less steps.
+          min_new_tokens: 20,
+        });
+
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated).toHaveLength(7);
+        expect(generated.at(-1)).toBe(2n);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "ends with </s> when sampling",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+          do_sample: true,
+          temperature: 0.8,
+          // Sampling reads the same logits: `min_new_tokens` masks </s> here too,
+          // and a masked row is a uniform distribution over the vocabulary.
+          min_new_tokens: 20,
+        });
+
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated).toHaveLength(7);
+        expect(generated.at(-1)).toBe(2n);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "ends on a per-call eos_token_id",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        // The model's own </s> is 2; this call ends on 3 instead, and the forced
+        // step must end on the token this call named, not on the stored config's.
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+          eos_token_id: 3,
+        });
+
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated.at(-1)).toBe(3n);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "ends on an eos_token_id from a per-call generation_config",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 100,
+          generation_config: { eos_token_id: 4 },
+        });
+
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated.at(-1)).toBe(4n);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "forward without generate (no encoder state)",
       async () => {
         const input_ids = new Tensor("int64", [1n, 32n, 32n], [1, 3]);
