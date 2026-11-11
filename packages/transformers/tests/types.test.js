@@ -140,6 +140,16 @@ describe("TypeScript expected errors", () => {
         code: src("text2text-generation", `"translate: hello", { past_key_values: "bad" }`),
         errors: [{ code: 2322, underline: "past_key_values", messageIncludes: "DynamicCache" }],
       },
+      {
+        name: "truncation rejects string",
+        code: src("text2text-generation", `"translate: hello", { truncation: "bad" }`),
+        errors: [{ code: 2322, underline: "truncation", messageIncludes: "boolean" }],
+      },
+      {
+        name: "padding accepts 'max_length'",
+        code: src("text2text-generation", `"translate: hello", { padding: "max_length", truncation: false }`),
+        errors: [],
+      },
     ],
 
     translation: [
@@ -148,6 +158,11 @@ describe("TypeScript expected errors", () => {
         code: src("translation", `"Bonjour", { past_key_values: "bad" }`),
         errors: [{ code: 2322, underline: "past_key_values", messageIncludes: "DynamicCache" }],
       },
+      {
+        name: "truncation rejects string",
+        code: src("translation", `"Bonjour", { truncation: "bad" }`),
+        errors: [{ code: 2322, underline: "truncation", messageIncludes: "boolean" }],
+      },
     ],
 
     summarization: [
@@ -155,6 +170,11 @@ describe("TypeScript expected errors", () => {
         name: "past_key_values rejects string",
         code: src("summarization", `"Long article text...", { past_key_values: "bad" }`),
         errors: [{ code: 2322, underline: "past_key_values", messageIncludes: "DynamicCache" }],
+      },
+      {
+        name: "truncation rejects string",
+        code: src("summarization", `"Long article text...", { truncation: "bad" }`),
+        errors: [{ code: 2322, underline: "truncation", messageIncludes: "boolean" }],
       },
     ],
 
