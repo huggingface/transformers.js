@@ -367,6 +367,65 @@ describe("Internal asset loading", () => {
     await expect(get_tokenizer_files(MODEL)).rejects.toThrow("Failed to fetch");
   });
 
+  describe.each([
+    ["path offline", "/models/foo", null],
+    ["path HTTP 404", "/models/foo", 404],
+    ["Hub id local offline", MODEL, null],
+    ["Hub id local HTTP 404", MODEL, 404],
+    ["Hub id local HTTP 403", MODEL, 403],
+    ["Hub id local HTTP 503", MODEL, 503],
+  ])("locally served tokenizer: %s", (_name, modelId, status) => {
+    const configure = () => {
+      env.useFS = false;
+      env.allowLocalModels = true;
+      env.logLevel = 50;
+      env.fetch = jest.fn(async () => {
+        if (status === null) throw new TypeError("Failed to fetch");
+        return new Response(JSON.stringify({ error: status }), { status });
+      });
+      return new AssetLoadingContext().resolve(modelId, "tokenizer_config.json", cache);
+    };
+
+    it("uses the old local cache and replaces it after a successful local read", async () => {
+      const resource = configure();
+      cache.entries.set(resource.localPath, jsonResponse({ stale: true }));
+      expect(await getModelJSON(modelId, "tokenizer_config.json")).toEqual({ stale: true });
+      expect(await get_tokenizer_files(modelId)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+      expect(await get_file_metadata(modelId, "tokenizer_config.json")).toMatchObject({ exists: true, fromCache: true });
+      expect(cache.put).not.toHaveBeenCalled();
+      expect(cache.delete).not.toHaveBeenCalled();
+      expect(env.fetch.mock.calls.every(([url]) => url === resource.localPath)).toBe(true);
+      env.fetch = jest.fn(async () => jsonResponse({ updated: true }));
+      expect(await getModelJSON(modelId, "tokenizer_config.json")).toEqual({ updated: true });
+      expect(cache.entries.has(resource.localCacheKey)).toBe(true);
+      expect(cache.entries.has(resource.localPath)).toBe(false);
+    });
+
+    it("preserves the existing behavior without an old cache", async () => {
+      configure();
+      if (modelId.startsWith("/") || status === 404) {
+        await expect(getModelJSON(modelId, "tokenizer_config.json")).rejects.toThrow(modelId.startsWith("/") ? "invalid model ID" : "Could not locate file");
+        expect(await get_tokenizer_files(modelId)).toEqual([]);
+      } else if (status === null) {
+        await expect(getModelJSON(modelId, "tokenizer_config.json")).rejects.toThrow("Failed to fetch");
+        await expect(get_tokenizer_files(modelId)).rejects.toThrow("Failed to fetch");
+      } else {
+        // Local error responses without a stale copy are intentionally unchanged.
+        expect(await getModelJSON(modelId, "tokenizer_config.json")).toEqual({ error: status });
+        expect(await get_tokenizer_files(modelId)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+      }
+    });
+  });
+
+  it("still refreshes an old Hub cache after an ordinary filesystem miss", async () => {
+    env.allowLocalModels = true;
+    env.useFS = true;
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(env.fetch).toHaveBeenCalledWith(`${REMOTE}tokenizer_config.json`, expect.objectContaining({ cache: "reload" }));
+    expect(cache.entries.has(VERSIONED)).toBe(true);
+  });
+
   it("falls back to the outdated copy when the refresh fails, and replaces it once online", async () => {
     env.logLevel = 50;
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));

@@ -91,6 +91,13 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
             try {
                 const response = await context.read(localPath);
                 if (typeof response !== 'string' && response.status !== 404) {
+                    if (response.status !== 200) {
+                        const stale = await context.match(cache, {
+                            ...resource,
+                            cacheKeys: resource.obsoleteCacheKeys,
+                        });
+                        if (stale) return { exists: true, fromCache: true };
+                    }
                     const size = response.headers.get('content-length');
                     const contentType = response.headers.get('content-type');
 
@@ -103,6 +110,10 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
                 }
             } catch (e) {
                 // File doesn't exist locally, continue to remote check
+            }
+            if (!context.settings.useFS) {
+                const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+                if (stale) return { exists: true, fromCache: true };
             }
         }
     }
@@ -168,8 +179,8 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
         }
     }
 
-    // A pre-versioned tokenizer config is still loadable when remote access is disabled.
-    if (!context.settings.allowRemoteModels || context.options.local_files_only) {
+    // Old configs are also loadable for local paths that cannot be refreshed from the Hub.
+    if (!validModelId || !context.settings.allowRemoteModels || context.options.local_files_only) {
         const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
         if (stale) return { exists: true, fromCache: true };
     }

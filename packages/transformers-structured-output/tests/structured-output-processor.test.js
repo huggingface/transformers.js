@@ -319,14 +319,20 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(extendedFinal, EOS_TOKEN_ID)).toBe(true);
   });
 
-  it("blocks unrelated special tokens during thinking, including alternate end tokens", () => {
+  it.each([{ open: "<think>" }, { open_pattern: "<think>\\s*" }, { open: ["<think>", "<think>\n"] }])("blocks unrelated special tokens immediately after thinking opener %j", (opener) => {
     const encoder = new TextEncoder();
     const specials = ["<think>", "</thi", "nk>", "<turn|>", "<|tool_response>", "<unrelated>", "</think>{", "</think>x", ""];
     const source = {
       tokens: [...Array.from({ length: 256 }, (_, id) => [id]), ...specials.map((text) => encoder.encode(text)), []],
       eos_token_id: 256 + specials.length,
       special_token_ids: Array.from({ length: specials.length + 1 }, (_, i) => 256 + i),
-      response_template: thinkingTokenizer.response_template,
+      response_template: {
+        ...thinkingTokenizer.response_template,
+        fields: {
+          ...thinkingTokenizer.response_template.fields,
+          reasoning_content: { ...opener, close: "</think>", content: "text" },
+        },
+      },
     };
     const processor = new StructuredOutputProcessor(source, { type: "json_object" });
     const input = [0n];

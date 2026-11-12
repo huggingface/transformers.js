@@ -440,6 +440,9 @@ export class ResponseParser {
             this._output[name] = previous == null ? value : previous + field.join + value;
         } else if (field.repeats) {
             (this._output[name] ??= []).push(value);
+        } else if (typeof value === 'string' && typeof this._output[name] === 'string') {
+            // Preserve each answer region (unlike Python's current last-region-wins behavior).
+            if (value.trim()) this._output[name] += value;
         } else {
             this._output[name] = value;
         }

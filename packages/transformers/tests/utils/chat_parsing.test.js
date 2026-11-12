@@ -1231,6 +1231,60 @@ describe("Response templates", () => {
   describe("JavaScript port", () => {
     const template_with = (fields) => ({ defaults: { role: "assistant" }, start_anchor: "<a>", fields });
 
+    it.each(["\n", "Done."])("preserves answer text around a tool call followed by %j", (suffix) => {
+      const template = template_with({
+        content: { close: "<|im_end|>" },
+        tool_calls: { open: "<tool_call>", close: "</tool_call>", content: "json", repeats: true },
+      });
+      const text = `Sure.\n<tool_call>{"name":"weather"}</tool_call>${suffix}<|im_end|>`;
+      const expected = { role: "assistant", content: `Sure.${suffix.trim()}`, tool_calls: [{ name: "weather" }] };
+      expect(parse_response(text, template, { prefix: "" })).toEqual(expected);
+      for (let split = 0; split <= text.length; ++split) {
+        const parser = new ResponseParser(template, { prefix: "" });
+        const events = [...parser.feed(text.slice(0, split)), ...parser.feed(text.slice(split))];
+        const [message, finalEvents] = parser.finalize();
+        events.push(...finalEvents);
+        expect(message).toEqual(expected);
+        expect(events.filter((event) => event.type === "region_close" && event.field === "content").map((event) => event.value)).toEqual(["Sure.", suffix.trim()]);
+      }
+    });
+
+    it("keeps join, repeats and non-string replacement semantics", () => {
+      const text = "<x>1</x><x>2</x>";
+      const field = { open: "<x>", close: "</x>" };
+      expect(parse_response(text, template_with({ x: { ...field, repeats: true, join: "|" } }), { prefix: "" }).x).toBe("1|2");
+      expect(parse_response(text, template_with({ x: { ...field, repeats: true } }), { prefix: "" }).x).toEqual(["1", "2"]);
+      expect(parse_response(text, template_with({ x: { ...field, content: "int" } }), { prefix: "" }).x).toBe(2);
+    });
+
+    it.each([
+      ["overlapping closers", { x: { open: "<x>", close: ["END", "ENDXY"] }, content: {} }, "<x>hiENDXYtail", { role: "assistant", x: "hi", content: "tail" }],
+      ["overlapping openers", { x: { open: ["```", "```json"], close: "```", content: "json" }, content: {} }, '```json{"n":1}```tail', { role: "assistant", x: { n: 1 }, content: "tail" }],
+    ])("keeps %s independent of streaming splits", (_name, fields, text, expected) => {
+      const template = template_with(fields);
+      expect(parse_response(text, template, { prefix: "" })).toEqual(expected);
+      for (let split = 0; split <= text.length; ++split) {
+        const parser = new ResponseParser(template, { prefix: "" });
+        parser.feed(text.slice(0, split));
+        parser.feed(text.slice(split));
+        expect(parser.finalize()[0]).toEqual(expected);
+      }
+      const parser = new ResponseParser(template, { prefix: "" });
+      for (const character of text) parser.feed(character);
+      expect(parser.finalize()[0]).toEqual(expected);
+    });
+
+    it.each(["<x>hiEND", "<x>hiENDX", "<x>hiENDXQtail"])("commits a shorter delimiter once its longer alternative ends or fails: %j", (text) => {
+      const template = template_with({ x: { open: "<x>", close: ["END", "ENDXY"] }, content: {} });
+      const expected = parse_response(text, template, { prefix: "" });
+      for (let split = 0; split <= text.length; ++split) {
+        const parser = new ResponseParser(template, { prefix: "" });
+        parser.feed(text.slice(0, split));
+        parser.feed(text.slice(split));
+        expect(parser.finalize()[0]).toEqual(expected);
+      }
+    });
+
     it("merges closing captures with opening captures, with closing captures taking precedence", () => {
       const template = template_with({ item: { open_pattern: "<(?P<tag>item):(?P<id>\\w+)>", close_pattern: "</(?P<tag>\\w+)>", transform: { tag: "{tag}", id: "{id}", body: "{content}" } } });
       const text = "<item:first>body</done>";

@@ -297,10 +297,12 @@ export function search(pattern, text, position, partial = false) {
         pattern.partial.lastIndex = position;
         const candidate = pattern.partial.exec(text);
         if (candidate === null) return null;
-        // A complete match at the same position takes precedence over the partial one.
+        // A shorter complete match must wait while a preferred, longer alternative is still partial.
         pattern.sticky.lastIndex = candidate.index;
         match = pattern.sticky.exec(text);
-        if (match === null) return { start: candidate.index, end: text.length, groups: {}, partial: true };
+        if (match === null || candidate[0].length > match[0].length) {
+            return { start: candidate.index, end: text.length, groups: {}, partial: true };
+        }
     } else {
         pattern.regex.lastIndex = position;
         match = pattern.regex.exec(text);

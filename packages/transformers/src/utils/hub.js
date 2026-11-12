@@ -191,6 +191,18 @@ async function loadResourceFile(
                     // NOTE: error handling is done in the next step (since `response` will be undefined)
                     logger.warn(`Unable to load from local path "${localPath}": "${e}"`);
                 }
+                // Keep filesystem misses eligible for Hub downloads, so Node users still get config updates.
+                if (
+                    stale &&
+                    typeof response !== 'string' &&
+                    response?.status !== 200 &&
+                    (!context.settings.useFS || !validModelId || (response !== undefined && response.status !== 404))
+                ) {
+                    logger.warn(`Unable to refresh "${localPath}", using the previously cached copy.`);
+                    response = stale.response;
+                    cacheKey = stale.key;
+                    servedStale = true;
+                }
             } else if (options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
             } else if (!context.settings.allowRemoteModels) {

@@ -147,6 +147,18 @@ export function withResponseProtocol(
             if (state.phase === 'start') {
                 // Only protocol branches justify special tokens, never the payload branch.
                 let candidate: ProtocolState = { ...state, structured: undefined };
+                if (
+                    state.thinking?.accepted &&
+                    advanceMatch(protocol.thinkingOpen, state.thinking, bytes[0]).complete === 'before'
+                ) {
+                    // The non-eager opener is complete: apply the same special-token rule as in thinking.
+                    candidate = { phase: 'thinking', closeBuffer: new Uint8Array() };
+                    for (const byte of bytes) candidate = transition(candidate, byte);
+                    return (
+                        candidate.phase !== 'dead' &&
+                        (candidate.phase !== 'thinking' || candidate.closeBuffer.length > 0)
+                    );
+                }
                 if (!advancesDelimiter(candidate, bytes[0])) return false;
                 for (const byte of bytes) candidate = transition(candidate, byte);
                 return candidate.phase !== 'dead';
