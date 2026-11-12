@@ -1,4 +1,5 @@
 import { PreTrainedTokenizer } from '../../tokenization_utils.js';
+import { mergeArrays } from '../../utils/core.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -70,6 +71,6 @@ export class MarianTokenizer extends PreTrainedTokenizer {
     tokenize(text, options) {
         const [language, remainder] = this._split_language_code(text);
         const tokens = super.tokenize(remainder, options);
-        return language === null ? tokens : [language, ...tokens];
+        return language === null ? tokens : mergeArrays([language], tokens);
     }
 }
