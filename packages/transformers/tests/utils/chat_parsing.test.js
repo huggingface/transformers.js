@@ -1,4 +1,7 @@
 import { parse_response, ResponseParser } from "../../src/utils/chat_parsing/index.js";
+import { CONTENT_PARSERS } from "../../src/utils/chat_parsing/content_parsers.js";
+
+const parse_content = (text, name, args) => CONTENT_PARSERS[name](text, args);
 
 // Mirrors transformers/tests/utils/test_chat_parsing.py
 
@@ -123,7 +126,12 @@ const granite33_template = {
   defaults: { role: "assistant" },
   start_anchor_pattern: String.raw`<\|start_of_role\|>assistant(?:\s+\[[^\n]*\])?<\|end_of_role\|>`,
   fields: {
-    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+    // Granite 3.3 wraps its answer in <response>...</response> only when thinking.
+    reasoning_content: {
+      open: "<think>",
+      close_pattern: String.raw`</think>\s*<response>|</think>(?=\s*[^\s<]|\s*<\|)|</think>\s*\Z`,
+      content: "text",
+    },
     tool_calls: {
       open: "<|tool_call|>",
       close: "<|end_of_text|>",
@@ -131,11 +139,7 @@ const granite33_template = {
       transform_each: true,
       transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
     },
-    content: {
-      close: "<|end_of_text|>",
-      content: "text",
-      content_args: { strip_prefix: "<response>", strip_suffix: "</response>" },
-    },
+    content: { close_pattern: String.raw`(?:</response>)?\s*<\|end_of_text\|>`, content: "text" },
   },
 };
 
@@ -273,6 +277,43 @@ function* chunk_random(text, rng) {
   }
   yield text.slice(previous);
 }
+
+const f = (args) => [{ name: "f", arguments: args }];
+
+// (input, expected) pairs for `python-call-list`; `null` means the input must be rejected.
+// Mirrors PYTHON_CALL_LIST_EDGE_CASES in transformers/tests/utils/test_chat_parsing.py.
+const PYTHON_CALL_LIST_EDGE_CASES = [
+  // Every Python str literal form is accepted.
+  ['[f(s="""a"b""")]', f({ s: 'a"b' })],
+  ["[f(s='''x\ny''')]", f({ s: "x\ny" })],
+  [String.raw`[f(s=r"C:\new", t=R"\N{x}")]`, f({ s: String.raw`C:\new`, t: String.raw`\N{x}` })],
+  [`[f(s="a" 'b' """c""")]`, f({ s: "abc" })],
+  ['[f(s=u"x")]', f({ s: "x" })],
+  [String.raw`[f(s="a\qb")]`, f({ s: String.raw`a\qb` })],
+  // Python number literals, including signs.
+  ["[f(h=0x1F, o=0o17, b=0b101, u=1_000, e=1e3, d=.5, t=1., n=--3, p=+2)]", f({ h: 31, o: 15, b: 5, u: 1000, e: 1000, d: 0.5, t: 1, n: 3, p: 2 })],
+  // `(1)` is just `1`; only `(1,)` and `()` are tuples.
+  ["[f(t=(1,), p=(1), e=())]", f({ t: [1], p: 1, e: [] })],
+  // Comments, redundant parentheses, JSON-style names as dict keys, unicode identifiers.
+  ["[f(x=1)  # note\n]", f({ x: 1 })],
+  ["[(f(x=1))]", f({ x: 1 })],
+  ["[f(d={true: 1, null: 2})]", f({ d: { true: 1, null: 2 } })],
+  ["[größe(wert=1)]", [{ name: "größe", arguments: { wert: 1 } }]],
+  // Rejected: positional or repeated arguments, non-str literals, non-literals, Python syntax errors.
+  ["[f(1, 3.5)]", null],
+  ["[f(x=1, x=2)]", null],
+  ['[f(s=b"x")]', null],
+  ['[f(s=f"x")]', null],
+  ["[f(n=1j)]", null],
+  ["[f(n=1e999)]", null],
+  ["[f(n=" + "-".repeat(20000) + "1)]", null],
+  ["[f(n=007)]", null],
+  ["[f(d={True: 1})]", null],
+  ["[f(x={1, 2})]", null],
+  ["[f(x=-True)]", null],
+  ["[if(x=1)]", null],
+  ['[f(s="a\nb")]', null],
+];
 
 function stream_all(template, chunks, options = { prefix: "" }) {
   const parser = new ResponseParser(template, options);
@@ -495,13 +536,47 @@ describe("Response templates", () => {
       expect(() => parse_response(named, lfm_template, { prefix: "" })).toThrow("named unicode escapes are not supported");
     });
 
-    it("treats empty text wrappers as no-ops", () => {
-      const template = {
-        start_anchor: "<assistant>",
-        fields: { content: { content: "text", content_args: { strip_prefix: "", strip_suffix: "" } } },
-      };
-      expect(parse_response("answer", template, { prefix: "" })).toEqual({ content: "answer" });
-      expect(stream_all(template, ["answer"]).events.find((event) => event.type === "region_chunk")?.dirty).toBe(false);
+    it("granite 3.3 answers without the response wrapper when not thinking", () => {
+      expect(parse_response("It is sunny.<|end_of_text|>", granite33_template, { prefix: "" })).toEqual({ role: "assistant", content: "It is sunny." });
+    });
+
+    it("python-call-list edge cases match Python transformers", () => {
+      // Mirrors PYTHON_CALL_LIST_EDGE_CASES in transformers/tests/utils/test_chat_parsing.py.
+      for (const [text, expected] of PYTHON_CALL_LIST_EDGE_CASES) {
+        if (expected === null) {
+          expect(() => parse_content(text, "python-call-list", {})).toThrow("python-call-list");
+        } else {
+          expect(parse_content(text, "python-call-list", {})).toEqual(expected);
+        }
+      }
+    });
+
+    it("python-call-list differences from Python transformers", () => {
+      const parse = (text) => parse_content(text, "python-call-list", {});
+      // Python accepts named unicode escapes; JS rejects them (no Unicode name table).
+      expect(() => parse(String.raw`[f(s="\N{BULLET}")]`)).toThrow("named unicode escapes are not supported");
+      // Same bracket limit as Python's tokenizer (200 open brackets).
+      const nest = (n) => `[f(x=${"[".repeat(n)}${"]".repeat(n)})]`;
+      expect(parse(nest(198))).toEqual(f({ x: JSON.parse(nest(198).slice(5, -2)) }));
+      expect(() => parse(nest(199))).toThrow("too many nested brackets");
+      expect(() => parse("[".repeat(300) + "]".repeat(300))).toThrow("python-call-list");
+      // Sign chains are capped at 1000 (Python's limit depends on its parser stack).
+      expect(parse("[f(n=" + "-".repeat(1000) + "1)]")).toEqual(f({ n: 1 }));
+      expect(() => parse("[f(n=" + "-".repeat(1001) + "1)]")).toThrow("too many unary operators");
+    });
+
+    it("rejects positional arguments in python-call-list", () => {
+      const model_out = '<|tool_call_start|>[get_weather(location="Paris"), add_numbers(2, 3.5)]<|tool_call_end|><|im_end|>';
+      expect(() => parse_response(model_out, lfm_template, { prefix: "" })).toThrow("only keyword arguments are supported");
+    });
+
+    it("json accepts NaN and Infinity like Python's json.loads", () => {
+      const parse = (text) => parse_content(text, "json", {});
+      expect(parse('{"a": NaN, "b": Infinity, "c": [-Infinity], "d": "NaN Infinity"}')).toEqual({ a: NaN, b: Infinity, c: [-Infinity], d: "NaN Infinity" });
+      expect(parse('{"s": "say \\"NaN\\"", "n": NaN}')).toEqual({ s: 'say "NaN"', n: NaN });
+      expect(() => parse('{"a": nan}')).toThrow("could not parse region as JSON");
+      expect(() => parse('{"a": -NaN}')).toThrow("could not parse region as JSON");
+      expect(() => parse('{"a": NaNx}')).toThrow("could not parse region as JSON");
     });
 
     it("inkling multi-block message", () => {
@@ -807,10 +882,12 @@ describe("Response templates", () => {
       });
     });
 
-    it("marks wrapper-stripped text as dirty until close", () => {
+    it("streams the granite 3.3 response wrapper out of the content", () => {
       const { message, events } = stream_all(granite33_template, chunk_fixed("<think>reason</think><response>answer</response><|end_of_text|>", 1));
       expect(message).toEqual({ role: "assistant", reasoning_content: "reason", content: "answer" });
-      expect(new Set(events.filter((e) => e.type === "region_chunk" && e.field === "content").map((e) => e.dirty))).toEqual(new Set([true]));
+      const chunks = events.filter((e) => e.type === "region_chunk" && e.field === "content");
+      expect(chunks.map((e) => e.text).join("")).toBe("answer");
+      expect(new Set(chunks.map((e) => e.dirty))).toEqual(new Set([false]));
     });
 
     it("streams prefixless regex delimiters without waiting for the end of the stream", () => {

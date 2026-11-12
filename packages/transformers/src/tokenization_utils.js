@@ -626,7 +626,7 @@ export class PreTrainedTokenizer
 
     /**
      * Decode a batch of tokenized sequences.
-     * @param {number[][]|Tensor} batch List/Tensor of tokenized input sequences.
+     * @param {number[][]|bigint[][]|Tensor} batch List/Tensor of tokenized input sequences.
      * @param {Object} decode_args (Optional) Object with decoding arguments.
      * @returns {string[]} List of decoded sequences.
      */
