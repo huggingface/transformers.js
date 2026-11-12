@@ -17,44 +17,61 @@ export class Qwen2VLImageProcessor extends ImageProcessor {
     }
 
     async _call(images, ...args) {
-        const { pixel_values, original_sizes, reshaped_input_sizes } = await super._call(images, ...args);
-
-        let patches = pixel_values;
+        if (!Array.isArray(images)) {
+            images = [images];
+        }
 
         // @ts-ignore
-        const { temporal_patch_size, merge_size, patch_size } = this.config;
-        if (patches.dims[0] === 1) {
+        const { temporal_patch_size = 2, merge_size, patch_size } = this.config;
+
+        const all_patches = [];
+        const all_image_grid_thw = [];
+        const original_sizes = [];
+        const reshaped_input_sizes = [];
+
+        for (const image of images) {
+            const { pixel_values, original_size, reshaped_input_size } = await this.preprocess(image, ...args);
+
+            // Add temporal dimension: [1, channel, height, width]
+            let patches = pixel_values.unsqueeze(0);
+
             // Equivalent to np.tile(patches, (self.temporal_patch_size, 1, 1, 1))
             patches = cat(
                 Array.from({ length: temporal_patch_size }, () => patches),
                 0,
             );
+
+            const grid_t = patches.dims[0] / temporal_patch_size;
+            const channel = patches.dims[1];
+            const grid_h = Math.floor(patches.dims[2] / patch_size);
+            const grid_w = Math.floor(patches.dims[3] / patch_size);
+
+            const flatten_patches = patches
+                .view(
+                    grid_t,
+                    temporal_patch_size,
+                    channel,
+                    Math.floor(grid_h / merge_size),
+                    merge_size,
+                    patch_size,
+                    Math.floor(grid_w / merge_size),
+                    merge_size,
+                    patch_size,
+                )
+                .permute(0, 3, 6, 4, 7, 2, 1, 5, 8)
+                .view(grid_t * grid_h * grid_w, channel * temporal_patch_size * patch_size * patch_size);
+
+            all_patches.push(flatten_patches);
+            all_image_grid_thw.push(grid_t, grid_h, grid_w);
+            original_sizes.push(original_size);
+            reshaped_input_sizes.push(reshaped_input_size);
         }
 
-        const grid_t = patches.dims[0] / temporal_patch_size;
-        const channel = patches.dims[1];
-        const grid_h = Math.floor(patches.dims[2] / patch_size);
-        const grid_w = Math.floor(patches.dims[3] / patch_size);
-
-        const flatten_patches = patches
-            .view(
-                grid_t,
-                temporal_patch_size,
-                channel,
-                Math.floor(grid_h / merge_size),
-                merge_size,
-                patch_size,
-                Math.floor(grid_w / merge_size),
-                merge_size,
-                patch_size,
-            )
-            .permute(0, 3, 6, 4, 7, 2, 1, 5, 8)
-            .view(grid_t * grid_h * grid_w, channel * temporal_patch_size * patch_size * patch_size);
-
-        const image_grid_thw = new Tensor('int64', [grid_t, grid_h, grid_w], [1, 3]);
+        const pixel_values = cat(all_patches, 0);
+        const image_grid_thw = new Tensor('int64', all_image_grid_thw, [images.length, 3]);
 
         return {
-            pixel_values: flatten_patches,
+            pixel_values,
             image_grid_thw,
             original_sizes,
             reshaped_input_sizes,
