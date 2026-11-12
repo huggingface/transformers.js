@@ -132,7 +132,7 @@ export function handleError(status, remoteURL, fatal) {
  *
  * @param {Response|import('./FileResponse.js').FileResponse} response The Response object to read
  * @param {(data: {progress: number, loaded: number, total: number}) => void} progress_callback The function to call with progress updates
- * @param {number} [expectedSize] The expected size of the file (used when content-length header is missing)
+ * @param {number} [expectedSize] Size used for the progress total when Content-Length is missing. The returned buffer is only the bytes read.
  * @returns {Promise<Uint8Array>} A Promise that resolves with the Uint8Array buffer
  */
 export async function readResponse(response, progress_callback, expectedSize) {
@@ -180,7 +180,9 @@ export async function readResponse(response, progress_callback, expectedSize) {
     // Actually read
     await read();
 
-    return buffer;
+    // Content-Length and expectedSize only size the buffer so progress can be
+    // reported. A body that ends early is not padded out to that length.
+    return loaded === buffer.length ? buffer : buffer.slice(0, loaded);
 }
 
 /**
