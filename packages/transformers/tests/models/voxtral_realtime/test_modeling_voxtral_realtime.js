@@ -331,6 +331,17 @@ export default () => {
           }),
         ).rejects.toThrow(/eos_token_id/);
 
+        // An empty list names no token either, and an all `-Infinity` row is `NaN`
+        // after the softmax rather than an end of sequence.
+        await expect(
+          model.generate({
+            input_ids: first_chunk.input_ids,
+            input_features: buildInputFeaturesGenerator(audio),
+            max_new_tokens: 100,
+            generation_config: { eos_token_id: [] },
+          }),
+        ).rejects.toThrow(/eos_token_id/);
+
         // The model is still usable afterwards.
         const outputs = await model.generate({
           input_ids: first_chunk.input_ids,

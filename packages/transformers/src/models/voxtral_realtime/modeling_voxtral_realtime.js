@@ -214,10 +214,12 @@ function addAudioEmbeddings(s, inputs_embeds, current_len) {
  */
 function endOfSequenceLogits(s, seq_len) {
     const { vocab_size, eos_token_id } = s;
-    if (eos_token_id == null) {
+    // Normalize first: an empty list names no token either, and a row of all
+    // `-Infinity` is `NaN` after the softmax rather than an end of sequence.
+    const eos = Array.isArray(eos_token_id) ? eos_token_id[0] : eos_token_id;
+    if (eos == null) {
         throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
     }
-    const eos = Array.isArray(eos_token_id) ? eos_token_id[0] : eos_token_id;
     const data = new Float32Array(seq_len * vocab_size).fill(-Infinity);
     for (let i = 0; i < seq_len; ++i) {
         data[i * vocab_size + eos] = 0;
