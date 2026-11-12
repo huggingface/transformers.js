@@ -545,7 +545,8 @@ export class Tensor {
 
     /**
      * Returns the matrix norm or vector norm of a given tensor.
-     * @param {number|string} [p='fro'] The order of norm
+     * @param {number|string} [p='fro'] The order of norm. Use `Infinity` for the max of the absolute values
+     * and `-Infinity` for the min.
      * @param {number|null} [dim=null] Specifies which dimension of the tensor to calculate the norm across.
      * If dim is None, the norm will be calculated across all dimensions of input.
      * @param {boolean} [keepdim=false] Whether the output tensors have dim retained or not.
@@ -567,21 +568,9 @@ export class Tensor {
         }
 
         if (p === Infinity || p === -Infinity) {
-            // Infinity norm is the max of the absolute values, -Infinity norm is the min (same as PyTorch).
-            const fn =
-                p === Infinity
-                    ? (/** @type {number} */ a, /** @type {number} */ b) => Math.max(a, Math.abs(b))
-                    : (/** @type {number} */ a, /** @type {number} */ b) => Math.min(a, Math.abs(b));
-            const init = p === Infinity ? 0 : Infinity;
-
-            if (dim === null) {
-                // @ts-ignore
-                const val = this_data.reduce(fn, init);
-                return new Tensor(this.type, [val], []);
-            }
-
-            const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim, init);
-            return new Tensor(type, result, resultDims);
+            // Same as PyTorch: inf-norm = amax(|x|), -inf-norm = amin(|x|).
+            const abs = this.map(Math.abs);
+            return p === Infinity ? abs.max(dim, keepdim) : abs.min(dim, keepdim);
         }
 
         const fn = (/** @type {number} */ a, /** @type {number} */ b) => a + Math.abs(b) ** p;
