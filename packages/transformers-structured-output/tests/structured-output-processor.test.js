@@ -56,7 +56,7 @@ const GRANITE_3_3_RESPONSE_TEMPLATE = {
   defaults: { role: "assistant" },
   start_anchor_pattern: "<\\|start_of_role\\|>assistant(?:\\s+\\[[^\\n]*\\])?<\\|end_of_role\\|>",
   fields: {
-    reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+    reasoning_content: { open: "<think>", close_pattern: "</think>\\s*<response>|</think>(?=\\s*[^\\s<]|\\s*<\\|)|</think>\\s*\\Z", content: "text" },
     tool_calls: {
       open: "<|tool_call|>",
       close: "<|end_of_text|>",
@@ -65,9 +65,8 @@ const GRANITE_3_3_RESPONSE_TEMPLATE = {
       transform: { type: "function", function: { name: "{name}", arguments: "{arguments}" } },
     },
     content: {
-      close: "<|end_of_text|>",
+      close_pattern: "(?:</response>)?\\s*<\\|end_of_text\\|>",
       content: "text",
-      content_args: { strip_prefix: "<response>", strip_suffix: "</response>" },
     },
   },
 };
@@ -124,6 +123,17 @@ function schemaAccepts(schema, text) {
 }
 
 describe("StructuredOutputProcessor", () => {
+  it.each(["\\Z", "\\A", "\\B", "\\G", "\\1", "\\q"])("rejects unsupported alphanumeric escape %s in user regexes", (regex) => {
+    expect(() => new StructuredOutputProcessor(tokenizer, { type: "regex", regex })).toThrow("unsupported escape");
+  });
+
+  it("keeps punctuation escapes literal", async () => {
+    const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: String.raw`\.\|\<\$` });
+    const inputIds = await consume(processor, ".|<$");
+    const scores = logits();
+    processor([inputIds], scores);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
+  });
   it("derives token bytes through the configured decoder", () => {
     const tokenizerJson = {
       version: "1.0",
@@ -464,7 +474,7 @@ describe("StructuredOutputProcessor", () => {
   });
 
   it.each([
-    ["a reasoning_content close_pattern", { reasoning_content: { open: "<think>", close_pattern: "</think>\\s*", content: "text" } }, "close_pattern"],
+    ["an unsupported content closer escape", { content: { close_pattern: "(?:<eos>|\\Z)", content: "text" } }, "unsupported escape"],
     ["an unsupported content opener", { content: { open_pattern: "(?P<x>a)", content: "text" } }, "open_pattern"],
     ["a `^` assertion inside an opener", { reasoning_content: { open_pattern: "(?:^|<think>\\s*)", close: "</think>", content: "text" } }, "open_pattern"],
   ])("falls back to the plain constraint for %s", (_, fields, warning) => {
@@ -563,12 +573,21 @@ describe("StructuredOutputProcessor", () => {
       expect(isAllowed(scores, "x".charCodeAt(0))).toBe(false);
     });
 
-    it("Granite 3.3: replays the prompt after start_anchor_pattern", () => {
-      const processor = new StructuredOutputProcessor(withTemplate(GRANITE_3_3_RESPONSE_TEMPLATE), { type: "json_object" });
-      const scores = logits();
-      processor([prompt("<|start_of_role|>assistant [thinking]<|end_of_role|><think>")], scores);
-      expect(isAllowed(scores, "x".charCodeAt(0))).toBe(true);
-      expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+    it("Granite 3.3: warns once and falls back for the live reasoning close_pattern", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const source = withTemplate(GRANITE_3_3_RESPONSE_TEMPLATE);
+        const processor = new StructuredOutputProcessor(source, { type: "json_object" });
+        const scores = logits();
+        processor([prompt("<|start_of_role|>assistant [thinking]<|end_of_role|><think>")], scores);
+        expect(isAllowed(scores, "x".charCodeAt(0))).toBe(false);
+        expect(isAllowed(scores, "{".charCodeAt(0))).toBe(true);
+        new StructuredOutputProcessor(source, { type: "json_object" });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain("reasoning_content close_pattern");
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 

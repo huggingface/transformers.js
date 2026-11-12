@@ -1,4 +1,4 @@
-import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { AutoModel, PreTrainedModel, env } from "../../src/transformers.js";
 import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -30,7 +30,7 @@ describe("Hub", () => {
       expect(headers.get("Authorization")).toBe("Bearer scoped-token");
     });
 
-    it("should authenticate only the configured custom Hub origin", () => {
+    it("should authenticate only the configured custom Hub origin with an explicit token", () => {
       const context = new AssetLoadingContext({
         env: { hfToken: "scoped-token", remoteHost: "https://private-hub.example/api/" },
       });
@@ -44,6 +44,33 @@ describe("Hub", () => {
       expect(externalHeaders.has("Authorization")).toBe(false);
       expect(downgradedHeaders.has("Authorization")).toBe(false);
       expect(otherPortHeaders.has("Authorization")).toBe(false);
+    });
+
+    it.each(["HF_TOKEN", "HF_ACCESS_TOKEN"])("does not forward %s to a custom Hub, but permits explicitly assigned tokens", (name) => {
+      const saved = { HF_TOKEN: process.env.HF_TOKEN, HF_ACCESS_TOKEN: process.env.HF_ACCESS_TOKEN };
+      try {
+        delete process.env.HF_TOKEN;
+        delete process.env.HF_ACCESS_TOKEN;
+        env.hfToken = undefined;
+        process.env[name] = "environment-token";
+        const options = { env: { remoteHost: "https://cdn.example/" } };
+        const implicit = new AssetLoadingContext(options);
+        expect(implicit.getHeaders("https://cdn.example/file").has("Authorization")).toBe(false);
+        for (const host of ["huggingface.co", "hf.co"]) {
+          expect(implicit.getHeaders(`https://${host}/file`).get("Authorization")).toBe("Bearer environment-token");
+          expect(implicit.getHeaders(`http://${host}/file`).has("Authorization")).toBe(false);
+        }
+        env.hfToken = "environment-token";
+        const explicit = new AssetLoadingContext(options);
+        expect(explicit.getHeaders("https://cdn.example/file").get("Authorization")).toBe("Bearer environment-token");
+        expect(explicit.key("org/model")).not.toBe(implicit.key("org/model"));
+      } finally {
+        env.hfToken = undefined;
+        for (const key of Object.keys(saved)) {
+          if (saved[key] === undefined) delete process.env[key];
+          else process.env[key] = saved[key];
+        }
+      }
     });
 
     it("should split memoization keys by token", () => {

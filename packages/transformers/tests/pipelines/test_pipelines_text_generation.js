@@ -230,6 +230,46 @@ export default () => {
         },
         MAX_TEST_EXECUTION_TIME,
       );
+
+      it.each(["root", "decoder", "generator", "text_config", "list"])(
+        "cuts batched chat output using EOS from the %s model config",
+        async (location) => {
+          const response_template = pipe.tokenizer.response_template;
+          const config = pipe.model.config;
+          const generation_config = pipe.model.configs.generation_config;
+          const eos = [pipe.model.generation_config.eos_token_id].flat()[0];
+          const eosIds = location === "list" ? [eos, 1] : eos;
+          const emittedEos = location === "list" ? 1 : eos;
+          pipe.tokenizer.response_template = { defaults: { role: "assistant" }, start_anchor: "<|assistant|>", fields: { content: { content: "text" } } };
+          pipe.model.config = { ...config, eos_token_id: undefined };
+          if (location === "root" || location === "list") pipe.model.config.eos_token_id = eosIds;
+          else pipe.model.config[location] = { eos_token_id: eosIds };
+          pipe.model.configs.generation_config = null;
+          const answer = pipe.tokenizer.encode("Paris", { add_special_tokens: false });
+          const junk = pipe.tokenizer.encode("junk", { add_special_tokens: false });
+          const generate = jest.spyOn(pipe.model, "generate").mockImplementation(async ({ input_ids }) => {
+            const rows = input_ids.tolist().map((row) => [...row, ...[...answer, emittedEos, ...junk].map(BigInt)]);
+            return new Tensor("int64", BigInt64Array.from(rows.flat()), [rows.length, rows[0].length]);
+          });
+          const parse = jest.spyOn(pipe.tokenizer, "parse_response");
+          try {
+            const output = await pipe([chat_input, chat_input], { max_new_tokens: 8 });
+            expect(output).toHaveLength(2);
+            expect(parse).toHaveBeenCalledTimes(2);
+            for (const [text] of parse.mock.calls) {
+              expect(text.endsWith(pipe.tokenizer.decode([emittedEos]))).toBe(true);
+              expect(text).not.toContain("junk");
+            }
+          } finally {
+            generate.mockRestore();
+            parse.mockRestore();
+            pipe.tokenizer.response_template = response_template;
+            pipe.model.config = config;
+            pipe.model.configs.generation_config = generation_config;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
     });
 
     // TODO: Fix batch_size>1

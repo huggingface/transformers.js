@@ -105,6 +105,8 @@ In Node.js, no configuration is needed for private or gated models: the library
 automatically sends `Authorization: Bearer $HF_TOKEN` with requests to the
 Hugging Face Hub, so setting that environment variable is enough.
 
+Tokens read only from `HF_TOKEN` or `HF_ACCESS_TOKEN` are sent exclusively to `https://huggingface.co` and `https://hf.co`. Tokens explicitly assigned to `env.hfToken` or `options.env.hfToken` may also be sent to the resolved `remoteHost` origin; outside Node.js, the library never sends token authorization headers.
+
 In browsers — or for retry logic and abort signals anywhere — override
 `env.fetch`:
 

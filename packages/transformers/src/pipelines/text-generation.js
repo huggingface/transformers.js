@@ -201,9 +201,10 @@ export class TextGenerationPipeline
             // In a batch, rows that finish early keep generating until the longest row is done. Cut each row after its
             // first EOS token so that run-on text doesn't end up in the parsed message.
             const eos = [
-                generation_kwargs.eos_token_id ??
-                    generation_kwargs.generation_config?.eos_token_id ??
-                    this.model.generation_config?.eos_token_id,
+                this.model._prepare_generation_config(generation_kwargs.generation_config, {
+                    ...this._default_generation_config,
+                    ...generation_kwargs,
+                }).eos_token_id,
             ]
                 .flat()
                 .filter((id) => id != null)

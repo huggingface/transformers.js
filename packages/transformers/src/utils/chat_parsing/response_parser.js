@@ -49,7 +49,17 @@ function schema_types(schema) {
 function coerce(raw, types) {
     for (const type_name of types) {
         try {
-            if (type_name === 'integer') return to_int(raw);
+            if (type_name === 'integer') {
+                let value;
+                try {
+                    value = to_int(raw);
+                } catch {
+                    value = to_float(raw);
+                }
+                // Unlike Python's exact integers, unsafe JS integers stay strings unless another type accepts them.
+                if (Number.isSafeInteger(value)) return value;
+                continue;
+            }
             if (type_name === 'number') {
                 const number = to_float(raw);
                 if (!Number.isFinite(number)) continue; // NaN / inf are not valid JSON numbers

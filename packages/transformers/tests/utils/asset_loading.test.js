@@ -337,10 +337,27 @@ describe("Internal asset loading", () => {
     expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
   });
 
-  it("does not use an old tokenizer cache when the server reports 404", async () => {
+  it.each([401, 404, 429, 503])("uses an old tokenizer cache after HTTP %i and refreshes it once available", async (status) => {
+    env.logLevel = 50;
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
-    env.fetch.mockResolvedValue(new Response(null, { status: 404 }));
-    expect(await get_tokenizer_files(MODEL)).toEqual([]);
+    const online = env.fetch;
+    env.fetch = jest.fn(async () => new Response(null, { status }));
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(cache.delete).not.toHaveBeenCalled();
+    env.fetch = online;
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(cache.entries.has(VERSIONED)).toBe(true);
+    expect(cache.entries.has(`${REMOTE}tokenizer_config.json`)).toBe(false);
+  });
+
+  it.each([401, 404, 429, 503])("preserves HTTP %i behavior without an old cache", async (status) => {
+    env.fetch.mockImplementation(async () => new Response(null, { status }));
+    await expect(getModelJSON(MODEL, "tokenizer_config.json")).rejects.toThrow();
+    if (status === 404) expect(await get_tokenizer_files(MODEL)).toEqual([]);
+    else await expect(get_tokenizer_files(MODEL)).rejects.toThrow();
   });
 
   it("propagates tokenizer metadata network errors without an old cache", async () => {

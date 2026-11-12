@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 
 import { CrossOriginStorage } from "../../src/utils/cache/CrossOriginStorageCache.js";
-import { env } from "../../src/env.js";
+import { env, resolveEnv } from "../../src/env.js";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
 import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 import { Pipeline, getSessionEnv, prepareImages, prepareAudios } from "../../src/pipelines/_base.js";
@@ -125,7 +125,7 @@ describe("Session-scoped resource loading", () => {
 
       expect(env.hfToken).toBe("late-token");
       expect(env.remoteHost).toBe("https://late-hub.example/");
-      expect(new AssetLoadingContext().getHeaders("https://late-hub.example/org/model").get("Authorization")).toBe("Bearer late-token");
+      expect(new AssetLoadingContext().getHeaders("https://late-hub.example/org/model").has("Authorization")).toBe(false);
     });
 
     it("should restore the environment-variable fallback when assigned undefined", () => {
@@ -138,6 +138,28 @@ describe("Session-scoped resource loading", () => {
 
       expect(env.hfToken).toBe("late-token");
       expect(env.remoteHost).toBe("https://late-hub.example/");
+    });
+
+    it("allows an explicitly assigned token to follow HF_ENDPOINT", () => {
+      process.env.HF_ENDPOINT = "https://private-hub.example/";
+      env.hfToken = "assigned-token";
+      try {
+        expect(new AssetLoadingContext().getHeaders("https://private-hub.example/file").get("Authorization")).toBe("Bearer assigned-token");
+      } finally {
+        env.hfToken = undefined;
+      }
+    });
+
+    it("never sends token headers outside Node", () => {
+      const originalProcess = globalThis.process;
+      try {
+        globalThis.process = undefined;
+        const context = new AssetLoadingContext({ env: { hfToken: "explicit-token", remoteHost: "https://private-hub.example/" } });
+        expect(context.getHeaders("https://huggingface.co/file").has("Authorization")).toBe(false);
+        expect(context.getHeaders("https://private-hub.example/file").has("Authorization")).toBe(false);
+      } finally {
+        globalThis.process = originalProcess;
+      }
     });
 
     it("should keep reading HF_TOKEN after an env snapshot without a token is restored", () => {
@@ -154,6 +176,20 @@ describe("Session-scoped resource loading", () => {
 
       expect(env.hfToken).toBe("legacy-token");
       expect(env.remoteHost).toBe("https://huggingface.co/");
+    });
+
+    it("ignores undefined session overrides and accepts null env", () => {
+      process.env.HF_TOKEN = "fallback-token";
+      expect(resolveEnv({ remoteHost: undefined, hfToken: undefined })).toEqual(resolveEnv());
+      expect(resolveEnv(null)).toEqual(resolveEnv());
+      const context = new AssetLoadingContext({ env: { remoteHost: undefined, hfToken: undefined } });
+      expect(context.resolve("org/model", "config.json").remoteURL).toBe("https://huggingface.co/org/model/resolve/main/config.json");
+      expect(context.getHeaders("https://huggingface.co/org/model").get("Authorization")).toBe("Bearer fallback-token");
+      expect(new AssetLoadingContext({ env: { remoteHost: "https://cdn.example/", hfToken: undefined } }).getHeaders("https://cdn.example/file").has("Authorization")).toBe(false);
+    });
+
+    it("preserves explicit false, null and empty-string overrides", () => {
+      expect(resolveEnv({ allowRemoteModels: false, hfToken: null, remoteHost: "" })).toMatchObject({ allowRemoteModels: false, hfToken: null, remoteHost: "" });
     });
   });
 

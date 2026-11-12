@@ -1083,6 +1083,12 @@ describe("Response templates", () => {
     });
 
     it("follows Python's casting rules", () => {
+      expect(coerce("3", { type: "integer" })).toBe(3);
+      expect(coerce("3.0", { type: "integer" })).toBe(3);
+      expect(coerce("-2.0", { type: "integer" })).toBe(-2);
+      expect(coerce("3.5", { type: "integer" })).toBe("3.5");
+      expect(coerce("9007199254740993", { type: "integer" })).toBe("9007199254740993");
+      expect(coerce("3.5", { type: ["integer", "number"] })).toBe(3.5);
       expect(coerce("not-a-number", { type: "integer" })).toEqual("not-a-number");
       expect(coerce("1_000", { type: "integer" })).toEqual(1000);
       expect(coerce("5", { type: ["integer", "null"] })).toEqual(5);

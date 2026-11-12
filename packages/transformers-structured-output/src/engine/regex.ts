@@ -156,9 +156,11 @@ class RegexParser {
         let value: number;
         if (code === 'x') value = this.hex(2);
         else if (code === 'u') value = this.hex(4);
-        else
-            value =
-                ({ n: 10, r: 13, t: 9, f: 12, v: 11, b: 8 } as Record<string, number>)[code] ?? code.codePointAt(0)!;
+        else {
+            const control = ({ n: 10, r: 13, t: 9, f: 12, v: 11, b: 8 } as Record<string, number>)[code];
+            if (control === undefined && /[a-z0-9]/i.test(code)) this.fail(`unsupported escape \\${code}`);
+            value = control ?? code.codePointAt(0)!;
+        }
         const text = String.fromCodePoint(value);
         const encoded = encoder.encode(text);
         const bytes = encoded.length === 1 ? singleton(encoded[0]) : undefined;

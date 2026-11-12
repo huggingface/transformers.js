@@ -240,6 +240,12 @@ async function loadResourceFile(
                 }
             }
 
+            if (remoteResponse && remoteResponse.status !== 200 && stale) {
+                logger.warn(
+                    `Unable to refresh "${remoteURL}" (HTTP ${remoteResponse.status}), using the previously cached copy.`,
+                );
+                remoteResponse = undefined;
+            }
             if (remoteResponse) {
                 response = remoteResponse;
                 if (response.status !== 200) {

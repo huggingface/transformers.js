@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+import { ENV_WITH_EXPLICIT_TOKEN } from './utils/hub/constants.js';
 
 const VERSION = '4.4.0-next.0';
 
@@ -325,9 +326,15 @@ export const env = {
 export function resolveEnv(sessionEnv = {}) {
     const resolved = { ...env };
     for (const key of SESSION_ENV_KEYS) {
-        if (Object.hasOwn(sessionEnv, key)) {
+        if (sessionEnv != null && Object.hasOwn(sessionEnv, key) && sessionEnv[key] !== undefined) {
             resolved[key] = sessionEnv[key];
         }
+    }
+    if (
+        hfToken !== undefined ||
+        (sessionEnv != null && Object.hasOwn(sessionEnv, 'hfToken') && sessionEnv.hfToken !== undefined)
+    ) {
+        ENV_WITH_EXPLICIT_TOKEN.add(resolved);
     }
     return resolved;
 }

@@ -158,6 +158,9 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
             };
         }
 
+        const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+        if (stale) return { exists: true, fromCache: true };
+
         // 404 means the file does not exist, and 416 is what a zero-length file returns for `bytes=0-0`.
         // Any other failure status (401/403, 429, 5xx, ...) is an error, not "missing".
         if (rangeResponse && rangeResponse.status !== 404 && rangeResponse.status !== 416) {

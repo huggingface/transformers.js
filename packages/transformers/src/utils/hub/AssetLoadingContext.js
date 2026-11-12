@@ -2,6 +2,7 @@ import { resolveEnv } from '../../env.js';
 import { getCacheForEnvironment, tryCache } from '../cache.js';
 import { FileCache } from '../cache/FileCache.js';
 import { FileResponse } from './FileResponse.js';
+import { ENV_WITH_EXPLICIT_TOKEN } from './constants.js';
 import { isValidHfModelId, isValidUrl, makePretrainedOptionsKey, pathJoin } from './utils.js';
 
 // Only assets explicitly listed here receive new cache keys. Model weights and
@@ -62,6 +63,7 @@ export class AssetLoadingContext {
             : null;
         // Authorization headers are never sent outside Node, since that would expose the token to the client.
         this.token = isNode ? this.settings.hfToken : null;
+        this.explicitToken = isNode && ENV_WITH_EXPLICIT_TOKEN.has(this.settings);
         /** @type {Promise<import('../cache.js').CacheInterface|null>|undefined} */
         this.cache = undefined;
     }
@@ -89,7 +91,8 @@ export class AssetLoadingContext {
         const { remoteHost } = this.settings;
         return (
             isValidUrl(urlOrPath, ['https:'], ['huggingface.co', 'hf.co']) ||
-            (isValidUrl(remoteHost, ['http:', 'https:']) &&
+            (this.explicitToken &&
+                isValidUrl(remoteHost, ['http:', 'https:']) &&
                 isValidUrl(urlOrPath) &&
                 new URL(urlOrPath).origin === new URL(remoteHost).origin)
         );
@@ -207,6 +210,14 @@ export class AssetLoadingContext {
                         : value,
                 ]),
         );
-        return makePretrainedOptionsKey(modelId, this.options, settings, this.userAgent, this.token, ...parts);
+        return makePretrainedOptionsKey(
+            modelId,
+            this.options,
+            settings,
+            this.userAgent,
+            this.token,
+            this.explicitToken,
+            ...parts,
+        );
     }
 }
