@@ -14,6 +14,7 @@ jest.unstable_mockModule("../../src/utils/model_registry/get_pipeline_files.js",
 const { env } = await import("../../src/env.js");
 const { getModelJSON, getModelFile } = await import("../../src/utils/hub.js");
 const { get_file_metadata, get_file_metadata_with_context } = await import("../../src/utils/model_registry/get_file_metadata.js");
+const { get_tokenizer_files } = await import("../../src/utils/model_registry/get_tokenizer_files.js");
 const { is_cached_files, is_pipeline_cached_files } = await import("../../src/utils/model_registry/is_cached.js");
 const { clear_cache, clear_pipeline_cache } = await import("../../src/utils/model_registry/clear_cache.js");
 const { FileCache } = await import("../../src/utils/cache/FileCache.js");
@@ -314,6 +315,41 @@ describe("Internal asset loading", () => {
     expect(cache.delete).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["remote disabled", { allowRemoteModels: false }, {}],
+    ["local files only", {}, { local_files_only: true }],
+  ])("discovers the old tokenizer cache with %s", async (_name, settings, options) => {
+    env.allowLocalModels = true;
+    Object.assign(env, settings);
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    expect(await get_tokenizer_files(MODEL, options)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(await getModelJSON(MODEL, "tokenizer_config.json", true, options)).toEqual({ stale: true });
+    expect(env.fetch).not.toHaveBeenCalled();
+  });
+
+  it("discovers an old tokenizer cache when the metadata request fails offline", async () => {
+    env.logLevel = 50;
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    env.fetch = jest.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
+  });
+
+  it("does not use an old tokenizer cache when the server reports 404", async () => {
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    env.fetch.mockResolvedValue(new Response(null, { status: 404 }));
+    expect(await get_tokenizer_files(MODEL)).toEqual([]);
+  });
+
+  it("propagates tokenizer metadata network errors without an old cache", async () => {
+    env.fetch = jest.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await expect(get_tokenizer_files(MODEL)).rejects.toThrow("Failed to fetch");
+  });
+
   it("falls back to the outdated copy when the refresh fails, and replaces it once online", async () => {
     env.logLevel = 50;
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
@@ -346,6 +382,7 @@ describe("Internal asset loading", () => {
       env.customCache = new FileCache(directory);
       env.allowRemoteModels = false;
       env.allowLocalModels = true;
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
       expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
       expect(await getModelFile(MODEL, "tokenizer_config.json", true, {}, true)).toBe(path.join(directory, MODEL, "tokenizer_config.json"));
     } finally {

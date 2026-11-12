@@ -626,6 +626,22 @@ describe("StructuredOutputProcessor", () => {
     expect(() => processor([[...inputIds, BigInt(EOS_TOKEN_ID)]], logits())).toThrow("observed the tokenizer EOS");
   });
 
+  it("allows EOS after an accepted non-eager content closer", async () => {
+    const source = {
+      ...thinkingTokenizer,
+      tokens: [...tokenizer.tokens.slice(0, EOS_TOKEN_ID), new TextEncoder().encode("<eos>")],
+      response_template: {
+        ...thinkingTokenizer.response_template,
+        fields: { ...thinkingTokenizer.response_template.fields, content: { close_pattern: "</final>\\s*" } },
+      },
+    };
+    const processor = new StructuredOutputProcessor(source, { type: "regex", regex: "ok" });
+    const inputIds = await consume(processor, "ok</final>");
+    const scores = logits();
+    processor([inputIds], scores);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
+  });
+
   it.each(["hello", "ok"])("ignores a start_anchor from an earlier, closed turn (previous answer %j)", (answer) => {
     const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
     const scores = logits();

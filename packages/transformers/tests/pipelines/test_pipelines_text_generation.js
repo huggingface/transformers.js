@@ -65,6 +65,22 @@ export default () => {
         MAX_TEST_EXECUTION_TIME,
       );
       it(
+        "plain text skips special tokens even when a response template is configured",
+        async () => {
+          const original = pipe.tokenizer.response_template;
+          pipe.tokenizer.response_template = { defaults: { role: "assistant" }, fields: { content: { content: "text" } } };
+          const decode = jest.spyOn(pipe.tokenizer, "batch_decode");
+          try {
+            expect(await pipe(text_input, { max_new_tokens: 3, return_full_text: false })).toEqual(new_text_target);
+            expect(decode.mock.calls.every(([, options]) => options.skip_special_tokens === true)).toBe(true);
+          } finally {
+            decode.mockRestore();
+            pipe.tokenizer.response_template = original;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
         "text input (list) - return_full_text=false",
         async () => {
           const output = await pipe([text_input], { max_new_tokens: 3, return_full_text: false });

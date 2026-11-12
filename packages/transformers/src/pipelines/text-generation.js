@@ -189,10 +189,10 @@ export class TextGenerationPipeline
             })
         );
 
-        // Response templates often delimit regions with special tokens, so keep them when parsing
+        // Response templates often delimit regions with special tokens, so keep them only when parsing
         const response_template = this.tokenizer.response_template;
-        const skip_special_tokens = !response_template;
         const parse = isChatInput && Boolean(response_template);
+        const skip_special_tokens = !parse;
         const prompt_length = text_inputs.input_ids.dims.at(-1);
 
         /** @type {Tensor|bigint[][]} */

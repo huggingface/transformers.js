@@ -110,8 +110,16 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
     // Check remote if allowed - use Range request for efficiency
     if (context.settings.allowRemoteModels && !context.options.local_files_only && validModelId) {
         // A Range request reads the metadata without downloading the file.
-        // Transport failures propagate: they mean "could not check", not "missing".
-        const rangeResponse = await fetch_file_head(remoteURL, context);
+        // Transport failures propagate unless an older cached copy can be loaded offline.
+        let rangeResponse;
+        try {
+            rangeResponse = await fetch_file_head(remoteURL, context);
+        } catch (error) {
+            // Match getModelFile's offline fallback, but don't mask a failure when no older copy exists.
+            const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+            if (!stale) throw error;
+            return { exists: true, fromCache: true };
+        }
 
         if (rangeResponse && rangeResponse.status >= 200 && rangeResponse.status < 300) {
             let size;
@@ -157,5 +165,10 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
         }
     }
 
+    // A pre-versioned tokenizer config is still loadable when remote access is disabled.
+    if (!context.settings.allowRemoteModels || context.options.local_files_only) {
+        const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+        if (stale) return { exists: true, fromCache: true };
+    }
     return { exists: false, fromCache: false };
 }

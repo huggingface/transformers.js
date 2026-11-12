@@ -59,10 +59,11 @@ const GROUP = /\((?:\?(?:(:|=|!|<=|<!)|P?<(\w+)>|P=(\w+)\)))?/y;
 /**
  * Translate a Python `regex` pattern to JavaScript.
  * @param {string} pattern The Python pattern.
+ * @param {boolean} [end_of_input=true] Whether end-of-input assertions may succeed.
  * @returns {{ source: string, partial: string, flags: string, names: string[] }} The JavaScript source,
  * its partial-matching variant, the flags to compile both with, and the names of all named groups.
  */
-function rewrite_python_to_js(pattern) {
+function rewrite_python_to_js(pattern, end_of_input = true) {
     // Global inline flags must lead the pattern, as in Python.
     const leading = /^(?:\(\?[a-zA-Z]+\))*/.exec(pattern)[0];
     let flags = 'su';
@@ -89,6 +90,7 @@ function rewrite_python_to_js(pattern) {
         ++i;
         if (i >= pattern.length) throw new Error('bad escape (end of pattern)');
         const e = next_character();
+        if (!in_class && e === 'Z' && !end_of_input) return '(?!)';
         const replacement = (in_class ? CLASS_ESCAPE_REWRITES : ESCAPE_REWRITES).get(e);
         if (replacement !== undefined) return replacement;
         if (NATIVE_ESCAPES.has(e)) return `\\${e}`;
@@ -222,7 +224,7 @@ function rewrite_python_to_js(pattern) {
             } else if (c === '|' || c === '^' || c === '$') {
                 ++i;
                 // Python's `$` also matches before a trailing newline
-                const text = c === '$' ? String.raw`(?=\n?(?![\s\S]))` : c;
+                const text = c === '$' ? (end_of_input ? String.raw`(?=\n?(?![\s\S]))` : '(?!)') : c;
                 source += text;
                 partial += text;
             } else if (c === '.') {
@@ -244,6 +246,7 @@ function rewrite_python_to_js(pattern) {
  * @typedef {Object} CompiledPattern
  * @property {RegExp} regex Global regex, for searching and iterating over matches.
  * @property {RegExp} sticky Sticky regex, for matching at a given position.
+ * @property {RegExp} streaming Sticky regex with end-of-input assertions disabled.
  * @property {RegExp} partial Global regex that also matches prefixes of matches that run into the end of the input.
  * @property {string[]} names Names of the pattern's named groups.
  */
@@ -263,6 +266,7 @@ export function compile_pattern(pattern) {
         compiled = {
             regex: new RegExp(source, `${flags}g`),
             sticky: new RegExp(source, `${flags}y`),
+            streaming: new RegExp(rewrite_python_to_js(pattern, false).source, `${flags}y`),
             partial: new RegExp(partial, `${flags}g`),
             names,
         };

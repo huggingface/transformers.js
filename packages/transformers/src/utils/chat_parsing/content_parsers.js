@@ -131,7 +131,10 @@ function _json(text, args) {
     }
 
     if (unquoted_keys) {
-        working = working.replace(compile_pattern(String.raw`(?<=[{,])(\w+):`).regex, '"$1":');
+        // Consume quoted strings first so key-like text and escaped quotes inside them stay untouched.
+        working = working.replace(compile_pattern(String.raw`"(?:\\.|[^"\\])*"|(?<=[{,])(\w+):`).regex, (match, key) =>
+            key === undefined ? match : `"${key}":`,
+        );
     }
 
     for (let i = 0; i < captured.length; ++i) {
@@ -648,7 +651,7 @@ export function validate_transform_strings(scope, transform) {
  * keys unpacked into the template scope, alongside any regex captures).
  * @param {string} body The region's text.
  * @param {import('./response_templates.js').ResponseTemplateField} field The field being closed.
- * @param {Record<string, string>} captures Named groups captured by the field's open pattern.
+ * @param {Record<string, string>} captures Named groups from the field's open and close patterns; closing groups take precedence.
  * @returns {any}
  */
 export function process_field(body, field, captures) {

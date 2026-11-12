@@ -1225,6 +1225,59 @@ describe("Response templates", () => {
   describe("JavaScript port", () => {
     const template_with = (fields) => ({ defaults: { role: "assistant" }, start_anchor: "<a>", fields });
 
+    it("merges closing captures with opening captures, with closing captures taking precedence", () => {
+      const template = template_with({ item: { open_pattern: "<(?P<tag>item):(?P<id>\\w+)>", close_pattern: "</(?P<tag>\\w+)>", transform: { tag: "{tag}", id: "{id}", body: "{content}" } } });
+      const text = "<item:first>body</done>";
+      const expected = { role: "assistant", item: { tag: "done", id: "first", body: "body" } };
+      expect(parse_response(text, template, { prefix: "" })).toEqual(expected);
+      for (let split = 0; split <= text.length; ++split) {
+        const parser = new ResponseParser(template, { prefix: "" });
+        parser.feed(text.slice(0, split));
+        parser.feed(text.slice(split));
+        expect(parser.finalize()[0]).toEqual(expected);
+      }
+    });
+
+    it("uses closing captures for implicit regions without leaking them across repeated regions", () => {
+      const implicit = template_with({ content: { close_pattern: "</(?P<tag>\\w+)>", transform: { tag: "{tag}", body: "{content}" } } });
+      expect(parse_response("body</done>", implicit, { prefix: "" }).content).toEqual({ tag: "done", body: "body" });
+      const repeated = template_with({ item: { open: "<item>", close_pattern: "</(?P<tag>\\w+)>", repeats: true, transform: { tag: "{tag}", body: "{content}" } } });
+      expect(parse_response("<item>one</first><item>two</second>", repeated, { prefix: "" }).item).toEqual([
+        { tag: "first", body: "one" },
+        { tag: "second", body: "two" },
+      ]);
+    });
+
+    it.each(["$", "(?=$)", "END$", "END(?=$)", "(?=\\n\\Z)"])("does not commit end-dependent closer %j before a trailing newline", (close_pattern) => {
+      const template = template_with({ item: { open: "<item>", close_pattern, content_args: { strip: false } } });
+      const marker = close_pattern.startsWith("END") ? "END" : "";
+      const text = `<item>hello${marker}\nworld${marker}`;
+      const expected = parse_response(text, template, { prefix: "" });
+      for (let split = 0; split <= text.length; ++split) {
+        const parser = new ResponseParser(template, { prefix: "" });
+        const events = parser.feed(text.slice(0, split));
+        expect(events.some((e) => e.type === "region_close")).toBe(false);
+        parser.feed(text.slice(split));
+        expect(parser.finalize()[0]).toEqual(expected);
+      }
+    });
+
+    it("does not delay a lookahead-only closer that already has its following text", () => {
+      const template = template_with({ item: { open: "<item>", close_pattern: "(?=NEXT)" }, content: {} });
+      const parser = new ResponseParser(template, { prefix: "" });
+      expect(parser.feed("<item>helloNEXT")).toContainEqual({ type: "region_close", field: "item", value: "hello" });
+      expect(parser.finalize()[0]).toEqual({ role: "assistant", item: "hello", content: "NEXT" });
+    });
+
+    it("quotes bare JSON keys without rewriting string values, escapes, or quoted keys", () => {
+      const values = [{ text: "note,warning: hot", n: 1 }, { text: 'quote: ",warning: hot', nested: { text: "{key:value}" } }, { text: "backslash: \\", items: [{ text: "comma,key:value" }] }, { "quoted,key:here": "value" }];
+      for (const value of values) {
+        expect(parse_content(JSON.stringify(value), "json", { unquoted_keys: true })).toEqual(value);
+      }
+      expect(parse_content('{text:"note,warning: hot",nested:{n:1}}', "json", { unquoted_keys: true })).toEqual({ text: "note,warning: hot", nested: { n: 1 } });
+      expect(parse_content('{text:<|"|>note,warning: hot<|"|>,n:1}', "json", { unquoted_keys: true, string_delims: [['<|"|>', '<|"|>']] })).toEqual({ text: "note,warning: hot", n: 1 });
+    });
+
     it("does not share mutable defaults across parses", () => {
       const template = { ...template_with({ tool_calls: { open: "<tool>", close: "</tool>", repeats: true, content: "json" } }), defaults: { role: "assistant", tool_calls: [] } };
       const response = '<tool>{"name":"weather"}</tool>';

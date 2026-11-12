@@ -234,6 +234,7 @@ export class ResponseParser {
                     // "close" (always the implicit region's close here,
                     // since explicit regions only expose their own close)
                     const had_content = this._opened;
+                    this._captures = { ...this._captures, ...m.groups };
                     this._close_current(events);
                     // Zero-width close on an already-empty region would just
                     // re-fire next iteration -- bail out to make progress.
@@ -341,8 +342,8 @@ export class ResponseParser {
     /**
      * Whether a *complete* match ending at the current buffer edge could still
      * change as more input arrives -- in which case we defer rather than commit. A
-     * match ending before the edge has already seen its terminating character and is
-     * final. At the edge: zero-width matches (`$` / `\Z`) are only real at true
+     * match ending before the edge is final only if it does not depend on end-of-input
+     * assertions (e.g. `$` before a trailing newline). At the edge: zero-width matches are held until
      * EOS; a fully-present literal that no other literal in its set extends cannot
      * grow (the fast path that keeps literal delimiters zero-latency); anything
      * else (regex delimiters, prefix-overlapping literal lists) might.
@@ -351,7 +352,17 @@ export class ResponseParser {
      * @private
      */
     _can_grow(anchor, m) {
-        if (m.end !== this._buffer.length) return false;
+        if (m.end !== this._buffer.length) {
+            // `$` can match before a trailing newline, including inside a lookahead.
+            // Commit only if the same match survives without end-of-input assertions.
+            anchor.streaming.lastIndex = m.start;
+            const stable = anchor.streaming.exec(this._buffer);
+            return (
+                stable === null ||
+                stable.index + stable[0].length !== m.end ||
+                Object.entries(m.groups).some(([name, value]) => stable.groups?.[name] !== value)
+            );
+        }
         if (m.start === m.end) return true;
         return anchor.literals === null || anchor.literal_can_extend;
     }

@@ -107,7 +107,9 @@ export function withResponseProtocol(
         return next.phase !== 'dead' && (next.phase !== 'structured' || next.state === structured.initial);
     };
     const accepting = (state: ProtocolState): boolean =>
-        state.phase === 'finished' || (state.phase === 'structured' && structured.accepting(state.state));
+        state.phase === 'finished' ||
+        (state.phase === 'ending' && state.progress.accepted) ||
+        (state.phase === 'structured' && structured.accepting(state.state));
     return {
         initial,
         initialize: (bytes) => {
