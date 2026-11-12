@@ -57,8 +57,8 @@ describe("Tensor operations", () => {
       expect(() => cat([a, b], 0)).toThrow("Sizes of tensors must match except in dimension 0. Expected size 3 but got size 2 for tensor number 1 in the list.");
       expect(() => cat([a, b], -2)).toThrow("Sizes of tensors must match except in dimension 0.");
       // Matching on the non-concatenated dim is still fine
-      const c = new Tensor("float32", [1, 2, 3, 4], [2, 2]);
-      expect(cat([a, c], 1).dims).toEqual([2, 5]);
+      const c = new Tensor("float32", [7, 8, 9, 10], [2, 2]);
+      expect(cat([a, c], 1)).toEqual(new Tensor("float32", [1, 2, 3, 7, 8, 4, 5, 6, 9, 10], [2, 5]));
     });
 
     it("should throw when tensors have different ranks", () => {
