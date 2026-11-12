@@ -528,12 +528,25 @@ export class Tensor {
      * @returns The summed tensor
      */
     sum(dim = null, keepdim = false) {
-        return this.norm(1, dim, keepdim);
+        const this_data = this.data;
+        const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
+        const fn = (/** @type {any} */ a, /** @type {any} */ b) => a + b;
+        const zero = is_bigint ? 0n : 0;
+
+        if (dim === null) {
+            // @ts-ignore
+            const val = this_data.reduce(fn, zero);
+            return new Tensor(this.type, [val], []);
+        }
+
+        const [type, result, resultDims] = reduce_helper(fn, this, dim, keepdim);
+        return new Tensor(type, result, resultDims);
     }
 
     /**
      * Returns the matrix norm or vector norm of a given tensor.
-     * @param {number|string} [p='fro'] The order of norm
+     * @param {number|string} [p='fro'] The order of norm. Use `Infinity` for the max of the absolute values
+     * and `-Infinity` for the min.
      * @param {number|null} [dim=null] Specifies which dimension of the tensor to calculate the norm across.
      * If dim is None, the norm will be calculated across all dimensions of input.
      * @param {boolean} [keepdim=false] Whether the output tensors have dim retained or not.
@@ -550,18 +563,18 @@ export class Tensor {
         const this_data = this.data;
         const is_bigint = this_data instanceof BigInt64Array || this_data instanceof BigUint64Array;
 
-        if (is_bigint && p !== 1) {
+        if (is_bigint) {
             throw Error(`Expected a floating point tensor as input. Got ${this.type}`);
         }
 
-        let fn, zero;
-        if (is_bigint) {
-            fn = (/** @type {bigint} */ a, /** @type {bigint} */ b) => a + b;
-            zero = 0n;
-        } else {
-            fn = (/** @type {number} */ a, /** @type {number} */ b) => a + b ** p;
-            zero = 0;
+        if (p === Infinity || p === -Infinity) {
+            // Same as PyTorch: inf-norm = amax(|x|), -inf-norm = amin(|x|).
+            const abs = this.map(Math.abs);
+            return p === Infinity ? abs.max(dim, keepdim) : abs.min(dim, keepdim);
         }
+
+        const fn = (/** @type {number} */ a, /** @type {number} */ b) => a + Math.abs(b) ** p;
+        const zero = 0;
 
         if (dim === null) {
             // @ts-ignore
