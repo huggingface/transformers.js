@@ -260,32 +260,76 @@ export default () => {
     );
 
     it(
-      "rejects a config without an eos_token_id before it touches the audio",
+      "generates without an eos_token_id when max_new_tokens comes first",
       async () => {
         const audio = syntheticAudio();
         const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
 
-        // `generate` cannot end a step whose audio ran out without an end-of-sequence
-        // token, so it fails up front. That has to happen before the encoder state is
-        // created: one created and then abandoned would leave its KV cache and its
-        // `states` entry behind. Creating it is the first thing that reads the
-        // iterator, so an untouched iterator shows nothing was set up.
-        let iterated = false;
-        const input_features = {
-          [Symbol.asyncIterator]() {
-            iterated = true;
-            return (async function* () {})();
-          },
-        };
+        // Only a step whose audio has run out needs an end-of-sequence token. A call
+        // that stops on `max_new_tokens` with audio to spare never takes that step,
+        // so it must not be rejected for the lack of one.
+        const outputs = await model.generate({
+          input_ids: first_chunk.input_ids,
+          input_features: buildInputFeaturesGenerator(audio),
+          max_new_tokens: 1,
+          generation_config: { eos_token_id: null },
+        });
 
+        const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+        expect(generated).toHaveLength(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "ends on a per-call eos_token_id when the model stores none",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        // Ending a step whose audio ran out has to read the eos_token_id of this call,
+        // not the model's stored one: a model that stores none still ends correctly
+        // when the caller passes one.
+        const storedGenerationEos = model.generation_config.eos_token_id;
+        const storedTextEos = model.config.text_config.eos_token_id;
+        model.generation_config.eos_token_id = null;
+        model.config.text_config.eos_token_id = null;
+        try {
+          const outputs = await model.generate({
+            input_ids: first_chunk.input_ids,
+            input_features: buildInputFeaturesGenerator(audio),
+            max_new_tokens: 100,
+            eos_token_id: 3,
+          });
+
+          const generated = outputs.tolist()[0].slice(first_chunk.input_ids.dims[1]);
+          expect(generated.at(-1)).toBe(3n);
+        } finally {
+          model.generation_config.eos_token_id = storedGenerationEos;
+          model.config.text_config.eos_token_id = storedTextEos;
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "rejects a config without an eos_token_id once the audio runs out",
+      async () => {
+        const audio = syntheticAudio();
+        const first_chunk = await processor(audio.subarray(0, processor.num_samples_first_audio_chunk), { is_streaming: true, is_first_audio_chunk: true });
+
+        // A step whose audio has run out can only end on an end-of-sequence token.
+        // Without one, generation fails at that step instead of decoding positions
+        // that have no audio embedding. `max_new_tokens` is what carries it to that
+        // step: the default budget would stop long before the audio runs out.
         await expect(
           model.generate({
             input_ids: first_chunk.input_ids,
-            input_features,
+            input_features: buildInputFeaturesGenerator(audio),
+            max_new_tokens: 100,
             generation_config: { eos_token_id: null },
           }),
         ).rejects.toThrow(/eos_token_id/);
-        expect(iterated).toBe(false);
 
         // The model is still usable afterwards.
         const outputs = await model.generate({

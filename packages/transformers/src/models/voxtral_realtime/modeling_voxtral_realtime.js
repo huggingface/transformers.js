@@ -78,8 +78,17 @@ function createEncoderState(model, input_features) {
         stream_exhausted: false,
         /** The step now being decoded had no audio left (`forward` set it): force `</s>`. */
         forcing_eos: false,
+        /**
+         * The end-of-sequence token(s) of this call, which is what a step without
+         * audio has to end on. It is the effective generation config's value, not the
+         * model's stored one, so `generate({ eos_token_id })` and a per-call
+         * `generation_config` are honoured here too. `generate` fills it in.
+         * @type {number|number[]|null}
+         */
+        eos_token_id: null,
         chunks_iter,
         text_hidden_size: text_config.hidden_size,
+        vocab_size: text_config.vocab_size,
     };
 }
 
@@ -195,23 +204,23 @@ function addAudioEmbeddings(s, inputs_embeds, current_len) {
  * implementation never runs such a step: it stops as soon as the chunk generator is
  * exhausted. Here the loop can only learn that the stream has ended once it needs the
  * next chunk, so the step is answered with `</s>` instead of being decoded.
- * @param {PreTrainedModel} model
+ *
+ * A call without an end-of-sequence token can only fail at that step, never earlier:
+ * until the audio runs out, nothing here is needed.
+ * @param {Object} s Encoder state.
  * @param {number} seq_len Number of positions in the current step.
  * @returns {Tensor} Logits of shape `[1, seq_len, vocab_size]`.
  * @private
  */
-function endOfSequenceLogits(model, seq_len) {
-    const config = /** @type {any} */ (model.config);
-    const { vocab_size } = config.text_config;
-    // Same precedence as `_prepare_generation_config`: the generation config, then the text config.
-    const eos = model.generation_config?.eos_token_id ?? config.text_config.eos_token_id ?? config.eos_token_id;
-    const eos_token_id = Array.isArray(eos) ? eos[0] : eos;
+function endOfSequenceLogits(s, seq_len) {
+    const { vocab_size, eos_token_id } = s;
     if (eos_token_id == null) {
         throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
     }
+    const eos = Array.isArray(eos_token_id) ? eos_token_id[0] : eos_token_id;
     const data = new Float32Array(seq_len * vocab_size).fill(-Infinity);
     for (let i = 0; i < seq_len; ++i) {
-        data[i * vocab_size + eos_token_id] = 0;
+        data[i * vocab_size + eos] = 0;
     }
     return new Tensor('float32', data, [1, seq_len, vocab_size]);
 }
@@ -226,29 +235,30 @@ function endOfSequenceLogits(model, seq_len) {
  * argmax — and generation would carry on decoding audio-less steps. This processor
  * is appended last, so it runs after all of them.
  *
- * Its `eos_token_id` comes from the effective generation config of this call, not
- * from the model's stored one: `generate({ eos_token_id })` and a per-call
- * `generation_config` replace it, and a stop token the helper below never read
+ * Its `eos_token_id` is the one on the encoder state, which is the effective generation
+ * config of this call, not the model's stored one: `generate({ eos_token_id })` and a
+ * per-call `generation_config` replace it, and a stop token the helper above never read
  * would leave generation running to `max_new_tokens`.
  * @private
  */
 class AudioExhaustedLogitsProcessor extends LogitsProcessor {
     /**
-     * @param {Object} enc_state The encoder streaming state.
-     * @param {number|number[]} eos_token_id The effective end-of-sequence token(s).
+     * @param {Object} enc_state The encoder streaming state, which carries the
+     * end-of-sequence token(s) of this call.
      */
-    constructor(enc_state, eos_token_id) {
+    constructor(enc_state) {
         super();
         this._s = enc_state;
-        this.eos_token_id = Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id];
     }
 
     _call(input_ids, logits) {
         if (!this._s.forcing_eos) return logits;
+        const { eos_token_id } = this._s;
+        const eos_tokens = Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id];
         for (let i = 0; i < logits.dims[0]; ++i) {
             const row = /** @type {Float32Array} */ (logits[i].data);
             row.fill(-Infinity);
-            for (const eos_token of this.eos_token_id) {
+            for (const eos_token of eos_tokens) {
                 row[eos_token] = 0;
             }
         }
@@ -292,7 +302,7 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
                 // processors did to these logits; the cache is not advanced here, and
                 // does not need to be, because generation stops on that token.
                 enc.forcing_eos = true;
-                return { logits: endOfSequenceLogits(this, current_len) };
+                return { logits: endOfSequenceLogits(enc, current_len) };
             }
         }
 
@@ -320,15 +330,14 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
             throw new Error('input_features (generator/iterable) must be provided');
         }
 
-        // Resolve the effective generation config before anything is allocated: a model with no
-        // `eos_token_id` cannot end a step whose audio ran out, and failing here keeps a call that
-        // cannot succeed from creating (and leaking) an encoder state.
+        // Resolve the effective generation config before the encoder state is created, so
+        // that the state carries the `eos_token_id` this call uses — `generate({ eos_token_id })`
+        // and a per-call `generation_config` included. A missing one is not an error yet: a
+        // call that stops before the audio runs out never needs it.
         const { eos_token_id } = this._prepare_generation_config(generation_config, kwargs);
-        if (eos_token_id == null) {
-            throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
-        }
 
         const enc_state = createEncoderState(this, input_features);
+        enc_state.eos_token_id = eos_token_id;
         states.set(this, enc_state);
 
         const stopping_criteria = new StoppingCriteriaList();
@@ -336,15 +345,13 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         if (userStoppingCriteria) stopping_criteria.extend(userStoppingCriteria);
 
         // Ending the step that runs out of audio is a processor of ours, appended last
-        // so that it runs after `min_new_tokens` and the rest, and built from the
-        // generation config this call actually uses — `generate({ eos_token_id })` and
-        // a per-call `generation_config` included. The logits `forward` returns for
-        // that step are only a fallback for callers that bypass `generate`.
+        // so that it runs after `min_new_tokens` and the rest. The logits `forward`
+        // returns for that step are only a fallback for callers that bypass `generate`.
         const logits_processor = new LogitsProcessorList();
         if (userLogitsProcessor) {
             logits_processor.extend(userLogitsProcessor);
         }
-        logits_processor.push(new AudioExhaustedLogitsProcessor(enc_state, eos_token_id));
+        logits_processor.push(new AudioExhaustedLogitsProcessor(enc_state));
 
         try {
             return await super.generate({ ...kwargs, generation_config, stopping_criteria, logits_processor });
