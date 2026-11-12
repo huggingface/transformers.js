@@ -39,4 +39,36 @@ export default () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
   });
+
+  describe("Translation (Marian model, target language codes)", () => {
+    const model_id = "Xenova/opus-mt-en-ROMANCE";
+
+    /** @type {TranslationPipeline} */
+    let pipe;
+    beforeAll(async () => {
+      pipe = await pipeline(PIPELINE_ID, model_id, { dtype: "q8" });
+    }, MAX_MODEL_LOAD_TIME);
+
+    it("should be an instance of TranslationPipeline", () => {
+      expect(pipe).toBeInstanceOf(TranslationPipeline);
+    });
+
+    describe("batch_size=1", () => {
+      it(
+        "translates into the language given by the language code",
+        async () => {
+          const text = "Hello, how are you?";
+          expect(await pipe(`>>fr<< ${text}`)).toEqual([{ translation_text: "Bonjour, comment allez-vous?" }]);
+          expect(await pipe(`>>es<< ${text}`)).toEqual([{ translation_text: "Hola, ¿cómo estás?" }]);
+          expect(await pipe(`>>it<< ${text}`)).toEqual([{ translation_text: "Ciao, come stai?" }]);
+          expect(await pipe(`>>pt<< ${text}`)).toEqual([{ translation_text: "Olá, como está?" }]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    afterAll(async () => {
+      await pipe?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
 };
