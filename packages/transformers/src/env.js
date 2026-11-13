@@ -281,6 +281,8 @@ export const env = {
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     get remoteHost() {
+        // TODO: Treat an empty HF_ENDPOINT as unset while preserving explicit empty-string overrides.
+        // https://github.com/huggingface/transformers.js/issues/1934
         return remoteHost !== undefined ? remoteHost : (readEnvVar('HF_ENDPOINT') ?? 'https://huggingface.co/');
     },
     set remoteHost(value) {
@@ -312,6 +314,9 @@ export const env = {
         return hfToken !== undefined ? hfToken : (readEnvVar('HF_TOKEN') ?? readEnvVar('HF_ACCESS_TOKEN'));
     },
     set hfToken(value) {
+        // TODO: Clarify snapshot/restore provenance: restoring an inherited token makes it explicit,
+        // freezing rotation and potentially allowing it on custom origins under the current contract.
+        // https://github.com/huggingface/transformers.js/issues/1936
         hfToken = value;
     },
 

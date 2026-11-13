@@ -39,6 +39,11 @@ The prompt decides whether thinking is possible: a template that renders disable
 
 Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine, except that protocol patterns containing positional `^`/`$` assertions, and start-anchor patterns containing ordered `|` alternatives outside character classes, fall back with a warning. The protocol's language matcher cannot reproduce the response parser's positional and ordered-anchor-search semantics for those patterns. Escaped literal assertions/alternation characters remain supported; delimiter alternatives retain the existing longest-accepted-endpoint behavior. This restriction does not change ordinary payload regex constraints. Unsupported templates fall back to constraining the response from its first token, without interpreting thinking delimiters or prompt anchors.
 
+Start-anchor patterns that accept the empty string (for example `a*` or `a?`) also warn and fall back:
+their empty-match selection is not represented by the protocol search. Nullable payload regexes remain
+supported. Special content-closer tokens select the delimiter branch on commit, even when the same
+bytes could extend the payload regex; ordinary tokens with those bytes keep their payload meaning.
+
 ## Supported constraints
 
 The JSON engine implements a practical JSON Schema 2020-12 profile. This includes deep `const` and `enum`, exact decimal bounds and `multipleOf`, tuple and homogeneous arrays, `contains`, deep `uniqueItems`, object property and dependency assertions, `allOf`/`anyOf`/`oneOf`/`not`, conditionals, local `$ref`, recursive `$defs`, draft-07 compatibility, and root-level `x-guidance` separators. String `pattern` and recognized `format` assertions are rejected because they cannot be enforced incrementally; unknown format names remain annotations. External and dynamic references and unevaluated-property/item assertions also remain unsupported.

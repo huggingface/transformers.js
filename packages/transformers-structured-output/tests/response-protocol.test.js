@@ -31,7 +31,7 @@ function initialize(pattern, text, onTransition = () => {}) {
 }
 
 // Reference behavior for the supported anchor subset: greedy, leftmost, non-overlapping matches.
-// Ordered pattern alternatives are deliberately tested as fallback below, not against this reference.
+// Ordered alternatives and nullable anchors are tested as fallback, not against this reference.
 function referenceLastEnd(pattern, text) {
   const machine = compileRegex(pattern);
   const bytes = encoder.encode(text);
@@ -73,7 +73,6 @@ describe("Response protocol prompt-anchor search", () => {
     ["a*b", ""],
     ["a*b", "aaaabaaa"],
     ["aab", "aaabz"],
-    ["a*", "aaa!aa"],
   ])("preserves supported greedy, non-overlapping selection for %j in %j", (pattern, text) => {
     const end = referenceLastEnd(pattern, text);
     expect(initialize(pattern, text)).toBe(end < 0 ? "" : text.slice(end));
@@ -143,7 +142,7 @@ describe("reassessment protocol regressions", () => {
     expect(responseProtocol({ response_template: spec })).toBeUndefined();
   });
 
-  it.each(["<assistant>first<assistant>last", "missing anchor", "<assistant>"])("matches parser truncation for literal anchors: %s", (text) => {
+  it.each(["<assistant>first<assistant>last", "missing anchor", "<assistant>"])("preserves literal-anchor selection and the existing missing-anchor policy: %s", (text) => {
     const spec = template();
     const expected = truncate_past_last_anchor(load_response_template(spec), text);
     expect(initialize("<assistant>", text)).toBe(text.includes("<assistant>") ? expected : "");

@@ -163,6 +163,8 @@ const pipe = await pipeline(task, modelId, { dtype });
 
 <!-- @generated:start id=class:ModelRegistry -->
 Static class for cache and file management operations.
+Discovery and cache-management methods do not dispatch `progress_callback` events. Use the
+corresponding model/tokenizer/processor loading APIs for download progress reporting.
 
 **Methods**
 

@@ -190,6 +190,9 @@ export class AssetLoadingContext {
     async cleanup(cache, resource, storedKey) {
         if (!cache.delete || !resource.obsoleteCacheKeys.length || !(await tryCache(cache, storedKey))) return;
         for (const key of resource.obsoleteCacheKeys) {
+            // Versioned FileCache keys alias one physical payload. Publication already replaced
+            // that entry; there is no separate obsolete file to remove. Custom caches keep their aliases.
+            if (cache instanceof FileCache && cache.isSameFile(key, storedKey)) continue;
             try {
                 await cache.delete(key);
             } catch {

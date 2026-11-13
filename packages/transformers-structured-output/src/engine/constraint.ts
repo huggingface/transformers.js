@@ -132,7 +132,9 @@ export function createTokenConstraint(
                     )
                         continue;
                     setBit(target, tokenId);
-                    tokenStates[tokenId] = current;
+                    tokenStates[tokenId] = tokenizer.data.specialTokenIds.has(tokenId)
+                        ? (machine.selectSpecialState?.(state, current, tokenizer.data.tokens[tokenId]) ?? current)
+                        : current;
                     tokenStamps[tokenId] = stamp;
                     allowed++;
                 }
@@ -162,6 +164,9 @@ export function createTokenConstraint(
             } else {
                 next = state;
                 for (const byte of tokenizer.data.tokens[tokenId]) next = machine.transition(next, byte);
+                if (tokenizer.data.specialTokenIds.has(tokenId)) {
+                    next = machine.selectSpecialState?.(state, next, tokenizer.data.tokens[tokenId]) ?? next;
+                }
             }
             stamp++;
             if (

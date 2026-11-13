@@ -188,6 +188,9 @@ function rewrite_python_to_js(pattern, end_of_input = true) {
                 const [inner, inner_partial] = walk(depth + 1);
                 if (kind === '<=' || kind === '<!' || kind === '!') {
                     // Lookbehinds and negative lookaheads stay exact
+                    // TODO: Defer unresolved negative lookaheads or reject unsupported streaming assertions;
+                    // later chunks can invalidate a delimiter already accepted from the current buffer.
+                    // https://github.com/huggingface/transformers.js/issues/1935
                     append(`${open}${inner})`, `${open}${inner})`);
                 } else if (kind === '=') {
                     append(`${open}${inner})`, `${open}${inner_partial})`);

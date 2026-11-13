@@ -5,7 +5,7 @@ import { get_file_metadata } from './get_file_metadata.js';
  * Automatically detects whether the model has tokenizer files.
  *
  * @param {string} modelId The model id to check for tokenizer files
- * @param {import('../hub.js').PretrainedOptions} [options] An object containing optional parameters.
+ * @param {import('./get_files.js').RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
  * @returns {Promise<string[]>} An array of file names that will be loaded
  */
 export async function get_tokenizer_files(modelId, options = {}) {

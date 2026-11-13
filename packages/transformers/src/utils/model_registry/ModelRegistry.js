@@ -113,6 +113,8 @@ import { get_available_dtypes } from './get_available_dtypes.js';
 
 /**
  * Static class for cache and file management operations.
+ * Discovery and cache-management methods do not dispatch `progress_callback` events. Use the
+ * corresponding model/tokenizer/processor loading APIs for download progress reporting.
  * @hideconstructor
  */
 export class ModelRegistry {
@@ -173,7 +175,7 @@ export class ModelRegistry {
      * Get tokenizer files needed for a specific model.
      *
      * @param {string} modelId - The model id
-     * @param {import('../hub.js').PretrainedOptions} [options] An object containing optional parameters.
+     * @param {import('./get_files.js').RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
      * **Example:**
@@ -190,7 +192,7 @@ export class ModelRegistry {
      * Get processor files needed for a specific model.
      *
      * @param {string} modelId - The model id
-     * @param {import('../hub.js').PretrainedOptions} [options] An object containing optional parameters.
+     * @param {import('./get_files.js').RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
      * @returns {Promise<string[]>} Array of processor file paths
      *
      * **Example:**
@@ -311,7 +313,7 @@ export class ModelRegistry {
      *
      * @param {string} path_or_repo_id - Model id or path
      * @param {string} filename - The file name
-     * @param {import('../hub.js').PretrainedOptions} [options] - Optional parameters
+     * @param {import('./get_files.js').RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
      * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} File metadata. `exists: false` means the file was not found.
      * @throws {import('../hub/utils.js').ModelFileNotFoundError} If the file is missing or inaccessible. The Hub returns 401 for nonexistent repositories.
      * @throws {Error} On network or server failures.

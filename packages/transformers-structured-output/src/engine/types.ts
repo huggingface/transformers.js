@@ -11,6 +11,8 @@ export interface ConstraintState<State> {
     /** Whether generation may end here with an end token whose own bytes are `bytes`. Defaults to `accepting`. */
     acceptsEnd?(state: State, bytes: Uint8Array): boolean;
     allowsSpecial?(state: State, next: State, bytes: Uint8Array): boolean;
+    /** Select the branch committed for an allowed special token, without mutating either input state. */
+    selectSpecialState?(state: State, next: State, bytes: Uint8Array): State;
     stringCapacity?(state: State): number | undefined;
     maskKey?(state: State): string | undefined;
 }

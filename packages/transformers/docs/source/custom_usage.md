@@ -65,3 +65,16 @@ const tokenizerB = await AutoTokenizer.from_pretrained(modelId, {
 ```
 
 Cache directories separate content namespaces, not credential authorization boundaries: loading a cached file does not reauthorize it with the current token. Rotating a token within the same content namespace should keep using the same directory. An explicit `cache_dir` still takes precedence over session and global `cacheDir` settings.
+
+Filesystem cache writers stage downloads before acquiring a per-file mutation lock. Publication holds
+the lock while renaming the payload and then atomically replacing its version marker; deletion holds
+the same lock while checking the version and removing the payload and marker. This orders stale
+deletion before a replacement, or makes it observe the replacement's new version and refuse deletion.
+The guarantee requires all writers/deleters sharing the directory to use this protocol; older library
+versions and external tools do not participate. Reads remain lock-free, including read-only/offline use.
+
+Lock files are adjacent to version markers with an added `.lock` suffix. Contention waits at most one
+second before failing; optional cleanup remains best-effort. Locks are not automatically stolen after
+a process crash, since a paused process can still be alive. If a crash leaves a lock behind, remove it
+only after confirming no process is mutating that entry. No payload/marker migration or custom-cache
+locking interface is required.

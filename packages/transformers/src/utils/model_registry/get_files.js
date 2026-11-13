@@ -3,8 +3,10 @@ import { get_model_files } from './get_model_files.js';
 import { get_processor_files } from './get_processor_files.js';
 
 /**
- * @typedef {import('../hub.js').PretrainedOptions & Pick<import('../hub.js').ModelSpecificPretrainedOptions, 'dtype'|'device'|'model_file_name'> & {include_tokenizer?: boolean, include_processor?: boolean}} RegistryOptions
- * Loading and file-selection options consumed by the model registry.
+ * @typedef {Omit<import('../hub.js').PretrainedOptions, 'progress_callback'>} RegistryLoadingOptions
+ * Loading options for discovery/cache operations, which do not emit download progress events.
+ * @typedef {RegistryLoadingOptions & Pick<import('../hub.js').ModelSpecificPretrainedOptions, 'dtype'|'device'|'model_file_name'> & {include_tokenizer?: boolean, include_processor?: boolean}} RegistryOptions
+ * Loading and file-selection options consumed by the model registry. Discovery does not support progress callbacks.
  */
 
 /**

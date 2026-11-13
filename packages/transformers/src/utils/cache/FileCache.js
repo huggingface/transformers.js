@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline as pipe } from 'node:stream/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { FileResponse } from '../hub/FileResponse.js';
 import { Random } from '../random.js';
@@ -9,6 +10,39 @@ import { apis } from '../../env.js';
 
 // Create a dedicated random instance for generating unique temporary file names
 const rng = new Random();
+
+// Only publication and deletion hold this lock; downloads are staged outside it. Never steal a
+// lock: a paused owner may still be alive. A crash leaves an actionable, bounded failure instead
+// of risking another writer's data. Remove an abandoned lock only after confirming no owner is active.
+// Cross-process mutation safety: https://github.com/huggingface/transformers.js/issues/1933
+async function withMutationLock(markerPath, operation) {
+    const lockPath = `${markerPath}.lock`;
+    const deadline = performance.now() + 1000;
+    let handle;
+    while (handle === undefined) {
+        try {
+            handle = await fs.promises.open(lockPath, 'wx');
+        } catch (error) {
+            if (error.code !== 'EEXIST') throw error;
+            if (performance.now() >= deadline) {
+                throw new Error(
+                    `Timed out waiting for cache mutation lock: ${lockPath}. Check for an active or crashed writer.`,
+                    { cause: error },
+                );
+            }
+            await delay(10);
+        }
+    }
+    try {
+        return await operation();
+    } finally {
+        try {
+            await handle.close();
+        } finally {
+            await fs.promises.unlink(lockPath);
+        }
+    }
+}
 
 /**
  * File system cache implementation that implements the CacheInterface.
@@ -47,6 +81,17 @@ export class FileCache {
             `.${path.basename(filePath)}.transformersjs_cache_version`,
         );
         return { filePath, markerPath, version };
+    }
+
+    /**
+     * Whether two logical keys alias the same physical entry (FileCache-only cleanup detail).
+     * @param {string} request
+     * @param {string} other
+     * @returns {boolean}
+     * @internal
+     */
+    isSameFile(request, other) {
+        return this.resolve(request).filePath === this.resolve(other).filePath;
     }
 
     /**
@@ -95,6 +140,7 @@ export class FileCache {
         const id = apis.IS_PROCESS_AVAILABLE ? process.pid : Date.now();
         const randomSuffix = rng._int32().toString(36);
         const tmpPath = filePath + `.tmp.${id}.${randomSuffix}`;
+        const markerTmpPath = markerPath + `.tmp.${id}.${randomSuffix}`;
 
         try {
             const contentLength = response.headers.get('Content-Length');
@@ -116,22 +162,22 @@ export class FileCache {
                 fs.createWriteStream(tmpPath),
             );
 
-            // Atomically move the completed temp file to the final path so that
-            // concurrent readers (other processes or other in-process calls)
-            // never observe a partially-written file.
-            await fs.promises.rename(tmpPath, filePath);
-
-            // Mark the version only after the file is in place: a reader in between
-            // sees new content with an old marker and refetches, never the reverse.
-            if (version) {
-                await fs.promises.writeFile(markerPath, String(version));
-            } else {
-                await fs.promises.rm(markerPath, { force: true });
-            }
+            if (version) await fs.promises.writeFile(markerTmpPath, String(version), { flag: 'wx' });
+            // Every cooperating process serializes payload/marker publication with delete's
+            // version check and both unlinks. A stale delete either finishes before publication,
+            // or observes the new version and refuses deletion. Publish the complete marker last.
+            await withMutationLock(markerPath, async () => {
+                await fs.promises.rename(tmpPath, filePath);
+                if (version) await fs.promises.rename(markerTmpPath, markerPath);
+                else await fs.promises.rm(markerPath, { force: true });
+            });
         } catch (error) {
             // Clean up the temp file if an error occurred during download
             try {
                 await fs.promises.unlink(tmpPath);
+            } catch {}
+            try {
+                await fs.promises.unlink(markerTmpPath);
             } catch {}
             throw error;
         }
@@ -145,15 +191,14 @@ export class FileCache {
     async delete(request) {
         const { filePath, markerPath, version } = this.resolve(request);
 
-        // Deleting an obsolete version must not remove the file that replaced it.
-        if ((await this.readVersion(markerPath)) !== version) {
-            return false;
-        }
-
         try {
-            await fs.promises.unlink(filePath);
-            await fs.promises.rm(markerPath, { force: true });
-            return true;
+            if (!fs.existsSync(filePath)) return false;
+            return await withMutationLock(markerPath, async () => {
+                if ((await this.readVersion(markerPath)) !== version) return false;
+                await fs.promises.unlink(filePath);
+                await fs.promises.rm(markerPath, { force: true });
+                return true;
+            });
         } catch (error) {
             // File doesn't exist or couldn't be deleted
             return false;

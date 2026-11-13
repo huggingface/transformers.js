@@ -6,7 +6,7 @@ import { get_file_metadata } from './get_file_metadata.js';
  * Auto-detects if the model has a processor by checking if preprocessor_config.json exists.
  *
  * @param {string} modelId The model id (e.g., "Xenova/detr-resnet-50")
- * @param {import('../hub.js').PretrainedOptions} [options] An object containing optional parameters.
+ * @param {import('./get_files.js').RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
  * @returns {Promise<string[]>} Array of processor file names (empty if no processor)
  */
 export async function get_processor_files(modelId, options = {}) {

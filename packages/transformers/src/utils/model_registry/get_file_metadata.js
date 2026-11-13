@@ -7,7 +7,7 @@ import { handleError, isValidUrl } from '../hub/utils.js';
 import { memoizePromise } from '../memoize_promise.js';
 
 /**
- * @typedef {import('../hub.js').PretrainedOptions} PretrainedOptions
+ * @typedef {import('./get_files.js').RegistryLoadingOptions} RegistryLoadingOptions
  */
 
 /**
@@ -45,7 +45,7 @@ async function fetch_file_head(urlOrPath, context) {
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to check.
- * @param {PretrainedOptions} [options] An object containing optional parameters.
+ * @param {RegistryLoadingOptions} [options] Discovery options (no progress callbacks).
  * @returns {Promise<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} A Promise that resolves to file metadata. `exists: false` means the file was not found.
  * @throws {import('../hub/utils.js').ModelFileNotFoundError} If access to the file was denied (401/403), e.g. a gated or private repository without a valid token.
  * @throws {Error} On network or server failures.

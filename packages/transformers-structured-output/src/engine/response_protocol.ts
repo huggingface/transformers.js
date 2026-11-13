@@ -147,6 +147,21 @@ export function withResponseProtocol(
         (state.phase === 'start' && state.structured !== undefined && structured.accepting(state.structured)) ||
         (state.phase === 'ending' && state.progress.accepted && state.progress.replay.length === 0) ||
         (state.phase === 'structured' && structured.accepting(state.state));
+    const specialCloser = (state: ProtocolState, bytes: Uint8Array): ProtocolState | undefined => {
+        if (state.phase !== 'structured' || protocol.contentClose === undefined || bytes.length === 0) return;
+        const progresses: MatchProgress[] = [];
+        if (state.closer !== undefined) progresses.push(state.closer);
+        // A token boundary can start a fresh closer even if ordinary payload ended in a closer prefix.
+        if (structured.accepting(state.state)) progresses.push(initialMatch(protocol.contentClose));
+        let partial: ProtocolState | undefined;
+        for (const progress of progresses) {
+            let delimiter: ProtocolState = { phase: 'ending', progress };
+            for (const byte of bytes) delimiter = transition(delimiter, byte);
+            if (delimiter.phase === 'finished') return delimiter;
+            if (delimiter.phase === 'ending') partial ??= delimiter;
+        }
+        return partial;
+    };
     return {
         initial,
         initialize: (bytes) => {
@@ -184,17 +199,7 @@ export function withResponseProtocol(
                 return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
             if (state.phase === 'structured') {
-                if (
-                    protocol.contentClose === undefined ||
-                    (state.closer === undefined && !structured.accepting(state.state))
-                )
-                    return false;
-                let delimiter: ProtocolState = {
-                    phase: 'ending',
-                    progress: state.closer ?? initialMatch(protocol.contentClose),
-                };
-                for (const byte of bytes) delimiter = transition(delimiter, byte);
-                return delimiter.phase === 'finished' || delimiter.phase === 'ending';
+                return specialCloser(state, bytes) !== undefined;
             }
             if (state.phase === 'start') {
                 // Only protocol branches justify special tokens, never the payload branch.
@@ -218,6 +223,8 @@ export function withResponseProtocol(
             }
             return state.phase === 'ending' || advancesDelimiter(state, bytes[0]);
         },
+        selectSpecialState: (state, next, bytes) =>
+            state.phase === 'structured' ? (specialCloser(state, bytes) ?? { phase: 'dead' }) : next,
         stringCapacity: (state) =>
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
@@ -389,7 +396,11 @@ function anchorMatcher(field: Record<string, unknown>, literalKey: string, patte
                     );
                 }
             }
-            return compileMatcher(field[patternKey] as string, false);
+            const matcher = compileMatcher(field[patternKey] as string, false);
+            if (patternKey === 'start_anchor_pattern' && matcher.machine.accepting(matcher.machine.initial)) {
+                throw new Error(`nullable start-anchor patterns require parser empty-match semantics: ${pattern}`);
+            }
+            return matcher;
         } catch (error) {
             throw new Error(`Unsupported response template ${patternKey}: ${String(error)}`);
         }
