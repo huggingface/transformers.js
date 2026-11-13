@@ -1393,9 +1393,23 @@ function safeIndex(index, size, dimension = null, boundsCheck = true) {
  * @returns {Tensor} The concatenated tensor.
  */
 export function cat(tensors, dim = 0) {
+    if (tensors.length === 0) {
+        throw new Error('Expected a non-empty list of tensors to concatenate.');
+    }
     dim = safeIndex(dim, tensors[0].dims.length);
 
-    // TODO do validation of shapes
+    // Validate shapes: all tensors must have the same rank, and the same size
+    // in every dimension except the one being concatenated.
+    const refDims = tensors[0].dims;
+    for (let t = 1; t < tensors.length; ++t) {
+        const dims = tensors[t].dims;
+        if (dims.length !== refDims.length || refDims.some((size, axis) => axis !== dim && dims[axis] !== size)) {
+            throw new Error(
+                `Tensor ${t} has shape [${dims}]; expected rank ${refDims.length} ` +
+                    `and sizes matching [${refDims}] except in dimension ${dim}.`,
+            );
+        }
+    }
 
     const resultDims = tensors[0].dims.slice();
     resultDims[dim] = tensors.reduce((a, b) => a + b.dims[dim], 0);
@@ -1455,8 +1469,7 @@ export function cat(tensors, dim = 0) {
  * @returns {Tensor} The stacked tensor.
  */
 export function stack(tensors, dim = 0) {
-    // TODO do validation of shapes
-    // NOTE: stack expects each tensor to be equal size
+    // NOTE: stack expects each tensor to be equal size (shape validation is performed by `cat`)
     return cat(
         tensors.map((t) => t.unsqueeze(dim)),
         dim,
