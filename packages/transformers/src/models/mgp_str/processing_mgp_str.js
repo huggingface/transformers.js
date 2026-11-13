@@ -2,6 +2,7 @@ import { Processor } from '../../processing_utils.js';
 import { AutoImageProcessor } from '../auto/image_processing_auto.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { max, softmax } from '../../utils/maths.js';
+import { Tensor } from '../../utils/tensor.js';
 
 const DECODE_TYPE_MAPPING = {
     char: ['char_decode', 1],
@@ -107,18 +108,26 @@ export class MgpstrProcessor extends Processor {
     }
 
     /**
-     * Convert a list of lists of token ids into a list of strings by calling decode.
-     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} sequences List of tokenized input ids.
+     * Convert model prediction logits into decoded text using char, bpe, and wp decoders.
+     *
+     * @overload
+     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]} batch Model prediction logits as a tuple of [char_logits, bpe_logits, wp_logits].
      * @returns {{generated_text: string[], scores: number[], char_preds: string[], bpe_preds: string[], wp_preds: string[]}}
-     * Dictionary of all the outputs of the decoded results.
-     * - generated_text: The final results after fusion of char, bpe, and wp.
-     * - scores: The final scores after fusion of char, bpe, and wp.
-     * - char_preds: The list of character decoded sentences.
-     * - bpe_preds: The list of BPE decoded sentences.
-     * - wp_preds: The list of wp decoded sentences.
+     *
+     * @overload
+     * @param {import('../../utils/tensor.js').Tensor|number[][]} batch Batch of token ids. Not supported: kept only for compatibility with the base class signature.
+     * @param {any} [decode_args] Optional decoding arguments.
+     * @returns {never} Always throws.
+     *
+     * @param {[import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor, import('../../utils/tensor.js').Tensor]|import('../../utils/tensor.js').Tensor|number[][]} batch
+     * @param {any} [decode_args]
+     * @returns {{generated_text: string[], scores: number[], char_preds: string[], bpe_preds: string[], wp_preds: string[]}}
      */
-    // @ts-expect-error The type of this method is not compatible with the one in the base class.
-    batch_decode([char_logits, bpe_logits, wp_logits]) {
+    batch_decode(batch, decode_args) {
+        if (!(Array.isArray(batch) && batch.length === 3 && batch.every((x) => x instanceof Tensor))) {
+            throw new Error('MgpstrProcessor.batch_decode expects [char_logits, bpe_logits, wp_logits]; decoding token ids is not supported.');
+        }
+        const [char_logits, bpe_logits, wp_logits] = /** @type {[Tensor, Tensor, Tensor]} */ (batch);
         const [char_preds, char_scores] = this._decode_helper(char_logits, 'char');
         const [bpe_preds, bpe_scores] = this._decode_helper(bpe_logits, 'bpe');
         const [wp_preds, wp_scores] = this._decode_helper(wp_logits, 'wp');

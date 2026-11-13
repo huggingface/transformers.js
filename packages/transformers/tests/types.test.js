@@ -71,6 +71,16 @@ describe("TypeScript compilation succeeds", () => {
   }
 });
 
+describe("Strict consumer", () => {
+  it("compiles declaration files with skipLibCheck: false", () => {
+    const program = ts.createProgram([resolve(__dirname, "..", "types", "transformers.d.ts")], { ...TS_OPTIONS, skipLibCheck: false });
+    const diagnostics = ts.getPreEmitDiagnostics(program);
+    if (diagnostics.length > 0) {
+      throw new Error(formatDiagnostics(diagnostics));
+    }
+  });
+});
+
 describe("TypeScript expected errors", () => {
   /**
    * Helper: generates inline source for a pipeline error test.
@@ -324,30 +334,67 @@ describe("TypeScript expected errors", () => {
     ],
   };
 
-  describe("pipeline errors", () => {
-    for (const [task, cases] of Object.entries(PIPELINE_CASES)) {
-      describe(task, () => {
-        for (const { name, code, errors } of cases) {
-          it(name, () => {
-            const diagnostics = getDiagnosticsFromSource(code);
+  /**
+   * Processor error test cases, keyed by processor class. Same shape as `PIPELINE_CASES`.
+   *
+   * @type {Record<string, Array<{ name: string, code: string, errors: Array<{ code: number, underline: string, messageIncludes: string }> }>>}
+   */
+  const PROCESSOR_CASES = {
+    MgpstrProcessor: [
+      {
+        name: "batch_decode accepts logits tuple",
+        code: `
+          import { MgpstrProcessor, Tensor } from "../../types/transformers.js";
+          declare const processor: MgpstrProcessor;
+          declare const logits: [Tensor, Tensor, Tensor];
+          const text: string[] = processor.batch_decode(logits).generated_text;
+        `,
+        errors: [],
+      },
+      {
+        name: "batch_decode types token ids as never (unsupported at runtime)",
+        code: `
+          import { MgpstrProcessor } from "../../types/transformers.js";
+          declare const processor: MgpstrProcessor;
+          const result = processor.batch_decode([[1, 2, 3]]);
+          const is_never: [typeof result] extends [never] ? true : false = true;
+        `,
+        errors: [],
+      },
+    ],
+  };
 
-            expect(diagnostics).toHaveLength(errors.length);
+  const GROUPS = {
+    "pipeline errors": PIPELINE_CASES,
+    "processor errors": PROCESSOR_CASES,
+  };
 
-            for (let i = 0; i < errors.length; i++) {
-              const diag = diagnostics[i];
-              const expected = errors[i];
+  for (const [group, group_cases] of Object.entries(GROUPS)) {
+    describe(group, () => {
+      for (const [task, cases] of Object.entries(group_cases)) {
+        describe(task, () => {
+          for (const { name, code, errors } of cases) {
+            it(name, () => {
+              const diagnostics = getDiagnosticsFromSource(code);
 
-              expect(diag.code).toBe(expected.code);
+              expect(diagnostics).toHaveLength(errors.length);
 
-              const underlined = diag.file?.text?.slice(diag.start, diag.start + diag.length);
-              expect(underlined).toBe(expected.underline);
+              for (let i = 0; i < errors.length; i++) {
+                const diag = diagnostics[i];
+                const expected = errors[i];
 
-              const message = ts.flattenDiagnosticMessageText(diag.messageText, "\n");
-              expect(message).toContain(expected.messageIncludes);
-            }
-          });
-        }
-      });
-    }
-  });
+                expect(diag.code).toBe(expected.code);
+
+                const underlined = diag.file?.text?.slice(diag.start, diag.start + diag.length);
+                expect(underlined).toBe(expected.underline);
+
+                const message = ts.flattenDiagnosticMessageText(diag.messageText, "\n");
+                expect(message).toContain(expected.messageIncludes);
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 });
