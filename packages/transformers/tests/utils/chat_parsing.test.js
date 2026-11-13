@@ -1,5 +1,9 @@
 import { parse_response, ResponseParser } from "../../src/utils/chat_parsing/index.js";
 import { CONTENT_PARSERS } from "../../src/utils/chat_parsing/content_parsers.js";
+import { readFile } from "node:fs/promises";
+
+// Portable input/output fixtures for the same strict grammar in Python and JavaScript.
+const pythonCallListFixtures = JSON.parse(await readFile(new URL("../fixtures/python_call_list.json", import.meta.url), "utf8"));
 
 const parse_content = (text, name, args) => CONTENT_PARSERS[name](text, args);
 
@@ -280,41 +284,6 @@ function* chunk_random(text, rng) {
 
 const f = (args) => [{ name: "f", arguments: args }];
 
-// (input, expected) pairs for `python-call-list`; `null` means the input must be rejected.
-// Mirrors PYTHON_CALL_LIST_EDGE_CASES in transformers/tests/utils/test_chat_parsing.py.
-const PYTHON_CALL_LIST_EDGE_CASES = [
-  // Every Python str literal form is accepted.
-  ['[f(s="""a"b""")]', f({ s: 'a"b' })],
-  ["[f(s='''x\ny''')]", f({ s: "x\ny" })],
-  [String.raw`[f(s=r"C:\new", t=R"\N{x}")]`, f({ s: String.raw`C:\new`, t: String.raw`\N{x}` })],
-  [`[f(s="a" 'b' """c""")]`, f({ s: "abc" })],
-  ['[f(s=u"x")]', f({ s: "x" })],
-  [String.raw`[f(s="a\qb")]`, f({ s: String.raw`a\qb` })],
-  // Python number literals, including signs.
-  ["[f(h=0x1F, o=0o17, b=0b101, u=1_000, e=1e3, d=.5, t=1., n=--3, p=+2)]", f({ h: 31, o: 15, b: 5, u: 1000, e: 1000, d: 0.5, t: 1, n: 3, p: 2 })],
-  // `(1)` is just `1`; only `(1,)` and `()` are tuples.
-  ["[f(t=(1,), p=(1), e=())]", f({ t: [1], p: 1, e: [] })],
-  // Comments, redundant parentheses, JSON-style names as dict keys, unicode identifiers.
-  ["[f(x=1)  # note\n]", f({ x: 1 })],
-  ["[(f(x=1))]", f({ x: 1 })],
-  ["[f(d={true: 1, null: 2})]", f({ d: { true: 1, null: 2 } })],
-  ["[größe(wert=1)]", [{ name: "größe", arguments: { wert: 1 } }]],
-  // Rejected: positional or repeated arguments, non-str literals, non-literals, Python syntax errors.
-  ["[f(1, 3.5)]", null],
-  ["[f(x=1, x=2)]", null],
-  ['[f(s=b"x")]', null],
-  ['[f(s=f"x")]', null],
-  ["[f(n=1j)]", null],
-  ["[f(n=1e999)]", null],
-  ["[f(n=" + "-".repeat(20000) + "1)]", null],
-  ["[f(n=007)]", null],
-  ["[f(d={True: 1})]", null],
-  ["[f(x={1, 2})]", null],
-  ["[f(x=-True)]", null],
-  ["[if(x=1)]", null],
-  ['[f(s="a\nb")]', null],
-];
-
 function stream_all(template, chunks, options = { prefix: "" }) {
   const parser = new ResponseParser(template, options);
   const events = [...parser.initial_events];
@@ -510,8 +479,8 @@ describe("Response templates", () => {
       expect(() => parse_response(model_out, lfm_template, { prefix: "" })).toThrow("unsupported value");
     });
 
-    it("parses python string escapes and accepts trailing commas in lfm tool calls", () => {
-      const model_out = String.raw`<|tool_call_start|>[search(query="a\q", quote="a\"b", path="a\\b", octal="\101", options={"limit": 2,},),]<|tool_call_end|>`;
+    it("parses strict string escapes in lfm tool calls", () => {
+      const model_out = String.raw`<|tool_call_start|>[search(query="a\\q", quote="a\"b", path="a\\b", unicode="\u0041", options={"limit": 2})]<|tool_call_end|>`;
       expect(parse_response(model_out, lfm_template, { prefix: "" }).tool_calls).toEqual([
         {
           type: "function",
@@ -521,7 +490,7 @@ describe("Response templates", () => {
               query: String.raw`a\q`,
               quote: 'a"b',
               path: String.raw`a\b`,
-              octal: "A",
+              unicode: "A",
               options: { limit: 2 },
             },
           },
@@ -529,40 +498,49 @@ describe("Response templates", () => {
       ]);
     });
 
-    it("handles python line continuations and rejects named unicode escapes", () => {
+    it("rejects Python line continuations and named unicode escapes", () => {
       const continued = '<|tool_call_start|>[search(query="a\\\nb")]<|tool_call_end|>';
-      expect(parse_response(continued, lfm_template, { prefix: "" }).tool_calls[0].function.arguments.query).toBe("ab");
+      expect(() => parse_response(continued, lfm_template, { prefix: "" })).toThrow("unknown escape");
       const named = String.raw`<|tool_call_start|>[search(query="\N{LATIN CAPITAL LETTER A}")]<|tool_call_end|>`;
-      expect(() => parse_response(named, lfm_template, { prefix: "" })).toThrow("named unicode escapes are not supported");
+      expect(() => parse_response(named, lfm_template, { prefix: "" })).toThrow("unknown escape");
     });
 
     it("granite 3.3 answers without the response wrapper when not thinking", () => {
       expect(parse_response("It is sunny.<|end_of_text|>", granite33_template, { prefix: "" })).toEqual({ role: "assistant", content: "It is sunny." });
     });
 
-    it("python-call-list edge cases match Python transformers", () => {
-      // Mirrors PYTHON_CALL_LIST_EDGE_CASES in transformers/tests/utils/test_chat_parsing.py.
-      for (const [text, expected] of PYTHON_CALL_LIST_EDGE_CASES) {
-        if (expected === null) {
-          expect(() => parse_content(text, "python-call-list", {})).toThrow("python-call-list");
-        } else {
-          expect(parse_content(text, "python-call-list", {})).toEqual(expected);
-        }
-      }
+    it.each(pythonCallListFixtures.accepted)("accepts strict python-call-list fixture: $input", ({ input, expected }) => {
+      // Compare numbers by value across languages, including JS's serialization of negative zero.
+      const normalize = (value) => JSON.parse(JSON.stringify(value));
+      expect(normalize(parse_content(input, "python-call-list", {}))).toEqual(normalize(expected));
     });
 
-    it("python-call-list differences from Python transformers", () => {
-      const parse = (text) => parse_content(text, "python-call-list", {});
-      // Python accepts named unicode escapes; JS rejects them (no Unicode name table).
-      expect(() => parse(String.raw`[f(s="\N{BULLET}")]`)).toThrow("named unicode escapes are not supported");
-      // Same bracket limit as Python's tokenizer (200 open brackets).
-      const nest = (n) => `[f(x=${"[".repeat(n)}${"]".repeat(n)})]`;
-      expect(parse(nest(198))).toEqual(f({ x: JSON.parse(nest(198).slice(5, -2)) }));
-      expect(() => parse(nest(199))).toThrow("too many nested brackets");
-      expect(() => parse("[".repeat(300) + "]".repeat(300))).toThrow("python-call-list");
-      // Sign chains are capped at 1000 (Python's limit depends on its parser stack).
-      expect(parse("[f(n=" + "-".repeat(1000) + "1)]")).toEqual(f({ n: 1 }));
-      expect(() => parse("[f(n=" + "-".repeat(1001) + "1)]")).toThrow("too many unary operators");
+    it.each(pythonCallListFixtures.rejected)("rejects strict python-call-list fixture: $input", ({ input, error }) => {
+      expect(() => parse_content(input, "python-call-list", {})).toThrow(error ?? "python-call-list");
+    });
+
+    it.each(["list", "dict", "mixed"])("limits %s values to 100 levels, excluding the call list and parentheses", (kind) => {
+      const nest = (depth) => {
+        let value = "0";
+        for (let i = 0; i < depth; ++i) value = kind === "dict" || (kind === "mixed" && i % 2) ? `{"x":${value}}` : `[${value}]`;
+        return value;
+      };
+      expect(parse_content(`[f(x=${nest(100)})]`, "python-call-list", {})).toEqual(f({ x: JSON.parse(nest(100)) }));
+      expect(() => parse_content(`[f(x=${nest(101)})]`, "python-call-list", {})).toThrow("at most 100 levels");
+      expect(() => parse_content(`[f(x=${"[".repeat(10000)}0${"]".repeat(10000)})]`, "python-call-list", {})).toThrow("at most 100 levels");
+    });
+
+    it("keeps argument names and dictionary keys as ordinary own properties", () => {
+      const [call] = parse_content('[f(__proto__=1, constructor=2, d={"__proto__":3,"constructor":4})]', "python-call-list", {});
+      for (const [object, proto, constructor] of [
+        [call.arguments, 1, 2],
+        [call.arguments.d, 3, 4],
+      ]) {
+        expect(Object.getPrototypeOf(object)).toBe(Object.prototype);
+        expect(Object.hasOwn(object, "__proto__")).toBe(true);
+        expect(object.__proto__).toBe(proto);
+        expect(object.constructor).toBe(constructor);
+      }
     });
 
     it("rejects positional arguments in python-call-list", () => {

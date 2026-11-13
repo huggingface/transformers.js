@@ -210,68 +210,20 @@ function _kv_lines(text, args) {
     return Object.fromEntries(out);
 }
 
-// Python keywords can't be used as names (soft keywords such as `match` or `type` can).
-const PY_KEYWORDS = new Set([
-    'False',
-    'None',
-    'True',
-    'and',
-    'as',
-    'assert',
-    'async',
-    'await',
-    'break',
-    'class',
-    'continue',
-    'def',
-    'del',
-    'elif',
-    'else',
-    'except',
-    'finally',
-    'for',
-    'from',
-    'global',
-    'if',
-    'import',
-    'in',
-    'is',
-    'lambda',
-    'nonlocal',
-    'not',
-    'or',
-    'pass',
-    'raise',
-    'return',
-    'try',
-    'while',
-    'with',
-    'yield',
-]);
-const PY_IDENTIFIER = /[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*/uy;
-const PY_DIGITS = String.raw`\d(?:_?\d)*`;
-const PY_NUMBER = new RegExp(
-    String.raw`0[xX](?:_?[0-9a-fA-F])+|0[oO](?:_?[0-7])+|0[bB](?:_?[01])+` +
-        `|(?:(?:${PY_DIGITS})?\\.${PY_DIGITS}|${PY_DIGITS}\\.)(?:[eE][+-]?${PY_DIGITS})?|${PY_DIGITS}[eE][+-]?${PY_DIGITS}` +
-        String.raw`|[1-9](?:_?\d)*|0(?:_?0)*`,
-    'y',
-);
-const PY_STRING_START = /([A-Za-z]{0,2})('''|"""|'|")/y;
-const PY_ESCAPES = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
-// Python's tokenizer rejects more than 200 open brackets.
-const PY_MAX_BRACKET_DEPTH = 200;
-// Python's limit on chained unary operators depends on its parser stack (~6000 at the top level); use a fixed cap.
-const PY_MAX_UNARY_CHAIN = 1000;
+const CALL_NAME = /[A-Za-z_][A-Za-z0-9_]*(?:[-.][A-Za-z0-9_]+)*/y;
+const CALL_NUMBER = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
+const CALL_ESCAPES = { '\\': '\\', "'": "'", '"': '"', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
+const CALL_MAX_DEPTH = 100;
 
 /**
- * Parse a Python-style list of keyword-argument calls, e.g. `[get_weather(city="Paris")]`, without evaluating
- * model output. The syntax is Python's own, matching the `ast`-based parser in Python transformers: any `str`
- * literal (quotes, triple quotes, `r`/`u` prefixes, implicit concatenation), Python number literals, comments and
- * redundant parentheses. Positional arguments, bytes, f-strings, overflowing numbers (`1e999`) and over-nested
- * input are rejected, as in Python.
+ * Parse the strict `python-call-list` grammar without evaluating model output. Calls take keyword arguments
+ * whose values are quoted strings, JSON numbers, lists, string-keyed dicts, or Python/JSON booleans and null.
+ * Names are ASCII identifiers with optional `-`/`.` segments and no reserved words. Strings use JSON escapes
+ * plus `\'`; lone surrogates and raw LF/CR are errors. Only space, tab, LF and CR count as whitespace.
  *
- * Differences from Python (JS-only): `\N{...}` escapes are rejected (decoding them needs the Unicode name table),
- * integers beyond 2^53 lose precision (and are rejected once they overflow a double), and chains of more than 1000 unary `+`/`-` are rejected.
+ * Trailing commas, duplicates, positional arguments and other Python syntax are rejected. Integers must be
+ * safe integers, floats must be finite, and value containers may nest at most 100 levels (excluding calls and
+ * the outer call list). The only language difference is numeric representation: JS has no separate float type.
  */
 function _python_call_list(text) {
     let pos = 0;
@@ -279,9 +231,9 @@ function _python_call_list(text) {
     const fail = (message) => {
         throw new Error(`python-call-list: ${message} at position ${pos}. Content: ${JSON.stringify(text)}`);
     };
-    /** Run `parse` for a bracketed construct, enforcing Python's nesting limit. */
+    /** Count only nested value lists and dicts, not the surrounding call list or argument parentheses. */
     const nested = (parse) => {
-        if (++depth > PY_MAX_BRACKET_DEPTH) fail('too many nested brackets');
+        if (++depth > CALL_MAX_DEPTH) fail('lists and dicts may nest at most 100 levels');
         const result = parse();
         --depth;
         return result;
@@ -291,114 +243,69 @@ function _python_call_list(text) {
         return regex.exec(text);
     };
     const skip = () => {
-        while (pos < text.length) {
-            const char = text[pos];
-            if (/\s/.test(char)) {
-                ++pos;
-            } else if (char === '#') {
-                while (pos < text.length && text[pos] !== '\n' && text[pos] !== '\r') ++pos;
-            } else if (char === '\\' && (text[pos + 1] === '\n' || text[pos + 1] === '\r')) {
-                pos += 2; // explicit line continuation
-            } else {
-                break;
-            }
-        }
+        while (/[ \t\n\r]/.test(text[pos] ?? '')) ++pos;
     };
     const take = (value) => {
         skip();
         if (!text.startsWith(value, pos)) fail(`expected ${JSON.stringify(value)}`);
         pos += value.length;
     };
-    const identifier = () => {
-        skip();
-        const match = at(PY_IDENTIFIER);
-        if (match === null) fail('expected identifier');
-        pos += match[0].length;
-        return match[0].normalize('NFKC'); // like Python's identifier normalization
-    };
     const name = () => {
-        const id = identifier();
-        if (PY_KEYWORDS.has(id)) fail(`${JSON.stringify(id)} is a reserved word`);
-        return id;
-    };
-    const string_literal = () => {
-        const match = at(PY_STRING_START);
-        const prefix = match[1].toLowerCase();
-        if (prefix !== '' && prefix !== 'r' && prefix !== 'u')
-            fail(`unsupported string prefix ${JSON.stringify(match[1])}`);
-        const raw = prefix === 'r';
-        const quote = match[2];
-        const triple = quote.length === 3;
+        skip();
+        const match = at(CALL_NAME);
+        if (match === null) fail('expected ASCII name');
         pos += match[0].length;
+        return match[0];
+    };
+    const string = () => {
+        skip();
+        const quote = text[pos];
+        if (quote !== "'" && quote !== '"') fail('dict keys must be quoted strings');
+        ++pos;
         let out = '';
         while (pos < text.length) {
-            if (text.startsWith(quote, pos)) {
-                pos += quote.length;
+            const char = text[pos++];
+            if (char === quote) {
+                for (let i = 0; i < out.length; ++i) {
+                    const code = out.charCodeAt(i);
+                    if (code >= 0xd800 && code <= 0xdbff) {
+                        const low = out.charCodeAt(++i);
+                        if (!(low >= 0xdc00 && low <= 0xdfff)) fail('lone surrogate in string');
+                    } else if (code >= 0xdc00 && code <= 0xdfff) {
+                        fail('lone surrogate in string');
+                    }
+                }
                 return out;
             }
-            const char = text[pos++];
-            if (char === '\n' || char === '\r') {
-                if (!triple) fail('unterminated string');
-                // Python reads source with universal newlines.
-                if (char === '\r' && text[pos] === '\n') ++pos;
-                out += '\n';
-                continue;
-            }
+            if (char === '\n' || char === '\r') fail('raw LF and CR are not allowed in strings');
             if (char !== '\\') {
                 out += char;
                 continue;
             }
             if (pos >= text.length) break;
             const escaped = text[pos++];
-            if (raw) {
-                // Raw strings keep the backslash, but it still stops the next character from closing the string.
-                out += char + escaped;
-            } else if (Object.hasOwn(PY_ESCAPES, escaped)) {
-                out += PY_ESCAPES[escaped];
-            } else if (/[0-7]/.test(escaped)) {
-                let digits = escaped;
-                while (digits.length < 3 && /[0-7]/.test(text[pos] ?? '')) digits += text[pos++];
-                out += String.fromCodePoint(Number.parseInt(digits, 8));
-            } else if (escaped === '\n') {
-                // Python ignores an escaped physical newline.
-            } else if (escaped === '\r') {
-                if (text[pos] === '\n') ++pos;
-            } else if (escaped === '\\' || escaped === '"' || escaped === "'") {
-                out += escaped;
-            } else if (escaped === 'N') {
-                fail('named unicode escapes are not supported');
-            } else if (escaped === 'x' || escaped === 'u' || escaped === 'U') {
-                const size = escaped === 'x' ? 2 : escaped === 'u' ? 4 : 8;
-                const digits = text.slice(pos, pos + size);
-                if (!new RegExp(`^[0-9a-fA-F]{${size}}$`).test(digits)) fail(`invalid \\${escaped} escape`);
-                const codepoint = Number.parseInt(digits, 16);
-                if (codepoint > 0x10ffff) fail('unicode escape is outside the valid range');
-                out += String.fromCodePoint(codepoint);
-                pos += size;
+            if (Object.hasOwn(CALL_ESCAPES, escaped)) {
+                out += CALL_ESCAPES[escaped];
+            } else if (escaped === 'u') {
+                const digits = text.slice(pos, pos + 4);
+                if (!/^[0-9a-fA-F]{4}$/.test(digits)) fail('invalid \\u escape');
+                out += String.fromCharCode(Number.parseInt(digits, 16));
+                pos += 4;
             } else {
-                out += `\\${escaped}`;
+                fail(`unknown escape \\${escaped}`);
             }
         }
         fail('unterminated string');
     };
-    const string = () => {
-        // Adjacent literals are concatenated: `"a" 'b'` is `"ab"`.
-        let out = string_literal();
-        while (true) {
-            skip();
-            if (at(PY_STRING_START) === null) return out;
-            out += string_literal();
-        }
-    };
-    /** Comma-separated items up to `close` (the opener is already consumed); trailing commas are allowed. */
+    /** Comma-separated items up to `close` (the opener is already consumed), with no trailing comma. */
     const items = (close, item) => {
         const values = [];
+        skip();
+        if (text[pos] === close) {
+            ++pos;
+            return values;
+        }
         while (true) {
-            skip();
-            if (text[pos] === close) {
-                ++pos;
-                return values;
-            }
             values.push(item());
             skip();
             if (text[pos] === close) {
@@ -406,39 +313,18 @@ function _python_call_list(text) {
                 return values;
             }
             take(',');
+            skip();
+            if (text[pos] === close) fail('trailing commas are not supported');
         }
     };
-    const group_or_tuple = () =>
-        nested(() => {
-            take('(');
-            skip();
-            if (text[pos] === ')') {
-                ++pos;
-                return [];
-            }
-            const first = value();
-            skip();
-            // `(x)` is just `x`; only `(x,)` is a tuple.
-            if (text[pos] === ')') {
-                ++pos;
-                return first;
-            }
-            take(',');
-            return [first, ...items(')', value)];
-        });
     const mapping = () =>
         nested(() => {
             take('{');
+            const seen = new Set();
             const entries = items('}', () => {
-                skip();
-                let key;
-                if (at(PY_STRING_START) !== null) {
-                    key = string();
-                } else {
-                    // Bare identifiers are accepted as keys, as in `{city: "Paris"}`.
-                    key = identifier();
-                    if (PY_KEYWORDS.has(key)) fail('dict keys must be strings');
-                }
+                const key = string();
+                if (seen.has(key)) fail(`dict key repeated: ${JSON.stringify(key)}`);
+                seen.add(key);
                 take(':');
                 return [key, value()];
             });
@@ -447,105 +333,58 @@ function _python_call_list(text) {
     const value = () => {
         skip();
         const char = text[pos];
-        if (at(PY_STRING_START) !== null) return string();
+        if (char === "'" || char === '"') return string();
         if (char === '[') {
             return nested(() => {
                 ++pos;
                 return items(']', value);
             });
         }
-        if (char === '(') return group_or_tuple();
         if (char === '{') return mapping();
-        if (char === '-' || char === '+') {
-            // Consume the whole sign chain iteratively so long chains can't overflow the stack.
-            let negative = false;
-            let count = 0;
-            while (text[pos] === '-' || text[pos] === '+') {
-                if (++count > PY_MAX_UNARY_CHAIN) fail('too many unary operators');
-                if (text[pos] === '-') negative = !negative;
-                ++pos;
-                skip();
-            }
-            const operand = value();
-            if (typeof operand !== 'number') fail('unary + and - only apply to numbers');
-            return negative ? -operand : operand;
-        }
-        const number = at(PY_NUMBER);
+        const number = at(CALL_NUMBER);
         if (number !== null) {
             pos += number[0].length;
-            if (/[\p{L}\p{N}_.]/u.test(text[pos] ?? '')) fail('invalid number literal');
-            // Integers beyond 2^53 lose precision here (Python keeps them exact).
-            const parsed = Number(number[0].replaceAll('_', ''));
-            // Overflowing literals like `1e999` would become Infinity, which isn't valid JSON.
+            const parsed = Number(number[0]);
+            if (!/[.eE]/.test(number[0]) && !Number.isSafeInteger(parsed)) fail('integer literal is out of range');
             if (!Number.isFinite(parsed)) fail('number literal is out of range');
             return parsed;
         }
-        const id = identifier();
+        const id = name();
         if (id === 'True' || id === 'true') return true;
         if (id === 'False' || id === 'false') return false;
         if (id === 'None' || id === 'null') return null;
         fail(`unsupported value ${JSON.stringify(id)}`);
     };
     const call = () => {
-        skip();
-        if (text[pos] === '(') {
-            return nested(() => {
-                ++pos;
-                const result = call();
-                take(')');
-                return result;
-            });
-        }
         const fn = name();
         take('(');
         const seen = new Set();
-        const entries = nested(() =>
-            items(')', () => {
+        const entries = items(')', () => {
+            skip();
+            const start = pos;
+            const match = at(CALL_NAME);
+            if (match !== null) {
+                pos += match[0].length;
                 skip();
-                const start = pos;
-                const match = at(PY_IDENTIFIER);
-                if (match !== null) {
-                    pos += match[0].length;
-                    skip();
-                }
-                if (match === null || text[pos] !== '=' || text[pos + 1] === '=') {
-                    pos = start;
-                    fail('only keyword arguments are supported');
-                }
+            }
+            if (match === null || text[pos] !== '=' || text[pos + 1] === '=') {
                 pos = start;
-                const key = name();
-                if (seen.has(key)) fail(`keyword argument repeated: ${JSON.stringify(key)}`);
-                seen.add(key);
-                take('=');
-                return [key, value()];
-            }),
-        );
+                fail('positional arguments are not supported; only keyword arguments are supported');
+            }
+            pos = start;
+            const key = name();
+            if (seen.has(key)) fail(`keyword argument repeated: ${JSON.stringify(key)}`);
+            seen.add(key);
+            take('=');
+            return [key, value()];
+        });
         return { name: fn, arguments: Object.fromEntries(entries) };
     };
-    const top = () => {
-        skip();
-        if (text[pos] === '(') {
-            return nested(() => {
-                ++pos;
-                const calls = top();
-                take(')');
-                return calls;
-            });
-        }
-        take('[');
-        return nested(() => items(']', call));
-    };
-
-    try {
-        const calls = top();
-        skip();
-        if (pos !== text.length) fail('unexpected trailing content');
-        return calls;
-    } catch (error) {
-        // Safety net in case some input still exhausts the stack on a small-stack runtime.
-        if (error instanceof RangeError) fail('input is too deeply nested');
-        throw error;
-    }
+    take('[');
+    const calls = items(']', call);
+    skip();
+    if (pos !== text.length) fail('unexpected trailing content');
+    return calls;
 }
 
 export const CONTENT_PARSERS = {

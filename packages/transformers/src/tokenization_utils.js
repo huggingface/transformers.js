@@ -669,6 +669,15 @@ export class PreTrainedTokenizer
      * ids) returns a single parsed message; a batch (an array of strings, an array of token-id sequences,
      * or a 2D tensor) returns an array of parsed messages, one per item.
      *
+     * Templates using `content: "python-call-list"` parse a strict list of keyword-argument calls,
+     * e.g. `[get-weather(from='Paris', days=2)]`. Names are ASCII identifiers with optional `-`/`.`
+     * segments and no reserved words. Values are single/double-quoted strings, JSON numbers, lists,
+     * string-keyed dicts, or `True`/`False`/`None` and `true`/`false`/`null`. Strings accept JSON escapes
+     * plus `\'`, but not raw LF/CR or lone surrogates. Integers must be within ±(2^53 - 1), floats must
+     * be finite, and lists/dicts may nest at most 100 levels. Outside strings, only space, tab, LF and CR
+     * count as whitespace. Duplicate names/keys, trailing commas, positional arguments, comments and other
+     * Python syntax are errors for the whole region.
+     *
      * **Example:** Parse a generated response.
      *
      * ```javascript
