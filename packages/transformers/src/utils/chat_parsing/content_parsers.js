@@ -61,45 +61,62 @@ const NON_FINITE_TOKEN = /-Infinity|Infinity|NaN/y;
 
 /**
  * Python's `json.loads` accepts `NaN`, `Infinity` and `-Infinity`, but `JSON.parse` doesn't. Replace them (outside
- * strings) with placeholder strings that `_revive_non_finite` turns back into numbers.
+ * strings) in value positions. All original string values are escaped into a separate namespace,
+ * so the reviver never mistakes user strings for a non-finite placeholder.
  * @param {string} text
  * @returns {string|null} The rewritten text, or `null` if there was nothing to replace.
  */
 function _replace_non_finite(text) {
-    if (text.includes(LAX_OPEN) || text.includes(LAX_CLOSE)) return null;
     let out = '';
     let replaced = false;
-    let in_string = false;
+    let previous;
     for (let i = 0; i < text.length; ++i) {
         const char = text[i];
-        if (in_string) {
-            out += char;
-            if (char === '\\') out += text[++i] ?? '';
-            else if (char === '"') in_string = false;
-            continue;
-        }
         if (char === '"') {
-            in_string = true;
-            out += char;
+            const start = i++;
+            while (i < text.length && text[i] !== '"') {
+                if (text[i] === '\\') ++i;
+                ++i;
+            }
+            if (i >= text.length) return null;
+            const quoted = text.slice(start, i + 1);
+            let next = i + 1;
+            while (/[ \t\r\n]/.test(text[next] ?? '')) ++next;
+            try {
+                out += text[next] === ':' ? quoted : JSON.stringify('s:' + JSON.parse(quoted));
+            } catch {
+                return null;
+            }
+            previous = '"';
             continue;
         }
         NON_FINITE_TOKEN.lastIndex = i;
         const match = NON_FINITE_TOKEN.exec(text);
         if (match !== null) {
-            // Escaped, because raw control characters aren't allowed inside JSON strings.
-            out += `"\\u0001${match[0]}\\u0002"`;
-            i += match[0].length - 1;
-            replaced = true;
-            continue;
+            let next = i + match[0].length;
+            while (/[ \t\r\n]/.test(text[next] ?? '')) ++next;
+            const after = text[next];
+            if (
+                (previous === undefined || ':,['.includes(previous)) &&
+                (after === undefined || ',]}'.includes(after))
+            ) {
+                out += JSON.stringify('n:' + match[0]);
+                i += match[0].length - 1;
+                previous = 'v';
+                replaced = true;
+                continue;
+            }
         }
         out += char;
+        if (!/[ \t\r\n]/.test(char)) previous = char;
     }
     return replaced ? out : null;
 }
 
 function _revive_non_finite(_key, value) {
-    if (typeof value === 'string' && value.startsWith(LAX_OPEN) && value.endsWith(LAX_CLOSE)) {
-        const token = value.slice(1, -1);
+    if (typeof value === 'string') {
+        if (value.startsWith('s:')) return value.slice(2);
+        const token = value.startsWith('n:') ? value.slice(2) : '';
         if (Object.hasOwn(NON_FINITE, token)) return NON_FINITE[token];
     }
     return value;
@@ -132,8 +149,9 @@ function _json(text, args) {
 
     if (unquoted_keys) {
         // Consume quoted strings first so key-like text and escaped quotes inside them stay untouched.
-        working = working.replace(compile_pattern(String.raw`"(?:\\.|[^"\\])*"|(?<=[{,])(\w+):`).regex, (match, key) =>
-            key === undefined ? match : `"${key}":`,
+        working = working.replace(
+            compile_pattern(String.raw`"(?:\\.|[^"\\])*"|(?<=[{,])(\s*)(\w+)(\s*):`).regex,
+            (match, before, key, after) => (key === undefined ? match : `${before}"${key}"${after}:`),
         );
     }
 
@@ -176,6 +194,7 @@ function _xml_inline(text, args) {
 
     // A Map keeps model-generated keys (e.g. `__proto__`) from touching object prototypes
     const out = new Map();
+    const duplicates = new Set();
     for (const m of text.matchAll(compile_pattern(tag_pattern).regex)) {
         const key = m.groups?.key;
         if (key === undefined) {
@@ -183,7 +202,10 @@ function _xml_inline(text, args) {
         }
         const value = _sub_parse(m.groups.value ?? '', value_parser);
         if (out.has(key) && merge) {
-            if (!Array.isArray(out.get(key))) out.set(key, [out.get(key)]);
+            if (!duplicates.has(key)) {
+                out.set(key, [out.get(key)]);
+                duplicates.add(key);
+            }
             out.get(key).push(value);
         } else {
             out.set(key, value);

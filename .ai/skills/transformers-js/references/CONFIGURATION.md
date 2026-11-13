@@ -48,7 +48,7 @@ env.cacheDir = '/path/to/cache/directory/';
 | `allowLocalModels` | `boolean` | Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise. If set to `false`, it will skip the local file check and try to load the model from the remote host. |
 | `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `fetch` | `(input: string \| URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
-| `hfToken` | `string\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. |
+| `hfToken` | `string\|null\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials. |
 | `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 <!-- @generated:end id=typedef:TransformersEnvironment -->
 

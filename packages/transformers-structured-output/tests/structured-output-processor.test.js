@@ -83,6 +83,50 @@ function isAllowed(scores, tokenId) {
   return Number.isFinite(scores.data[tokenId]);
 }
 
+describe("reassessment EOS and special-closer masks", () => {
+  const source = {
+    ...thinkingTokenizer,
+    tokens: [...tokenizer.tokens, Array.from(new TextEncoder().encode("<turn|>")), Array.from(new TextEncoder().encode("<other>"))],
+    special_token_ids: [256, 257, 258],
+    response_template: {
+      ...thinkingTokenizer.response_template,
+      fields: { ...thinkingTokenizer.response_template.fields, content: { close: "<turn|>" } },
+    },
+  };
+  function scoresFor(pattern, text) {
+    const processor = new StructuredOutputProcessor(source, { type: "regex", regex: pattern });
+    const prompt = encodeIds("<assistant>");
+    const scores = new Tensor("float32", new Float32Array(259).fill(1), [1, 259]);
+    processor([prompt], scores);
+    const after = new Tensor("float32", new Float32Array(259).fill(1), [1, 259]);
+    processor([[...prompt, ...encodeIds(text)]], after);
+    return after;
+  }
+  it.each(["", "a*", "a?", "<"])("allows EOS for an accepting direct branch %j", (pattern) => {
+    expect(isAllowed(scoresFor(pattern, pattern === "<" ? "<" : ""), 256)).toBe(true);
+  });
+  it("masks EOS and closer for incomplete required payloads", () => {
+    const scores = scoresFor("okay", "ok");
+    expect(isAllowed(scores, 256)).toBe(false);
+    expect(isAllowed(scores, 257)).toBe(false);
+  });
+  it.each([".+", "ok"])("allows configured non-EOS closer and EOS, not unrelated special tokens: %s", (pattern) => {
+    const scores = scoresFor(pattern, "ok");
+    expect(isAllowed(scores, 256)).toBe(true);
+    expect(isAllowed(scores, 257)).toBe(true);
+    expect(isAllowed(scores, 258)).toBe(false);
+  });
+  it("recognizes a closer completed after an ordinary prefix", () => {
+    const splitSource = { ...source, tokens: [...source.tokens, Array.from(new TextEncoder().encode("rn|>"))], special_token_ids: [256, 257, 258, 259] };
+    const processor = new StructuredOutputProcessor(splitSource, { type: "regex", regex: ".+" });
+    const prompt = encodeIds("<assistant>");
+    processor([prompt], new Tensor("float32", new Float32Array(260).fill(1), [1, 260]));
+    const scores = new Tensor("float32", new Float32Array(260).fill(1), [1, 260]);
+    processor([[...prompt, ...encodeIds("ok<tu")]], scores);
+    expect(isAllowed(scores, 259)).toBe(true);
+  });
+});
+
 const inputIdsByConstraint = new WeakMap();
 
 async function consume(processor, text) {

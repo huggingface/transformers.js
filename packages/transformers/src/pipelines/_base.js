@@ -5,6 +5,7 @@ import { Processor } from '../processing_utils.js';
 import { Callable } from '../utils/generic.js';
 
 import { decode_audio } from '../utils/audio.js';
+import { assertAudioContextAvailable } from '../utils/audio_context.js';
 import { RawImage } from '../utils/image.js';
 import { getFile } from '../utils/hub.js';
 
@@ -89,6 +90,7 @@ export async function prepareAudios(pipeline, audios, sampling_rate) {
     return await Promise.all(
         audios.map(async (x) => {
             if (typeof x === 'string' || x instanceof URL) {
+                assertAudioContextAvailable();
                 const response = await fetchInput(pipeline, x, 'audio');
                 return await decode_audio(await response.arrayBuffer(), sampling_rate);
             } else if (x instanceof Float64Array) {

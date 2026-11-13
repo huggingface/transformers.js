@@ -2,7 +2,9 @@ import { compileRegex } from './regex';
 import type { ConstraintState, TokenizerSource } from './types';
 
 type Matcher = { machine: ConstraintState<unknown>; eager: boolean; source: string };
-type MatchProgress = { state: unknown; accepted: boolean };
+type Replay = { length: number; byte?: number; previous?: Replay };
+const EMPTY_REPLAY: Replay = { length: 0 };
+type MatchProgress = { state: unknown; accepted: boolean; replay: Replay };
 export type ProtocolConfig = {
     thinkingOpen: Matcher;
     thinkingClose: Uint8Array[];
@@ -21,7 +23,7 @@ type ProtocolState =
     | { phase: 'thinking'; closeBuffer: Uint8Array }
     | { phase: 'content'; progress: MatchProgress; opener: Matcher }
     | { phase: 'ending'; progress: MatchProgress }
-    | { phase: 'structured'; state: unknown; framing?: number }
+    | { phase: 'structured'; state: unknown; framing?: number; closer?: MatchProgress }
     | { phase: 'dead' | 'finished' };
 
 export function withResponseProtocol(
@@ -54,7 +56,7 @@ export function withResponseProtocol(
     ): ProtocolState => {
         const next = advanceMatch(matcher, progress, byte);
         if (next.complete === 'after') return phase === 'ending' ? { phase: 'finished' } : boundary;
-        if (next.complete === 'before' && phase === 'content') return transition(boundary, byte);
+        if (next.complete === 'before' && phase === 'content') return next.replay!.reduce(transition, boundary);
         if (next.progress === undefined) return { phase: 'dead' };
         return phase === 'content'
             ? { phase, progress: next.progress, opener: matcher }
@@ -68,17 +70,41 @@ export function withResponseProtocol(
                 return { phase: 'dead' };
             case 'structured': {
                 const next = structured.transition(state.state, byte);
+                if (preserveWhitespaceIdentity && next === state.state && isFramingWhitespace(byte)) return state;
+                // Keep the delimiter branch alongside broad payload languages. Ordinary bytes still
+                // belong to the payload; only this independent branch can justify a special token.
+                let close =
+                    protocol.contentClose === undefined
+                        ? undefined
+                        : advanceMatch(
+                              protocol.contentClose,
+                              state.closer ?? initialMatch(protocol.contentClose),
+                              byte,
+                          );
+                if (
+                    state.closer !== undefined &&
+                    close?.progress === undefined &&
+                    close?.complete !== 'after' &&
+                    protocol.contentClose !== undefined &&
+                    structured.accepting(state.state)
+                ) {
+                    close = advanceMatch(protocol.contentClose, initialMatch(protocol.contentClose), byte);
+                }
+                const eligible = state.closer !== undefined || structured.accepting(state.state);
+                const closer = eligible ? close?.progress : undefined;
                 if (structured.viable(next)) {
+                    if (closer !== undefined) return { phase: 'structured', state: next, closer };
                     // Regex loops can consume payload without changing state. JSON whitespace must keep identity.
                     return next === state.state &&
+                        state.closer === undefined &&
                         (state.framing === undefined || (preserveWhitespaceIdentity && isFramingWhitespace(byte)))
                         ? state
                         : payload(next);
                 }
                 if (state.framing !== undefined && state.framing < MAX_FRAMING_WHITESPACE && isFramingWhitespace(byte))
                     return { phase: 'structured', state: state.state, framing: state.framing + 1 };
-                return structured.accepting(state.state) && protocol.contentClose !== undefined
-                    ? framed('ending', initialMatch(protocol.contentClose), protocol.contentClose, byte)
+                return eligible && protocol.contentClose !== undefined
+                    ? framed('ending', state.closer ?? initialMatch(protocol.contentClose), protocol.contentClose, byte)
                     : { phase: 'dead' };
             }
             case 'content':
@@ -95,10 +121,13 @@ export function withResponseProtocol(
                 const thinking = state.thinking && advanceMatch(protocol.thinkingOpen, state.thinking, byte);
                 if (thinking?.complete === 'after') return { phase: 'thinking', closeBuffer: new Uint8Array() };
                 if (thinking?.complete === 'before')
-                    return transition({ phase: 'thinking', closeBuffer: new Uint8Array() }, byte);
+                    return thinking.replay!.reduce(transition, {
+                        phase: 'thinking',
+                        closeBuffer: new Uint8Array(),
+                    } as ProtocolState);
                 const content = state.content && advanceMatch(protocol.contentOpen!, state.content, byte);
                 if (content?.complete === 'after') return boundary;
-                if (content?.complete === 'before') return transition(boundary, byte);
+                if (content?.complete === 'before') return content.replay!.reduce(transition, boundary);
                 const next = state.structured === undefined ? undefined : structured.transition(state.structured, byte);
                 const direct = next !== undefined && structured.viable(next) ? next : undefined;
                 if (thinking?.progress === undefined && content?.progress === undefined)
@@ -115,7 +144,8 @@ export function withResponseProtocol(
     };
     const accepting = (state: ProtocolState): boolean =>
         state.phase === 'finished' ||
-        (state.phase === 'ending' && state.progress.accepted) ||
+        (state.phase === 'start' && state.structured !== undefined && structured.accepting(state.structured)) ||
+        (state.phase === 'ending' && state.progress.accepted && state.progress.replay.length === 0) ||
         (state.phase === 'structured' && structured.accepting(state.state));
     return {
         initial,
@@ -143,14 +173,29 @@ export function withResponseProtocol(
             if (accepting(state)) return true;
             let next = state;
             for (const byte of bytes) next = transition(next, byte);
-            return next.phase === 'finished' || (next.phase === 'ending' && next.progress.accepted);
+            return (
+                next.phase === 'finished' ||
+                (next.phase === 'ending' && next.progress.accepted && next.progress.replay.length === 0)
+            );
         },
         allowsSpecial: (state, next, bytes) => {
             if (bytes.length === 0) return false;
             if (state.phase === 'thinking') {
                 return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
-            if (state.phase === 'structured') return next.phase === 'ending' || next.phase === 'finished';
+            if (state.phase === 'structured') {
+                if (
+                    protocol.contentClose === undefined ||
+                    (state.closer === undefined && !structured.accepting(state.state))
+                )
+                    return false;
+                let delimiter: ProtocolState = {
+                    phase: 'ending',
+                    progress: state.closer ?? initialMatch(protocol.contentClose),
+                };
+                for (const byte of bytes) delimiter = transition(delimiter, byte);
+                return delimiter.phase === 'finished' || delimiter.phase === 'ending';
+            }
             if (state.phase === 'start') {
                 // Only protocol branches justify special tokens, never the payload branch.
                 let candidate: ProtocolState = { ...state, structured: undefined };
@@ -160,6 +205,7 @@ export function withResponseProtocol(
                 ) {
                     // The non-eager opener is complete: apply the same special-token rule as in thinking.
                     candidate = { phase: 'thinking', closeBuffer: new Uint8Array() };
+                    candidate = replayBytes(state.thinking.replay).reduce(transition, candidate);
                     for (const byte of bytes) candidate = transition(candidate, byte);
                     return (
                         candidate.phase !== 'dead' &&
@@ -177,6 +223,7 @@ export function withResponseProtocol(
         maskKey: (state) => {
             if (state.phase === 'thinking') return `thinking:${Array.from(state.closeBuffer).join(',')}`;
             if (state.phase !== 'structured') return undefined;
+            if (state.closer !== undefined) return undefined;
             const key = structured.maskKey?.(state.state);
             if (key === undefined) return undefined;
             return state.framing === undefined ? `structured:${key}` : `framing:${state.framing}:${key}`;
@@ -189,17 +236,39 @@ function isFramingWhitespace(byte: number): boolean {
 }
 
 function initialMatch(matcher: Matcher): MatchProgress {
-    return { state: matcher.machine.initial, accepted: matcher.machine.accepting(matcher.machine.initial) };
+    return {
+        state: matcher.machine.initial,
+        accepted: matcher.machine.accepting(matcher.machine.initial),
+        replay: EMPTY_REPLAY,
+    };
+}
+function replayBytes(replay: Replay, byte?: number): Uint8Array {
+    const bytes = new Uint8Array(replay.length + (byte === undefined ? 0 : 1));
+    if (byte !== undefined) bytes[replay.length] = byte;
+    for (let node = replay; node.length > 0; node = node.previous!) bytes[node.length - 1] = node.byte!;
+    return bytes;
 }
 function advanceMatch(
     matcher: Matcher,
     progress: MatchProgress,
     byte: number,
-): { progress?: MatchProgress; complete?: 'before' | 'after' } {
+): { progress?: MatchProgress; complete?: 'before' | 'after'; replay?: Uint8Array } {
     const next = matcher.machine.transition(progress.state, byte);
-    if (!matcher.machine.viable(next)) return progress.accepted ? { complete: 'before' } : {};
+    if (!matcher.machine.viable(next))
+        return progress.accepted ? { complete: 'before', replay: replayBytes(progress.replay, byte) } : {};
     const accepted = matcher.machine.accepting(next);
-    return accepted && matcher.eager ? { complete: 'after' } : { progress: { state: next, accepted } };
+    return accepted && matcher.eager
+        ? { complete: 'after' }
+        : {
+              progress: {
+                  state: next,
+                  accepted: accepted || progress.accepted,
+                  replay:
+                      accepted || !progress.accepted
+                          ? EMPTY_REPLAY
+                          : { byte, previous: progress.replay, length: progress.replay.length + 1 },
+              },
+          };
 }
 function advanceLiteralSearch(
     literals: Uint8Array[],
@@ -299,6 +368,27 @@ function anchorMatcher(field: Record<string, unknown>, literalKey: string, patte
     }
     if (typeof field[patternKey] === 'string') {
         try {
+            // The payload DFA ignores outer anchors and combines alternatives as a language, not ordered search.
+            // Never use those approximations to truncate a prompt; leave unsupported templates to the parser.
+            let inClass = false;
+            const pattern = field[patternKey] as string;
+            for (let i = 0; i < pattern.length; ++i) {
+                const char = pattern[i];
+                if (char === '\\') {
+                    ++i;
+                    continue;
+                }
+                if (char === '[') inClass = true;
+                else if (char === ']') inClass = false;
+                else if (
+                    !inClass &&
+                    (char === '^' || char === '$' || (patternKey === 'start_anchor_pattern' && char === '|'))
+                ) {
+                    throw new Error(
+                        `positional assertions and ordered start-anchor alternatives require parser semantics: ${pattern}`,
+                    );
+                }
+            }
             return compileMatcher(field[patternKey] as string, false);
         } catch (error) {
             throw new Error(`Unsupported response template ${patternKey}: ${String(error)}`);

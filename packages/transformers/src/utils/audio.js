@@ -13,17 +13,7 @@ import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
 import { Tensor, matmul } from './tensor.js';
 import { logger } from './logger.js';
-
-function assertAudioContextAvailable() {
-    if (typeof AudioContext === 'undefined') {
-        // Running in node or an environment without AudioContext
-        throw Error(
-            'Unable to load audio from path/URL since `AudioContext` is not available in your environment. ' +
-                'Instead, audio data should be passed directly to the pipeline/processor. ' +
-                'For more information and some example code, see https://huggingface.co/docs/transformers.js/guides/node-audio-processing.',
-        );
-    }
-}
+import { assertAudioContextAvailable } from './audio_context.js';
 
 /**
  * Helper function to load audio from a path/URL.

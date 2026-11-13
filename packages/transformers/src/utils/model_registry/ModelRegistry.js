@@ -120,13 +120,7 @@ export class ModelRegistry {
      * Get all files (model, tokenizer, processor) needed for a model.
      *
      * @param {string} modelId - The model id (e.g., "onnx-community/bert-base-uncased-ONNX")
-     * @param {Object} [options] - Optional parameters
-     * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
-     * @param {boolean} [options.include_tokenizer=true] - Whether to check for tokenizer files
-     * @param {boolean} [options.include_processor=true] - Whether to check for processor files
+     * @param {import('./get_files.js').RegistryOptions} [options] Loading and file-selection options.
      * @returns {Promise<string[]>} Array of file paths
      *
      * **Example:**
@@ -145,11 +139,7 @@ export class ModelRegistry {
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
      * @param {string} modelId - The model id (e.g., "onnx-community/bert-base-uncased-ONNX")
-     * @param {Object} [options] - Optional parameters
-     * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {Omit<import('./get_files.js').RegistryOptions, 'include_tokenizer'|'include_processor'>} [options] Loading and task-specific file-selection options.
      * @returns {Promise<string[]>} Array of file paths
      *
      * **Example:**
@@ -166,11 +156,7 @@ export class ModelRegistry {
      * Get model files needed for a specific model.
      *
      * @param {string} modelId - The model id
-     * @param {Object} [options] - Optional parameters
-     * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+     * @param {Parameters<typeof get_model_files>[1]} [options] Loading and model-file selection options.
      * @returns {Promise<string[]>} Array of model file paths
      *
      * **Example:**
@@ -227,12 +213,7 @@ export class ModelRegistry {
      * An empty array means the model is accessible but has no complete set of ONNX files for any dtype.
      *
      * @param {string} modelId - The model id (e.g., "onnx-community/all-MiniLM-L6-v2-ONNX")
-     * @param {Object} [options] - Optional parameters
-     * @param {import('../../configs.js').PretrainedConfig} [options.config=null] - Pre-loaded config
-     * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
-     * @param {string} [options.revision='main'] - Model revision
-     * @param {string} [options.cache_dir=null] - Custom cache directory
-     * @param {boolean} [options.local_files_only=false] - Only check local files
+     * @param {Parameters<typeof get_available_dtypes>[1]} [options] Loading and dtype-discovery options.
      * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8']). Empty if the model has no ONNX files.
      * @throws {import('../hub/utils.js').ModelFileNotFoundError} If the model is missing or inaccessible. The Hub returns 401 for nonexistent repositories.
      * @throws {Error} On network or server failures.
@@ -253,12 +234,7 @@ export class ModelRegistry {
      * Returns a plain boolean — use `is_cached_files` if you need per-file detail.
      *
      * @param {string} modelId - The model id
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {import('./get_files.js').RegistryOptions} [options] Loading and file-selection options.
      * @returns {Promise<boolean>} Whether all required files are cached
      *
      * **Example:**
@@ -276,12 +252,7 @@ export class ModelRegistry {
      * Automatically determines which files are needed using get_files().
      *
      * @param {string} modelId - The model id
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {import('./get_files.js').RegistryOptions} [options] Loading and file-selection options.
      * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
      *
      * **Example:**
@@ -302,12 +273,7 @@ export class ModelRegistry {
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
      * @param {string} modelId - The model id
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {Omit<import('./get_files.js').RegistryOptions, 'include_tokenizer'|'include_processor'>} [options] Loading and task-specific file-selection options.
      * @returns {Promise<boolean>} Whether all required files are cached
      *
      * **Example:**
@@ -326,12 +292,7 @@ export class ModelRegistry {
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "background-removal")
      * @param {string} modelId - The model id
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
+     * @param {Omit<import('./get_files.js').RegistryOptions, 'include_tokenizer'|'include_processor'>} [options] Loading and task-specific file-selection options.
      * @returns {Promise<import('./is_cached.js').CacheCheckResult>} Object with allCached boolean and files array with cache status
      *
      * **Example:**
@@ -370,14 +331,7 @@ export class ModelRegistry {
      * Automatically determines which files are needed and removes them from the cache.
      *
      * @param {string} modelId - The model id (e.g., "onnx-community/gpt2-ONNX")
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
-     * @param {boolean} [options.include_tokenizer=true] - Whether to clear tokenizer files
-     * @param {boolean} [options.include_processor=true] - Whether to clear processor files
+     * @param {import('./get_files.js').RegistryOptions} [options] Loading and file-selection options.
      * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
      *
      * **Example:**
@@ -396,12 +350,7 @@ export class ModelRegistry {
      *
      * @param {string} task - The pipeline task (e.g., "text-generation", "image-classification")
      * @param {string} modelId - The model id (e.g., "onnx-community/gpt2-ONNX")
-     * @param {Object} [options] - Optional parameters
-     * @param {string} [options.cache_dir] - Custom cache directory
-     * @param {string} [options.revision] - Model revision (default: 'main')
-     * @param {import('../../configs.js').PretrainedConfig} [options.config] - Pre-loaded config
-     * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype] - Override dtype
-     * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device] - Override device
+     * @param {Omit<import('./get_files.js').RegistryOptions, 'include_tokenizer'|'include_processor'>} [options] Loading and task-specific file-selection options.
      * @returns {Promise<import('./clear_cache.js').CacheClearResult>} Object with deletion statistics and file status
      *
      * **Example:**

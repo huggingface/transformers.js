@@ -1,5 +1,6 @@
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
+import { load_response_template, truncate_past_last_anchor } from "../../transformers/src/utils/chat_parsing/response_templates.js";
 
 // Exercise internal matchers without adding them to the package's public exports.
 const { outputFiles } = await build({
@@ -29,7 +30,8 @@ function initialize(pattern, text, onTransition = () => {}) {
   return state.phase === "start" ? state.structured : state.state;
 }
 
-// Reference behavior from the reviewed baseline: greedy, leftmost, non-overlapping matches.
+// Reference behavior for the supported anchor subset: greedy, leftmost, non-overlapping matches.
+// Ordered pattern alternatives are deliberately tested as fallback below, not against this reference.
 function referenceLastEnd(pattern, text) {
   const machine = compileRegex(pattern);
   const bytes = encoder.encode(text);
@@ -72,8 +74,7 @@ describe("Response protocol prompt-anchor search", () => {
     ["a*b", "aaaabaaa"],
     ["aab", "aaabz"],
     ["a*", "aaa!aa"],
-    ["ab|aab", "aabxab!"],
-  ])("preserves greedy, non-overlapping selection for %j in %j", (pattern, text) => {
+  ])("preserves supported greedy, non-overlapping selection for %j in %j", (pattern, text) => {
     const end = referenceLastEnd(pattern, text);
     expect(initialize(pattern, text)).toBe(end < 0 ? "" : text.slice(end));
   });
@@ -92,5 +93,100 @@ describe("Response protocol prompt-anchor search", () => {
     const state = machine.initialize(encoder.encode(prompt));
     expect(machine.accepting(machine.transition(state, "k".charCodeAt(0)))).toBe(true);
     expect(machine.viable(machine.transition(state, "x".charCodeAt(0)))).toBe(false);
+  });
+});
+
+describe("reassessment protocol regressions", () => {
+  const template = (reasoning = {}, content = {}, anchor = { start_anchor: "<assistant>" }) => ({
+    ...anchor,
+    fields: {
+      reasoning_content: { open: "<think>", close: "</think>", ...reasoning },
+      content: { close: "<turn|>", ...content },
+    },
+  });
+  const protocol = (value, pattern = "ok") => withResponseProtocol(compileRegex(pattern), responseProtocol({ response_template: value }));
+  const feed = (machine, state, text) => encoder.encode(text).reduce(machine.transition, state);
+
+  it.each([
+    ["<assistant><think>\nreason", "</think>ok"],
+    ["<assistant><think>\n\nreason", "</think>ok"],
+    ["<assistant><think>", "reason</think>ok"],
+  ])("replays accepted reasoning-opener suffixes: %s", (prefix, rest) => {
+    const machine = protocol(template({ open: ["<think>", "<think>\n\n"] }));
+    expect(machine.accepting(feed(machine, machine.initialize(encoder.encode(prefix)), rest))).toBe(true);
+  });
+
+  it.each(["<assistant><final>\no", "<assistant><think>r</think><final>\no", "<assistant><final>\n\no"])("replays content-opener suffixes: %s", (prefix) => {
+    const machine = protocol(template({}, { open: ["<final>", "<final>\n\n"] }), "\\n?ok");
+    const state = machine.initialize(encoder.encode(prefix));
+    // Framing whitespace is optional; payload includes it only when its regex accepts it.
+    expect(machine.accepting(feed(machine, state, "k"))).toBe(true);
+  });
+
+  it("rejects a prefill with no accepted opener", () => {
+    const machine = protocol(template({}, { open: ["<final>", "<final>\n\n"] }));
+    expect(() => machine.initialize(encoder.encode("<assistant><fX"))).toThrow();
+  });
+
+  it.each(["^<assistant>", "<assistant>$", "<assistant>|<assistant><think>", "<assistant><think>|<assistant>"])("explicitly falls back for unsupported anchor %s", (start_anchor_pattern) => {
+    expect(responseProtocol({ response_template: template({}, {}, { start_anchor_pattern }) })).toBeUndefined();
+  });
+
+  it.each([
+    ["^<assistant>", "x<assistant><think>", "x<assistant><think>"],
+    ["<assistant>$", "<assistant><think>", "<assistant><think>"],
+    ["<assistant>|<assistant><think>", "<assistant><think>", "<think>"],
+    ["<assistant><think>|<assistant>", "<assistant><think>", ""],
+  ])("leaves unsupported ordered/positional truncation to the parser: %s", (start_anchor_pattern, text, expected) => {
+    const spec = template({}, {}, { start_anchor_pattern });
+    expect(truncate_past_last_anchor(load_response_template(spec), text)).toBe(expected);
+    expect(responseProtocol({ response_template: spec })).toBeUndefined();
+  });
+
+  it.each(["<assistant>first<assistant>last", "missing anchor", "<assistant>"])("matches parser truncation for literal anchors: %s", (text) => {
+    const spec = template();
+    const expected = truncate_past_last_anchor(load_response_template(spec), text);
+    expect(initialize("<assistant>", text)).toBe(text.includes("<assistant>") ? expected : "");
+  });
+
+  it.each(["", "a*", "a?"])("allows nullable initial EOS for %j", (pattern) => {
+    const machine = protocol(template(), pattern);
+    expect(machine.acceptsEnd(machine.initial, encoder.encode("EOS"))).toBe(true);
+  });
+
+  it("allows a complete direct payload without committing an opener prefix", () => {
+    const machine = protocol(template(), "<");
+    const state = feed(machine, machine.initial, "<");
+    expect(machine.accepting(state)).toBe(true);
+    expect(machine.accepting(feed(machine, state, "think>r</think><"))).toBe(true);
+    const required = protocol(template(), "<x");
+    expect(required.accepting(feed(required, required.initial, "<"))).toBe(false);
+    expect(required.accepting(required.initial)).toBe(false);
+  });
+
+  it.each([".+", "ok"])("allows only configured special closers after %s", (pattern) => {
+    const machine = protocol(template(), pattern);
+    const state = feed(machine, machine.initial, "ok");
+    const closer = encoder.encode("<turn|>");
+    expect(machine.allowsSpecial(state, closer.reduce(machine.transition, state), closer)).toBe(true);
+    const unrelated = encoder.encode("<other>");
+    expect(machine.allowsSpecial(state, unrelated.reduce(machine.transition, state), unrelated)).toBe(false);
+    for (const text of ["payload<turn|>", "<turn|>payload"]) {
+      const compound = encoder.encode(text);
+      expect(machine.allowsSpecial(state, compound.reduce(machine.transition, state), compound)).toBe(false);
+    }
+    expect(machine.acceptsEnd(state, encoder.encode("EOS"))).toBe(true);
+  });
+
+  it("keeps closer-looking ordinary text in broad payloads", () => {
+    const machine = protocol(template(), ".+");
+    const state = feed(machine, machine.initial, "ok<turn|>ordinary");
+    expect(machine.accepting(state)).toBe(true);
+    expect(state.phase).toBe("structured");
+  });
+  it("keeps a closer branch when a bounded payload dies halfway through it", () => {
+    const machine = protocol(template(), ".{1,4}");
+    const state = feed(machine, machine.initial, "ok<turn|>");
+    expect(machine.accepting(state)).toBe(true);
   });
 });

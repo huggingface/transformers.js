@@ -225,7 +225,7 @@ export const LogLevel = Object.freeze({
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
- * @property {string|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access.
+ * @property {string|null|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  */
 

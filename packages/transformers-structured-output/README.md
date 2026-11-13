@@ -37,7 +37,7 @@ When the tokenizer defines `response_template.fields.reasoning_content` and `res
 
 The prompt decides whether thinking is possible: a template that renders disabled thinking as an empty, closed thinking block (Qwen3's `<think>\n\n</think>\n\n`) makes the constraint apply from the first generated token. Prompt prefills are validated: completed thinking blocks are accepted, and invalid answer prefills raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
 
-Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine. If the response template uses anything else, the processor logs a warning once and falls back to constraining the response from its first token.
+Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine, except that protocol patterns containing positional `^`/`$` assertions, and start-anchor patterns containing ordered `|` alternatives outside character classes, fall back with a warning. The protocol's language matcher cannot reproduce the response parser's positional and ordered-anchor-search semantics for those patterns. Escaped literal assertions/alternation characters remain supported; delimiter alternatives retain the existing longest-accepted-endpoint behavior. This restriction does not change ordinary payload regex constraints. Unsupported templates fall back to constraining the response from its first token, without interpreting thinking delimiters or prompt anchors.
 
 ## Supported constraints
 

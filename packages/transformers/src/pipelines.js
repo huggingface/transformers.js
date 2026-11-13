@@ -15,6 +15,7 @@
 
 import { DefaultProgressCallback, dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
+import { ModelFileNotFoundError } from './utils/hub/utils.js';
 
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
 import { AutoProcessor } from './models/auto/processing_auto.js';
@@ -183,6 +184,11 @@ export async function pipeline(
     // Determine which components to load based on the expected files
     const hasTokenizer = expected_files.includes('tokenizer.json');
     const hasProcessor = expected_files.includes('preprocessor_config.json');
+    if (!hasTokenizer && pipelineInfo.type === 'text') {
+        throw new ModelFileNotFoundError(
+            `Tokenizer files are unavailable for "${model}"; the "${task}" pipeline requires a tokenizer.`,
+        );
+    }
 
     // Resolve the correct model class (needs config when multiple candidates exist)
     const modelClasses = pipelineInfo.model;

@@ -214,11 +214,12 @@ export class TextGenerationPipeline
                 return end === -1 ? row : row.slice(0, end + 1);
             });
         }
-        const decoded = this.tokenizer.batch_decode(sequences, { skip_special_tokens });
+        const decode_options = { skip_special_tokens, ...(parse ? { clean_up_tokenization_spaces: false } : {}) };
+        const decoded = this.tokenizer.batch_decode(sequences, decode_options);
 
         let prompts;
         if (!return_full_text && text_inputs.input_ids.dims.at(-1) > 0) {
-            prompts = this.tokenizer.batch_decode(text_inputs.input_ids, { skip_special_tokens });
+            prompts = this.tokenizer.batch_decode(text_inputs.input_ids, decode_options);
         }
 
         /** @type {TextGenerationOutput[]} */
@@ -255,6 +256,7 @@ export class TextGenerationPipeline
                     // Chat templates expect `content` on assistant messages (e.g. ones with only tool calls), so
                     // the message can be passed back in as history.
                     message.content ??= '';
+                    message.role ??= 'assistant';
                 } else {
                     message = { role: 'assistant', content: decoded[i] };
                 }
