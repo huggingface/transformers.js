@@ -63,6 +63,7 @@ export const MODEL_SESSION_CONFIG = {
             return s;
         },
         cache_sessions: { decoder_model_merged: true },
+        gpu_output_sessions: { embed_tokens: ['inputs_embeds'] },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.AudioTextToText]: {
@@ -73,6 +74,7 @@ export const MODEL_SESSION_CONFIG = {
             return s;
         },
         cache_sessions: { decoder_model_merged: true },
+        gpu_output_sessions: { embed_tokens: ['inputs_embeds'] },
         optional_configs: { generation_config: 'generation_config.json' },
     },
     [MODEL_TYPES.ImageAudioTextToText]: {
