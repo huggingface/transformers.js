@@ -92,6 +92,46 @@ describe("special closer state selection through token constraints", () => {
     c.commit(120);
     expect(allowed(maskOf(c), 256)).toBe(true);
   });
+  it.each(["after-mask", "without-mask", "repeated-mask", "primed-constraint"])("retains a restarted closer when the payload dies: %s", (path) => {
+    const make = () => {
+      const c = createTokenConstraint(source, { type: "regex", regex: "ok<?" });
+      c.initializePrompt(ids("<assistant>ok<"));
+      return c;
+    };
+    // Partial delimiter states intentionally have no shared mask-cache key. Complete-payload
+    // shared-cache paths are covered above; exercise repeated traversal and token-state caching here.
+    if (path === "primed-constraint") maskOf(make());
+    const c = make();
+    if (path !== "without-mask") {
+      const mask = maskOf(c);
+      expect(allowed(mask, 257)).toBe(true);
+      expect(allowed(mask, 258)).toBe(false);
+      expect(allowed(mask, 263)).toBe(false);
+      expect(allowed(mask, 264)).toBe(false);
+      if (path === "repeated-mask") expect(maskOf(c)).toEqual(mask);
+    }
+    c.commit(257);
+    const after = maskOf(c);
+    expect(allowed(after, 256)).toBe(true);
+    expect(allowed(after, 120)).toBe(false);
+    expect(() => c.commit(120)).toThrow();
+  });
+  it("does not turn a narrow ordinary closer into a payload escape", () => {
+    const c = createTokenConstraint(source, { type: "regex", regex: "ok<?" });
+    c.initializePrompt(ids("<assistant>ok<"));
+    const mask = maskOf(c);
+    expect(allowed(mask, 264)).toBe(false); // Ordinary/special compound must not append payload after closing.
+    expect(allowed(mask, 120)).toBe(false);
+    // Ordinary bytes may finish a configured delimiter when they cannot extend the payload,
+    // but must not permit any additional payload bytes. They never widen the payload regex.
+    if (allowed(mask, 259)) {
+      c.commit(259);
+      expect(allowed(maskOf(c), 256)).toBe(true);
+      expect(allowed(maskOf(c), 120)).toBe(false);
+    } else {
+      expect(() => c.commit(259)).toThrow();
+    }
+  });
   it.each([
     ["ok<", 257],
     ["ok<tu", 261],
@@ -131,6 +171,7 @@ describe("processor commits special closer branches", () => {
     [regex, "ok", 257],
     [".+", "ok<", 257],
     [".+", "ok<tu", 261],
+    ["ok<?", "ok<", 257],
   ])("terminates %s after %s", (pattern, prefix, token) => {
     const processor = new StructuredOutputProcessor(source, { type: "regex", regex: pattern });
     const input = ids("<assistant>" + prefix);

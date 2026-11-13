@@ -103,9 +103,10 @@ export function withResponseProtocol(
                 }
                 if (state.framing !== undefined && state.framing < MAX_FRAMING_WHITESPACE && isFramingWhitespace(byte))
                     return { phase: 'structured', state: state.state, framing: state.framing + 1 };
-                return eligible && protocol.contentClose !== undefined
-                    ? framed('ending', state.closer ?? initialMatch(protocol.contentClose), protocol.contentClose, byte)
-                    : { phase: 'dead' };
+                // Use the result already advanced above, including any fresh-closer retry. Replaying
+                // this byte against the old partial would discard that retry before trie pruning.
+                if (eligible && close?.complete === 'after') return { phase: 'finished' };
+                return closer === undefined ? { phase: 'dead' } : { phase: 'ending', progress: closer };
             }
             case 'content':
                 return framed('content', state.progress, state.opener, byte);

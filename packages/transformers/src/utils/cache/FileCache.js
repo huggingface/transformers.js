@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline as pipe } from 'node:stream/promises';
-import { setTimeout as delay } from 'node:timers/promises';
 
 import { FileResponse } from '../hub/FileResponse.js';
 import { Random } from '../random.js';
@@ -30,7 +29,7 @@ async function withMutationLock(markerPath, operation) {
                     { cause: error },
                 );
             }
-            await delay(10);
+            await new Promise((resolve) => setTimeout(resolve, 10));
         }
     }
     try {
