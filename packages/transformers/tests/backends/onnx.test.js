@@ -1,7 +1,8 @@
 import { jest } from "@jest/globals";
 
 // onnx.js takes the ONNX runtime from this global first, ahead of any environment
-// branch, so a fake here keeps the test free of the native onnxruntime binaries.
+// branch. It still imports onnx-node.js, which loads the native onnxruntime-node binding
+// on import, so that module is mocked below to keep the test free of native binaries.
 const ORT_SYMBOL = Symbol.for("onnxruntime");
 const create = jest.fn();
 globalThis[ORT_SYMBOL] = {
@@ -9,6 +10,8 @@ globalThis[ORT_SYMBOL] = {
   InferenceSession: { create },
   Tensor: class {},
 };
+
+jest.unstable_mockModule("../../src/backends/onnx-node.js", () => ({ default: {} }));
 
 // `apis` is frozen, so the web path has to be selected by mocking the module.
 jest.unstable_mockModule("../../src/env.js", () => ({
