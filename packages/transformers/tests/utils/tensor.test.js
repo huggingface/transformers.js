@@ -54,8 +54,8 @@ describe("Tensor operations", () => {
       const a = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       const b = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
 
-      expect(() => cat([a, b], 0)).toThrow("Sizes of tensors must match except in dimension 0. Expected size 3 but got size 2 for tensor number 1 in the list.");
-      expect(() => cat([a, b], -2)).toThrow("Sizes of tensors must match except in dimension 0.");
+      expect(() => cat([a, b], 0)).toThrow("Tensor 1 has shape [3,2]; expected rank 2 and sizes matching [2,3] except in dimension 0.");
+      expect(() => cat([a, b], -2)).toThrow("except in dimension 0.");
       // Matching on the non-concatenated dim is still fine
       const c = new Tensor("float32", [7, 8, 9, 10], [2, 2]);
       expect(cat([a, c], 1)).toEqual(new Tensor("float32", [1, 2, 3, 7, 8, 4, 5, 6, 9, 10], [2, 5]));
@@ -65,7 +65,7 @@ describe("Tensor operations", () => {
       const a = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       const b = new Tensor("float32", [1, 2, 3], [3]);
 
-      expect(() => cat([a, b], 0)).toThrow("Tensors must have the same number of dimensions. Expected 2 but got 1 for tensor number 1 in the list.");
+      expect(() => cat([a, b], 0)).toThrow("Tensor 1 has shape [3]; expected rank 2 and sizes matching [2,3] except in dimension 0.");
     });
 
     it("should throw on an empty list", () => {
@@ -165,7 +165,7 @@ describe("Tensor operations", () => {
 
     it("should throw when tensors have different shapes", () => {
       const t2 = new Tensor("float32", [0, 1, 2, 3], [1, 2, 2]);
-      expect(() => stack([t1, t2], 0)).toThrow("Sizes of tensors must match");
+      expect(() => stack([t1, t2], 0)).toThrow("Tensor 1 has shape [1,1,2,2]");
     });
 
     it("should stack on dim=0", () => {

@@ -1403,17 +1403,11 @@ export function cat(tensors, dim = 0) {
     const refDims = tensors[0].dims;
     for (let t = 1; t < tensors.length; ++t) {
         const dims = tensors[t].dims;
-        if (dims.length !== refDims.length) {
+        if (dims.length !== refDims.length || refDims.some((size, axis) => axis !== dim && dims[axis] !== size)) {
             throw new Error(
-                `Tensors must have the same number of dimensions. Expected ${refDims.length} but got ${dims.length} for tensor number ${t} in the list.`,
+                `Tensor ${t} has shape [${dims}]; expected rank ${refDims.length} ` +
+                    `and sizes matching [${refDims}] except in dimension ${dim}.`,
             );
-        }
-        for (let j = 0; j < refDims.length; ++j) {
-            if (j !== dim && dims[j] !== refDims[j]) {
-                throw new Error(
-                    `Sizes of tensors must match except in dimension ${dim}. Expected size ${refDims[j]} but got size ${dims[j]} for tensor number ${t} in the list.`,
-                );
-            }
         }
     }
 
