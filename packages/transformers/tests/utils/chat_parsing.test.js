@@ -1,6 +1,7 @@
 import { parse_response, ResponseParser } from "../../src/utils/chat_parsing/index.js";
 import { CONTENT_PARSERS } from "../../src/utils/chat_parsing/content_parsers.js";
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 
 // Portable input/output fixtures for the same strict grammar in Python and JavaScript.
 const pythonCallListFixtures = JSON.parse(await readFile(new URL("../fixtures/python_call_list.json", import.meta.url), "utf8"));
@@ -1208,6 +1209,45 @@ describe("Response templates", () => {
 
   describe("JavaScript port", () => {
     const template_with = (fields) => ({ defaults: { role: "assistant" }, start_anchor: "<a>", fields });
+
+    it.each(["one-shot", "incremental", "finalize"])("rejects a non-progress delimiter cycle during %s under an external deadline", (mode) => {
+      const moduleURL = new URL("../../src/utils/chat_parsing/index.js", import.meta.url).href;
+      const script = `
+        import { parse_response, ResponseParser } from ${JSON.stringify(moduleURL)};
+        const mode = ${JSON.stringify(mode)};
+        const pattern = mode === "finalize" ? "(?=x$)" : "(?=x)";
+        const template = { start_anchor: "<a>", fields: { item: { open_pattern: pattern, close_pattern: pattern } } };
+        try {
+          if (mode === "one-shot") parse_response("x", template, { prefix: "" });
+          else {
+            const parser = new ResponseParser(template, { prefix: "" });
+            if (mode === "incremental") { parser.feed("prelude"); parser.feed("x"); }
+            else { parser.feed("x"); parser.finalize(); }
+          }
+          console.log(JSON.stringify({ threw: false }));
+        } catch (error) { console.log(JSON.stringify({ threw: true, message: error.message })); }
+      `;
+      const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 2000 });
+      expect({ status: result.status, error: result.error, stderr: result.stderr }).toEqual({ status: 0, error: undefined, stderr: "" });
+      const output = JSON.parse(result.stdout.trim());
+      expect(output.threw).toBe(true);
+      expect(output.message).toMatch(/non-progress.*position/i);
+    });
+
+    it("keeps finite zero-width transitions and consuming delimiters working", () => {
+      const cases = [
+        ["x", { item: { open_pattern: "(?=x)" } }, { role: "assistant", item: "x" }],
+        ["xx", { item: { open_pattern: "(?=x)", close: "x", repeats: true } }, { role: "assistant", item: ["", ""] }],
+        ["<x>hi</x>", { item: { open: "<x>", close: "</x>" } }, { role: "assistant", item: "hi" }],
+      ];
+      for (const [text, fields, expected] of cases) {
+        const template = template_with(fields);
+        expect(parse_response(text, template, { prefix: "" })).toEqual(expected);
+        const parser = new ResponseParser(template, { prefix: "" });
+        for (const character of text) parser.feed(character);
+        expect(parser.finalize()[0]).toEqual(expected);
+      }
+    });
 
     it.each(["\n", "Done."])("preserves answer text around a tool call followed by %j", (suffix) => {
       const template = template_with({

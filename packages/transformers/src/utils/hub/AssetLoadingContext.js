@@ -3,6 +3,7 @@ import { getCacheForEnvironment, tryCache } from '../cache.js';
 import { FileCache } from '../cache/FileCache.js';
 import { FileResponse } from './FileResponse.js';
 import { ENV_WITH_EXPLICIT_TOKEN } from './constants.js';
+import { credentialFingerprint } from './credential_fingerprint.js';
 import { isValidHfModelId, isValidUrl, makePretrainedOptionsKey, pathJoin } from './utils.js';
 
 // Only assets explicitly listed here receive new cache keys. Model weights and
@@ -63,6 +64,7 @@ export class AssetLoadingContext {
             : null;
         // Authorization headers are never sent outside Node, since that would expose the token to the client.
         this.token = isNode ? this.settings.hfToken : null;
+        this.tokenFingerprint = credentialFingerprint(this.token);
         this.explicitToken = isNode && ENV_WITH_EXPLICIT_TOKEN.has(this.settings);
         /** @type {Promise<import('../cache.js').CacheInterface|null>|undefined} */
         this.cache = undefined;
@@ -215,7 +217,7 @@ export class AssetLoadingContext {
             this.options,
             settings,
             this.userAgent,
-            this.token,
+            this.tokenFingerprint,
             this.explicitToken,
             ...parts,
         );

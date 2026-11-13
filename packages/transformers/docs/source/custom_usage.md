@@ -39,3 +39,29 @@ The `cache_dir` and `local_files_only` options keep working as before, and are a
 
 - `local_files_only: true` prevents remote requests even if `allowRemoteModels` is `true`.
 - `cache_dir` overrides both `options.env.cacheDir` and global `env.cacheDir` for that call.
+
+## Filesystem cache namespaces
+
+Session-scoped hosts and tokens do **not** partition the filesystem cache. Persisted files keep the existing model ID/revision/file layout, without automatic host or token namespaces. If two hosts serve different content under the same model ID and revision, use separate `options.env.cacheDir` values (or explicit `cache_dir` values):
+
+```javascript
+import { AutoTokenizer } from "@huggingface/transformers";
+
+const modelId = "acme/shared-model";
+const tokenizerA = await AutoTokenizer.from_pretrained(modelId, {
+  revision: "main",
+  env: {
+    remoteHost: "https://hub-a.example/",
+    cacheDir: "/var/cache/models/host-a/",
+  },
+});
+const tokenizerB = await AutoTokenizer.from_pretrained(modelId, {
+  revision: "main",
+  env: {
+    remoteHost: "https://hub-b.example/",
+    cacheDir: "/var/cache/models/host-b/",
+  },
+});
+```
+
+Cache directories separate content namespaces, not credential authorization boundaries: loading a cached file does not reauthorize it with the current token. Rotating a token within the same content namespace should keep using the same directory. An explicit `cache_dir` still takes precedence over session and global `cacheDir` settings.

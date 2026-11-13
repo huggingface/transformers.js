@@ -428,6 +428,45 @@ describe("Internal asset loading", () => {
     expect(cache.entries.has(VERSIONED)).toBe(true);
   });
 
+  it("keeps filesystem content namespaces separate by directory, not host or token", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "transformers-namespaces-"));
+    try {
+      env.useCustomCache = false;
+      env.useFSCache = true;
+      env.allowLocalModels = true;
+      const cacheA = path.join(directory, "host-a");
+      const cacheB = path.join(directory, "host-b");
+      const fetch = jest.fn(async (url) => jsonResponse({ host: new URL(url).hostname }));
+      const options = (host, cacheDir, hfToken = "synthetic-original-token") => ({
+        revision: "v1",
+        env: { remoteHost: `https://${host}/`, cacheDir, hfToken, fetch },
+      });
+      const a = options("host-a.example", cacheA);
+      const b = options("host-b.example", cacheB);
+      expect(await getModelJSON(MODEL, "config.json", true, a)).toEqual({ host: "host-a.example" });
+      expect(await getModelJSON(MODEL, "config.json", true, b)).toEqual({ host: "host-b.example" });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      fetch.mockClear();
+      fetch.mockImplementation(async () => {
+        throw new Error("offline: network must not be called");
+      });
+      expect(await getModelJSON(MODEL, "config.json", true, { ...a, local_files_only: true })).toEqual({ host: "host-a.example" });
+      expect(await getModelJSON(MODEL, "config.json", true, { ...b, local_files_only: true })).toEqual({ host: "host-b.example" });
+      const rotated = options("host-a.example", cacheA, "synthetic-rotated-token");
+      expect(await getModelJSON(MODEL, "config.json", true, { ...rotated, local_files_only: true })).toEqual({ host: "host-a.example" });
+      // Credentials are not an authorization boundary for persisted files in the same content namespace.
+      const sameNamespace = options("another-mirror.example", cacheA, "synthetic-other-token");
+      expect(await getModelJSON(MODEL, "config.json", true, { ...sameNamespace, local_files_only: true })).toEqual({ host: "host-a.example" });
+      const explicit = { ...b, cache_dir: cacheA, local_files_only: true };
+      expect(await getModelJSON(MODEL, "config.json", true, explicit)).toEqual({ host: "host-a.example" });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(await fs.readFile(path.join(cacheA, MODEL, "v1/config.json"), "utf8")).toBe('{"host":"host-a.example"}');
+      expect(await fs.readFile(path.join(cacheB, MODEL, "v1/config.json"), "utf8")).toBe('{"host":"host-b.example"}');
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each([null, 404])("refreshes an old Hub cache after local %s, including tokenizer discovery", async (localStatus) => {
     env.useFS = false;
     env.allowLocalModels = true;

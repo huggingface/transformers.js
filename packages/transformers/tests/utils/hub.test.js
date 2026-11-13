@@ -3,6 +3,8 @@ import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js"
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
+import { credentialFingerprint } from "../../src/utils/hub/credential_fingerprint.js";
 
 // TODO: Set cache folder to a temp directory
 
@@ -64,6 +66,8 @@ describe("Hub", () => {
         const explicit = new AssetLoadingContext(options);
         expect(explicit.getHeaders("https://cdn.example/file").get("Authorization")).toBe("Bearer environment-token");
         expect(explicit.key("org/model")).not.toBe(implicit.key("org/model"));
+        expect(explicit.key("org/model")).not.toContain("environment-token");
+        expect(implicit.key("org/model")).not.toContain("environment-token");
       } finally {
         env.hfToken = undefined;
         for (const key of Object.keys(saved)) {
@@ -78,6 +82,19 @@ describe("Hub", () => {
 
       expect(key("hf_token")).toBe(key("hf_token"));
       expect(key("hf_token")).not.toBe(key("hf_other-token"));
+    });
+
+    it("keeps synthetic credentials out of stable, credential-separated memoization keys", () => {
+      const tokens = ["hf_synthetic_review_token_A_12345", "hf_synthetic_review_token_B_67890"];
+      const key = (hfToken) => new AssetLoadingContext({ env: { hfToken } }).key("org/model", "config.json");
+      const keys = tokens.map(key);
+      expect(key(tokens[0])).toBe(keys[0]);
+      expect(keys[0]).not.toBe(keys[1]);
+      for (const value of keys) for (const token of tokens) expect(value).not.toContain(token);
+    });
+
+    it.each(["", "abc", "x".repeat(53), "x".repeat(54), "x".repeat(62), "x".repeat(1024), "é🚀", "\ud800", "\ud801"])("matches SHA-256 for a serialized synthetic credential (%j)", (token) => {
+      expect(credentialFingerprint(token)).toBe(createHash("sha256").update(JSON.stringify(token)).digest("hex"));
     });
   });
 

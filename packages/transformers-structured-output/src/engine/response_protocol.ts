@@ -334,15 +334,37 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 // End of the last non-overlapping match, scanning left to right like the parser's `matchAll`.
 function lastMatchEnd(machine: ConstraintState<unknown>, bytes: Uint8Array): number {
-    let last = -1;
-    for (let start = 0; start < bytes.length; ) {
+    // Equivalent DFA states at the same offset have the same longest accepting suffix.
+    // Memoize that work across candidate starts: O(bytes * states), rather than rescanning every suffix.
+    const memo = new Map<unknown, Map<number, number>>();
+    const longestEnd = (start: number): number => {
         let state = machine.initial;
         let end = -1;
+        const path: Array<[unknown, number, number]> = [];
         for (let i = start; i < bytes.length; ++i) {
-            state = machine.transition(state, bytes[i]);
-            if (!machine.viable(state)) break;
-            if (machine.accepting(state)) end = i + 1;
+            const cached = memo.get(state)?.get(i);
+            if (cached !== undefined) {
+                end = cached;
+                break;
+            }
+            const next = machine.transition(state, bytes[i]);
+            const viable = machine.viable(next);
+            path.push([state, i, viable && machine.accepting(next) ? i + 1 : -1]);
+            if (!viable) break;
+            state = next;
         }
+        for (let i = path.length - 1; i >= 0; --i) {
+            const [previous, position, accepted] = path[i];
+            end = Math.max(end, accepted);
+            let suffixes = memo.get(previous);
+            if (suffixes === undefined) memo.set(previous, (suffixes = new Map()));
+            suffixes.set(position, end);
+        }
+        return end;
+    };
+    let last = -1;
+    for (let start = 0; start < bytes.length; ) {
+        const end = longestEnd(start);
         if (end > start) {
             last = end;
             start = end;

@@ -229,7 +229,21 @@ export class ResponseParser {
      * @private
      */
     _process(events, eos) {
+        let position = -1;
+        const configurations = new Set();
         while (true) {
+            if (this._pos !== position) {
+                position = this._pos;
+                configurations.clear();
+            }
+            // Delimiter selection depends on the active region and its open state, not accumulated output.
+            const configuration = JSON.stringify([this._current, this._opened]);
+            if (configurations.has(configuration)) {
+                throw new Error(
+                    `ResponseParser detected a non-progress delimiter cycle at input position ${position}.`,
+                );
+            }
+            configurations.add(configuration);
             const watch = this._watchlist();
             const [best, hold_start] = this._scan(watch, eos);
 
