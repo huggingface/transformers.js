@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline as pipe } from 'node:stream/promises';
 
 import { FileResponse } from '../hub/FileResponse.js';
 import { Random } from '../random.js';
@@ -40,7 +42,10 @@ export class FileCache {
             return next ? separator : '';
         });
         const filePath = path.join(this.path, key);
-        const markerPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.transformersjs_cache_version`);
+        const markerPath = path.join(
+            path.dirname(filePath),
+            `.${path.basename(filePath)}.transformersjs_cache_version`,
+        );
         return { filePath, markerPath, version };
     }
 
@@ -97,34 +102,19 @@ export class FileCache {
             let loaded = 0;
 
             await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-            const fileStream = fs.createWriteStream(tmpPath);
-            const reader = response.body.getReader();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    break;
-                }
-
-                await new Promise((resolve, reject) => {
-                    fileStream.write(value, (err) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        resolve();
-                    });
-                });
-
-                loaded += value.length;
-                const progress = total ? (loaded / total) * 100 : 0;
-
-                progress_callback?.({ progress, loaded, total });
-            }
-
-            await new Promise((resolve, reject) => {
-                fileStream.close((err) => (err ? reject(err) : resolve()));
-            });
+            // As in saveBlob, pipeline handles stream errors and waits for close before cleanup or rename.
+            await pipe(
+                Readable.fromWeb(response.body),
+                async function* (source) {
+                    for await (const value of source) {
+                        yield value;
+                        loaded += value.length;
+                        const progress = total ? (loaded / total) * 100 : 0;
+                        progress_callback?.({ progress, loaded, total });
+                    }
+                },
+                fs.createWriteStream(tmpPath),
+            );
 
             // Atomically move the completed temp file to the final path so that
             // concurrent readers (other processes or other in-process calls)

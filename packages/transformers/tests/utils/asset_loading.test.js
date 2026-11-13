@@ -2,6 +2,7 @@ import { jest } from "@jest/globals";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const files = ["tokenizer_config.json", "onnx/model.onnx"];
 jest.unstable_mockModule("../../src/utils/model_registry/get_files.js", () => ({
@@ -394,7 +395,8 @@ describe("Internal asset loading", () => {
       expect(await get_file_metadata(modelId, "tokenizer_config.json")).toMatchObject({ exists: true, fromCache: true });
       expect(cache.put).not.toHaveBeenCalled();
       expect(cache.delete).not.toHaveBeenCalled();
-      expect(env.fetch.mock.calls.every(([url]) => url === resource.localPath)).toBe(true);
+      const canTryHub = modelId === MODEL && (status === null || status === 404);
+      expect(env.fetch.mock.calls.some(([url]) => url === resource.remoteURL)).toBe(canTryHub);
       env.fetch = jest.fn(async () => jsonResponse({ updated: true }));
       expect(await getModelJSON(modelId, "tokenizer_config.json")).toEqual({ updated: true });
       expect(cache.entries.has(resource.localCacheKey)).toBe(true);
@@ -424,6 +426,77 @@ describe("Internal asset loading", () => {
     expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
     expect(env.fetch).toHaveBeenCalledWith(`${REMOTE}tokenizer_config.json`, expect.objectContaining({ cache: "reload" }));
     expect(cache.entries.has(VERSIONED)).toBe(true);
+  });
+
+  it.each([null, 404])("refreshes an old Hub cache after local %s, including tokenizer discovery", async (localStatus) => {
+    env.useFS = false;
+    env.allowLocalModels = true;
+    env.logLevel = 50;
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    env.fetch = jest.fn(async (url) => {
+      if (url === `${REMOTE}tokenizer_config.json`) return jsonResponse({ updated: true });
+      if (localStatus === null) throw new TypeError("Failed to fetch locally");
+      return new Response(null, { status: localStatus });
+    });
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
+    env.fetch.mockClear();
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
+    expect(cache.entries.has(VERSIONED)).toBe(true);
+    expect(cache.entries.has(`${REMOTE}tokenizer_config.json`)).toBe(false);
+    env.fetch.mockClear();
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(env.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 404])("uses the old Hub cache if local %s is followed by Hub HTTP 503", async (localStatus) => {
+    env.useFS = false;
+    env.allowLocalModels = true;
+    env.logLevel = 50;
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    env.fetch = jest.fn(async (url) => {
+      if (url === `${REMOTE}tokenizer_config.json`) return new Response(null, { status: 503 });
+      if (localStatus === null) throw new TypeError("Failed to fetch locally");
+      return new Response(null, { status: localStatus });
+    });
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
+    expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`, `/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  const permissionTest = process.platform === "win32" || process.getuid?.() === 0 ? it.skip : it;
+  permissionTest("returns a refreshed tokenizer config when the old filesystem cache is read-only", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "transformers-readonly-"));
+    const modelDirectory = path.join(directory, MODEL);
+    try {
+      await fs.mkdir(modelDirectory, { recursive: true });
+      await fs.writeFile(path.join(modelDirectory, "tokenizer_config.json"), '{"stale":true}');
+      await fs.chmod(modelDirectory, 0o555);
+      // A child process makes an unhandled stream error an observable failure rather than crashing Jest.
+      const script = `
+        import { env } from ${JSON.stringify(new URL("../../src/env.js", import.meta.url).href)};
+        import { getModelJSON } from ${JSON.stringify(new URL("../../src/utils/hub.js", import.meta.url).href)};
+        Object.assign(env, {
+          allowLocalModels: false, allowRemoteModels: true, useFSCache: true,
+          useCustomCache: false, useBrowserCache: false, experimental_useCrossOriginStorage: false,
+          remoteHost: "https://huggingface.co/", cacheDir: ${JSON.stringify(directory)}, logLevel: 50,
+          fetch: async () => new Response('{"updated":true}')
+        });
+        console.log(JSON.stringify(await getModelJSON(${JSON.stringify(MODEL)}, "tokenizer_config.json")));
+      `;
+      const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 10000 });
+      expect({ status: result.status, stderr: result.stderr, error: result.error }).toEqual({ status: 0, stderr: "", error: undefined });
+      expect(JSON.parse(result.stdout.trim())).toEqual({ updated: true });
+      expect(await fs.readFile(path.join(modelDirectory, "tokenizer_config.json"), "utf8")).toBe('{"stale":true}');
+      expect(await fs.readdir(modelDirectory)).toEqual(["tokenizer_config.json"]);
+    } finally {
+      await fs.chmod(modelDirectory, 0o755);
+      await fs.rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("falls back to the outdated copy when the refresh fails, and replaces it once online", async () => {

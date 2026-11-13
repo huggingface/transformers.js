@@ -111,10 +111,6 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
             } catch (e) {
                 // File doesn't exist locally, continue to remote check
             }
-            if (!context.settings.useFS) {
-                const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
-                if (stale) return { exists: true, fromCache: true };
-            }
         }
     }
 

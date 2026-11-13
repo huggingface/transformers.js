@@ -27,6 +27,7 @@ type ProtocolState =
 export function withResponseProtocol(
     structured: ConstraintState<unknown>,
     protocol: ProtocolConfig,
+    preserveWhitespaceIdentity = false,
 ): ConstraintState<ProtocolState> {
     const payload = (state: unknown): ProtocolState =>
         structured.viable(state) ? { phase: 'structured', state } : { phase: 'dead' };
@@ -67,7 +68,13 @@ export function withResponseProtocol(
                 return { phase: 'dead' };
             case 'structured': {
                 const next = structured.transition(state.state, byte);
-                if (structured.viable(next)) return next === state.state ? state : payload(next);
+                if (structured.viable(next)) {
+                    // Regex loops can consume payload without changing state. JSON whitespace must keep identity.
+                    return next === state.state &&
+                        (state.framing === undefined || (preserveWhitespaceIdentity && isFramingWhitespace(byte)))
+                        ? state
+                        : payload(next);
+                }
                 if (state.framing !== undefined && state.framing < MAX_FRAMING_WHITESPACE && isFramingWhitespace(byte))
                     return { phase: 'structured', state: state.state, framing: state.framing + 1 };
                 return structured.accepting(state.state) && protocol.contentClose !== undefined

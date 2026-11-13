@@ -56,7 +56,10 @@ export function createTokenConstraint(
     const tokenizer = cachedTokenizer(tokenizerSource);
     const structuredMachine = createMachine(responseFormat, tokenizer);
     const protocol = responseProtocol(tokenizerSource);
-    const machine = protocol === undefined ? structuredMachine : withResponseProtocol(structuredMachine, protocol);
+    const machine =
+        protocol === undefined
+            ? structuredMachine
+            : withResponseProtocol(structuredMachine, protocol, responseFormat.type !== 'regex');
     // Close-plus-payload tokens make even thinking masks grammar-dependent. Include both
     // the protocol and grammar in the cache identity, but keep protocol masks separate.
     const maskCache =

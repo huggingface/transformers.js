@@ -440,10 +440,8 @@ export class ResponseParser {
             this._output[name] = previous == null ? value : previous + field.join + value;
         } else if (field.repeats) {
             (this._output[name] ??= []).push(value);
-        } else if (typeof value === 'string' && typeof this._output[name] === 'string') {
-            // Preserve each answer region (unlike Python's current last-region-wins behavior).
-            if (value.trim()) this._output[name] += value;
-        } else {
+        } else if (typeof value !== 'string' || value.trim() || !Object.hasOwn(this._output, name)) {
+            // Match Python's last-region-wins behavior, except whitespace-only regions preserve existing values.
             this._output[name] = value;
         }
         events.push({ type: 'region_close', field: name, value });

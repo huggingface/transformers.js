@@ -440,6 +440,18 @@ describe("StructuredOutputProcessor", () => {
     expect(() => invalid([Array.from(encoder.encode("<assistant><think></think>\n\nx"), BigInt)], logits())).toThrow("prompt prefill");
   });
 
+  it.each([
+    ["[a-z]*", "ab"],
+    ["[^\\n]*", "line1"],
+  ])("ends framing after a payload byte even when regex %j loops", async (regex, answer) => {
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex });
+    const inputIds = await consume(processor, `<think>reasoning</think>\n\n${answer}`);
+    const scores = logits();
+    processor([inputIds], scores);
+    expect(isAllowed(scores, "\n".charCodeAt(0))).toBe(false);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(true);
+  });
+
   it("does not share close-plus-content masks across different grammars", () => {
     const encoder = new TextEncoder();
     const source = {
@@ -726,9 +738,9 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(true);
   });
 
-  it("discourages repeated non-progressing JSON whitespace", () => {
-    const processor = new StructuredOutputProcessor(tokenizer, { type: "json_object" });
-    const inputIds = [0n];
+  it.each([false, true])("discourages repeated non-progressing JSON whitespace (thinking template: %j)", (thinking) => {
+    const processor = new StructuredOutputProcessor(thinking ? thinkingTokenizer : tokenizer, { type: "json_object" });
+    const inputIds = thinking ? encodeIds("<assistant><think></think>") : [0n];
     processor([inputIds], logits());
 
     for (let count = 1; count <= 4; ++count) {
