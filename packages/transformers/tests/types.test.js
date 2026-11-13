@@ -71,6 +71,16 @@ describe("TypeScript compilation succeeds", () => {
   }
 });
 
+describe("Strict consumer", () => {
+  it("compiles declaration files with skipLibCheck: false", () => {
+    const program = ts.createProgram([resolve(__dirname, "..", "types", "transformers.d.ts")], { ...TS_OPTIONS, skipLibCheck: false });
+    const diagnostics = ts.getPreEmitDiagnostics(program);
+    if (diagnostics.length > 0) {
+      throw new Error(formatDiagnostics(diagnostics));
+    }
+  });
+});
+
 describe("TypeScript expected errors", () => {
   /**
    * Helper: generates inline source for a pipeline error test.
