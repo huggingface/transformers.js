@@ -3,8 +3,8 @@ import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js"
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
-import { createHash } from "node:crypto";
 import { credentialFingerprint } from "../../src/utils/hub/credential_fingerprint.js";
+import { get_config } from "../../src/utils/model_registry/get_model_files.js";
 
 // TODO: Set cache folder to a temp directory
 
@@ -82,6 +82,8 @@ describe("Hub", () => {
 
       expect(key("hf_token")).toBe(key("hf_token"));
       expect(key("hf_token")).not.toBe(key("hf_other-token"));
+      expect(key("hf_token")).not.toBe(key(null));
+      expect(key("hf_other-token")).not.toBe(key(null));
     });
 
     it("keeps synthetic credentials out of stable, credential-separated memoization keys", () => {
@@ -93,8 +95,45 @@ describe("Hub", () => {
       for (const value of keys) for (const token of tokens) expect(value).not.toContain(token);
     });
 
-    it.each(["", "abc", "x".repeat(53), "x".repeat(54), "x".repeat(62), "x".repeat(1024), "é🚀", "\ud800", "\ud801"])("matches SHA-256 for a serialized synthetic credential (%j)", (token) => {
-      expect(credentialFingerprint(token)).toBe(createHash("sha256").update(JSON.stringify(token)).digest("hex"));
+    it.each(["", "abc", "x".repeat(53), "x".repeat(54), "x".repeat(62), "x".repeat(1024), "é🚀", "\ud800", "\ud801"])("assigns a stable numeric identity to each exact synthetic credential (%j)", (token) => {
+      const id = credentialFingerprint(token);
+      expect(Number.isSafeInteger(id)).toBe(true);
+      expect(id).toBeGreaterThan(0);
+      expect(credentialFingerprint(token)).toBe(id);
+      expect(credentialFingerprint(null)).toBeNull();
+      expect(credentialFingerprint(undefined)).toBeNull();
+    });
+
+    it("assigns distinct increasing IDs without merging unusual strings or absent credentials", () => {
+      const tokens = ["hf_identity_test_A", "hf_identity_test_B", "hf_identity_test_\ud800", "hf_identity_test_\ud801", "hf_identity_test_\ufffd"];
+      const ids = tokens.map(credentialFingerprint);
+      expect(new Set(ids).size).toBe(tokens.length);
+      for (let i = 1; i < ids.length; ++i) expect(ids[i]).toBe(ids[i - 1] + 1);
+      expect(tokens.map(credentialFingerprint)).toEqual(ids);
+      expect(ids).not.toContain(credentialFingerprint(null));
+    });
+
+    it("does not reuse a gated configuration across credentials or for an anonymous request", async () => {
+      const saved = { useFSCache: env.useFSCache, useBrowserCache: env.useBrowserCache, useCustomCache: env.useCustomCache, experimental_useCrossOriginStorage: env.experimental_useCrossOriginStorage };
+      Object.assign(env, { useFSCache: false, useBrowserCache: false, useCustomCache: false, experimental_useCrossOriginStorage: false });
+      const requests = [];
+      const fetch = async (_url, init) => {
+        const authorization = new Headers(init.headers).get("Authorization");
+        requests.push(authorization);
+        return authorization === null ? new Response("gated", { status: 401 }) : new Response(JSON.stringify({ model_type: "bert" }));
+      };
+      const options = (hfToken) => ({ env: { hfToken, fetch, allowLocalModels: false, remoteHost: "https://huggingface.co/" } });
+      try {
+        const first = await get_config("memo-identity/gated-config", options("hf_memo_map_A"));
+        const second = await get_config("memo-identity/gated-config", options("hf_memo_map_B"));
+        expect(second).not.toBe(first);
+        await expect(get_config("memo-identity/gated-config", options(null))).rejects.toThrow();
+        expect(await get_config("memo-identity/gated-config", options("hf_memo_map_A"))).toBe(first);
+        expect(await get_config("memo-identity/gated-config", options("hf_memo_map_B"))).toBe(second);
+        expect(requests).toEqual(["Bearer hf_memo_map_A", "Bearer hf_memo_map_B", null]);
+      } finally {
+        Object.assign(env, saved);
+      }
     });
   });
 
