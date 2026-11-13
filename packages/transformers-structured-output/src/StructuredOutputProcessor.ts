@@ -14,8 +14,21 @@ export type ResponseFormat =
     | { type: 'json_schema'; json_schema: JSONSchema }
     | { type: 'regex'; regex: string };
 
+export type StructuredOutputOptions = {
+    /**
+     * Whether the prompt was rendered with thinking enabled.
+     * - `undefined` (default): detect from the prompt, allowing optional thinking unless it is already closed.
+     * - `false`: no thinking region; constrain the first content token.
+     * - `true`: same as `undefined`, explicitly allowing the optional thinking region.
+     * Needed for templates such as Gemma 4 that omit thinking markers rather than write a closed block;
+     * prompt detection alone cannot identify their disabled-thinking mode. See #1791 / 43768e98.
+     */
+    enable_thinking?: boolean;
+};
+
 type GenerationState = {
     constraint: TokenConstraint;
+    enableThinking?: boolean;
     processedInputLength?: number;
     mask?: Uint32Array;
 };
@@ -34,10 +47,11 @@ export class StructuredOutputProcessor extends LogitsProcessorList {
         prepareTokenizer(tokenizer);
     }
 
-    constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat) {
+    constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat, options: StructuredOutputOptions = {}) {
         super();
         const state: GenerationState = {
             constraint: createTokenConstraint(tokenizer, responseFormat),
+            enableThinking: options.enable_thinking,
         };
         this.push(new ConstraintLogitsProcessor(state));
     }
@@ -52,7 +66,7 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
         assertSingleSequence(inputIds.length);
         const input = inputIds[0];
         if (this.state.processedInputLength === undefined) {
-            this.state.constraint.initializePrompt(input);
+            this.state.constraint.initializePrompt(input, { enable_thinking: this.state.enableThinking });
         }
         const start = this.state.processedInputLength ?? input.length;
         for (let i = start; i < input.length; ++i) {

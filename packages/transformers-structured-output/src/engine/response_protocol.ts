@@ -165,7 +165,7 @@ export function withResponseProtocol(
     };
     return {
         initial,
-        initialize: (bytes) => {
+        initialize: (bytes, context) => {
             const start = protocol.startAnchor === undefined ? -1 : lastMatchEnd(protocol.startAnchor.machine, bytes);
             let state: ProtocolState = initial;
             if (start >= 0) for (let i = start; i < bytes.length; ++i) state = transition(state, bytes[i]);
@@ -178,6 +178,26 @@ export function withResponseProtocol(
                 state = initial;
             if (state.phase === 'dead')
                 throw new Error('The prompt prefill does not satisfy the response protocol or constraint.');
+            // The prompt can't always tell us that thinking is off. Qwen3 writes an empty, closed
+            // `<think>\n\n</think>` block, which replay already handles. Gemma 4 only leaves `<|think|>`
+            // out of the system turn and writes no closed channel, so detection still allows
+            // `<|channel>thought`. Under a constraint, greedy decoding then picks the opener and thinks until
+            // max_new_tokens without emitting the answer (0/6 valid JSON on gemma-4-E2B-it vs 6/6 in 4.3.2).
+            // Callers who rendered the prompt with thinking off must be able to say so. Don't remove
+            // this option unless detection can handle templates like Gemma 4. See #1791 / 43768e98.
+            if (context?.enable_thinking === false) {
+                if (
+                    state.phase === 'thinking' ||
+                    (state.phase === 'start' && state.structured === undefined && state.content === undefined)
+                ) {
+                    throw new Error('Thinking is disabled but the prompt prefills an unfinished thinking region.');
+                }
+                if (state.phase !== 'start') return state;
+                if (state.structured !== undefined) return payload(state.structured);
+                if (state.content !== undefined)
+                    return { phase: 'content', progress: state.content, opener: protocol.contentOpen! };
+                throw new Error('The prompt is incompatible with disabled thinking.');
+            }
             return state;
         },
         transition,

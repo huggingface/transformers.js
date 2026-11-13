@@ -1,5 +1,7 @@
 import { jest } from "@jest/globals";
 import { PreTrainedTokenizer, Tensor } from "@huggingface/transformers";
+import ts from "typescript";
+import { fileURLToPath } from "node:url";
 
 import { StructuredOutputProcessor } from "../dist/index.js";
 
@@ -82,6 +84,113 @@ function logits() {
 function isAllowed(scores, tokenId) {
   return Number.isFinite(scores.data[tokenId]);
 }
+
+describe("explicit thinking opt-out", () => {
+  it("exports the optional boolean option in the generated public types", () => {
+    const path = fileURLToPath(new URL("./__structured_options__.ts", import.meta.url));
+    const source = `
+      import { StructuredOutputProcessor, type StructuredOutputOptions } from "../types/index.js";
+      declare const tokenizer: object;
+      const options: StructuredOutputOptions = { enable_thinking: false };
+      new StructuredOutputProcessor(tokenizer, { type: "json_object" }, options);
+      new StructuredOutputProcessor(tokenizer, { type: "json_object" });
+      new StructuredOutputProcessor(tokenizer, { type: "json_object" }, { enable_thinking: true });
+      // @ts-expect-error Only boolean values are supported.
+      options.enable_thinking = "false";
+      // @ts-expect-error Unknown option names are not accepted.
+      new StructuredOutputProcessor(tokenizer, { type: "json_object" }, { thinking: false });
+    `;
+    // Match this package's bundler resolution for its extensionless declaration exports.
+    const options = { strict: true, noEmit: true, skipLibCheck: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
+    const host = ts.createCompilerHost(options);
+    const getSourceFile = host.getSourceFile.bind(host);
+    host.getSourceFile = (file, languageVersion, ...args) => (file === path ? ts.createSourceFile(file, source, languageVersion, true) : getSourceFile(file, languageVersion, ...args));
+    const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([path], options, host));
+    expect(diagnostics.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"))).toEqual([]);
+  });
+  const opener = "<|channel>thought\n";
+  const openerId = 257;
+  const gemmaTokenizer = {
+    ...tokenizer,
+    tokens: [...tokenizer.tokens, Array.from(new TextEncoder().encode(opener))],
+    special_token_ids: [EOS_TOKEN_ID, openerId],
+    response_template: {
+      start_anchor: "<|turn>model\n",
+      fields: {
+        reasoning_content: { open: opener, close: "<channel|>" },
+        content: { close: "<turn|>" },
+      },
+    },
+  };
+  const prompt = "<|turn>system\nFollow instructions.<turn|>\n<|turn>user\nReturn JSON.<turn|>\n<|turn>model\n";
+  function scoresFor(source, prefix, options, responseFormat = { type: "json_object" }) {
+    const processor = new StructuredOutputProcessor(source, responseFormat, options);
+    const scores = new Tensor("float32", new Float32Array(source.tokens.length).fill(1), [1, source.tokens.length]);
+    processor([encodeIds(prefix)], scores);
+    return scores;
+  }
+
+  it("allows Gemma-style thinking by default but constrains the first answer token when disabled", () => {
+    expect(prompt).not.toContain("<|think|>");
+    expect(prompt).not.toContain("<channel|>");
+    expect(isAllowed(scoresFor(gemmaTokenizer, prompt), openerId)).toBe(true);
+    const disabled = scoresFor(gemmaTokenizer, prompt, { enable_thinking: false });
+    expect(isAllowed(disabled, openerId)).toBe(false);
+    expect(Array.from(disabled.data.keys()).filter((id) => isAllowed(disabled, id))).toEqual([9, 10, 13, 32, "{".charCodeAt(0)]);
+  });
+
+  it.each(["<|channel>thought\n", "<|channel>thought\nreasoning"])("rejects an unfinished thinking prefill: %j", (prefill) => {
+    expect(() => scoresFor(gemmaTokenizer, prompt + prefill, { enable_thinking: false })).toThrow("Thinking is disabled but the prompt prefills an unfinished thinking region.");
+  });
+
+  it("rejects a partial thinking-only opener before it can become a region", () => {
+    const source = {
+      ...gemmaTokenizer,
+      response_template: { ...gemmaTokenizer.response_template, fields: { ...gemmaTokenizer.response_template.fields, content: { open: "<final>", close: "</final>" } } },
+    };
+    expect(() => scoresFor(source, prompt + "<|channel>th", { enable_thinking: false })).toThrow("prefills an unfinished thinking region");
+  });
+
+  it("keeps Qwen3's closed empty-thinking prefill unchanged", () => {
+    const source = { ...tokenizer, response_template: QWEN3_RESPONSE_TEMPLATE };
+    const prefix = "<|im_start|>assistant\n<think>\n\n</think>\n\n";
+    const detected = scoresFor(source, prefix);
+    expect(scoresFor(source, prefix, { enable_thinking: false }).data).toEqual(detected.data);
+    expect(isAllowed(detected, "{".charCodeAt(0))).toBe(true);
+    expect(isAllowed(detected, "<".charCodeAt(0))).toBe(false);
+  });
+
+  it.each([undefined, {}])("keeps explicit true identical to default detection (%j)", (options) => {
+    expect(scoresFor(gemmaTokenizer, prompt, { enable_thinking: true }).data).toEqual(scoresFor(gemmaTokenizer, prompt, options).data);
+  });
+
+  it.each([tokenizer, { ...tokenizer, response_template: { start_anchor: "<assistant>", fields: { content: { close: "<eos>" } } } }])("ignores the option without a thinking-aware protocol", (source) => {
+    for (const enable_thinking of [false, true]) {
+      expect(scoresFor(source, "<assistant>", { enable_thinking }).data).toEqual(scoresFor(source, "<assistant>").data);
+    }
+  });
+
+  it("preserves an explicit content opener with thinking disabled", () => {
+    const source = { ...thinkingTokenizer, response_template: { ...thinkingTokenizer.response_template, fields: { ...thinkingTokenizer.response_template.fields, content: { open: "<final>", close: "</final>" } } } };
+    const options = { enable_thinking: false };
+    expect(isAllowed(scoresFor(source, "<assistant>", options), "<".charCodeAt(0))).toBe(true);
+    const partial = scoresFor(source, "<assistant><fin", options);
+    expect(isAllowed(partial, "a".charCodeAt(0))).toBe(true);
+    expect(isAllowed(partial, "{".charCodeAt(0))).toBe(false);
+    expect(isAllowed(scoresFor(source, "<assistant><final>", options), "{".charCodeAt(0))).toBe(true);
+  });
+
+  it("keeps the disabled state for subsequent generated tokens", () => {
+    const processor = new StructuredOutputProcessor(gemmaTokenizer, { type: "json_object" }, { enable_thinking: false });
+    const input = encodeIds(prompt);
+    const scores = () => new Tensor("float32", new Float32Array(gemmaTokenizer.tokens.length).fill(1), [1, gemmaTokenizer.tokens.length]);
+    processor([input], scores());
+    const next = scores();
+    processor([[...input, BigInt("{".charCodeAt(0))]], next);
+    expect(isAllowed(next, openerId)).toBe(false);
+    expect(isAllowed(next, '"'.charCodeAt(0))).toBe(true);
+  });
+});
 
 describe("reassessment EOS and special-closer masks", () => {
   const source = {

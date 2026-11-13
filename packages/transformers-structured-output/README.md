@@ -35,7 +35,20 @@ A processor tracks the state of one generation. Create a new `StructuredOutputPr
 
 When the tokenizer defines `response_template.fields.reasoning_content` and `response_template.fields.content`, thinking is treated as an optional region before the answer. The processor allows either the thinking opener or constrained content at the start of the response, leaves the thinking body unconstrained, and applies the requested constraint when final content begins. The prompt is replayed from the last `start_anchor` (or `start_anchor_pattern`) match, so prefilled thinking blocks and content openers are taken into account. Up to four whitespace characters are allowed between a closed thinking block (or content opener) and the constrained answer, matching templates that emit `</think>\n\n` before the answer.
 
-The prompt decides whether thinking is possible: a template that renders disabled thinking as an empty, closed thinking block (Qwen3's `<think>\n\n</think>\n\n`) makes the constraint apply from the first generated token. Prompt prefills are validated: completed thinking blocks are accepted, and invalid answer prefills raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
+By default, the prompt decides whether thinking is possible: a template that renders disabled thinking as an empty, closed thinking block (Qwen3's `<think>\n\n</think>\n\n`) makes the constraint apply from the first generated token. Prompt prefills are validated: completed thinking blocks are accepted, and invalid answer prefills raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
+
+If the prompt was rendered with thinking off and the template does not write an empty, closed thinking block (for example, Gemma 4), pass `{ enable_thinking: false }` to the processor too. This disables the optional thinking region and constrains the first content token. Use the same flag when rendering the prompt; `true` or omitting the option keeps the existing prompt detection. An unfinished thinking prefill with thinking explicitly disabled raises an error.
+
+```js
+const enable_thinking = false;
+const inputs = tokenizer.apply_chat_template(messages, {
+  add_generation_prompt: true,
+  return_dict: true,
+  enable_thinking,
+});
+const processor = new StructuredOutputProcessor(tokenizer, responseFormat, { enable_thinking });
+await model.generate({ ...inputs, logits_processor: processor });
+```
 
 Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine, except that protocol patterns containing positional `^`/`$` assertions, and start-anchor patterns containing ordered `|` alternatives outside character classes, fall back with a warning. The protocol's language matcher cannot reproduce the response parser's positional and ordered-anchor-search semantics for those patterns. Escaped literal assertions/alternation characters remain supported; delimiter alternatives retain the existing longest-accepted-endpoint behavior. This restriction does not change ordinary payload regex constraints. Unsupported templates fall back to constraining the response from its first token, without interpreting thinking delimiters or prompt anchors.
 
