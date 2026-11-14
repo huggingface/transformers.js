@@ -15,6 +15,7 @@
 
 import { DefaultProgressCallback, dispatchCallback } from './utils/core.js';
 import { logger } from './utils/logger.js';
+import { ModelFileNotFoundError } from './utils/hub/utils.js';
 
 import { AutoTokenizer } from './models/auto/tokenization_auto.js';
 import { AutoProcessor } from './models/auto/processing_auto.js';
@@ -112,6 +113,7 @@ export async function pipeline(
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
+        env: sessionEnv = {},
     } = {},
 ) {
     // Apply aliases
@@ -133,18 +135,28 @@ export async function pipeline(
         }
     }
 
-    // Determine which files the model needs
-    const expected_files = await get_pipeline_files(task, model, {
+    const load_options = {
+        config,
+        cache_dir,
+        local_files_only,
+        revision,
         device,
         dtype,
-    });
+        model_file_name,
+        env: sessionEnv,
+    };
+
+    // Determine which files the model needs
+    const expected_files = await get_pipeline_files(task, model, load_options);
 
     /** @type {import('./utils/core.js').FilesLoadingMap} */
     let files_loading = {};
     if (progress_callback) {
         try {
             /** @type {Array<{exists: boolean, size?: number, contentType?: string, fromCache?: boolean}>} */
-            const metadata = await Promise.all(expected_files.map(async (file) => get_file_metadata(model, file)));
+            const metadata = await Promise.all(
+                expected_files.map(async (file) => get_file_metadata(model, file, load_options)),
+            );
             metadata.forEach((m, i) => {
                 if (m.exists) {
                     files_loading[expected_files[i]] = {
@@ -160,24 +172,23 @@ export async function pipeline(
     }
 
     const pretrainedOptions = {
+        ...load_options,
         progress_callback: progress_callback
             ? new DefaultProgressCallback(progress_callback, files_loading)
             : undefined,
-        config,
-        cache_dir,
-        local_files_only,
-        revision,
-        device,
-        dtype,
         subfolder,
         use_external_data_format,
-        model_file_name,
         session_options,
     };
 
     // Determine which components to load based on the expected files
     const hasTokenizer = expected_files.includes('tokenizer.json');
     const hasProcessor = expected_files.includes('preprocessor_config.json');
+    if (!hasTokenizer && pipelineInfo.type === 'text') {
+        throw new ModelFileNotFoundError(
+            `Tokenizer files are unavailable for "${model}"; the "${task}" pipeline requires a tokenizer.`,
+        );
+    }
 
     // Resolve the correct model class (needs config when multiple candidates exist)
     const modelClasses = pipelineInfo.model;
@@ -204,7 +215,7 @@ export async function pipeline(
         modelPromise,
     ]);
 
-    const results = { task, model: model_loaded };
+    const results = { task, model: model_loaded, sessionEnv };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
 

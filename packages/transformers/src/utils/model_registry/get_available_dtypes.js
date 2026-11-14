@@ -1,6 +1,7 @@
 import { getSessionsConfig } from '../../models/session_config.js';
 import { DEFAULT_DTYPE_SUFFIX_MAPPING } from '../dtypes.js';
-import { get_file_metadata } from './get_file_metadata.js';
+import { AssetLoadingContext } from '../hub/AssetLoadingContext.js';
+import { get_file_metadata_with_context } from './get_file_metadata.js';
 import { get_config } from './get_model_files.js';
 import { resolve_model_type } from './resolve_model_type.js';
 
@@ -31,15 +32,14 @@ const CONCRETE_DTYPES = Object.keys(DEFAULT_DTYPE_SUFFIX_MAPPING);
  * @param {string} [options.revision='main'] Model revision
  * @param {string} [options.cache_dir=null] Custom cache directory
  * @param {boolean} [options.local_files_only=false] Only check local files
+ * @param {Partial<import('../../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
  * @returns {Promise<string[]>} Array of available dtype strings (e.g., ['fp32', 'fp16', 'q4', 'q8']). Empty if the model has no ONNX files.
  * @throws {import('../hub/utils.js').ModelFileNotFoundError} If the model is missing or inaccessible. The Hub returns 401 for nonexistent repositories.
  * @throws {Error} On network or server failures.
  */
-export async function get_available_dtypes(
-    modelId,
-    { config = null, model_file_name = null, revision = 'main', cache_dir = null, local_files_only = false } = {},
-) {
-    config = await get_config(modelId, { config, cache_dir, local_files_only, revision });
+export async function get_available_dtypes(modelId, options = {}) {
+    const { model_file_name = null } = options;
+    const config = await get_config(modelId, options);
 
     const subfolder = 'onnx';
 
@@ -50,8 +50,8 @@ export async function get_available_dtypes(
     // Get all base names for model session files
     const baseNames = Object.values(sessions);
 
-    // For each dtype, check if all session files exist
-    const metadataOptions = { revision, cache_dir, local_files_only };
+    // For each dtype, check if all session files exist, sharing one loading context (and cache) across probes
+    const context = new AssetLoadingContext(options);
 
     // Probe all (dtype, baseName) combinations in parallel
     const probeResults = await Promise.all(
@@ -60,7 +60,7 @@ export async function get_available_dtypes(
             const allExist = await Promise.all(
                 baseNames.map(async (baseName) => {
                     const filename = `${subfolder}/${baseName}${suffix}.onnx`;
-                    const metadata = await get_file_metadata(modelId, filename, metadataOptions);
+                    const metadata = await get_file_metadata_with_context(modelId, filename, context);
                     return metadata.exists;
                 }),
             );

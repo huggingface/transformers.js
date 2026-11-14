@@ -13,6 +13,7 @@ import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
 import { Tensor, matmul } from './tensor.js';
 import { logger } from './logger.js';
+import { assertAudioContextAvailable } from './audio_context.js';
 
 /**
  * Helper function to load audio from a path/URL.
@@ -21,21 +22,25 @@ import { logger } from './logger.js';
  * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
  */
 export async function load_audio(url, sampling_rate) {
-    if (typeof AudioContext === 'undefined') {
-        // Running in node or an environment without AudioContext
-        throw Error(
-            'Unable to load audio from path/URL since `AudioContext` is not available in your environment. ' +
-                'Instead, audio data should be passed directly to the pipeline/processor. ' +
-                'For more information and some example code, see https://huggingface.co/docs/transformers.js/guides/node-audio-processing.',
-        );
-    }
-
+    assertAudioContextAvailable();
     const response = await (await getFile(url)).arrayBuffer();
+    return await decode_audio(response, sampling_rate);
+}
+
+/**
+ * Helper function to decode audio from encoded bytes (e.g., the contents of a `.wav` or `.mp3` file).
+ * @param {ArrayBuffer} buffer The encoded audio data.
+ * @param {number} sampling_rate The sampling rate to use when decoding the audio.
+ * @returns {Promise<Float32Array>} The decoded audio as a `Float32Array`.
+ * @private
+ */
+export async function decode_audio(buffer, sampling_rate) {
+    assertAudioContextAvailable();
     const audioCTX = new AudioContext({ sampleRate: sampling_rate });
     if (typeof sampling_rate === 'undefined') {
         logger.warn(`No sampling rate provided, using default of ${audioCTX.sampleRate}Hz.`);
     }
-    const decoded = await audioCTX.decodeAudioData(response);
+    const decoded = await audioCTX.decodeAudioData(buffer);
 
     /** @type {Float32Array} */
     let audio;

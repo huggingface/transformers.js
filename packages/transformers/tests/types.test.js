@@ -60,7 +60,7 @@ function getDiagnosticsFromSource(source) {
 
 describe("TypeScript compilation succeeds", () => {
   const DIR = "tests/types/";
-  const FILES = ["pipelines.ts", "cache.ts", "tokenizers.ts"];
+  const FILES = ["pipelines.ts", "cache.ts", "tokenizers.ts", "reassessment.ts"];
   for (const file of FILES) {
     it(`compiles ${file} without errors`, () => {
       const diagnostics = getDiagnostics(`${DIR}${file}`);

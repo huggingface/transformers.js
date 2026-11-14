@@ -29,11 +29,39 @@ await model.generate({
 
 Constraints currently support a single generated sequence at a time. Generation throws when the logical batch size is not `1` rather than sharing mutable grammar state across sequences.
 
+A processor tracks the state of one generation. Create a new `StructuredOutputProcessor` for every `generate()` or pipeline call; constructing one is cheap once the tokenizer has been prepared (see `StructuredOutputProcessor.warmup()`).
+
+### Thinking models
+
+When the tokenizer defines `response_template.fields.reasoning_content` and `response_template.fields.content`, thinking is treated as an optional region before the answer. The processor allows either the thinking opener or constrained content at the start of the response, leaves the thinking body unconstrained, and applies the requested constraint when final content begins. The prompt is replayed from the last `start_anchor` (or `start_anchor_pattern`) match, so prefilled thinking blocks and content openers are taken into account. Up to four whitespace characters are allowed between a closed thinking block (or content opener) and the constrained answer, matching templates that emit `</think>\n\n` before the answer.
+
+By default, the prompt decides whether thinking is possible: a template that renders disabled thinking as an empty, closed thinking block (Qwen3's `<think>\n\n</think>\n\n`) makes the constraint apply from the first generated token. Prompt prefills are validated: completed thinking blocks are accepted, and invalid answer prefills raise errors. Once content satisfies the constraint, the processor allows the response template's content closer or the model's EOS token.
+
+If the prompt was rendered with thinking off and the template does not write an empty, closed thinking block (for example, Gemma 4), pass `{ enable_thinking: false }` to the processor too. This disables the optional thinking region and constrains the first content token. Use the same flag when rendering the prompt; `true` or omitting the option keeps the existing prompt detection. An unfinished thinking prefill with thinking explicitly disabled raises an error.
+
+```js
+const enable_thinking = false;
+const inputs = tokenizer.apply_chat_template(messages, {
+  add_generation_prompt: true,
+  return_dict: true,
+  enable_thinking,
+});
+const processor = new StructuredOutputProcessor(tokenizer, responseFormat, { enable_thinking });
+await model.generate({ ...inputs, logits_processor: processor });
+```
+
+Thinking close delimiters must be literals (or a list of literals). Openers, content closers and start anchors may be literals or patterns supported by the constraint regex engine, except that protocol patterns containing positional `^`/`$` assertions, and start-anchor patterns containing ordered `|` alternatives outside character classes, fall back with a warning. The protocol's language matcher cannot reproduce the response parser's positional and ordered-anchor-search semantics for those patterns. Escaped literal assertions/alternation characters remain supported; delimiter alternatives retain the existing longest-accepted-endpoint behavior. This restriction does not change ordinary payload regex constraints. Unsupported templates fall back to constraining the response from its first token, without interpreting thinking delimiters or prompt anchors.
+
+Start-anchor patterns that accept the empty string (for example `a*` or `a?`) also warn and fall back:
+their empty-match selection is not represented by the protocol search. Nullable payload regexes remain
+supported. Special content-closer tokens select the delimiter branch on commit, even when the same
+bytes could extend the payload regex; ordinary tokens with those bytes keep their payload meaning.
+
 ## Supported constraints
 
 The JSON engine implements a practical JSON Schema 2020-12 profile. This includes deep `const` and `enum`, exact decimal bounds and `multipleOf`, tuple and homogeneous arrays, `contains`, deep `uniqueItems`, object property and dependency assertions, `allOf`/`anyOf`/`oneOf`/`not`, conditionals, local `$ref`, recursive `$defs`, draft-07 compatibility, and root-level `x-guidance` separators. String `pattern` and recognized `format` assertions are rejected because they cannot be enforced incrementally; unknown format names remain annotations. External and dynamic references and unevaluated-property/item assertions also remain unsupported.
 
-The regex engine performs full-string matching and supports literals, UTF-8 literals, alternation, groups, character classes, `.`, `\\d`, `\\s`, `\\w`, anchors, and greedy `*`, `+`, `?`, and `{m,n}` quantifiers. Lookarounds, backreferences, lazy quantifiers, and Unicode character classes are intentionally unsupported.
+The regex engine performs full-string matching and supports literals, UTF-8 literals, alternation, groups, character classes, `.`, `\\d`, `\\s`, `\\w`, `^` and `$` anchors at the very start and end of the pattern, and greedy `*`, `+`, `?`, and `{m,n}` quantifiers. Lookarounds, backreferences, lazy quantifiers, and Unicode character classes are intentionally unsupported.
 
 When the generated bytes satisfy the constraint, the processor allows the tokenizer's EOS token. Transformers.js then stops generation through its built-in EOS stopping criterion, so the model generation config and tokenizer must use the same `eos_token_id`.
 

@@ -63,7 +63,7 @@ export class ImageFeatureExtractionPipeline
 {
     /** @type {ImageFeatureExtractionPipelineCallback} */
     async _call(images, { pool = null } = {}) {
-        const preparedImages = await prepareImages(images);
+        const preparedImages = await prepareImages(this, images);
         const { pixel_values } = await this.processor(preparedImages);
         const outputs = await this.model({ pixel_values });
 

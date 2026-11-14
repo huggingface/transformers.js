@@ -1,11 +1,142 @@
-import { AutoModel, PreTrainedModel } from "../../src/transformers.js";
+import { AutoModel, PreTrainedModel, env } from "../../src/transformers.js";
+import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
 
 import { MAX_TEST_EXECUTION_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 import fs from "node:fs";
+import { credentialFingerprint } from "../../src/utils/hub/credential_fingerprint.js";
+import { get_config } from "../../src/utils/model_registry/get_model_files.js";
 
 // TODO: Set cache folder to a temp directory
 
 describe("Hub", () => {
+  describe("Session env", () => {
+    it("should use scoped resource path options", () => {
+      const context = new AssetLoadingContext({
+        revision: "refs/pr/1",
+        env: {
+          localModelPath: "/scoped-models/",
+          remoteHost: "https://models.example.com/",
+          remotePathTemplate: "{model}/at/{revision}/",
+        },
+      });
+      const paths = context.resolve("org/model", "config.json");
+
+      expect(paths.localPath).toBe("/scoped-models/org/model/config.json");
+      expect(paths.remoteURL).toBe("https://models.example.com/org/model/at/refs%2Fpr%2F1/config.json");
+    });
+
+    it("should use scoped Hugging Face token for request headers", () => {
+      const context = new AssetLoadingContext({ env: { hfToken: "scoped-token" } });
+      const headers = context.getHeaders("https://huggingface.co/org/model/resolve/main/config.json");
+
+      expect(headers.get("Authorization")).toBe("Bearer scoped-token");
+    });
+
+    it("should authenticate only the configured custom Hub origin with an explicit token", () => {
+      const context = new AssetLoadingContext({
+        env: { hfToken: "scoped-token", remoteHost: "https://private-hub.example/api/" },
+      });
+
+      const hubHeaders = context.getHeaders("https://private-hub.example/api/org/model/config.json");
+      const externalHeaders = context.getHeaders("https://cdn.example/org/model/config.json");
+      const downgradedHeaders = context.getHeaders("http://private-hub.example/api/org/model/config.json");
+      const otherPortHeaders = context.getHeaders("https://private-hub.example:8443/api/org/model/config.json");
+
+      expect(hubHeaders.get("Authorization")).toBe("Bearer scoped-token");
+      expect(externalHeaders.has("Authorization")).toBe(false);
+      expect(downgradedHeaders.has("Authorization")).toBe(false);
+      expect(otherPortHeaders.has("Authorization")).toBe(false);
+    });
+
+    it.each(["HF_TOKEN", "HF_ACCESS_TOKEN"])("does not forward %s to a custom Hub, but permits explicitly assigned tokens", (name) => {
+      const saved = { HF_TOKEN: process.env.HF_TOKEN, HF_ACCESS_TOKEN: process.env.HF_ACCESS_TOKEN };
+      try {
+        delete process.env.HF_TOKEN;
+        delete process.env.HF_ACCESS_TOKEN;
+        env.hfToken = undefined;
+        process.env[name] = "environment-token";
+        const options = { env: { remoteHost: "https://cdn.example/" } };
+        const implicit = new AssetLoadingContext(options);
+        expect(implicit.getHeaders("https://cdn.example/file").has("Authorization")).toBe(false);
+        for (const host of ["huggingface.co", "hf.co"]) {
+          expect(implicit.getHeaders(`https://${host}/file`).get("Authorization")).toBe("Bearer environment-token");
+          expect(implicit.getHeaders(`http://${host}/file`).has("Authorization")).toBe(false);
+        }
+        env.hfToken = "environment-token";
+        const explicit = new AssetLoadingContext(options);
+        expect(explicit.getHeaders("https://cdn.example/file").get("Authorization")).toBe("Bearer environment-token");
+        expect(explicit.key("org/model")).not.toBe(implicit.key("org/model"));
+        expect(explicit.key("org/model")).not.toContain("environment-token");
+        expect(implicit.key("org/model")).not.toContain("environment-token");
+      } finally {
+        env.hfToken = undefined;
+        for (const key of Object.keys(saved)) {
+          if (saved[key] === undefined) delete process.env[key];
+          else process.env[key] = saved[key];
+        }
+      }
+    });
+
+    it("should split memoization keys by token", () => {
+      const key = (hfToken) => new AssetLoadingContext({ env: { hfToken } }).key("org/model");
+
+      expect(key("hf_token")).toBe(key("hf_token"));
+      expect(key("hf_token")).not.toBe(key("hf_other-token"));
+      expect(key("hf_token")).not.toBe(key(null));
+      expect(key("hf_other-token")).not.toBe(key(null));
+    });
+
+    it("keeps synthetic credentials out of stable, credential-separated memoization keys", () => {
+      const tokens = ["hf_synthetic_review_token_A_12345", "hf_synthetic_review_token_B_67890"];
+      const key = (hfToken) => new AssetLoadingContext({ env: { hfToken } }).key("org/model", "config.json");
+      const keys = tokens.map(key);
+      expect(key(tokens[0])).toBe(keys[0]);
+      expect(keys[0]).not.toBe(keys[1]);
+      for (const value of keys) for (const token of tokens) expect(value).not.toContain(token);
+    });
+
+    it.each(["", "abc", "x".repeat(53), "x".repeat(54), "x".repeat(62), "x".repeat(1024), "é🚀", "\ud800", "\ud801"])("assigns a stable numeric identity to each exact synthetic credential (%j)", (token) => {
+      const id = credentialFingerprint(token);
+      expect(Number.isSafeInteger(id)).toBe(true);
+      expect(id).toBeGreaterThan(0);
+      expect(credentialFingerprint(token)).toBe(id);
+      expect(credentialFingerprint(null)).toBeNull();
+      expect(credentialFingerprint(undefined)).toBeNull();
+    });
+
+    it("assigns distinct increasing IDs without merging unusual strings or absent credentials", () => {
+      const tokens = ["hf_identity_test_A", "hf_identity_test_B", "hf_identity_test_\ud800", "hf_identity_test_\ud801", "hf_identity_test_\ufffd"];
+      const ids = tokens.map(credentialFingerprint);
+      expect(new Set(ids).size).toBe(tokens.length);
+      for (let i = 1; i < ids.length; ++i) expect(ids[i]).toBe(ids[i - 1] + 1);
+      expect(tokens.map(credentialFingerprint)).toEqual(ids);
+      expect(ids).not.toContain(credentialFingerprint(null));
+    });
+
+    it("does not reuse a gated configuration across credentials or for an anonymous request", async () => {
+      const saved = { useFSCache: env.useFSCache, useBrowserCache: env.useBrowserCache, useCustomCache: env.useCustomCache, experimental_useCrossOriginStorage: env.experimental_useCrossOriginStorage };
+      Object.assign(env, { useFSCache: false, useBrowserCache: false, useCustomCache: false, experimental_useCrossOriginStorage: false });
+      const requests = [];
+      const fetch = async (_url, init) => {
+        const authorization = new Headers(init.headers).get("Authorization");
+        requests.push(authorization);
+        return authorization === null ? new Response("gated", { status: 401 }) : new Response(JSON.stringify({ model_type: "bert" }));
+      };
+      const options = (hfToken) => ({ env: { hfToken, fetch, allowLocalModels: false, remoteHost: "https://huggingface.co/" } });
+      try {
+        const first = await get_config("memo-identity/gated-config", options("hf_memo_map_A"));
+        const second = await get_config("memo-identity/gated-config", options("hf_memo_map_B"));
+        expect(second).not.toBe(first);
+        await expect(get_config("memo-identity/gated-config", options(null))).rejects.toThrow();
+        expect(await get_config("memo-identity/gated-config", options("hf_memo_map_A"))).toBe(first);
+        expect(await get_config("memo-identity/gated-config", options("hf_memo_map_B"))).toBe(second);
+        expect(requests).toEqual(["Bearer hf_memo_map_A", "Bearer hf_memo_map_B", null]);
+      } finally {
+        Object.assign(env, saved);
+      }
+    });
+  });
+
   describe("Loading models", () => {
     it(
       "should load a model from the local cache",

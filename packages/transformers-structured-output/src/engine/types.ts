@@ -4,9 +4,15 @@ export type TokenizerSource = object | ((...args: unknown[]) => unknown);
 
 export interface ConstraintState<State> {
     readonly initial: State;
+    initialize?(bytes: Uint8Array, context?: { enable_thinking?: boolean }): State;
     transition(state: State, byte: number): State;
     viable(state: State): boolean;
     accepting(state: State): boolean;
+    /** Whether generation may end here with an end token whose own bytes are `bytes`. Defaults to `accepting`. */
+    acceptsEnd?(state: State, bytes: Uint8Array): boolean;
+    allowsSpecial?(state: State, next: State, bytes: Uint8Array): boolean;
+    /** Select the branch committed for an allowed special token, without mutating either input state. */
+    selectSpecialState?(state: State, next: State, bytes: Uint8Array): State;
     stringCapacity?(state: State): number | undefined;
     maskKey?(state: State): string | undefined;
 }

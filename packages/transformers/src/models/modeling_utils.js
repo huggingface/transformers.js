@@ -285,6 +285,7 @@ export class PreTrainedModel extends Callable {
             dtype = null,
             use_external_data_format = null,
             session_options = {},
+            env: sessionEnv = {},
         } = {},
     ) {
         const options = {
@@ -299,6 +300,7 @@ export class PreTrainedModel extends Callable {
             dtype,
             use_external_data_format,
             session_options,
+            env: sessionEnv,
         };
 
         const modelName = MODEL_CLASS_TO_NAME_MAPPING.get(this);
@@ -325,12 +327,7 @@ export class PreTrainedModel extends Callable {
             const files_loading = {};
 
             try {
-                const expected_files = await get_model_files(pretrained_model_name_or_path, {
-                    config,
-                    dtype,
-                    device,
-                    model_file_name,
-                });
+                const expected_files = await get_model_files(pretrained_model_name_or_path, options);
 
                 const metadata = await Promise.all(
                     expected_files.map((file) => get_file_metadata(pretrained_model_name_or_path, file, options)),

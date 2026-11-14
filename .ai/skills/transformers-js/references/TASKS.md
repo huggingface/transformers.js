@@ -804,6 +804,11 @@ Language generation pipeline using compatible causal language models.
 This pipeline predicts the words that will follow a specified text prompt.
 For all generation parameters, see `GenerationConfig`.
 
+For chat inputs, if the tokenizer defines a `response_template`, the generated assistant message is
+parsed with it (e.g., into `reasoning_content`, `content` and `tool_calls` fields). Each sequence is cut after its
+first EOS token before parsing, `content` is always set (to `''` if the template found none), and if the output
+can't be parsed (e.g. a truncated tool call), a warning is logged and the text is returned as `content`.
+
 **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
 ```javascript
 import { pipeline } from '@huggingface/transformers';

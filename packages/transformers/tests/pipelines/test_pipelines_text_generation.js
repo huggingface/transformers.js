@@ -1,4 +1,4 @@
-import { pipeline, TextGenerationPipeline, DynamicCache } from "../../src/transformers.js";
+import { pipeline, TextGenerationPipeline, DynamicCache, Tensor } from "../../src/transformers.js";
 import { jest } from "@jest/globals";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -65,6 +65,22 @@ export default () => {
         MAX_TEST_EXECUTION_TIME,
       );
       it(
+        "plain text skips special tokens even when a response template is configured",
+        async () => {
+          const original = pipe.tokenizer.response_template;
+          pipe.tokenizer.response_template = { defaults: { role: "assistant" }, fields: { content: { content: "text" } } };
+          const decode = jest.spyOn(pipe.tokenizer, "batch_decode");
+          try {
+            expect(await pipe(text_input, { max_new_tokens: 3, return_full_text: false })).toEqual(new_text_target);
+            expect(decode.mock.calls.every(([, options]) => options.skip_special_tokens === true)).toBe(true);
+          } finally {
+            decode.mockRestore();
+            pipe.tokenizer.response_template = original;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+      it(
         "text input (list) - return_full_text=false",
         async () => {
           const output = await pipe([text_input], { max_new_tokens: 3, return_full_text: false });
@@ -118,6 +134,139 @@ export default () => {
           expect(options.tools).toEqual(tools);
           expect(options.add_generation_prompt).toBe(true);
           spy.mockRestore();
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "chat input is parsed with the response template, using the prompt as prefix",
+        async () => {
+          // When the chat template pre-writes the start of the assistant message (here, an
+          // opening <think> block), the pipeline must pass the prompt to `parse_response` as
+          // `prefix` so that generated text is correctly routed into the prefilled region.
+          const { chat_template, response_template } = pipe.tokenizer;
+          pipe.tokenizer.chat_template = "{% for message in messages %}" + "{{ '<|im_start|>' + message['role'] + '\n' + (message['content'] | default('')) + '<|im_end|>' + '\n' }}" + "{% endfor %}" + "{% if add_generation_prompt %}{{ '<|im_start|>assistant\n<think>\n' }}{% endif %}";
+          pipe.tokenizer.response_template = {
+            defaults: { role: "assistant" },
+            start_anchor: "<|im_start|>assistant\n",
+            fields: {
+              reasoning_content: { open: "<think>", close: "</think>", content: "text" },
+              content: { close: "<|im_end|>", content: "text" },
+            },
+          };
+          const tools = [{ type: "function", function: { name: "set_alarm", parameters: { type: "object", properties: { hour: { type: "integer" } } } } }];
+          const spy = jest.spyOn(pipe.tokenizer, "parse_response");
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 3, tools });
+            const message = output[0].generated_text.at(-1);
+            // The tiny model never emits </think>, so everything it generates stays inside the
+            // reasoning region opened by the chat template in the prompt.
+            expect(message.role).toBe("assistant");
+            // `content` is always set, so the message can be passed back in as history.
+            expect(message.content).toBe("");
+            expect(typeof message.reasoning_content).toBe("string");
+            expect(message.reasoning_content.length).toBeGreaterThan(0);
+            expect(spy.mock.calls.at(-1)[1].tools).toBe(tools);
+
+            // Parsed assistant messages without content remain valid chat history.
+            await expect(pipe(output[0].generated_text, { max_new_tokens: 1, tools })).resolves.toBeDefined();
+          } finally {
+            spy.mockRestore();
+            Object.assign(pipe.tokenizer, { chat_template, response_template });
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "chat output is cut after the first EOS token before parsing",
+        async () => {
+          // In a batch, rows that finish early keep generating; that run-on text must not reach the parser.
+          const { response_template } = pipe.tokenizer;
+          pipe.tokenizer.response_template = {
+            defaults: { role: "assistant" },
+            start_anchor: "<|assistant|>",
+            fields: { content: { content: "text" } },
+          };
+          const eos = [pipe.model.generation_config.eos_token_id].flat()[0];
+          const answer = pipe.tokenizer.encode("Paris", { add_special_tokens: false });
+          const junk = pipe.tokenizer.encode("junk", { add_special_tokens: false });
+          const generate = jest.spyOn(pipe.model, "generate").mockImplementation(async ({ input_ids }) => {
+            const ids = [...input_ids.data, ...[...answer, eos, ...junk].map(BigInt)];
+            return new Tensor("int64", BigInt64Array.from(ids), [1, ids.length]);
+          });
+          const parse = jest.spyOn(pipe.tokenizer, "parse_response");
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 8 });
+            const text = parse.mock.calls.at(-1)[0];
+            expect(text.endsWith(pipe.tokenizer.decode([eos]))).toBe(true);
+            expect(text).not.toContain("junk");
+            expect(output[0].generated_text.at(-1).content).toContain("Paris");
+          } finally {
+            generate.mockRestore();
+            parse.mockRestore();
+            pipe.tokenizer.response_template = response_template;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "chat output the template can't parse is returned as plain content",
+        async () => {
+          const { response_template } = pipe.tokenizer;
+          // Random tokens are never valid JSON, so parsing fails.
+          pipe.tokenizer.response_template = {
+            defaults: { role: "assistant" },
+            start_anchor: "<|assistant|>",
+            fields: { tool_calls: { content: "json" } },
+          };
+          try {
+            const output = await pipe(chat_input, { max_new_tokens: 3 });
+            expect(output).toEqual(chat_target);
+          } finally {
+            pipe.tokenizer.response_template = response_template;
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it.each(["root", "decoder", "generator", "text_config", "list"])(
+        "cuts batched chat output using EOS from the %s model config",
+        async (location) => {
+          const response_template = pipe.tokenizer.response_template;
+          const config = pipe.model.config;
+          const generation_config = pipe.model.configs.generation_config;
+          const eos = [pipe.model.generation_config.eos_token_id].flat()[0];
+          const eosIds = location === "list" ? [eos, 1] : eos;
+          const emittedEos = location === "list" ? 1 : eos;
+          pipe.tokenizer.response_template = { defaults: { role: "assistant" }, start_anchor: "<|assistant|>", fields: { content: { content: "text" } } };
+          pipe.model.config = { ...config, eos_token_id: undefined };
+          if (location === "root" || location === "list") pipe.model.config.eos_token_id = eosIds;
+          else pipe.model.config[location] = { eos_token_id: eosIds };
+          pipe.model.configs.generation_config = null;
+          const answer = pipe.tokenizer.encode("Paris", { add_special_tokens: false });
+          const junk = pipe.tokenizer.encode("junk", { add_special_tokens: false });
+          const generate = jest.spyOn(pipe.model, "generate").mockImplementation(async ({ input_ids }) => {
+            const rows = input_ids.tolist().map((row) => [...row, ...[...answer, emittedEos, ...junk].map(BigInt)]);
+            return new Tensor("int64", BigInt64Array.from(rows.flat()), [rows.length, rows[0].length]);
+          });
+          const parse = jest.spyOn(pipe.tokenizer, "parse_response");
+          try {
+            const output = await pipe([chat_input, chat_input], { max_new_tokens: 8 });
+            expect(output).toHaveLength(2);
+            expect(parse).toHaveBeenCalledTimes(2);
+            for (const [text] of parse.mock.calls) {
+              expect(text.endsWith(pipe.tokenizer.decode([emittedEos]))).toBe(true);
+              expect(text).not.toContain("junk");
+            }
+          } finally {
+            generate.mockRestore();
+            parse.mockRestore();
+            pipe.tokenizer.response_template = response_template;
+            pipe.model.config = config;
+            pipe.model.configs.generation_config = generation_config;
+          }
         },
         MAX_TEST_EXECUTION_TIME,
       );

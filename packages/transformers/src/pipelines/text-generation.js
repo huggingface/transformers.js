@@ -6,6 +6,7 @@ import { Pipeline } from './_base.js';
 
 import { Tensor } from '../utils/tensor.js';
 import { pick } from '../utils/core.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -14,7 +15,7 @@ import { pick } from '../utils/core.js';
  */
 
 function isChat(x) {
-    return Array.isArray(x) && x.every((x) => 'role' in x && 'content' in x);
+    return Array.isArray(x) && x.every((x) => x !== null && typeof x === 'object' && 'role' in x);
 }
 
 /**
@@ -55,6 +56,11 @@ function isChat(x) {
  * Language generation pipeline using compatible causal language models.
  * This pipeline predicts the words that will follow a specified text prompt.
  * For all generation parameters, see `GenerationConfig`.
+ *
+ * For chat inputs, if the tokenizer defines a `response_template`, the generated assistant message is
+ * parsed with it (e.g., into `reasoning_content`, `content` and `tool_calls` fields). Each sequence is cut after its
+ * first EOS token before parsing, `content` is always set (to `''` if the template found none), and if the output
+ * can't be parsed (e.g. a truncated tool call), a warning is logged and the text is returned as `content`.
  *
  * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
@@ -183,17 +189,37 @@ export class TextGenerationPipeline
             })
         );
 
-        const decoded = this.tokenizer.batch_decode(outputTokenIds, {
-            skip_special_tokens: true,
-        });
+        // Response templates often delimit regions with special tokens, so keep them only when parsing
+        const response_template = this.tokenizer.response_template;
+        const parse = isChatInput && Boolean(response_template);
+        const skip_special_tokens = !parse;
+        const prompt_length = text_inputs.input_ids.dims.at(-1);
 
-        let promptLengths;
+        /** @type {Tensor|bigint[][]} */
+        let sequences = outputTokenIds;
+        if (parse) {
+            // In a batch, rows that finish early keep generating until the longest row is done. Cut each row after its
+            // first EOS token so that run-on text doesn't end up in the parsed message.
+            const eos = [
+                this.model._prepare_generation_config(generation_kwargs.generation_config, {
+                    ...this._default_generation_config,
+                    ...generation_kwargs,
+                }).eos_token_id,
+            ]
+                .flat()
+                .filter((id) => id != null)
+                .map((id) => BigInt(id));
+            sequences = /** @type {bigint[][]} */ (outputTokenIds.tolist()).map((row) => {
+                const end = row.findIndex((id, j) => j >= prompt_length && eos.includes(BigInt(id)));
+                return end === -1 ? row : row.slice(0, end + 1);
+            });
+        }
+        const decode_options = { skip_special_tokens, ...(parse ? { clean_up_tokenization_spaces: false } : {}) };
+        const decoded = this.tokenizer.batch_decode(sequences, decode_options);
+
+        let prompts;
         if (!return_full_text && text_inputs.input_ids.dims.at(-1) > 0) {
-            promptLengths = this.tokenizer
-                .batch_decode(text_inputs.input_ids, {
-                    skip_special_tokens: true,
-                })
-                .map((x) => x.length);
+            prompts = this.tokenizer.batch_decode(text_inputs.input_ids, decode_options);
         }
 
         /** @type {TextGenerationOutput[]} */
@@ -201,17 +227,42 @@ export class TextGenerationPipeline
         for (let i = 0; i < decoded.length; ++i) {
             const textIndex = Math.floor((i / outputTokenIds.dims[0]) * texts.length);
 
-            if (promptLengths) {
+            if (prompts) {
                 // Trim the decoded text to only include the generated part
-                decoded[i] = decoded[i].slice(promptLengths[textIndex]);
+                decoded[i] = decoded[i].slice(prompts[textIndex].length);
             }
-            toReturn[textIndex].push(
-                /** @type {TextGenerationSingle} */ ({
-                    generated_text: isChatInput
-                        ? [.../** @type {Chat[]} */ (texts)[textIndex], { role: 'assistant', content: decoded[i] }]
-                        : decoded[i],
-                }),
-            );
+            /** @type {string|Chat} */
+            let generated_text = decoded[i];
+            if (isChatInput) {
+                // Chat templates often pre-write part of the assistant message (e.g. an opening <think> tag),
+                // so the parser needs to see the prompt as `prefix`.
+                let message;
+                if (parse) {
+                    try {
+                        message = this.tokenizer.parse_response(decoded[i], {
+                            prefix: prompts?.[textIndex] ?? '',
+                            tools,
+                        });
+                    } catch (error) {
+                        // Don't lose the generation when the model writes something the template can't parse
+                        // (e.g. a truncated or malformed tool call). `tokenizer.parse_response` still throws.
+                        logger.warn(`Could not parse the generated message; returning it as plain content. ${error}`);
+                        // Decode like the no-template path: full sequence minus the decoded prompt.
+                        const row = /** @type {bigint[][]} */ (sequences)[i];
+                        const plain = (ids) => this.tokenizer.decode(ids, { skip_special_tokens: true });
+                        const prompt_text = prompt_length > 0 ? plain(row.slice(0, prompt_length)) : '';
+                        message = { role: 'assistant', content: plain(row).slice(prompt_text.length) };
+                    }
+                    // Chat templates expect `content` on assistant messages (e.g. ones with only tool calls), so
+                    // the message can be passed back in as history.
+                    message.content ??= '';
+                    message.role ??= 'assistant';
+                } else {
+                    message = { role: 'assistant', content: decoded[i] };
+                }
+                generated_text = /** @type {Chat} */ ([.../** @type {Chat[]} */ (texts)[textIndex], message]);
+            }
+            toReturn[textIndex].push(/** @type {TextGenerationSingle} */ ({ generated_text }));
         }
         return !isBatched && toReturn.length === 1 ? toReturn[0] : toReturn;
     }

@@ -1,5 +1,7 @@
 /// <reference path="./cross-origin-storage.d.ts" />
 
+import { env } from '../../env.js';
+
 const HASH_ALGORITHM = 'SHA-256';
 
 /**
@@ -28,6 +30,14 @@ export class CrossOriginStorage {
     #hashCache = null;
 
     /**
+     * @param {Object} [options]
+     * @param {(input: string | URL, init?: any) => Promise<any>} [options.fetch] Fetch implementation used for LFS pointer lookups. Defaults to `env.fetch`.
+     */
+    constructor(options = {}) {
+        this.fetch = options.fetch ?? env.fetch;
+    }
+
+    /**
      * Returns (and lazily opens) the hash cache, reusing the same promise across concurrent callers.
      * @returns {Promise<Cache>}
      */
@@ -38,9 +48,12 @@ export class CrossOriginStorage {
 
     /**
      * Returns whether the `navigator.crossOriginStorage` API is available in the current environment.
+     * Checks for `getFileHandle()` itself, so that an implementation exposing
+     * `navigator.crossOriginStorage` without the method falls back to the next cache.
      * @returns {boolean}
      */
-    static isAvailable = () => typeof navigator !== 'undefined' && 'crossOriginStorage' in navigator;
+    static isAvailable = () =>
+        typeof navigator !== 'undefined' && typeof navigator.crossOriginStorage?.getFileHandle === 'function';
 
     /**
      * Looks up a cached response for the given URL by resolving its SHA-256 hash and requesting
@@ -57,7 +70,7 @@ export class CrossOriginStorage {
             return undefined;
         }
         try {
-            const handle = await navigator.crossOriginStorage.requestFileHandle(makeHashDescriptor(hashValue));
+            const handle = await navigator.crossOriginStorage.getFileHandle(makeHashDescriptor(hashValue));
             const blob = await handle.getFile();
             return new Response(blob, {
                 headers: {
@@ -110,7 +123,7 @@ export class CrossOriginStorage {
      * @returns {Promise<void>}
      */
     _storeBlobInCOS = async (blob, hashHex) => {
-        const handle = await navigator.crossOriginStorage.requestFileHandle(makeHashDescriptor(hashHex), {
+        const handle = await navigator.crossOriginStorage.getFileHandle(makeHashDescriptor(hashHex), {
             create: true,
             origins: '*',
         });
@@ -229,7 +242,7 @@ export class CrossOriginStorage {
         const rawUrl = url.replace('/resolve/', '/raw/');
 
         try {
-            const text = await fetch(rawUrl).then((r) => r.text());
+            const text = await this.fetch(rawUrl).then((r) => r.text());
             const match = text.match(/^oid sha256:([0-9a-f]+)$/m);
             return match ? match[1] : null;
         } catch {
