@@ -20,8 +20,20 @@
  * @module generation/streamers
  */
 
-import { mergeArrays } from '../utils/core.js';
 import { apis } from '../env.js';
+
+/**
+ * Number of already-decoded tokens that are decoded again together with new tokens.
+ * Tokenizers decode a token differently depending on what surrounds it (e.g., the leading
+ * space of the first token in a sequence is stripped, and `clean_up_tokenization_spaces`
+ * rewrites sequences like " n't" that can span several tokens), so new tokens need context.
+ */
+const DECODE_CONTEXT_TOKENS = 8;
+
+/**
+ * What a token decodes to while its UTF-8 byte sequence is still incomplete.
+ */
+const REPLACEMENT_CHARACTER = '\uFFFD';
 
 const is_chinese_char = (cp) =>
     (cp >= 0x4e00 && cp <= 0x9fff) ||
@@ -92,8 +104,57 @@ export class TextStreamer extends BaseStreamer {
         this.print_len = 0;
         this.next_tokens_are_prompt = true;
 
+        // Text decoded from the first `decoded_len` tokens of `token_cache`. Used to decode
+        // new tokens without decoding the entire cache again.
+        this.decoded_text = '';
+        this.decoded_len = 0;
+
         // Track special token IDs for special handling during streaming.
         this.special_ids = new Set(this.tokenizer.all_special_ids.map(BigInt));
+    }
+
+    /**
+     * Decodes the token cache. Only the tokens added since the last call are decoded (plus a
+     * few preceding ones for context), so the cost does not grow with the size of the cache.
+     * @returns {string} The decoded text of the entire token cache.
+     * @private
+     */
+    _decode_token_cache() {
+        const cache = this.token_cache;
+        if (this.decoded_len === cache.length) return this.decoded_text;
+
+        const start = Math.max(0, this.decoded_len - DECODE_CONTEXT_TOKENS);
+        const context =
+            start < this.decoded_len
+                ? this.tokenizer.decode(cache.slice(start, this.decoded_len), this.decode_kwargs)
+                : '';
+        const decoded = this.tokenizer.decode(cache.slice(start), this.decode_kwargs);
+
+        if (!decoded.startsWith(context)) {
+            // The new tokens changed how the context tokens are decoded, so decode everything.
+            this.decoded_text = this.tokenizer.decode(cache, this.decode_kwargs);
+            this.decoded_len = cache.length;
+            return this.decoded_text;
+        }
+
+        const text = this.decoded_text + decoded.slice(context.length);
+        if (!decoded.endsWith(REPLACEMENT_CHARACTER)) {
+            // Tokens that end in an incomplete character are decoded again with the next tokens.
+            this.decoded_text = text;
+            this.decoded_len = cache.length;
+        }
+        return text;
+    }
+
+    /**
+     * Empties the token cache.
+     * @private
+     */
+    _reset_token_cache() {
+        this.token_cache = [];
+        this.print_len = 0;
+        this.decoded_text = '';
+        this.decoded_len = 0;
     }
 
     /**
@@ -120,11 +181,10 @@ export class TextStreamer extends BaseStreamer {
 
             // Flush any existing cached text first
             if (this.token_cache.length > 0) {
-                const text = this.tokenizer.decode(this.token_cache, this.decode_kwargs);
+                const text = this._decode_token_cache();
                 const printable_text = text.slice(this.print_len);
                 this.on_finalized_text(printable_text, false);
-                this.token_cache = [];
-                this.print_len = 0;
+                this._reset_token_cache();
             }
             // Print the special token immediately
             const special_text = this.tokenizer.decode(tokens, this.decode_kwargs);
@@ -132,16 +192,17 @@ export class TextStreamer extends BaseStreamer {
             return;
         }
 
-        // Add the new token to the cache and decodes the entire thing.
-        this.token_cache = mergeArrays(this.token_cache, tokens);
-        const text = this.tokenizer.decode(this.token_cache, this.decode_kwargs);
+        // Add the new tokens to the cache and decode them.
+        for (const token of tokens) {
+            this.token_cache.push(token);
+        }
+        const text = this._decode_token_cache();
 
         let printable_text;
         if (is_prompt || text.endsWith('\n')) {
             // After the symbol for a new line, we flush the cache.
             printable_text = text.slice(this.print_len);
-            this.token_cache = [];
-            this.print_len = 0;
+            this._reset_token_cache();
         } else if (text.length > 0 && is_chinese_char(text.charCodeAt(text.length - 1))) {
             // If the last token is a CJK character, we print the characters.
             printable_text = text.slice(this.print_len);
@@ -162,10 +223,9 @@ export class TextStreamer extends BaseStreamer {
     end() {
         let printable_text;
         if (this.token_cache.length > 0) {
-            const text = this.tokenizer.decode(this.token_cache, this.decode_kwargs);
+            const text = this._decode_token_cache();
             printable_text = text.slice(this.print_len);
-            this.token_cache = [];
-            this.print_len = 0;
+            this._reset_token_cache();
         } else {
             printable_text = '';
         }
