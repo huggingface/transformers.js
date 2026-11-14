@@ -21,6 +21,13 @@ for (const key in cache) {
 // Ensure tensors in cache can be disposed
 type T4 = Expect<Equal<ReturnType<typeof cache.dispose>, Promise<void>>>;
 
+type Snap = ReturnType<DynamicCache['snapshot']>;
+type T12 = Expect<Equal<ReturnType<typeof cache.crop>, DynamicCache>>;
+type T13 = Expect<Equal<ReturnType<typeof cache.clone>, DynamicCache>>;
+type T14 = Expect<Equal<Snap['length'], number>>;
+type T15 = Expect<Equal<Snap['states'][string], Tensor>>;
+type T16 = Expect<Equal<ReturnType<Snap['dispose']>, Promise<void>>>;
+
 // Ensure past_key_values accepts DynamicCache or null
 type PastKeyValues = TextGenerationConfig['past_key_values'];
 type T5 = Expect<Equal<PastKeyValues, DynamicCache | null | undefined>>;
