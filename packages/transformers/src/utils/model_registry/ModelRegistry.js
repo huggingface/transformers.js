@@ -187,6 +187,10 @@ export class ModelRegistry {
      * Get tokenizer files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {Object} [options] - Optional parameters
+     * @param {string|null} [options.cache_dir=null] - Custom cache directory
+     * @param {boolean} [options.local_files_only=false] - Only check local files
+     * @param {string} [options.revision='main'] - Model revision
      * @returns {Promise<string[]>} Array of tokenizer file paths
      *
      * **Example:**
@@ -195,14 +199,18 @@ export class ModelRegistry {
      * console.log(files); // ['tokenizer.json', 'tokenizer_config.json']
      * ```
      */
-    static async get_tokenizer_files(modelId) {
-        return get_tokenizer_files(modelId);
+    static async get_tokenizer_files(modelId, options = {}) {
+        return get_tokenizer_files(modelId, options);
     }
 
     /**
      * Get processor files needed for a specific model.
      *
      * @param {string} modelId - The model id
+     * @param {Object} [options] - Optional parameters
+     * @param {string|null} [options.cache_dir=null] - Custom cache directory
+     * @param {boolean} [options.local_files_only=false] - Only check local files
+     * @param {string} [options.revision='main'] - Model revision
      * @returns {Promise<string[]>} Array of processor file paths
      *
      * **Example:**
@@ -211,8 +219,8 @@ export class ModelRegistry {
      * console.log(files); // ['preprocessor_config.json']
      * ```
      */
-    static async get_processor_files(modelId) {
-        return get_processor_files(modelId);
+    static async get_processor_files(modelId, options = {}) {
+        return get_processor_files(modelId, options);
     }
 
     /**

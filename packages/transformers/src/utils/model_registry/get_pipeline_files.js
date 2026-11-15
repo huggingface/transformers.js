@@ -16,6 +16,9 @@ import { SUPPORTED_TASKS, TASK_ALIASES } from '../../pipelines/index.js';
  * @param {import('../dtypes.js').DataType|Record<string, import('../dtypes.js').DataType>} [options.dtype=null] - Override dtype
  * @param {import('../devices.js').DeviceType|Record<string, import('../devices.js').DeviceType>} [options.device=null] - Override device
  * @param {string} [options.model_file_name=null] - Override the model file name (excluding .onnx suffix)
+ * @param {string|null} [options.cache_dir=null] - Custom cache directory
+ * @param {boolean} [options.local_files_only=false] - Only check local files
+ * @param {string} [options.revision='main'] - Model revision
  * @returns {Promise<string[]>} Array of file paths that will be loaded
  * @throws {Error} If the task is not supported
  */
