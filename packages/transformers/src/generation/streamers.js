@@ -23,6 +23,21 @@
 import { mergeArrays } from '../utils/core.js';
 import { apis } from '../env.js';
 
+/**
+ * What `clean_up_tokenization_spaces` removes the preceding space from when decoding
+ * (e.g., "do n't" is decoded as "don't"). The last one is the result of two steps:
+ * "n ' t" becomes "n't", which is then cleaned up as well.
+ */
+const CLEAN_UP_PATTERNS = ['.', '?', '!', ',', "' ", "n't", "'m", "'s", "'ve", "'re", "n ' t"];
+
+/**
+ * Every incomplete start of a clean-up pattern (e.g., "n" and "n'" for "n't"). A space followed
+ * by one of these at the end of the text may still be removed once more tokens are decoded.
+ */
+const CLEAN_UP_PATTERN_STARTS = new Set(
+    CLEAN_UP_PATTERNS.flatMap((pattern) => Array.from(pattern, (_, i) => pattern.slice(0, i))),
+);
+
 const is_chinese_char = (cp) =>
     (cp >= 0x4e00 && cp <= 0x9fff) ||
     (cp >= 0x3400 && cp <= 0x4dbf) ||
@@ -97,6 +112,28 @@ export class TextStreamer extends BaseStreamer {
     }
 
     /**
+     * Finds the last space that can be printed. With `clean_up_tokenization_spaces`, a space
+     * followed by the start of a clean-up pattern is not printed yet, because the next tokens
+     * may complete the pattern and remove that space from the decoded text.
+     * @param {string} text The decoded text of the token cache.
+     * @returns {number} The index of the space, or -1 if there is none.
+     * @private
+     */
+    _last_printable_space(text) {
+        let index = text.lastIndexOf(' ');
+        const clean_up =
+            this.decode_kwargs.clean_up_tokenization_spaces ??
+            this.tokenizer.config?.clean_up_tokenization_spaces ??
+            true;
+        if (clean_up) {
+            while (index >= 0 && CLEAN_UP_PATTERN_STARTS.has(text.slice(index + 1))) {
+                index = index > 0 ? text.lastIndexOf(' ', index - 1) : -1;
+            }
+        }
+        return index;
+    }
+
+    /**
      * Receives tokens, decodes them, and prints them to stdout as soon as they form entire words.
      * @param {bigint[][]} value
      */
@@ -149,7 +186,7 @@ export class TextStreamer extends BaseStreamer {
         } else {
             // Otherwise, prints until the last space char (simple heuristic to avoid printing incomplete words,
             // which may change with the subsequent token -- there are probably smarter ways to do this!)
-            printable_text = text.slice(this.print_len, text.lastIndexOf(' ') + 1);
+            printable_text = text.slice(this.print_len, this._last_printable_space(text) + 1);
             this.print_len += printable_text.length;
         }
 

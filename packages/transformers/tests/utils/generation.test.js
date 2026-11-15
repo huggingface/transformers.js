@@ -241,6 +241,53 @@ describe("Generation parameters", () => {
 });
 
 describe("Streamers", () => {
+  describe("clean_up_tokenization_spaces", () => {
+    const stream = async (model_id, text, options = {}) => {
+      const tokenizer = await AutoTokenizer.from_pretrained(model_id);
+      const ids = tokenizer.encode(text, { add_special_tokens: false });
+      const chunks = [];
+      const streamer = new TextStreamer(tokenizer, { skip_prompt: true, callback_function: (x) => chunks.push(x), ...options });
+      streamer.put([[0n]]); // prompt (skipped)
+      for (const id of ids) {
+        streamer.put([[BigInt(id)]]);
+      }
+      streamer.end();
+      return { chunks, decoded: tokenizer.decode(ids, options.decode_kwargs) };
+    };
+
+    it(
+      "keeps apostrophes (WordPiece)",
+      async () => {
+        const { chunks, decoded } = await stream("Xenova/bert-base-uncased", "I don't know, it's what we've got.");
+        expect(chunks).toEqual(["i ", "don't ", "know, ", "it's ", "what ", "we've ", "got."]);
+        expect(chunks.join("")).toEqual(decoded);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "keeps opening quotes (BPE)",
+      async () => {
+        const { chunks, decoded } = await stream("Xenova/gpt2", "He said 'so what' to me.");
+        expect(chunks).toEqual(["He ", "said'so ", "what' ", "to ", "me."]);
+        expect(chunks.join("")).toEqual(decoded);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "does not hold back text when disabled",
+      async () => {
+        const { chunks, decoded } = await stream("Xenova/gpt2", "He said 'so what' to me.", {
+          decode_kwargs: { clean_up_tokenization_spaces: false },
+        });
+        expect(chunks).toEqual(["He ", "said ", "'so ", "what' ", "to ", "me."]);
+        expect(chunks.join("")).toEqual(decoded);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+  });
+
   describe("decoder-only (Llama)", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
     let model, tokenizer;
