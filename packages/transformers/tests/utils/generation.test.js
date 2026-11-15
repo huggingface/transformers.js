@@ -477,6 +477,51 @@ describe("Streamers", () => {
       expect(chunks).toEqual(TARGET);
     });
   });
+
+  describe("incremental decoding", () => {
+    const stream = (tokenizer, text, options = {}) => {
+      const chunks = [];
+      const streamer = new TextStreamer(tokenizer, { callback_function: (x) => chunks.push(x), ...options });
+      streamer.put([[0n]]); // Prompt
+      for (const id of tokenizer.encode(text, { add_special_tokens: false })) {
+        streamer.put([[BigInt(id)]]);
+      }
+      streamer.end();
+      return chunks;
+    };
+
+    it("does not decode the whole line for every token", async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("hf-internal-testing/tiny-random-LlamaForCausalLM");
+
+      // Track how many tokens are passed to each `decode` call.
+      const decode_lengths = [];
+      const decode = tokenizer.decode.bind(tokenizer);
+      tokenizer.decode = (token_ids, ...args) => {
+        decode_lengths.push(token_ids.length);
+        return decode(token_ids, ...args);
+      };
+
+      // A single line of ~1000 tokens (no newline characters)
+      const text = Array(100).fill("The quick brown fox jumps over the lazy dog").join(" ");
+      const chunks = stream(tokenizer, text, { skip_prompt: true });
+
+      expect(chunks.join("")).toEqual(text);
+      expect(decode_lengths.length).toBeGreaterThan(1000);
+      expect(Math.max(...decode_lengths)).toBeLessThan(20);
+    });
+
+    it("characters split across multiple tokens", async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/gpt2");
+      const chunks = stream(tokenizer, "Emoji 😀🎉 café 中文 done", { skip_prompt: true });
+      expect(chunks).toEqual(["Emoji ", "😀🎉 ", "café ", "中", "文", " ", "done"]);
+    });
+
+    it("tokenizer with clean_up_tokenization_spaces", async () => {
+      const tokenizer = await AutoTokenizer.from_pretrained("Xenova/t5-small");
+      const chunks = stream(tokenizer, "I don't think it's ok", { skip_prompt: true });
+      expect(chunks).toEqual(["I ", "don't ", "think ", "it's ", "ok"]);
+    });
+  });
 });
 
 describe("Dynamic Cache", () => {
