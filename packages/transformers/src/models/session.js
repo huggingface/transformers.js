@@ -14,6 +14,23 @@ import { Tensor } from '../utils/tensor.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Merges provider options (from `transformers.js_config`, usually `device_config[device].execution_provider_options`)
+ * into each execution provider entry. Strings become `{ name, ...options }`; object entries keep their own fields,
+ * which win over the config's (e.g. WebNN's `deviceType`).
+ * @param {import('../backends/onnx.js').ONNXExecutionProviders[]|undefined} executionProviders The providers selected for the device.
+ * @param {Record<string, any>|undefined} providerOptions The options to merge in.
+ * @returns {import('../backends/onnx.js').ONNXExecutionProviders[]|undefined} The providers with the options applied.
+ */
+export function applyExecutionProviderOptions(executionProviders, providerOptions) {
+    if (!executionProviders || !providerOptions || Object.keys(providerOptions).length === 0) {
+        return executionProviders;
+    }
+    return executionProviders.map((ep) =>
+        typeof ep === 'string' ? { ...providerOptions, name: ep } : { ...providerOptions, ...ep },
+    );
+}
+
+/**
  * Constructs an InferenceSession using a model file located at the specified path.
  * @param {string} pretrained_model_name_or_path The path to the directory containing the model file.
  * @param {string} fileName The name of the model file.
@@ -76,8 +93,11 @@ async function getSession(
 
     const session_options = { ...options.session_options };
 
-    // Overwrite `executionProviders` if not specified
-    session_options.executionProviders ??= executionProviders;
+    // Overwrite `executionProviders` if not specified, with any provider options from the model's config
+    session_options.executionProviders ??= applyExecutionProviderOptions(
+        executionProviders,
+        custom_config.execution_provider_options,
+    );
 
     // Overwrite `freeDimensionOverrides` if specified in config and not set in session options
     const free_dimension_overrides = custom_config.free_dimension_overrides;
