@@ -22,12 +22,14 @@ describe("TensorOpRegistry.session_options", () => {
     expect(TensorOpRegistry.session_options).toEqual({});
   });
 
-  it("pins auxiliary sessions to WASM in web environments", async () => {
+  it("pins auxiliary sessions to WASM in the official web runtime", async () => {
     // session_options is initialized at class-evaluation time from the
     // environment, so a web-env instance needs a fresh module registry.
     jest.resetModules();
+    // official runtime: the backend module populated `env.backends.onnx` (incl. wasm settings)
     jest.unstable_mockModule("../../src/env.js", () => ({
       apis: Object.freeze({ IS_WEB_ENV: true, IS_BROWSER_ENV: true }),
+      env: { backends: { onnx: { wasm: {} } } },
     }));
     const { TensorOpRegistry } = await import("../../src/ops/registry.js");
     expect(TensorOpRegistry.session_options).toEqual({ executionProviders: ["wasm"] });
@@ -36,6 +38,22 @@ describe("TensorOpRegistry.session_options", () => {
     await TensorOpRegistry.matmul;
     expect(createInferenceSession).toHaveBeenCalled();
     expect(createInferenceSession.mock.calls[0][1]).toEqual({ executionProviders: ["wasm"] });
+  }, 2000);
+
+  it("keeps empty options for a custom injected runtime without WASM", async () => {
+    jest.resetModules();
+    // custom injected runtime: `env.backends.onnx` replaced without wasm settings
+    jest.unstable_mockModule("../../src/env.js", () => ({
+      apis: Object.freeze({ IS_WEB_ENV: true, IS_BROWSER_ENV: true }),
+      env: { backends: { onnx: { setLogLevel: () => {} } } },
+    }));
+    const { TensorOpRegistry } = await import("../../src/ops/registry.js");
+    expect(TensorOpRegistry.session_options).toEqual({});
+
+    const { createInferenceSession } = await import("../../src/backends/onnx.js");
+    await TensorOpRegistry.matmul;
+    expect(createInferenceSession).toHaveBeenCalled();
+    expect(createInferenceSession.mock.calls.at(-1)[1]).toEqual({});
   }, 2000);
 
   it("is overridable by consumers", async () => {

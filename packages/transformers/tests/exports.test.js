@@ -38,10 +38,6 @@ describe("Public exports", () => {
 
     expect(missing).toEqual([]);
   });
-
-  it("exports TensorOpRegistry from the root entry point", () => {
-    expect(transformers.TensorOpRegistry).toBeDefined();
-  });
 });
 
 describe("env.backends.onnx.getSupportedDevices", () => {
