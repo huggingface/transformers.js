@@ -127,7 +127,7 @@ export class SpeechT5ForTextToSpeech extends SpeechT5PreTrainedModel {
                 encoder_hidden_states: encoder_outputs,
             };
 
-            addPastKeyValues(this, decoderFeeds, past_key_values);
+            await addPastKeyValues(this, decoderFeeds, past_key_values);
             decoder_outputs = await sessionRun(this.sessions['decoder_model_merged'], decoderFeeds);
             past_key_values = getPastKeyValues(decoder_outputs, past_key_values);
 
