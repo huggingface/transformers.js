@@ -43,6 +43,7 @@ Passing no `model` uses the default for that task.
 - [`translation`](references/TASKS.md#translation) — default model: `Xenova/t5-small`
 - [`text2text-generation`](references/TASKS.md#text2text-generation) — default model: `Xenova/flan-t5-small`
 - [`text-generation`](references/TASKS.md#text-generation) — default model: `onnx-community/Qwen3-0.6B-ONNX`
+- [`decision`](references/TASKS.md#decision) — default model: `onnx-community/Qwen2.5-0.5B-Instruct`
 - [`zero-shot-classification`](references/TASKS.md#zero-shot-classification) — default model: `Xenova/distilbert-base-uncased-mnli`
 - [`audio-classification`](references/TASKS.md#audio-classification) — default model: `Xenova/wav2vec2-base-superb-ks`
 - [`zero-shot-audio-classification`](references/TASKS.md#zero-shot-audio-classification) — default model: `Xenova/clap-htsat-unfused`

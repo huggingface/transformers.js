@@ -20,6 +20,10 @@
  * - [Stopping criteria](./generation/stopping_criteria.md) — control when generation halts.
  * - [Streamers](./generation/streamers.md) — receive tokens as they're produced.
  *
+ * **Decisions** _(experimental)_
+ * - [Decision config](./decision/configuration_utils.md) — labels, temperatures and prompt template of the `decision` pipeline.
+ * - [Decision prompts](./decision/template_utils.md) — requests, questions and answers in the System One format.
+ *
  * **Data types and I/O**
  * - [Tensors](./utils/tensor.md) — `Tensor`, shape ops, math, I/O.
  * - [Images](./utils/image.md) — `RawImage`, `load_image()`.
@@ -69,6 +73,7 @@ export * from './generation/streamers.js';
 export * from './generation/stopping_criteria.js';
 export * from './generation/logits_process.js';
 export { GenerationConfig } from './generation/configuration_utils.js';
+export { DecisionConfig } from './decision/configuration_utils.js';
 
 export { load_audio, read_audio, RawAudio } from './utils/audio.js';
 export { load_image, RawImage } from './utils/image.js';
