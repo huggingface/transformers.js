@@ -15,6 +15,8 @@ Each section is pulled from the pipeline class's JSDoc, so the examples stay in 
 
 **Embeddings** — [`feature-extraction`](#feature-extraction)
 
+**Other** — [`decision`](#decision)
+
 ## Audio
 
 ### `audio-classification`
@@ -936,4 +938,39 @@ const output = await extractor('This is a simple test.', { pooling: 'mean', quan
 
 // You can convert this Tensor to a nested JavaScript array using `.tolist()`:
 console.log(output.tolist());
+```
+
+## Other
+
+### `decision`
+
+**Default model:** `onnx-community/Qwen2.5-0.5B-Instruct`
+
+Decision pipeline (experimental, ported from `transformers`): answers typed questions (`choice`, `score`, `noul`)
+about a `state` with a probability for every option, in the System One format. Nothing is generated: the score of
+each option is the next-token logit of its label (`A`, `B`, ... or `Yes`/`No`), so any chat model can answer. The
+prompt and labels come from the `decision.json` and `decision_template.jinja` of the model repo, if any.
+
+**Example:** Typed decisions with `onnx-community/Qwen2.5-0.5B-Instruct`.
+```javascript
+import { pipeline } from '@huggingface/transformers';
+
+const decide = await pipeline('decision', 'onnx-community/Qwen2.5-0.5B-Instruct');
+const answers = await decide({
+  state: 'I was charged twice for my order and want a refund.',
+  questions: {
+    intent: {
+      type: 'choice',
+      instructions: 'What does the customer want?',
+      criteria: { refund: 'wants money back', cancel: 'wants to cancel an order', track: 'wants to track an order' },
+    },
+    refund: { type: 'noul', instructions: 'Is a refund requested?' },
+    anger: { type: 'score', instructions: 'How angry?', criteria: ['calm', 'annoyed', 'furious'] },
+  },
+});
+// {
+//   intent: { type: 'choice', choice: 'refund', confidence: ..., probabilities: { refund: ..., cancel: ..., track: ... } },
+//   refund: { type: 'noul', noul: ... },
+//   anger: { type: 'score', score: ..., legend: { 0: 'calm', 1: 'annoyed', 2: 'furious' }, confidence: ..., probabilities: { 0: ..., 1: ..., 2: ... } },
+// }
 ```
