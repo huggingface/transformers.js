@@ -179,7 +179,7 @@ export const SUPPORTED_TASKS = Object.freeze({
         default: {
             model: 'Xenova/vit-base-patch16-224',
         },
-        type: 'multimodal',
+        type: 'image',
     },
     'image-segmentation': {
         pipeline: ImageSegmentationPipeline,
