@@ -864,5 +864,49 @@ export const CUSTOM_TESTS = () => {
       },
       MAX_EXECUTION_TIME,
     );
+
+    it(
+      "should decode the same sentence the same way twice",
+      async () => {
+        // Regression test: PUNCTUATION_ONLY_REGEX had the `g` flag, so RegExp.test() kept `lastIndex`
+        // between calls, and that state leaked from one decode into the next. Decoding this sentence
+        // leaves `lastIndex` at 1 (after the trailing "..."), so the leading "..." of the next decode
+        // no longer matched and took the pause before " and" as its duration.
+        const tokenizer = await WhisperTokenizer.from_pretrained("onnx-community/whisper-tiny.en_timestamped");
+
+        const text = "... and then ...";
+        const ids = tokenizer.encode(text, { add_special_tokens: false });
+        expect(ids.map((id) => tokenizer.decode([id]))).toEqual(["...", " and", " then", "..."]);
+
+        const model_outputs = [
+          {
+            stride: [30, 0, 5],
+            tokens: [50257n, 50362n, ...ids.map(BigInt), 50256n],
+            token_timestamps: [0, 0, 0, 1, 2, 3, 4],
+          },
+        ];
+        const decode = () =>
+          tokenizer._decode_asr(model_outputs, {
+            return_timestamps: "word",
+            time_precision: 0.02,
+            force_full_sequences: false,
+          });
+        const target = [
+          "... and then...",
+          {
+            chunks: [
+              { text: "...", timestamp: [0, 0.02] },
+              { text: " and", timestamp: [1, 2] },
+              { text: " then", timestamp: [2, 3] },
+              { text: "...", timestamp: [3, 3.02] },
+            ],
+          },
+        ];
+
+        expect(decode()).toBeCloseToNested(target, 2);
+        expect(decode()).toBeCloseToNested(target, 2);
+      },
+      MAX_EXECUTION_TIME,
+    );
   });
 };
