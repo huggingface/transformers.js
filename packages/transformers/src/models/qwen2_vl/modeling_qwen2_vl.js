@@ -311,8 +311,11 @@ export class Qwen2VLForConditionalGeneration extends Qwen2VLPreTrainedModel {
                 model_inputs.attention_mask,
             );
         } else {
-            model_inputs.pixel_values = null;
-            // model_inputs.pixel_values_videos = null;
+            // The images were read with the prompt that filled the cache: drop them. Deleted, not set to
+            // null, as generic_text_to_text_forward picks modality inputs that aren't undefined, so a null
+            // would be taken for an image and sent to the vision encoder (which a text-only load lacks).
+            delete model_inputs.pixel_values;
+            // delete model_inputs.pixel_values_videos;
 
             const past_length = model_inputs.past_key_values.get_seq_length();
 
