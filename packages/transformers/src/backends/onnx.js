@@ -354,7 +354,12 @@ if (ONNX_ENV) {
             const wasmPathPrefix = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNX_ENV.versions.web}/dist/`;
 
             let wasmPathSuffix = '.asyncify'; // Default to asyncify WASM build
-            if (apis.IS_SAFARI_BELOW_26 && !apis.IS_WEBGPU_AVAILABLE) {
+            if (typeof WebAssembly !== 'undefined' && 'Suspending' in WebAssembly) {
+                // The JSPI build where the browser has JSPI (recent Chrome, Safari 26+): it pauses for the
+                // GPU without Asyncify's rewrite, so its WebAssembly is smaller (16.8 vs 26.9 MB), takes less
+                // memory to compile and runs faster, notably in Safari.
+                wasmPathSuffix = '.jspi';
+            } else if (apis.IS_SAFARI_BELOW_26 && !apis.IS_WEBGPU_AVAILABLE) {
                 // Disable asyncify for Safari below 26 when WebGPU is not available
                 wasmPathSuffix = '';
             }
