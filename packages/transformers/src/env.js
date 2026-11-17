@@ -281,9 +281,11 @@ export const env = {
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     get remoteHost() {
-        // TODO: Treat an empty HF_ENDPOINT as unset while preserving explicit empty-string overrides.
-        // https://github.com/huggingface/transformers.js/issues/1934
-        return remoteHost !== undefined ? remoteHost : (readEnvVar('HF_ENDPOINT') ?? 'https://huggingface.co/');
+        if (remoteHost !== undefined) {
+            return remoteHost;
+        }
+        const endpoint = readEnvVar('HF_ENDPOINT');
+        return endpoint && endpoint.trim().length > 0 ? endpoint : 'https://huggingface.co/';
     },
     set remoteHost(value) {
         remoteHost = value;
