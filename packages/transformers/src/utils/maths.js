@@ -911,20 +911,28 @@ export function medianFilter(data, windowSize) {
     // @ts-ignore
     const outputArray = new data.constructor(data.length);
 
+    if (data.length <= 1) {
+        outputArray.set(data);
+        return outputArray;
+    }
+
     // @ts-ignore
     const buffer = new data.constructor(windowSize); // Reusable array for storing values
 
     const halfWindowSize = Math.floor(windowSize / 2);
+    const reflectPeriod = 2 * (data.length - 1);
 
     for (let i = 0; i < data.length; ++i) {
         let valuesIndex = 0;
 
         for (let j = -halfWindowSize; j <= halfWindowSize; ++j) {
             let index = i + j;
-            if (index < 0) {
-                index = Math.abs(index);
-            } else if (index >= data.length) {
-                index = 2 * (data.length - 1) - index;
+            if (index < 0 || index >= data.length) {
+                // Repeat reflection when the window extends beyond both ends.
+                index = Math.abs(index) % reflectPeriod;
+                if (index >= data.length) {
+                    index = reflectPeriod - index;
+                }
             }
 
             buffer[valuesIndex++] = data[index];
