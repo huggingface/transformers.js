@@ -7,6 +7,7 @@ import { Pipeline, prepareAudios } from './_base.js';
 import { Tensor } from '../utils/tensor.js';
 import { max, round } from '../utils/maths.js';
 import { logger } from '../utils/logger.js';
+import { collapseCtcRepeats } from '../utils/ctc.js';
 
 /**
  * @typedef {import('./_base.js').TextAudioPipelineConstructorArgs} TextAudioPipelineConstructorArgs
@@ -191,7 +192,9 @@ export class AutomaticSpeechRecognitionPipeline
             for (const item of logits) {
                 predicted_ids.push(max(item.data)[1]);
             }
-            const predicted_sentences = this.tokenizer.decode(predicted_ids, { skip_special_tokens: true }).trim();
+            const blankId = this.model.config.pad_token_id ?? this.tokenizer.pad_token_id;
+            const collapsed_ids = collapseCtcRepeats(predicted_ids, blankId);
+            const predicted_sentences = this.tokenizer.decode(collapsed_ids, { skip_special_tokens: true }).trim();
             toReturn.push({ text: predicted_sentences });
         }
         return single ? toReturn[0] : toReturn;
