@@ -10,6 +10,7 @@ import { DATA_TYPES, DEFAULT_DTYPE_SUFFIX_MAPPING, isWebGpuFp16Supported, select
 import { selectDevice } from '../utils/devices.js';
 import { apis } from '../env.js';
 import { getCoreModelFile, getModelDataFiles } from '../utils/model-loader.js';
+import { awaitWithBackground } from '../utils/promise.js';
 import { Tensor } from '../utils/tensor.js';
 import { logger } from '../utils/logger.js';
 
@@ -92,15 +93,20 @@ async function getSession(
 
     const bufferOrPathPromise = getCoreModelFile(pretrained_model_name_or_path, fileName, options, suffix);
 
-    // Handle onnx external data files
+    // Handle onnx external data files. The model file is fetched at the same time, but
+    // it is only awaited after external data. If that load rejects first, the model-file
+    // promise must already have a handler or Node exits on the unhandled rejection.
     const use_external_data_format = options.use_external_data_format ?? custom_config.use_external_data_format;
-    const externalData = await getModelDataFiles(
-        pretrained_model_name_or_path,
-        fileName,
-        suffix,
-        options,
-        use_external_data_format,
-        session_options,
+    const [externalData, buffer_or_path] = await awaitWithBackground(
+        getModelDataFiles(
+            pretrained_model_name_or_path,
+            fileName,
+            suffix,
+            options,
+            use_external_data_format,
+            session_options,
+        ),
+        bufferOrPathPromise,
     );
 
     if (externalData.length > 0 && (!apis.IS_NODE_ENV || externalData.some((data) => typeof data !== 'string'))) {
@@ -123,7 +129,6 @@ async function getSession(
         }
     }
 
-    const buffer_or_path = await bufferOrPathPromise;
     const session_config = {
         dtype: selectedDtype,
         device: selectedDevice,
