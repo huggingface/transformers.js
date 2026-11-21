@@ -15,6 +15,48 @@ import { Tensor } from '../utils/tensor.js';
 import { max, log_softmax } from '../utils/maths.js';
 
 /**
+ * Visits the scores from the highest to the lowest, until `is_last` returns `true`,
+ * and returns the last score that was visited, with how many of the visited scores are equal to it.
+ *
+ * Uses a max-heap over a copy of the scores, so the cost is O(n) plus O(log n) for each
+ * visited score, instead of sorting the whole vocabulary on every generation step.
+ * @param {Float32Array} scores The scores of a single sequence.
+ * @param {(score: number, count: number) => boolean} is_last Called with each score and the number
+ * of scores visited so far (including this one). Returns whether this is the last score to visit.
+ * @returns {[number, number]} The last visited score, and the number of visited scores with this value.
+ * @private
+ */
+function find_cutoff(scores, is_last) {
+    const heap = scores.slice();
+    const sift_down = (/** @type {number} */ i, /** @type {number} */ size) => {
+        const value = heap[i];
+        while (true) {
+            let child = 2 * i + 1;
+            if (child >= size) break;
+            if (child + 1 < size && heap[child + 1] > heap[child]) ++child;
+            if (heap[child] <= value) break;
+            heap[i] = heap[child];
+            i = child;
+        }
+        heap[i] = value;
+    };
+
+    let size = heap.length;
+    for (let i = (size >> 1) - 1; i >= 0; --i) sift_down(i, size);
+
+    let score = -Infinity;
+    let ties = 0;
+    for (let count = 1; size > 0; ++count) {
+        ties = heap[0] === score ? ties + 1 : 1;
+        score = heap[0];
+        heap[0] = heap[--size];
+        sift_down(0, size);
+        if (is_last(score, count)) break;
+    }
+    return [score, ties];
+}
+
+/**
  * Abstract base class for all logit processors that can be applied during generation.
  */
 export class LogitsProcessor extends Callable {
@@ -735,6 +777,42 @@ export class TopPLogitsWarper extends LogitsWarper {
         this.filter_value = filter_value;
         this.min_tokens_to_keep = min_tokens_to_keep;
     }
+
+    /**
+     * Apply logit warper.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Tensor} The processed logits.
+     */
+    _call(input_ids, logits) {
+        for (let i = 0; i < logits.dims[0]; ++i) {
+            const batch_logits_data = /** @type {Float32Array} */ (logits[i].data);
+
+            // Normalization terms of the softmax
+            const max_logit = max(batch_logits_data)[0];
+            let sum = 0;
+            for (let j = 0; j < batch_logits_data.length; ++j) {
+                sum += Math.exp(batch_logits_data[j] - max_logit);
+            }
+
+            // Keep the most probable tokens, until their probabilities add up to `top_p`.
+            let cumulative_prob = 0;
+            let [cutoff, ties] = find_cutoff(batch_logits_data, (score, count) => {
+                cumulative_prob += Math.exp(score - max_logit) / sum;
+                return score === -Infinity || (cumulative_prob >= this.top_p && count >= this.min_tokens_to_keep);
+            });
+            if (cutoff === -Infinity) continue; // nothing left to filter
+
+            // Of the tokens with the same score as the last one, only as many as needed are kept.
+            for (let j = 0; j < batch_logits_data.length; ++j) {
+                const score = batch_logits_data[j];
+                if (score < cutoff || (score === cutoff && --ties < 0)) {
+                    batch_logits_data[j] = this.filter_value;
+                }
+            }
+        }
+        return logits;
+    }
 }
 
 /**
@@ -757,5 +835,27 @@ export class TopKLogitsWarper extends LogitsWarper {
 
         this.top_k = Math.max(top_k, min_tokens_to_keep);
         this.filter_value = filter_value;
+    }
+
+    /**
+     * Apply logit warper.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Tensor} The processed logits.
+     */
+    _call(input_ids, logits) {
+        for (let i = 0; i < logits.dims[0]; ++i) {
+            const batch_logits_data = /** @type {Float32Array} */ (logits[i].data);
+
+            // The `top_k`-th highest score. Tokens with the same score are kept as well.
+            const [cutoff] = find_cutoff(batch_logits_data, (_, count) => count === this.top_k);
+
+            for (let j = 0; j < batch_logits_data.length; ++j) {
+                if (batch_logits_data[j] < cutoff) {
+                    batch_logits_data[j] = this.filter_value;
+                }
+            }
+        }
+        return logits;
     }
 }

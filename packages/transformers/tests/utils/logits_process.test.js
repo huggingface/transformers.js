@@ -2,6 +2,11 @@ import {
   // Pipelines
   pipeline,
   TextGenerationPipeline,
+
+  // Logits warpers
+  TopKLogitsWarper,
+  TopPLogitsWarper,
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -105,8 +110,117 @@ describe("Logits Processors", () => {
       );
     });
 
+    describe("top_p", () => {
+      it(
+        "a very small top_p is the same as greedy search",
+        async () => {
+          const text_input = "hello";
+          const greedy = await pipe(text_input, { max_new_tokens: 5 });
+
+          // Only the most likely token is left to sample from. `top_k: 0` disables top-k.
+          const output = await pipe(text_input, { max_new_tokens: 5, do_sample: true, top_k: 0, top_p: 1e-6 });
+          expect(output).toEqual(greedy);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("warpers", () => {
+    // Two sequences with the probabilities of four tokens each
+    const PROBS = [
+      [0.1, 0.4, 0.2, 0.3],
+      [0.7, 0.15, 0.1, 0.05],
+    ];
+    const INPUT_IDS = [[0n], [0n]];
+    const make_logits = () => new Tensor("float32", PROBS.flat().map(Math.log), [2, 4]);
+
+    /** Applies the warper and returns which tokens are kept. */
+    const kept = (warper, logits = make_logits()) => {
+      const output = warper(INPUT_IDS, logits);
+      const original = make_logits().data;
+      return [0, 1].map((i) =>
+        Array.from(output.data.subarray(4 * i, 4 * (i + 1)), (x, j) => {
+          if (x !== -Infinity) expect(x).toEqual(original[4 * i + j]); // kept scores are not modified
+          return x !== -Infinity;
+        }),
+      );
+    };
+
+    describe("TopPLogitsWarper", () => {
+      // Expected values are from `TopPLogitsWarper` in the Python library.
+      it("keeps the most likely tokens whose probabilities add up to top_p", () => {
+        expect(kept(new TopPLogitsWarper(0.5))).toEqual([
+          [false, true, false, true],
+          [true, false, false, false],
+        ]);
+        expect(kept(new TopPLogitsWarper(0.75))).toEqual([
+          [false, true, true, true],
+          [true, true, false, false],
+        ]);
+      });
+
+      it("keeps a single token for a very small top_p", () => {
+        expect(kept(new TopPLogitsWarper(1e-6))).toEqual([
+          [false, true, false, false],
+          [true, false, false, false],
+        ]);
+      });
+
+      it("supports min_tokens_to_keep", () => {
+        expect(kept(new TopPLogitsWarper(1e-6, { min_tokens_to_keep: 2 }))).toEqual([
+          [false, true, false, true],
+          [true, true, false, false],
+        ]);
+      });
+
+      it("supports filter_value", () => {
+        const output = new TopPLogitsWarper(0.5, { filter_value: -100 })(INPUT_IDS, make_logits());
+        expect(Array.from(output.data.subarray(0, 4), (x) => x === -100)).toEqual([true, false, true, false]);
+      });
+
+      it("keeps only as many tokens with the same score as needed", () => {
+        const logits = new Tensor("float32", [0.7, 0.1, 0.1, 0.1].map(Math.log), [1, 4]);
+        const output = new TopPLogitsWarper(0.75)([[0n]], logits);
+        expect(output.data[0]).not.toEqual(-Infinity);
+        expect(output.data.filter((x) => x !== -Infinity).length).toEqual(2);
+      });
+
+      it("ignores tokens that are already filtered", () => {
+        const logits = make_logits();
+        logits.data[1] = -Infinity; // the remaining probabilities are 1/6, 2/6 and 3/6
+        expect(kept(new TopPLogitsWarper(0.6), logits)[0]).toEqual([false, false, true, true]);
+      });
+    });
+
+    describe("TopKLogitsWarper", () => {
+      it("keeps the top_k most likely tokens", () => {
+        expect(kept(new TopKLogitsWarper(2))[0]).toEqual([false, true, false, true]);
+        expect(kept(new TopKLogitsWarper(1))[0]).toEqual([false, true, false, false]);
+      });
+
+      it("keeps tokens with the same score as the last one", () => {
+        const logits = new Tensor("float32", [0.7, 0.1, 0.1, 0.1].map(Math.log), [1, 4]);
+        const output = new TopKLogitsWarper(2)([[0n]], logits);
+        expect(Array.from(output.data, (x) => x !== -Infinity)).toEqual([true, true, true, true]);
+      });
+
+      it("keeps everything if top_k is larger than the vocabulary", () => {
+        expect(kept(new TopKLogitsWarper(10))).toEqual([
+          [true, true, true, true],
+          [true, true, true, true],
+        ]);
+      });
+
+      it("can be combined with top_p", () => {
+        // top-k keeps the probabilities 0.4, 0.3 and 0.2, which are renormalized to 4/9, 3/9 and 2/9
+        const logits = new TopKLogitsWarper(3)(INPUT_IDS, make_logits());
+        expect(kept(new TopPLogitsWarper(0.7), logits)[0]).toEqual([false, true, false, true]);
+      });
+    });
   });
 });
