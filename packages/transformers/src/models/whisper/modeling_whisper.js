@@ -346,7 +346,9 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             if (seek_token_timestamps) {
                 allTokenTimestamps.push(...seek_token_timestamps.slice(0, tokens_to_keep));
             }
-            if (segment_offset <= 0) break;
+            if (segment_offset <= 0) {
+                segment_offset = seek_end - seek;
+            }
             seek += segment_offset;
         }
 

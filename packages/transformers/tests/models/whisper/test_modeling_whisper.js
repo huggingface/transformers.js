@@ -151,7 +151,7 @@ export default () => {
       /**
        * Run the seek loop with generation mocked at the PreTrainedModel level.
        * This exercises Whisper's real segmentation logic without loading audio or running a model.
-       * @param {number[]} tokens Tokens returned by each mocked decoding pass.
+       * @param {number[]|number[][]} tokens Tokens returned by each mocked decoding pass.
        * @param {number} num_frames Number of real (unpadded) input frames.
        */
       const runSeek = async (tokens, num_frames = 3000) => {
@@ -164,15 +164,17 @@ export default () => {
             throw new Error("seek loop did not terminate after 50 passes");
           }
           segmentInputDims = inputs.dims;
-          const ids = [...decoder_input_ids, ...tokens, EOS].map(BigInt);
+          const passTokens = Array.isArray(tokens[0]) ? tokens[Math.min(passes - 1, tokens.length - 1)] : tokens;
+          const ids = [...decoder_input_ids, ...passTokens, EOS].map(BigInt);
           return new Tensor("int64", BigInt64Array.from(ids), [1, ids.length]);
         });
 
         try {
           const whisper = Object.create(WhisperForConditionalGeneration.prototype);
           whisper.config = { max_source_positions: 1500 };
+          const inputFrames = Math.max(3000, num_frames);
           const output = await whisper._generate_with_seek({
-            inputs: new Tensor("float32", new Float32Array(80 * 3000), [1, 80, 3000]),
+            inputs: new Tensor("float32", new Float32Array(80 * inputFrames), [1, 80, inputFrames]),
             generation_config: {
               no_timestamps_token_id: NO_TIMESTAMPS,
               eos_token_id: EOS,
@@ -203,10 +205,13 @@ export default () => {
         expect(segmentInputDims).toEqual([1, 80, 3000]);
       });
 
-      it("terminates when a complete segment has zero offset", async () => {
-        const { passes } = await runSeek([TIMESTAMP_BEGIN, 1654, TIMESTAMP_BEGIN, TIMESTAMP_BEGIN + 1200]);
+      it("advances to the next window when a complete segment has zero offset", async () => {
+        const zeroOffset = [TIMESTAMP_BEGIN, 1654, TIMESTAMP_BEGIN, TIMESTAMP_BEGIN + 1200];
+        const nextWindow = [TIMESTAMP_BEGIN, 1655, TIMESTAMP_BEGIN + 500];
+        const { passes, output } = await runSeek([zeroOffset, nextWindow], 6000);
 
-        expect(passes).toBe(1);
+        expect(passes).toBe(2);
+        expect(output.tolist()[0]).toContain(BigInt(1655));
       });
 
       it("continues through ordinary multi-segment output", async () => {
