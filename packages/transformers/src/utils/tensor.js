@@ -1272,8 +1272,11 @@ export function mean_pooling(last_hidden_state, attention_mask) {
             }
         }
         const outOffset = i * embedDim;
+        // Clamp the denominator so an all-padding row averages to zero instead of NaN,
+        // matching sentence-transformers' torch.clamp(..., min=1e-9) behaviour.
+        const denominator = Math.max(count, 1e-9);
         for (let k = 0; k < embedDim; ++k) {
-            returnedData[outOffset + k] = sums[k] / count;
+            returnedData[outOffset + k] = sums[k] / denominator;
         }
     }
 
