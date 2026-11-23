@@ -27,7 +27,7 @@
  * @property {import('./streamers.js').BaseStreamer} [streamer=null] (`BaseStreamer`, *optional*):
  * Streamer object used to stream the generated sequences. Generated tokens are passed
  * through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
- * @property {number[]|import('../utils/tensor.js').Tensor} [decoder_input_ids=null] (`number[]` or `Tensor`, *optional*):
+ * @property {number[]|number[][]|import('../utils/tensor.js').Tensor} [decoder_input_ids=null] (`number[]`, `number[][]` or `Tensor`, *optional*):
  * If the model is an encoder-decoder model, this argument is used to pass the `decoder_input_ids`.
  * @property {import('../cache_utils.js').DynamicCache | null} [past_key_values=null] (`DynamicCache`, *optional*):
  * A cache object that stores previously computed key/value states. When provided, the model will
