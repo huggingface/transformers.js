@@ -18,21 +18,12 @@ const pause = async (event) => {
 
 if (mode === "write") {
   const cache = new FileCache(directory);
-  const { markerPath, filePath } = cache.resolve(key);
+  const { markerPath } = cache.resolve(key);
   const rename = fs.promises.rename.bind(fs.promises);
   const writeFile = fs.promises.writeFile.bind(fs.promises);
   const open = fs.promises.open.bind(fs.promises);
-  let attempted = false;
-  fs.promises.open = async (path, ...args) => {
-    if (schedule === "direct" && String(path) === `${markerPath}.lock` && !attempted) {
-      attempted = true;
-      process.send("lock-attempt");
-    }
-    return open(path, ...args);
-  };
   fs.promises.rename = async (source, target) => {
     if (schedule === "marker" && target === markerPath) await pause("marker-ready");
-    if (schedule === "direct" && target === filePath) process.send("publishing");
     return rename(source, target);
   };
   // Baseline adapter only: expose the live write's actual truncate/write boundary. Corrected
@@ -50,16 +41,6 @@ if (mode === "write") {
   };
   await cache.put(key, new Response("replacement"));
   process.disconnect();
-} else if (mode === "delete") {
-  const cache = new FileCache(directory);
-  const readVersion = cache.readVersion.bind(cache);
-  cache.readVersion = async (...args) => {
-    const version = await readVersion(...args);
-    await pause("checked");
-    return version;
-  };
-  assert.equal(await cache.delete(key), true);
-  process.disconnect();
 } else {
   const root = await fs.promises.mkdtemp(join(tmpdir(), "cache-mutation-"));
   const children = [];
@@ -74,28 +55,7 @@ if (mode === "write") {
   }
   try {
     const cache = new FileCache(root);
-    const oldKey = "org/model/file";
-    const current = oldKey + "?__transformersjs_cache_version=1";
-    if (mode === "direct") {
-      await cache.put(oldKey, new Response("old"));
-      const deletion = job(["delete", root, oldKey]);
-      assert.equal(await deletion.next(), "checked");
-      const writer = job(["write", root, current, "direct"]);
-      const event = await writer.next();
-      if (event === "lock-attempt") {
-        // Do not wait for a writer blocked behind the paused deleter. Its payload is still staged.
-        assert.equal(await fs.promises.readFile(cache.resolve(current).filePath, "utf8"), "old");
-        deletion.child.send("continue");
-        await Promise.all([deletion.exited, writer.exited]);
-      } else {
-        assert.equal(event, "publishing");
-        await writer.exited;
-        deletion.child.send("continue");
-        await deletion.exited;
-      }
-      assert.equal(await (await cache.match(current))?.text(), "replacement", "replacement must survive obsolete deletion");
-      assert.equal(await fs.promises.readFile(cache.resolve(current).markerPath, "utf8"), "1");
-    } else if (mode === "loader") {
+    if (mode === "loader") {
       Object.assign(env, { useCustomCache: true, customCache: cache, useFSCache: false, useBrowserCache: false });
       const options = { env: { allowLocalModels: false, fetch: async () => new Response("loader-result") } };
       const resource = new AssetLoadingContext(options).resolve("org/loader", "tokenizer_config.json", cache);
@@ -126,7 +86,7 @@ if (mode === "write") {
     } else throw new Error(`Unknown mode ${mode}`);
     const files = await fs.promises.readdir(root, { recursive: true });
     assert.equal(
-      files.some((name) => name.includes(".tmp.") || name.endsWith(".lock")),
+      files.some((name) => name.includes(".tmp.")),
       false,
       "no mutation debris",
     );

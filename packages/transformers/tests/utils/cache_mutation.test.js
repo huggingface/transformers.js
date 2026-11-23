@@ -7,14 +7,10 @@ import { join, dirname } from "node:path";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
 
 describe("replacement-safe filesystem cache mutations", () => {
-  it.each(["direct", "loader"])(
-    "preserves a separate writer's replacement during %s deletion",
-    (schedule) => {
-      const result = spawnSync(process.execPath, [fileURLToPath(new URL("./fixtures/cache_mutation_process.mjs", import.meta.url)), schedule], { encoding: "utf8", timeout: 15000 });
-      expect({ status: result.status, error: result.error?.message, stdout: result.stdout, stderr: result.stderr }).toEqual({ status: 0, error: undefined, stdout: "", stderr: "" });
-    },
-    20000,
-  );
+  it("preserves a separate writer's replacement during loader cleanup", () => {
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL("./fixtures/cache_mutation_process.mjs", import.meta.url)), "loader"], { encoding: "utf8", timeout: 15000 });
+    expect({ status: result.status, error: result.error?.message, stdout: result.stdout, stderr: result.stderr }).toEqual({ status: 0, error: undefined, stdout: "", stderr: "" });
+  }, 20000);
 
   let directory;
   let cache;
@@ -27,7 +23,7 @@ describe("replacement-safe filesystem cache mutations", () => {
     await fs.promises.rm(directory, { recursive: true, force: true });
   });
   const key = "org/model/file?__transformersjs_cache_version=1";
-  const debris = async () => (await fs.promises.readdir(directory, { recursive: true })).filter((name) => name.includes(".tmp.") || name.endsWith(".lock"));
+  const debris = async () => (await fs.promises.readdir(directory, { recursive: true })).filter((name) => name.includes(".tmp."));
 
   it("keeps the live marker intact until an atomic replacement", async () => {
     await cache.put(key, new Response("old"));
@@ -51,7 +47,7 @@ describe("replacement-safe filesystem cache mutations", () => {
     expect(await debris()).toEqual([]);
   });
 
-  it("cleans both staged files and releases the lock after publication failure", async () => {
+  it("cleans both staged files after publication failure", async () => {
     const rename = fs.promises.rename.bind(fs.promises);
     jest.spyOn(fs.promises, "rename").mockImplementation(async (source, target) => {
       if (target === cache.resolve(key).markerPath) throw new Error("marker rename failed");
@@ -63,19 +59,6 @@ describe("replacement-safe filesystem cache mutations", () => {
     await cache.put(key, new Response("retry"));
     expect(await (await cache.match(key)).text()).toBe("retry");
   });
-
-  it("bounds contention without stealing a lock, while reads remain usable", async () => {
-    await cache.put(key, new Response("offline"));
-    const lock = `${cache.resolve(key).markerPath}.lock`;
-    await fs.promises.writeFile(lock, "owner");
-    expect(await (await cache.match(key)).text()).toBe("offline");
-    await expect(cache.put(key, new Response("blocked"))).rejects.toThrow("Timed out waiting for cache mutation lock");
-    expect(await cache.delete(key)).toBe(false);
-    expect(await fs.promises.readFile(lock, "utf8")).toBe("owner");
-    expect((await debris()).filter((name) => name.includes(".tmp."))).toEqual([]);
-    await fs.promises.unlink(lock);
-    expect(await cache.delete(key)).toBe(true);
-  }, 5000);
 
   it("preserves legacy reads, harmless misses and ordinary conditional deletion", async () => {
     await cache.put("legacy/file", new Response("legacy"));
@@ -89,7 +72,7 @@ describe("replacement-safe filesystem cache mutations", () => {
     expect(await debris()).toEqual([]);
   });
 
-  it("releases deletion resources when unlink fails", async () => {
+  it("reports a failed deletion when unlink fails", async () => {
     await cache.put(key, new Response("current"));
     const unlink = fs.promises.unlink.bind(fs.promises);
     jest.spyOn(fs.promises, "unlink").mockImplementation(async (path) => {
@@ -102,7 +85,7 @@ describe("replacement-safe filesystem cache mutations", () => {
     expect(await cache.delete(key)).toBe(true);
   });
 
-  it("cleans a failed staged stream without leaving locks or temporary files", async () => {
+  it("cleans a failed staged stream without leaving temporary files", async () => {
     const body = new ReadableStream({
       start(controller) {
         controller.enqueue(new Uint8Array([1]));
@@ -115,7 +98,7 @@ describe("replacement-safe filesystem cache mutations", () => {
     expect(await (await cache.match(key)).text()).toBe("retry");
   });
 
-  it("keeps read-only cache reads usable when mutation locks cannot be created", async () => {
+  it("keeps cache reads usable when the directory is read-only", async () => {
     await cache.put(key, new Response("read-only"));
     const parent = dirname(cache.resolve(key).filePath);
     await fs.promises.chmod(parent, 0o555);
