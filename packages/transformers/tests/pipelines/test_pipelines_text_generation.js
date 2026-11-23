@@ -72,6 +72,7 @@ export default () => {
           const decode = jest.spyOn(pipe.tokenizer, "batch_decode");
           try {
             expect(await pipe(text_input, { max_new_tokens: 3, return_full_text: false })).toEqual(new_text_target);
+            expect(decode).toHaveBeenCalled();
             expect(decode.mock.calls.every(([, options]) => options.skip_special_tokens === true)).toBe(true);
           } finally {
             decode.mockRestore();
