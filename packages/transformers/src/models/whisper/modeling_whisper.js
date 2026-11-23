@@ -201,7 +201,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
 
         // input_features shape: [batch=1, n_mels, total_frames]
         const input_features = inputs;
-        const total_frames = input_features.dims[2];
+        const total_frames =
+            generation_config.num_frames != null
+                ? Math.min(input_features.dims[2], generation_config.num_frames)
+                : input_features.dims[2];
 
         // The encoder downsamples by input_stride (=2 for whisper), so:
         //   num_segment_frames = input_stride * max_source_positions = 3000 mel frames per segment
@@ -342,6 +345,9 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             allTokens.push(...generated_tokens.slice(0, tokens_to_keep));
             if (seek_token_timestamps) {
                 allTokenTimestamps.push(...seek_token_timestamps.slice(0, tokens_to_keep));
+            }
+            if (segment_offset <= 0) {
+                segment_offset = seek_end - seek;
             }
             seek += segment_offset;
         }

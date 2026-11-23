@@ -2,6 +2,8 @@ import {
   // Pipelines
   pipeline,
   TextGenerationPipeline,
+  WhisperTimeStampLogitsProcessor,
+  full,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -16,6 +18,79 @@ const DEFAULT_MODEL_OPTIONS = {
 };
 
 describe("Logits Processors", () => {
+  describe("WhisperTimeStampLogitsProcessor", () => {
+    it("masks initial timestamps above max_initial_timestamp_index", () => {
+      const processor = new WhisperTimeStampLogitsProcessor(
+        {
+          eos_token_id: 2,
+          no_timestamps_token_id: 4,
+          max_initial_timestamp_index: 1,
+        },
+        [0],
+      );
+      const logits = full([1, 10], 0.0);
+
+      processor([[0]], logits);
+
+      expect(logits.data[5]).toBe(0);
+      expect(logits.data[6]).toBe(0);
+      expect(logits.data[7]).toBe(-Infinity);
+      expect(logits.data[9]).toBe(-Infinity);
+    });
+
+    it.each([
+      ["omitted", {}],
+      ["null", { max_initial_timestamp_index: null }],
+    ])("does not restrict initial timestamps when the limit is %s", (_name, limit) => {
+      const processor = new WhisperTimeStampLogitsProcessor(
+        {
+          eos_token_id: 2,
+          no_timestamps_token_id: 4,
+          ...limit,
+        },
+        [0],
+      );
+      const logits = full([1, 10], 0.0);
+
+      processor([[0]], logits);
+
+      expect(Array.from(logits.data.slice(5))).toEqual([0, 0, 0, 0, 0]);
+    });
+
+    it("allows only the first timestamp when max_initial_timestamp_index is zero", () => {
+      const processor = new WhisperTimeStampLogitsProcessor(
+        {
+          eos_token_id: 2,
+          no_timestamps_token_id: 4,
+          max_initial_timestamp_index: 0,
+        },
+        [0],
+      );
+      const logits = full([1, 10], 0.0);
+
+      processor([[0]], logits);
+
+      expect(logits.data[5]).toBe(0);
+      expect(Array.from(logits.data.slice(6))).toEqual(new Array(4).fill(-Infinity));
+    });
+
+    it("does not apply the initial timestamp limit after the first step", () => {
+      const processor = new WhisperTimeStampLogitsProcessor(
+        {
+          eos_token_id: 2,
+          no_timestamps_token_id: 4,
+          max_initial_timestamp_index: 0,
+        },
+        [0],
+      );
+      const logits = full([1, 10], 0.0);
+
+      processor([[0, 3]], logits);
+
+      expect(Array.from(logits.data.slice(5))).toEqual([0, 0, 0, 0, 0]);
+    });
+  });
+
   describe("text-generation", () => {
     const model_id = "hf-internal-testing/tiny-random-LlamaForCausalLM";
 
