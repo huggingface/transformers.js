@@ -35,7 +35,7 @@ async function check_files_cache(modelId, files, options = {}) {
     const fileStatuses = await Promise.all(
         files.map(async (filename) => {
             const resource = context.resolve(modelId, filename, cache);
-            const cached = await context.match(cache, resource);
+            const cached = await context.match(cache, resource.cacheKeys);
             return { file: filename, cached: !!cached };
         }),
     );
@@ -55,7 +55,7 @@ async function is_file_cached(modelId, filename, options = {}) {
     const context = new AssetLoadingContext(options);
     const cache = await context.getCache();
     if (!cache) return false;
-    return !!(await context.match(cache, context.resolve(modelId, filename, cache)));
+    return !!(await context.match(cache, context.resolve(modelId, filename, cache).cacheKeys));
 }
 
 /**

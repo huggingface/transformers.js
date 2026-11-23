@@ -72,7 +72,7 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
     const { localPath, remoteURL, validModelId } = resource;
 
     // Check cache first - if cached, we can get metadata from the cached response
-    const cachedResponse = (await context.match(cache, resource))?.response;
+    const cachedResponse = (await context.match(cache, resource.cacheKeys))?.response;
     if (cachedResponse !== undefined && typeof cachedResponse !== 'string') {
         const size = cachedResponse.headers.get('content-length');
         const contentType = cachedResponse.headers.get('content-type');
@@ -92,10 +92,7 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
                 const response = await context.read(localPath);
                 if (typeof response !== 'string' && response.status !== 404) {
                     if (response.status !== 200) {
-                        const stale = await context.match(cache, {
-                            ...resource,
-                            cacheKeys: resource.obsoleteCacheKeys,
-                        });
+                        const stale = await context.match(cache, resource.obsoleteCacheKeys);
                         if (stale) return { exists: true, fromCache: true };
                     }
                     const size = response.headers.get('content-length');
@@ -123,7 +120,7 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
             rangeResponse = await fetch_file_head(remoteURL, context);
         } catch (error) {
             // Match getModelFile's offline fallback, but don't mask a failure when no older copy exists.
-            const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+            const stale = await context.match(cache, resource.obsoleteCacheKeys);
             if (!stale) throw error;
             return { exists: true, fromCache: true };
         }
@@ -165,7 +162,7 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
             };
         }
 
-        const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+        const stale = await context.match(cache, resource.obsoleteCacheKeys);
         if (stale) return { exists: true, fromCache: true };
 
         // 404 means the file does not exist, and 416 is what a zero-length file returns for `bytes=0-0`.
@@ -177,7 +174,7 @@ async function _get_file_metadata(path_or_repo_id, filename, context) {
 
     // Old configs are also loadable for local paths that cannot be refreshed from the Hub.
     if (!validModelId || !context.settings.allowRemoteModels || context.options.local_files_only) {
-        const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+        const stale = await context.match(cache, resource.obsoleteCacheKeys);
         if (stale) return { exists: true, fromCache: true };
     }
     return { exists: false, fromCache: false };

@@ -131,24 +131,16 @@ async function storeCachedResource(path_or_repo_id, filename, cache, cacheKey, r
  * - a string, the *model id* of a model repo on huggingface.co.
  * - a path to a *directory* potentially containing the file.
  * @param {string} filename The name of the file to locate.
- * @param {boolean} [fatal=true] Whether to throw an error if the file is not found.
- * @param {PretrainedOptions} [options] An object containing optional parameters.
- * @param {boolean} [return_path=false] Whether to return the path of the file instead of the file content.
- * @param {import('./cache.js').CacheInterface | null} [cache] The cache instance to use.
- * @param {AssetLoadingContext} [context] Captured resource-loading settings.
+ * @param {boolean} fatal Whether to throw an error if the file is not found.
+ * @param {PretrainedOptions} options An object containing optional parameters.
+ * @param {boolean} return_path Whether to return the path of the file instead of the file content.
+ * @param {import('./cache.js').CacheInterface | null} cache The cache instance to use.
+ * @param {AssetLoadingContext} context Captured resource-loading settings.
  *
  * @throws Will throw an error if the file is not found and `fatal` is true.
  * @returns {Promise<string|Uint8Array|null>} A Promise that resolves with the file content as a Uint8Array if `return_path` is false, or the file path as a string if `return_path` is true.
  */
-async function loadResourceFile(
-    path_or_repo_id,
-    filename,
-    fatal = true,
-    options = {},
-    return_path = false,
-    cache = null,
-    context = new AssetLoadingContext(options),
-) {
+async function loadResourceFile(path_or_repo_id, filename, fatal, options, return_path, cache, context) {
     const resource = context.resolve(path_or_repo_id, filename, cache);
     const { requestURL, localPath, remoteURL, localCacheKey, proposedCacheKey, validModelId } = resource;
 
@@ -165,7 +157,7 @@ async function loadResourceFile(
     let response;
 
     // Check cache
-    const cached = await context.match(cache, resource);
+    const cached = await context.match(cache, resource.cacheKeys);
     response = cached?.response;
 
     const cacheHit = response !== undefined;
@@ -174,7 +166,7 @@ async function loadResourceFile(
     } else {
         // Caching not available, or file is not cached, so we perform the request
         // Bypass the HTTP cache only when replacing an older cached asset.
-        const stale = await context.match(cache, { ...resource, cacheKeys: resource.obsoleteCacheKeys });
+        const stale = await context.match(cache, resource.obsoleteCacheKeys);
         /** @type {RequestInit|undefined} */
         const requestInit = stale ? { cache: 'reload' } : undefined;
 
@@ -206,7 +198,7 @@ async function loadResourceFile(
                     cacheKey = stale.key;
                     servedStale = true;
                 }
-            } else if (options.local_files_only) {
+            } else if (context.options.local_files_only) {
                 throw new Error(`\`local_files_only=true\`, but attempted to load a remote file from: ${requestURL}.`);
             } else if (!context.settings.allowRemoteModels) {
                 throw new Error(
@@ -221,8 +213,8 @@ async function loadResourceFile(
             // - the path is a valid HTTP url (`response === undefined`)
             // - the path is not a valid HTTP url and the file is not present on the file system or local server (`response.status === 404`)
 
-            const remoteDisabled = context.options.local_files_only || !context.settings.allowRemoteModels;
-            if (remoteDisabled && !stale) {
+            // NOTE: With remote access disabled, an outdated cached copy (if any) was already served above.
+            if (context.options.local_files_only || !context.settings.allowRemoteModels) {
                 // User requested local files only, but the file is not found locally.
                 if (fatal) {
                     throw new ModelFileNotFoundError(
@@ -235,24 +227,22 @@ async function loadResourceFile(
                 }
             }
 
+            if (!validModelId) {
+                // Before making any requests to the remote server, we check if the model ID is valid.
+                // This prevents unnecessary network requests for invalid model IDs.
+                throw new ModelFileNotFoundError(
+                    `Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`,
+                );
+            }
+
+            // File not found locally, so we try to download it from the remote server
             /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined} */
             let remoteResponse;
-            if (!remoteDisabled) {
-                if (!validModelId) {
-                    // Before making any requests to the remote server, we check if the model ID is valid.
-                    // This prevents unnecessary network requests for invalid model IDs.
-                    throw new ModelFileNotFoundError(
-                        `Local file missing at "${localPath}" and download aborted due to invalid model ID "${path_or_repo_id}".`,
-                    );
-                }
-
-                // File not found locally, so we try to download it from the remote server
-                try {
-                    remoteResponse = await context.read(remoteURL, requestInit);
-                } catch (e) {
-                    if (!stale) throw e;
-                    logger.warn(`Unable to refresh "${remoteURL}", using the previously cached copy: "${e}"`);
-                }
+            try {
+                remoteResponse = await context.read(remoteURL, requestInit);
+            } catch (e) {
+                if (!stale) throw e;
+                logger.warn(`Unable to refresh "${remoteURL}", using the previously cached copy: "${e}"`);
             }
 
             if (remoteResponse && remoteResponse.status !== 200 && stale) {
@@ -442,7 +432,7 @@ export async function getModelFile(path_or_repo_id, filename, fatal = true, opti
     if (!context.settings.allowLocalModels) {
         // User has disabled local models, so we just make sure other settings are correct.
 
-        if (options.local_files_only) {
+        if (context.options.local_files_only) {
             throw Error(
                 'Invalid configuration detected: local models are disabled (`env.allowLocalModels=false`) but you have requested to only use local models (`local_files_only=true`).',
             );

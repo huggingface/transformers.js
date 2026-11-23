@@ -247,9 +247,9 @@ describe("Internal asset loading", () => {
     const context = new AssetLoadingContext();
     const resource = context.resolve(MODEL, "tokenizer_config.json", cache);
     cache.entries.set(resource.localPath, jsonResponse({ stale: true }));
-    expect(await context.match(cache, resource)).toBeUndefined();
+    expect(await context.match(cache, resource.cacheKeys)).toBeUndefined();
     cache.entries.set(VERSIONED, jsonResponse({ updated: true }));
-    expect(await (await context.match(cache, resource)).response.json()).toEqual({ updated: true });
+    expect(await (await context.match(cache, resource.cacheKeys)).response.json()).toEqual({ updated: true });
   });
 
   it("versions local HTTP cache entries without changing the local request path", async () => {

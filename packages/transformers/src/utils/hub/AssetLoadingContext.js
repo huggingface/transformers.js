@@ -156,7 +156,6 @@ export class AssetLoadingContext {
             localPath,
             remoteURL,
             validModelId,
-            cacheVersion: version,
             localCacheKey,
             proposedCacheKey,
             cacheKeys,
@@ -168,11 +167,11 @@ export class AssetLoadingContext {
      * Return the matching key too: a local cache hit must not be mistaken for a
      * remote-key hit when returning a filesystem path or removing an entry.
      * @param {import('../cache.js').CacheInterface|null} cache
-     * @param {ReturnType<AssetLoadingContext['resolve']>} resource
+     * @param {string[]} keys The resource's `cacheKeys`, or its `obsoleteCacheKeys` to find an outdated copy.
      */
-    async match(cache, resource) {
+    async match(cache, keys) {
         if (cache) {
-            for (const key of resource.cacheKeys) {
+            for (const key of keys) {
                 const response = await tryCache(cache, key);
                 if (response !== undefined) return { key, response };
             }
