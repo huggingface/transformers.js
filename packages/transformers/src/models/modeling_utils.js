@@ -358,7 +358,13 @@ export class PreTrainedModel extends Callable {
 
         const sessions = typeConfig.sessions(config, options, textOnly);
         const promises = [
-            constructSessions(pretrained_model_name_or_path, sessions, options, typeConfig.cache_sessions),
+            constructSessions(
+                pretrained_model_name_or_path,
+                sessions,
+                options,
+                typeConfig.cache_sessions,
+                typeConfig.gpu_output_sessions,
+            ),
         ];
         if (typeConfig.optional_configs) {
             promises.push(get_optional_configs(pretrained_model_name_or_path, typeConfig.optional_configs, options));
@@ -1078,15 +1084,28 @@ export class PreTrainedModel extends Callable {
      * @param {string} sessionName
      * @param {Record<string, Tensor>} inputs
      * @param {string} outputName
+     * @param {Object} [options]
+     * @param {boolean} [options.keepOnGpu=false] Return a GPU-resident output as-is instead of downloading it to the CPU.
      * @private
      */
-    async _encode_input(sessionName, inputs, outputName) {
+    async _encode_input(sessionName, inputs, outputName, { keepOnGpu = false } = {}) {
         if (!Object.hasOwn(this.sessions, sessionName)) {
             throw new Error(`Model does not have a ${sessionName} session.`);
         }
         const session = this.sessions[sessionName];
         const output = await sessionRun(session, pick(inputs, session.inputNames));
-        return output[outputName];
+        const result = output[outputName];
+        if (!keepOnGpu && result.location === 'gpu-buffer') {
+            // Download (and release the GPU buffer), since callers may read or modify the data on the CPU.
+            // After a successful download, the tensor itself holds the data on the CPU.
+            try {
+                await result.ort_tensor.getData(true);
+            } catch (e) {
+                result.dispose();
+                throw e;
+            }
+        }
+        return result;
     }
 
     /**
@@ -1429,13 +1448,24 @@ async function generic_text_to_text_forward(
         ...kwargs
     },
 ) {
+    let keepOnGpu = false;
     if (!inputs_embeds) {
+        const modality_values = pick(kwargs, modality_input_names);
+        const has_modality = Object.keys(modality_values).length > 0;
+
+        // Keep the embeddings on the GPU unless they are merged on the CPU below or the decoder is not on WebGPU.
+        // They are then computed right before the decoder call.
+        keepOnGpu =
+            !(has_modality && input_ids.dims[1] !== 1) &&
+            self.sessions['decoder_model_merged'].config?.device === 'webgpu';
+
         // 1. Extract the text embeddings.
-        inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
+        if (!keepOnGpu) {
+            inputs_embeds = await self.encode_text({ input_ids, ...kwargs });
+        }
 
         // 2. Possibly, merge text and modality values
-        const modality_values = pick(kwargs, modality_input_names);
-        if (Object.keys(modality_values).length > 0) {
+        if (has_modality) {
             if (input_ids.dims[1] !== 1) {
                 const modality_features = await encode_function({
                     // Pass the modality values under its expected key.
@@ -1491,6 +1521,17 @@ async function generic_text_to_text_forward(
         }
     }
 
+    let owned_embeds = null;
+    if (keepOnGpu) {
+        // Keep this right before the decoder call; anything that throws in between would leak the GPU buffer.
+        inputs_embeds = owned_embeds = await self._encode_input(
+            'embed_tokens',
+            { input_ids, ...kwargs },
+            'inputs_embeds',
+            { keepOnGpu: true },
+        );
+    }
+
     // 3. Call the decoder forward using the updated inputs.
     const outputs = await decoder_forward(
         self,
@@ -1504,7 +1545,12 @@ async function generic_text_to_text_forward(
             num_logits_to_keep,
         },
         true,
-    );
+    ).finally(() => {
+        // Only release the embeddings created above, and only if they were returned on the GPU.
+        if (owned_embeds?.location === 'gpu-buffer') {
+            owned_embeds.dispose();
+        }
+    });
     return outputs;
 }
 
