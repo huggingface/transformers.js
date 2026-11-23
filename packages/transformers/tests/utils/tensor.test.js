@@ -50,7 +50,27 @@ describe("Tensor operations", () => {
       expect(concatenated).toEqual(target);
     });
 
-    // TODO add tests for errors
+    it("should throw when non-concatenated dimensions do not match", () => {
+      const a = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const b = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+
+      expect(() => cat([a, b], 0)).toThrow("Tensor 1 has shape [3,2]; expected rank 2 and sizes matching [2,3] except in dimension 0.");
+      expect(() => cat([a, b], -2)).toThrow("except in dimension 0.");
+      // Matching on the non-concatenated dim is still fine
+      const c = new Tensor("float32", [7, 8, 9, 10], [2, 2]);
+      expect(cat([a, c], 1)).toEqual(new Tensor("float32", [1, 2, 3, 7, 8, 4, 5, 6, 9, 10], [2, 5]));
+    });
+
+    it("should throw when tensors have different ranks", () => {
+      const a = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      const b = new Tensor("float32", [1, 2, 3], [3]);
+
+      expect(() => cat([a, b], 0)).toThrow("Tensor 1 has shape [3]; expected rank 2 and sizes matching [2,3] except in dimension 0.");
+    });
+
+    it("should throw on an empty list", () => {
+      expect(() => cat([])).toThrow("Expected a non-empty list of tensors to concatenate.");
+    });
   });
 
   describe("slice", () => {
@@ -142,6 +162,11 @@ describe("Tensor operations", () => {
 
   describe("stack", () => {
     const t1 = new Tensor("float32", [0, 1, 2, 3, 4, 5], [1, 3, 2]);
+
+    it("should throw when tensors have different shapes", () => {
+      const t2 = new Tensor("float32", [0, 1, 2, 3], [1, 2, 2]);
+      expect(() => stack([t1, t2], 0)).toThrow("Tensor 1 has shape [1,1,2,2]");
+    });
 
     it("should stack on dim=0", () => {
       const target1 = new Tensor("float32", [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5], [2, 1, 3, 2]);
