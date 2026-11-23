@@ -4,6 +4,16 @@ import { init } from "../init.js";
 init();
 
 describe("Tensor operations", () => {
+  describe("constructor", () => {
+    it("should wrap the ONNX Runtime tensor of another Tensor", () => {
+      // The tensors Transformers.js creates and the ones the runtime returns must share one class.
+      const t1 = new Tensor("float32", [1, 2, 3], [3]);
+      const t2 = new Tensor(t1.ort_tensor);
+      expect(t2.ort_tensor).toBe(t1.ort_tensor);
+      expect(t2.tolist()).toEqual([1, 2, 3]);
+    });
+  });
+
   describe("cat", () => {
     it("should concatenate on dim=0", () => {
       const t1 = new Tensor("float32", [1, 2, 3], [1, 3]);
