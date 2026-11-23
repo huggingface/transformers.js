@@ -161,12 +161,12 @@ describe("required offline tokenizers", () => {
     }
   });
   it.each(["global", "session", "local_files_only"])("reports missing files and loads cached/local files in %s mode", async (mode) => {
-    const directory = await mkdtemp(join(tmpdir(), "reassessment-tokenizer-"));
+    const directory = await mkdtemp(join(tmpdir(), "offline-tokenizer-"));
     const original = env.allowRemoteModels;
     const fetch = jest.fn(() => {
       throw new Error("Unexpected network access");
     });
-    const options = { env: { fetch, useFSCache: false, useBrowserCache: false, useCustomCache: false } };
+    const options = { env: { fetch } };
     if (mode === "global") env.allowRemoteModels = false;
     if (mode === "session") options.env.allowRemoteModels = false;
     if (mode === "local_files_only") options.local_files_only = true;
