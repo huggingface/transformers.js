@@ -544,7 +544,7 @@ export class PreTrainedTokenizer
      * @param {boolean} [options.add_special_tokens=true] Whether or not to add the special tokens associated with the corresponding model.
      * @param {boolean|null} [options.return_token_type_ids=null] Whether to return token_type_ids.
      * @returns {{input_ids: number[], attention_mask: number[], token_type_ids?: number[]}} An object containing the encoded text.
-     * @private
+     * @protected
      */
     _encode_plus(text, { text_pair = null, add_special_tokens = true, return_token_type_ids = null } = {}) {
         const { ids, attention_mask, token_type_ids } = this._tokenizer.encode(text, {
