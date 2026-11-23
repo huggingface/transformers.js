@@ -112,6 +112,14 @@ type IsAssignable<T, U> = T extends U ? true : false;
 }
 
 {
+  const batch: bigint[][] = [[1n], [2n]];
+  const output = tokenizer.parse_response(batch, { prefix: batch });
+  type T0 = Expect<Equal<typeof output, Record<string, any>[]>>;
+  const single = tokenizer.parse_response([1n], { prefix: batch });
+  type T1 = Expect<Equal<typeof single, Record<string, any>>>;
+}
+
+{
   const parser = tokenizer.get_response_parser({ prefix: "" });
   type T0 = Expect<Equal<typeof parser, ResponseParser>>;
   const events = parser.feed("text");
