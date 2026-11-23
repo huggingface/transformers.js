@@ -579,6 +579,10 @@ export class AutoConfig {
  * @property {import('./utils/devices.js').DeviceType} [device] The default device to use for the model.
  * @property {import('./utils/dtypes.js').DataType|Record<string, import('./utils/dtypes.js').DataType>} [dtype] The default data type to use for the model.
  * @property {import('./utils/hub.js').ExternalData|Record<string, import('./utils/hub.js').ExternalData>} [use_external_data_format=null] Whether to load the model using the external data format (used for models >= 2GB in size).
+ * @property {Record<string, any>} [execution_provider_options] Extra options for the selected execution provider(s), merged into each
+ * provider entry when the user does not pass `session_options.executionProviders`. Usually set per device inside `device_config`, e.g.
+ * `{ "device_config": { "webgpu": { "execution_provider_options": { "forceCpuNodeNames": ["/lstm/LSTM"] } } } }` keeps those nodes on the CPU.
+ * See https://onnxruntime.ai/docs/tutorials/web/env-flags-and-session-options.html#executionproviders
  */
 
 /**
