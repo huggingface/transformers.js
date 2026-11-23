@@ -77,6 +77,10 @@ export default () => {
       MAX_TEST_EXECUTION_TIME,
     );
 
+    it("batch_decode rejects token ids", () => {
+      expect(() => processor.batch_decode([[1, 2, 3]])).toThrow("decoding token ids is not supported");
+    });
+
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
