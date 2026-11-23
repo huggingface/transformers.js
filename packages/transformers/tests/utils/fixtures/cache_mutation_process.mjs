@@ -20,24 +20,9 @@ if (mode === "write") {
   const cache = new FileCache(directory);
   const { markerPath } = cache.resolve(key);
   const rename = fs.promises.rename.bind(fs.promises);
-  const writeFile = fs.promises.writeFile.bind(fs.promises);
-  const open = fs.promises.open.bind(fs.promises);
   fs.promises.rename = async (source, target) => {
     if (schedule === "marker" && target === markerPath) await pause("marker-ready");
     return rename(source, target);
-  };
-  // Baseline adapter only: expose the live write's actual truncate/write boundary. Corrected
-  // writers never take this path; their barrier is before the staged marker's atomic rename.
-  fs.promises.writeFile = async (path, data, ...args) => {
-    if (schedule === "marker" && path === markerPath) {
-      const handle = await open(path, "w");
-      try {
-        await pause("marker-ready");
-        await handle.writeFile(data);
-      } finally {
-        await handle.close();
-      }
-    } else return writeFile(path, data, ...args);
   };
   await cache.put(key, new Response("replacement"));
   process.disconnect();
@@ -59,6 +44,8 @@ if (mode === "write") {
       Object.assign(env, { useCustomCache: true, customCache: cache, useFSCache: false, useBrowserCache: false });
       const options = { env: { allowLocalModels: false, fetch: async () => new Response("loader-result") } };
       const resource = new AssetLoadingContext(options).resolve("org/loader", "tokenizer_config.json", cache);
+      // Loader cleanup only runs after replacing an outdated copy, so start from a pre-versioning entry.
+      await cache.put(resource.obsoleteCacheKeys[0], new Response("outdated"));
       const put = cache.put.bind(cache);
       const match = cache.match.bind(cache);
       let stored = false;

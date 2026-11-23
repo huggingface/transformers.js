@@ -4,6 +4,7 @@ import { CrossOriginStorage } from "../../src/utils/cache/CrossOriginStorageCach
 import { env, resolveEnv } from "../../src/env.js";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
 import { AssetLoadingContext } from "../../src/utils/hub/AssetLoadingContext.js";
+import { getModelJSON } from "../../src/utils/hub.js";
 import { Pipeline, getSessionEnv, prepareImages, prepareAudios } from "../../src/pipelines/_base.js";
 
 describe("Session-scoped resource loading", () => {
@@ -113,6 +114,8 @@ describe("Session-scoped resource loading", () => {
     });
 
     afterEach(() => {
+      env.hfToken = undefined;
+      env.remoteHost = undefined;
       for (const name of names) {
         if (saved[name] === undefined) delete process.env[name];
         else process.env[name] = saved[name];
@@ -163,13 +166,81 @@ describe("Session-scoped resource loading", () => {
       }
     });
 
-    it("should keep reading HF_TOKEN after an env snapshot without a token is restored", () => {
+    it.each([
+      ["HF_TOKEN", () => (process.env.HF_TOKEN = "secret-token")],
+      ["an assigned token", () => (env.hfToken = "secret-token")],
+    ])("keeps the token out of env enumeration and serialization with %s", (_name, configure) => {
+      configure();
+      expect(Object.keys(env)).not.toContain("hfToken");
+      expect(Object.keys(env)).toContain("remoteHost");
+      expect({ ...env }).not.toHaveProperty("hfToken");
+      expect(JSON.stringify({ ...env })).not.toContain("secret-token");
+      expect(JSON.stringify(env)).not.toContain("secret-token");
+      expect(env.hfToken).toBe("secret-token");
+      expect(resolveEnv().hfToken).toBe("secret-token");
+      expect(resolveEnv({ hfToken: "session-token" }).hfToken).toBe("session-token");
+      expect(resolveEnv({ hfToken: null }).hfToken).toBeNull();
+      expect(new AssetLoadingContext({ env: { hfToken: "session-token" } }).getHeaders("https://huggingface.co/file").get("Authorization")).toBe("Bearer session-token");
+    });
+
+    it("does not turn an inherited HF_TOKEN into an explicit token when restoring an env snapshot", () => {
+      process.env.HF_TOKEN = "late-token";
+      process.env.HF_ENDPOINT = "https://private-hub.example/";
       const snapshot = { ...env };
       env.hfToken = "assigned-token";
       Object.assign(env, snapshot);
-      process.env.HF_TOKEN = "late-token";
+      // The snapshot doesn't carry the token, so restoring it leaves the assignment in place.
+      expect(env.hfToken).toBe("assigned-token");
+      env.hfToken = undefined;
+      Object.assign(env, { ...env });
 
       expect(env.hfToken).toBe("late-token");
+      const context = new AssetLoadingContext();
+      expect(context.getHeaders("https://huggingface.co/file").get("Authorization")).toBe("Bearer late-token");
+      expect(context.getHeaders("https://private-hub.example/file").has("Authorization")).toBe(false);
+    });
+
+    it.each([undefined, "", "   ", "\t\n"])("uses the official Hub when HF_ENDPOINT is %j", async (value) => {
+      if (value !== undefined) process.env.HF_ENDPOINT = value;
+      expect(env.remoteHost).toBe("https://huggingface.co/");
+      expect(resolveEnv().remoteHost).toBe("https://huggingface.co/");
+      const fetch = jest.fn(async () => new Response(JSON.stringify({ model_type: "bert" })));
+      const model = `empty-endpoint/length-${value?.length ?? "unset"}`;
+      const caches = { useFSCache: env.useFSCache, useBrowserCache: env.useBrowserCache, useCustomCache: env.useCustomCache, experimental_useCrossOriginStorage: env.experimental_useCrossOriginStorage };
+      Object.assign(env, { useFSCache: false, useBrowserCache: false, useCustomCache: false, experimental_useCrossOriginStorage: false });
+      try {
+        const options = { env: { fetch, allowLocalModels: false, allowRemoteModels: true } };
+        await expect(getModelJSON(model, "config.json", true, options)).resolves.toEqual({ model_type: "bert" });
+      } finally {
+        Object.assign(env, caches);
+      }
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toBe(`https://huggingface.co/${model}/resolve/main/config.json`);
+    });
+
+    it.each(["https://mirror.example", "https://mirror.example/", "  https://mirror.example/  "])("uses a non-empty HF_ENDPOINT %j", (value) => {
+      process.env.HF_ENDPOINT = value;
+      const context = new AssetLoadingContext();
+      expect(context.resolve("org/model", "config.json").remoteURL).toBe("https://mirror.example/org/model/resolve/main/config.json");
+    });
+
+    it("keeps an explicit empty remoteHost distinguishable from an empty HF_ENDPOINT", () => {
+      process.env.HF_ENDPOINT = "";
+      env.remoteHost = "";
+      expect(env.remoteHost).toBe("");
+      expect(resolveEnv().remoteHost).toBe("");
+      env.remoteHost = undefined;
+      expect(env.remoteHost).toBe("https://huggingface.co/");
+      expect(resolveEnv({ remoteHost: "" }).remoteHost).toBe("");
+      expect(new AssetLoadingContext({ env: { remoteHost: "" } }).resolve("org/model", "config.json").remoteURL).toBe("/org/model/resolve/main/config.json");
+    });
+
+    it("keeps credential origins unchanged when HF_ENDPOINT is empty", () => {
+      process.env.HF_ENDPOINT = " ";
+      process.env.HF_TOKEN = "environment-token";
+      const context = new AssetLoadingContext();
+      expect(context.getHeaders("https://huggingface.co/file").get("Authorization")).toBe("Bearer environment-token");
+      expect(context.getHeaders("https://cdn.example/file").has("Authorization")).toBe(false);
     });
 
     it("should fall back to HF_ACCESS_TOKEN and the official Hub", () => {

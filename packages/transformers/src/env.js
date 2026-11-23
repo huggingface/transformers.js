@@ -167,6 +167,8 @@ const DEFAULT_FETCH = typeof globalThis.fetch === 'function' ? globalThis.fetch.
 // `remoteHost` and `hfToken` fall back to environment variables, which are read on access (not at import)
 // so that variables loaded after importing the library (e.g., with `dotenv`) are still picked up.
 // Assigning `undefined` restores that fallback (e.g., when restoring a `{ ...env }` snapshot).
+// `hfToken` is non-enumerable, so `{ ...env }` snapshots don't carry it and restoring one with
+// `Object.assign(env, snapshot)` leaves it untouched: reset it with `env.hfToken = undefined`.
 // NOTE: We keep `HF_ACCESS_TOKEN` for backwards compatibility (as a fallback).
 const readEnvVar = (name) => globalThis.process?.env?.[name];
 let remoteHost;
@@ -219,13 +221,13 @@ export const LogLevel = Object.freeze({
  * @typedef {Object} TransformersEnvironmentSession
  * @property {boolean} allowRemoteModels Whether to allow loading of remote files, defaults to `true`.
  * If set to `false`, it will have the same effect as setting `local_files_only=true` when loading pipelines, models, tokenizers, processors, etc.
- * @property {string} remoteHost Host URL to load models from. Defaults to the `HF_ENDPOINT` environment variable when set (read on access), otherwise the Hugging Face Hub.
+ * @property {string} remoteHost Host URL to load models from. Defaults to the `HF_ENDPOINT` environment variable when set and not empty (read on access), otherwise the Hugging Face Hub.
  * @property {string} remotePathTemplate Path template to fill in and append to `remoteHost` when loading models.
  * @property {boolean} allowLocalModels Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise.
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
- * @property {string|null|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials.
+ * @property {string|null|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials. On `env`, this property is not enumerable, so `{ ...env }` snapshots don't include it; reset it with `env.hfToken = undefined`.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  */
 
@@ -281,9 +283,8 @@ export const env = {
     /////////////////// Model settings ///////////////////
     allowRemoteModels: true,
     get remoteHost() {
-        // TODO: Treat an empty HF_ENDPOINT as unset while preserving explicit empty-string overrides.
-        // https://github.com/huggingface/transformers.js/issues/1934
-        return remoteHost !== undefined ? remoteHost : (readEnvVar('HF_ENDPOINT') ?? 'https://huggingface.co/');
+        // An empty HF_ENDPOINT counts as unset; an explicitly assigned empty string does not.
+        return remoteHost !== undefined ? remoteHost : readEnvVar('HF_ENDPOINT')?.trim() || 'https://huggingface.co/';
     },
     set remoteHost(value) {
         remoteHost = value;
@@ -314,14 +315,13 @@ export const env = {
         return hfToken !== undefined ? hfToken : (readEnvVar('HF_TOKEN') ?? readEnvVar('HF_ACCESS_TOKEN'));
     },
     set hfToken(value) {
-        // TODO: Clarify snapshot/restore provenance: restoring an inherited token makes it explicit,
-        // freezing rotation and potentially allowing it on custom origins under the current contract.
-        // https://github.com/huggingface/transformers.js/issues/1936
         hfToken = value;
     },
 
     //////////////////////////////////////////////////////
 };
+// Keep the token out of `Object.keys(env)`, `{ ...env }` and `JSON.stringify(env)`.
+Object.defineProperty(env, 'hfToken', { enumerable: false });
 
 /**
  * Create a session environment by applying session-scopable overrides to the global defaults.
@@ -329,7 +329,7 @@ export const env = {
  * @returns {TransformersEnvironment}
  */
 export function resolveEnv(sessionEnv = {}) {
-    const resolved = { ...env };
+    const resolved = { ...env, hfToken: env.hfToken };
     for (const key of SESSION_ENV_KEYS) {
         if (sessionEnv != null && Object.hasOwn(sessionEnv, key) && sessionEnv[key] !== undefined) {
             resolved[key] = sessionEnv[key];

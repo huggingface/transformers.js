@@ -362,3 +362,49 @@ describe("processor commits special closer branches", () => {
     expect(Number.isFinite(after.data[120])).toBe(false);
   });
 });
+
+describe("regex anchors", () => {
+  const accepts = (pattern, text) => {
+    const machine = compileRegex(pattern);
+    let state = machine.initial;
+    for (const byte of encoder.encode(text)) {
+      state = machine.transition(state, byte);
+      if (!machine.viable(state)) return false;
+    }
+    return machine.accepting(state);
+  };
+  const candidates = ["yes", "no", "^yes", "yes$", "^no", "no$", "^yes$", "", "yesno"];
+
+  it.each(["^yes$|^no$", "^yes|no$", "yes$|^no", "^(yes|no)$", "(?:yes|no)"])("%j accepts exactly yes and no", (pattern) => {
+    expect(candidates.filter((text) => accepts(pattern, text))).toEqual(["yes", "no"]);
+  });
+
+  it("keeps escaped anchors literal", () => {
+    expect(accepts("\\^yes\\$", "^yes$")).toBe(true);
+    expect(accepts("\\^yes\\$", "yes")).toBe(false);
+    expect(accepts("[$^]a", "$a")).toBe(true);
+  });
+
+  it.each(["a^b", "a$b", "(^a|b)+", "x(^a|b)", "(a$)b", "(a|b$)", "a$$"])("rejects the non-equivalent anchor in %j", (pattern) => {
+    expect(() => compileRegex(pattern)).toThrow("anchors are only supported");
+  });
+
+  it("applies top-level alternative anchors through the processor", () => {
+    const vocabulary = { tokens: [...Array.from({ length: 256 }, (_, id) => [id]), []], eos_token_id: 256, special_token_ids: [256] };
+    const run = (text) => {
+      const processor = new StructuredOutputProcessor(vocabulary, { type: "regex", regex: "^yes$|^no$" });
+      const input = [0n];
+      for (const byte of [...encoder.encode(text), 256]) {
+        const scores = new Tensor("float32", new Float32Array(257).fill(1), [1, 257]);
+        processor([input], scores);
+        if (!Number.isFinite(scores.data[byte])) return false;
+        input.push(BigInt(byte));
+      }
+      return true;
+    };
+    expect(run("yes")).toBe(true);
+    expect(run("no")).toBe(true);
+    expect(run("yes$")).toBe(false);
+    expect(run("^no")).toBe(false);
+  });
+});

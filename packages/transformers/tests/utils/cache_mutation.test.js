@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { FileCache } from "../../src/utils/cache/FileCache.js";
 
-describe("replacement-safe filesystem cache mutations", () => {
+describe("filesystem cache mutations", () => {
   it("preserves a separate writer's replacement during loader cleanup", () => {
     const result = spawnSync(process.execPath, [fileURLToPath(new URL("./fixtures/cache_mutation_process.mjs", import.meta.url)), "loader"], { encoding: "utf8", timeout: 15000 });
     expect({ status: result.status, error: result.error?.message, stdout: result.stdout, stderr: result.stderr }).toEqual({ status: 0, error: undefined, stdout: "", stderr: "" });

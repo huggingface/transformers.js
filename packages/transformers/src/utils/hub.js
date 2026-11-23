@@ -153,6 +153,10 @@ async function loadResourceFile(path_or_repo_id, filename, fatal, options, retur
     // Whether an outdated cached copy was served because the replacement could not be fetched.
     let servedStale = false;
 
+    // An outdated cached copy found before downloading; only then is there anything to clean up after storing.
+    /** @type {Awaited<ReturnType<AssetLoadingContext['match']>>} */
+    let stale;
+
     /** @type {Response|import('./hub/FileResponse.js').FileResponse|undefined|string} */
     let response;
 
@@ -166,7 +170,7 @@ async function loadResourceFile(path_or_repo_id, filename, fatal, options, retur
     } else {
         // Caching not available, or file is not cached, so we perform the request
         // Bypass the HTTP cache only when replacing an older cached asset.
-        const stale = await context.match(cache, resource.obsoleteCacheKeys);
+        stale = await context.match(cache, resource.obsoleteCacheKeys);
         /** @type {RequestInit|undefined} */
         const requestInit = stale ? { cache: 'reload' } : undefined;
 
@@ -360,7 +364,7 @@ async function loadResourceFile(path_or_repo_id, filename, fatal, options, retur
         typeof response !== 'string'
     ) {
         await storeCachedResource(path_or_repo_id, filename, cache, cacheKey, response, result, options);
-        await context.cleanup(cache, resource, cacheKey);
+        if (stale) await context.cleanup(cache, resource, cacheKey);
     }
 
     // In Node.js with return_path, the buffer read is skipped so no progress

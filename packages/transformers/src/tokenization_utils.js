@@ -748,6 +748,30 @@ export class PreTrainedTokenizer
      * assistant-turn content (e.g., `<think>\n`) that the model continues from. If the stream truly starts
      * from a clean assistant turn, pass `prefix: ""` to opt out.
      *
+     * The parser emits three event types: `{ type: 'region_open', field }` when a field such as
+     * `reasoning_content` or `content` starts, `{ type: 'region_chunk', field, text, dirty }` for text written
+     * to the open field (`dirty` marks raw text of structured fields, which is only parsed on close), and
+     * `{ type: 'region_close', field, value }` with the field's parsed value.
+     *
+     * **Example:** Stream the regions of a generated response.
+     *
+     * ```javascript
+     * const prompt = tokenizer.apply_chat_template(messages, { add_generation_prompt: true, tokenize: false });
+     * const parser = tokenizer.get_response_parser({ prefix: prompt });
+     * const handle = (event) => {
+     *     if (event.type === 'region_open') console.log(`[${event.field}]`);
+     *     else if (event.type === 'region_chunk') process.stdout.write(event.text);
+     *     else console.log(`\n[/${event.field}]`, event.value); // 'region_close'
+     * };
+     * // Regions the chat template already opened (e.g., a prefilled `<think>`).
+     * parser.initial_events.forEach(handle);
+     * // Feed decoded text chunks as they are generated, keeping special tokens.
+     * for (const chunk of generated_text_chunks) parser.feed(chunk).forEach(handle);
+     * const [message, final_events] = parser.finalize();
+     * final_events.forEach(handle);
+     * // message: { role: 'assistant', reasoning_content: '...', content: '...' }
+     * ```
+     *
      * @param {Object} options
      * @param {string|number[]|bigint[]|Tensor} options.prefix The prompt that came before generation.
      * @param {Object|null} [options.response_template=null] Template override. Defaults to the tokenizer's `response_template`.

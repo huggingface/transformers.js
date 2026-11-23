@@ -98,12 +98,12 @@ export function parse_response(text, response_template, options) {
 
 /**
  * This class implements a streaming parser with a `response_template`. If you don't need streaming and
- * just want to parse a complete message, use `parse_response` instead. Streaming parsing emits events
- * indicating when regions (message fields) are opened and closed, with the model writing to the region
- * that is currently open.
+ * just want to parse a complete message, use `tokenizer.parse_response` instead. Streaming parsing emits
+ * events indicating when regions (message fields) are opened and closed, with the model writing to the
+ * region that is currently open. Create one with `tokenizer.get_response_parser`:
  *
  * ```javascript
- * const parser = new ResponseParser(response_template, { prefix: chat_prompt });
+ * const parser = tokenizer.get_response_parser({ prefix: chat_prompt });
  * for (const event of parser.initial_events) handle(event);
  * for (const chunk of model_text_stream) {
  *     for (const event of parser.feed(chunk)) handle(event);

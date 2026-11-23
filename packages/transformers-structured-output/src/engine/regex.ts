@@ -27,26 +27,29 @@ class RegexParser {
     constructor(private readonly source: string) {}
 
     parse(): Expression {
-        if (this.source.startsWith('^')) this.index++;
-        const expression = this.alternation();
-        if (this.peek() === '$' && this.index === this.source.length - 1) this.index++;
+        const expression = this.alternation(true);
         if (this.index !== this.source.length) this.fail(`unexpected ${JSON.stringify(this.peek())}`);
         return expression;
     }
 
-    private alternation(): Expression {
-        const choices = [this.concatenation()];
+    private alternation(topLevel = false): Expression {
+        const choices = [this.concatenation(topLevel)];
         while (this.peek() === '|') {
             this.index++;
-            choices.push(this.concatenation());
+            choices.push(this.concatenation(topLevel));
         }
         return choice(choices);
     }
 
-    private concatenation(): Expression {
+    // The whole input must match, so `^` and `$` around a top-level alternative are no-ops.
+    private concatenation(topLevel: boolean): Expression {
+        if (topLevel && this.peek() === '^') this.index++;
         const parts: Expression[] = [];
         while (this.index < this.source.length && this.peek() !== ')' && this.peek() !== '|') {
-            if (this.peek() === '$' && this.index === this.source.length - 1) break;
+            if (topLevel && this.peek() === '$' && [undefined, '|'].includes(this.source[this.index + 1])) {
+                this.index++;
+                break;
+            }
             parts.push(this.quantified());
         }
         return sequence(parts);
@@ -97,7 +100,7 @@ class RegexParser {
         if (character === '\\') return this.escape(false).expression;
         if ('*+?{})'.includes(character)) this.fail(`unexpected ${JSON.stringify(character)}`);
         if (character === '^' || character === '$')
-            this.fail('anchors are only supported at the start or end of the pattern');
+            this.fail('anchors are only supported at the start or end of a top-level alternative');
         this.index += character.length;
         return literal(character);
     }

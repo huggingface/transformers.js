@@ -130,13 +130,47 @@ describe("explicit thinking opt-out", () => {
     return scores;
   }
 
-  it("allows Gemma-style thinking by default but constrains the first answer token when disabled", () => {
+  it("constrains the first Gemma-style answer token by default and when disabled", () => {
     expect(prompt).not.toContain("<|think|>");
     expect(prompt).not.toContain("<channel|>");
-    expect(isAllowed(scoresFor(gemmaTokenizer, prompt), openerId)).toBe(true);
-    const disabled = scoresFor(gemmaTokenizer, prompt, { enable_thinking: false });
-    expect(isAllowed(disabled, openerId)).toBe(false);
-    expect(Array.from(disabled.data.keys()).filter((id) => isAllowed(disabled, id))).toEqual([9, 10, 13, 32, "{".charCodeAt(0)]);
+    for (const options of [undefined, {}, { enable_thinking: false }]) {
+      const scores = scoresFor(gemmaTokenizer, prompt, options);
+      expect(isAllowed(scores, openerId)).toBe(false);
+      expect(Array.from(scores.data.keys()).filter((id) => isAllowed(scores, id))).toEqual([9, 10, 13, 32, "{".charCodeAt(0)]);
+    }
+  });
+
+  it("allows the Gemma-style thinking opener only when thinking is enabled", () => {
+    const enabled = scoresFor(gemmaTokenizer, prompt, { enable_thinking: true });
+    expect(isAllowed(enabled, openerId)).toBe(true);
+    expect(isAllowed(enabled, "{".charCodeAt(0))).toBe(true);
+  });
+
+  it.each([undefined, { enable_thinking: true }])("continues a prefilled open thinking region (%j)", (options) => {
+    const source = { ...tokenizer, response_template: QWEN3_RESPONSE_TEMPLATE };
+    const processor = new StructuredOutputProcessor(source, { type: "regex", regex: "ok" }, options);
+    const input = encodeIds("<|im_start|>assistant\n<think>\n");
+    const inside = logits();
+    processor([input], inside);
+    expect(isAllowed(inside, "x".charCodeAt(0))).toBe(true);
+    expect(isAllowed(inside, EOS_TOKEN_ID)).toBe(false);
+    const closed = encodeIds("</think>\n\n");
+    let ids = input;
+    for (const id of closed) {
+      ids = [...ids, id];
+      processor([ids], logits());
+    }
+    const answer = logits();
+    processor([[...ids, BigInt("o".charCodeAt(0))]], answer);
+    expect(isAllowed(answer, "k".charCodeAt(0))).toBe(true);
+    expect(isAllowed(answer, "x".charCodeAt(0))).toBe(false);
+  });
+
+  it("completes a partially written thinking opener by default", () => {
+    const scores = scoresFor(gemmaTokenizer, prompt + "<|channel>th");
+    expect(isAllowed(scores, "o".charCodeAt(0))).toBe(true);
+    expect(isAllowed(scores, "{".charCodeAt(0))).toBe(false);
+    expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
   });
 
   it.each(["<|channel>thought\n", "<|channel>thought\nreasoning"])("rejects an unfinished thinking prefill: %j", (prefill) => {
@@ -156,16 +190,17 @@ describe("explicit thinking opt-out", () => {
     const prefix = "<|im_start|>assistant\n<think>\n\n</think>\n\n";
     const detected = scoresFor(source, prefix);
     expect(scoresFor(source, prefix, { enable_thinking: false }).data).toEqual(detected.data);
+    expect(scoresFor(source, prefix, { enable_thinking: true }).data).toEqual(detected.data);
     expect(isAllowed(detected, "{".charCodeAt(0))).toBe(true);
     expect(isAllowed(detected, "<".charCodeAt(0))).toBe(false);
   });
 
-  it.each([undefined, {}])("keeps explicit true identical to default detection (%j)", (options) => {
-    expect(scoresFor(gemmaTokenizer, prompt, { enable_thinking: true }).data).toEqual(scoresFor(gemmaTokenizer, prompt, options).data);
+  it.each([undefined, {}])("keeps the default identical to disabled thinking without a thinking prefill (%j)", (options) => {
+    expect(scoresFor(gemmaTokenizer, prompt, { enable_thinking: false }).data).toEqual(scoresFor(gemmaTokenizer, prompt, options).data);
   });
 
   it.each([tokenizer, { ...tokenizer, response_template: { start_anchor: "<assistant>", fields: { content: { close: "<eos>" } } } }])("ignores the option without a thinking-aware protocol", (source) => {
-    for (const enable_thinking of [false, true]) {
+    for (const enable_thinking of [undefined, false, true]) {
       expect(scoresFor(source, "<assistant>", { enable_thinking }).data).toEqual(scoresFor(source, "<assistant>").data);
     }
   });
@@ -339,15 +374,19 @@ describe("StructuredOutputProcessor", () => {
   });
 
   it("allows optional thinking before applying a JSON schema", async () => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, {
-      type: "json_schema",
-      json_schema: {
-        type: "object",
-        properties: { answer: { type: "string" } },
-        required: ["answer"],
-        additionalProperties: false,
+    const processor = new StructuredOutputProcessor(
+      thinkingTokenizer,
+      {
+        type: "json_schema",
+        json_schema: {
+          type: "object",
+          properties: { answer: { type: "string" } },
+          required: ["answer"],
+          additionalProperties: false,
+        },
       },
-    });
+      { enable_thinking: true },
+    );
     const initial = logits();
 
     processor([[0n]], initial);
@@ -383,10 +422,14 @@ describe("StructuredOutputProcessor", () => {
         },
       },
     };
-    const processor = new StructuredOutputProcessor(explicitContentTokenizer, {
-      type: "regex",
-      regex: "answer: \\d+",
-    });
+    const processor = new StructuredOutputProcessor(
+      explicitContentTokenizer,
+      {
+        type: "regex",
+        regex: "answer: \\d+",
+      },
+      { enable_thinking: true },
+    );
     const inputIds = await consume(processor, "<think>reasoning</think><final>answer: 42");
     const final = logits();
 
@@ -406,7 +449,7 @@ describe("StructuredOutputProcessor", () => {
       special_token_ids: [openerTokenId, transitionTokenId, eosTokenId],
       response_template: thinkingTokenizer.response_template,
     };
-    const processor = new StructuredOutputProcessor(compoundTokenizer, { type: "json_object" });
+    const processor = new StructuredOutputProcessor(compoundTokenizer, { type: "json_object" }, { enable_thinking: true });
     const inputIds = [0n];
     const makeLogits = () => new Tensor("float32", new Float32Array(eosTokenId + 1).fill(1), [1, eosTokenId + 1]);
 
@@ -458,14 +501,14 @@ describe("StructuredOutputProcessor", () => {
         },
       },
     };
-    const processor = new StructuredOutputProcessor(overlappingTokenizer, { type: "regex", regex: "ok" });
+    const processor = new StructuredOutputProcessor(overlappingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const inputIds = await consume(processor, "<think>reasoning</think>ok");
     const final = logits();
 
     processor([inputIds], final);
     expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
 
-    const extended = new StructuredOutputProcessor(overlappingTokenizer, { type: "regex", regex: "ok" });
+    const extended = new StructuredOutputProcessor(overlappingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const extendedIds = await consume(extended, "<think>reasoning</think>\nok");
     const extendedFinal = logits();
     extended([extendedIds], extendedFinal);
@@ -487,7 +530,7 @@ describe("StructuredOutputProcessor", () => {
         },
       },
     };
-    const processor = new StructuredOutputProcessor(source, { type: "json_object" });
+    const processor = new StructuredOutputProcessor(source, { type: "json_object" }, { enable_thinking: true });
     const input = [0n];
     const scores = () => new Tensor("float32", new Float32Array(source.tokens.length).fill(1), [1, source.tokens.length]);
     processor([input], scores());
@@ -567,7 +610,7 @@ describe("StructuredOutputProcessor", () => {
   });
 
   it("allows bounded framing whitespace before the payload during generation", async () => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const inputIds = await consume(processor, "<think>reasoning</think>\n\n \n");
     const capped = logits();
     processor([inputIds], capped);
@@ -575,7 +618,7 @@ describe("StructuredOutputProcessor", () => {
     expect(isAllowed(capped, "\n".charCodeAt(0))).toBe(false);
     expect(isAllowed(capped, " ".charCodeAt(0))).toBe(false);
 
-    const inside = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
+    const inside = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const insideIds = await consume(inside, "<think>reasoning</think>o");
     const scores = logits();
     inside([insideIds], scores);
@@ -597,7 +640,7 @@ describe("StructuredOutputProcessor", () => {
     ["[a-z]*", "ab"],
     ["[^\\n]*", "line1"],
   ])("ends framing after a payload byte even when regex %j loops", async (regex, answer) => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex });
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex }, { enable_thinking: true });
     const inputIds = await consume(processor, `<think>reasoning</think>\n\n${answer}`);
     const scores = logits();
     processor([inputIds], scores);
@@ -636,7 +679,7 @@ describe("StructuredOutputProcessor", () => {
         },
       },
     };
-    const processor = new StructuredOutputProcessor(patternedTokenizer, { type: "regex", regex: "ok" });
+    const processor = new StructuredOutputProcessor(patternedTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const inputIds = await consume(processor, "<think>\nreasoning</think>ok");
     const final = logits();
 
@@ -683,8 +726,16 @@ describe("StructuredOutputProcessor", () => {
     };
     const prompt = (anchor) => encodeIds(`<|system|>be brief<|user|>hi${anchor}`);
 
-    it("Qwen3: allows <think> or JSON at the first step", () => {
+    it("Qwen3: constrains the first step by default", () => {
       const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "json_object" });
+      const scores = logits();
+      processor([prompt("<|im_start|>assistant\n")], scores);
+      expect(isAllowed(scores, "<".charCodeAt(0))).toBe(false);
+      expect(isAllowed(scores, "{".charCodeAt(0))).toBe(true);
+    });
+
+    it("Qwen3: allows <think> or JSON at the first step with thinking enabled", () => {
+      const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "json_object" }, { enable_thinking: true });
       const scores = logits();
       processor([prompt("<|im_start|>assistant\n")], scores);
       expect(isAllowed(scores, "<".charCodeAt(0))).toBe(true);
@@ -693,7 +744,7 @@ describe("StructuredOutputProcessor", () => {
     });
 
     it("Qwen3: constrains the answer after a generated thinking block", () => {
-      const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "json_object" });
+      const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "json_object" }, { enable_thinking: true });
       const inputIds = prompt("<|im_start|>assistant\n");
       feed(processor, inputIds, '<think>\nfree-form\n</think>\n\n{"a":1}');
       const final = logits();
@@ -704,7 +755,7 @@ describe("StructuredOutputProcessor", () => {
     });
 
     it("Qwen3: allows the usual blank line between </think> and a regex answer", () => {
-      const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "regex", regex: "ok" });
+      const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "regex", regex: "ok" }, { enable_thinking: true });
       const inputIds = prompt("<|im_start|>assistant\n");
       feed(processor, inputIds, "<think>\nfree-form\n</think>\n\nok");
       const final = logits();
@@ -721,7 +772,7 @@ describe("StructuredOutputProcessor", () => {
     });
 
     it("gpt-oss: requires a channel header and accepts a new assistant message before the final channel", () => {
-      const processor = new StructuredOutputProcessor(withTemplate(GPT_OSS_RESPONSE_TEMPLATE), { type: "json_object" });
+      const processor = new StructuredOutputProcessor(withTemplate(GPT_OSS_RESPONSE_TEMPLATE), { type: "json_object" }, { enable_thinking: true });
       const inputIds = prompt("<|start|>assistant");
       const first = logits();
       processor([inputIds], first);
@@ -779,7 +830,7 @@ describe("StructuredOutputProcessor", () => {
       },
     };
     const makeLogits = () => new Tensor("float32", new Float32Array(eosTokenId + 1).fill(1), [1, eosTokenId + 1]);
-    const processor = new StructuredOutputProcessor(endingTokenizer, { type: "json_object" });
+    const processor = new StructuredOutputProcessor(endingTokenizer, { type: "json_object" }, { enable_thinking: true });
     const inputIds = [0n];
     processor([inputIds], makeLogits());
 
@@ -833,7 +884,7 @@ describe("StructuredOutputProcessor", () => {
   });
 
   it.each(["hello", "ok"])("ignores a start_anchor from an earlier, closed turn (previous answer %j)", (answer) => {
-    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" });
+    const processor = new StructuredOutputProcessor(thinkingTokenizer, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const scores = logits();
     processor([encodeIds(`<assistant>${answer}<eos><user>Say ok`)], scores);
     expect(isAllowed(scores, "o".charCodeAt(0))).toBe(true);
@@ -851,7 +902,7 @@ describe("StructuredOutputProcessor", () => {
         },
       },
     };
-    const processor = new StructuredOutputProcessor(source, { type: "regex", regex: "ok" });
+    const processor = new StructuredOutputProcessor(source, { type: "regex", regex: "ok" }, { enable_thinking: true });
     const inputIds = await consume(processor, "<think>reasoning</think>\nok");
     const final = logits();
     processor([inputIds], final);
@@ -889,6 +940,51 @@ describe("StructuredOutputProcessor", () => {
     const scores = logits();
     processor([inputIds], scores);
     expect(isAllowed(scores, "b".charCodeAt(0))).toBe(true);
+  });
+
+  describe("reuse across generations", () => {
+    const finished = () => {
+      const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "yes|no" });
+      const inputIds = encodeIds("prompt:");
+      for (const byte of encodeIds("yes")) {
+        processor([inputIds], logits());
+        inputIds.push(byte);
+      }
+      const final = logits();
+      processor([inputIds], final);
+      expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+      return { processor, inputIds };
+    };
+
+    it("rejects a second generation with a shorter prompt", () => {
+      const { processor } = finished();
+      expect(() => processor([encodeIds("q:")], logits())).toThrow("StructuredOutputProcessor was reused for a new generation. Create a new processor for every generate() call.");
+    });
+
+    it("mentions reuse when a longer second prompt fails the constraint", () => {
+      const { processor, inputIds } = finished();
+      expect(() => processor([[...inputIds, BigInt(EOS_TOKEN_ID), ...encodeIds("next turn:")]], logits())).toThrow(/may have been reused for another generation/);
+      const { processor: other, inputIds: otherIds } = finished();
+      expect(() => other([[...otherIds, ...encodeIds("\nnext turn:")]], logits())).toThrow(/does not satisfy the constraint\. .*reused/);
+    });
+
+    it("keeps same-length repeated calls idempotent", () => {
+      const { processor, inputIds } = finished();
+      const again = logits();
+      processor([inputIds], again);
+      expect(isAllowed(again, EOS_TOKEN_ID)).toBe(true);
+      expect(isAllowed(again, "s".charCodeAt(0))).toBe(false);
+    });
+
+    it("works with a fresh processor for the second prompt", () => {
+      const { inputIds } = finished();
+      const processor = new StructuredOutputProcessor(tokenizer, { type: "regex", regex: "yes|no" });
+      const scores = logits();
+      processor([[...inputIds, BigInt(EOS_TOKEN_ID), ...encodeIds("next turn:")]], scores);
+      expect(isAllowed(scores, "y".charCodeAt(0))).toBe(true);
+      expect(isAllowed(scores, "n".charCodeAt(0))).toBe(true);
+      expect(isAllowed(scores, "x".charCodeAt(0))).toBe(false);
+    });
   });
 
   it.each([false, true])("discourages repeated non-progressing JSON whitespace (thinking template: %j)", (thinking) => {

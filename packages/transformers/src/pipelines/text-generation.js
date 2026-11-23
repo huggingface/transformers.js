@@ -7,6 +7,7 @@ import { Pipeline } from './_base.js';
 import { Tensor } from '../utils/tensor.js';
 import { pick } from '../utils/core.js';
 import { logger } from '../utils/logger.js';
+import { load_response_template } from '../utils/chat_parsing/response_templates.js';
 
 /**
  * @typedef {import('./_base.js').TextPipelineConstructorArgs} TextPipelineConstructorArgs
@@ -16,6 +17,40 @@ import { logger } from '../utils/logger.js';
 
 function isChat(x) {
     return Array.isArray(x) && x.every((x) => x !== null && typeof x === 'object' && 'role' in x);
+}
+
+/** @type {WeakMap<object, boolean>} */
+const loadable_response_templates = new WeakMap();
+/** @type {Map<unknown, boolean>} Non-object templates, which a WeakMap can't hold. */
+const loadable_primitive_templates = new Map();
+
+/**
+ * Whether a tokenizer's `response_template` can be loaded. A template that can't be loaded is reported once
+ * per template object and treated as absent, so it isn't mistaken for malformed model output on every call.
+ * @param {any} response_template The tokenizer's `response_template`.
+ * @returns {boolean}
+ * @private
+ */
+export function is_loadable_response_template(response_template) {
+    if (!response_template) return false;
+    const cache =
+        typeof response_template === 'object' || typeof response_template === 'function'
+            ? loadable_response_templates
+            : loadable_primitive_templates;
+    let loadable = cache.get(response_template);
+    if (loadable === undefined) {
+        try {
+            load_response_template(response_template);
+            loadable = true;
+        } catch (error) {
+            logger.warn(
+                `The tokenizer's response_template is invalid and will be ignored; chat output is returned as plain content. ${error}`,
+            );
+            loadable = false;
+        }
+        cache.set(response_template, loadable);
+    }
+    return loadable;
 }
 
 /**
@@ -60,7 +95,8 @@ function isChat(x) {
  * For chat inputs, if the tokenizer defines a `response_template`, the generated assistant message is
  * parsed with it (e.g., into `reasoning_content`, `content` and `tool_calls` fields). Each sequence is cut after its
  * first EOS token before parsing, `content` is always set (to `''` if the template found none), and if the output
- * can't be parsed (e.g. a truncated tool call), a warning is logged and the text is returned as `content`.
+ * can't be parsed (e.g. a truncated tool call), a warning is logged and the text is returned as `content`. A
+ * `response_template` that can't be loaded (e.g. an unsupported regex) is reported once and ignored.
  *
  * **Example:** Text generation with `onnx-community/SmolLM2-135M-ONNX` (default settings).
  * ```javascript
@@ -189,9 +225,9 @@ export class TextGenerationPipeline
             })
         );
 
-        // Response templates often delimit regions with special tokens, so keep them only when parsing
-        const response_template = this.tokenizer.response_template;
-        const parse = isChatInput && Boolean(response_template);
+        // Response templates often delimit regions with special tokens, so keep them only when parsing.
+        // A template that can't be loaded is reported once and treated as absent.
+        const parse = isChatInput && is_loadable_response_template(this.tokenizer.response_template);
         const skip_special_tokens = !parse;
         const prompt_length = text_inputs.input_ids.dims.at(-1);
 

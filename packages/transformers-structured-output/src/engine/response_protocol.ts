@@ -178,27 +178,27 @@ export function withResponseProtocol(
                 state = initial;
             if (state.phase === 'dead')
                 throw new Error('The prompt prefill does not satisfy the response protocol or constraint.');
-            // The prompt can't always tell us that thinking is off. Qwen3 writes an empty, closed
-            // `<think>\n\n</think>` block, which replay already handles. Gemma 4 only leaves `<|think|>`
-            // out of the system turn and writes no closed channel, so detection still allows
-            // `<|channel>thought`. Under a constraint, greedy decoding then picks the opener and thinks until
-            // max_new_tokens without emitting the answer (0/6 valid JSON on gemma-4-E2B-it vs 6/6 in 4.3.2).
-            // Callers who rendered the prompt with thinking off must be able to say so. Don't remove
-            // this option unless detection can handle templates like Gemma 4. See #1791.
-            if (context?.enable_thinking === false) {
-                if (
-                    state.phase === 'thinking' ||
-                    (state.phase === 'start' && state.structured === undefined && state.content === undefined)
-                ) {
+            // Thinking is opt-in. The prompt can't always tell us that thinking is off: Qwen3 writes an
+            // empty, closed `<think>\n\n</think>` block, which replay already handles, but Gemma 4 only
+            // leaves `<|think|>` out of the system turn and writes no closed channel. Allowing
+            // `<|channel>thought` there lets greedy decoding open thinking and run until max_new_tokens
+            // without an answer (0/6 valid JSON on gemma-4-E2B-it vs 6/6 in 4.3.2, which constrained the
+            // first token). So unless the caller passes `enable_thinking: true`, thinking only continues
+            // when the prompt already started it. See #1791.
+            if (context?.enable_thinking === true) return state;
+            const startedThinking =
+                state.phase === 'thinking' ||
+                (state.phase === 'start' && state.structured === undefined && state.content === undefined);
+            if (startedThinking) {
+                if (context?.enable_thinking === false)
                     throw new Error('Thinking is disabled but the prompt prefills an unfinished thinking region.');
-                }
-                if (state.phase !== 'start') return state;
-                if (state.structured !== undefined) return payload(state.structured);
-                if (state.content !== undefined)
-                    return { phase: 'content', progress: state.content, opener: protocol.contentOpen! };
-                throw new Error('The prompt is incompatible with disabled thinking.');
+                return state;
             }
-            return state;
+            if (state.phase !== 'start') return state;
+            if (state.structured !== undefined) return payload(state.structured);
+            if (state.content !== undefined)
+                return { phase: 'content', progress: state.content, opener: protocol.contentOpen! };
+            throw new Error('The prompt is incompatible with disabled thinking.');
         },
         transition,
         viable: (state) => state.phase !== 'dead',

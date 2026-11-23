@@ -24,6 +24,7 @@ const { AssetLoadingContext } = await import("../../src/utils/hub/AssetLoadingCo
 const MODEL = "test/asset-loading";
 const REMOTE = `https://huggingface.co/${MODEL}/resolve/main/`;
 const VERSIONED = `${REMOTE}tokenizer_config.json?__transformersjs_cache_version=1`;
+// `{ ...env }` leaves out the non-enumerable `hfToken`, so reset it explicitly when restoring.
 const ORIGINAL_ENV = { ...env };
 
 function jsonResponse(value) {
@@ -59,12 +60,15 @@ describe("Internal asset loading", () => {
       fetch: jest.fn(async () => jsonResponse({ updated: true })),
     });
   });
-  afterEach(() => Object.assign(env, ORIGINAL_ENV));
+  afterEach(() => {
+    Object.assign(env, ORIGINAL_ENV);
+    env.hfToken = undefined;
+  });
 
   it("shallow-copies the environment while preserving transport and cache identities", () => {
     const context = new AssetLoadingContext();
     expect(context.settings).not.toBe(env);
-    expect(context.settings).toEqual(env);
+    expect(context.settings).toEqual({ ...env, hfToken: env.hfToken });
     expect(context.settings.fetch).toBe(env.fetch);
     expect(context.settings.customCache).toBe(cache);
     expect(context.settings.backends).toBe(env.backends);
@@ -280,6 +284,40 @@ describe("Internal asset loading", () => {
     expect(env.fetch.mock.calls[0][0]).toBe(`${REMOTE}tokenizer_config.json`);
   });
 
+  it("keeps the only entry of a custom cache that keys entries by URL pathname", async () => {
+    const entries = new Map();
+    const pathname = (key) => new URL(key, "https://app.example/").pathname;
+    const pathCache = {
+      entries,
+      match: jest.fn(async (key) => entries.get(pathname(key))?.clone()),
+      put: jest.fn(async (key, response) => entries.set(pathname(key), response.clone())),
+      delete: jest.fn(async (key) => entries.delete(pathname(key))),
+    };
+    env.customCache = pathCache;
+
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(env.fetch).toHaveBeenCalledTimes(1);
+    expect(pathCache.delete).not.toHaveBeenCalled();
+
+    Object.assign(env, { allowLocalModels: true, allowRemoteModels: false, useFS: false });
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(env.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not clean up after a first download into an empty exact-key cache", async () => {
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(cache.entries.has(VERSIONED)).toBe(true);
+    expect(cache.delete).not.toHaveBeenCalled();
+  });
+
+  it("removes a 4.3-style entry after storing its replacement", async () => {
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
+    expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(cache.delete).toHaveBeenCalledWith(`${REMOTE}tokenizer_config.json`);
+    expect([...cache.entries.keys()]).toEqual([VERSIONED]);
+  });
+
   it("does not require custom caches to support deletion", async () => {
     delete cache.delete;
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
@@ -298,8 +336,10 @@ describe("Internal asset loading", () => {
   });
 
   it("ignores cleanup failures after successfully storing the replacement", async () => {
+    cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
     cache.delete.mockRejectedValue(new Error("read-only cache"));
     expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
+    expect(cache.delete).toHaveBeenCalled();
     expect(cache.entries.has(VERSIONED)).toBe(true);
   });
 

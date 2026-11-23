@@ -158,6 +158,7 @@ export class FileCache {
             if (!fs.existsSync(filePath)) return false;
             // NOTE: Processes sharing the cache are not coordinated. If another one replaces the entry
             // between this check and the unlink, its replacement is removed and downloaded again on next use.
+            // https://github.com/huggingface/transformers.js/issues/1933
             if ((await this.readVersion(markerPath)) !== version) return false;
             await fs.promises.unlink(filePath);
             await fs.promises.rm(markerPath, { force: true });
