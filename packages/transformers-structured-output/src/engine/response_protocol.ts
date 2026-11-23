@@ -184,7 +184,7 @@ export function withResponseProtocol(
             // `<|channel>thought`. Under a constraint, greedy decoding then picks the opener and thinks until
             // max_new_tokens without emitting the answer (0/6 valid JSON on gemma-4-E2B-it vs 6/6 in 4.3.2).
             // Callers who rendered the prompt with thinking off must be able to say so. Don't remove
-            // this option unless detection can handle templates like Gemma 4. See #1791 / 43768e98.
+            // this option unless detection can handle templates like Gemma 4. See #1791.
             if (context?.enable_thinking === false) {
                 if (
                     state.phase === 'thinking' ||

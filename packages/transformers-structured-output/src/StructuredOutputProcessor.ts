@@ -21,7 +21,7 @@ export type StructuredOutputOptions = {
      * - `false`: no thinking region; constrain the first content token.
      * - `true`: same as `undefined`, explicitly allowing the optional thinking region.
      * Needed for templates such as Gemma 4 that omit thinking markers rather than write a closed block;
-     * prompt detection alone cannot identify their disabled-thinking mode. See #1791 / 43768e98.
+     * prompt detection alone cannot identify their disabled-thinking mode. See #1791.
      */
     enable_thinking?: boolean;
 };
