@@ -34,6 +34,11 @@ export const ignoreModulesPlugin = (modules = []) => ({
               export const pipeline = noop;
             `,
           };
+        case "./onnx-node.js":
+          // `onnx.js` calls this loader when the web bundle runs in Node, so it must stay callable.
+          return {
+            contents: `export default () => ({});`,
+          };
         case "node:fs":
         case "node:path":
         case "node:url":

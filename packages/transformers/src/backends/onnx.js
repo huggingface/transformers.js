@@ -14,8 +14,7 @@
 
 import { env, apis, LogLevel } from '../env.js';
 
-// NOTE: Import order matters here. We need to import `onnxruntime-node` before `onnxruntime-web`.
-import ONNX_NODE from './onnx-node.js';
+import loadOnnxNode from './onnx-node.js';
 import * as ONNX_WEB from 'onnxruntime-web/webgpu';
 import { loadWasmBinary, loadWasmFactory } from './utils/cacheWasm.js';
 import { isBlobURL, toAbsoluteURL } from '../utils/hub/utils.js';
@@ -101,7 +100,7 @@ if (ORT_SYMBOL in globalThis) {
     // If the JS runtime exposes their own ONNX runtime, use it
     ONNX = globalThis[ORT_SYMBOL];
 } else if (apis.IS_NODE_ENV) {
-    ONNX = ONNX_NODE;
+    ONNX = loadOnnxNode();
 
     // Updated as of ONNX Runtime 1.23.0-dev.20250612-70f14d7670
     // The following table lists the supported versions of ONNX Runtime Node.js binding provided with pre-built binaries.
