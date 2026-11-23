@@ -296,9 +296,33 @@ export async function createInferenceSession(buffer_or_path, session_options, se
             logSeverityLevel,
             ...session_options,
         });
-    const session = await (apis.IS_WEB_ENV ? (webInitChain = webInitChain.then(load)) : load());
+    const session = await (apis.IS_WEB_ENV ? serializeOn(webInitChain, load, (next) => (webInitChain = next)) : load());
     session.config = session_config;
     return session;
+}
+
+/**
+ * Run `fn` after every earlier call queued on `chain` has settled, and hand the caller
+ * `fn`'s own result.
+ *
+ * The chain exists to serialize WASM/WebGPU work, so it must always advance. Chaining
+ * `chain.then(fn)` and storing that back would make the chain itself reject the moment
+ * one call failed; `.then(fn)` on a rejected promise skips `fn` entirely and forwards
+ * the old error, so a single failed session creation broke every later one in the
+ * process. The stored chain is therefore `result.then(noop, noop)`: a `Promise<void>` that
+ * settles when this call settles but never rejects, so the next call always runs. The
+ * caller still receives `result` itself, with its own value or rejection.
+ * @template T
+ * @param {Promise<any>} chain The current serialization chain.
+ * @param {() => Promise<T>} fn The work to run once the chain has settled.
+ * @param {(next: Promise<void>) => void} setChain Stores the advanced chain.
+ * @returns {Promise<T>} The result of `fn` for this call.
+ */
+function serializeOn(chain, fn, setChain) {
+    const result = chain.then(fn);
+    const noop = () => {};
+    setChain(result.then(noop, noop));
+    return result;
 }
 
 /**
@@ -316,7 +340,7 @@ let webInferenceChain = Promise.resolve();
  */
 export async function runInferenceSession(session, ortFeed) {
     const run = () => session.run(ortFeed);
-    return apis.IS_WEB_ENV ? (webInferenceChain = webInferenceChain.then(run)) : run();
+    return apis.IS_WEB_ENV ? serializeOn(webInferenceChain, run, (next) => (webInferenceChain = next)) : run();
 }
 
 /**
