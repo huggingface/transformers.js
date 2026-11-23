@@ -6,19 +6,25 @@
   "types": "./types/transformers.d.ts",
   "type": "module",
   "exports": {
-    "node": {
-      "import": {
-        "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.mjs"
+    ".": {
+      "node": {
+        "import": {
+          "types": "./types/transformers.d.ts",
+          "default": "./dist/transformers.node.mjs"
+        },
+        "require": {
+          "types": "./types/transformers.d.ts",
+          "default": "./dist/transformers.node.cjs"
+        }
       },
-      "require": {
+      "default": {
         "types": "./types/transformers.d.ts",
-        "default": "./dist/transformers.node.cjs"
+        "default": "./dist/transformers.web.js"
       }
     },
-    "default": {
-      "types": "./types/transformers.d.ts",
-      "default": "./dist/transformers.web.js"
+    "./tokenizers": {
+      "types": "./types/models/auto/tokenization_auto.d.ts",
+      "default": "./src/models/auto/tokenization_qwen_auto.js"
     }
   },
   "scripts": {
