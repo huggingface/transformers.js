@@ -30,7 +30,8 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * const model = await AutoModelForVision2Seq.from_pretrained(model_id);
  *
  * // Run inference
- * const output = await model.generate(image_inputs.pixel_values, {
+ * const output = await model.generate({
+ *   ...image_inputs,
  *   decoder_input_ids,
  *   max_length: model.config.decoder.max_position_embeddings,
  * });
@@ -66,7 +67,8 @@ export class DonutSwinPreTrainedModel extends PreTrainedModel {}
  * const model = await AutoModelForVision2Seq.from_pretrained(model_id);
  *
  * // Run inference
- * const output = await model.generate(image_inputs.pixel_values, {
+ * const output = await model.generate({
+ *   ...image_inputs,
  *   decoder_input_ids,
  *   max_length: model.config.decoder.max_position_embeddings,
  * });

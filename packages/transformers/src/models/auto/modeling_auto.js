@@ -28,8 +28,8 @@
  * const tokenizer = await AutoTokenizer.from_pretrained('Xenova/t5-small');
  * const model = await AutoModelForSeq2SeqLM.from_pretrained('Xenova/t5-small');
  *
- * const { input_ids } = await tokenizer('translate English to German: I love transformers!');
- * const outputs = await model.generate(input_ids);
+ * const inputs = await tokenizer('translate English to German: I love transformers!');
+ * const outputs = await model.generate({ ...inputs });
  * const decoded = tokenizer.decode(outputs[0], { skip_special_tokens: true });
  * // 'Ich liebe Transformatoren!'
  * ```
