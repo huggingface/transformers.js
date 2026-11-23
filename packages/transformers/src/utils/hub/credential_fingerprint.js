@@ -1,8 +1,7 @@
-// Explicit tradeoff: retain a token-to-ID map for this module's lifetime instead of maintaining
-// a hand-written hash. Tokens already live in request settings; this map additionally retains each
-// distinct token so process-local memoization can separate credentials without putting raw tokens
-// in key strings. This is hygiene against accidental log/debug exposure, not a security boundary
-// or a persisted cache namespace. IDs are local to this module instance, not stable across restarts.
+// Maps each distinct token to a process-local ID, so that memoization keys can separate credentials
+// without containing raw tokens. This guards against accidental log/debug exposure; it is not a
+// security boundary or a persisted cache namespace. The map retains every token it has seen, and
+// IDs are not stable across restarts.
 /** @type {Map<string, number>} */
 const credentialIds = new Map();
 let nextCredentialId = 1;
