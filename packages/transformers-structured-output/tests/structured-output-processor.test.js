@@ -192,7 +192,7 @@ describe("explicit thinking opt-out", () => {
   });
 });
 
-describe("reassessment EOS and special-closer masks", () => {
+describe("EOS and special-closer masks", () => {
   const source = {
     ...thinkingTokenizer,
     tokens: [...tokenizer.tokens, Array.from(new TextEncoder().encode("<turn|>")), Array.from(new TextEncoder().encode("<other>"))],
