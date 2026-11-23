@@ -33,7 +33,8 @@ describe("Session-scoped resource loading", () => {
 
       Object.defineProperty(globalThis, "navigator", {
         configurable: true,
-        value: { crossOriginStorage: {} },
+        // `CrossOriginStorage.isAvailable()` requires `getFileHandle()`; reject to simulate a cache miss.
+        value: { crossOriginStorage: { getFileHandle: async () => Promise.reject(new Error("NotFoundError")) } },
       });
       env.experimental_useCrossOriginStorage = true;
       env.useBrowserCache = false;
