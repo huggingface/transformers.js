@@ -6,6 +6,7 @@ import { DataTypeMap } from '../../utils/dtypes.js';
 import { pick } from '../../utils/core.js';
 import { DynamicCache } from '../../cache_utils.js';
 import { StoppingCriteria, StoppingCriteriaList } from '../../generation/stopping_criteria.js';
+import { LogitsProcessor, LogitsProcessorList } from '../../generation/logits_process.js';
 
 // Causal conv padding constants
 const CONV1_LEFT_PAD = 2;
@@ -75,8 +76,19 @@ function createEncoderState(model, input_features) {
         audio_queue_offset: 0,
         audio_consumed: 0,
         stream_exhausted: false,
+        /** The step now being decoded had no audio left (`forward` set it): force `</s>`. */
+        forcing_eos: false,
+        /**
+         * The end-of-sequence token(s) of this call, which is what a step without
+         * audio has to end on. It is the effective generation config's value, not the
+         * model's stored one, so `generate({ eos_token_id })` and a per-call
+         * `generation_config` are honoured here too. `generate` fills it in.
+         * @type {number|number[]|null}
+         */
+        eos_token_id: null,
         chunks_iter,
         text_hidden_size: text_config.hidden_size,
+        vocab_size: text_config.vocab_size,
     };
 }
 
@@ -183,6 +195,80 @@ function addAudioEmbeddings(s, inputs_embeds, current_len) {
 }
 
 /**
+ * Logits that put all probability on the end-of-sequence token, for a decoding step
+ * whose audio has run out.
+ *
+ * The decoder's input at every position is the sum of an audio embedding and a text
+ * embedding; it was never trained on a text embedding alone, and what it samples from
+ * one is arbitrary (a word-piece suffix such as "ished", or punctuation). The Python
+ * implementation never runs such a step: it stops as soon as the chunk generator is
+ * exhausted. Here the loop can only learn that the stream has ended once it needs the
+ * next chunk, so the step is answered with `</s>` instead of being decoded.
+ *
+ * A call without an end-of-sequence token can only fail at that step, never earlier:
+ * until the audio runs out, nothing here is needed.
+ * @param {Object} s Encoder state.
+ * @param {number} seq_len Number of positions in the current step.
+ * @returns {Tensor} Logits of shape `[1, seq_len, vocab_size]`.
+ * @private
+ */
+function endOfSequenceLogits(s, seq_len) {
+    const { vocab_size, eos_token_id } = s;
+    // Normalize first: an empty list names no token either, and a row of all
+    // `-Infinity` is `NaN` after the softmax rather than an end of sequence.
+    const eos = Array.isArray(eos_token_id) ? eos_token_id[0] : eos_token_id;
+    if (eos == null) {
+        throw new Error('VoxtralRealtime needs an `eos_token_id` to end generation when the audio runs out.');
+    }
+    const data = new Float32Array(seq_len * vocab_size).fill(-Infinity);
+    for (let i = 0; i < seq_len; ++i) {
+        data[i * vocab_size + eos] = 0;
+    }
+    return new Tensor('float32', data, [1, seq_len, vocab_size]);
+}
+
+/**
+ * Forces the end-of-sequence token on a step whose audio has run out.
+ *
+ * `forward` already answers such a step with `</s>` logits, but those are only an
+ * input to the processors that run after it: `min_new_tokens` (and `min_length`)
+ * mask every end-of-sequence token until enough have been generated, which would
+ * leave a row of all `-Infinity` — `NaN` after the softmax, or token 0 from an
+ * argmax — and generation would carry on decoding audio-less steps. This processor
+ * is appended last, so it runs after all of them.
+ *
+ * Its `eos_token_id` is the one on the encoder state, which is the effective generation
+ * config of this call, not the model's stored one: `generate({ eos_token_id })` and a
+ * per-call `generation_config` replace it, and a stop token the helper above never read
+ * would leave generation running to `max_new_tokens`.
+ * @private
+ */
+class AudioExhaustedLogitsProcessor extends LogitsProcessor {
+    /**
+     * @param {Object} enc_state The encoder streaming state, which carries the
+     * end-of-sequence token(s) of this call.
+     */
+    constructor(enc_state) {
+        super();
+        this._s = enc_state;
+    }
+
+    _call(input_ids, logits) {
+        if (!this._s.forcing_eos) return logits;
+        const { eos_token_id } = this._s;
+        const eos_tokens = Array.isArray(eos_token_id) ? eos_token_id : [eos_token_id];
+        for (let i = 0; i < logits.dims[0]; ++i) {
+            const row = /** @type {Float32Array} */ (logits[i].data);
+            row.fill(-Infinity);
+            for (const eos_token of eos_tokens) {
+                row[eos_token] = 0;
+            }
+        }
+        return logits;
+    }
+}
+
+/**
  * Stopping criterion that triggers when the audio stream is exhausted
  * and all buffered audio embeddings have been consumed.
  * @private
@@ -208,8 +294,18 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
 
         const enc = states.get(this);
         if (enc) {
+            enc.forcing_eos = false;
             // Fill audio buffer and embed tokens with audio
             await fillAudioBuffer(enc, enc.audio_consumed + current_len);
+            if (enc.audio_embed_total_tokens - enc.audio_consumed < current_len) {
+                // The stream ended before this step: end the sequence rather than decode
+                // positions that have no audio embedding. The flag makes
+                // `AudioExhaustedLogitsProcessor` force `</s>` whatever the other
+                // processors did to these logits; the cache is not advanced here, and
+                // does not need to be, because generation stops on that token.
+                enc.forcing_eos = true;
+                return { logits: endOfSequenceLogits(enc, current_len) };
+            }
         }
 
         const { inputs_embeds } = await sessionRun(this.sessions['embed_tokens'], { input_ids });
@@ -225,20 +321,42 @@ export class VoxtralRealtimeForConditionalGeneration extends VoxtralRealtimePreT
         return await sessionRun(session, fixed);
     }
 
-    async generate({ input_features, stopping_criteria: userStoppingCriteria, ...kwargs }) {
+    async generate({
+        input_features,
+        stopping_criteria: userStoppingCriteria,
+        logits_processor: userLogitsProcessor,
+        generation_config,
+        ...kwargs
+    }) {
         if (!input_features) {
             throw new Error('input_features (generator/iterable) must be provided');
         }
 
+        // Resolve the effective generation config before the encoder state is created, so
+        // that the state carries the `eos_token_id` this call uses — `generate({ eos_token_id })`
+        // and a per-call `generation_config` included. A missing one is not an error yet: a
+        // call that stops before the audio runs out never needs it.
+        const { eos_token_id } = this._prepare_generation_config(generation_config, kwargs);
+
         const enc_state = createEncoderState(this, input_features);
+        enc_state.eos_token_id = eos_token_id;
         states.set(this, enc_state);
 
         const stopping_criteria = new StoppingCriteriaList();
         stopping_criteria.push(new AudioExhaustedCriteria(enc_state));
         if (userStoppingCriteria) stopping_criteria.extend(userStoppingCriteria);
 
+        // Ending the step that runs out of audio is a processor of ours, appended last
+        // so that it runs after `min_new_tokens` and the rest. The logits `forward`
+        // returns for that step are only a fallback for callers that bypass `generate`.
+        const logits_processor = new LogitsProcessorList();
+        if (userLogitsProcessor) {
+            logits_processor.extend(userLogitsProcessor);
+        }
+        logits_processor.push(new AudioExhaustedLogitsProcessor(enc_state));
+
         try {
-            return await super.generate({ ...kwargs, stopping_criteria });
+            return await super.generate({ ...kwargs, generation_config, stopping_criteria, logits_processor });
         } finally {
             // Cleanup encoder state
             enc_state.enc_kv_cache.dispose();
