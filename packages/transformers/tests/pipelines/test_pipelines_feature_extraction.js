@@ -1,4 +1,4 @@
-import { pipeline, FeatureExtractionPipeline } from "../../src/transformers.js";
+import { pipeline, FeatureExtractionPipeline, Tensor } from "../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
 
@@ -117,5 +117,25 @@ export default () => {
     afterAll(async () => {
       await pipe?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Feature Extraction last-token pooling", () => {
+    it.each(["last_token", "eos"])("%s skips padding at the end of each sequence", async (pooling) => {
+      const attention_mask = new Tensor("int64", [1n, 1n, 0n, 1n, 1n, 1n, 0n, 1n, 1n], [3, 3]);
+      const last_hidden_state = new Tensor("float32", [1, 2, 3, 4, 90, 91, 5, 6, 7, 8, 9, 10, 92, 93, 11, 12, 13, 14], [3, 3, 2]);
+      const extractor = new FeatureExtractionPipeline({
+        task: PIPELINE_ID,
+        tokenizer: () => ({ attention_mask }),
+        model: async () => ({ last_hidden_state }),
+      });
+
+      const output = await extractor(["shorter", "longest input", "left padded"], { pooling });
+
+      expect(output.tolist()).toEqual([
+        [3, 4],
+        [9, 10],
+        [13, 14],
+      ]);
+    });
   });
 };
