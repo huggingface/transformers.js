@@ -16,9 +16,14 @@ import { Tensor } from '../utils/tensor.js';
  * @property {string} generated_text The generated text.
  * @typedef {Text2TextGenerationSingle[]} Text2TextGenerationOutput
  *
+ * @typedef {Object} Text2TextGenerationSpecificParams Parameters specific to text2text-generation pipelines.
+ * @property {boolean|'max_length'} [padding=true] Whether to pad the input sequences. Use `'max_length'` to pad to the tokenizer's `model_max_length`.
+ * @property {boolean} [truncation=true] Whether to truncate the input sequences to the tokenizer's `model_max_length`.
+ * @typedef {import('../generation/parameters.js').GenerationFunctionParameters & Text2TextGenerationSpecificParams} Text2TextGenerationConfig
+ *
  * @callback Text2TextGenerationPipelineCallback Generate the output text(s) using text(s) given as inputs.
  * @param {string|string[]} texts Input text for the encoder.
- * @param {Partial<import('../generation/parameters.js').GenerationFunctionParameters>} [options] Additional keyword arguments to pass along to the generate method of the model.
+ * @param {Partial<Text2TextGenerationConfig>} [options] Tokenizer options (`padding`, `truncation`) and additional keyword arguments to pass along to the generate method of the model.
  * @returns {Promise<Text2TextGenerationOutput>}
  *
  * @typedef {TextPipelineConstructorArgs & Text2TextGenerationPipelineCallback & Disposable} Text2TextGenerationPipelineType
@@ -52,6 +57,8 @@ export class Text2TextGenerationPipeline
 
     /** @type {Text2TextGenerationPipelineCallback} */
     async _call(texts, generate_kwargs = {}) {
+        const { padding = true, truncation = true, ...generation_kwargs } = generate_kwargs;
+
         if (!Array.isArray(texts)) {
             texts = [texts];
         }
@@ -77,15 +84,15 @@ export class Text2TextGenerationPipeline
 
         const tokenizer = this.tokenizer;
         const tokenizer_options = {
-            padding: true,
-            truncation: true,
+            padding,
+            truncation,
         };
         let inputs;
         if (this.task === 'translation' && '_build_translation_inputs' in tokenizer) {
             // TODO: move to Translation pipeline?
             // Currently put here to avoid code duplication
             // @ts-ignore
-            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, generate_kwargs);
+            inputs = tokenizer._build_translation_inputs(texts, tokenizer_options, generation_kwargs);
         } else {
             inputs = tokenizer(texts, tokenizer_options);
         }
@@ -93,7 +100,7 @@ export class Text2TextGenerationPipeline
         const outputTokenIds = await this.model.generate({
             ...inputs,
             ...this._default_generation_config,
-            ...generate_kwargs,
+            ...generation_kwargs,
         });
         return tokenizer
             .batch_decode(/** @type {Tensor} */ (outputTokenIds), {
