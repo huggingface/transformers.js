@@ -1,0 +1,1538 @@
+{
+ "model": "onnx-internal-testing/tiny-random-Qwen3ForCausalLM",
+ "transformers_commit": "31d7392997c13162c58f2e3c6555b5e060d6f60b",
+ "generator": "make_fixtures.py (see the PR description)",
+ "request": {
+  "state": "I was charged twice for my order and want a refund.",
+  "questions": {
+   "intent": {
+    "type": "choice",
+    "instructions": "What does the customer want?",
+    "criteria": {
+     "refund": "wants money back",
+     "cancel": "wants to cancel an order",
+     "track": "wants to track an order"
+    }
+   },
+   "refund": {
+    "type": "noul",
+    "instructions": "Is a refund requested?"
+   },
+   "anger": {
+    "type": "score",
+    "instructions": "How angry?",
+    "criteria": [
+     "calm",
+     "annoyed",
+     "furious"
+    ]
+   }
+  }
+ },
+ "renders": [
+  {
+   "name": "choice",
+   "state": {
+    "message": "WIN a FREE iPhone, click here!"
+   },
+   "question": {
+    "type": "choice",
+    "instructions": "What is the tone?",
+    "criteria": {
+     "calm": null,
+     "pushy": "Pressures the reader"
+    }
+   },
+   "labels": {},
+   "text": "{\"message\": \"WIN a FREE iPhone, click here!\"}\n\nWhat is the tone?\nA. calm\nB. pushy: Pressures the reader\nAnswer with the letter of the option that fits best (A to B) only."
+  },
+  {
+   "name": "choice_one_option",
+   "state": "s",
+   "question": {
+    "type": "choice",
+    "criteria": {
+     "only": null
+    }
+   },
+   "labels": {},
+   "text": "s\n\nA. only\nAnswer with the letter of the option that fits best (A to A) only."
+  },
+  {
+   "name": "choice_json_description",
+   "state": [
+    "a",
+    1,
+    null
+   ],
+   "question": {
+    "type": "choice",
+    "instructions": {
+     "q": "nested"
+    },
+    "criteria": {
+     "a": {
+      "x": [
+       1,
+       2
+      ]
+     },
+     "b": [
+      "l",
+      "m"
+     ]
+    }
+   },
+   "labels": {},
+   "text": "[\"a\", 1, null]\n\n{\"q\": \"nested\"}\nA. a: {\"x\": [1, 2]}\nB. b: [\"l\", \"m\"]\nAnswer with the letter of the option that fits best (A to B) only."
+  },
+  {
+   "name": "noul_bare",
+   "state": "state",
+   "question": {
+    "type": "noul"
+   },
+   "labels": {},
+   "text": "state\n\n\nAnswer Yes or No only."
+  },
+  {
+   "name": "noul_criteria",
+   "state": "state",
+   "question": {
+    "type": "noul",
+    "instructions": "Is it spam?",
+    "criteria": {
+     "true": "Unsolicited ads",
+     "false": "A real conversation"
+    }
+   },
+   "labels": {},
+   "text": "state\n\nIs it spam?\nYes: Unsolicited ads\nNo: A real conversation\nAnswer Yes or No only."
+  },
+  {
+   "name": "noul_one_criterion",
+   "state": "état — ünïcode ✓",
+   "question": {
+    "type": "noul",
+    "instructions": "Is it spam?",
+    "criteria": {
+     "false": "A real conversation"
+    }
+   },
+   "labels": {},
+   "text": "état — ünïcode ✓\n\nIs it spam?\nNo: A real conversation\nAnswer Yes or No only."
+  },
+  {
+   "name": "score",
+   "state": {
+    "a": "b",
+    "n": 3.5,
+    "t": true
+   },
+   "question": {
+    "type": "score",
+    "instructions": "How urgent is it?",
+    "criteria": [
+     "Can wait",
+     "This week",
+     "Today"
+    ]
+   },
+   "labels": {},
+   "text": "{\"a\": \"b\", \"n\": 3.5, \"t\": true}\n\nHow urgent is it?\nA. Can wait\nB. This week\nC. Today\nAnswer with the letter of the level that fits best (A to C) only."
+  },
+  {
+   "name": "score_no_instructions",
+   "state": "",
+   "question": {
+    "type": "score",
+    "criteria": [
+     "low",
+     {
+      "desc": "high"
+     }
+    ]
+   },
+   "labels": {},
+   "text": "\n\nA. low\nB. {\"desc\": \"high\"}\nAnswer with the letter of the level that fits best (A to B) only."
+  },
+  {
+   "name": "choice_custom_labels",
+   "state": {
+    "message": "WIN a FREE iPhone, click here!"
+   },
+   "question": {
+    "type": "choice",
+    "instructions": "What is the tone?",
+    "criteria": {
+     "calm": null,
+     "pushy": "Pressures the reader"
+    }
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "{\"message\": \"WIN a FREE iPhone, click here!\"}\n\nWhat is the tone?\n1. calm\n2. pushy: Pressures the reader\nAnswer with the label of the option that fits best (1 to 2) only."
+  },
+  {
+   "name": "choice_one_option_custom_labels",
+   "state": "s",
+   "question": {
+    "type": "choice",
+    "criteria": {
+     "only": null
+    }
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "s\n\n1. only\nAnswer with the label of the option that fits best (1 to 1) only."
+  },
+  {
+   "name": "choice_json_description_custom_labels",
+   "state": [
+    "a",
+    1,
+    null
+   ],
+   "question": {
+    "type": "choice",
+    "instructions": {
+     "q": "nested"
+    },
+    "criteria": {
+     "a": {
+      "x": [
+       1,
+       2
+      ]
+     },
+     "b": [
+      "l",
+      "m"
+     ]
+    }
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "[\"a\", 1, null]\n\n{\"q\": \"nested\"}\n1. a: {\"x\": [1, 2]}\n2. b: [\"l\", \"m\"]\nAnswer with the label of the option that fits best (1 to 2) only."
+  },
+  {
+   "name": "noul_bare_custom_labels",
+   "state": "state",
+   "question": {
+    "type": "noul"
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "state\n\nT: true\nF: false\nAnswer T or F only."
+  },
+  {
+   "name": "noul_criteria_custom_labels",
+   "state": "state",
+   "question": {
+    "type": "noul",
+    "instructions": "Is it spam?",
+    "criteria": {
+     "true": "Unsolicited ads",
+     "false": "A real conversation"
+    }
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "state\n\nIs it spam?\nT: Unsolicited ads\nF: A real conversation\nAnswer T or F only."
+  },
+  {
+   "name": "noul_one_criterion_custom_labels",
+   "state": "état — ünïcode ✓",
+   "question": {
+    "type": "noul",
+    "instructions": "Is it spam?",
+    "criteria": {
+     "false": "A real conversation"
+    }
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "état — ünïcode ✓\n\nIs it spam?\nT: true\nF: A real conversation\nAnswer T or F only."
+  },
+  {
+   "name": "score_custom_labels",
+   "state": {
+    "a": "b",
+    "n": 3.5,
+    "t": true
+   },
+   "question": {
+    "type": "score",
+    "instructions": "How urgent is it?",
+    "criteria": [
+     "Can wait",
+     "This week",
+     "Today"
+    ]
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "{\"a\": \"b\", \"n\": 3.5, \"t\": true}\n\nHow urgent is it?\nx. Can wait\ny. This week\nz. Today\nAnswer with the label of the level that fits best (x to z) only."
+  },
+  {
+   "name": "score_no_instructions_custom_labels",
+   "state": "",
+   "question": {
+    "type": "score",
+    "criteria": [
+     "low",
+     {
+      "desc": "high"
+     }
+    ]
+   },
+   "labels": {
+    "noul": [
+     "T",
+     "F"
+    ],
+    "choice": [
+     "1",
+     "2",
+     "3"
+    ],
+    "score": [
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "text": "\n\nx. low\ny. {\"desc\": \"high\"}\nAnswer with the label of the level that fits best (x to y) only."
+  }
+ ],
+ "prompts": {
+  "default": {
+   "request": {
+    "state": "I was charged twice for my order and want a refund.",
+    "questions": {
+     "intent": {
+      "type": "choice",
+      "instructions": "What does the customer want?",
+      "criteria": {
+       "refund": "wants money back",
+       "cancel": "wants to cancel an order",
+       "track": "wants to track an order"
+      }
+     },
+     "refund": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     },
+     "anger": {
+      "type": "score",
+      "instructions": "How angry?",
+      "criteria": [
+       "calm",
+       "annoyed",
+       "furious"
+      ]
+     }
+    }
+   },
+   "config": {},
+   "prompts": [
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3838,
+      1558,
+      279,
+      6002,
+      1366,
+      5267,
+      32,
+      13,
+      20965,
+      25,
+      6801,
+      3220,
+      1182,
+      198,
+      33,
+      13,
+      9121,
+      25,
+      6801,
+      311,
+      9121,
+      458,
+      1973,
+      198,
+      34,
+      13,
+      3754,
+      25,
+      6801,
+      311,
+      3754,
+      458,
+      1973,
+      198,
+      16141,
+      448,
+      279,
+      6524,
+      315,
+      279,
+      2999,
+      429,
+      18304,
+      1850,
+      320,
+      32,
+      311,
+      356,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      75
+     ],
+     "questions": [
+      "intent"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3872,
+      264,
+      20965,
+      11223,
+      5267,
+      16141,
+      7414,
+      476,
+      2308,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      35
+     ],
+     "questions": [
+      "refund"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      4340,
+      18514,
+      5267,
+      32,
+      13,
+      19300,
+      198,
+      33,
+      13,
+      56030,
+      198,
+      34,
+      13,
+      52070,
+      198,
+      16141,
+      448,
+      279,
+      6524,
+      315,
+      279,
+      2188,
+      429,
+      18304,
+      1850,
+      320,
+      32,
+      311,
+      356,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      56
+     ],
+     "questions": [
+      "anger"
+     ]
+    }
+   ]
+  },
+  "marks_split": {
+   "request": {
+    "state": "s",
+    "questions": {
+     "x": {
+      "type": "noul"
+     }
+    }
+   },
+   "config": {
+    "chat_template": "Options:<|mark|>\n\nDecision<|split|>:\n\nA<|mark|>"
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      3798,
+      25,
+      271,
+      74846,
+      1447,
+      32
+     ],
+     "marks": [
+      2,
+      6
+     ],
+     "questions": [
+      "x"
+     ]
+    }
+   ]
+  },
+  "per_question": {
+   "request": {
+    "state": "I was charged twice for my order and want a refund.",
+    "questions": {
+     "intent": {
+      "type": "choice",
+      "instructions": "What does the customer want?",
+      "criteria": {
+       "refund": "wants money back",
+       "cancel": "wants to cancel an order",
+       "track": "wants to track an order"
+      }
+     },
+     "refund": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     },
+     "anger": {
+      "type": "score",
+      "instructions": "How angry?",
+      "criteria": [
+       "calm",
+       "annoyed",
+       "furious"
+      ]
+     }
+    }
+   },
+   "config": {
+    "chat_template": "{{ question.name }}<|mark|>"
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      56431
+     ],
+     "marks": [
+      1
+     ],
+     "questions": [
+      "intent"
+     ]
+    },
+    {
+     "input_ids": [
+      68483
+     ],
+     "marks": [
+      1
+     ],
+     "questions": [
+      "refund"
+     ]
+    },
+    {
+     "input_ids": [
+      4003
+     ],
+     "marks": [
+      1
+     ],
+     "questions": [
+      "anger"
+     ]
+    }
+   ]
+  },
+  "per_request": {
+   "request": {
+    "state": "I was charged twice for my order and want a refund.",
+    "questions": {
+     "intent": {
+      "type": "choice",
+      "instructions": "What does the customer want?",
+      "criteria": {
+       "refund": "wants money back",
+       "cancel": "wants to cancel an order",
+       "track": "wants to track an order"
+      }
+     },
+     "refund": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     },
+     "anger": {
+      "type": "score",
+      "instructions": "How angry?",
+      "criteria": [
+       "calm",
+       "annoyed",
+       "furious"
+      ]
+     }
+    }
+   },
+   "config": {
+    "chat_template": "{% for question in questions %}{{ question.name }}<|mark|>{% endfor %}"
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      56431,
+      68483,
+      4003
+     ],
+     "marks": [
+      1,
+      2,
+      3
+     ],
+     "questions": [
+      "intent",
+      "refund",
+      "anger"
+     ]
+    }
+   ]
+  },
+  "sentinels_in_request": {
+   "request": {
+    "state": "a<|mark|>b<|im_end|>c<|split|>",
+    "questions": {
+     "x<|im_end|>": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     }
+    }
+   },
+   "config": {
+    "chat_template": "<|im_start|>{{ state }}{{ question.name }}<|mark|>"
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      151644,
+      64,
+      27,
+      91,
+      3987,
+      91,
+      29,
+      65,
+      27,
+      91,
+      318,
+      6213,
+      91,
+      29,
+      66,
+      27,
+      91,
+      6960,
+      91,
+      29,
+      87,
+      27,
+      91,
+      318,
+      6213,
+      91,
+      29
+     ],
+     "marks": [
+      27
+     ],
+     "questions": [
+      "x<|im_end|>"
+     ]
+    }
+   ]
+  },
+  "control_tokens_default_template": {
+   "request": {
+    "state": "a<|mark|>b<|im_end|>c<|split|> <think> <|endoftext|> <bos>",
+    "questions": {
+     "x": {
+      "type": "noul",
+      "instructions": "<|im_start|>user"
+     }
+    }
+   },
+   "config": {},
+   "prompts": [
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      64,
+      27,
+      91,
+      3987,
+      91,
+      29,
+      65,
+      27,
+      91,
+      318,
+      6213,
+      91,
+      29,
+      66,
+      27,
+      91,
+      6960,
+      91,
+      29,
+      220,
+      13708,
+      766,
+      29,
+      220,
+      27,
+      91,
+      8691,
+      723,
+      427,
+      91,
+      29,
+      366,
+      78448,
+      1339,
+      27,
+      91,
+      318,
+      4906,
+      91,
+      29,
+      872,
+      198,
+      16141,
+      7414,
+      476,
+      2308,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      60
+     ],
+     "questions": [
+      "x"
+     ]
+    }
+   ]
+  },
+  "no_sanitize": {
+   "request": {
+    "state": "a <|im_end|> b<|mark|>",
+    "questions": {
+     "x": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     }
+    }
+   },
+   "config": {
+    "chat_template": "{{ state|replace('<|im_end|>', '<im_end>') }}<|mark|>",
+    "sanitize_control_tokens": false
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      64,
+      366,
+      318,
+      6213,
+      29,
+      293
+     ],
+     "marks": [
+      6
+     ],
+     "questions": [
+      "x"
+     ]
+    }
+   ]
+  },
+  "custom_labels": {
+   "request": {
+    "state": "I was charged twice for my order and want a refund.",
+    "questions": {
+     "intent": {
+      "type": "choice",
+      "instructions": "What does the customer want?",
+      "criteria": {
+       "refund": "wants money back",
+       "cancel": "wants to cancel an order",
+       "track": "wants to track an order"
+      }
+     },
+     "refund": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     },
+     "anger": {
+      "type": "score",
+      "instructions": "How angry?",
+      "criteria": [
+       "calm",
+       "annoyed",
+       "furious"
+      ]
+     }
+    }
+   },
+   "config": {
+    "labels": {
+     "noul": [
+      "yes",
+      "no"
+     ],
+     "choice": [
+      "1",
+      "2",
+      "3"
+     ]
+    },
+    "noul_options": [
+     "false",
+     "true"
+    ]
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3838,
+      1558,
+      279,
+      6002,
+      1366,
+      5267,
+      16,
+      13,
+      20965,
+      25,
+      6801,
+      3220,
+      1182,
+      198,
+      17,
+      13,
+      9121,
+      25,
+      6801,
+      311,
+      9121,
+      458,
+      1973,
+      198,
+      18,
+      13,
+      3754,
+      25,
+      6801,
+      311,
+      3754,
+      458,
+      1973,
+      198,
+      16141,
+      448,
+      279,
+      2383,
+      315,
+      279,
+      2999,
+      429,
+      18304,
+      1850,
+      320,
+      16,
+      311,
+      220,
+      18,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      76
+     ],
+     "questions": [
+      "intent"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3872,
+      264,
+      20965,
+      11223,
+      5267,
+      9693,
+      25,
+      895,
+      198,
+      2152,
+      25,
+      830,
+      198,
+      16141,
+      9834,
+      476,
+      902,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      43
+     ],
+     "questions": [
+      "refund"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      4340,
+      18514,
+      5267,
+      32,
+      13,
+      19300,
+      198,
+      33,
+      13,
+      56030,
+      198,
+      34,
+      13,
+      52070,
+      198,
+      16141,
+      448,
+      279,
+      6524,
+      315,
+      279,
+      2188,
+      429,
+      18304,
+      1850,
+      320,
+      32,
+      311,
+      356,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      56
+     ],
+     "questions": [
+      "anger"
+     ]
+    }
+   ]
+  },
+  "temperature": {
+   "request": {
+    "state": "I was charged twice for my order and want a refund.",
+    "questions": {
+     "intent": {
+      "type": "choice",
+      "instructions": "What does the customer want?",
+      "criteria": {
+       "refund": "wants money back",
+       "cancel": "wants to cancel an order",
+       "track": "wants to track an order"
+      }
+     },
+     "refund": {
+      "type": "noul",
+      "instructions": "Is a refund requested?"
+     },
+     "anger": {
+      "type": "score",
+      "instructions": "How angry?",
+      "criteria": [
+       "calm",
+       "annoyed",
+       "furious"
+      ]
+     }
+    }
+   },
+   "config": {
+    "temperature": {
+     "choice": 0.5,
+     "score": 2,
+     "noul": 1.5
+    }
+   },
+   "prompts": [
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3838,
+      1558,
+      279,
+      6002,
+      1366,
+      5267,
+      32,
+      13,
+      20965,
+      25,
+      6801,
+      3220,
+      1182,
+      198,
+      33,
+      13,
+      9121,
+      25,
+      6801,
+      311,
+      9121,
+      458,
+      1973,
+      198,
+      34,
+      13,
+      3754,
+      25,
+      6801,
+      311,
+      3754,
+      458,
+      1973,
+      198,
+      16141,
+      448,
+      279,
+      6524,
+      315,
+      279,
+      2999,
+      429,
+      18304,
+      1850,
+      320,
+      32,
+      311,
+      356,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      75
+     ],
+     "questions": [
+      "intent"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      3872,
+      264,
+      20965,
+      11223,
+      5267,
+      16141,
+      7414,
+      476,
+      2308,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      35
+     ],
+     "questions": [
+      "refund"
+     ]
+    },
+    {
+     "input_ids": [
+      151644,
+      872,
+      198,
+      40,
+      572,
+      11430,
+      10917,
+      369,
+      847,
+      1973,
+      323,
+      1366,
+      264,
+      20965,
+      382,
+      4340,
+      18514,
+      5267,
+      32,
+      13,
+      19300,
+      198,
+      33,
+      13,
+      56030,
+      198,
+      34,
+      13,
+      52070,
+      198,
+      16141,
+      448,
+      279,
+      6524,
+      315,
+      279,
+      2188,
+      429,
+      18304,
+      1850,
+      320,
+      32,
+      311,
+      356,
+      8,
+      1172,
+      13,
+      151645,
+      198,
+      151644,
+      77091,
+      198,
+      151667,
+      271,
+      151668,
+      271
+     ],
+     "marks": [
+      56
+     ],
+     "questions": [
+      "anger"
+     ]
+    }
+   ]
+  }
+ },
+ "answers": {
+  "default": {
+   "intent": {
+    "type": "choice",
+    "choice": "cancel",
+    "confidence": 0.9883402585983276,
+    "probabilities": {
+     "refund": 4.482827080209972e-06,
+     "cancel": 0.9922268390655518,
+     "track": 0.007768642157316208
+    }
+   },
+   "refund": {
+    "type": "noul",
+    "noul": 0.06160338222980499
+   },
+   "anger": {
+    "type": "score",
+    "score": 1.2795423865318298,
+    "legend": {
+     "0": "calm",
+     "1": "annoyed",
+     "2": "furious"
+    },
+    "confidence": 0.5804003895354981,
+    "probabilities": {
+     "0": 9.53792841755785e-05,
+     "1": 0.7202669978141785,
+     "2": 0.2796376943588257
+    }
+   }
+  },
+  "custom_labels": {
+   "intent": {
+    "type": "choice",
+    "choice": "refund",
+    "confidence": 0.8236528038978577,
+    "probabilities": {
+     "refund": 0.8824352025985718,
+     "cancel": 0.043366190046072006,
+     "track": 0.0741986483335495
+    }
+   },
+   "refund": {
+    "type": "noul",
+    "noul": 0.9999996423721313
+   },
+   "anger": {
+    "type": "score",
+    "score": 1.2795423865318298,
+    "legend": {
+     "0": "calm",
+     "1": "annoyed",
+     "2": "furious"
+    },
+    "confidence": 0.5804003895354981,
+    "probabilities": {
+     "0": 9.53792841755785e-05,
+     "1": 0.7202669978141785,
+     "2": 0.2796376943588257
+    }
+   }
+  },
+  "temperature": {
+   "intent": {
+    "type": "choice",
+    "choice": "cancel",
+    "confidence": 0.9999080896377563,
+    "probabilities": {
+     "refund": 2.0410582945995515e-11,
+     "cancel": 0.9999387264251709,
+     "track": 6.12973453826271e-05
+    }
+   },
+   "refund": {
+    "type": "noul",
+    "noul": 0.1399582028388977
+   },
+   "anger": {
+    "type": "score",
+    "score": 1.3741488456726074,
+    "legend": {
+     "0": "calm",
+     "1": "annoyed",
+     "2": "furious"
+    },
+    "confidence": 0.4176568661350757,
+    "probabilities": {
+     "0": 0.007039946038275957,
+     "1": 0.6117712259292603,
+     "2": 0.3811888098716736
+    }
+   }
+  }
+ }
+}

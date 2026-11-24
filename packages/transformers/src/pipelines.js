@@ -48,7 +48,9 @@ import {
     DepthEstimationPipeline,
     FeatureExtractionPipeline,
     ImageFeatureExtractionPipeline,
+    DecisionPipeline,
 } from './pipelines/index.js';
+import { DecisionConfig } from './decision/configuration_utils.js';
 import { get_pipeline_files } from './utils/model_registry/get_pipeline_files.js';
 import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
 
@@ -69,6 +71,7 @@ import { get_file_metadata } from './utils/model_registry/get_file_metadata.js';
  *  - `"audio-classification"`: will return a `AudioClassificationPipeline`.
  *  - `"automatic-speech-recognition"` (alias "asr" available): will return a `AutomaticSpeechRecognitionPipeline`.
  *  - `"background-removal"`: will return a `BackgroundRemovalPipeline`.
+ *  - `"decision"`: will return a `DecisionPipeline`.
  *  - `"depth-estimation"`: will return a `DepthEstimationPipeline`.
  *  - `"document-question-answering"`: will return a `DocumentQuestionAnsweringPipeline`.
  *  - `"feature-extraction"` (alias "embeddings" available): will return a `FeatureExtractionPipeline`.
@@ -198,15 +201,18 @@ export async function pipeline(
     }
 
     // Load all components in parallel
-    const [tokenizer, processor, model_loaded] = await Promise.all([
+    const [tokenizer, processor, model_loaded, decision_config] = await Promise.all([
         hasTokenizer ? AutoTokenizer.from_pretrained(model, pretrainedOptions) : null,
         hasProcessor ? AutoProcessor.from_pretrained(model, pretrainedOptions) : null,
         modelPromise,
+        // The decision config of the model repo (`decision.json`, `decision_template.jinja`), if any
+        task === 'decision' ? DecisionConfig.from_pretrained(model, pretrainedOptions) : null,
     ]);
 
     const results = { task, model: model_loaded };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
+    if (decision_config) results.decision_config = decision_config;
 
     dispatchCallback(progress_callback, {
         status: 'ready',
@@ -244,6 +250,7 @@ export {
     DepthEstimationPipeline,
     FeatureExtractionPipeline,
     ImageFeatureExtractionPipeline,
+    DecisionPipeline,
 };
 
 // Export pipeline output types
@@ -271,4 +278,5 @@ export {
  * @typedef {import('./pipelines/zero-shot-image-classification.js').ZeroShotImageClassificationOutput} ZeroShotImageClassificationOutput
  * @typedef {import('./pipelines/document-question-answering.js').DocumentQuestionAnsweringOutput} DocumentQuestionAnsweringOutput
  * @typedef {import('./pipelines/depth-estimation.js').DepthEstimationOutput} DepthEstimationOutput
+ * @typedef {import('./pipelines/decision.js').DecisionOutput} DecisionOutput
  */

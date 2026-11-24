@@ -56,6 +56,7 @@ import { ImageToImagePipeline } from './image-to-image.js';
 import { DepthEstimationPipeline } from './depth-estimation.js';
 import { FeatureExtractionPipeline } from './feature-extraction.js';
 import { ImageFeatureExtractionPipeline } from './image-feature-extraction.js';
+import { DecisionPipeline } from './decision.js';
 
 export const SUPPORTED_TASKS = Object.freeze({
     'text-classification': {
@@ -120,6 +121,15 @@ export const SUPPORTED_TASKS = Object.freeze({
         model: AutoModelForCausalLM,
         default: {
             model: 'onnx-community/Qwen3-0.6B-ONNX',
+            dtype: 'q4',
+        },
+        type: 'text',
+    },
+    decision: {
+        pipeline: DecisionPipeline,
+        model: AutoModelForCausalLM,
+        default: {
+            model: 'onnx-community/Qwen2.5-0.5B-Instruct',
             dtype: 'q4',
         },
         type: 'text',
@@ -304,6 +314,7 @@ export {
     DepthEstimationPipeline,
     FeatureExtractionPipeline,
     ImageFeatureExtractionPipeline,
+    DecisionPipeline,
 };
 
 /**
