@@ -404,6 +404,9 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             logger.warn('Model config has no `median_filter_width`, using default value of 7.');
             median_filter_width = 7;
         }
+        if (median_filter_width % 2 === 0 || median_filter_width <= 0) {
+            throw new Error('Window size must be a positive odd number');
+        }
 
         // TODO: Improve batch processing
         const batch = generate_outputs.cross_attentions;
@@ -453,8 +456,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                         cTensorData[d] = (cTensorData[d] - meanTensorData[d]) / stdTensorData[d];
                     }
 
-                    // Apply median filter.
-                    cTensorData.set(medianFilter(cTensorData, median_filter_width));
+                    // Whisper skips smoothing when reflect padding is at least the input length.
+                    if (cTensorData.length > Math.floor(median_filter_width / 2)) {
+                        cTensorData.set(medianFilter(cTensorData, median_filter_width));
+                    }
                 }
             }
         }
