@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
-import { ENV_WITH_EXPLICIT_TOKEN } from './utils/hub/constants.js';
+import { ENV_TOKEN_ORIGIN } from './utils/hub/constants.js';
 
 const VERSION = '4.4.0-next.0';
 
@@ -227,7 +227,7 @@ export const LogLevel = Object.freeze({
  * If set to `false`, it will skip the local file check and try to load the model from the remote host.
  * @property {string} localModelPath Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers).
  * @property {(input: string | URL, init?: any) => Promise<any>} fetch The fetch function to use. Defaults to `fetch`.
- * @property {string|null|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials. On `env`, this property is not enumerable, so `{ ...env }` snapshots don't include it; reset it with `env.hfToken = undefined`.
+ * @property {string|null|undefined} hfToken Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials.
  * @property {string|null} cacheDir The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers).
  */
 
@@ -330,16 +330,23 @@ Object.defineProperty(env, 'hfToken', { enumerable: false });
  */
 export function resolveEnv(sessionEnv = {}) {
     const resolved = { ...env, hfToken: env.hfToken };
+    const overrides = new Set();
     for (const key of SESSION_ENV_KEYS) {
-        if (sessionEnv != null && Object.hasOwn(sessionEnv, key) && sessionEnv[key] !== undefined) {
-            resolved[key] = sessionEnv[key];
+        const value = sessionEnv != null && Object.hasOwn(sessionEnv, key) ? sessionEnv[key] : undefined;
+        if (value !== undefined) {
+            resolved[key] = value;
+            overrides.add(key);
         }
     }
-    if (
-        hfToken !== undefined ||
-        (sessionEnv != null && Object.hasOwn(sessionEnv, 'hfToken') && sessionEnv.hfToken !== undefined)
-    ) {
-        ENV_WITH_EXPLICIT_TOKEN.add(resolved);
+    if (overrides.has('hfToken') && typeof resolved.hfToken === 'string' && overrides.has('remoteHost')) {
+        try {
+            const host = new URL(resolved.remoteHost);
+            if (host.protocol === 'https:' || host.protocol === 'http:') {
+                ENV_TOKEN_ORIGIN.set(resolved, host.origin);
+            }
+        } catch {
+            return resolved;
+        }
     }
     return resolved;
 }

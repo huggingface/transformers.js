@@ -22,6 +22,7 @@ import { Tensor } from './utils/tensor.js';
 import { logger } from './utils/logger.js';
 import { get_tokenizer_files } from './utils/model_registry/get_tokenizer_files.js';
 import { parse_response as template_parse_response, ResponseParser } from './utils/chat_parsing/index.js';
+import { load_response_template } from './utils/chat_parsing/response_templates.js';
 
 /**
  * @typedef {import('./utils/hub.js').PretrainedOptions} PretrainedTokenizerOptions
@@ -336,6 +337,16 @@ export class PreTrainedTokenizer
             this.chat_template = chat_template;
         }
         this.response_template = tokenizerConfig.response_template ?? null;
+        if (this.response_template !== null) {
+            try {
+                load_response_template(this.response_template);
+            } catch (error) {
+                logger.warn(
+                    `The tokenizer's response_template is invalid; response parsing is disabled for this tokenizer. ${error}`,
+                );
+                this.response_template = null;
+            }
+        }
         this._compiled_template_cache = new Map();
 
         const special_tokens = getSpecialTokens(this._tokenizer);

@@ -144,14 +144,47 @@ describe("Session-scoped resource loading", () => {
       expect(env.remoteHost).toBe("https://late-hub.example/");
     });
 
-    it("allows an explicitly assigned token to follow HF_ENDPOINT", () => {
+    it("does not allow a globally assigned token to follow HF_ENDPOINT", () => {
       process.env.HF_ENDPOINT = "https://private-hub.example/";
       env.hfToken = "assigned-token";
-      try {
-        expect(new AssetLoadingContext().getHeaders("https://private-hub.example/file").get("Authorization")).toBe("Bearer assigned-token");
-      } finally {
-        env.hfToken = undefined;
+      expect(new AssetLoadingContext().getHeaders("https://private-hub.example/file").get("Authorization")).toBeNull();
+    });
+
+    it("only authorizes a custom origin when both token and host come from the session", () => {
+      const hfToken = "test-secret-token";
+      const remoteHost = "http://private-hub.example:8080/";
+      const customURL = `${remoteHost}file`;
+      const officialURL = "https://huggingface.co/file";
+      const session = { hfToken, remoteHost };
+      const rows = [
+        [session, {}, {}, customURL, true],
+        [{ hfToken }, { remoteHost }, {}, customURL, false],
+        [{ hfToken }, {}, { HF_ENDPOINT: remoteHost }, customURL, false],
+        [{ remoteHost }, { hfToken }, {}, customURL, false],
+        [{}, { hfToken, remoteHost }, {}, customURL, false],
+        [{}, {}, { HF_TOKEN: hfToken, HF_ENDPOINT: remoteHost }, customURL, false],
+        [session, {}, {}, "http://private-hub.example:8081/file", false],
+        [session, {}, {}, "https://private-hub.example:8080/file", false],
+      ];
+      const keys = [];
+      for (const [overrides, globals, variables, url, sendsToken] of rows) {
+        env.hfToken = globals.hfToken;
+        env.remoteHost = globals.remoteHost;
+        for (const name of names) delete process.env[name];
+        Object.assign(process.env, variables);
+        const context = new AssetLoadingContext({ env: overrides });
+        expect(context.getHeaders(url).get("Authorization")).toBe(sendsToken ? `Bearer ${hfToken}` : null);
+        const key = context.key("org/model");
+        expect(key).not.toContain(hfToken);
+        keys.push(key);
       }
+      expect(keys[0]).not.toBe(keys[3]);
+
+      env.hfToken = hfToken;
+      expect(new AssetLoadingContext().getHeaders(officialURL).get("Authorization")).toBe(`Bearer ${hfToken}`);
+      const suppressed = new AssetLoadingContext({ env: { hfToken: null, remoteHost } });
+      expect(suppressed.getHeaders(officialURL).has("Authorization")).toBe(false);
+      expect(suppressed.getHeaders(customURL).has("Authorization")).toBe(false);
     });
 
     it("never sends token headers outside Node", () => {

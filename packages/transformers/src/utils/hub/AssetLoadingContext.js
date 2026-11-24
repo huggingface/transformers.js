@@ -2,7 +2,7 @@ import { resolveEnv } from '../../env.js';
 import { getCacheForEnvironment, tryCache } from '../cache.js';
 import { FileCache } from '../cache/FileCache.js';
 import { FileResponse } from './FileResponse.js';
-import { ENV_WITH_EXPLICIT_TOKEN } from './constants.js';
+import { ENV_TOKEN_ORIGIN } from './constants.js';
 import { credentialFingerprint } from './credential_fingerprint.js';
 import { isValidHfModelId, isValidUrl, makePretrainedOptionsKey, pathJoin } from './utils.js';
 
@@ -65,7 +65,7 @@ export class AssetLoadingContext {
         // Authorization headers are never sent outside Node, since that would expose the token to the client.
         this.token = isNode ? this.settings.hfToken : null;
         this.tokenFingerprint = credentialFingerprint(this.token);
-        this.explicitToken = isNode && ENV_WITH_EXPLICIT_TOKEN.has(this.settings);
+        this.tokenOrigin = isNode ? (ENV_TOKEN_ORIGIN.get(this.settings) ?? null) : null;
         /** @type {Promise<import('../cache.js').CacheInterface|null>|undefined} */
         this.cache = undefined;
     }
@@ -90,13 +90,11 @@ export class AssetLoadingContext {
      * @param {URL|string} urlOrPath
      */
     isHubURL(urlOrPath) {
-        const { remoteHost } = this.settings;
         return (
             isValidUrl(urlOrPath, ['https:'], ['huggingface.co', 'hf.co']) ||
-            (this.explicitToken &&
-                isValidUrl(remoteHost, ['http:', 'https:']) &&
-                isValidUrl(urlOrPath) &&
-                new URL(urlOrPath).origin === new URL(remoteHost).origin)
+            (this.tokenOrigin !== null &&
+                isValidUrl(urlOrPath, ['http:', 'https:']) &&
+                new URL(urlOrPath).origin === this.tokenOrigin)
         );
     }
 
@@ -220,7 +218,7 @@ export class AssetLoadingContext {
             settings,
             this.userAgent,
             this.tokenFingerprint,
-            this.explicitToken,
+            this.tokenOrigin,
             ...parts,
         );
     }

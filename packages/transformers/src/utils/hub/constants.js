@@ -15,7 +15,7 @@ export const ERROR_MAPPING = {
 
 export const MAX_EXTERNAL_DATA_CHUNKS = 100;
 
-// Internal provenance for resolved environments; never part of the public settings object.
-export const ENV_WITH_EXPLICIT_TOKEN = new WeakSet();
+/** @type {WeakMap<object, string>} */
+export const ENV_TOKEN_ORIGIN = new WeakMap();
 
 export const REPO_ID_REGEX = /^(\b[\w\-.]+\b\/)?\b[\w\-.]{1,96}\b$/;

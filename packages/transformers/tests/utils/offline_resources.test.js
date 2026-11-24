@@ -52,6 +52,31 @@ function pipeFor(tokenizer, suffix) {
 }
 
 describe("local parsed decoding", () => {
+  it("warns once and discards an invalid configured response template", () => {
+    const response_template = { start_anchor: "<assistant>", fields: { content: { open_pattern: "\\p{L}+", content: "text" } } };
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const tokenizer = localTokenizer(response_template);
+      expect(tokenizer.response_template).toBeNull();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0].join(" ")).toMatch(/response parsing is disabled.*open_pattern.*bad escape/);
+      expect(() => tokenizer.parse_response("hi", { prefix: "<assistant>", response_template })).toThrow("bad escape");
+      expect(() => tokenizer.get_response_parser({ prefix: "<assistant>", response_template })).toThrow("bad escape");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("keeps a valid configured response template unchanged and does not warn", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(localTokenizer(argumentsTemplate).response_template).toBe(argumentsTemplate);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("keeps structured strings lossless for text, IDs, meaningful prefixes and bigint batches", () => {
     const tokenizer = localTokenizer(argumentsTemplate);
     expect(tokenizer.decode(tokenizer.encode("hello ."))).toBe("hello.");

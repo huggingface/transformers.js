@@ -48,7 +48,7 @@ describe("Hub", () => {
       expect(otherPortHeaders.has("Authorization")).toBe(false);
     });
 
-    it.each(["HF_TOKEN", "HF_ACCESS_TOKEN"])("does not forward %s to a custom Hub, but permits explicitly assigned tokens", (name) => {
+    it.each(["HF_TOKEN", "HF_ACCESS_TOKEN"])("does not forward %s or globally assigned tokens to a custom Hub", (name) => {
       const saved = { HF_TOKEN: process.env.HF_TOKEN, HF_ACCESS_TOKEN: process.env.HF_ACCESS_TOKEN };
       try {
         delete process.env.HF_TOKEN;
@@ -64,8 +64,8 @@ describe("Hub", () => {
         }
         env.hfToken = "environment-token";
         const explicit = new AssetLoadingContext(options);
-        expect(explicit.getHeaders("https://cdn.example/file").get("Authorization")).toBe("Bearer environment-token");
-        expect(explicit.key("org/model")).not.toBe(implicit.key("org/model"));
+        expect(explicit.getHeaders("https://cdn.example/file").get("Authorization")).toBeNull();
+        expect(explicit.key("org/model")).toBe(implicit.key("org/model"));
         expect(explicit.key("org/model")).not.toContain("environment-token");
         expect(implicit.key("org/model")).not.toContain("environment-token");
       } finally {

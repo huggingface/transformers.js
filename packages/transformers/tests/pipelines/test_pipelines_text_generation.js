@@ -235,30 +235,28 @@ export default () => {
       it(
         "a response template that can't be loaded is reported once and ignored",
         async () => {
-          const { response_template } = pipe.tokenizer;
-          const invalid = () => ({
+          const original = pipe.tokenizer;
+          const response_template = {
             defaults: { role: "assistant" },
             start_anchor: "<|assistant|>",
             fields: { reasoning_content: { open_pattern: "\\p{L}+", close: "</think>" }, content: { content: "text" } },
-          });
+          };
           const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-          const parse = jest.spyOn(pipe.tokenizer, "parse_response");
           try {
-            pipe.tokenizer.response_template = invalid();
-            expect(await pipe(chat_input, { max_new_tokens: 3 })).toEqual(chat_target);
-            expect(await pipe(chat_input, { max_new_tokens: 3 })).toEqual(chat_target);
-            expect(parse).not.toHaveBeenCalled();
+            pipe.tokenizer = new original.constructor(original._tokenizerJSON, { ...original.config, response_template });
+            expect(pipe.tokenizer.response_template).toBeNull();
             expect(warn).toHaveBeenCalledTimes(1);
             expect(String(warn.mock.calls[0][0])).toContain("response_template is invalid");
             expect(String(warn.mock.calls[0][0])).toContain("open_pattern");
 
-            pipe.tokenizer.response_template = invalid();
+            const parse = jest.spyOn(pipe.tokenizer, "parse_response");
             expect(await pipe(chat_input, { max_new_tokens: 3 })).toEqual(chat_target);
-            expect(warn).toHaveBeenCalledTimes(2);
+            expect(await pipe(chat_input, { max_new_tokens: 3 })).toEqual(chat_target);
+            expect(parse).not.toHaveBeenCalled();
+            expect(warn).toHaveBeenCalledTimes(1);
           } finally {
             warn.mockRestore();
-            parse.mockRestore();
-            pipe.tokenizer.response_template = response_template;
+            pipe.tokenizer = original;
           }
         },
         MAX_TEST_EXECUTION_TIME,

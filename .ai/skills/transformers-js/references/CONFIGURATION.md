@@ -48,7 +48,7 @@ env.cacheDir = '/path/to/cache/directory/';
 | `allowLocalModels` | `boolean` | Whether to allow loading of local files, defaults to `false` if running in-browser, and `true` otherwise. If set to `false`, it will skip the local file check and try to load the model from the remote host. |
 | `localModelPath` | `string` | Path to load local models from. By default, it is `/models/` relative to the library's installed location when a file system is available (e.g., Node.js), and the `/models/` URL path otherwise (e.g., browsers). |
 | `fetch` | `(input: string \| URL, init?: any) => Promise<any>` | The fetch function to use. Defaults to `fetch`. |
-| `hfToken` | `string\|null\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials. On `env`, this property is not enumerable, so `{ ...env }` snapshots don't include it; reset it with `env.hfToken = undefined`. |
+| `hfToken` | `string\|null\|undefined` | Hugging Face access token to use for requests to the Hugging Face Hub. Defaults to the `HF_TOKEN` (or `HF_ACCESS_TOKEN`) environment variable, read on access. Set `null` to suppress inherited credentials. |
 | `cacheDir` | `string\|null` | The directory to use for caching files with the file system. By default, it is `.cache` relative to the library's installed location when a file system is available (e.g., Node.js), and `null` otherwise (e.g., browsers). |
 <!-- @generated:end id=typedef:TransformersEnvironment -->
 
@@ -105,7 +105,7 @@ In Node.js, no configuration is needed for private or gated models: the library
 automatically sends `Authorization: Bearer $HF_TOKEN` with requests to the
 Hugging Face Hub, so setting that environment variable is enough.
 
-Tokens read only from `HF_TOKEN` or `HF_ACCESS_TOKEN` are sent exclusively to `https://huggingface.co` and `https://hf.co`. Tokens explicitly assigned to `env.hfToken` or `options.env.hfToken` may also be sent to the resolved `remoteHost` origin; outside Node.js, the library never sends token authorization headers.
+In Node.js, tokens from `HF_TOKEN`, `HF_ACCESS_TOKEN` or `env.hfToken` are only sent to `https://huggingface.co` and `https://hf.co`. To authenticate against another host, pass `hfToken` and `remoteHost` together in `options.env`.
 
 In browsers — or for retry logic and abort signals anywhere — override
 `env.fetch`:

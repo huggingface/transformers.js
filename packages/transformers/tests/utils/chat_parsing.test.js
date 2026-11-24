@@ -1,7 +1,5 @@
-import { jest } from "@jest/globals";
 import { parse_response, ResponseParser } from "../../src/utils/chat_parsing/index.js";
 import { CONTENT_PARSERS } from "../../src/utils/chat_parsing/content_parsers.js";
-import { is_loadable_response_template } from "../../src/pipelines/text-generation.js";
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
@@ -1474,41 +1472,5 @@ describe("Content parsers", () => {
     const args = { tag_pattern: "<(?P<key>[^>]+)>(?P<value>.*?)</[^>]+>", value_parser: { name: "json" } };
     expect(CONTENT_PARSERS["xml-inline"](text, { ...args, merge_duplicates: true })).toEqual({ x: expected });
     expect(CONTENT_PARSERS["xml-inline"](text, args)).toEqual({ x: values.at(-1) });
-  });
-});
-
-describe("text-generation response template validation", () => {
-  const invalid = () => ({ start_anchor: "<a>", fields: { content: { open_pattern: "\\p{L}+", content: "text" } } });
-
-  it("accepts loadable templates and rejects missing ones without warning", () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      expect(is_loadable_response_template(cohere_template)).toBe(true);
-      expect(is_loadable_response_template(undefined)).toBe(false);
-      expect(is_loadable_response_template(null)).toBe(false);
-      expect(warn).not.toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  it("warns once per invalid template object", () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const template = invalid();
-      expect(is_loadable_response_template(template)).toBe(false);
-      expect(is_loadable_response_template(template)).toBe(false);
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(String(warn.mock.calls[0][0])).toContain("response_template is invalid");
-      expect(String(warn.mock.calls[0][0])).toContain("bad escape");
-      expect(is_loadable_response_template(invalid())).toBe(false);
-      expect(warn).toHaveBeenCalledTimes(2);
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  it("keeps parse_response throwing on the same template", () => {
-    expect(() => parse_response("hi", invalid(), { prefix: "<a>" })).toThrow("bad escape");
   });
 });
