@@ -3,6 +3,8 @@ import {
   AutoModelForSeq2SeqLM,
   AutoModelForCausalLM,
   LlamaForCausalLM,
+  Lfm2ForCausalLM,
+  PreTrainedTokenizer,
 
   // Tokenizers
   AutoTokenizer,
@@ -14,6 +16,7 @@ import {
   StoppingCriteria,
   random,
   full,
+  Tensor,
 } from "../../src/transformers.js";
 
 import { init, MAX_TEST_EXECUTION_TIME, MAX_MODEL_LOAD_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../init.js";
@@ -480,6 +483,21 @@ describe("Streamers", () => {
 });
 
 describe("Dynamic Cache", () => {
+  const seqKvTensor = (T) => {
+    const size = 1 * 2 * T * 4;
+    const data = Float32Array.from({ length: size }, (_, i) => i);
+    return new Tensor("float32", data, [1, 2, T, 4]);
+  };
+
+  const attentionOnlyCache = (T) => {
+    const cache = new DynamicCache();
+    cache.update({
+      "past_key_values.0.key": seqKvTensor(T),
+      "past_key_values.0.value": seqKvTensor(T),
+    });
+    return cache;
+  };
+
   it("should update and get sequence length correctly", () => {
     const cache = new DynamicCache();
     expect(cache.get_seq_length()).toEqual(0);
@@ -489,6 +507,138 @@ describe("Dynamic Cache", () => {
       "past_key_values.0.value": full([1, 2, 16, 32], 0.0),
     });
     expect(cache.get_seq_length()).toEqual(16);
+  });
+
+  it("crop positive, negative, zero, no-op, and errors", () => {
+    const cache = attentionOnlyCache(8);
+
+    cache.crop(5);
+    expect(cache.get_seq_length()).toEqual(5);
+    expect(cache["past_key_values.0.key"].dims).toEqual([1, 2, 5, 4]);
+    expect(cache["past_key_values.0.key"].data[0]).toBe(0);
+    expect(cache["past_key_values.0.key"].data[19]).toBe(19);
+    expect(cache["past_key_values.0.key"].data[20]).toBe(32);
+
+    const keyAfterCrop = cache["past_key_values.0.key"];
+    cache.crop(10);
+    expect(cache.get_seq_length()).toEqual(5);
+    expect(cache["past_key_values.0.key"]).toBe(keyAfterCrop);
+
+    const cache2 = attentionOnlyCache(6);
+    cache2.crop(-2);
+    expect(cache2.get_seq_length()).toEqual(4);
+
+    expect(() => attentionOnlyCache(4).crop(1.5)).toThrow(RangeError);
+    expect(() => attentionOnlyCache(2).crop(-5)).toThrow(RangeError);
+  });
+
+  it("crop(0) clears the decoder attention cache (keeps zero sequence positions)", () => {
+    const cache = attentionOnlyCache(3);
+    cache.crop(0);
+    expect(cache.get_seq_length()).toEqual(0);
+    expect(cache["past_key_values.0.key"].dims[2]).toEqual(0);
+    expect(cache["past_key_values.0.value"].dims[2]).toEqual(0);
+  });
+
+  it("snapshot length uses decoder attention, not get_seq_length when encoder is longer", () => {
+    const cache = new DynamicCache();
+    cache.update({
+      "past_key_values.0.encoder.key": seqKvTensor(10),
+      "past_key_values.0.decoder.key": seqKvTensor(4),
+      "past_key_values.0.decoder.value": seqKvTensor(4),
+    });
+    expect(cache.get_seq_length()).toEqual(10);
+    expect(cache.snapshot().length).toEqual(4);
+  });
+
+  it("restore on empty cache throws", () => {
+    const cache = new DynamicCache();
+    expect(() => cache.restore({ length: 0, states: {}, dispose: async () => {} })).toThrow(/Unable to determine sequence length/);
+  });
+
+  it("crop leaves encoder entries untouched", () => {
+    const T = 6;
+    const cache = new DynamicCache();
+    const enc = full([1, 2, T, 4], 99.0);
+    const dec = seqKvTensor(T);
+    cache.update({
+      "past_key_values.0.decoder.key": dec,
+      "past_key_values.0.decoder.value": seqKvTensor(T),
+      "past_key_values.0.encoder.key": enc,
+    });
+    cache.crop(3);
+    expect(cache.get_seq_length()).toEqual(3);
+    expect(cache["past_key_values.0.encoder.key"]).toBe(enc);
+    expect(cache["past_key_values.0.decoder.key"].dims[2]).toEqual(3);
+  });
+
+  it("crop throws on mismatched sequence lengths", () => {
+    const cache = new DynamicCache();
+    cache.update({
+      "past_key_values.0.key": seqKvTensor(5),
+      "past_key_values.1.key": seqKvTensor(4),
+      "past_key_values.1.value": seqKvTensor(4),
+    });
+    expect(() => cache.crop(3)).toThrow(/sequence length/);
+    expect(cache.get_seq_length()).toEqual(5);
+  });
+
+  it("clone is independent of the original", async () => {
+    const cache = attentionOnlyCache(7);
+    const copy = cache.clone(4);
+    expect(copy.get_seq_length()).toEqual(4);
+    expect(cache.get_seq_length()).toEqual(7);
+
+    copy["past_key_values.0.key"].data.fill(42);
+    expect(cache["past_key_values.0.key"].data[0]).not.toBe(42);
+
+    copy.crop(2);
+    expect(copy.get_seq_length()).toEqual(2);
+    expect(cache.get_seq_length()).toEqual(7);
+
+    await copy.dispose();
+    expect(cache.get_seq_length()).toEqual(7);
+  });
+
+  it("hybrid cache crop throws; snapshot/restore round-trips", () => {
+    const cache = new DynamicCache();
+    cache.update({
+      "past_conv.0": full([1, 6, 8], 1.0),
+      "past_key_values.1.key": seqKvTensor(5),
+      "past_key_values.1.value": seqKvTensor(5),
+    });
+    expect(() => cache.crop(3)).toThrow(/snapshot/i);
+
+    const snap = cache.snapshot();
+    expect(snap.length).toBe(5);
+    expect(Object.keys(snap.states)).toEqual(["past_conv.0"]);
+
+    cache.update({
+      "past_conv.0": full([1, 6, 8], 9.0),
+      "past_key_values.1.key": seqKvTensor(8),
+      "past_key_values.1.value": seqKvTensor(8),
+    });
+    expect(cache.get_seq_length()).toBe(8);
+
+    cache.restore(snap);
+    expect(cache.get_seq_length()).toBe(5);
+    expect([...cache["past_conv.0"].data.slice(0, 4)]).toEqual([...snap.states["past_conv.0"].data.slice(0, 4)]);
+
+    cache.update({
+      "past_conv.0": full([1, 6, 8], 3.0),
+    });
+    cache.restore(snap);
+    expect([...cache["past_conv.0"].data.slice(0, 4)]).toEqual([...snap.states["past_conv.0"].data.slice(0, 4)]);
+
+    const snapLong = { length: 10, states: snap.states, dispose: snap.dispose };
+    expect(() => cache.restore(snapLong)).toThrow(/Cannot restore snapshot/);
+  });
+
+  it("snapshot.dispose does not alter the live cache", async () => {
+    const cache = attentionOnlyCache(4);
+    const snap = cache.snapshot();
+    await snap.dispose();
+    expect(cache.get_seq_length()).toBe(4);
   });
 });
 
@@ -545,6 +695,51 @@ describe("PKV caching", () => {
 
         expect(generated_ids.tolist()).toEqual(target);
         expect(generated_ids_pkv.tolist()).toEqual(target);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "prefix reuse with crop matches full prefill (greedy)",
+      async () => {
+        const PREFIX = "shared:";
+        const SUFFIX_A = " answer-A";
+        const SUFFIX_B = " answer-B";
+        const fullA = tokenizer(PREFIX + SUFFIX_A);
+        const prefixLen = tokenizer(PREFIX).input_ids.dims[1];
+        const fullB = tokenizer(PREFIX + SUFFIX_B);
+
+        const idsFullA = await model.generate({ ...fullA, max_new_tokens: 5, do_sample: false });
+
+        const cache = new DynamicCache();
+        const prefixInputs = {
+          input_ids: fullA.input_ids.slice(null, [0, prefixLen]),
+        };
+        await model.generate({
+          ...prefixInputs,
+          max_new_tokens: 1,
+          do_sample: false,
+          return_dict_in_generate: true,
+          past_key_values: cache,
+        });
+        cache.crop(prefixLen - 1);
+        const shared = cache.clone();
+        const idsReuseA = await model.generate({
+          ...fullA,
+          past_key_values: cache,
+          max_new_tokens: 5,
+          do_sample: false,
+        });
+        expect(idsReuseA.tolist()).toEqual(idsFullA.tolist());
+
+        const idsFullB = await model.generate({ ...fullB, max_new_tokens: 5, do_sample: false });
+        const idsReuseB = await model.generate({
+          ...fullB,
+          past_key_values: shared,
+          max_new_tokens: 5,
+          do_sample: false,
+        });
+        expect(idsReuseB.tolist()).toEqual(idsFullB.tolist());
       },
       MAX_TEST_EXECUTION_TIME,
     );
@@ -606,6 +801,70 @@ describe("PKV caching", () => {
 
         expect(generated_ids.tolist()).toEqual(target);
         expect(generated_ids_pkv.tolist()).toEqual(target);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    afterAll(async () => {
+      await model?.dispose();
+    }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("Lfm2ForCausalLM", () => {
+    const model_id = "onnx-internal-testing/tiny-random-Lfm2ForCausalLM";
+    /** @type {Lfm2ForCausalLM} */
+    let model;
+    /** @type {PreTrainedTokenizer} */
+    let tokenizer;
+
+    beforeAll(async () => {
+      model = await Lfm2ForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
+      tokenizer = await PreTrainedTokenizer.from_pretrained(model_id);
+    }, MAX_MODEL_LOAD_TIME);
+
+    it(
+      "snapshot/restore at prefix boundary matches fresh suffix-B generate",
+      async () => {
+        const PREFIX = "sys:";
+        const SUFFIX_A = " pathA";
+        const SUFFIX_B = " pathB";
+        const fullA = tokenizer(PREFIX + SUFFIX_A);
+        const fullB = tokenizer(PREFIX + SUFFIX_B);
+        const prefixLen = tokenizer(PREFIX).input_ids.dims[1];
+        const prefixInputs = {
+          input_ids: fullA.input_ids.slice(null, [0, prefixLen]),
+        };
+
+        const cache = new DynamicCache();
+        await model.generate({
+          ...prefixInputs,
+          max_new_tokens: 1,
+          do_sample: false,
+          return_dict_in_generate: true,
+          past_key_values: cache,
+        });
+        const snap = cache.snapshot();
+
+        await model.generate({
+          ...fullA,
+          past_key_values: cache,
+          max_new_tokens: 4,
+          do_sample: false,
+        });
+
+        cache.restore(snap);
+        const idsRestoreB = await model.generate({
+          ...fullB,
+          past_key_values: cache,
+          max_new_tokens: 4,
+          do_sample: false,
+        });
+        const idsFreshB = await model.generate({
+          ...fullB,
+          max_new_tokens: 4,
+          do_sample: false,
+        });
+        expect(idsRestoreB.tolist()).toEqual(idsFreshB.tolist());
       },
       MAX_TEST_EXECUTION_TIME,
     );

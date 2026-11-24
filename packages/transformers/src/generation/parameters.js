@@ -32,6 +32,10 @@
  * @property {import('../cache_utils.js').DynamicCache | null} [past_key_values=null] (`DynamicCache`, *optional*):
  * A cache object that stores previously computed key/value states. When provided, the model will
  * use these cached states to avoid recomputing them, significantly speeding up sequential generation.
+ * Re-send the full prompt each call; only uncached suffix tokens are forwarded. To reuse a shared
+ * prefix across turns with different continuations, prefill the prefix, then `crop()` to the
+ * token-level common prefix (keep at least one token outside the cache for logits). Hybrid models
+ * with conv/recurrent state need `snapshot()` / `restore()` at branch points.
  */
 
 /**
