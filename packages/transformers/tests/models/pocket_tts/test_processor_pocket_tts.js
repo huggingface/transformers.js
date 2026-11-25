@@ -47,6 +47,10 @@ export default () => {
 
     it.each([
       ["hello. goodbye.", 8, ["Hello.", "goodbye."]],
+      ["hello <|audio_bos|> there.", 8, ["Hello there."]],
+      ["hello <|audio_prompt|> there.", 8, ["Hello there."]],
+      ["hello <|audio_latent|> there.", 8, ["Hello there."]],
+      ["<|audio_prompt|>hello. <|audio_latent|>goodbye.<|audio_bos|>", 8, ["Hello.", "goodbye."]],
       ["Hi.Bye.", 50, ["Hi. Bye."]],
       ["one,two,three,four,five,six.", 17, ["One, two, three,", "four, five, six."]],
       ["price 3.5. next.", 10, ["Price 3.5.", "next."]],
@@ -56,6 +60,9 @@ export default () => {
       ["a".repeat(80), 10, ["A" + "a".repeat(79) + "."]],
     ])("splits %s like Python", (text, budget, expected) => {
       expect(processor.split_text(text, budget)).toEqual(expected);
+    });
+    it.each(["<|audio_bos|>", " <|audio_prompt|> <|audio_latent|> "])("rejects text containing only audio markers: %s", (text) => {
+      expect(() => processor.split_text(text)).toThrow("expects a non-empty text string");
     });
     it("bounds decoding work for long text", () => {
       const decode = jest.spyOn(processor.tokenizer, "decode");

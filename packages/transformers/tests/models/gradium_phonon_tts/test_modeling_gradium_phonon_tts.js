@@ -291,6 +291,12 @@ export default () => {
         expect(feed.dims).toEqual([1, 3, 2]);
         expect([...feed.data]).toEqual([1, 10, 2, 20, 3, 30]);
       });
+      it("strips audio markers from pipeline text before prefill", async () => {
+        const output = await fixture.pipe("Hello <|audio_bos|> there.", { speaker_embeddings: voice });
+        expect(output.audio.length).toBeGreaterThan(0);
+        const [[prefill]] = fixture.flow.run.mock.calls;
+        expect(fixture.processor.tokenizer.decode([...prefill.input_ids.data].map(Number))).toBe("Hello there.");
+      });
       it("preserves sentence chunk and batch order and starts each prefill fresh", async () => {
         await fixture.pipe.dispose();
         fixture = create_pipeline(4, () => 5, true);

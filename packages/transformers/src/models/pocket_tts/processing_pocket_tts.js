@@ -5,10 +5,11 @@ import { Processor } from '../../processing_utils.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
 import { Tensor, full } from '../../utils/tensor.js';
 
-// Markers emitted by the Python checkpoint's chat template:
-// https://huggingface.co/gradium/phonon-31m-en/blob/8f7a37c94a4c58b04c8287300c53f11d2e208eae/chat_template.jinja
+// See model_specific_special_tokens in the Python checkpoint's tokenizer config:
+// https://huggingface.co/gradium/phonon-31m-en/blob/8f7a37c94a4c58b04c8287300c53f11d2e208eae/tokenizer_config.json
 const AUDIO_PROMPT_TOKEN = '<|audio_prompt|>';
 const AUDIO_BOS_TOKEN = '<|audio_bos|>';
+const AUDIO_LATENT_TOKEN = '<|audio_latent|>';
 
 // Until tokenizers.js implements Unigram byte fallback, expand unknown pieces
 // before they are converted to IDs. Limit the workaround to this processor.
@@ -33,11 +34,17 @@ export class PocketTTSProcessor extends Processor {
 
     /**
      * Split text into sentence-aligned chunks of at most `max_tokens` tokens, as Python's `PocketTTSProcessor.split_text`.
+     * Audio marker strings in the text are removed before tokenization, as in Python.
      * @param {string} text The text to split.
      * @param {number} [max_tokens=50] Maximum number of tokens per chunk (a soft limit).
      * @returns {string[]} The text chunks, in order.
      */
     split_text(text, max_tokens = 50) {
+        if (typeof text === 'string') {
+            for (const token of [AUDIO_PROMPT_TOKEN, AUDIO_BOS_TOKEN, AUDIO_LATENT_TOKEN]) {
+                text = text.replaceAll(token, '');
+            }
+        }
         if (typeof text !== 'string' || !text.trim()) {
             throw new Error('PocketTTSProcessor expects a non-empty text string.');
         }
@@ -91,7 +98,7 @@ export class PocketTTSProcessor extends Processor {
 
     /**
      * Prepare a rendered chat prompt and a precomputed voice for generation.
-     * The current ONNX export accepts one prompt and one voice per call.
+     * Accepts one prompt and at most one voice per call.
      * @param {string} text Prompt from `apply_chat_template(..., { add_generation_prompt: true })`.
      * @param {Object} [options]
      * @param {Tensor[]} [options.audio_prompt_latents] One voice tensor of shape `[frames, audio_prompt_dim]`.
