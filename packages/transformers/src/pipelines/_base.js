@@ -145,15 +145,15 @@ export class Pipeline extends Callable {
      * @param {PreTrainedModel} [options.model] The model used by the pipeline.
      * @param {PreTrainedTokenizer} [options.tokenizer=null] The tokenizer used by the pipeline (if any).
      * @param {Processor} [options.processor=null] The processor used by the pipeline (if any).
-     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.sessionEnv={}] Session-scopable environment overrides.
+     * @param {Partial<import('../env.js').TransformersEnvironmentSession>} [options.env={}] Session-scopable environment overrides.
      */
-    constructor({ task, model, tokenizer = null, processor = null, sessionEnv = {} }) {
+    constructor({ task, model, tokenizer = null, processor = null, env = {} }) {
         super();
         this.task = task;
         this.model = model;
         this.tokenizer = tokenizer;
         this.processor = processor;
-        PIPELINE_SESSION_ENVS.set(this, sessionEnv);
+        PIPELINE_SESSION_ENVS.set(this, env);
     }
 
     /** @type {DisposeType} */
@@ -167,7 +167,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
- * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv] The session-scopable environment overrides used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env] The session-scopable environment overrides used by the pipeline.
  *
  * @typedef {ModelTokenizerConstructorArgs} TextPipelineConstructorArgs An object used to instantiate a text-based pipeline.
  */
@@ -177,7 +177,7 @@ export class Pipeline extends Callable {
  * @property {string} task The task of the pipeline. Useful for specifying subtasks.
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
- * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv] The session-scopable environment overrides used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env] The session-scopable environment overrides used by the pipeline.
  *
  * @typedef {ModelProcessorConstructorArgs} AudioPipelineConstructorArgs An object used to instantiate an audio-based pipeline.
  * @typedef {ModelProcessorConstructorArgs} ImagePipelineConstructorArgs An object used to instantiate an image-based pipeline.
@@ -189,7 +189,7 @@ export class Pipeline extends Callable {
  * @property {PreTrainedModel} model The model used by the pipeline.
  * @property {PreTrainedTokenizer} tokenizer The tokenizer used by the pipeline.
  * @property {Processor} processor The processor used by the pipeline.
- * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [sessionEnv] The session-scopable environment overrides used by the pipeline.
+ * @property {Partial<import('../env.js').TransformersEnvironmentSession>} [env] The session-scopable environment overrides used by the pipeline.
  *
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextAudioPipelineConstructorArgs An object used to instantiate a text- and audio-based pipeline.
  * @typedef {ModelTokenizerProcessorConstructorArgs} TextImagePipelineConstructorArgs An object used to instantiate a text- and image-based pipeline.

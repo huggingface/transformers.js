@@ -113,7 +113,7 @@ export async function pipeline(
         use_external_data_format = null,
         model_file_name = null,
         session_options = {},
-        env: sessionEnv = {},
+        env = {},
     } = {},
 ) {
     // Apply aliases
@@ -143,7 +143,7 @@ export async function pipeline(
         device,
         dtype,
         model_file_name,
-        env: sessionEnv,
+        env,
     };
 
     // Determine which files the model needs
@@ -215,7 +215,7 @@ export async function pipeline(
         modelPromise,
     ]);
 
-    const results = { task, model: model_loaded, sessionEnv };
+    const results = { task, model: model_loaded, env };
     if (tokenizer) results.tokenizer = tokenizer;
     if (processor) results.processor = processor;
 

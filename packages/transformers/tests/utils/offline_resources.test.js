@@ -122,7 +122,7 @@ describe("audio fail-fast capability", () => {
     delete globalThis.AudioContext;
     const arrayBuffer = jest.fn();
     const fetch = jest.fn(async () => ({ arrayBuffer }));
-    const pipe = new Pipeline({ task: "test", model: null, sessionEnv: { fetch } });
+    const pipe = new Pipeline({ task: "test", model: null, env: { fetch } });
     await expect(prepareAudios(pipe, url, 16000)).rejects.toThrow("AudioContext");
     expect(fetch).not.toHaveBeenCalled();
     expect(arrayBuffer).not.toHaveBeenCalled();
@@ -142,7 +142,7 @@ describe("audio fail-fast capability", () => {
       async close() {}
     };
     const fetch = jest.fn(async () => new Response(new Uint8Array([1, 2])));
-    const pipe = new Pipeline({ task: "test", model: null, sessionEnv: { fetch } });
+    const pipe = new Pipeline({ task: "test", model: null, env: { fetch } });
     expect(await prepareAudios(pipe, "https://example.test/audio.wav", 16000)).toEqual([new Float32Array([0.5])]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });

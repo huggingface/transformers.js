@@ -301,7 +301,7 @@ describe("Session-scoped resource loading", () => {
   describe("Pipeline env", () => {
     it("should keep session overrides off the public pipeline instance", () => {
       const sessionEnv = { hfToken: "scoped-token" };
-      const pipe = new Pipeline({ task: "test", model: null, sessionEnv });
+      const pipe = new Pipeline({ task: "test", model: null, env: sessionEnv });
 
       expect(getSessionEnv(pipe)).toBe(sessionEnv);
       expect(Object.values(pipe)).not.toContain(sessionEnv);
@@ -318,7 +318,7 @@ describe("Session-scoped resource loading", () => {
     it("should download image URL inputs with the session fetch and token", async () => {
       const fetch = jest.fn(async () => ({ status: 404, statusText: "Not Found" }));
 
-      await expect(prepareImages(new Pipeline({ task: "test", model: null, sessionEnv: { ...sessionEnv, fetch } }), "https://private-hub.example/image.png")).rejects.toThrow('Unable to read image from "https://private-hub.example/image.png"');
+      await expect(prepareImages(new Pipeline({ task: "test", model: null, env: { ...sessionEnv, fetch } }), "https://private-hub.example/image.png")).rejects.toThrow('Unable to read image from "https://private-hub.example/image.png"');
 
       expect(fetch).toHaveBeenCalledWith("https://private-hub.example/image.png", expect.any(Object));
       expect(fetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer scoped-token");
@@ -337,7 +337,7 @@ describe("Session-scoped resource loading", () => {
       const fetch = jest.fn(async () => new Response(new ArrayBuffer(8)));
 
       try {
-        const [audio] = await prepareAudios(new Pipeline({ task: "test", model: null, sessionEnv: { ...sessionEnv, fetch } }), "https://private-hub.example/audio.wav", 16000);
+        const [audio] = await prepareAudios(new Pipeline({ task: "test", model: null, env: { ...sessionEnv, fetch } }), "https://private-hub.example/audio.wav", 16000);
 
         expect(audio).toEqual(new Float32Array([0.25, 0.5]));
         expect(fetch).toHaveBeenCalledWith("https://private-hub.example/audio.wav", expect.any(Object));
