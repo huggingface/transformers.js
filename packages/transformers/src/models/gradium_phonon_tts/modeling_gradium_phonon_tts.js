@@ -60,13 +60,40 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         if (input_ids.dims.length !== 2 || input_ids.dims[0] !== 1) {
             throw new Error('This Phonon ONNX export supports one prompt per generate() call.');
         }
-        const prompt_length = Number(attention_mask.sum().item());
-        const text_length = prompt_length - Number(audio_prompt_latents_mask.sum().item()) - 1;
+        if (
+            attention_mask.dims.length !== 2 ||
+            attention_mask.dims[0] !== 1 ||
+            attention_mask.dims[1] !== input_ids.dims[1]
+        ) {
+            throw new Error('attention_mask must match the shape of input_ids.');
+        }
+        const voice_length = audio_prompt_latents.dims[1];
+        if (
+            audio_prompt_latents_mask.dims.length !== 2 ||
+            audio_prompt_latents_mask.dims[0] !== 1 ||
+            audio_prompt_latents_mask.dims[1] !== voice_length ||
+            audio_prompt_latents_mask.data.some((value) => Number(value) !== 1)
+        ) {
+            throw new Error('Phonon requires an unpadded voice prompt with a matching audio_prompt_latents_mask.');
+        }
+
+        // The graph inserts the projected voice and its own audio BOS. Keep the
+        // logical prompt length for max_length, but embed only unmasked text tokens.
+        const mask = attention_mask.data;
+        const audio_prompt_id = BigInt(config.audio_prompt_token_id);
+        const audio_bos_id = BigInt(config.audio_bos_token_id);
+        const text_ids = [];
+        let prompt_length = 0;
+        for (const [i, id] of input_ids.data.entries()) {
+            if (!mask[i]) continue;
+            ++prompt_length;
+            if (id !== audio_prompt_id && id !== audio_bos_id) text_ids.push(id);
+        }
         const max_frames =
             options.max_new_tokens ??
             (options.max_length != null
                 ? options.max_length - prompt_length
-                : Math.ceil((text_length / 3 + 2) * config.frame_rate));
+                : Math.ceil((text_ids.length / 3 + 2) * config.frame_rate));
         const tail = frames_after_eos instanceof Tensor ? Number(frames_after_eos.item()) : frames_after_eos;
         if (!Number.isInteger(max_frames) || max_frames < 1 || !Number.isInteger(tail) || tail < 0) {
             throw new Error('The frame budget must be a positive integer and frames_after_eos a non-negative integer.');
@@ -74,12 +101,13 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         if (!Number.isFinite(options.temperature) || options.temperature < 0) {
             throw new Error('temperature must be a finite non-negative number.');
         }
-        let inputs = { input_ids, attention_mask, audio_prompt_latents, audio_prompt_latents_mask };
+        const prompt_inputs = {
+            input_ids: new Tensor('int64', text_ids, [1, text_ids.length]),
+            audio_prompt_latents,
+        };
         const empty_inputs = {
             input_ids: new Tensor('int64', [], [1, 0]),
-            attention_mask: new Tensor('int64', [], [1, 0]),
             audio_prompt_latents: full([1, 0, config.audio_prompt_dim], 0),
-            audio_prompt_latents_mask: new Tensor('int64', [], [1, 0]),
         };
         const cache = addPastKeyValues(this, {}, null);
         let audio_latents,
@@ -87,31 +115,51 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
             stop_frame = null;
         try {
             while (num_frames < Math.min(stop_frame ?? max_frames, max_frames)) {
+                const prefill = num_frames === 0;
+                // The KV cache includes voice and text positions, unlike the audio latent cache.
+                const past_length = cache['past_key_values.0.key'].dims.at(-2);
+                const step_length = block_size + (prefill ? voice_length + text_ids.length : 0);
+                const position_ids = new Tensor(
+                    'int64',
+                    BigInt64Array.from({ length: step_length }, (_, i) => BigInt(past_length + i)),
+                    [1, step_length],
+                );
                 const noise =
                     options.do_sample && options.temperature > 0
                         ? randn([1, block_size, config.latent_dim]).mul_(Math.sqrt(options.temperature))
                         : full([1, block_size, config.latent_dim], 0);
-                const outputs = await sessionRun(model, { ...inputs, ...cache, noise });
+                const outputs = await sessionRun(model, {
+                    ...(prefill ? prompt_inputs : empty_inputs),
+                    ...cache,
+                    position_ids,
+                    attention_mask: full([1, past_length + step_length], 1n),
+                    noise,
+                });
                 getPastKeyValues(outputs, cache);
                 audio_latents?.dispose();
                 audio_latents = outputs.audio_latents;
-                if (stop_frame === null) {
-                    const eos = outputs.eos_logits.data.findIndex(
-                        (value, i) => num_frames + i >= options.min_frames_before_eos && value > options.eos_threshold,
-                    );
-                    if (eos !== -1) stop_frame = num_frames + eos + tail + 1;
+                try {
+                    if (stop_frame === null) {
+                        const eos = outputs.eos_logits.data.findIndex(
+                            (value, i) =>
+                                num_frames + i >= options.min_frames_before_eos && value > options.eos_threshold,
+                        );
+                        if (eos !== -1) stop_frame = num_frames + eos + tail + 1;
+                    }
+                } finally {
+                    outputs.eos_logits.dispose();
                 }
                 num_frames += block_size;
-                inputs = empty_inputs;
             }
             num_frames = Math.min(num_frames, stop_frame ?? max_frames, max_frames);
             if (stop_frame === null && options.max_new_tokens == null && options.max_length == null) {
                 logger.warn('Phonon reached its safety frame limit; audio may be truncated.');
             }
-            const { audio_values } = await sessionRun(mimi_decoder, {
+            const { audio_values, audio_lengths } = await sessionRun(mimi_decoder, {
                 audio_latents,
-                num_frames: new Tensor('int64', [BigInt(num_frames)], []),
+                num_frames: new Tensor('int64', [BigInt(num_frames)], [1]),
             });
+            audio_lengths.dispose();
             return { audio_values };
         } finally {
             await cache.dispose();
