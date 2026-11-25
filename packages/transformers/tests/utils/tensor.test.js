@@ -433,6 +433,17 @@ describe("Tensor operations", () => {
       const norm = layer_norm(t1, [t1.dims.at(-1)]);
       expect(norm).toBeCloseToNested(target);
     });
+
+    it("should throw when normalized_shape has the wrong length", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      // First element matches featureDim, but the shape is not 1D of that size.
+      expect(() => layer_norm(t1, [3, 3])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
+
+    it("should throw when normalized_shape does not match the feature dimension", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      expect(() => layer_norm(t1, [2])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
   });
 
   describe("sigmoid", () => {
