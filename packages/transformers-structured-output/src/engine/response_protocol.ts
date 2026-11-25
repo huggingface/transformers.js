@@ -1,13 +1,18 @@
-import { compileRegex } from './regex';
+import { compileRegex, compileSearchRegex } from './regex';
 import type { ConstraintState, TokenizerSource } from './types';
 
-type Matcher = { machine: ConstraintState<unknown>; eager: boolean; source: string };
+type Matcher = {
+    machine: ConstraintState<unknown>;
+    eager: boolean;
+    source: string;
+    terminal?: (state: unknown) => boolean;
+};
 type Replay = { length: number; byte?: number; previous?: Replay };
 const EMPTY_REPLAY: Replay = { length: 0 };
 type MatchProgress = { state: unknown; accepted: boolean; replay: Replay };
 export type ProtocolConfig = {
     thinkingOpen: Matcher;
-    thinkingClose: Uint8Array[];
+    thinkingClose: Uint8Array[] | Matcher;
     contentOpen?: Matcher;
     /** Content opener after a thinking region, which may first repeat the start anchor. */
     contentOpenAfterThinking?: Matcher;
@@ -21,6 +26,7 @@ const MAX_FRAMING_WHITESPACE = 4;
 type ProtocolState =
     | { phase: 'start'; structured?: unknown; thinking?: MatchProgress; content?: MatchProgress }
     | { phase: 'thinking'; closeBuffer: Uint8Array }
+    | { phase: 'thinkingRegex'; progress: MatchProgress }
     | { phase: 'content'; progress: MatchProgress; opener: Matcher }
     | { phase: 'ending'; progress: MatchProgress }
     | { phase: 'structured'; state: unknown; framing?: number; closer?: MatchProgress }
@@ -48,6 +54,14 @@ export function withResponseProtocol(
         thinking: initialMatch(protocol.thinkingOpen),
         content: protocol.contentOpen === undefined ? undefined : initialMatch(protocol.contentOpen),
     };
+    const thinkingClose = protocol.thinkingClose;
+    const thinkingInitial: ProtocolState = Array.isArray(thinkingClose)
+        ? { phase: 'thinking', closeBuffer: new Uint8Array() }
+        : { phase: 'thinkingRegex', progress: initialMatch(thinkingClose) };
+    const partialThinkingDelimiter = (state: ProtocolState): boolean =>
+        state.phase === 'thinking'
+            ? state.closeBuffer.length > 0
+            : state.phase === 'thinkingRegex' && state.progress.state !== (thinkingClose as Matcher).machine.initial;
     const framed = (
         phase: 'content' | 'ending',
         progress: MatchProgress,
@@ -113,19 +127,23 @@ export function withResponseProtocol(
             case 'ending':
                 return framed('ending', state.progress, protocol.contentClose!, byte);
             case 'thinking': {
-                const close = advanceLiteralSearch(protocol.thinkingClose, state.closeBuffer, byte);
+                const close = advanceLiteralSearch(thinkingClose as Uint8Array[], state.closeBuffer, byte);
                 if (close.complete === 'after') return afterThinking();
                 if (close.replay !== undefined) return close.replay.reduce(transition, afterThinking());
                 return { phase: 'thinking', closeBuffer: close.buffer };
             }
+            case 'thinkingRegex': {
+                const close = advanceMatch(thinkingClose as Matcher, state.progress, byte);
+                if (close.complete === 'after') return afterThinking();
+                // The matcher already consumed all delimiter bytes, including greedy whitespace.
+                // Replay only the bytes after its winning match, even within the same token.
+                if (close.complete === 'before') return close.replay!.reduce(transition, afterThinking());
+                return { phase: 'thinkingRegex', progress: close.progress! };
+            }
             case 'start': {
                 const thinking = state.thinking && advanceMatch(protocol.thinkingOpen, state.thinking, byte);
-                if (thinking?.complete === 'after') return { phase: 'thinking', closeBuffer: new Uint8Array() };
-                if (thinking?.complete === 'before')
-                    return thinking.replay!.reduce(transition, {
-                        phase: 'thinking',
-                        closeBuffer: new Uint8Array(),
-                    } as ProtocolState);
+                if (thinking?.complete === 'after') return thinkingInitial;
+                if (thinking?.complete === 'before') return thinking.replay!.reduce(transition, thinkingInitial);
                 const content = state.content && advanceMatch(protocol.contentOpen!, state.content, byte);
                 if (content?.complete === 'after') return boundary;
                 if (content?.complete === 'before') return content.replay!.reduce(transition, boundary);
@@ -188,6 +206,7 @@ export function withResponseProtocol(
             if (context?.enable_thinking === true) return state;
             const startedThinking =
                 state.phase === 'thinking' ||
+                (state.phase === 'thinkingRegex' && !state.progress.accepted) ||
                 (state.phase === 'start' && state.structured === undefined && state.content === undefined);
             if (startedThinking) {
                 if (context?.enable_thinking === false)
@@ -206,6 +225,12 @@ export function withResponseProtocol(
         // The end token may itself complete the content closer, e.g. Qwen3's `\s*<|im_end|>` once a
         // newline has started it.
         acceptsEnd: (state, bytes) => {
+            if (state.phase === 'thinkingRegex') {
+                // EOF settles a previously accepted closer, but EOS bytes cannot provide
+                // a thinking closer or fill in a missing answer.
+                if (!state.progress.accepted) return false;
+                state = replayBytes(state.progress.replay).reduce(transition, afterThinking());
+            }
             if (accepting(state)) return true;
             let next = state;
             for (const byte of bytes) next = transition(next, byte);
@@ -219,6 +244,9 @@ export function withResponseProtocol(
             if (state.phase === 'thinking') {
                 return next.phase !== 'thinking' || next.closeBuffer.length > state.closeBuffer.length;
             }
+            if (state.phase === 'thinkingRegex') {
+                return next.phase !== 'thinkingRegex' || partialThinkingDelimiter(next);
+            }
             if (state.phase === 'structured') {
                 return specialCloser(state, bytes) !== undefined;
             }
@@ -230,12 +258,12 @@ export function withResponseProtocol(
                     advanceMatch(protocol.thinkingOpen, state.thinking, bytes[0]).complete === 'before'
                 ) {
                     // The non-eager opener is complete: apply the same special-token rule as in thinking.
-                    candidate = { phase: 'thinking', closeBuffer: new Uint8Array() };
-                    candidate = replayBytes(state.thinking.replay).reduce(transition, candidate);
+                    candidate = replayBytes(state.thinking.replay).reduce(transition, thinkingInitial);
                     for (const byte of bytes) candidate = transition(candidate, byte);
                     return (
                         candidate.phase !== 'dead' &&
-                        (candidate.phase !== 'thinking' || candidate.closeBuffer.length > 0)
+                        ((candidate.phase !== 'thinking' && candidate.phase !== 'thinkingRegex') ||
+                            partialThinkingDelimiter(candidate))
                     );
                 }
                 if (!advancesDelimiter(candidate, bytes[0])) return false;
@@ -250,6 +278,10 @@ export function withResponseProtocol(
             state.phase === 'structured' ? structured.stringCapacity?.(state.state) : undefined,
         maskKey: (state) => {
             if (state.phase === 'thinking') return `thinking:${Array.from(state.closeBuffer).join(',')}`;
+            if (state.phase === 'thinkingRegex' && state.progress.replay.length === 0) {
+                const key = (thinkingClose as Matcher).machine.maskKey?.(state.progress.state);
+                if (key !== undefined) return `thinking-regex:${key}`;
+            }
             if (state.phase !== 'structured') return undefined;
             if (state.closer !== undefined) return undefined;
             const key = structured.maskKey?.(state.state);
@@ -285,7 +317,7 @@ function advanceMatch(
     if (!matcher.machine.viable(next))
         return progress.accepted ? { complete: 'before', replay: replayBytes(progress.replay, byte) } : {};
     const accepted = matcher.machine.accepting(next);
-    return accepted && matcher.eager
+    return accepted && (matcher.eager || matcher.terminal?.(next))
         ? { complete: 'after' }
         : {
               progress: {
@@ -359,12 +391,12 @@ function buildProtocol(
     thinking: Record<string, unknown>,
     content: Record<string, unknown>,
 ): ProtocolConfig {
-    if (thinking.close_pattern !== undefined)
-        throw new Error('Thinking-aware constraints do not support a reasoning_content close_pattern.');
     const thinkingOpen = anchorMatcher(thinking, 'open', 'open_pattern');
-    const thinkingClose = literalAnchor(thinking.close, 'response_template.fields.reasoning_content.close');
+    const thinkingClose = Object.hasOwn(thinking, 'close_pattern')
+        ? thinkingCloseMatcher(thinking)
+        : literalAnchor(thinking.close, 'response_template.fields.reasoning_content.close');
     if (thinkingOpen === undefined || thinkingClose === undefined)
-        throw new Error('Thinking-aware constraints require reasoning_content open and literal close delimiters.');
+        throw new Error('Thinking-aware constraints require reasoning_content open and close delimiters.');
     const contentOpen = anchorMatcher(content, 'open', 'open_pattern');
     if ((content.open !== undefined || content.open_pattern !== undefined) && contentOpen === undefined)
         throw new Error('Thinking-aware constraints require a supported content opener.');
@@ -383,6 +415,24 @@ function buildProtocol(
         contentClose: anchorMatcher(content, 'close', 'close_pattern'),
         startAnchor,
     };
+}
+function thinkingCloseMatcher(thinking: Record<string, unknown>): Matcher {
+    try {
+        const source = thinking.close_pattern;
+        if (typeof source !== 'string' || Object.hasOwn(thinking, 'close'))
+            throw new Error('expected a close_pattern string without a literal close delimiter');
+        const machine = compileSearchRegex(source);
+        if (machine.accepting(machine.initial))
+            throw new Error(`nullable patterns are unsupported: ${JSON.stringify(source)}`);
+        return {
+            machine: machine as ConstraintState<unknown>,
+            eager: false,
+            source,
+            terminal: (state) => machine.terminal(state as number),
+        };
+    } catch (error) {
+        throw new Error(`Unsupported response template reasoning_content close_pattern: ${String(error)}`);
+    }
 }
 function anchorMatcher(field: Record<string, unknown>, literalKey: string, patternKey: string): Matcher | undefined {
     if (field[literalKey] !== undefined) {

@@ -3,6 +3,7 @@ import { PreTrainedTokenizer, Tensor } from "@huggingface/transformers";
 import ts from "typescript";
 import { fileURLToPath } from "node:url";
 
+import { ResponseParser } from "../../transformers/src/utils/chat_parsing/index.js";
 import { StructuredOutputProcessor } from "../dist/index.js";
 
 const EOS_TOKEN_ID = 256;
@@ -70,6 +71,25 @@ const GRANITE_3_3_RESPONSE_TEMPLATE = {
       close_pattern: "(?:</response>)?\\s*<\\|end_of_text\\|>",
       content: "text",
     },
+  },
+};
+const LFM3_RESPONSE_TEMPLATE = {
+  defaults: { role: "assistant" },
+  start_anchor_pattern: "<\\|im_start\\|>assistant\\n",
+  fields: {
+    reasoning_content: { open_pattern: "<think>\\n?", close_pattern: "</think>\\s*", content: "text" },
+    tool_calls: {
+      open_pattern: "<tool_call>\\s*<function=(?P<name>[^\\n>]+)>",
+      close_pattern: "</tool_call>\\s*",
+      repeats: true,
+      content: "xml-inline",
+      content_args: {
+        tag_pattern: "<parameter=(?P<key>[^>\\n]+)>\\n?(?P<value>.*?)\\n?</parameter>(?=\\s*(?:<parameter=|</function>\\s*\\Z|\\Z))",
+        value_parser: { name: "text", args: { strip: false } },
+      },
+      transform: { type: "function", function: { name: "{name}", arguments: "{content}" } },
+    },
+    content: { close_pattern: "<\\|im_end\\|>\\s*", content: "text" },
   },
 };
 
@@ -691,6 +711,9 @@ describe("StructuredOutputProcessor", () => {
     ["an unsupported content closer escape", { content: { close_pattern: "(?:<eos>|\\Z)", content: "text" } }, "unsupported escape"],
     ["an unsupported content opener", { content: { open_pattern: "(?P<x>a)", content: "text" } }, "open_pattern"],
     ["a `^` assertion inside an opener", { reasoning_content: { open_pattern: "(?:^|<think>\\s*)", close: "</think>", content: "text" } }, "open_pattern"],
+    ["a positional assertion in the thinking closer", { reasoning_content: { open: "<think>", close_pattern: "</think>$" } }, "positional assertions"],
+    ["a nullable thinking closer", { reasoning_content: { open: "<think>", close_pattern: "\\s*" } }, "nullable"],
+    ["an empty thinking closer", { reasoning_content: { open: "<think>", close_pattern: "" } }, "nullable"],
   ])("falls back to the plain constraint for %s", (_, fields, warning) => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
     try {
@@ -725,6 +748,115 @@ describe("StructuredOutputProcessor", () => {
       }
     };
     const prompt = (anchor) => encodeIds(`<|system|>be brief<|user|>hi${anchor}`);
+    const lfmPrefix = "<|im_start|>assistant\n<think>";
+    const recipeSchema = {
+      type: "json_schema",
+      json_schema: { type: "object", properties: { servings: { const: 2 } }, required: ["servings"], additionalProperties: false },
+    };
+
+    it("LFM3: searches past near misses and overlaps, then constrains the JSON answer", () => {
+      const processor = new StructuredOutputProcessor(withTemplate(LFM3_RESPONSE_TEMPLATE), recipeSchema, { enable_thinking: true });
+      const inputIds = prompt(lfmPrefix);
+      feed(processor, inputIds, "free-form </thinX> reasoning </thi</think>\n");
+      const scores = logits();
+      processor([inputIds], scores);
+      expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+      expect(isAllowed(scores, "x".charCodeAt(0))).toBe(false);
+      feed(processor, inputIds, '{"servings":');
+      processor([inputIds], scores);
+      expect(isAllowed(scores, "3".charCodeAt(0))).toBe(false);
+      feed(processor, inputIds, "2}");
+      const final = logits();
+      processor([inputIds], final);
+      expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+    });
+
+    it("LFM3: rejects an unfinished prefill with thinking disabled but accepts a closed prefill", () => {
+      const make = () => new StructuredOutputProcessor(withTemplate(LFM3_RESPONSE_TEMPLATE), recipeSchema, { enable_thinking: false });
+      expect(() => make()([prompt(lfmPrefix)], logits())).toThrow("Thinking is disabled");
+      const scores = logits();
+      make()([prompt(`${lfmPrefix}reasoning</think>\n\n`)], scores);
+      expect(isAllowed(scores, "{".charCodeAt(0))).toBe(true);
+      expect(isAllowed(scores, "x".charCodeAt(0))).toBe(false);
+      expect(isAllowed(scores, EOS_TOKEN_ID)).toBe(false);
+    });
+
+    it.each([
+      ["", false],
+      ["</thi", true],
+    ])("LFM3: validates the first JSON byte in the token that closes thinking (closer prefill %j, special %j)", (partial, special) => {
+      const closingSuffix = "</think>".slice(partial.length);
+      const encoder = new TextEncoder();
+      const allowed = tokenizer.tokens.length;
+      const blocked = allowed + 1;
+      const source = {
+        ...withTemplate(LFM3_RESPONSE_TEMPLATE),
+        tokens: [...tokenizer.tokens, encoder.encode(`${closingSuffix}\n{`), encoder.encode(`${closingSuffix}\nx`)],
+        special_token_ids: special ? [...tokenizer.special_token_ids, allowed, blocked] : tokenizer.special_token_ids,
+      };
+      const processor = new StructuredOutputProcessor(source, recipeSchema, { enable_thinking: true });
+      const inputIds = prompt(lfmPrefix);
+      const scores = () => new Tensor("float32", new Float32Array(source.tokens.length).fill(1), [1, source.tokens.length]);
+      processor([inputIds], scores());
+      inputIds.push(...encodeIds(`reasoning${partial}`));
+      const mask = scores();
+      processor([inputIds], mask);
+      expect(isAllowed(mask, allowed)).toBe(true);
+      expect(isAllowed(mask, blocked)).toBe(false);
+      const incomplete = scores();
+      inputIds.push(BigInt(allowed));
+      processor([inputIds], incomplete);
+      expect(isAllowed(incomplete, EOS_TOKEN_ID)).toBe(false);
+      inputIds.push(...encodeIds('"servings":2}'));
+      const complete = scores();
+      processor([inputIds], complete);
+      expect(isAllowed(complete, EOS_TOKEN_ID)).toBe(true);
+    });
+
+    const contentChunks = (template, prefix, chunks) => {
+      const parser = new ResponseParser(template, { prefix });
+      const events = [...chunks.flatMap((chunk) => parser.feed(chunk)), ...parser.finalize()[1]];
+      return events
+        .filter((event) => event.type === "region_chunk" && event.field === "content")
+        .map((event) => event.text)
+        .join("");
+    };
+
+    it.each(["", "\n \t\r", "\n \t \n \n \t", "\u0085\u00a0\u2002\u2028\u3000"])("LFM3: matches the parser's payload boundary with whitespace %j", (framing) => {
+      const chunks = ["reasoning</think>", framing, "ok"];
+      const answer = contentChunks(LFM3_RESPONSE_TEMPLATE, lfmPrefix, chunks);
+      expect(answer).toBe("ok");
+      const processor = new StructuredOutputProcessor(withTemplate(LFM3_RESPONSE_TEMPLATE), { type: "regex", regex: answer }, { enable_thinking: true });
+      const inputIds = prompt(lfmPrefix);
+      for (const chunk of chunks) feed(processor, inputIds, chunk);
+      const final = logits();
+      processor([inputIds], final);
+      expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+    });
+
+    it.each([
+      ["a|ab", "abok", "bok"],
+      ["abx|a", "abcok", "bcok"],
+      ["abx|a", "abxok", "ok"],
+      ["ax+z|a", "axxok", "xxok"],
+      ["abx|b", "abok", "ok"],
+      ["abx|b", "abxok", "ok"],
+      ["a.{2}z", "a\nbzok", "ok"],
+      ["a[^x]+z", "abbzok", "ok"],
+    ])("uses the parser's ordered boundary for %j in %j", (close_pattern, text, payload) => {
+      const template = {
+        ...thinkingTokenizer.response_template,
+        fields: { reasoning_content: { open: "<think>", close_pattern }, content: { content: "text" } },
+      };
+      const prefix = "<assistant><think>";
+      expect(contentChunks(template, prefix, Array.from(text))).toBe(payload);
+      const processor = new StructuredOutputProcessor(withTemplate(template), { type: "regex", regex: payload });
+      const inputIds = encodeIds(prefix);
+      feed(processor, inputIds, text);
+      const final = logits();
+      processor([inputIds], final);
+      expect(isAllowed(final, EOS_TOKEN_ID)).toBe(true);
+    });
 
     it("Qwen3: constrains the first step by default", () => {
       const processor = new StructuredOutputProcessor(withTemplate(QWEN3_RESPONSE_TEMPLATE), { type: "json_object" });

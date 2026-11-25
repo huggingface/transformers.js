@@ -11,20 +11,34 @@ const EMPTY: Expression = { kind: 'empty' };
 const encoder = new TextEncoder();
 
 export function compileRegex(source: string): ConstraintState<number> {
-    const machine = new RegexMachine(new RegexParser(source).parse());
+    return compile(source, false);
+}
+
+// Unanchored delimiter search needs the parser's left-to-right alternatives and greedy
+// repetition, rather than just the language accepted by the payload DFA.
+export function compileSearchRegex(source: string): ConstraintState<number> & { terminal(state: number): boolean } {
+    return compile(source, true);
+}
+
+function compile(source: string, ordered: boolean) {
+    const machine = new RegexMachine(new RegexParser(source, ordered).parse(), ordered);
     return {
         initial: machine.initial,
         transition: (state, byte) => machine.transition(state, byte),
         viable: (state) => state >= 0,
         accepting: (state) => machine.accepting(state),
         maskKey: (state) => machine.stateKey(state),
-    };
+        terminal: (state) => machine.terminal(state),
+    } satisfies ConstraintState<number> & { terminal(state: number): boolean };
 }
 
 class RegexParser {
     private index = 0;
 
-    constructor(private readonly source: string) {}
+    constructor(
+        private readonly source: string,
+        private readonly ordered: boolean,
+    ) {}
 
     parse(): Expression {
         const expression = this.alternation(true);
@@ -43,10 +57,15 @@ class RegexParser {
 
     // The whole input must match, so `^` and `$` around a top-level alternative are no-ops.
     private concatenation(topLevel: boolean): Expression {
-        if (topLevel && this.peek() === '^') this.index++;
+        if (!this.ordered && topLevel && this.peek() === '^') this.index++;
         const parts: Expression[] = [];
         while (this.index < this.source.length && this.peek() !== ')' && this.peek() !== '|') {
-            if (topLevel && this.peek() === '$' && [undefined, '|'].includes(this.source[this.index + 1])) {
+            if (
+                !this.ordered &&
+                topLevel &&
+                this.peek() === '$' &&
+                [undefined, '|'].includes(this.source[this.index + 1])
+            ) {
                 this.index++;
                 break;
             }
@@ -74,9 +93,14 @@ class RegexParser {
             [minimum, maximum] = this.bounds();
         }
         if (this.peek() === '?' || this.peek() === '+') this.fail('lazy and possessive quantifiers are unsupported');
+        if (this.ordered && (maximum === null || maximum > 1) && nullable(atom)) {
+            this.fail('repeated empty matches require parser backtracking semantics');
+        }
         const parts = Array.from({ length: minimum }, () => atom);
         if (maximum === null) parts.push(star(atom));
-        else for (let count = minimum; count < maximum; ++count) parts.push(choice([EMPTY, atom]));
+        else
+            for (let count = minimum; count < maximum; ++count)
+                parts.push(choice(this.ordered ? [atom, EMPTY] : [EMPTY, atom]));
         return sequence(parts);
     }
 
@@ -95,12 +119,17 @@ class RegexParser {
         if (character === '[') return this.characterClass();
         if (character === '.') {
             this.index++;
-            return byteSet(range(0, 255));
+            return this.ordered ? choice([byteSet(range(0, 127)), MULTIBYTE_CODE_POINT]) : byteSet(range(0, 255));
         }
         if (character === '\\') return this.escape(false).expression;
         if ('*+?{})'.includes(character)) this.fail(`unexpected ${JSON.stringify(character)}`);
         if (character === '^' || character === '$')
-            this.fail('anchors are only supported at the start or end of a top-level alternative');
+            this.fail(
+                this.ordered
+                    ? 'positional assertions are unsupported in delimiter search'
+                    : 'anchors are only supported at the start or end of a top-level alternative',
+            );
+        if (this.ordered) return literal(this.readCodePoint());
         this.index += character.length;
         return literal(character);
     }
@@ -110,9 +139,11 @@ class RegexParser {
         const negated = this.peek() === '^';
         if (negated) this.index++;
         const bytes = new Uint32Array(8);
+        let unicodeWhitespace = false;
         let hasValue = false;
         while (this.peek() !== ']') {
             if (this.peek() === undefined) this.fail('unterminated character class');
+            if (this.ordered && this.source.startsWith('\\s', this.index)) unicodeWhitespace = true;
             const first = this.classValue();
             if (this.peek() === '-' && this.source[this.index + 1] !== ']') {
                 this.index++;
@@ -129,6 +160,14 @@ class RegexParser {
         this.index++;
         if (!hasValue) this.fail('empty character class');
         if (negated) for (let word = 0; word < bytes.length; ++word) bytes[word] = ~bytes[word];
+        if (this.ordered) {
+            if (negated && unicodeWhitespace) this.fail('negated Unicode whitespace classes are unsupported');
+            if (negated) {
+                bytes.fill(0, 4); // Non-ASCII input must be consumed as a whole code point.
+                return choice([byteSet(bytes), MULTIBYTE_CODE_POINT]);
+            }
+            if (unicodeWhitespace) return choice([byteSet(bytes), MULTIBYTE_WHITESPACE]);
+        }
         return byteSet(bytes);
     }
 
@@ -147,13 +186,17 @@ class RegexParser {
 
     private escape(inClass: boolean): { expression: Expression; bytes?: Uint32Array; single?: number } {
         this.index++;
-        const code = this.peek();
+        const code = this.ordered ? this.readCodePoint() : this.peek();
         if (code === undefined) this.fail('trailing escape');
-        this.index++;
+        if (!this.ordered) this.index++;
         if ('dDsSwW'.includes(code)) {
+            if (this.ordered && code !== 's') this.fail(`Unicode \\${code} is unsupported in delimiter search`);
             const bytes = shorthand(code.toLowerCase());
             if (code === code.toUpperCase()) for (let word = 0; word < bytes.length; ++word) bytes[word] = ~bytes[word];
-            return { expression: byteSet(bytes), bytes };
+            return {
+                expression: this.ordered && !inClass ? choice([byteSet(bytes), MULTIBYTE_WHITESPACE]) : byteSet(bytes),
+                bytes,
+            };
         }
         if (code === 'b' && !inClass) this.fail('word boundaries are unsupported');
         let value: number;
@@ -164,6 +207,7 @@ class RegexParser {
             if (control === undefined && /[a-z0-9]/i.test(code)) this.fail(`unsupported escape \\${code}`);
             value = control ?? code.codePointAt(0)!;
         }
+        if (this.ordered && value >= 0xd800 && value <= 0xdfff) this.fail('surrogate escapes are unsupported');
         const text = String.fromCodePoint(value);
         const encoded = encoder.encode(text);
         const bytes = encoded.length === 1 ? singleton(encoded[0]) : undefined;
@@ -202,6 +246,15 @@ class RegexParser {
 
     private peek(): string | undefined {
         return this.source[this.index];
+    }
+
+    private readCodePoint(): string {
+        const code = this.source.codePointAt(this.index);
+        if (code === undefined) this.fail('trailing escape');
+        if (code >= 0xd800 && code <= 0xdfff) this.fail('lone surrogates are unsupported');
+        const text = String.fromCodePoint(code);
+        this.index += text.length;
+        return text;
     }
 
     private fail(message: string): never {
@@ -288,11 +341,22 @@ class RegexMachine {
     private readonly stateIds = new Map<string, number>();
     private readonly stateKeys: string[] = [];
 
-    constructor(expression: Expression) {
+    constructor(
+        expression: Expression,
+        private readonly ordered: boolean,
+    ) {
         const fragment = this.builder.compile(expression);
         const match = this.builder.emit(OP_MATCH);
         this.builder.patch(fragment.outs, match);
-        this.initial = this.intern(this.closure([fragment.start]));
+        let start = fragment.start;
+        if (ordered) {
+            // Try the delimiter here before skipping a reasoning byte and trying again.
+            // Earlier starts outrank later ones, including overlapping prefixes.
+            start = this.builder.emit(OP_SPLIT, start);
+            const skip = this.builder.emit(OP_SET, start, -1, range(0, 255));
+            this.builder.out2[start] = skip;
+        }
+        this.initial = this.intern(this.closure([start]));
     }
 
     transition(state: number, byte: number): number {
@@ -315,6 +379,10 @@ class RegexMachine {
         return state >= 0 && this.acceptingStates[state];
     }
 
+    terminal(state: number): boolean {
+        return this.accepting(state) && this.states[state].length === 1;
+    }
+
     // The interned NFA state set is intrinsic to the regex (unlike the interned
     // ids, which depend on discovery order), so it is a stable mask-cache key
     // across constraint instances compiled from the same source.
@@ -324,7 +392,7 @@ class RegexMachine {
 
     private closure(seeds: number[]): number[] {
         const result: number[] = [];
-        const stack = [...seeds];
+        const stack = this.ordered ? [...seeds].reverse() : [...seeds];
         const seen = new Set<number>();
         while (stack.length > 0) {
             const state = stack.pop()!;
@@ -332,14 +400,17 @@ class RegexMachine {
             seen.add(state);
             const op = this.builder.ops[state];
             if (op === OP_SPLIT) {
-                stack.push(this.builder.out1[state], this.builder.out2[state]);
+                stack.push(this.builder.out2[state], this.builder.out1[state]);
             } else if (op === OP_JUMP) {
                 stack.push(this.builder.out1[state]);
             } else {
                 result.push(state);
+                // Once a higher-priority branch has matched, only the paths before it
+                // can supersede that match. The caller holds on to its end as a fallback.
+                if (this.ordered && op === OP_MATCH) break;
             }
         }
-        result.sort((left, right) => left - right);
+        if (!this.ordered) result.sort((left, right) => left - right);
         return result;
     }
 
@@ -380,6 +451,38 @@ function star(child: Expression): Expression {
     if (child.kind === 'star') return child;
     return { kind: 'star', child };
 }
+
+function nullable(expression: Expression): boolean {
+    switch (expression.kind) {
+        case 'empty':
+        case 'star':
+            return true;
+        case 'set':
+            return false;
+        case 'choice':
+            return expression.choices.some(nullable);
+        case 'sequence':
+            return expression.parts.every(nullable);
+    }
+}
+
+// In response templates '.' and negated ASCII classes consume Unicode scalars, not bytes.
+const CONTINUATION = byteSet(range(0x80, 0xbf));
+const MULTIBYTE_CODE_POINT = choice([
+    sequence([byteSet(range(0xc2, 0xdf)), CONTINUATION]),
+    sequence([byteSet(singleton(0xe0)), byteSet(range(0xa0, 0xbf)), CONTINUATION]),
+    sequence([byteSet(range(0xe1, 0xec)), CONTINUATION, CONTINUATION]),
+    sequence([byteSet(singleton(0xed)), byteSet(range(0x80, 0x9f)), CONTINUATION]),
+    sequence([byteSet(range(0xee, 0xef)), CONTINUATION, CONTINUATION]),
+    sequence([byteSet(singleton(0xf0)), byteSet(range(0x90, 0xbf)), CONTINUATION, CONTINUATION]),
+    sequence([byteSet(range(0xf1, 0xf3)), CONTINUATION, CONTINUATION, CONTINUATION]),
+    sequence([byteSet(singleton(0xf4)), byteSet(range(0x80, 0x8f)), CONTINUATION, CONTINUATION]),
+]);
+const MULTIBYTE_WHITESPACE = choice(
+    [
+        ...'\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000',
+    ].map(literal),
+);
 
 function literal(value: string): Expression {
     return sequence([...encoder.encode(value)].map((byte) => byteSet(singleton(byte))));
