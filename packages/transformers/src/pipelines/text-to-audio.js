@@ -217,9 +217,15 @@ export class TextToAudioPipeline
         const { audio_prompt_dim } = /** @type {any} */ (model.config);
         if (!speaker_embeddings) throw new Error('Speaker embeddings must be provided for Phonon models.');
         const embeddings = await this._prepare_speaker_embeddings(speaker_embeddings, 1);
-        if (embeddings.type !== 'float32' || !embeddings.size || embeddings.size % audio_prompt_dim !== 0) {
+        const shape = embeddings.dims;
+        if (
+            embeddings.type !== 'float32' ||
+            !embeddings.size ||
+            embeddings.size % audio_prompt_dim !== 0 ||
+            (shape.length !== 1 && !(shape.length === 3 && shape[0] === 1 && shape[1] === audio_prompt_dim))
+        ) {
             throw new Error(
-                `Phonon speaker_embeddings must be float32 data in [1, ${audio_prompt_dim}, frames] order.`,
+                `Phonon speaker_embeddings must be flat channel-first float32 data or a float32 tensor of shape [1, ${audio_prompt_dim}, frames]. For [frames, ${audio_prompt_dim}] tensors, use PocketTTSProcessor and model.generate().`,
             );
         }
         // Voice files use channel-first storage; upstream accepts [frames, audio_prompt_dim].

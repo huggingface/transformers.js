@@ -31,9 +31,10 @@ const samples_per_frame = 1920;
 
 const gpu_tensor = (dims) => ORTTensor.fromGpuBuffer({}, { dataType: "float32", dims, dispose: jest.fn() });
 
-function create_pipeline(block_size = 4, eos = () => 5) {
+function create_pipeline(block_size = 4, eos = () => 5, distinguish_chunks = false) {
   const noise = [],
     outputs = [];
+  let decoded_chunks = 0;
   const batch = "batch_size";
   const generator_inputs = [{ name: "input_ids", type: "int64", shape: [batch, "text_length"] }, { name: "audio_prompt_latents", type: "float32", shape: [batch, "voice_length", 2] }, { name: "attention_mask", type: "int64", shape: [batch, "total_sequence_length"] }, { name: "position_ids", type: "int64", shape: [batch, "new_sequence_length"] }, { name: "past_key_values.audio_latents", type: "float32", shape: [batch, "past_frames", 2] }, { name: "noise", type: "float32", shape: [batch, block_size, 2] }, ...["key", "value"].map((kind) => ({ name: `past_key_values.0.${kind}`, type: "float32", shape: [batch, 1, "past_sequence_length", 2] }))];
   const flow = {
@@ -75,7 +76,7 @@ function create_pipeline(block_size = 4, eos = () => 5) {
       expect(num_frames.data[0]).toBeLessThanOrEqual(BigInt(audio_latents.dims[1]));
       const samples = Number(num_frames.data[0]) * samples_per_frame;
       return {
-        audio_values: new ORTTensor("float32", new Float32Array(samples).fill(0.25), [1, 1, samples]),
+        audio_values: new ORTTensor("float32", new Float32Array(samples).fill(distinguish_chunks ? ++decoded_chunks * 0.25 : 0.25), [1, 1, samples]),
         audio_lengths: new ORTTensor("int64", [BigInt(samples)], [1]),
       };
     }),
@@ -146,29 +147,78 @@ export default () => {
         expect(Array.from(voice.data)).toEqual([0.5, 0.25]);
       });
       it("packs unmasked text and uses KV positions for continuation", async () => {
+        const warn = jest.spyOn(console, "warn");
         const [bos, prompt] = AUDIO_TOKEN_IDS;
-        const input_ids = new Tensor("int64", [prompt, prompt, 42, 43, 44, bos], [1, 6]);
-        const attention_mask = new Tensor("int64", [1, 1, 1, 0, 1, 1], [1, 6]);
-        const audio_prompt_latents = new Tensor("float32", [0.5, 0.25, 0.125, 1], [1, 2, 2]);
+        const input_ids = new Tensor("int64", [prompt, 42, 43, 44, bos, 3], [1, 6]);
+        const attention_mask = new Tensor("int64", [1, 1, 0, 1, 1, 0], [1, 6]);
+        const audio_prompt_latents = new Tensor("float32", [0.5, 0.25], [1, 1, 2]);
         owned.push(input_ids, attention_mask, audio_prompt_latents);
-        // Five logical prompt positions (two voice placeholders, two text tokens, BOS).
-        await generate({ input_ids, attention_mask, audio_prompt_latents, audio_prompt_latents_mask: undefined, max_length: 11, min_frames_before_eos: 6 });
+        // Four logical prompt positions (one voice placeholder, two text tokens, BOS).
+        await generate({ input_ids, attention_mask, audio_prompt_latents, max_length: 10, min_frames_before_eos: 6 });
         expect(fixture.flow.run).toHaveBeenCalledTimes(2);
         const [[prefill], [continuation]] = fixture.flow.run.mock.calls;
         expect(prefill.input_ids.dims).toEqual([1, 2]);
         expect([...prefill.input_ids.data]).toEqual([42n, 44n]);
         expect(prefill.audio_prompt_latents).toBe(audio_prompt_latents.ort_tensor);
-        expect(prefill).not.toHaveProperty("audio_prompt_latents_mask");
-        expect(prefill.position_ids.dims).toEqual([1, 8]);
-        expect([...prefill.position_ids.data]).toEqual([0n, 1n, 2n, 3n, 4n, 5n, 6n, 7n]);
-        expect(prefill.attention_mask.dims).toEqual([1, 8]);
-        expect([...prefill.attention_mask.data]).toEqual(Array(8).fill(1n));
+        expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("Too many inputs"));
+        expect(prefill.position_ids.dims).toEqual([1, 7]);
+        expect([...prefill.position_ids.data]).toEqual([0n, 1n, 2n, 3n, 4n, 5n, 6n]);
+        expect(prefill.attention_mask.dims).toEqual([1, 7]);
+        expect([...prefill.attention_mask.data]).toEqual(Array(7).fill(1n));
         expect(continuation.position_ids.dims).toEqual([1, 4]);
-        expect([...continuation.position_ids.data]).toEqual([8n, 9n, 10n, 11n]);
-        expect(continuation.attention_mask.dims).toEqual([1, 12]);
-        expect([...continuation.attention_mask.data]).toEqual(Array(12).fill(1n));
+        expect([...continuation.position_ids.data]).toEqual([7n, 8n, 9n, 10n]);
+        expect(continuation.attention_mask.dims).toEqual([1, 11]);
+        expect([...continuation.attention_mask.data]).toEqual(Array(11).fill(1n));
         expect(fixture.decoder.run.mock.calls[0][0].num_frames.data[0]).toBe(6n);
         expect(fixture.decoder.run.mock.calls[0][0].audio_latents).toBe(fixture.outputs[1].audio_latents);
+      });
+      const [bos, placeholder, latent] = AUDIO_TOKEN_IDS;
+      it.each([
+        ["placeholders without a voice", [placeholder, 42, bos], null, "voice frame count"],
+        ["wrong placeholder count", [placeholder, placeholder, 42, bos], [1, 125, 2], "voice frame count"],
+        ["missing final BOS", [bos, 42], null, "last unmasked token"],
+        ["duplicate BOS", [bos, 42, bos], null, "exactly one unmasked audio_bos_token_id"],
+        ["placeholder after text", [42, placeholder, bos], [1, 1, 2], "before the first text token"],
+        ["audio latent marker", [42, latent, bos], null, "must not contain audio_latent_token_id"],
+        ["rank-2 voice", [placeholder, 42, bos], [1, 2], "float32 tensor of shape"],
+        ["wrong voice batch size", [placeholder, 42, bos], [2, 1, 2], "float32 tensor of shape"],
+        ["wrong voice width", [placeholder, 42, bos], [1, 1, 3], "float32 tensor of shape"],
+        ["wrong voice dtype", [placeholder, 42, bos], [1, 1, 2], "float32 tensor of shape", "int64"],
+      ])("rejects %s before inference", async (_name, ids, shape, message, dtype = "float32") => {
+        const input_ids = new Tensor("int64", ids, [1, ids.length]);
+        const audio_prompt_latents = shape ? new Tensor(dtype, Array(shape.reduce((a, b) => a * b, 1)).fill(0), shape) : undefined;
+        owned.push(input_ids, ...(audio_prompt_latents ? [audio_prompt_latents] : []));
+        await expect(fixture.model.generate({ input_ids, audio_prompt_latents })).rejects.toThrow(message);
+        expect(fixture.flow.run).not.toHaveBeenCalled();
+      });
+      it("generates without a voice when the prompt has no placeholders", async () => {
+        const input_ids = new Tensor("int64", [42, bos], [1, 2]);
+        owned.push(input_ids);
+        const { audio_values } = await fixture.model.generate({ input_ids, max_new_tokens: 1 });
+        owned.push(audio_values);
+        expect(audio_values.dims).toEqual([1, 1, samples_per_frame]);
+        expect(fixture.flow.run.mock.calls[0][0].audio_prompt_latents.dims).toEqual([1, 0, 2]);
+      });
+      it("rejects a batch of prompts before inference", async () => {
+        const input_ids = new Tensor("int64", [42, bos, 43, bos], [2, 2]);
+        owned.push(input_ids);
+        await expect(fixture.model.generate({ input_ids })).rejects.toThrow("accepts one prompt per call");
+        expect(fixture.flow.run).not.toHaveBeenCalled();
+      });
+      it("rejects a mismatched prompt mask before inference", async () => {
+        const attention_mask = new Tensor("int64", [1], [1, 1]);
+        owned.push(attention_mask);
+        await expect(generate({ attention_mask })).rejects.toThrow("attention_mask must match the shape of input_ids");
+        expect(fixture.flow.run).not.toHaveBeenCalled();
+      });
+      it("warns and truncates at the default safety limit if EOS never fires", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        const input_ids = new Tensor("int64", [42, bos], [1, 2]);
+        owned.push(input_ids);
+        const { audio_values } = await fixture.model.generate({ input_ids, temperature: 0, eos_threshold: 6 });
+        owned.push(audio_values);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("Phonon reached its safety frame limit"));
+        expect(audio_values.dims).toEqual([1, 1, 30 * samples_per_frame]);
       });
       it("rejects padded voice prompts before inference", async () => {
         const audio_prompt_latents_mask = new Tensor("int64", [0], [1, 1]);
@@ -233,15 +283,37 @@ export default () => {
         expect(output.audio.every((x) => x === 0.25)).toBe(true);
         expect(output.sampling_rate).toBe(24000);
       });
-      it("starts fresh for each sentence chunk and batched input", async () => {
-        const text = "Hello. ".repeat(10);
-        const output = await fixture.pipe([text, "Bye."], { speaker_embeddings: voice });
-        expect(output.map((x) => x.audio.length)).toEqual([6 * samples_per_frame, 4 * samples_per_frame]);
-        for (const [inputs] of fixture.flow.run.mock.calls) expect(inputs["past_key_values.audio_latents"].dims).toEqual([1, 0, 2]);
+      it.each([[[1, 2, 3]], [[6]]])("converts multi-frame channel-first voice data from shape %j", async (shape) => {
+        const speaker_embeddings = new Tensor("float32", [1, 2, 3, 10, 20, 30], shape);
+        owned.push(speaker_embeddings);
+        await speak({ speaker_embeddings });
+        const feed = fixture.flow.run.mock.calls[0][0].audio_prompt_latents;
+        expect(feed.dims).toEqual([1, 3, 2]);
+        expect([...feed.data]).toEqual([1, 10, 2, 20, 3, 30]);
+      });
+      it("preserves sentence chunk and batch order and starts each prefill fresh", async () => {
+        await fixture.pipe.dispose();
+        fixture = create_pipeline(4, () => 5, true);
+        const first = "Hello there, everyone in this very long room.";
+        const second = "See you soon.";
+        const output = await fixture.pipe([`${first} ${second}`, "Bye."], { speaker_embeddings: voice });
+        const first_samples = 2 * samples_per_frame;
+        expect(output.map((x) => x.audio.length)).toEqual([first_samples + 4 * samples_per_frame, 4 * samples_per_frame]);
+        expect(output[0].audio.subarray(0, first_samples).every((x) => x === 0.25)).toBe(true);
+        expect(output[0].audio.subarray(first_samples).every((x) => x === 0.5)).toBe(true);
+        expect(output[1].audio.every((x) => x === 0.75)).toBe(true);
+        const prefills = fixture.flow.run.mock.calls.map(([inputs]) => {
+          expect(inputs["past_key_values.audio_latents"].dims).toEqual([1, 0, 2]);
+          return fixture.processor.tokenizer.decode([...inputs.input_ids.data].map(Number));
+        });
+        expect(prefills).toEqual([first, second, "Bye."]);
       });
       it("reports missing and malformed voices before inference", async () => {
         await expect(fixture.pipe("Hello.")).rejects.toThrow("Speaker embeddings must be provided");
         await expect(speak({ speaker_embeddings: new Float32Array(3) })).rejects.toThrow("[1, 2, frames]");
+        const rank_two = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
+        owned.push(rank_two);
+        await expect(speak({ speaker_embeddings: rank_two })).rejects.toThrow("use PocketTTSProcessor and model.generate()");
         fetch.mockResolvedValueOnce(new Response("", { status: 404 }));
         await expect(speak({ speaker_embeddings: voice_url })).rejects.toThrow("404");
         expect(fixture.flow.run).not.toHaveBeenCalled();
@@ -249,17 +321,35 @@ export default () => {
     });
 
     describe("onnx-community/phonon-31m-en-ONNX", () => {
-      let tts, speaker_embeddings;
+      let tts;
+      const speaker_embeddings = "https://huggingface.co/onnx-community/phonon-31m-en-ONNX/resolve/main/voices/default.bin";
       beforeAll(async () => {
         tts = await pipeline("text-to-speech", "onnx-community/phonon-31m-en-ONNX", { dtype: "q4" });
-        const response = await env.fetch("https://huggingface.co/onnx-community/phonon-31m-en-ONNX/resolve/main/voices/default.bin");
-        expect(response.ok).toBe(true);
-        speaker_embeddings = new Float32Array(await response.arrayBuffer());
-        expect(speaker_embeddings.some((x) => x !== 0)).toBe(true);
       }, MAX_MODEL_LOAD_TIME);
       afterAll(async () => {
         await tts?.dispose();
       });
+      it(
+        "produces audible speech and stops naturally before the safety limit",
+        async () => {
+          const warn = jest.spyOn(console, "warn");
+          try {
+            // Seven text tokens give ceil((7 / 3 + 2) * 12.5) = 55 frames.
+            const { audio, sampling_rate } = await tts("Hello from Phonon.", { speaker_embeddings, temperature: 0 });
+            expect(sampling_rate).toBe(24000);
+            expect(audio.length).toBeGreaterThan(0);
+            expect(audio.length).toBeLessThan(55 * samples_per_frame);
+            expect(audio.length % samples_per_frame).toBe(0);
+            expect(audio.every(Number.isFinite)).toBe(true);
+            const rms = Math.sqrt(audio.reduce((sum, sample) => sum + sample * sample, 0) / audio.length);
+            expect(rms).toBeGreaterThan(0.03);
+            expect(warn).not.toHaveBeenCalled();
+          } finally {
+            warn.mockRestore();
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
       it.each([
         [6, 1],
         [11, 2],

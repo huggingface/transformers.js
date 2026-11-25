@@ -3,9 +3,12 @@
  */
 import { Processor } from '../../processing_utils.js';
 import { AutoTokenizer } from '../auto/tokenization_auto.js';
-import { IMAGE_PROCESSOR_NAME } from '../../utils/constants.js';
-import { getModelJSON } from '../../utils/hub.js';
 import { Tensor, full } from '../../utils/tensor.js';
+
+// Markers emitted by the Python checkpoint's chat template:
+// https://huggingface.co/gradium/phonon-31m-en/blob/8f7a37c94a4c58b04c8287300c53f11d2e208eae/chat_template.jinja
+const AUDIO_PROMPT_TOKEN = '<|audio_prompt|>';
+const AUDIO_BOS_TOKEN = '<|audio_bos|>';
 
 // Until tokenizers.js implements Unigram byte fallback, expand unknown pieces
 // before they are converted to IDs. Limit the workaround to this processor.
@@ -25,17 +28,8 @@ function encode(tokenizer, text) {
  * Prepares Pocket TTS prompts and precomputed voices, and splits long text.
  */
 export class PocketTTSProcessor extends Processor {
-    static classes = ['tokenizer_class'];
+    static uses_processor_config = true;
     static tokenizer_class = AutoTokenizer;
-
-    /** @type {typeof Processor.from_pretrained} */
-    static async from_pretrained(pretrained_model_name_or_path, options = {}) {
-        const [config, tokenizer] = await Promise.all([
-            getModelJSON(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME, true, options),
-            this.tokenizer_class.from_pretrained(pretrained_model_name_or_path, options),
-        ]);
-        return new this(config, { tokenizer }, null);
-    }
 
     /**
      * Split text into sentence-aligned chunks of at most `max_tokens` tokens, as Python's `PocketTTSProcessor.split_text`.
@@ -104,18 +98,18 @@ export class PocketTTSProcessor extends Processor {
      * @returns {Promise<Object>} `input_ids`, `attention_mask`, voice latents and masks, and `frames_after_eos`.
      */
     async _call(text, { audio_prompt_latents = [] } = {}) {
-        if (typeof text !== 'string' || !text.endsWith('<|audio_bos|>')) {
+        if (typeof text !== 'string' || !text.endsWith(AUDIO_BOS_TOKEN)) {
             throw new Error('Prepare one prompt with apply_chat_template and add_generation_prompt=true.');
         }
-        const placeholders = text.match(/<\|audio_prompt\|>/g) ?? [];
-        if (placeholders.length !== audio_prompt_latents.length || placeholders.length > 1) {
+        const placeholder_count = text.split(AUDIO_PROMPT_TOKEN).length - 1;
+        if (placeholder_count !== audio_prompt_latents.length || placeholder_count > 1) {
             throw new Error('Pass one audio_prompt_latents tensor per voice placeholder (at most one).');
         }
         const voice = audio_prompt_latents[0];
         if (voice && (voice.type !== 'float32' || voice.dims.length !== 2 || !voice.size)) {
             throw new Error('audio_prompt_latents must contain a float32 tensor of shape [frames, audio_prompt_dim].');
         }
-        const prompt = text.replace('<|audio_prompt|>', '<|audio_prompt|>'.repeat(voice?.dims[0] ?? 0));
+        const prompt = text.replace(AUDIO_PROMPT_TOKEN, AUDIO_PROMPT_TOKEN.repeat(voice?.dims[0] ?? 0));
         const ids = encode(this.tokenizer, prompt);
         const num_words = this.tokenizer.decode(ids, { skip_special_tokens: true }).trim().split(/\s+/u).length;
         const { short_text_max_words = 4, frames_after_eos_short_text = 4, frames_after_eos = 2 } = this.config;

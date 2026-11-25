@@ -14,13 +14,16 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
     /**
      * Generate a waveform for one prompt prepared by `PocketTTSProcessor`.
      * Runs both the speech generator and the Mimi decoder, trimming unused frames before decoding.
+     * Drops masked text tokens and strips the voice placeholders and audio BOS before passing the
+     * prompt to ONNX. Padded voices are not supported. Unlike Python's `generate()`, which returns
+     * audio latents, this method returns the decoded waveform.
      * The exported graph fixes the block size and number of flow-solver steps.
      *
      * @param {Object} options Processor outputs and generation options.
      * @param {Tensor} options.input_ids Prompt tokens, including audio placeholders, of shape `[1, sequence_length]`.
      * @param {Tensor} [options.attention_mask] Mask of non-padding prompt tokens.
-     * @param {Tensor} [options.audio_prompt_latents] Voice latents of shape `[1, frames, audio_prompt_dim]`.
-     * @param {Tensor} [options.audio_prompt_latents_mask] Mask of non-padding voice frames.
+     * @param {Tensor} [options.audio_prompt_latents] Unpadded float32 voice latents of shape `[1, frames, audio_prompt_dim]`.
+     * @param {Tensor} [options.audio_prompt_latents_mask] Optional all-ones mask of shape `[1, frames]`.
      * @param {Tensor|number} [options.frames_after_eos=1] Frames to retain after the EOS frame.
      * @param {Object} [options.generation_config] Generation defaults to override.
      * @param {number} [options.max_new_tokens] Maximum number of audio frames.
@@ -36,13 +39,14 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         input_ids,
         attention_mask = full(input_ids.dims, 1n),
         audio_prompt_latents = full([1, 0, /** @type {any} */ (this.config).audio_prompt_dim], 0),
-        audio_prompt_latents_mask = full(audio_prompt_latents.dims.slice(0, 2), 1n),
+        audio_prompt_latents_mask,
         frames_after_eos = 1,
         generation_config,
         ...kwargs
     }) {
         const config = /** @type {any} */ (this.config);
         const options = {
+            // Match the Phonon checkpoint's generation_config.json, not Python's generic Pocket TTS defaults.
             do_sample: true,
             temperature: 0.3,
             num_flow_steps: 1,
@@ -58,7 +62,7 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
             throw new Error('This ONNX export supports num_flow_steps=1; other values require re-export.');
         }
         if (input_ids.dims.length !== 2 || input_ids.dims[0] !== 1) {
-            throw new Error('This Phonon ONNX export supports one prompt per generate() call.');
+            throw new Error('Phonon generate() accepts one prompt per call.');
         }
         if (
             attention_mask.dims.length !== 2 ||
@@ -67,12 +71,22 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         ) {
             throw new Error('attention_mask must match the shape of input_ids.');
         }
+        if (
+            !(audio_prompt_latents instanceof Tensor) ||
+            audio_prompt_latents.type !== 'float32' ||
+            audio_prompt_latents.dims.length !== 3 ||
+            audio_prompt_latents.dims[0] !== 1 ||
+            audio_prompt_latents.dims[2] !== config.audio_prompt_dim
+        ) {
+            throw new Error('audio_prompt_latents must be a float32 tensor of shape [1, frames, audio_prompt_dim].');
+        }
         const voice_length = audio_prompt_latents.dims[1];
         if (
-            audio_prompt_latents_mask.dims.length !== 2 ||
-            audio_prompt_latents_mask.dims[0] !== 1 ||
-            audio_prompt_latents_mask.dims[1] !== voice_length ||
-            audio_prompt_latents_mask.data.some((value) => Number(value) !== 1)
+            audio_prompt_latents_mask !== undefined &&
+            (audio_prompt_latents_mask.dims.length !== 2 ||
+                audio_prompt_latents_mask.dims[0] !== 1 ||
+                audio_prompt_latents_mask.dims[1] !== voice_length ||
+                audio_prompt_latents_mask.data.some((value) => Number(value) !== 1))
         ) {
             throw new Error('Phonon requires an unpadded voice prompt with a matching audio_prompt_latents_mask.');
         }
@@ -82,12 +96,39 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         const mask = attention_mask.data;
         const audio_prompt_id = BigInt(config.audio_prompt_token_id);
         const audio_bos_id = BigInt(config.audio_bos_token_id);
+        const audio_latent_id = BigInt(config.audio_latent_token_id);
         const text_ids = [];
         let prompt_length = 0;
+        let placeholder_count = 0;
+        let bos_count = 0;
+        let last_id;
         for (const [i, id] of input_ids.data.entries()) {
+            if (id === audio_latent_id) {
+                throw new Error('input_ids must not contain audio_latent_token_id.');
+            }
             if (!mask[i]) continue;
             ++prompt_length;
-            if (id !== audio_prompt_id && id !== audio_bos_id) text_ids.push(id);
+            last_id = id;
+            if (id === audio_prompt_id) {
+                if (text_ids.length) {
+                    throw new Error('audio_prompt_token_id placeholders must come before the first text token.');
+                }
+                ++placeholder_count;
+            } else if (id === audio_bos_id) {
+                ++bos_count;
+            } else {
+                text_ids.push(id);
+            }
+        }
+        if (bos_count !== 1 || last_id !== audio_bos_id) {
+            throw new Error(
+                'input_ids must contain exactly one unmasked audio_bos_token_id, as the last unmasked token.',
+            );
+        }
+        if (placeholder_count !== voice_length) {
+            throw new Error(
+                'The number of unmasked audio_prompt_token_id placeholders must match the voice frame count.',
+            );
         }
         const max_frames =
             options.max_new_tokens ??

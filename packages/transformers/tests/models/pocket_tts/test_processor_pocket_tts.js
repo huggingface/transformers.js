@@ -18,19 +18,20 @@ export default () => {
       const modelPath = await mkdtemp(join(tmpdir(), "pocket-tts-"));
       try {
         const config = { processor_class: "PocketTTSProcessor", feature_extractor: { sampling_rate: 24000 }, frames_after_eos_short_text: 3 };
-        await Promise.all(Object.entries({
-          "preprocessor_config.json": config,
-          "tokenizer_config.json": { tokenizer_class: "PreTrainedTokenizer", unk_token: "<unk>", chat_template: CHAT_TEMPLATE },
-          "tokenizer.json": TOKENIZER_JSON,
-        }).map(([name, data]) => writeFile(join(modelPath, name), JSON.stringify(data))));
+        await Promise.all(
+          Object.entries({
+            "preprocessor_config.json": { processor_class: config.processor_class },
+            "processor_config.json": config,
+            "tokenizer_config.json": { tokenizer_class: "PreTrainedTokenizer", unk_token: "<unk>", chat_template: CHAT_TEMPLATE },
+            "tokenizer.json": TOKENIZER_JSON,
+          }).map(([name, data]) => writeFile(join(modelPath, name), JSON.stringify(data))),
+        );
         const files = await get_files(modelPath, {
           config: { model_type: "gradium_phonon_tts", architectures: ["GradiumPhononTTSForConditionalGeneration"] },
-          dtype: "q4", device: "cpu",
+          dtype: "q4",
+          device: "cpu",
         });
-        expect(files).toEqual([
-          "config.json", "onnx/model_q4.onnx", "onnx/mimi_decoder_q4.onnx", "generation_config.json",
-          "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json",
-        ]);
+        expect(files).toEqual(["config.json", "onnx/model_q4.onnx", "onnx/mimi_decoder_q4.onnx", "generation_config.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"]);
         const loaded = await ProcessorClass.from_pretrained(modelPath, { local_files_only: true });
         expect(loaded).toBeInstanceOf(PocketTTSProcessor);
         expect(loaded.config).toEqual(config);
