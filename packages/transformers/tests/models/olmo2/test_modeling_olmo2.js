@@ -1,6 +1,6 @@
 import { GPT2Tokenizer, Olmo2ForCausalLM } from "../../../src/transformers.js";
 
-import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
+import { MAX_MODEL_LOAD_TIME, MAX_TOKENIZER_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
 export default () => {
   describe("Olmo2ForCausalLM", () => {
@@ -13,7 +13,7 @@ export default () => {
       model = await Olmo2ForCausalLM.from_pretrained(model_id, DEFAULT_MODEL_OPTIONS);
       tokenizer = await GPT2Tokenizer.from_pretrained(model_id);
       tokenizer.padding_side = "left";
-    }, MAX_MODEL_LOAD_TIME);
+    }, MAX_MODEL_LOAD_TIME + MAX_TOKENIZER_LOAD_TIME);
 
     it(
       "batch_size=1",

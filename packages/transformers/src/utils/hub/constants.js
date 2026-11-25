@@ -15,4 +15,7 @@ export const ERROR_MAPPING = {
 
 export const MAX_EXTERNAL_DATA_CHUNKS = 100;
 
+/** @type {WeakMap<object, string>} */
+export const ENV_TOKEN_ORIGIN = new WeakMap();
+
 export const REPO_ID_REGEX = /^(\b[\w\-.]+\b\/)?\b[\w\-.]{1,96}\b$/;

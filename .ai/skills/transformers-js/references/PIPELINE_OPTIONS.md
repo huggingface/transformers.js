@@ -11,6 +11,7 @@ class in the [API reference](https://huggingface.co/docs/transformers.js/api/pip
 |--------|------|-------------|
 | `progress_callback`? | `ProgressCallback` | If specified, this function is called during model construction with progress updates. _(default: `null`)_ |
 | `config`? | `PretrainedConfig` | Configuration to use for the model instead of an automatically loaded configuration. Configuration can be automatically loaded when:<br />- The model is provided by the library and loaded with the *model ID* string of a pretrained model.<br />- The model is loaded by supplying a local directory as `pretrained_model_name_or_path` and a configuration JSON file named *config.json* is found in the directory. _(default: `null`)_ |
+| `env`? | `Partial<TransformersEnvironmentSession>` | Session-scopable environment overrides. _(default: `{}`)_ |
 | `cache_dir`? | `string` | Path to a directory where downloaded model files should be cached if the standard cache should not be used. _(default: `null`)_ |
 | `local_files_only`? | `boolean` | Whether to only look at local files (e.g., not try downloading the model). _(default: `false`)_ |
 | `revision`? | `string` | The model revision to use. This can be a branch name, tag name, or commit ID. Because the Hub uses Git-based storage, `revision` can be any identifier accepted by Git. Ignored for local requests. _(default: `'main'`)_ |

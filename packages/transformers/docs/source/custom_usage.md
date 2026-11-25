@@ -5,3 +5,68 @@
     "path": "../snippets/3_custom-usage.snippet"
 }
 </include>
+
+## Resource-loading precedence
+
+Global `env` values are defaults. A loader's `options.env` object can override only the session-scopable resource-loading fields: `allowRemoteModels`, `remoteHost`, `remotePathTemplate`, `allowLocalModels`, `localModelPath`, `fetch`, `hfToken`, and `cacheDir`. Cache backend selection, filesystem capability, logging, and backend settings remain global.
+
+```javascript
+import { pipeline } from "@huggingface/transformers";
+
+// Two pipelines in the same process, each loading from its own host and cache directory.
+const publicPipe = await pipeline(
+  "feature-extraction",
+  "Xenova/all-MiniLM-L6-v2",
+);
+const privatePipe = await pipeline(
+  "feature-extraction",
+  "acme/internal-embeddings",
+  {
+    env: {
+      remoteHost: "https://hub.internal.example/",
+      hfToken: process.env.ACME_HUB_TOKEN,
+      cacheDir: "/var/cache/acme-models/",
+    },
+  },
+);
+```
+
+Fields that a loader's `options.env` does not override are read from the global `env` when they are needed, so later changes to the global `env` still apply. Pipelines also use their `options.env` when they download image or audio inputs given as URLs.
+
+In Node.js, `env.remoteHost` defaults to `HF_ENDPOINT` when set and not empty, otherwise `https://huggingface.co/`. `env.hfToken` defaults to `HF_TOKEN`, falling back to `HF_ACCESS_TOKEN`. Both variables are read when they are needed, not when the library is imported, so they can be loaded afterwards (for example, with `dotenv`). Explicit global assignments replace those defaults, and an `options.env` value takes precedence for that loader. Tokens from `HF_TOKEN`, `HF_ACCESS_TOKEN` or `env.hfToken` are only sent to `https://huggingface.co` and `https://hf.co`. To authenticate against another host, pass `hfToken` and `remoteHost` together in `options.env`. Browser environments do not send token authorization headers.
+
+The `cache_dir` and `local_files_only` options keep working as before, and are applied after environment resolution:
+
+- `local_files_only: true` prevents remote requests even if `allowRemoteModels` is `true`.
+- `cache_dir` overrides both `options.env.cacheDir` and global `env.cacheDir` for that call.
+
+## Filesystem cache namespaces
+
+Session-scoped hosts and tokens do **not** partition the filesystem cache. Persisted files keep the existing model ID/revision/file layout, without automatic host or token namespaces. If two hosts serve different content under the same model ID and revision, use separate `options.env.cacheDir` values (or explicit `cache_dir` values):
+
+```javascript
+import { AutoTokenizer } from "@huggingface/transformers";
+
+const modelId = "acme/shared-model";
+const tokenizerA = await AutoTokenizer.from_pretrained(modelId, {
+  revision: "main",
+  env: {
+    remoteHost: "https://hub-a.example/",
+    cacheDir: "/var/cache/models/host-a/",
+  },
+});
+const tokenizerB = await AutoTokenizer.from_pretrained(modelId, {
+  revision: "main",
+  env: {
+    remoteHost: "https://hub-b.example/",
+    cacheDir: "/var/cache/models/host-b/",
+  },
+});
+```
+
+Cache directories separate content namespaces, not credential authorization boundaries: loading a cached file does not reauthorize it with the current token. Rotating a token within the same content namespace should keep using the same directory. An explicit `cache_dir` still takes precedence over session and global `cacheDir` settings.
+
+The filesystem cache stages each download in a temporary file and publishes it with an atomic rename,
+so readers never observe a partially written file. Processes sharing a cache directory are not otherwise
+coordinated: if one process deletes an entry while another replaces it, the replacement can be removed,
+and it is downloaded again on the next load.

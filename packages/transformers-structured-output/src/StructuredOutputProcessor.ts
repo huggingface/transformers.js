@@ -14,8 +14,23 @@ export type ResponseFormat =
     | { type: 'json_schema'; json_schema: JSONSchema }
     | { type: 'regex'; regex: string };
 
+export type StructuredOutputOptions = {
+    /**
+     * Whether the model may think before the constrained answer.
+     * - `undefined` (default): thinking only continues if the prompt already started it (an open
+     *   thinking prefill or a partially written opener). Otherwise behaves like `false`.
+     * - `false`: no thinking region; constrain the first content token. An unfinished thinking
+     *   prefill raises an error.
+     * - `true`: the model may open the optional thinking region before the answer.
+     * Thinking is opt-in because templates such as Gemma 4 omit thinking markers rather than write a
+     * closed block, so the prompt alone cannot tell that thinking is off. See #1791.
+     */
+    enable_thinking?: boolean;
+};
+
 type GenerationState = {
     constraint: TokenConstraint;
+    enableThinking?: boolean;
     processedInputLength?: number;
     mask?: Uint32Array;
 };
@@ -34,10 +49,11 @@ export class StructuredOutputProcessor extends LogitsProcessorList {
         prepareTokenizer(tokenizer);
     }
 
-    constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat) {
+    constructor(tokenizer: TokenizerSource, responseFormat: ResponseFormat, options: StructuredOutputOptions = {}) {
         super();
         const state: GenerationState = {
             constraint: createTokenConstraint(tokenizer, responseFormat),
+            enableThinking: options.enable_thinking,
         };
         this.push(new ConstraintLogitsProcessor(state));
     }
@@ -51,11 +67,26 @@ class ConstraintLogitsProcessor extends LogitsProcessor {
     _call(inputIds: bigint[][], logits: Tensor) {
         assertSingleSequence(inputIds.length);
         const input = inputIds[0];
+        if (this.state.processedInputLength === undefined) {
+            this.state.constraint.initializePrompt(input, { enable_thinking: this.state.enableThinking });
+        } else if (input.length < this.state.processedInputLength) {
+            throw new Error(
+                'StructuredOutputProcessor was reused for a new generation. Create a new processor for every generate() call.',
+            );
+        }
         const start = this.state.processedInputLength ?? input.length;
         for (let i = start; i < input.length; ++i) {
-            if (this.state.constraint.commit(Number(input[i]))) {
+            try {
+                if (this.state.constraint.commit(Number(input[i]))) {
+                    throw new Error(
+                        'StructuredOutputProcessor observed the tokenizer EOS token after generation continued. Ensure the model generation config uses the same eos_token_id as the tokenizer.',
+                    );
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
                 throw new Error(
-                    'StructuredOutputProcessor observed the tokenizer EOS token after generation continued. Ensure the model generation config uses the same eos_token_id as the tokenizer.',
+                    `${message} The StructuredOutputProcessor may have been reused for another generation; create a new processor for every generate() call.`,
+                    { cause: error },
                 );
             }
         }

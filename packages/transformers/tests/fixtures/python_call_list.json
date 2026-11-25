@@ -1,0 +1,259 @@
+{
+  "accepted": [
+    { "input": "[]", "expected": [] },
+    { "input": "[f()]", "expected": [{ "name": "f", "arguments": {} }] },
+    {
+      "input": "[f(city='Paris', days=2)]",
+      "expected": [{ "name": "f", "arguments": { "city": "Paris", "days": 2 } }]
+    },
+    {
+      "input": "[convert(amount=5, from='USD', to='EUR')]",
+      "expected": [
+        {
+          "name": "convert",
+          "arguments": { "amount": 5, "from": "USD", "to": "EUR" }
+        }
+      ]
+    },
+    {
+      "input": "[f(None=1, true=2, class=3, in=4)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "None": 1, "true": 2, "class": 3, "in": 4 }
+        }
+      ]
+    },
+    {
+      "input": "[None(True=1), class(in=2), true(from=3)]",
+      "expected": [
+        { "name": "None", "arguments": { "True": 1 } },
+        { "name": "class", "arguments": { "in": 2 } },
+        { "name": "true", "arguments": { "from": 3 } }
+      ]
+    },
+    {
+      "input": "[f(a=True, b=false, c=None, d=null, e=true, f=False)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": {
+            "a": true,
+            "b": false,
+            "c": null,
+            "d": null,
+            "e": true,
+            "f": false
+          }
+        }
+      ]
+    },
+    {
+      "input": "[f(l=[1, \"x\", true, {\"k\": [1.5]}], d={})]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "l": [1, "x", true, { "k": [1.5] }], "d": {} }
+        }
+      ]
+    },
+    {
+      "input": "[f(s='it\\'s', t=\"say \\\"hi\\\"\")]",
+      "expected": [
+        { "name": "f", "arguments": { "s": "it's", "t": "say \"hi\"" } }
+      ]
+    },
+    {
+      "input": "[f(u=\"é🚀\", e=\"\\u00e9\\ud83d\\ude80\")]",
+      "expected": [{ "name": "f", "arguments": { "u": "é🚀", "e": "é🚀" } }]
+    },
+    {
+      "input": "[f(w=\"a\\\\b\\/c\\td\")]",
+      "expected": [{ "name": "f", "arguments": { "w": "a\\b/c\td" } }]
+    },
+    {
+      "input": "[f(s='a\tb', t=\"a\u0000b\u000cb\")]",
+      "expected": [
+        { "name": "f", "arguments": { "s": "a\tb", "t": "a\u0000b\u000cb" } }
+      ]
+    },
+    {
+      "input": "[f(s='\\b\\f\\n\\r\\t\\\\\\/\\\"\\'')]",
+      "expected": [{ "name": "f", "arguments": { "s": "\b\f\n\r\t\\/\"'" } }]
+    },
+    {
+      "input": "[f(n=-3, e=1e-05, g=1E+20, z=-0.0)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "n": -3, "e": 0.00001, "g": 1e20, "z": 0 }
+        }
+      ]
+    },
+    {
+      "input": "[f(x=1e-999, y=-1e-999, z=-0)]",
+      "expected": [{ "name": "f", "arguments": { "x": 0, "y": 0, "z": 0 } }]
+    },
+    {
+      "input": "[f(x=9007199254740991, y=-9007199254740991)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "x": 9007199254740991, "y": -9007199254740991 }
+        }
+      ]
+    },
+    {
+      "input": "[f(x=9007199254740992.0, y=1.7976931348623157e308)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "x": 9007199254740992, "y": 1.7976931348623157e308 }
+        }
+      ]
+    },
+    {
+      "input": "[get-weather(max-results=5)]",
+      "expected": [{ "name": "get-weather", "arguments": { "max-results": 5 } }]
+    },
+    {
+      "input": "[github.search(q=\"a\"), a._b-0(x.1=2)]",
+      "expected": [
+        { "name": "github.search", "arguments": { "q": "a" } },
+        { "name": "a._b-0", "arguments": { "x.1": 2 } }
+      ]
+    },
+    {
+      "input": "[f(__proto__=1, constructor=2, d={\"constructor\": 2, \"__proto__\": 3})]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": {
+            "__proto__": 1,
+            "constructor": 2,
+            "d": { "constructor": 2, "__proto__": 3 }
+          }
+        }
+      ]
+    },
+    {
+      "input": "[__proto__(constructor=1), constructor(__proto__=2)]",
+      "expected": [
+        { "name": "__proto__", "arguments": { "constructor": 1 } },
+        { "name": "constructor", "arguments": { "__proto__": 2 } }
+      ]
+    },
+    {
+      "input": " \t\n[ f( x = 1 ) ,\r\n g( y = {'a': [], 'b': {}} ) ] \r\n",
+      "expected": [
+        { "name": "f", "arguments": { "x": 1 } },
+        { "name": "g", "arguments": { "y": { "a": [], "b": {} } } }
+      ]
+    },
+    {
+      "input": "[f(), f()]",
+      "expected": [
+        { "name": "f", "arguments": {} },
+        { "name": "f", "arguments": {} }
+      ]
+    },
+    {
+      "input": "[f(x=0, y=1.0, z=-0.125, a=1e0, b=1E-2)]",
+      "expected": [
+        {
+          "name": "f",
+          "arguments": { "x": 0, "y": 1, "z": -0.125, "a": 1, "b": 0.01 }
+        }
+      ]
+    }
+  ],
+  "rejected": [
+    { "input": "[add_numbers(2, 3.5)]", "error": "positional arguments" },
+    { "input": "[f(2, x=1)]", "error": "positional arguments" },
+    { "input": "[f(True)]", "error": "positional arguments" },
+    { "input": "[f('x')]", "error": "positional arguments" },
+    { "input": "f(x=1)" },
+    { "input": "[f(x=1),]" },
+    { "input": "[f(x=1,)]" },
+    { "input": "[f(l=[1,])]" },
+    { "input": "[f(d={\"a\": 1,})]" },
+    { "input": "[f(x=1, x=2)]" },
+    { "input": "[f(d={\"a\": 1, \"a\": 2})]" },
+    { "input": "[f(d={\"a\": 1, '\\u0061': 2})]" },
+    { "input": "[f(__proto__=1, __proto__=2)]" },
+    { "input": "[f(d={'__proto__':1, '__proto__':2})]" },
+    { "input": "[f(q=\"\\d+\")]" },
+    { "input": "[f(q=\"\\x41\")]" },
+    { "input": "[f(p=\"C:\\users\")]" },
+    { "input": "[f(s=\"\\a\")]" },
+    { "input": "[f(s=\"\\v\")]" },
+    { "input": "[f(s=\"\\101\")]" },
+    { "input": "[f(s=\"\\N{BULLET}\")]" },
+    { "input": "[f(s=\"\\U0001f680\")]" },
+    { "input": "[f(s='a\nb')]" },
+    { "input": "[f(s='a\rb')]" },
+    { "input": "[f(s='a\\\nb')]" },
+    { "input": "[f(x=9007199254740992)]" },
+    { "input": "[f(x=-9007199254740992)]" },
+    { "input": "[f(x=12345678901234567890)]" },
+    { "input": "[f(x=(1, 2))]" },
+    { "input": "[f(x=(1))]" },
+    { "input": "[(f(x=1))]" },
+    { "input": "([f(x=1)])" },
+    { "input": "[f(d={k: 1})]" },
+    { "input": "[f(d={1: 2})]" },
+    { "input": "[f(s=\"\"\"a\"\"\")]" },
+    { "input": "[f(s='''a''')]" },
+    { "input": "[f(s=r\"a\")]" },
+    { "input": "[f(s=u\"a\")]" },
+    { "input": "[f(s=b\"a\")]" },
+    { "input": "[f(s=f\"a\")]" },
+    { "input": "[f(s=\"a\" \"b\")]" },
+    { "input": "[f(x=0x1F)]" },
+    { "input": "[f(x=0o17)]" },
+    { "input": "[f(x=0b10)]" },
+    { "input": "[f(x=1_000)]" },
+    { "input": "[f(x=.5)]" },
+    { "input": "[f(x=1.)]" },
+    { "input": "[f(x=+1)]" },
+    { "input": "[f(x=--3)]" },
+    { "input": "[f(month=07)]" },
+    { "input": "[f(x=-01)]" },
+    { "input": "[f(x=inf)]" },
+    { "input": "[f(x=nan)]" },
+    { "input": "[f(x=1e999)]" },
+    { "input": "[f(x=-1e999)]" },
+    { "input": "[f(x=1.7976931348623159e308)]" },
+    { "input": "[f(x=1e)]" },
+    { "input": "[f(x=1e+)]" },
+    { "input": "[f(größe=1)]" },
+    { "input": "[größe(x=1)]" },
+    { "input": "[2f(x=1)]" },
+    { "input": "[-f(x=1)]" },
+    { "input": "[get-(x=1)]" },
+    { "input": "[a..b()]" },
+    { "input": "[f.(x=1)]" },
+    { "input": "[f(x=g())]" },
+    { "input": "[f(x=TRUE)]" },
+    { "input": "[f(x=True1)]" },
+    { "input": "[f(x=1) # note]" },
+    { "input": "[f(s=\"\\ud83d\")]" },
+    { "input": "[f(s=\"\\ude80\")]" },
+    { "input": "[f(s=\"\\ud83d\\u0041\")]" },
+    { "input": "[f(s=\"\\u123\")]" },
+    { "input": "[f(s=\"\\uZZZZ\")]" },
+    { "input": "[f(s='\ud83d')]" },
+    { "input": "[f(\u00a0x=1)]" },
+    { "input": "\u000c[f(x=1)]" },
+    { "input": "[f(x=1)] extra" },
+    { "input": "[f(" },
+    { "input": "" },
+    { "input": "[f(x=1), g(x=1, x=2)]" },
+    { "input": "[f(*args)]" },
+    { "input": "[f(**kwargs)]" },
+    { "input": "[f(x=1, y)]", "error": "positional arguments" },
+    { "input": "[f(x==1)]" },
+    { "input": "[f(x=1j)]" },
+    { "input": "[f(x={1, 2})]" }
+  ]
+}
