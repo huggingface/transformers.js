@@ -211,6 +211,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         const max_source_positions = /** @type {number} */ (this.config.max_source_positions);
         const num_segment_frames = input_stride * max_source_positions;
 
+        // A caller-supplied cache is updated in place and handed back as the same object,
+        // so keep a reference to tell it apart from a cache created for one seek pass.
+        const supplied_past_key_values = kwargs.past_key_values;
+
         let seek = 0;
         const allTokens = [];
         const allTokenTimestamps = [];
@@ -254,6 +258,13 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     ...kwargs,
                 })
             );
+
+            // Token timestamps set `return_dict_in_generate`, so each pass returns its key-value cache.
+            // Only `sequences` and the attentions are read, and the cache is never returned, so dispose
+            // it here (on WebGPU it holds GPU buffers). A caller-supplied cache stays caller-owned.
+            if (outputs.past_key_values && outputs.past_key_values !== supplied_past_key_values) {
+                await outputs.past_key_values.dispose();
+            }
 
             // Extract tokens (skip init_tokens prefix)
             const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
