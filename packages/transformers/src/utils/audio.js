@@ -13,6 +13,7 @@ import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
 import { Tensor, matmul } from './tensor.js';
 import { logger } from './logger.js';
+import { TensorOpRegistry } from '../ops/registry.js';
 
 /**
  * Helper function to load audio from a path/URL.
@@ -425,6 +426,159 @@ function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range =
 }
 
 /**
+ * Frames per call to `TensorOpRegistry.mel_spectrogram`. Bounds the op's intermediate tensors
+ * (roughly 18 MB for Whisper's 400-sample frames) regardless of the audio length.
+ */
+const MEL_SPECTROGRAM_CHUNK_FRAMES = 1024;
+
+let mel_spectrogram_op_failed = false;
+
+/** @type {WeakMap<Float32Array|Float64Array, Map<string, Tensor>>} */
+const dft_basis_cache = new WeakMap();
+
+/** @type {WeakMap<number[][], Tensor>} */
+const mel_filters_cache = new WeakMap();
+
+/**
+ * Builds the windowed DFT basis for `TensorOpRegistry.mel_spectrogram`: row `n` holds
+ * `window[n] * cos(2πkn / fft_length)` for each bin `k`, followed by the same with `sin`.
+ * @param {Float32Array|Float64Array} window
+ * @param {number} fft_length
+ * @param {number} num_frequency_bins
+ * @returns {Tensor} Tensor of shape `[window.length, 2 * num_frequency_bins]`.
+ */
+function get_dft_basis(window, fft_length, num_frequency_bins) {
+    let cache = dft_basis_cache.get(window);
+    if (!cache) {
+        cache = new Map();
+        dft_basis_cache.set(window, cache);
+    }
+    const key = `${fft_length},${num_frequency_bins}`;
+    let basis = cache.get(key);
+    if (!basis) {
+        const cos = new Float64Array(fft_length);
+        const sin = new Float64Array(fft_length);
+        for (let m = 0; m < fft_length; ++m) {
+            cos[m] = Math.cos((2 * Math.PI * m) / fft_length);
+            sin[m] = Math.sin((2 * Math.PI * m) / fft_length);
+        }
+        const frame_length = window.length;
+        const width = 2 * num_frequency_bins;
+        const data = new Float32Array(frame_length * width);
+        for (let n = 0; n < frame_length; ++n) {
+            const row = n * width;
+            for (let k = 0; k < num_frequency_bins; ++k) {
+                const m = (k * n) % fft_length;
+                data[row + k] = window[n] * cos[m];
+                data[row + num_frequency_bins + k] = window[n] * sin[m];
+            }
+        }
+        basis = new Tensor('float32', data, [frame_length, width]);
+        cache.set(key, basis);
+    }
+    return basis;
+}
+
+/**
+ * Computes `mel_filters @ |STFT(waveform)|^power` with `TensorOpRegistry.mel_spectrogram`, so the per-frame
+ * work runs in ONNX Runtime instead of a JS FFT per frame. This matters most on JS engines without a JIT
+ * (e.g. Hermes in React Native), where the JS FFT takes seconds per 30 s of audio.
+ *
+ * Frames past the end of `waveform` are zero-padded, and DC offset removal and preemphasis only use each
+ * frame's real samples, exactly like the JS implementation.
+ *
+ * @param {Float32Array|Float64Array} waveform The (already padded) waveform.
+ * @param {Float32Array|Float64Array} window The window, of length `frame_length`.
+ * @param {Object} options
+ * @param {number} options.fft_length
+ * @param {number} options.hop_length
+ * @param {number} options.num_frequency_bins
+ * @param {number} options.num_frames Number of frames to compute.
+ * @param {number} options.total_frames Number of output frames; frames past `num_frames` are zero.
+ * @param {number} options.power
+ * @param {number|null} options.preemphasis
+ * @param {boolean|null} options.remove_dc_offset
+ * @param {number[][]} options.mel_filters
+ * @returns {Promise<Tensor|null>} The mel spectrogram of shape `[num_mel_filters, total_frames]`,
+ * or `null` if the op is unavailable and the JS implementation must be used instead.
+ */
+async function mel_spectrogram_onnx(
+    waveform,
+    window,
+    {
+        fft_length,
+        hop_length,
+        num_frequency_bins,
+        num_frames,
+        total_frames,
+        power,
+        preemphasis,
+        remove_dc_offset,
+        mel_filters,
+    },
+) {
+    if (mel_spectrogram_op_failed) return null;
+
+    const frame_length = window.length;
+    const num_mel_filters = mel_filters.length;
+    const signal = waveform instanceof Float32Array ? waveform : Float32Array.from(waveform);
+    const output = new Float32Array(num_mel_filters * total_frames);
+
+    try {
+        const op = await TensorOpRegistry.mel_spectrogram;
+        const basis = get_dft_basis(window, fft_length, num_frequency_bins);
+        let mel = mel_filters_cache.get(mel_filters);
+        if (!mel) {
+            mel = new Tensor('float32', Float32Array.from(mel_filters.flat()), [num_mel_filters, num_frequency_bins]);
+            mel_filters_cache.set(mel_filters, mel);
+        }
+        const int64 = (/** @type {number} */ value) => new Tensor('int64', BigInt64Array.of(BigInt(value)), []);
+        const float32 = (/** @type {number} */ value) => new Tensor('float32', Float32Array.of(value), []);
+        const hop = int64(hop_length);
+        const dc_offset = float32(remove_dc_offset ? 1 : 0);
+        const preemphasis_coefficient = float32(preemphasis ?? 0);
+        const exponent = float32(power / 2);
+
+        for (let start = 0; start < num_frames; start += MEL_SPECTROGRAM_CHUNK_FRAMES) {
+            const count = Math.min(MEL_SPECTROGRAM_CHUNK_FRAMES, num_frames - start);
+            const begin = start * hop_length;
+            const end = begin + (count - 1) * hop_length + frame_length;
+            let chunk;
+            if (end <= signal.length) {
+                chunk = signal.subarray(begin, end);
+            } else {
+                // Frames run past the end of the signal: zero-pad (the op masks the padding).
+                chunk = new Float32Array(end - begin);
+                if (begin < signal.length) chunk.set(signal.subarray(begin));
+            }
+            const result = await op({
+                signal: new Tensor('float32', chunk, [chunk.length]),
+                length: int64(Math.max(0, Math.min(signal.length - begin, chunk.length))),
+                hop,
+                num_frames: int64(count),
+                dc_offset,
+                preemphasis: preemphasis_coefficient,
+                exponent,
+                basis,
+                mel,
+            });
+            const data = /** @type {Float32Array} */ (result.data);
+            for (let m = 0; m < num_mel_filters; ++m) {
+                output.set(data.subarray(m * count, (m + 1) * count), m * total_frames + start);
+            }
+        }
+    } catch (error) {
+        mel_spectrogram_op_failed = true;
+        logger.warn(
+            'Unable to compute the spectrogram with ONNX Runtime, falling back to the JS implementation:',
+            error,
+        );
+        return null;
+    }
+    return new Tensor('float32', output, [num_mel_filters, total_frames]);
+}
+
+/**
  * Calculates a spectrogram over one waveform using the Short-Time Fourier Transform.
  *
  * This function can create the following kinds of spectrograms:
@@ -590,82 +744,98 @@ export async function spectrogram(
     }
 
     // Preallocate arrays to store output.
-    const fft = new FFT(fft_length);
-    const inputBuffer = new Float64Array(fft_length);
-    const outputBuffer = new Float64Array(fft.outputBufferSize);
-    const transposedMagnitudeData = new Float32Array(num_frequency_bins * d1Max);
-
-    for (let i = 0; i < d1; ++i) {
-        // Populate buffer with waveform data
-        const offset = i * hop_length;
-        const buffer_size = Math.min(waveform.length - offset, frame_length);
-        if (buffer_size !== frame_length) {
-            // The full buffer is not needed, so we need to reset it (avoid overflow from previous iterations)
-            // NOTE: We don't need to reset the buffer if it's full since we overwrite the first
-            // `frame_length` values and the rest (`fft_length - frame_length`) remains zero.
-            inputBuffer.fill(0, 0, frame_length);
-        }
-
-        for (let j = 0; j < buffer_size; ++j) {
-            inputBuffer[j] = waveform[offset + j];
-        }
-
-        if (remove_dc_offset) {
-            let sum = 0;
-            for (let j = 0; j < buffer_size; ++j) {
-                sum += inputBuffer[j];
-            }
-            const mean = sum / buffer_size;
-            for (let j = 0; j < buffer_size; ++j) {
-                inputBuffer[j] -= mean;
-            }
-        }
-
-        if (preemphasis !== null) {
-            // Done in reverse to avoid copies and destructive modification
-            for (let j = buffer_size - 1; j >= 1; --j) {
-                inputBuffer[j] -= preemphasis * inputBuffer[j - 1];
-            }
-            inputBuffer[0] *= 1 - preemphasis;
-        }
-
-        // Apply window function
-        for (let j = 0; j < window.length; ++j) {
-            inputBuffer[j] *= window[j];
-        }
-
-        fft.realTransform(outputBuffer, inputBuffer);
-
-        // compute magnitudes
-        for (let j = 0; j < num_frequency_bins; ++j) {
-            const j2 = j << 1;
-
-            // NOTE: We transpose the data here to avoid doing it later
-            transposedMagnitudeData[j * d1Max + i] = outputBuffer[j2] ** 2 + outputBuffer[j2 + 1] ** 2;
-        }
-    }
-
-    if (power !== null && power !== 2) {
-        // slight optimization to not sqrt
-        const pow = power / 2; // we use 2 since we already squared
-        for (let i = 0; i < transposedMagnitudeData.length; ++i) {
-            transposedMagnitudeData[i] **= pow;
-        }
-    }
-
     // TODO: What if `mel_filters` is null?
     const num_mel_filters = mel_filters.length;
+    // Use ONNX Runtime for the per-frame work when possible (see `mel_spectrogram_onnx`).
+    let mel_spec =
+        d1 > 0
+            ? await mel_spectrogram_onnx(waveform, window, {
+                  fft_length,
+                  hop_length,
+                  num_frequency_bins,
+                  num_frames: d1,
+                  total_frames: d1Max,
+                  power,
+                  preemphasis,
+                  remove_dc_offset,
+                  mel_filters,
+              })
+            : null;
+    if (!mel_spec) {
+        const fft = new FFT(fft_length);
+        const inputBuffer = new Float64Array(fft_length);
+        const outputBuffer = new Float64Array(fft.outputBufferSize);
+        const transposedMagnitudeData = new Float32Array(num_frequency_bins * d1Max);
 
-    // Perform matrix muliplication:
-    // mel_spec = mel_filters @ magnitudes.T
-    //  - mel_filters.shape=(80, 201)
-    //  - magnitudes.shape=(3000, 201) => magnitudes.T.shape=(201, 3000)
-    //  - mel_spec.shape=(80, 3000)
-    let mel_spec = await matmul(
-        // TODO: Make `mel_filters` a Tensor during initialization
-        new Tensor('float32', mel_filters.flat(), [num_mel_filters, num_frequency_bins]),
-        new Tensor('float32', transposedMagnitudeData, [num_frequency_bins, d1Max]),
-    );
+        for (let i = 0; i < d1; ++i) {
+            // Populate buffer with waveform data
+            const offset = i * hop_length;
+            const buffer_size = Math.min(waveform.length - offset, frame_length);
+            if (buffer_size !== frame_length) {
+                // The full buffer is not needed, so we need to reset it (avoid overflow from previous iterations)
+                // NOTE: We don't need to reset the buffer if it's full since we overwrite the first
+                // `frame_length` values and the rest (`fft_length - frame_length`) remains zero.
+                inputBuffer.fill(0, 0, frame_length);
+            }
+
+            for (let j = 0; j < buffer_size; ++j) {
+                inputBuffer[j] = waveform[offset + j];
+            }
+
+            if (remove_dc_offset) {
+                let sum = 0;
+                for (let j = 0; j < buffer_size; ++j) {
+                    sum += inputBuffer[j];
+                }
+                const mean = sum / buffer_size;
+                for (let j = 0; j < buffer_size; ++j) {
+                    inputBuffer[j] -= mean;
+                }
+            }
+
+            if (preemphasis !== null) {
+                // Done in reverse to avoid copies and destructive modification
+                for (let j = buffer_size - 1; j >= 1; --j) {
+                    inputBuffer[j] -= preemphasis * inputBuffer[j - 1];
+                }
+                inputBuffer[0] *= 1 - preemphasis;
+            }
+
+            // Apply window function
+            for (let j = 0; j < window.length; ++j) {
+                inputBuffer[j] *= window[j];
+            }
+
+            fft.realTransform(outputBuffer, inputBuffer);
+
+            // compute magnitudes
+            for (let j = 0; j < num_frequency_bins; ++j) {
+                const j2 = j << 1;
+
+                // NOTE: We transpose the data here to avoid doing it later
+                transposedMagnitudeData[j * d1Max + i] = outputBuffer[j2] ** 2 + outputBuffer[j2 + 1] ** 2;
+            }
+        }
+
+        if (power !== null && power !== 2) {
+            // slight optimization to not sqrt
+            const pow = power / 2; // we use 2 since we already squared
+            for (let i = 0; i < transposedMagnitudeData.length; ++i) {
+                transposedMagnitudeData[i] **= pow;
+            }
+        }
+
+        // Perform matrix muliplication:
+        // mel_spec = mel_filters @ magnitudes.T
+        //  - mel_filters.shape=(80, 201)
+        //  - magnitudes.shape=(3000, 201) => magnitudes.T.shape=(201, 3000)
+        //  - mel_spec.shape=(80, 3000)
+        mel_spec = await matmul(
+            // TODO: Make `mel_filters` a Tensor during initialization
+            new Tensor('float32', mel_filters.flat(), [num_mel_filters, num_frequency_bins]),
+            new Tensor('float32', transposedMagnitudeData, [num_frequency_bins, d1Max]),
+        );
+    }
     if (transpose) {
         mel_spec = mel_spec.transpose(1, 0);
     }
