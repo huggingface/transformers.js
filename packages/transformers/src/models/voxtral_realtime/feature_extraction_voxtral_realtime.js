@@ -1,5 +1,5 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -16,6 +16,8 @@ export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
         );
 
         this.window = window_function(this.config.n_fft, 'hann');
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, this.config.hop_length);
     }
 
     /**
@@ -43,6 +45,7 @@ export class VoxtralRealtimeFeatureExtractor extends FeatureExtractor {
             {
                 power: 2.0,
                 mel_filters,
+                kernel: this.spectrogram_kernel,
                 log_mel: 'log10_max_norm',
                 max_log_mel: global_log_mel_max,
                 center,

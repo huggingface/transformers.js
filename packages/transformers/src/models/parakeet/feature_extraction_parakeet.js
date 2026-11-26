@@ -1,6 +1,6 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 const EPSILON = 1e-5;
 
@@ -26,6 +26,10 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
         this.window = new Float64Array(this.config.n_fft);
         const offset = Math.floor((this.config.n_fft - this.config.win_length) / 2);
         this.window.set(window, offset);
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, this.config.hop_length, {
+            fft_length: this.config.n_fft,
+        });
     }
 
     /**
@@ -50,6 +54,7 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
                 fft_length: this.config.n_fft,
                 power: 2.0,
                 mel_filters: this.config.mel_filters,
+                kernel: this.spectrogram_kernel,
                 log_mel: 'log',
                 mel_floor: -Infinity,
                 pad_mode: 'constant',

@@ -1,6 +1,6 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 export class ASTFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -25,6 +25,12 @@ export class ASTFeatureExtractor extends FeatureExtractor {
 
         this.mean = this.config.mean;
         this.std = this.config.std;
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, 160, {
+            fft_length: 512,
+            preemphasis: 0.97,
+            remove_dc_offset: true,
+        });
     }
 
     /**
@@ -46,6 +52,7 @@ export class ASTFeatureExtractor extends FeatureExtractor {
                 center: false,
                 preemphasis: 0.97,
                 mel_filters: this.mel_filters,
+                kernel: this.spectrogram_kernel,
                 log_mel: 'log',
                 mel_floor: 1.192092955078125e-7,
                 remove_dc_offset: true,

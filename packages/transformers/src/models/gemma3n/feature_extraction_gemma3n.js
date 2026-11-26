@@ -1,6 +1,6 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
 import { full, Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
     constructor(config) {
@@ -21,6 +21,12 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
         this.mel_filters = mel_filters;
 
         this.window = window_function(frame_length, 'hann');
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, this.config.hop_length, {
+            fft_length,
+            preemphasis: this.config.preemphasis,
+            remove_dc_offset: false,
+        });
     }
 
     /**
@@ -43,6 +49,7 @@ export class Gemma3nAudioFeatureExtractor extends FeatureExtractor {
                 preemphasis: this.config.preemphasis,
                 preemphasis_htk_flavor: this.config.preemphasis_htk_flavor,
                 mel_filters: this.mel_filters,
+                kernel: this.spectrogram_kernel,
                 log_mel: 'log',
                 mel_floor: this.config.mel_floor,
                 remove_dc_offset: false,

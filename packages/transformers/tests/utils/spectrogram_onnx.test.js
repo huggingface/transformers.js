@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { spectrogram, window_function, mel_filter_bank } from "../../src/utils/audio.js";
+import { spectrogram, spectrogram_kernel, window_function, mel_filter_bank } from "../../src/utils/audio.js";
 import { TensorOpRegistry } from "../../src/ops/registry.js";
 import { init } from "../init.js";
 
@@ -220,5 +220,26 @@ describe("spectrogram (ONNX Runtime ops)", () => {
       // float32 accumulation: relative error for significant bins, absolute (vs. peak) for tiny ones
       expect(Math.abs(a - e)).toBeLessThanOrEqual(Math.max(1e-4 * Math.abs(e), 1e-6 * peak));
     }
+  });
+
+  describe("precomputed kernel", () => {
+    const window = window_function(400, "povey", { periodic: false });
+    const options = { fft_length: 512, power: 2.0, center: false, preemphasis: 0.97, remove_dc_offset: true, mel_filters: kaldi_filters };
+    const kernel = spectrogram_kernel(window, 160, { fft_length: 512, preemphasis: 0.97, remove_dc_offset: true });
+
+    it("gives the same result as building the kernel on each call", async () => {
+      const waveform = make_signal(8000);
+      const built = await spectrogram(waveform, window, 400, 160, options);
+      const precomputed = await spectrogram(waveform, window, 400, 160, { ...options, kernel });
+      expect(precomputed.dims).toEqual(built.dims);
+      expect(Array.from(precomputed.data)).toEqual(Array.from(built.data));
+    });
+
+    it("rejects a kernel built for different settings", async () => {
+      const waveform = make_signal(8000);
+      await expect(spectrogram(waveform, window, 400, 160, { ...options, preemphasis: 0.9, kernel })).rejects.toThrow("`kernel`");
+      await expect(spectrogram(waveform, window, 400, 100, { ...options, kernel })).rejects.toThrow("`kernel`");
+      await expect(spectrogram(waveform, Float64Array.from(window), 400, 160, { ...options, kernel })).rejects.toThrow("`kernel`");
+    });
   });
 });
