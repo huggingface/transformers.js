@@ -2,6 +2,7 @@ import { build as esbuild } from "esbuild";
 import path from "node:path";
 import { stripNodePrefixPlugin } from "./plugins/stripNodePrefixPlugin.mjs";
 import { ignoreModulesPlugin } from "./plugins/ignoreModulesPlugin.mjs";
+import { aliasPlugin } from "./plugins/aliasPlugin.mjs";
 import { postBuildPlugin } from "./plugins/postBuildPlugin.mjs";
 import { externalNodeBuiltinsPlugin } from "./plugins/externalNodeBuiltinsPlugin.mjs";
 import { OUT_DIR, ROOT_DIR, getEsbuildProdConfig } from "./constants.mjs";
@@ -19,16 +20,26 @@ async function buildTarget(
     format = "esm", // 'esm' | 'cjs'
     ignoreModules = [],
     externalModules = [],
+    aliases = {},
     usePostBuild = false,
+    supportsImportMeta = true,
   },
   log,
 ) {
   const platform = format === "cjs" ? "node" : "neutral";
 
+  // Runtimes without `import.meta` (e.g. Hermes/Metro) can't even parse it, so let esbuild
+  // rewrite every occurrence to the same empty-object shim it already uses for CJS output.
+  const supported = supportsImportMeta ? undefined : { "import-meta": false };
+
   const regularFile = `transformers${name}${suffix}`;
   const minFile = `transformers${name}.min${suffix}`;
 
   const plugins = [];
+  // aliasPlugin runs first so aliases are resolved before any other plugin touches the specifier
+  if (Object.keys(aliases).length > 0) {
+    plugins.push(aliasPlugin(aliases));
+  }
   // Add ignoreModulesPlugin FIRST so it can catch modules before stripNodePrefixPlugin marks them as external
   if (ignoreModules.length > 0) {
     plugins.push(ignoreModulesPlugin(ignoreModules));
@@ -47,6 +58,7 @@ async function buildTarget(
     outfile: path.join(OUT_DIR, regularFile),
     external: externalModules,
     plugins,
+    supported,
   });
   reportSize(path.join(OUT_DIR, regularFile), log);
 
@@ -60,6 +72,7 @@ async function buildTarget(
     external: externalModules,
     plugins,
     legalComments: "none",
+    supported,
   });
   reportSize(path.join(OUT_DIR, minFile), log);
 }
