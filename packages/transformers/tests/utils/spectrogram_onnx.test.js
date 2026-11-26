@@ -24,16 +24,22 @@ function make_signal(length) {
  * Float64 reference for `spectrogram()`: a naive DFT per frame, written independently of the implementation.
  */
 function reference_spectrogram(waveform, window, frame_length, hop_length, options) {
-  const { fft_length = frame_length, power = 1.0, center = true, pad_mode = "reflect", onesided = true, preemphasis = null, mel_filters, mel_floor = 1e-10, remove_dc_offset = null, min_num_frames = null, max_num_frames = null, do_pad = true, transpose = false } = options;
+  const { fft_length = frame_length, power = 1.0, center = true, pad_mode = "reflect", onesided = true, preemphasis = null, mel_filters, mel_floor = 1e-10, mel_offset = 0, mel_floor_mode = "clamp", log_mel = null, max_log_mel = null, reference = 1.0, min_value = 1e-10, db_range = null, remove_dc_offset = null, min_num_frames = null, max_num_frames = null, do_pad = true, transpose = false } = options;
 
   let x = Array.from(waveform);
   if (center) {
     const p = Math.floor(frame_length / 2);
     if (pad_mode === "reflect") {
+      // Periodic reflection (period 2 * (length - 1)), so padding may exceed the signal length.
+      const w = x.length - 1;
+      const at = (i) => {
+        const m = ((i % (2 * w)) + 2 * w) % (2 * w);
+        return x[m > w ? 2 * w - m : m];
+      };
       const left = [];
       const right = [];
-      for (let i = p; i >= 1; --i) left.push(x[i]);
-      for (let i = x.length - 2; i >= x.length - 1 - p; --i) right.push(x[i]);
+      for (let i = p; i >= 1; --i) left.push(at(-i));
+      for (let i = 1; i <= p; ++i) right.push(at(w + i));
       x = [...left, ...x, ...right];
     } else if (pad_mode === "constant") {
       x = [...new Array(p).fill(0), ...x, ...new Array(p).fill(0)];
@@ -96,14 +102,38 @@ function reference_spectrogram(waveform, window, frame_length, hop_length, optio
       out[m * d1Max + t] = sum;
     }
   }
-  for (let i = 0; i < out.length; ++i) out[i] = Math.max(mel_floor, out[i]);
-
-  if (!transpose) return { data: out, dims: [n_mels, d1Max] };
-  const transposed = new Float64Array(out.length);
-  for (let m = 0; m < n_mels; ++m) {
-    for (let t = 0; t < d1Max; ++t) transposed[t * n_mels + m] = out[m * d1Max + t];
+  let data = out;
+  let dims = [n_mels, d1Max];
+  if (transpose) {
+    data = new Float64Array(out.length);
+    for (let m = 0; m < n_mels; ++m) {
+      for (let t = 0; t < d1Max; ++t) data[t * n_mels + m] = out[m * d1Max + t];
+    }
+    dims = [d1Max, n_mels];
   }
-  return { data: transposed, dims: [d1Max, n_mels] };
+  for (let i = 0; i < data.length; ++i) {
+    data[i] = mel_floor_mode === "add" ? mel_offset + data[i] + mel_floor : mel_offset + Math.max(mel_floor, data[i]);
+  }
+  // Same regions as `spectrogram()`: the log covers the first `d1 * n_mels` values; dB and the max cover all of them.
+  const o = Math.min(data.length, d1 * n_mels);
+  const max_of = (arr) => arr.reduce((a, b) => Math.max(a, b), -Infinity);
+  if (log_mel === "log") for (let i = 0; i < o; ++i) data[i] = Math.log(data[i]);
+  if (log_mel === "log10") for (let i = 0; i < o; ++i) data[i] = Math.log10(data[i]);
+  if (log_mel === "log10_max_norm") {
+    for (let i = 0; i < o; ++i) data[i] = Math.log10(data[i]);
+    const threshold = (max_log_mel ?? max_of(data)) - 8;
+    for (let i = 0; i < o; ++i) data[i] = (Math.max(data[i], threshold) + 4) / 4;
+  }
+  if (log_mel === "dB") {
+    const factor = power === 1 ? 20 : 10;
+    const log_reference = Math.log10(Math.max(min_value, reference));
+    for (let i = 0; i < data.length; ++i) data[i] = factor * Math.log10(Math.max(min_value, data[i]) - log_reference);
+    if (db_range !== null) {
+      const floor = max_of(data) - db_range;
+      for (let i = 0; i < data.length; ++i) data[i] = Math.max(data[i], floor);
+    }
+  }
+  return { data, dims };
 }
 
 const whisper_filters = mel_filter_bank(201, 80, 0.0, 8000.0, 16000, "slaney", "slaney");
@@ -184,6 +214,54 @@ const CASES = [
     options: { power: 2.0, preemphasis: 0.97, remove_dc_offset: true, mel_filters: kaldi_filters, min_num_frames: 50 },
   },
   {
+    name: "log10_max_norm with do_pad (log over the first d1 * n_mels values)",
+    length: 4000,
+    frame_length: 400,
+    hop_length: 160,
+    window: window_function(400, "hann"),
+    options: { power: 2.0, mel_filters: whisper_filters, log_mel: "log10_max_norm", max_num_frames: 60 },
+  },
+  {
+    name: "log10 with transpose",
+    length: 6000,
+    frame_length: 400,
+    hop_length: 160,
+    window: window_function(400, "hann"),
+    options: { power: 2.0, mel_filters: whisper_filters, log_mel: "log10", transpose: true },
+  },
+  {
+    name: "power dB with db_range (CLAP-style)",
+    length: 8000,
+    frame_length: 400,
+    hop_length: 160,
+    window: window_function(400, "hann"),
+    options: { power: 2.0, mel_filters: whisper_filters, log_mel: "dB", db_range: 80, transpose: true },
+  },
+  {
+    name: "amplitude dB",
+    length: 6000,
+    frame_length: 400,
+    hop_length: 160,
+    window: window_function(400, "hann"),
+    options: { power: 1.0, mel_filters: whisper_filters, log_mel: "dB" },
+  },
+  {
+    name: "additive mel_floor with mel_offset and log (Gemma 4-style)",
+    length: 6000,
+    frame_length: 400,
+    hop_length: 160,
+    window: window_function(400, "hann"),
+    options: { power: 2.0, pad_mode: "semicausal", mel_filters: whisper_filters, log_mel: "log", mel_floor: 1e-3, mel_floor_mode: "add", mel_offset: 0.5, transpose: true },
+  },
+  {
+    name: "reflect padding longer than the signal",
+    length: 120,
+    frame_length: 400,
+    hop_length: 40,
+    window: window_function(400, "hann"),
+    options: { power: 2.0, mel_filters: whisper_filters, log_mel: "log" },
+  },
+  {
     name: "two-sided spectrum",
     length: 4000,
     frame_length: 256,
@@ -194,7 +272,7 @@ const CASES = [
 ];
 
 describe("spectrogram (ONNX Runtime ops)", () => {
-  const OPS = ["conv1d_channels_last", "pow", "matmul"];
+  const OPS = ["conv1d_channels_last", "pow", "matmul", "matmul_transpose_a"];
   let getters;
   beforeEach(() => {
     getters = Object.fromEntries(OPS.map((name) => [name, jest.spyOn(TensorOpRegistry, name, "get")]));
@@ -209,7 +287,9 @@ describe("spectrogram (ONNX Runtime ops)", () => {
     const expected = reference_spectrogram(waveform, window, frame_length, hop_length, options);
 
     // The ONNX Runtime ops must have run.
-    for (const getter of Object.values(getters)) expect(getter).toHaveBeenCalled();
+    expect(getters.conv1d_channels_last).toHaveBeenCalled();
+    expect(getters.pow).toHaveBeenCalled();
+    expect(getters[options.transpose ? "matmul_transpose_a" : "matmul"]).toHaveBeenCalled();
 
     expect(output.dims).toEqual(expected.dims);
     let peak = 0;
@@ -218,7 +298,9 @@ describe("spectrogram (ONNX Runtime ops)", () => {
       const e = expected.data[i];
       const a = output.data[i];
       // float32 accumulation: relative error for significant bins, absolute (vs. peak) for tiny ones
-      expect(Math.abs(a - e)).toBeLessThanOrEqual(Math.max(1e-4 * Math.abs(e), 1e-6 * peak));
+      // Log-scaled outputs: float32 rounding of the mel values becomes a small absolute error after the log.
+      const tolerance = Math.max(1e-4 * Math.abs(e), 1e-6 * peak, options.log_mel ? 1e-3 : 0);
+      expect(Math.abs(a - e)).toBeLessThanOrEqual(tolerance);
     }
   });
 

@@ -8,10 +8,8 @@
  */
 
 import { getFile } from './hub.js';
-import { max } from './maths.js';
-import { calculateReflectOffset } from './core.js';
 import { saveBlob } from './io.js';
-import { Tensor, matmul, conv1d, pow } from './tensor.js';
+import { Tensor, matmul, conv1d, pow, clamp, add, mul, log, amax, pad } from './tensor.js';
 import { logger } from './logger.js';
 
 /**
@@ -310,44 +308,42 @@ export function mel_filter_bank(
 }
 
 /**
- * @template {Float32Array|Float64Array} T
- * Pads an array with a reflected version of itself on both ends.
- * @param {T} array The array to pad.
+ * Pads a signal with reflected copies of itself on both ends, excluding the edge samples. Padding longer than the
+ * signal keeps reflecting (the signal is extended periodically with period `2 * (length - 1)`).
+ * @param {Float32Array} signal The signal to pad (at least 2 samples).
  * @param {number} left The amount of padding to add to the left.
  * @param {number} right The amount of padding to add to the right.
- * @returns {T} The padded array.
+ * @returns {Promise<Float32Array>} The padded signal.
  */
-function padReflect(array, left, right) {
-    // @ts-ignore
-    const padded = new array.constructor(array.length + left + right);
-    const w = array.length - 1;
-
-    for (let i = 0; i < array.length; ++i) {
-        padded[left + i] = array[i];
+async function reflect_pad(signal, left, right) {
+    const period = signal.length - 1;
+    if (period < 1 && (left > 0 || right > 0)) {
+        throw new Error('Reflect padding needs a signal of at least 2 samples.');
     }
-
-    for (let i = 1; i <= left; ++i) {
-        padded[left - i] = array[calculateReflectOffset(i, w)];
+    let padded = new Tensor('float32', signal, [signal.length]);
+    while (left > 0 || right > 0) {
+        // ONNX reflect padding is limited to `length - 1` per side. Padding by a multiple of `period` keeps each edge
+        // on a point of symmetry of the periodic extension, so repeated reflection continues it correctly.
+        const room = Math.floor((padded.dims[0] - 1) / period) * period;
+        const l = Math.min(left, room);
+        const r = Math.min(right, room);
+        padded = await pad(padded, [l, r], { mode: 'reflect' });
+        left -= l;
+        right -= r;
     }
-
-    for (let i = 1; i <= right; ++i) {
-        padded[w + left + i] = array[calculateReflectOffset(w - i, w)];
-    }
-
-    return padded;
+    return /** @type {Float32Array} */ (padded.data);
 }
 
 /**
  * Helper function to compute `amplitude_to_db` and `power_to_db`.
- * @template {Float32Array|Float64Array} T
- * @param {T} spectrogram
+ * @param {Tensor} spectrogram
  * @param {number} factor
  * @param {number} reference
  * @param {number} min_value
  * @param {number} db_range
- * @returns {T}
+ * @returns {Promise<Tensor>}
  */
-function _db_conversion_helper(spectrogram, factor, reference, min_value, db_range) {
+async function _db_conversion_helper(spectrogram, factor, reference, min_value, db_range) {
     if (reference <= 0) {
         throw new Error('reference must be greater than zero');
     }
@@ -358,42 +354,41 @@ function _db_conversion_helper(spectrogram, factor, reference, min_value, db_ran
 
     reference = Math.max(min_value, reference);
 
+    // factor * log10(max(min_value, x) - log10(reference))
     const logReference = Math.log10(reference);
-    for (let i = 0; i < spectrogram.length; ++i) {
-        spectrogram[i] = factor * Math.log10(Math.max(min_value, spectrogram[i]) - logReference);
+    let result = await clamp(spectrogram, min_value);
+    if (logReference !== 0) {
+        result = await add(result, -logReference);
     }
+    result = await mul(await log(result), factor * Math.LOG10E);
 
     if (db_range !== null) {
         if (db_range <= 0) {
             throw new Error('db_range must be greater than zero');
         }
-        const maxValue = max(spectrogram)[0] - db_range;
-        for (let i = 0; i < spectrogram.length; ++i) {
-            spectrogram[i] = Math.max(spectrogram[i], maxValue);
-        }
+        result = await clamp(result, Number((await amax(result)).item()) - db_range);
     }
 
-    return spectrogram;
+    return result;
 }
 
 /**
  * Converts an amplitude spectrogram to the decibel scale. This computes `20 * log10(spectrogram / reference)`,
- * using basic logarithm properties for numerical stability. NOTE: Operates in-place.
+ * using basic logarithm properties for numerical stability.
  *
  * The motivation behind applying the log function on the (mel) spectrogram is that humans do not hear loudness on a
  * linear scale. Generally to double the perceived volume of a sound we need to put 8 times as much energy into it.
  * This means that large variations in energy may not sound all that different if the sound is loud to begin with.
  * This compression operation makes the (mel) spectrogram features match more closely what humans actually hear.
  *
- * @template {Float32Array|Float64Array} T
- * @param {T} spectrogram The input amplitude (mel) spectrogram.
+ * @param {Tensor} spectrogram The input amplitude (mel) spectrogram.
  * @param {number} [reference=1.0] Sets the input spectrogram value that corresponds to 0 dB.
  * For example, use `np.max(spectrogram)` to set the loudest part to 0 dB. Must be greater than zero.
  * @param {number} [min_value=1e-5] The spectrogram will be clipped to this minimum value before conversion to decibels,
  * to avoid taking `log(0)`. The default of `1e-5` corresponds to a minimum of -100 dB. Must be greater than zero.
  * @param {number} [db_range=null] Sets the maximum dynamic range in decibels. For example, if `db_range = 80`, the
  * difference between the peak value and the smallest value will never be more than 80 dB. Must be greater than zero.
- * @returns {T} The modified spectrogram in decibels.
+ * @returns {Promise<Tensor>} The spectrogram in decibels.
  */
 function amplitude_to_db(spectrogram, reference = 1.0, min_value = 1e-5, db_range = null) {
     return _db_conversion_helper(spectrogram, 20.0, reference, min_value, db_range);
@@ -401,7 +396,7 @@ function amplitude_to_db(spectrogram, reference = 1.0, min_value = 1e-5, db_rang
 
 /**
  * Converts a power spectrogram to the decibel scale. This computes `10 * log10(spectrogram / reference)`,
- * using basic logarithm properties for numerical stability. NOTE: Operates in-place.
+ * using basic logarithm properties for numerical stability.
  *
  * The motivation behind applying the log function on the (mel) spectrogram is that humans do not hear loudness on a
  * linear scale. Generally to double the perceived volume of a sound we need to put 8 times as much energy into it.
@@ -410,15 +405,14 @@ function amplitude_to_db(spectrogram, reference = 1.0, min_value = 1e-5, db_rang
  *
  * Based on the implementation of `librosa.power_to_db`.
  *
- * @template {Float32Array|Float64Array} T
- * @param {T} spectrogram The input power (mel) spectrogram. Note that a power spectrogram has the amplitudes squared!
+ * @param {Tensor} spectrogram The input power (mel) spectrogram. Note that a power spectrogram has the amplitudes squared!
  * @param {number} [reference=1.0] Sets the input spectrogram value that corresponds to 0 dB.
  * For example, use `np.max(spectrogram)` to set the loudest part to 0 dB. Must be greater than zero.
  * @param {number} [min_value=1e-10] The spectrogram will be clipped to this minimum value before conversion to decibels,
  * to avoid taking `log(0)`. The default of `1e-10` corresponds to a minimum of -100 dB. Must be greater than zero.
  * @param {number} [db_range=null] Sets the maximum dynamic range in decibels. For example, if `db_range = 80`, the
  * difference between the peak value and the smallest value will never be more than 80 dB. Must be greater than zero.
- * @returns {T} The modified spectrogram in decibels.
+ * @returns {Promise<Tensor>} The spectrogram in decibels.
  */
 function power_to_db(spectrogram, reference = 1.0, min_value = 1e-10, db_range = null) {
     return _db_conversion_helper(spectrogram, 10.0, reference, min_value, db_range);
@@ -568,33 +562,40 @@ export function spectrogram_kernel(
 }
 
 /**
- * Builds the matrices that project squared `[real, imag]` DFT outputs onto the mel filters: for `power = 2`,
- * one `[num_mel_filters, 2 * bins]` matrix (`[mel_filters, mel_filters]`); otherwise a `[bins, 2 * bins]`
- * matrix summing real and imaginary parts, followed by the `[num_mel_filters, bins]` mel filters.
- * @param {number[][]} mel_filters
- * @param {boolean} squared Whether `power` is 2.
- * @returns {Tensor[]}
+ * Builds the mel filters for a `matmul` with the DFT outputs: `[num_mel_filters, columns]`, or its transpose
+ * `[columns, num_mel_filters]` if `transposed` (to multiply as `x.T @ filters`). With `duplicated`, the filters are
+ * repeated for the real and imaginary parts (`columns = 2 * bins`), so the product also sums them.
+ * @param {number[][]} mel_filters The mel filters, of shape `[num_mel_filters, bins]`.
+ * @param {boolean} duplicated Whether to repeat the filters for the real and imaginary parts.
+ * @param {boolean} transposed Whether to return the transpose.
+ * @returns {Tensor}
  */
-function mel_matrices(mel_filters, squared) {
+function mel_matrix(mel_filters, duplicated, transposed) {
     const num_mel_filters = mel_filters.length;
     const bins = mel_filters[0].length;
-    if (squared) {
-        const data = new Float32Array(num_mel_filters * 2 * bins);
-        for (let m = 0; m < num_mel_filters; ++m) {
-            data.set(mel_filters[m], m * 2 * bins);
-            data.set(mel_filters[m], m * 2 * bins + bins);
+    const columns = duplicated ? 2 * bins : bins;
+    const data = new Float32Array(num_mel_filters * columns);
+    for (let m = 0; m < num_mel_filters; ++m) {
+        const filter = mel_filters[m];
+        for (let k = 0; k < columns; ++k) {
+            data[transposed ? k * num_mel_filters + m : m * columns + k] = filter[k % bins];
         }
-        return [new Tensor('float32', data, [num_mel_filters, 2 * bins])];
     }
-    const sum = new Float32Array(bins * 2 * bins);
+    return new Tensor('float32', data, transposed ? [columns, num_mel_filters] : [num_mel_filters, columns]);
+}
+
+/**
+ * Builds the `[bins, 2 * bins]` matrix that sums the real and imaginary parts of the DFT outputs.
+ * @param {number} bins
+ * @returns {Tensor}
+ */
+function complex_sum_matrix(bins) {
+    const data = new Float32Array(bins * 2 * bins);
     for (let k = 0; k < bins; ++k) {
-        sum[k * 2 * bins + k] = 1;
-        sum[k * 2 * bins + bins + k] = 1;
+        data[k * 2 * bins + k] = 1;
+        data[k * 2 * bins + bins + k] = 1;
     }
-    return [
-        new Tensor('float32', sum, [bins, 2 * bins]),
-        new Tensor('float32', Float32Array.from(mel_filters.flat()), [num_mel_filters, bins]),
-    ];
+    return new Tensor('float32', data, [bins, 2 * bins]);
 }
 
 /**
@@ -613,9 +614,11 @@ function mel_matrices(mel_filters, squared) {
  * @param {number} options.total_frames Number of output frames; frames past `num_frames` are zero.
  * @param {number} options.power
  * @param {number[][]} options.mel_filters
- * @returns {Promise<Tensor>} The mel spectrogram of shape `[num_mel_filters, total_frames]`.
+ * @param {boolean} options.transpose Whether to return `[total_frames, num_mel_filters]`.
+ * @returns {Promise<Tensor>} The mel spectrogram of shape `[num_mel_filters, total_frames]`,
+ * or `[total_frames, num_mel_filters]` if `transpose`.
  */
-async function compute_mel_spectrogram(waveform, kernel, { num_frames, total_frames, power, mel_filters }) {
+async function compute_mel_spectrogram(waveform, kernel, { num_frames, total_frames, power, mel_filters, transpose }) {
     const { window, hop_length, fft_length, num_frequency_bins, preemphasis, remove_dc_offset, weight, offset } =
         kernel;
     const frame_length = window.length;
@@ -624,25 +627,32 @@ async function compute_mel_spectrogram(waveform, kernel, { num_frames, total_fra
     const signal = waveform instanceof Float32Array ? waveform : Float32Array.from(waveform);
     const output = new Float32Array(num_mel_filters * total_frames);
 
-    const matrices = mel_matrices(mel_filters, power === 2);
+    // For `power = 2`, one matmul sums the squared real and imaginary parts and projects them onto the mel filters.
+    // Otherwise, sum them first, then take `|X|^power = (|X|^2)^(power / 2)`, then project.
+    const squared_power = power === 2;
+    const complex_sum = squared_power ? null : complex_sum_matrix(num_frequency_bins);
+    const filters = mel_matrix(mel_filters, squared_power, transpose);
 
     /**
      * Writes `mel_filters @ |X|^power` for consecutive frames, given the squared DFT outputs.
-     * @param {Tensor} squared Tensor of shape `[..., 2 * bins, count]`.
+     * @param {Float32Array} squared The squared DFT outputs, of shape `[2 * bins, count]`.
      * @param {number} start Index of the first frame.
      * @param {number} count Number of frames.
      */
     const write_mel = async (squared, start, count) => {
-        let mel;
-        if (matrices.length === 1) {
-            mel = await matmul(matrices[0], squared);
-        } else {
-            const magnitudes = await pow(await matmul(matrices[0], squared), power / 2);
-            mel = await matmul(matrices[1], magnitudes);
+        let x = new Tensor('float32', squared, [width, count]);
+        if (!squared_power) {
+            x = await pow(await matmul(complex_sum, x), power / 2);
         }
-        const data = /** @type {Float32Array} */ (mel.data);
-        for (let m = 0; m < num_mel_filters; ++m) {
-            output.set(data.subarray(m * count, (m + 1) * count), m * total_frames + start);
+        if (transpose) {
+            // [count, num_mel_filters] rows are contiguous in the output.
+            const mel = await matmul(x, filters, { transpose_a: true });
+            output.set(/** @type {Float32Array} */ (mel.data), start * num_mel_filters);
+        } else {
+            const data = /** @type {Float32Array} */ ((await matmul(filters, x)).data);
+            for (let m = 0; m < num_mel_filters; ++m) {
+                output.set(data.subarray(m * count, (m + 1) * count), m * total_frames + start);
+            }
         }
     };
 
@@ -665,7 +675,7 @@ async function compute_mel_spectrogram(waveform, kernel, { num_frames, total_fra
         const spectrum = await conv1d(new Tensor('float32', chunk, [1, blocks, hop_length]), weight, {
             channels_last: true,
         });
-        await write_mel(await pow(spectrum, 2), start, count);
+        await write_mel(/** @type {Float32Array} */ ((await pow(spectrum, 2)).data), start, count);
     }
 
     // Frames that only partly overlap the signal, if DC offset removal or preemphasis depend on that.
@@ -695,10 +705,10 @@ async function compute_mel_spectrogram(waveform, kernel, { num_frames, total_fra
             for (let i = 0; i < partial; ++i) {
                 for (let k = 0; k < width; ++k) transposed[k * partial + i] = squared[i * width + k];
             }
-            await write_mel(new Tensor('float32', transposed, [width, partial]), first, partial);
+            await write_mel(transposed, first, partial);
         }
     }
-    return new Tensor('float32', output, [num_mel_filters, total_frames]);
+    return new Tensor('float32', output, transpose ? [total_frames, num_mel_filters] : [num_mel_filters, total_frames]);
 }
 
 /**
@@ -820,35 +830,31 @@ export async function spectrogram(
         throw new Error('`preemphasis_htk_flavor=false` is not currently supported.');
     }
 
+    let signal = waveform instanceof Float32Array ? waveform : new Float32Array(waveform);
     if (center) {
         const padding = Math.floor(frame_length / 2);
         switch (pad_mode) {
-            case 'reflect': {
-                waveform = padReflect(waveform, padding, padding);
+            case 'reflect':
+                signal = await reflect_pad(signal, padding, padding);
                 break;
-            }
-            case 'constant': {
-                // @ts-expect-error ts(2351)
-                const padded = new waveform.constructor(waveform.length + 2 * padding);
-                padded.set(waveform, padding);
-                waveform = padded;
+            case 'constant':
+                signal = /** @type {Float32Array} */ (
+                    (await pad(new Tensor('float32', signal, [signal.length]), [padding, padding])).data
+                );
                 break;
-            }
-            case 'semicausal': {
+            case 'semicausal':
                 // Prepend padding zeros only (no right padding)
-                // @ts-expect-error ts(2351)
-                const padded = new waveform.constructor(waveform.length + padding);
-                padded.set(waveform, padding);
-                waveform = padded;
+                signal = /** @type {Float32Array} */ (
+                    (await pad(new Tensor('float32', signal, [signal.length]), [padding, 0])).data
+                );
                 break;
-            }
             default:
                 throw new Error(`pad_mode="${pad_mode}" not implemented yet.`);
         }
     }
 
     // split waveform into frames of frame_length size
-    let num_frames = Math.floor(1 + Math.floor((waveform.length - frame_length) / hop_length));
+    let num_frames = Math.floor(1 + Math.floor((signal.length - frame_length) / hop_length));
     if (min_num_frames !== null && num_frames < min_num_frames) {
         num_frames = min_num_frames;
     }
@@ -884,57 +890,48 @@ export async function spectrogram(
     ) {
         throw new Error('`kernel` was built for a different window or settings than this `spectrogram()` call.');
     }
-    let mel_spec = await compute_mel_spectrogram(waveform, kernel, {
+    let mel_spec = await compute_mel_spectrogram(signal, kernel, {
         num_frames: d1,
         total_frames: d1Max,
         power,
         mel_filters,
+        transpose,
     });
-    if (transpose) {
-        mel_spec = mel_spec.transpose(1, 0);
-    }
 
-    const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
     if (mel_floor_mode === 'add') {
-        for (let i = 0; i < mel_spec_data.length; ++i) {
-            mel_spec_data[i] = mel_offset + mel_spec_data[i] + mel_floor;
-        }
+        mel_spec = await add(mel_spec, mel_offset + mel_floor);
     } else {
-        for (let i = 0; i < mel_spec_data.length; ++i) {
-            mel_spec_data[i] = mel_offset + Math.max(mel_floor, mel_spec_data[i]);
+        mel_spec = await clamp(mel_spec, mel_floor);
+        if (mel_offset !== 0) {
+            mel_spec = await add(mel_spec, mel_offset);
         }
     }
 
     if (power !== null && log_mel !== null) {
+        const mel_spec_data = /** @type {Float32Array} */ (mel_spec.data);
+        // The log is taken over the first `d1 * num_mel_filters` values (`dB` and the max use all of them).
         const o = Math.min(mel_spec_data.length, d1 * num_mel_filters);
-        // NOTE: operates in-place
+        const head = new Tensor('float32', mel_spec_data.subarray(0, o), [o]);
         switch (log_mel) {
             case 'log':
-                for (let i = 0; i < o; ++i) {
-                    mel_spec_data[i] = Math.log(mel_spec_data[i]);
-                }
+                mel_spec_data.set(/** @type {Float32Array} */ ((await log(head)).data));
                 break;
             case 'log10':
-                for (let i = 0; i < o; ++i) {
-                    mel_spec_data[i] = Math.log10(mel_spec_data[i]);
-                }
+                mel_spec_data.set(/** @type {Float32Array} */ ((await mul(await log(head), Math.LOG10E)).data));
                 break;
             case 'log10_max_norm': {
-                for (let i = 0; i < o; ++i) {
-                    mel_spec_data[i] = Math.log10(mel_spec_data[i]);
-                }
-                const logMax = max_log_mel ?? max(mel_spec_data)[0];
-                const threshold = logMax - 8.0;
-                for (let i = 0; i < o; ++i) {
-                    mel_spec_data[i] = (Math.max(mel_spec_data[i], threshold) + 4.0) / 4.0;
-                }
+                mel_spec_data.set(/** @type {Float32Array} */ ((await mul(await log(head), Math.LOG10E)).data));
+                const logMax = max_log_mel ?? Number((await amax(mel_spec)).item());
+                // (max(x, logMax - 8) + 4) / 4
+                const normalized = await add(await mul(await clamp(head, logMax - 8.0), 0.25), 1.0);
+                mel_spec_data.set(/** @type {Float32Array} */ (normalized.data));
                 break;
             }
             case 'dB':
                 if (power === 1.0) {
-                    amplitude_to_db(mel_spec_data, reference, min_value, db_range);
+                    mel_spec = await amplitude_to_db(mel_spec, reference, min_value, db_range);
                 } else if (power === 2.0) {
-                    power_to_db(mel_spec_data, reference, min_value, db_range);
+                    mel_spec = await power_to_db(mel_spec, reference, min_value, db_range);
                 } else {
                     throw new Error(`Cannot use log_mel option '${log_mel}' with power ${power}`);
                 }

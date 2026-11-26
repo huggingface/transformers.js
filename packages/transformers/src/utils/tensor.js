@@ -1172,12 +1172,18 @@ export async function interpolate_4d(input, { size = null, mode = 'bilinear' } =
  * Inspired by https://pytorch.org/docs/stable/generated/torch.matmul.html
  * @param {Tensor} a the first tensor to be multiplied
  * @param {Tensor} b the second tensor to be multiplied
+ * @param {Object} [options]
+ * @param {boolean} [options.transpose_a=false] Whether to multiply by the transpose of `a` (`a.T @ b`).
+ * Both tensors must then be 2D.
  * @returns {Promise<Tensor>} The matrix product of the two tensors.
  */
-export async function matmul(a, b) {
-    const op = await TensorOpRegistry.matmul;
+export async function matmul(a, b, { transpose_a = false } = {}) {
+    const op = await (transpose_a ? TensorOpRegistry.matmul_transpose_a : TensorOpRegistry.matmul);
     return await op({ a, b });
 }
+
+/** @param {number} value */
+const scalar_float32 = (value) => new Tensor('float32', Float32Array.of(value), []);
 
 /**
  * Applies a 1D convolution over an input signal, with stride 1, no padding and no bias.
@@ -1203,7 +1209,100 @@ export async function conv1d(input, weight, { channels_last = false } = {}) {
  */
 export async function pow(input, exponent) {
     const op = await TensorOpRegistry.pow;
-    return await op({ x: input, e: new Tensor('float32', Float32Array.of(exponent), []) });
+    return await op({ x: input, e: scalar_float32(exponent) });
+}
+
+/**
+ * Clamps all elements of a float32 tensor into the range `[min, max]`.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.clamp.html
+ * @param {Tensor} input The input tensor.
+ * @param {number} [min=-Infinity] The lower bound.
+ * @param {number} [max=Infinity] The upper bound.
+ * @returns {Promise<Tensor>} The output tensor.
+ */
+export async function clamp(input, min = -Infinity, max = Infinity) {
+    const op = await TensorOpRegistry.clamp;
+    return await op({ x: input, lo: scalar_float32(min), hi: scalar_float32(max) });
+}
+
+/**
+ * Adds a scalar to each element of a float32 tensor.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.add.html
+ * @param {Tensor} input The input tensor.
+ * @param {number} other The number to add.
+ * @returns {Promise<Tensor>} The output tensor.
+ */
+export async function add(input, other) {
+    const op = await TensorOpRegistry.add;
+    return await op({ x: input, b: scalar_float32(other) });
+}
+
+/**
+ * Multiplies each element of a float32 tensor by a scalar.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.mul.html
+ * @param {Tensor} input The input tensor.
+ * @param {number} other The number to multiply by.
+ * @returns {Promise<Tensor>} The output tensor.
+ */
+export async function mul(input, other) {
+    const op = await TensorOpRegistry.mul;
+    return await op({ x: input, b: scalar_float32(other) });
+}
+
+/**
+ * Computes the natural logarithm of each element of a float32 tensor.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.log.html
+ * @param {Tensor} input The input tensor.
+ * @returns {Promise<Tensor>} The output tensor.
+ */
+export async function log(input) {
+    const op = await TensorOpRegistry.log;
+    return await op({ x: input });
+}
+
+/**
+ * Returns the maximum value of all elements of a float32 tensor.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.amax.html
+ * @param {Tensor} input The input tensor.
+ * @returns {Promise<Tensor>} A scalar tensor with the maximum value.
+ */
+export async function amax(input) {
+    const op = await TensorOpRegistry.amax;
+    return await op({ x: input });
+}
+
+/**
+ * Pads a float32 tensor.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html
+ * @param {Tensor} input The input tensor.
+ * @param {number[]} pad The padding sizes, starting from the last dimension:
+ * `[last_left, last_right, second_last_left, second_last_right, ...]`.
+ * @param {Object} [options]
+ * @param {'constant'|'reflect'} [options.mode='constant'] Pad with zeros (`'constant'`), or with the input mirrored
+ * at its edges, excluding the edge value (`'reflect'`, which needs each pad to be smaller than that dimension).
+ * @returns {Promise<Tensor>} The padded tensor.
+ */
+export async function pad(input, pad, { mode = 'constant' } = {}) {
+    if (pad.length % 2 !== 0 || pad.length / 2 > input.dims.length) {
+        throw new Error(`Invalid padding ${JSON.stringify(pad)} for a ${input.dims.length}D tensor.`);
+    }
+    let op;
+    if (mode === 'constant') {
+        op = await TensorOpRegistry.pad_constant;
+    } else if (mode === 'reflect') {
+        op = await TensorOpRegistry.pad_reflect;
+    } else {
+        throw new Error(`Unsupported padding mode: ${mode}`);
+    }
+    // ONNX order: the begins of every dimension, then the ends.
+    const rank = input.dims.length;
+    const pads = new BigInt64Array(2 * rank);
+    for (let i = 0; i < pad.length / 2; ++i) {
+        const dim = rank - 1 - i;
+        pads[dim] = BigInt(pad[2 * i]);
+        pads[rank + dim] = BigInt(pad[2 * i + 1]);
+    }
+    return await op({ x: input, p: new Tensor('int64', pads, [2 * rank]) });
 }
 
 /**
