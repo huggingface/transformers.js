@@ -1,4 +1,6 @@
-import { WhisperTokenizer, WhisperForConditionalGeneration, full } from "../../../src/transformers.js";
+import { jest } from "@jest/globals";
+
+import { WhisperTokenizer, WhisperForConditionalGeneration, PreTrainedModel, Tensor, full } from "../../../src/transformers.js";
 
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME, MAX_MODEL_DISPOSE_TIME, DEFAULT_MODEL_OPTIONS } from "../../init.js";
 
@@ -144,5 +146,171 @@ export default () => {
     afterAll(async () => {
       await model?.dispose();
     }, MAX_MODEL_DISPOSE_TIME);
+  });
+
+  describe("WhisperForConditionalGeneration KV cache disposal", () => {
+    // <|startoftranscript|> <|en|> <|transcribe|>; each seek pass then generates two text tokens and <|endoftext|>
+    const init_tokens = [50258, 50259, 50359];
+    const eos_token_id = 50257;
+
+    // Helper function to create a model with no weights: `super.generate` and the
+    // DTW step are stubbed, so only the seek loop itself runs
+    function createModel() {
+      const model = Object.create(WhisperForConditionalGeneration.prototype);
+      model.config = { max_source_positions: 1500 };
+      model.configs = { generation_config: { eos_token_id, no_timestamps_token_id: 50363, alignment_heads: [[0, 0]] } };
+      model._extract_token_timestamps = (outputs) => new Tensor("float32", new Float32Array(outputs.sequences.dims[1]), outputs.sequences.dims);
+      return model;
+    }
+
+    // Helper function to stub `super.generate`, returning a new KV cache for every seek pass.
+    // A supplied cache is updated in place and handed back as the same object, so mirror that here.
+    function mockSuperGenerate(generated = [100n, 200n]) {
+      const caches = [];
+      jest.spyOn(PreTrainedModel.prototype, "generate").mockImplementation(async (params) => {
+        const tokens = [...init_tokens.map(BigInt), ...generated, BigInt(eos_token_id)];
+        const sequences = new Tensor("int64", tokens, [1, tokens.length]);
+        if (!params.generation_config.return_dict_in_generate) return sequences;
+        const past_key_values = params.past_key_values ?? { dispose: jest.fn(async () => {}) };
+        caches.push(past_key_values);
+        return { sequences, past_key_values };
+      });
+      return caches;
+    }
+
+    // Two 30-second segments of silence: 2 x 3000 mel frames
+    const inputs = full([1, 80, 6000], 0.0);
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it(
+      "disposes the KV cache of every seek pass with token timestamps",
+      async () => {
+        const caches = mockSuperGenerate();
+        const model = createModel();
+
+        const output = await model.generate({ inputs, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true });
+
+        expect(output.sequences.dims).toEqual([1, init_tokens.length + 5]);
+        expect(caches).toHaveLength(2);
+        for (const cache of caches) {
+          expect(cache.dispose).toHaveBeenCalledTimes(1);
+        }
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "disposes the KV cache of a seek pass that generates no tokens",
+      async () => {
+        const caches = mockSuperGenerate([]);
+        const model = createModel();
+
+        await model.generate({ inputs, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true });
+
+        expect(caches).toHaveLength(1);
+        expect(caches[0].dispose).toHaveBeenCalledTimes(1);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
+      "does not dispose a caller-supplied KV cache",
+      async () => {
+        const caches = mockSuperGenerate();
+        const supplied_past_key_values = { dispose: jest.fn(async () => {}) };
+        const model = createModel();
+
+        await model.generate({ inputs, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, past_key_values: supplied_past_key_values });
+
+        expect(caches).toEqual([supplied_past_key_values, supplied_past_key_values]);
+        expect(supplied_past_key_values.dispose).not.toHaveBeenCalled();
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    describe("without the seek loop (max_new_tokens set)", () => {
+      // One 30-second segment; `max_new_tokens` makes `generate` skip the seek loop
+      const segment = full([1, 80, 3000], 0.0);
+
+      it(
+        "disposes and drops a KV cache the caller didn't request",
+        async () => {
+          const caches = mockSuperGenerate();
+          const model = createModel();
+
+          const output = await model.generate({ inputs: segment, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, max_new_tokens: 4 });
+
+          expect(output.token_timestamps).toBeDefined();
+          expect(output.past_key_values).toBeUndefined();
+          expect(caches).toHaveLength(1);
+          expect(caches[0].dispose).toHaveBeenCalledTimes(1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "disposes a KV cache the caller didn't request when token timestamp extraction fails",
+        async () => {
+          const caches = mockSuperGenerate();
+          const model = createModel();
+          model._extract_token_timestamps = () => {
+            throw new Error("DTW failed");
+          };
+
+          await expect(model.generate({ inputs: segment, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, max_new_tokens: 4 })).rejects.toThrow("DTW failed");
+
+          expect(caches).toHaveLength(1);
+          expect(caches[0].dispose).toHaveBeenCalledTimes(1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "returns the KV cache when the caller requests return_dict_in_generate",
+        async () => {
+          const caches = mockSuperGenerate();
+          const model = createModel();
+
+          const output = await model.generate({ inputs: segment, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, max_new_tokens: 4, return_dict_in_generate: true });
+
+          expect(caches).toHaveLength(1);
+          expect(output.past_key_values).toBe(caches[0]);
+          expect(caches[0].dispose).not.toHaveBeenCalled();
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "does not dispose a caller-supplied KV cache",
+        async () => {
+          mockSuperGenerate();
+          const supplied_past_key_values = { dispose: jest.fn(async () => {}) };
+          const model = createModel();
+
+          const output = await model.generate({ inputs: segment, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, max_new_tokens: 4, past_key_values: supplied_past_key_values });
+
+          expect(output.past_key_values).toBe(supplied_past_key_values);
+          expect(supplied_past_key_values.dispose).not.toHaveBeenCalled();
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    it(
+      "works when each seek pass returns only the sequences",
+      async () => {
+        const caches = mockSuperGenerate();
+        const model = createModel();
+
+        const output = await model.generate({ inputs, decoder_input_ids: init_tokens, return_timestamps: true });
+
+        expect(output.dims).toEqual([1, init_tokens.length + 5]);
+        expect(caches).toHaveLength(0);
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
   });
 };

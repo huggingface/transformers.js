@@ -134,6 +134,9 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             );
         }
 
+        // Token timestamps switch on `return_dict_in_generate` below; remember whether the caller asked for it.
+        const return_dict_requested = generation_config.return_dict_in_generate;
+
         if (generation_config.return_token_timestamps) {
             if (!generation_config.alignment_heads) {
                 throw new Error(
@@ -171,6 +174,14 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             decoder_input_ids: init_tokens,
             ...kwargs,
         });
+
+        // A cache the caller neither requested nor supplied is only here because of token timestamps,
+        // and nothing else will dispose it (on WebGPU it holds GPU buffers).
+        const past_key_values = outputs['past_key_values'];
+        if (!return_dict_requested && past_key_values && past_key_values !== kwargs.past_key_values) {
+            await past_key_values.dispose();
+            delete outputs['past_key_values'];
+        }
 
         if (generation_config.return_token_timestamps) {
             outputs['token_timestamps'] = this._extract_token_timestamps(
@@ -210,6 +221,10 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
         // @ts-expect-error ts(2339)
         const max_source_positions = /** @type {number} */ (this.config.max_source_positions);
         const num_segment_frames = input_stride * max_source_positions;
+
+        // A caller-supplied cache is updated in place and handed back as the same object,
+        // so keep a reference to tell it apart from a cache created for one seek pass.
+        const supplied_past_key_values = kwargs.past_key_values;
 
         let seek = 0;
         const allTokens = [];
@@ -254,6 +269,12 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                     ...kwargs,
                 })
             );
+
+            // With token timestamps each pass returns its key-value cache, which is never read or returned:
+            // dispose it unless the caller supplied it (on WebGPU it holds GPU buffers).
+            if (outputs.past_key_values && outputs.past_key_values !== supplied_past_key_values) {
+                await outputs.past_key_values.dispose();
+            }
 
             // Extract tokens (skip init_tokens prefix)
             const raw_sequence = return_token_timestamps ? outputs.sequences : /** @type {Tensor} */ (outputs);
