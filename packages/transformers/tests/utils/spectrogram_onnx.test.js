@@ -1,7 +1,6 @@
 import { jest } from "@jest/globals";
 import { spectrogram, window_function, mel_filter_bank } from "../../src/utils/audio.js";
 import { TensorOpRegistry } from "../../src/ops/registry.js";
-import { logger } from "../../src/utils/logger.js";
 import { init } from "../init.js";
 
 init();
@@ -169,6 +168,22 @@ const CASES = [
     options: { power: 2.0, pad_mode: "semicausal", mel_filters: whisper_filters },
   },
   {
+    name: "window zero-padded to frame_length (Parakeet-style)",
+    length: 16000 * 3,
+    frame_length: 512,
+    hop_length: 160,
+    window: window_function(400, "hann", { frame_length: 512 }),
+    options: { power: 2.0, mel_filters: mel_filter_bank(257, 128, 0, 8000, 16000, "slaney", "slaney") },
+  },
+  {
+    name: "zero-padded window with DC offset and preemphasis",
+    length: 6000,
+    frame_length: 512,
+    hop_length: 160,
+    window: window_function(400, "hann", { frame_length: 512 }),
+    options: { power: 2.0, preemphasis: 0.97, remove_dc_offset: true, mel_filters: kaldi_filters, min_num_frames: 50 },
+  },
+  {
     name: "two-sided spectrum",
     length: 4000,
     frame_length: 256,
@@ -178,16 +193,14 @@ const CASES = [
   },
 ];
 
-describe("spectrogram (ONNX Runtime path)", () => {
-  let op_getter;
-  let warn;
+describe("spectrogram (ONNX Runtime ops)", () => {
+  const OPS = ["conv1d_channels_last", "pow", "matmul"];
+  let getters;
   beforeEach(() => {
-    op_getter = jest.spyOn(TensorOpRegistry, "mel_spectrogram", "get");
-    warn = jest.spyOn(logger, "warn");
+    getters = Object.fromEntries(OPS.map((name) => [name, jest.spyOn(TensorOpRegistry, name, "get")]));
   });
   afterEach(() => {
-    op_getter.mockRestore();
-    warn.mockRestore();
+    Object.values(getters).forEach((getter) => getter.mockRestore());
   });
 
   it.each(CASES)("$name", async ({ length, frame_length, hop_length, window, options }) => {
@@ -195,9 +208,8 @@ describe("spectrogram (ONNX Runtime path)", () => {
     const output = await spectrogram(waveform, window, frame_length, hop_length, options);
     const expected = reference_spectrogram(waveform, window, frame_length, hop_length, options);
 
-    // The ONNX op must have run, without falling back to the JS implementation.
-    expect(op_getter).toHaveBeenCalled();
-    expect(warn).not.toHaveBeenCalled();
+    // The ONNX Runtime ops must have run.
+    for (const getter of Object.values(getters)) expect(getter).toHaveBeenCalled();
 
     expect(output.dims).toEqual(expected.dims);
     let peak = 0;

@@ -1180,6 +1180,33 @@ export async function matmul(a, b) {
 }
 
 /**
+ * Applies a 1D convolution over an input signal, with stride 1, no padding and no bias.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.nn.functional.conv1d.html
+ * @param {Tensor} input The input tensor of shape `[batch, in_channels, width]`,
+ * or `[batch, width, in_channels]` if `channels_last` is `true`.
+ * @param {Tensor} weight The filters of shape `[out_channels, in_channels, kernel_size]`.
+ * @param {Object} [options]
+ * @param {boolean} [options.channels_last=false] Whether `input` is channels-last.
+ * @returns {Promise<Tensor>} The output tensor of shape `[batch, out_channels, width - kernel_size + 1]`.
+ */
+export async function conv1d(input, weight, { channels_last = false } = {}) {
+    const op = await (channels_last ? TensorOpRegistry.conv1d_channels_last : TensorOpRegistry.conv1d);
+    return await op({ x: input, w: weight });
+}
+
+/**
+ * Raises each element of the input to the power of `exponent`.
+ * Inspired by https://pytorch.org/docs/stable/generated/torch.pow.html
+ * @param {Tensor} input The input tensor (float32).
+ * @param {number} exponent The exponent.
+ * @returns {Promise<Tensor>} The output tensor.
+ */
+export async function pow(input, exponent) {
+    const op = await TensorOpRegistry.pow;
+    return await op({ x: input, e: new Tensor('float32', Float32Array.of(exponent), []) });
+}
+
+/**
  * Computes the one dimensional Fourier transform of real-valued input.
  * Inspired by https://pytorch.org/docs/stable/generated/torch.fft.rfft.html
  * @param {Tensor} x the real input tensor
