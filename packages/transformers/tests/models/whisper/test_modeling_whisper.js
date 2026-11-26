@@ -252,6 +252,23 @@ export default () => {
       );
 
       it(
+        "disposes a KV cache the caller didn't request when token timestamp extraction fails",
+        async () => {
+          const caches = mockSuperGenerate();
+          const model = createModel();
+          model._extract_token_timestamps = () => {
+            throw new Error("DTW failed");
+          };
+
+          await expect(model.generate({ inputs: segment, decoder_input_ids: init_tokens, return_timestamps: true, return_token_timestamps: true, max_new_tokens: 4 })).rejects.toThrow("DTW failed");
+
+          expect(caches).toHaveLength(1);
+          expect(caches[0].dispose).toHaveBeenCalledTimes(1);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
         "returns the KV cache when the caller requests return_dict_in_generate",
         async () => {
           const caches = mockSuperGenerate();

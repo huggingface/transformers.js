@@ -134,7 +134,7 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             );
         }
 
-        // Token timestamps switch on `return_dict_in_generate` below, so remember whether the caller asked for it.
+        // Token timestamps switch on `return_dict_in_generate` below; remember whether the caller asked for it.
         const return_dict_requested = generation_config.return_dict_in_generate;
 
         if (generation_config.return_token_timestamps) {
@@ -175,6 +175,14 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
             ...kwargs,
         });
 
+        // A cache the caller neither requested nor supplied is only here because of token timestamps,
+        // and nothing else will dispose it (on WebGPU it holds GPU buffers).
+        const past_key_values = outputs['past_key_values'];
+        if (!return_dict_requested && past_key_values && past_key_values !== kwargs.past_key_values) {
+            await past_key_values.dispose();
+            delete outputs['past_key_values'];
+        }
+
         if (generation_config.return_token_timestamps) {
             outputs['token_timestamps'] = this._extract_token_timestamps(
                 // @ts-expect-error TS2345
@@ -184,15 +192,6 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 0.02,
                 init_tokens.length,
             );
-
-            // The key-value cache is only returned because of token timestamps. If the caller didn't ask for
-            // `return_dict_in_generate` (or supply the cache), nothing will read or dispose it, so do it here
-            // (on WebGPU it holds GPU buffers).
-            const past_key_values = /** @type {any} */ (outputs).past_key_values;
-            if (!return_dict_requested && past_key_values && past_key_values !== kwargs.past_key_values) {
-                await past_key_values.dispose();
-                delete (/** @type {any} */ (outputs).past_key_values);
-            }
         }
 
         return outputs;
@@ -271,9 +270,8 @@ export class WhisperForConditionalGeneration extends WhisperPreTrainedModel {
                 })
             );
 
-            // Token timestamps set `return_dict_in_generate`, so each pass returns its key-value cache.
-            // Only `sequences` and the attentions are read, and the cache is never returned, so dispose
-            // it here (on WebGPU it holds GPU buffers). A caller-supplied cache stays caller-owned.
+            // With token timestamps each pass returns its key-value cache, which is never read or returned:
+            // dispose it unless the caller supplied it (on WebGPU it holds GPU buffers).
             if (outputs.past_key_values && outputs.past_key_values !== supplied_past_key_values) {
                 await outputs.past_key_values.dispose();
             }
