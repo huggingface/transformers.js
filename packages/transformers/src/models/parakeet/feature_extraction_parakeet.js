@@ -1,6 +1,6 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { Tensor } from '../../utils/tensor.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { Tensor, full, matmul, conv1d, add, mul, pow, pad } from '../../utils/tensor.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 const EPSILON = 1e-5;
 
@@ -26,6 +26,13 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
         this.window = new Float64Array(this.config.n_fft);
         const offset = Math.floor((this.config.n_fft - this.config.win_length) / 2);
         this.window.set(window, offset);
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, this.config.hop_length, {
+            fft_length: this.config.n_fft,
+        });
+
+        // Preemphasis filter y[j] = x[j] - preemphasis * x[j - 1], as a convolution kernel.
+        this.preemphasis_kernel = new Tensor('float32', Float32Array.of(-this.config.preemphasis, 1), [1, 1, 2]);
     }
 
     /**
@@ -35,14 +42,12 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
      */
     async _extract_fbank_features(waveform) {
         // Parakeet uses a custom preemphasis strategy: Apply preemphasis to entire waveform at once
-        const preemphasis = this.config.preemphasis;
-        waveform = new Float64Array(waveform); // Clone to avoid destructive changes
-        for (let j = waveform.length - 1; j >= 1; --j) {
-            waveform[j] -= preemphasis * waveform[j - 1];
-        }
+        // (with a zero before the first sample, so that y[0] = x[0])
+        const signal = new Tensor('float32', new Float32Array(waveform), [1, 1, waveform.length]);
+        const emphasized = await conv1d(await pad(signal, [1, 0]), this.preemphasis_kernel);
 
         const features = await spectrogram(
-            waveform,
+            /** @type {Float32Array} */ (emphasized.data),
             this.window, // window
             this.window.length, // frame_length
             this.config.hop_length, // hop_length
@@ -50,6 +55,7 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
                 fft_length: this.config.n_fft,
                 power: 2.0,
                 mel_filters: this.config.mel_filters,
+                kernel: this.spectrogram_kernel,
                 log_mel: 'log',
                 mel_floor: -Infinity,
                 pad_mode: 'constant',
@@ -72,41 +78,36 @@ export class ParakeetFeatureExtractor extends FeatureExtractor {
     async _call(audio) {
         validate_audio_inputs(audio, 'ParakeetFeatureExtractor');
 
-        const features = await this._extract_fbank_features(audio);
+        const mel = await this._extract_fbank_features(audio);
+        const [num_frames, num_features] = mel.dims;
 
-        const features_length = Math.floor(
-            (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length,
+        const features_length = Math.min(
+            num_frames,
+            Math.floor(
+                (audio.length + Math.floor(this.config.n_fft / 2) * 2 - this.config.n_fft) / this.config.hop_length,
+            ),
         );
 
-        const features_data = /** @type {Float32Array} */ (features.data);
-        features_data.fill(0, features_length * features.dims[1]);
-
-        // normalize mel features, ignoring padding
-        const [num_frames, num_features] = features.dims;
-        const sum = new Float64Array(num_features);
-        const sum_sq = new Float64Array(num_features);
-
-        for (let i = 0; i < features_length; ++i) {
-            const offset = i * num_features;
-            for (let j = 0; j < num_features; ++j) {
-                const val = features_data[offset + j];
-                sum[j] += val;
-                sum_sq[j] += val * val;
+        // normalize mel features over the valid frames ((x - mean) / (std + EPSILON), with ddof=1); padding frames are zero.
+        // Means over frames are computed as [1, frames] @ [frames, mel] products.
+        let features;
+        if (features_length > 0) {
+            const valid = new Tensor(
+                'float32',
+                /** @type {Float32Array} */ (mel.data).subarray(0, features_length * num_features),
+                [features_length, num_features],
+            );
+            const neg_mean = await matmul(full([1, features_length], -1 / features_length), valid);
+            const centered = await add(valid, neg_mean);
+            const divisor = features_length > 1 ? features_length - 1 : 1;
+            const variance = await matmul(full([1, features_length], 1 / divisor), await pow(centered, 2));
+            const inv_std = await pow(await add(await pow(variance, 0.5), EPSILON), -1);
+            features = await mul(centered, inv_std);
+            if (features_length < num_frames) {
+                features = await pad(features, [0, 0, 0, num_frames - features_length]);
             }
-        }
-
-        // Calculate mean and standard deviation, then normalize
-        const divisor = features_length > 1 ? features_length - 1 : 1;
-        for (let j = 0; j < num_features; ++j) {
-            const mean = sum[j] / features_length;
-            const variance = (sum_sq[j] - features_length * mean * mean) / divisor;
-            const std = Math.sqrt(variance) + EPSILON;
-            const inv_std = 1 / std;
-
-            for (let i = 0; i < features_length; ++i) {
-                const index = i * num_features + j;
-                features_data[index] = (features_data[index] - mean) * inv_std;
-            }
+        } else {
+            features = full([num_frames, num_features], 0);
         }
 
         const mask_data = new BigInt64Array(num_frames);

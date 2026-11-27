@@ -24,6 +24,7 @@ export class Gemma4AudioFeatureExtractor extends Gemma3nAudioFeatureExtractor {
             preemphasis: this.config.preemphasis,
             preemphasis_htk_flavor: this.config.preemphasis_htk_flavor,
             mel_filters: this.mel_filters,
+            kernel: this.spectrogram_kernel,
             log_mel: 'log',
             mel_floor: this.config.mel_floor,
             mel_floor_mode: 'add',

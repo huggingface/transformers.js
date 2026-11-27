@@ -1,5 +1,5 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { mel_filter_bank, spectrogram, window_function } from '../../utils/audio.js';
+import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 import { Tensor } from '../../utils/tensor.js';
 
 export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
@@ -25,6 +25,8 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
         this.window = new Float64Array(n_fft);
         const pad = Math.floor((n_fft - win_length) / 2);
         this.window.set(raw_window, pad);
+
+        this.spectrogram_kernel = spectrogram_kernel(this.window, config.melspec_kwargs.hop_length);
     }
 
     /**
@@ -44,6 +46,7 @@ export class GraniteSpeechFeatureExtractor extends FeatureExtractor {
         const mel = await spectrogram(audio, this.window, n_fft, hop_length, {
             power: 2.0,
             mel_filters: this.mel_filters,
+            kernel: this.spectrogram_kernel,
             log_mel: 'log10_max_norm',
             transpose: true, // [time, n_mels]
             max_num_frames,
