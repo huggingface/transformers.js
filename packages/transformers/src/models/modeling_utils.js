@@ -104,6 +104,7 @@ export { MODEL_TYPES } from './session_config.js';
  * and is merged in at lookup time by `resolveTypeConfig` to avoid duplication.
  */
 const MODEL_RUNTIME_CONFIG = {
+    [MODEL_TYPES.GradiumPhononTTS]: { can_generate: true },
     [MODEL_TYPES.DecoderOnly]: {
         can_generate: true,
         forward: decoder_forward,

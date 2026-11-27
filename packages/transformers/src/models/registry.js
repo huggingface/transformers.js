@@ -201,6 +201,7 @@ const MODEL_FOR_TEXT_TO_WAVEFORM_MAPPING_NAMES = new Map([
     ['vits', 'VitsModel'],
     ['musicgen', 'MusicgenForConditionalGeneration'],
     ['supertonic', 'SupertonicForConditionalGeneration'],
+    ['gradium_phonon_tts', 'GradiumPhononTTSForConditionalGeneration'],
 ]);
 
 const MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES = new Map([
@@ -639,6 +640,11 @@ const CUSTOM_MAPPING = [
         MODEL_TYPES.ImageAudioTextToText,
     ],
     ['SupertonicForConditionalGeneration', ALL_MODEL_FILES.SupertonicForConditionalGeneration, MODEL_TYPES.Supertonic],
+    [
+        'GradiumPhononTTSForConditionalGeneration',
+        ALL_MODEL_FILES.GradiumPhononTTSForConditionalGeneration,
+        MODEL_TYPES.GradiumPhononTTS,
+    ],
     ['ChatterboxModel', ALL_MODEL_FILES.ChatterboxModel, MODEL_TYPES.Chatterbox],
     ['EmbeddingGemma2Model', ALL_MODEL_FILES.EmbeddingGemma2Model, MODEL_TYPES.MultimodalEncoder],
 

@@ -490,6 +490,16 @@ describe("Dynamic Cache", () => {
     });
     expect(cache.get_seq_length()).toEqual(16);
   });
+
+  it("should skip the audio latent entry when it comes before the attention entries", () => {
+    // Phonon lists its latent cache first: 8 generated frames, but 21 attention positions.
+    const cache = new DynamicCache({
+      "past_key_values.audio_latents": full([1, 8, 32], 0.0),
+      "past_key_values.0.key": full([1, 2, 21, 32], 0.0),
+      "past_key_values.0.value": full([1, 2, 21, 32], 0.0),
+    });
+    expect(cache.get_seq_length()).toEqual(21);
+  });
 });
 
 describe("PKV caching", () => {

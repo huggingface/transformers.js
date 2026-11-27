@@ -21,6 +21,7 @@ export * from './owlvit/processing_owlvit.js';
 export * from './paligemma/processing_paligemma.js';
 export * from './phi3_v/processing_phi3_v.js';
 export * from './pixtral/processing_pixtral.js';
+export * from './pocket_tts/processing_pocket_tts.js';
 export * from './pyannote/processing_pyannote.js';
 export * from './qwen2_vl/processing_qwen2_vl.js';
 export * from './qwen2_5_vl/processing_qwen2_5_vl.js';

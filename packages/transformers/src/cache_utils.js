@@ -43,7 +43,8 @@ class _DynamicCache {
         }
 
         for (const name in self) {
-            if (name.startsWith('past_key_values.')) {
+            // Phonon's `past_key_values.audio_latents` counts generated frames, not attention positions.
+            if (name.startsWith('past_key_values.') && name !== 'past_key_values.audio_latents') {
                 return self[name].dims.at(-2);
             }
         }

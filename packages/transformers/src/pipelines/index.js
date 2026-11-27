@@ -163,7 +163,8 @@ export const SUPPORTED_TASKS = Object.freeze({
             model: 'onnx-community/Supertonic-TTS-ONNX',
             dtype: 'fp32',
         },
-        type: 'text',
+        // Text input, but some models (e.g., SpeechT5, Phonon) also need a processor.
+        type: 'multimodal',
     },
     'image-to-text': {
         pipeline: ImageToTextPipeline,

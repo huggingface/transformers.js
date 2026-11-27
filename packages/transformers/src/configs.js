@@ -154,6 +154,7 @@ function getNormalizedConfig(config) {
         case 'phi3':
         case 'phi3_v':
         case 'llava_qwen2':
+        case 'gradium_phonon_tts':
             mapping['num_heads'] = 'num_key_value_heads';
             mapping['num_layers'] = 'num_hidden_layers';
             mapping['hidden_size'] = 'hidden_size';
@@ -353,7 +354,13 @@ export function getCacheNames(config, options) {
     /** @type {Set<string>} */
     const names = new Set();
 
-    if (['lfm2', 'lfm2_moe', 'lfm3'].includes(config.model_type)) {
+    if (config.model_type === 'gradium_phonon_tts') {
+        if (options?.session_name === 'mimi_decoder') return names;
+        const flow_names = getKeyValueNames(config, { prefix: pkv_prefix });
+        flow_names.add(`${pkv_prefix}.audio_latents`);
+        if (pkv_prefix === 'present') flow_names.add('audio_latents');
+        return flow_names;
+    } else if (['lfm2', 'lfm2_moe', 'lfm3'].includes(config.model_type)) {
         const { layer_types } = /** @type {any} */ (config);
         for (let i = 0; i < layer_types.length; ++i) {
             if (layer_types[i] === 'full_attention' || layer_types[i] === 'sliding_attention') {
