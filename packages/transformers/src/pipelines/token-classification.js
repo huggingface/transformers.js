@@ -142,12 +142,19 @@ export class TokenClassificationPipeline
             const batch = logits[i];
 
             const tokens = [];
+            /** @type {Set<number>} Positions in `tokens` that follow a dropped (ignored) token. */
+            const breaks = new Set();
             for (let j = 0; j < batch.dims[0]; ++j) {
                 const tokenData = batch[j];
                 const topScoreIndex = max(tokenData.data)[1];
 
                 const entity = id2label ? id2label[topScoreIndex] : `LABEL_${topScoreIndex}`;
-                if (ignore_labels.includes(entity)) continue;
+                if (ignore_labels.includes(entity)) {
+                    // The ignored token is not returned, but it still separates the tokens
+                    // around it, so they must not be grouped into a single entity.
+                    breaks.add(tokens.length);
+                    continue;
+                }
 
                 // TODO add option to keep special tokens?
                 const word = this.tokenizer.decode([ids[j]], { skip_special_tokens: true });
@@ -163,7 +170,9 @@ export class TokenClassificationPipeline
                 });
             }
 
-            toReturn.push(aggregation_strategy === 'simple' ? groupEntities(tokens, ids, this.tokenizer) : tokens);
+            toReturn.push(
+                aggregation_strategy === 'simple' ? groupEntities(tokens, ids, this.tokenizer, breaks) : tokens,
+            );
         }
         return isBatched ? toReturn : toReturn[0];
     }
@@ -193,14 +202,17 @@ function getTag(entity) {
  * @param {number[]} ids Full input_ids for the sequence (indexed by `token.index`), used to re-decode
  *   each group so the joined `word` matches what the tokenizer would produce.
  * @param {any} tokenizer
+ * @param {Set<number>} [breaks] Positions in `tokens` that follow a token dropped by `ignore_labels`.
+ *   No group continues across such a position.
  * @returns {_Grouped[]}
  */
-function groupEntities(tokens, ids, tokenizer) {
+function groupEntities(tokens, ids, tokenizer, breaks = new Set()) {
     /** @type {{ tag: string, start: number, end: number }[]} */
     const groups = []; // each entry is a [start, end) slice into `tokens`, plus the shared tag
     let openTag = null; // null = no open group
 
     for (let i = 0; i < tokens.length; ++i) {
+        if (breaks.has(i)) openTag = null;
         const [prefix, tag] = getTag(tokens[i].entity);
         const extend = openTag === tag && prefix !== 'B' && prefix !== 'S';
         if (extend) {

@@ -242,6 +242,39 @@ export default () => {
       }, MAX_MODEL_DISPOSE_TIME);
     });
 
+    describe("IO with O (O / I-PER)", () => {
+      /** @type {TokenClassificationPipeline} */
+      let pipe;
+      beforeAll(async () => {
+        pipe = await pipeline(PIPELINE_ID, model_id, {
+          ...DEFAULT_MODEL_OPTIONS,
+          config: {
+            model_type: "bert",
+            id2label: { 0: "O", 1: "I-PER" },
+            label2id: { O: 0, "I-PER": 1 },
+          },
+        });
+      }, MAX_MODEL_LOAD_TIME);
+
+      it(
+        "aggregation_strategy='simple' does not merge same-tag tokens across a dropped O token",
+        async () => {
+          // Raw predictions: 1:O 3:I-PER 2:O 3:I-PER
+          const output = await pipe("1 3 2 3", { aggregation_strategy: "simple" });
+          const target = [
+            { entity_group: "PER", score: 0.5161253, word: "3" },
+            { entity_group: "PER", score: 0.5073943, word: "3" },
+          ];
+          expect(output).toBeCloseToNested(target, 5);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      afterAll(async () => {
+        await pipe?.dispose();
+      }, MAX_MODEL_DISPOSE_TIME);
+    });
+
     describe("BIOES (E-PER / B-PER)", () => {
       /** @type {TokenClassificationPipeline} */
       let pipe;
