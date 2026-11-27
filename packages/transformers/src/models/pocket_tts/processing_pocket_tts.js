@@ -33,6 +33,24 @@ export class PocketTTSProcessor extends Processor {
     static tokenizer_class = AutoTokenizer;
 
     /**
+     * Create a processor from parsed config and its tokenizer.
+     * @param {Object} config Processor configuration.
+     * @param {Record<string, Object>} components The loaded tokenizer.
+     * @param {string|null} chat_template Optional chat template loaded from the model repo.
+     */
+    constructor(config, components, chat_template) {
+        super(config, components, chat_template);
+        const boundary_ids = (pieces) =>
+            new Set(
+                /** @type {number[]} */ (this.tokenizer.convert_tokens_to_ids(pieces)).filter(
+                    (id) => Number.isInteger(id) && id !== this.tokenizer.unk_token_id,
+                ),
+            );
+        this.sentence_end_ids = boundary_ids(['.', '!', '...', '?']);
+        this.clause_end_ids = boundary_ids([',', ';', ':']);
+    }
+
+    /**
      * Split text into sentence-aligned chunks of at most `max_tokens` tokens, as Python's `PocketTTSProcessor.split_text`.
      * Audio marker strings in the text are removed before tokenization, as in Python.
      * @param {string} text The text to split.
@@ -51,14 +69,7 @@ export class PocketTTSProcessor extends Processor {
         // Split the whole text after sentence ends (not decimal points), split long sentences after
         // clause ends, then group greedily up to `max_tokens` (a soft limit).
         const tokens = encode(this.tokenizer, text.trim());
-        const boundary_ids = (pieces) =>
-            new Set(
-                /** @type {number[]} */ (this.tokenizer.convert_tokens_to_ids(pieces)).filter(
-                    (id) => Number.isInteger(id) && id !== this.tokenizer.unk_token_id,
-                ),
-            );
-        const sentence_ends = boundary_ids(['.', '!', '...', '?']);
-        const clause_ends = boundary_ids([',', ';', ':']);
+        const { sentence_end_ids, clause_end_ids } = this;
         // Five tokens cover a four-byte Unicode digit plus punctuation/space.
         const is_decimal_point = (ids, i) =>
             /\p{Nd}\.$/u.test(this.tokenizer.decode(ids.slice(Math.max(0, i - 5), i))) &&
@@ -68,15 +79,15 @@ export class PocketTTSProcessor extends Processor {
             let start = 0;
             for (let i = 1; i < ids.length; ++i) {
                 if (!boundaries.has(ids[i - 1]) || boundaries.has(ids[i])) continue;
-                if (boundaries === sentence_ends && is_decimal_point(ids, i)) continue;
+                if (boundaries === sentence_end_ids && is_decimal_point(ids, i)) continue;
                 segments.push(ids.slice(start, i));
                 start = i;
             }
             segments.push(ids.slice(start));
             return segments;
         };
-        const segments = split_after(tokens, sentence_ends).flatMap((sentence) =>
-            sentence.length > max_tokens ? split_after(sentence, clause_ends) : [sentence],
+        const segments = split_after(tokens, sentence_end_ids).flatMap((sentence) =>
+            sentence.length > max_tokens ? split_after(sentence, clause_end_ids) : [sentence],
         );
         const chunks = [];
         let chunk = '',

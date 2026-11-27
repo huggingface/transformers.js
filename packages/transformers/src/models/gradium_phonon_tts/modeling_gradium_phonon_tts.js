@@ -6,11 +6,40 @@ import { Tensor, full, randn } from '../../utils/tensor.js';
 import { sessionRun } from '../session.js';
 import { logger } from '../../utils/logger.js';
 
+// These have no library default: they come from the checkpoint's generation_config.json or the caller.
+const REQUIRED_GENERATION_SETTINGS = [
+    'do_sample',
+    'temperature',
+    'num_flow_steps',
+    'eos_threshold',
+    'min_frames_before_eos',
+];
+
 /** Base class for Gradium Phonon TTS models. */
 export class GradiumPhononTTSPreTrainedModel extends PreTrainedModel {}
 
 /** Gradium Phonon speech generation from text and precomputed voice latents. */
 export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPreTrainedModel {
+    // Frames per generator call, which the export declares on its `noise` input.
+    #block_size;
+
+    /**
+     * Create a model from configuration and inference sessions.
+     * @param {import('../../configs.js').PretrainedConfig} config The model configuration.
+     * @param {Record<string, any>} sessions The generator (`model`) and `mimi_decoder` sessions.
+     * @param {Record<string, Object>} configs Additional configuration files (e.g., generation_config.json).
+     */
+    constructor(config, sessions, configs) {
+        super(config, sessions, configs);
+        const block_size = sessions.model.inputMetadata.find(({ name }) => name === 'noise')?.shape[1];
+        if (!Number.isInteger(block_size) || block_size < 1) {
+            throw new Error(
+                'Incompatible Phonon ONNX export: the generator must declare a static, positive block size on its `noise` input.',
+            );
+        }
+        this.#block_size = block_size;
+    }
+
     /**
      * Generate a waveform for one prompt prepared by `PocketTTSProcessor`.
      * Runs both the speech generator and the Mimi decoder, trimming unused frames before decoding.
@@ -18,6 +47,7 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
      * prompt to ONNX. Padded voices are not supported. Unlike Python's `generate()`, which returns
      * audio latents, this method returns the decoded waveform.
      * The exported graph fixes the block size and number of flow-solver steps.
+     * Sampling and end-of-speech settings default to the checkpoint's `generation_config.json`.
      *
      * @param {Object} options Processor outputs and generation options.
      * @param {Tensor} options.input_ids Prompt tokens, including audio placeholders, of shape `[1, sequence_length]`.
@@ -25,7 +55,7 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
      * @param {Tensor} [options.audio_prompt_latents] Unpadded float32 voice latents of shape `[1, frames, audio_prompt_dim]`.
      * @param {Tensor} [options.audio_prompt_latents_mask] Optional all-ones mask of shape `[1, frames]`.
      * @param {Tensor|number} [options.frames_after_eos=1] Frames to retain after the EOS frame.
-     * @param {Object} [options.generation_config] Generation defaults to override.
+     * @param {Object} [options.generation_config] Overrides for the checkpoint's generation config.
      * @param {number} [options.max_new_tokens] Maximum number of audio frames.
      * @param {number} [options.max_length] Maximum prompt-plus-audio sequence length.
      * @param {number} [options.temperature] Noise variance; zero is deterministic.
@@ -46,18 +76,18 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
     }) {
         const config = /** @type {any} */ (this.config);
         const options = {
-            // Match the Phonon checkpoint's generation_config.json, not Python's generic Pocket TTS defaults.
-            do_sample: true,
-            temperature: 0.3,
-            num_flow_steps: 1,
-            eos_threshold: config.eos_threshold,
-            min_frames_before_eos: 0,
             ...this.generation_config,
             ...generation_config,
             ...Object.fromEntries(Object.entries(kwargs).filter(([, value]) => value != null)),
         };
+        const missing = REQUIRED_GENERATION_SETTINGS.filter((name) => options[name] == null);
+        if (missing.length) {
+            throw new Error(
+                `Missing Phonon generation settings: ${missing.join(', ')}. Set them in the model's generation_config.json or pass them to generate().`,
+            );
+        }
         const { model, mimi_decoder } = this.sessions;
-        const block_size = model.inputMetadata.find(({ name }) => name === 'noise').shape[1];
+        const block_size = this.#block_size;
         if (options.num_flow_steps !== 1) {
             throw new Error('This ONNX export supports num_flow_steps=1; other values require re-export.');
         }
@@ -71,16 +101,8 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
         ) {
             throw new Error('attention_mask must match the shape of input_ids.');
         }
-        if (
-            !(audio_prompt_latents instanceof Tensor) ||
-            audio_prompt_latents.type !== 'float32' ||
-            audio_prompt_latents.dims.length !== 3 ||
-            audio_prompt_latents.dims[0] !== 1 ||
-            audio_prompt_latents.dims[2] !== config.audio_prompt_dim
-        ) {
-            throw new Error('audio_prompt_latents must be a float32 tensor of shape [1, frames, audio_prompt_dim].');
-        }
         const voice_length = audio_prompt_latents.dims[1];
+        // The voice mask is not a graph input, so ONNX Runtime cannot reject padding.
         if (
             audio_prompt_latents_mask !== undefined &&
             (audio_prompt_latents_mask.dims.length !== 2 ||
@@ -158,7 +180,7 @@ export class GradiumPhononTTSForConditionalGeneration extends GradiumPhononTTSPr
             while (num_frames < Math.min(stop_frame ?? max_frames, max_frames)) {
                 const prefill = num_frames === 0;
                 // The KV cache includes voice and text positions, unlike the audio latent cache.
-                const past_length = cache['past_key_values.0.key'].dims.at(-2);
+                const past_length = cache.get_seq_length();
                 const step_length = block_size + (prefill ? voice_length + text_ids.length : 0);
                 const position_ids = new Tensor(
                     'int64',

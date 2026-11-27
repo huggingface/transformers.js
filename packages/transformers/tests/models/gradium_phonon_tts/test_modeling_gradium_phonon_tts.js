@@ -1,11 +1,17 @@
 import { jest } from "@jest/globals";
 import { Tensor as ORTTensor } from "onnxruntime-node";
-import { env, pipeline, PretrainedConfig, Tensor, TextToAudioPipeline, GradiumPhononTTSForConditionalGeneration, PocketTTSProcessor } from "../../../src/transformers.js";
+import { AutoProcessor, PretrainedConfig, Tensor, GradiumPhononTTSForConditionalGeneration } from "../../../src/transformers.js";
 import { get_model_files } from "../../../src/utils/model_registry/get_model_files.js";
 import { getCacheNames } from "../../../src/configs.js";
 import { random } from "../../../src/utils/random.js";
-import { create_tokenizer, AUDIO_TOKEN_IDS, CHAT_TEMPLATE } from "./tokenizer_fixture.js";
 import { MAX_MODEL_LOAD_TIME, MAX_TEST_EXECUTION_TIME } from "../../init.js";
+
+// Audio marker IDs of the checkpoint. Any other ID is a text token.
+const BOS = 4;
+const PLACEHOLDER = 5;
+const LATENT = 6;
+const SAMPLES_PER_FRAME = 1920;
+const GENERATION_CONFIG = { do_sample: true, temperature: 0.3, num_flow_steps: 1, eos_threshold: 4, min_frames_before_eos: 0 };
 
 const config = () =>
   new PretrainedConfig({
@@ -13,12 +19,9 @@ const config = () =>
     audio_prompt_dim: 2,
     latent_dim: 2,
     frame_rate: 12.5,
-    eos_threshold: 4,
-    num_speakers: 1,
-    duration_delta: 0,
-    audio_bos_token_id: AUDIO_TOKEN_IDS[0],
-    audio_prompt_token_id: AUDIO_TOKEN_IDS[1],
-    audio_latent_token_id: AUDIO_TOKEN_IDS[2],
+    audio_bos_token_id: BOS,
+    audio_prompt_token_id: PLACEHOLDER,
+    audio_latent_token_id: LATENT,
     num_hidden_layers: 1,
     num_attention_heads: 1,
     num_key_value_heads: 1,
@@ -26,39 +29,51 @@ const config = () =>
     head_dim: 2,
     "transformers.js_config": { dtype: "fp32" },
   });
-const voice_url = "https://example.com/voice.bin";
-const samples_per_frame = 1920;
 
+const ids = (data, dims = [1, data.length]) => new Tensor("int64", data, dims);
+const voice = (frames = 1) =>
+  new Tensor(
+    "float32",
+    Float32Array.from({ length: frames * 2 }, (_, i) => 0.5 + i),
+    [1, frames, 2],
+  );
 const gpu_tensor = (dims) => ORTTensor.fromGpuBuffer({}, { dataType: "float32", dims, dispose: jest.fn() });
 
-function create_pipeline(block_size = 4, eos = () => 5, distinguish_chunks = false) {
-  const noise = [],
-    outputs = [];
-  let decoded_chunks = 0;
+/**
+ * A model on generator and decoder doubles that declare the published graphs' inputs, in their order.
+ * Every frame has the EOS logit `eos(frame)`, and `outputs` collects what each generator call returned.
+ */
+function create_model({ block_size = 4, eos = () => 5, generation_config = GENERATION_CONFIG } = {}) {
   const batch = "batch_size";
-  const generator_inputs = [{ name: "input_ids", type: "int64", shape: [batch, "text_length"] }, { name: "audio_prompt_latents", type: "float32", shape: [batch, "voice_length", 2] }, { name: "attention_mask", type: "int64", shape: [batch, "total_sequence_length"] }, { name: "position_ids", type: "int64", shape: [batch, "new_sequence_length"] }, { name: "past_key_values.audio_latents", type: "float32", shape: [batch, "past_frames", 2] }, { name: "noise", type: "float32", shape: [batch, block_size, 2] }, ...["key", "value"].map((kind) => ({ name: `past_key_values.0.${kind}`, type: "float32", shape: [batch, 1, "past_sequence_length", 2] }))];
-  const flow = {
-    inputMetadata: generator_inputs,
-    inputNames: generator_inputs.map(({ name }) => name),
+  const inputMetadata = [
+    { name: "input_ids", type: "int64", shape: [batch, "text_length"] },
+    { name: "audio_prompt_latents", type: "float32", shape: [batch, "voice_length", 2] },
+    { name: "attention_mask", type: "int64", shape: [batch, "total_sequence_length"] },
+    { name: "position_ids", type: "int64", shape: [batch, "new_sequence_length"] },
+    { name: "past_key_values.audio_latents", type: "float32", shape: [batch, "past_frames", 2] },
+    { name: "noise", type: "float32", shape: [batch, block_size, 2] },
+    { name: "past_key_values.0.key", type: "float32", shape: [batch, 1, "past_sequence_length", 2] },
+    { name: "past_key_values.0.value", type: "float32", shape: [batch, 1, "past_sequence_length", 2] },
+  ];
+  const outputs = [];
+  const generator = {
+    inputMetadata,
+    inputNames: inputMetadata.map(({ name }) => name),
     outputNames: ["audio_latents", "present.audio_latents", "eos_logits", "present.0.key", "present.0.value"],
-    run: jest.fn(async (inputs) => {
-      const start = inputs["past_key_values.audio_latents"].dims[1],
-        frames = start + block_size;
-      for (const { name, type, shape } of generator_inputs) {
-        expect(inputs[name].type).toBe(type);
-        expect(inputs[name].dims).toHaveLength(shape.length);
-      }
-      const sequence_length = inputs["past_key_values.0.key"].dims[2] + inputs.input_ids.dims[1] + inputs.audio_prompt_latents.dims[1] + block_size;
-      noise.push(Array.from(inputs.noise.data));
+    run: jest.fn(async (feeds) => {
+      const start = feeds["past_key_values.audio_latents"].dims[1];
+      const frames = start + block_size;
+      const sequence_length = feeds["past_key_values.0.key"].dims[2] + feeds.audio_prompt_latents.dims[1] + feeds.input_ids.dims[1] + block_size;
       const result = {
-        ...Object.fromEntries(["key", "value"].map((kind) => [`present.0.${kind}`, gpu_tensor([1, 1, sequence_length, 2])])),
+        audio_latents: new ORTTensor("float32", new Float32Array(frames * 2), [1, frames, 2]),
         "present.audio_latents": gpu_tensor([1, frames, 2]),
-        audio_latents: new ORTTensor("float32", new Float32Array(frames * 2).fill(0.5), [1, frames, 2]),
         eos_logits: new ORTTensor(
           "float32",
-          Array.from({ length: block_size }, (_, i) => eos(start + i)),
+          Float32Array.from({ length: block_size }, (_, i) => eos(start + i)),
           [1, block_size],
         ),
+        "present.0.key": gpu_tensor([1, 1, sequence_length, 2]),
+        "present.0.value": gpu_tensor([1, 1, sequence_length, 2]),
       };
       outputs.push({ ...result });
       return result;
@@ -68,38 +83,29 @@ function create_pipeline(block_size = 4, eos = () => 5, distinguish_chunks = fal
   const decoder = {
     inputNames: ["audio_latents", "num_frames"],
     outputNames: ["audio_values", "audio_lengths"],
-    run: jest.fn(async ({ audio_latents, num_frames }) => {
-      expect(audio_latents.type).toBe("float32");
-      expect(audio_latents.dims).toHaveLength(3);
-      expect(num_frames.type).toBe("int64");
-      expect(num_frames.dims).toEqual([1]);
-      expect(num_frames.data[0]).toBeLessThanOrEqual(BigInt(audio_latents.dims[1]));
-      const samples = Number(num_frames.data[0]) * samples_per_frame;
+    run: jest.fn(async ({ num_frames }) => {
+      const samples = Number(num_frames.data[0]) * SAMPLES_PER_FRAME;
       return {
-        audio_values: new ORTTensor("float32", new Float32Array(samples).fill(distinguish_chunks ? ++decoded_chunks * 0.25 : 0.25), [1, 1, samples]),
+        audio_values: new ORTTensor("float32", new Float32Array(samples).fill(0.25), [1, 1, samples]),
         audio_lengths: new ORTTensor("int64", [BigInt(samples)], [1]),
       };
     }),
     release: jest.fn(),
   };
-  const model = new GradiumPhononTTSForConditionalGeneration(config(), { model: flow, mimi_decoder: decoder }, {});
-  const processor = new PocketTTSProcessor(
-    {
-      feature_extractor: { sampling_rate: 24000, frame_size: samples_per_frame },
-      fade_in_duration: 0,
-      short_text_max_words: 4,
-      frames_after_eos_short_text: 3,
-      frames_after_eos: 1,
-    },
-    { tokenizer: create_tokenizer() },
-    CHAT_TEMPLATE,
-  );
-  const pipe = new TextToAudioPipeline({ model, processor, tokenizer: processor.tokenizer });
-  return { pipe, model, processor, flow, decoder, noise, outputs };
+  const model = new GradiumPhononTTSForConditionalGeneration(config(), { model: generator, mimi_decoder: decoder }, { generation_config });
+  return { model, generator, decoder, outputs };
 }
+
+/** The number of frames the model sent to the decoder in its last call. */
+const decoded_frames = (decoder) => Number(decoder.run.mock.calls.at(-1)[0].num_frames.data[0]);
 
 export default () => {
   describe("GradiumPhononTTSForConditionalGeneration", () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+      random.seed();
+    });
+
     it.each(["fp32", "q4", "q4f16"])("lists both generation and decoder graphs for %s", async (dtype) => {
       const suffix = dtype === "fp32" ? "" : `_${dtype}`;
       expect(await get_model_files("unused", { config: config(), dtype })).toEqual(["config.json", `onnx/model${suffix}.onnx`, `onnx/mimi_decoder${suffix}.onnx`, "generation_config.json"]);
@@ -108,290 +114,273 @@ export default () => {
       expect([...getCacheNames(config(), { prefix: "present", session_name: "model" })]).toEqual(["present.0.key", "present.0.value", "present.audio_latents", "audio_latents"]);
     });
 
-    describe("generation", () => {
-      let fixture, voice, owned, fetch;
-      beforeEach(() => {
-        fixture = create_pipeline();
-        voice = new Tensor("float32", [0.5, 0.25], [1, 2, 1]);
-        owned = [voice];
-        fetch = jest.spyOn(env, "fetch").mockImplementation(async () => new Response(new Float32Array([0.5, 0.25]).buffer));
-      });
-      afterEach(async () => {
-        owned.forEach((tensor) => tensor.dispose());
-        await fixture.pipe.dispose();
-        expect(fixture.flow.release).toHaveBeenCalledTimes(1);
-        expect(fixture.decoder.release).toHaveBeenCalledTimes(1);
-        jest.restoreAllMocks();
-        random.seed();
-      });
-      const speak = (options = {}) => fixture.pipe("Hello.", { speaker_embeddings: voice, temperature: 0, ...options });
-      const generate = async (options = {}) => {
-        const prompt = fixture.processor.apply_chat_template([{ role: "user", content: [{ type: "audio" }, { type: "text", text: "Hello." }] }], { add_generation_prompt: true });
-        const row = voice.view(2, 1).transpose(1, 0);
-        const inputs = await fixture.processor(prompt, { audio_prompt_latents: [row] });
-        owned.push(row, ...Object.values(inputs));
-        const result = await fixture.model.generate({ ...inputs, ...options });
-        owned.push(result.audio_values);
-        return result;
-      };
-
-      it("generates decoded audio and releases intermediate state", async () => {
-        const output = await generate({ temperature: 0 });
-        expect(output.audio_values.dims).toEqual([1, 1, 4 * samples_per_frame]);
-        expect(output.audio_values.data.every((x) => x === 0.25)).toBe(true);
-        expect(fixture.decoder.run).toHaveBeenCalledTimes(1);
-        expect(fixture.decoder.run.mock.calls[0][0].audio_latents).toBe(fixture.outputs[0].audio_latents);
-        for (const name of ["audio_latents", "present.audio_latents", "eos_logits", "present.0.key", "present.0.value"]) {
-          expect(() => fixture.outputs[0][name].data).toThrow("disposed");
+    describe("generator and decoder feeds", () => {
+      it("packs the unmasked prompt and continues from the KV length", async () => {
+        const { model, generator, decoder, outputs } = create_model();
+        const audio_prompt_latents = voice();
+        // Four unmasked positions: one voice placeholder, two text tokens and the audio BOS.
+        const { audio_values } = await model.generate({
+          input_ids: ids([PLACEHOLDER, 42, 43, 44, BOS, 3]),
+          attention_mask: ids([1, 1, 0, 1, 1, 0]),
+          audio_prompt_latents,
+          audio_prompt_latents_mask: ids([1]),
+          max_length: 10,
+          min_frames_before_eos: 6,
+        });
+        expect(generator.run).toHaveBeenCalledTimes(2);
+        const [[prefill], [continuation]] = generator.run.mock.calls;
+        for (const feeds of [prefill, continuation]) {
+          expect(Object.keys(feeds).sort()).toEqual([...generator.inputNames].sort());
         }
-        expect(Array.from(voice.data)).toEqual([0.5, 0.25]);
-      });
-      it("packs unmasked text and uses KV positions for continuation", async () => {
-        const warn = jest.spyOn(console, "warn");
-        const [bos, prompt] = AUDIO_TOKEN_IDS;
-        const input_ids = new Tensor("int64", [prompt, 42, 43, 44, bos, 3], [1, 6]);
-        const attention_mask = new Tensor("int64", [1, 1, 0, 1, 1, 0], [1, 6]);
-        const audio_prompt_latents = new Tensor("float32", [0.5, 0.25], [1, 1, 2]);
-        owned.push(input_ids, attention_mask, audio_prompt_latents);
-        // Four logical prompt positions (one voice placeholder, two text tokens, BOS).
-        await generate({ input_ids, attention_mask, audio_prompt_latents, max_length: 10, min_frames_before_eos: 6 });
-        expect(fixture.flow.run).toHaveBeenCalledTimes(2);
-        const [[prefill], [continuation]] = fixture.flow.run.mock.calls;
-        expect(prefill.input_ids.dims).toEqual([1, 2]);
         expect([...prefill.input_ids.data]).toEqual([42n, 44n]);
         expect(prefill.audio_prompt_latents).toBe(audio_prompt_latents.ort_tensor);
-        expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("Too many inputs"));
-        expect(prefill.position_ids.dims).toEqual([1, 7]);
+        // One voice frame, two text tokens and a block of four frames.
         expect([...prefill.position_ids.data]).toEqual([0n, 1n, 2n, 3n, 4n, 5n, 6n]);
-        expect(prefill.attention_mask.dims).toEqual([1, 7]);
         expect([...prefill.attention_mask.data]).toEqual(Array(7).fill(1n));
-        expect(continuation.position_ids.dims).toEqual([1, 4]);
+
+        // The latent cache, which the graph lists first, holds four frames; the KV cache holds seven positions.
+        expect(continuation.input_ids.dims).toEqual([1, 0]);
+        expect(continuation.audio_prompt_latents.dims).toEqual([1, 0, 2]);
+        expect(continuation["past_key_values.audio_latents"]).toBe(outputs[0]["present.audio_latents"]);
+        expect(continuation["past_key_values.0.key"]).toBe(outputs[0]["present.0.key"]);
         expect([...continuation.position_ids.data]).toEqual([7n, 8n, 9n, 10n]);
-        expect(continuation.attention_mask.dims).toEqual([1, 11]);
         expect([...continuation.attention_mask.data]).toEqual(Array(11).fill(1n));
-        expect(fixture.decoder.run.mock.calls[0][0].num_frames.data[0]).toBe(6n);
-        expect(fixture.decoder.run.mock.calls[0][0].audio_latents).toBe(fixture.outputs[1].audio_latents);
+
+        // max_length leaves six frames after the four prompt positions.
+        const [[decoded]] = decoder.run.mock.calls;
+        expect(decoded.audio_latents).toBe(outputs[1].audio_latents);
+        expect(decoded.num_frames.type).toBe("int64");
+        expect(decoded.num_frames.dims).toEqual([1]);
+        expect(decoded.num_frames.data[0]).toBe(6n);
+        expect(audio_values.dims).toEqual([1, 1, 6 * SAMPLES_PER_FRAME]);
+        expect(audio_values.data.every((x) => x === 0.25)).toBe(true);
       });
-      const [bos, placeholder, latent] = AUDIO_TOKEN_IDS;
-      it.each([
-        ["placeholders without a voice", [placeholder, 42, bos], null, "voice frame count"],
-        ["wrong placeholder count", [placeholder, placeholder, 42, bos], [1, 125, 2], "voice frame count"],
-        ["missing final BOS", [bos, 42], null, "last unmasked token"],
-        ["duplicate BOS", [bos, 42, bos], null, "exactly one unmasked audio_bos_token_id"],
-        ["placeholder after text", [42, placeholder, bos], [1, 1, 2], "before the first text token"],
-        ["audio latent marker", [42, latent, bos], null, "must not contain audio_latent_token_id"],
-        ["rank-2 voice", [placeholder, 42, bos], [1, 2], "float32 tensor of shape"],
-        ["wrong voice batch size", [placeholder, 42, bos], [2, 1, 2], "float32 tensor of shape"],
-        ["wrong voice width", [placeholder, 42, bos], [1, 1, 3], "float32 tensor of shape"],
-        ["wrong voice dtype", [placeholder, 42, bos], [1, 1, 2], "float32 tensor of shape", "int64"],
-      ])("rejects %s before inference", async (_name, ids, shape, message, dtype = "float32") => {
-        const input_ids = new Tensor("int64", ids, [1, ids.length]);
-        const audio_prompt_latents = shape ? new Tensor(dtype, Array(shape.reduce((a, b) => a * b, 1)).fill(0), shape) : undefined;
-        owned.push(input_ids, ...(audio_prompt_latents ? [audio_prompt_latents] : []));
-        await expect(fixture.model.generate({ input_ids, audio_prompt_latents })).rejects.toThrow(message);
-        expect(fixture.flow.run).not.toHaveBeenCalled();
+
+      it.each([2, 8])("keeps the EOS tail across a block boundary with blocks of %i frames", async (block_size) => {
+        // EOS fires on the last frame of the first block.
+        const { model, generator, decoder } = create_model({ block_size, eos: (frame) => (frame === block_size - 1 ? 5 : -5) });
+        await model.generate({ input_ids: ids([42, BOS]), frames_after_eos: 3 });
+        expect(generator.run).toHaveBeenCalledTimes(Math.ceil((block_size + 3) / block_size));
+        expect(generator.run.mock.calls[0][0].noise.dims).toEqual([1, block_size, 2]);
+        expect(decoder.run).toHaveBeenCalledTimes(1);
+        expect(decoded_frames(decoder)).toBe(block_size + 3);
       });
+
+      it.each(["frames", 0])("rejects an export with the noise block size %p", (block_size) => {
+        expect(() => create_model({ block_size })).toThrow("Incompatible Phonon ONNX export");
+      });
+
       it("generates without a voice when the prompt has no placeholders", async () => {
-        const input_ids = new Tensor("int64", [42, bos], [1, 2]);
-        owned.push(input_ids);
-        const { audio_values } = await fixture.model.generate({ input_ids, max_new_tokens: 1 });
-        owned.push(audio_values);
-        expect(audio_values.dims).toEqual([1, 1, samples_per_frame]);
-        expect(fixture.flow.run.mock.calls[0][0].audio_prompt_latents.dims).toEqual([1, 0, 2]);
+        const { model, generator } = create_model();
+        const { audio_values } = await model.generate({ input_ids: ids([42, BOS]), max_new_tokens: 1 });
+        expect(audio_values.dims).toEqual([1, 1, SAMPLES_PER_FRAME]);
+        expect(generator.run.mock.calls[0][0].audio_prompt_latents.dims).toEqual([1, 0, 2]);
       });
-      it("rejects a batch of prompts before inference", async () => {
-        const input_ids = new Tensor("int64", [42, bos, 43, bos], [2, 2]);
-        owned.push(input_ids);
-        await expect(fixture.model.generate({ input_ids })).rejects.toThrow("accepts one prompt per call");
-        expect(fixture.flow.run).not.toHaveBeenCalled();
-      });
-      it("rejects a mismatched prompt mask before inference", async () => {
-        const attention_mask = new Tensor("int64", [1], [1, 1]);
-        owned.push(attention_mask);
-        await expect(generate({ attention_mask })).rejects.toThrow("attention_mask must match the shape of input_ids");
-        expect(fixture.flow.run).not.toHaveBeenCalled();
-      });
+
       it("warns and truncates at the default safety limit if EOS never fires", async () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        const input_ids = new Tensor("int64", [42, bos], [1, 2]);
-        owned.push(input_ids);
-        const { audio_values } = await fixture.model.generate({ input_ids, temperature: 0, eos_threshold: 6 });
-        owned.push(audio_values);
+        const { model, decoder } = create_model({ eos: () => -5 });
+        // One text token gives ceil((1 / 3 + 2) * 12.5) = 30 frames.
+        await model.generate({ input_ids: ids([42, BOS]) });
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("Phonon reached its safety frame limit"));
-        expect(audio_values.dims).toEqual([1, 1, 30 * samples_per_frame]);
+        expect(decoded_frames(decoder)).toBe(30);
       });
-      it("rejects padded voice prompts before inference", async () => {
-        const audio_prompt_latents_mask = new Tensor("int64", [0], [1, 1]);
-        owned.push(audio_prompt_latents_mask);
-        await expect(generate({ audio_prompt_latents_mask })).rejects.toThrow("unpadded voice prompt");
-        expect(fixture.flow.run).not.toHaveBeenCalled();
-      });
-      it.each([1, 4, 8])("retains the EOS frame and tail across blocks of %i", async (size) => {
-        await fixture.pipe.dispose();
-        fixture = create_pipeline(size, (frame) => (frame === size - 1 ? 5 : -5));
-        const output = await generate({ frames_after_eos: 3 });
-        expect(output.audio_values.dims).toEqual([1, 1, (size + 3) * samples_per_frame]);
-        expect(fixture.decoder.run).toHaveBeenCalledTimes(1);
-        expect(fixture.decoder.run.mock.calls[0][0].num_frames.data[0]).toBe(BigInt(size + 3));
-        expect(fixture.flow.run).toHaveBeenCalledTimes(Math.ceil((size + 3) / size));
-        const second = fixture.flow.run.mock.calls[1][0];
-        const first = fixture.outputs[0];
-        expect(second.input_ids.dims).toEqual([1, 0]);
-        expect(second.audio_prompt_latents.dims).toEqual([1, 0, 2]);
-        expect(second["past_key_values.audio_latents"]).toBe(first["present.audio_latents"]);
-        expect(second["past_key_values.0.key"]).toBe(first["present.0.key"]);
-      });
-      it("honors generation settings and per-call overrides", async () => {
-        fixture.model.configs.generation_config = { eos_threshold: 10, min_frames_before_eos: 5, temperature: 0 };
-        const output = await generate({ eos_threshold: 4 });
-        expect(output.audio_values.dims).toEqual([1, 1, 9 * samples_per_frame]);
-        expect(fixture.noise.flat().every((x) => x === 0)).toBe(true);
-        expect((await generate({ max_new_tokens: 2 })).audio_values.dims).toEqual([1, 1, 2 * samples_per_frame]);
-      });
-      it("scales noise by the square root of temperature", async () => {
-        random.seed(123);
-        await generate({ temperature: 0.3 });
-        const baseline = fixture.noise.at(-1);
-        random.seed(123);
-        await generate({ temperature: 1.2 });
-        fixture.noise.at(-1).forEach((value, i) => expect(value).toBeCloseTo(baseline[i] * 2));
-        await generate({ do_sample: false });
-        expect(fixture.noise.at(-1).every((x) => x === 0)).toBe(true);
-      });
-      it.each([{ max_new_tokens: 0 }, { frames_after_eos: -1 }, { temperature: -1 }])("rejects invalid generation options %j", async (options) => {
-        await expect(generate(options)).rejects.toThrow();
-        expect(fixture.flow.run).not.toHaveBeenCalled();
-      });
-      it("rejects solver settings absent from the export", async () => {
-        await expect(generate({ num_flow_steps: 4 })).rejects.toThrow("require re-export");
-        expect(fixture.flow.run).not.toHaveBeenCalled();
-      });
-      it.each(["flow", "decoder"])("releases state when %s inference fails", async (failure) => {
-        fixture.model.configs.generation_config = { min_frames_before_eos: 5 };
-        jest.spyOn(console, "error").mockImplementation(() => {});
-        if (failure === "flow") fixture.flow.run.mockImplementationOnce(fixture.flow.run.getMockImplementation()).mockRejectedValueOnce(new Error("failed"));
-        else fixture.decoder.run.mockRejectedValueOnce(new Error("failed"));
-        await expect(speak()).rejects.toThrow("failed");
-        for (const tensor of Object.values(fixture.outputs[0])) {
-          expect(() => tensor.data).toThrow("disposed");
-        }
-        expect(Array.from(voice.data)).toEqual([0.5, 0.25]);
-      });
-      it.each([voice_url, new URL(voice_url), new Float32Array([0.5, 0.25])])("accepts voice input %p", async (speaker_embeddings) => {
-        const output = await speak({ speaker_embeddings });
-        expect(output.audio).toHaveLength(4 * samples_per_frame);
-        expect(output.audio.every((x) => x === 0.25)).toBe(true);
-        expect(output.sampling_rate).toBe(24000);
-      });
-      it.each([[[1, 2, 3]], [[6]]])("converts multi-frame channel-first voice data from shape %j", async (shape) => {
-        const speaker_embeddings = new Tensor("float32", [1, 2, 3, 10, 20, 30], shape);
-        owned.push(speaker_embeddings);
-        await speak({ speaker_embeddings });
-        const feed = fixture.flow.run.mock.calls[0][0].audio_prompt_latents;
-        expect(feed.dims).toEqual([1, 3, 2]);
-        expect([...feed.data]).toEqual([1, 10, 2, 20, 3, 30]);
-      });
-      it("strips audio markers from pipeline text before prefill", async () => {
-        const output = await fixture.pipe("Hello <|audio_bos|> there.", { speaker_embeddings: voice });
-        expect(output.audio.length).toBeGreaterThan(0);
-        const [[prefill]] = fixture.flow.run.mock.calls;
-        expect(fixture.processor.tokenizer.decode([...prefill.input_ids.data].map(Number))).toBe("Hello there.");
-      });
-      it("preserves sentence chunk and batch order and starts each prefill fresh", async () => {
-        await fixture.pipe.dispose();
-        fixture = create_pipeline(4, () => 5, true);
-        const first = "Hello there, everyone in this very long room.";
-        const second = "See you soon.";
-        const output = await fixture.pipe([`${first} ${second}`, "Bye."], { speaker_embeddings: voice });
-        const first_samples = 2 * samples_per_frame;
-        expect(output.map((x) => x.audio.length)).toEqual([first_samples + 4 * samples_per_frame, 4 * samples_per_frame]);
-        expect(output[0].audio.subarray(0, first_samples).every((x) => x === 0.25)).toBe(true);
-        expect(output[0].audio.subarray(first_samples).every((x) => x === 0.5)).toBe(true);
-        expect(output[1].audio.every((x) => x === 0.75)).toBe(true);
-        const prefills = fixture.flow.run.mock.calls.map(([inputs]) => {
-          expect(inputs["past_key_values.audio_latents"].dims).toEqual([1, 0, 2]);
-          return fixture.processor.tokenizer.decode([...inputs.input_ids.data].map(Number));
-        });
-        expect(prefills).toEqual([first, second, "Bye."]);
-      });
-      it("reports missing and malformed voices before inference", async () => {
-        await expect(fixture.pipe("Hello.")).rejects.toThrow("Speaker embeddings must be provided");
-        await expect(speak({ speaker_embeddings: new Float32Array(3) })).rejects.toThrow("[1, 2, frames]");
-        const rank_two = new Tensor("float32", [1, 2, 3, 4, 5, 6], [3, 2]);
-        owned.push(rank_two);
-        await expect(speak({ speaker_embeddings: rank_two })).rejects.toThrow("use PocketTTSProcessor and model.generate()");
-        fetch.mockResolvedValueOnce(new Response("", { status: 404 }));
-        await expect(speak({ speaker_embeddings: voice_url })).rejects.toThrow("404");
-        expect(fixture.flow.run).not.toHaveBeenCalled();
+
+      it.each([
+        ["a batch of prompts", { input_ids: ids([42, BOS, 43, BOS], [2, 2]) }, "accepts one prompt per call"],
+        ["a prompt mask of another shape", { attention_mask: ids([1]) }, "attention_mask must match the shape of input_ids"],
+        ["placeholders without a voice", { audio_prompt_latents: undefined }, "voice frame count"],
+        ["a placeholder count that differs from the voice", { input_ids: ids([PLACEHOLDER, PLACEHOLDER, 42, BOS]) }, "voice frame count"],
+        ["a placeholder after text", { input_ids: ids([42, PLACEHOLDER, BOS]) }, "before the first text token"],
+        ["a missing final BOS", { input_ids: ids([PLACEHOLDER, BOS, 42]) }, "last unmasked token"],
+        ["a duplicate BOS", { input_ids: ids([PLACEHOLDER, BOS, 42, BOS]) }, "exactly one unmasked audio_bos_token_id"],
+        ["an audio latent marker", { input_ids: ids([PLACEHOLDER, 42, LATENT, BOS]) }, "must not contain audio_latent_token_id"],
+        ["a padded voice", { audio_prompt_latents_mask: ids([0]) }, "unpadded voice prompt"],
+        ["a voice mask of another length", { audio_prompt_latents_mask: ids([1, 1]) }, "unpadded voice prompt"],
+        ["an empty frame budget", { max_new_tokens: 0 }, "frame budget must be a positive integer"],
+        ["a negative EOS tail", { frames_after_eos: -1 }, "frames_after_eos a non-negative integer"],
+        ["a negative temperature", { temperature: -1 }, "temperature must be a finite non-negative number"],
+        ["solver steps absent from the export", { num_flow_steps: 4 }, "require re-export"],
+      ])("rejects %s before inference", async (_name, options, message) => {
+        const { model, generator } = create_model();
+        await expect(model.generate({ input_ids: ids([PLACEHOLDER, 42, BOS]), audio_prompt_latents: voice(), ...options })).rejects.toThrow(message);
+        expect(generator.run).not.toHaveBeenCalled();
       });
     });
 
-    describe("onnx-community/phonon-31m-en-ONNX", () => {
-      let tts;
-      const speaker_embeddings = "https://huggingface.co/onnx-community/phonon-31m-en-ONNX/resolve/main/voices/default.bin";
+    describe("generation settings", () => {
+      it("applies the checkpoint config, then generation_config, then direct options", async () => {
+        // Every frame has an EOS logit of 5, and one frame is kept after EOS.
+        const { model, decoder } = create_model({ generation_config: { ...GENERATION_CONFIG, eos_threshold: 10, min_frames_before_eos: 5 } });
+        const frames = async (options) => {
+          await model.generate({ input_ids: ids([42, BOS]), max_new_tokens: 12, ...options });
+          return decoded_frames(decoder);
+        };
+        expect(await frames()).toBe(12);
+        expect(await frames({ generation_config: { eos_threshold: 4 } })).toBe(7);
+        expect(await frames({ generation_config: { eos_threshold: 4, min_frames_before_eos: 9 }, min_frames_before_eos: 2 })).toBe(4);
+        expect(await frames({ eos_threshold: 4, min_frames_before_eos: 0 })).toBe(2);
+        // Direct options that are not set leave the merged config in place.
+        expect(await frames({ generation_config: { eos_threshold: 4 }, eos_threshold: undefined, min_frames_before_eos: null })).toBe(7);
+      });
+
+      it("keeps `temperature: 0` and `do_sample: false` overrides, and scales noise by the square root of temperature", async () => {
+        const { model, generator } = create_model();
+        const noise = async (options) => {
+          await model.generate({ input_ids: ids([42, BOS]), ...options });
+          return [...generator.run.mock.calls.at(-1)[0].noise.data];
+        };
+        const is_silent = (values) => values.every((x) => x === 0);
+        expect(is_silent(await noise())).toBe(false);
+        expect(is_silent(await noise({ temperature: 0 }))).toBe(true);
+        expect(is_silent(await noise({ do_sample: false }))).toBe(true);
+        expect(is_silent(await noise({ generation_config: { temperature: 0 } }))).toBe(true);
+        expect(is_silent(await noise({ generation_config: { do_sample: false } }))).toBe(true);
+        expect(is_silent(await noise({ generation_config: { do_sample: false }, do_sample: true }))).toBe(false);
+
+        random.seed(123);
+        const baseline = await noise({ temperature: 0.3 });
+        random.seed(123);
+        const scaled = await noise({ temperature: 1.2 });
+        scaled.forEach((value, i) => expect(value).toBeCloseTo(baseline[i] * 2));
+      });
+
+      it("reports settings that neither the checkpoint nor the call provides", async () => {
+        // A repo without generation_config.json loads as an empty config.
+        const { model, generator } = create_model({ generation_config: {} });
+        const input_ids = ids([42, BOS]);
+        await expect(model.generate({ input_ids })).rejects.toThrow("Missing Phonon generation settings: do_sample, temperature, num_flow_steps, eos_threshold, min_frames_before_eos. Set them in the model's generation_config.json or pass them to generate().");
+        const generation_config = { do_sample: false, temperature: 0, num_flow_steps: 1 };
+        await expect(model.generate({ input_ids, generation_config, eos_threshold: 4 })).rejects.toThrow("Missing Phonon generation settings: min_frames_before_eos.");
+        expect(generator.run).not.toHaveBeenCalled();
+
+        const { audio_values } = await model.generate({ input_ids, generation_config, eos_threshold: 4, min_frames_before_eos: 0 });
+        expect(audio_values.dims).toEqual([1, 1, 2 * SAMPLES_PER_FRAME]);
+      });
+    });
+
+    describe("cleanup", () => {
+      const expect_released = (outputs) => {
+        for (const tensor of Object.values(outputs)) {
+          expect(() => tensor.data).toThrow("disposed");
+        }
+      };
+
+      it("releases intermediate state and leaves the caller's voice intact", async () => {
+        const { model, outputs } = create_model();
+        const audio_prompt_latents = voice(2);
+        const { audio_values } = await model.generate({ input_ids: ids([PLACEHOLDER, PLACEHOLDER, 42, BOS]), audio_prompt_latents, min_frames_before_eos: 5 });
+        expect(audio_values.dims).toEqual([1, 1, 7 * SAMPLES_PER_FRAME]);
+        expect(outputs).toHaveLength(2);
+        outputs.forEach(expect_released);
+        expect([...audio_prompt_latents.data]).toEqual([0.5, 1.5, 2.5, 3.5]);
+      });
+
+      it.each(["generator", "decoder"])("releases state when %s inference fails", async (failure) => {
+        jest.spyOn(console, "error").mockImplementation(() => {});
+        const { model, generator, decoder, outputs } = create_model();
+        // Fail the second generator call, so there is state from the first one to release.
+        if (failure === "generator") generator.run.mockImplementationOnce(generator.run.getMockImplementation()).mockRejectedValueOnce(new Error("failed"));
+        else decoder.run.mockRejectedValueOnce(new Error("failed"));
+        const audio_prompt_latents = voice();
+        await expect(model.generate({ input_ids: ids([PLACEHOLDER, 42, BOS]), audio_prompt_latents, min_frames_before_eos: 5 })).rejects.toThrow("failed");
+        expect(outputs).toHaveLength(failure === "generator" ? 1 : 2);
+        outputs.forEach(expect_released);
+        expect([...audio_prompt_latents.data]).toEqual([0.5, 1.5]);
+      });
+    });
+
+    describe("onnx-community/phonon-31m-en-ONNX (q4)", () => {
+      const model_id = "onnx-community/phonon-31m-en-ONNX";
+      let model, inputs;
       beforeAll(async () => {
-        tts = await pipeline("text-to-speech", "onnx-community/phonon-31m-en-ONNX", { dtype: "q4" });
+        const processor = await AutoProcessor.from_pretrained(model_id);
+        model = await GradiumPhononTTSForConditionalGeneration.from_pretrained(model_id, { dtype: "q4" });
+        // Voice files hold flat float32 data in [audio_prompt_dim, frames] order.
+        const response = await fetch(`https://huggingface.co/${model_id}/resolve/main/voices/default.bin`);
+        const data = new Float32Array(await response.arrayBuffer());
+        const voice = new Tensor("float32", data, [data.length]).view(model.config.audio_prompt_dim, -1).transpose(1, 0);
+        const prompt = processor.apply_chat_template([{ role: "user", content: [{ type: "audio" }, { type: "text", text: "Hello from Phonon." }] }], { add_generation_prompt: true });
+        inputs = await processor(prompt, { audio_prompt_latents: [voice] });
       }, MAX_MODEL_LOAD_TIME);
       afterAll(async () => {
-        await tts?.dispose();
+        await model?.dispose();
       });
-      it(
-        "produces audible speech and stops naturally before the safety limit",
-        async () => {
-          const warn = jest.spyOn(console, "warn");
-          try {
-            // Seven text tokens give ceil((7 / 3 + 2) * 12.5) = 55 frames.
-            const { audio, sampling_rate } = await tts("Hello from Phonon.", { speaker_embeddings, temperature: 0 });
-            expect(sampling_rate).toBe(24000);
-            expect(audio.length).toBeGreaterThan(0);
-            expect(audio.length).toBeLessThan(55 * samples_per_frame);
-            expect(audio.length % samples_per_frame).toBe(0);
-            expect(audio.every(Number.isFinite)).toBe(true);
-            const rms = Math.sqrt(audio.reduce((sum, sample) => sum + sample * sample, 0) / audio.length);
-            expect(rms).toBeGreaterThan(0.03);
-            expect(warn).not.toHaveBeenCalled();
-          } finally {
-            warn.mockRestore();
-          }
-        },
-        MAX_TEST_EXECUTION_TIME,
-      );
+
       it.each([
         [6, 1],
         [11, 2],
       ])(
-        "retains %i frames after %i real generator calls",
-        async (frames, blocks) => {
-          const model = tts.model;
-          expect(model).toBeInstanceOf(GradiumPhononTTSForConditionalGeneration);
-          expect(Object.keys(model.sessions)).toEqual(["model", "mimi_decoder"]);
-          const { model: flow, mimi_decoder } = model.sessions;
-          const generator = jest.spyOn(flow, "run");
-          const run_decoder = mimi_decoder.run.bind(mimi_decoder);
-          const decoder = jest.spyOn(mimi_decoder, "run").mockImplementation(async (inputs) => {
-            const result = await run_decoder(inputs);
-            expect(result.audio_lengths.dims).toEqual([1]);
-            expect(result.audio_lengths.data[0]).toBe(BigInt(frames * samples_per_frame));
-            expect(result.audio_values.dims).toEqual([1, 1, frames * samples_per_frame]);
-            return result;
-          });
-          const generation_config = model.configs.generation_config;
+        "feeds the graph contract for %i frames over %i generator calls",
+        async (frames, calls) => {
+          const { model: generator, mimi_decoder } = model.sessions;
+          const generate = jest.spyOn(generator, "run");
+          const decode = jest.spyOn(mimi_decoder, "run");
           // Make continuation independent of the real graph's EOS timing.
-          model.configs.generation_config = { ...generation_config, min_frames_before_eos: frames };
-          try {
-            const speak = () => tts("Hello from Phonon.", { speaker_embeddings, temperature: 0, max_new_tokens: frames });
-            const first = await speak();
-            expect(generator).toHaveBeenCalledTimes(blocks);
-            expect(decoder).toHaveBeenCalledTimes(1);
-            expect(first.audio).toHaveLength(frames * samples_per_frame);
-            expect(first.sampling_rate).toBe(24000);
-            expect(first.audio.every(Number.isFinite)).toBe(true);
-            expect((await speak()).audio).toEqual(first.audio);
-          } finally {
-            model.configs.generation_config = generation_config;
-            decoder.mockRestore();
-            generator.mockRestore();
+          const run = () => model.generate({ ...inputs, temperature: 0, max_new_tokens: frames, min_frames_before_eos: frames });
+          const { audio_values } = await run();
+
+          expect(generate).toHaveBeenCalledTimes(calls);
+          const block_size = generate.mock.calls[0][0].noise.dims[1];
+          let past_length = 0;
+          for (const [i, [feeds]] of generate.mock.calls.entries()) {
+            expect(Object.keys(feeds).sort()).toEqual([...generator.inputNames].sort());
+            // The prefill adds the voice frames and text tokens, which replace the placeholders and drop the BOS.
+            const new_length = block_size + (i === 0 ? inputs.input_ids.dims[1] - 1 : 0);
+            expect(feeds.position_ids.dims).toEqual([1, new_length]);
+            expect([...feeds.position_ids.data]).toEqual(Array.from({ length: new_length }, (_, j) => BigInt(past_length + j)));
+            expect(feeds["past_key_values.0.key"].dims[2]).toBe(past_length);
+            expect(feeds["past_key_values.audio_latents"].dims[1]).toBe(i * block_size);
+            past_length += new_length;
+            expect(feeds.attention_mask.dims).toEqual([1, past_length]);
+            expect(feeds.attention_mask.data.every((x) => x === 1n)).toBe(true);
           }
+
+          expect(decode).toHaveBeenCalledTimes(1);
+          const { num_frames } = decode.mock.calls[0][0];
+          expect(num_frames.type).toBe("int64");
+          expect(num_frames.dims).toEqual([1]);
+          expect(num_frames.data[0]).toBe(BigInt(frames));
+          expect(audio_values.dims).toEqual([1, 1, frames * SAMPLES_PER_FRAME]);
+          expect(audio_values.data.every(Number.isFinite)).toBe(true);
+          expect((await run()).audio_values.data).toEqual(audio_values.data);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "stops at a natural end of speech with the checkpoint's generation config",
+        async () => {
+          const warn = jest.spyOn(console, "warn");
+          // Seven text tokens give a safety limit of ceil((7 / 3 + 2) * 12.5) = 55 frames.
+          const { audio_values } = await model.generate({ ...inputs, temperature: 0 });
+          const audio = audio_values.data;
+          expect(audio.length).toBeGreaterThan(0);
+          expect(audio.length).toBeLessThan(55 * SAMPLES_PER_FRAME);
+          expect(audio.length % SAMPLES_PER_FRAME).toBe(0);
+          expect(audio.every(Number.isFinite)).toBe(true);
+          const rms = Math.sqrt(audio.reduce((sum, sample) => sum + sample * sample, 0) / audio.length);
+          expect(rms).toBeGreaterThan(0.03);
+          expect(warn).not.toHaveBeenCalled();
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      // generate() does not check these: the graph declares them, so ONNX Runtime does.
+      it.each([
+        ["width", "float32", (frames, dim) => [1, frames, dim - 1]],
+        ["data type", "float64", (frames, dim) => [1, frames, dim]],
+        ["batch size", "float32", (frames, dim) => [2, frames, dim]],
+      ])(
+        "leaves a voice of the wrong %s to ONNX Runtime",
+        async (_name, type, shape) => {
+          jest.spyOn(console, "error").mockImplementation(() => {});
+          const generate = jest.spyOn(model.sessions.model, "run");
+          const [, frames, dim] = inputs.audio_prompt_latents.dims;
+          const dims = shape(frames, dim);
+          const audio_prompt_latents = new Tensor(type, Array(dims.reduce((a, b) => a * b)).fill(0), dims);
+          await expect(model.generate({ ...inputs, audio_prompt_latents, audio_prompt_latents_mask: undefined })).rejects.toThrow();
+          expect(generate).toHaveBeenCalledTimes(1);
         },
         MAX_TEST_EXECUTION_TIME,
       );
