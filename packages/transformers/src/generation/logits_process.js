@@ -735,6 +735,59 @@ export class TopPLogitsWarper extends LogitsWarper {
         this.filter_value = filter_value;
         this.min_tokens_to_keep = min_tokens_to_keep;
     }
+
+    /**
+     * Keep the smallest set of tokens whose probabilities sum to at least `top_p`.
+     * @param {bigint[][]} input_ids The input IDs.
+     * @param {Tensor} logits The logits.
+     * @returns {Tensor} The processed logits.
+     */
+    _call(input_ids, logits) {
+        const data = /** @type {Float32Array} */ (logits.data);
+        const vocab = logits.dims.at(-1);
+        const rows = data.length / vocab;
+        for (let r = 0; r < rows; ++r) {
+            this._filterRow(data.subarray(r * vocab, (r + 1) * vocab));
+        }
+        return logits;
+    }
+
+    /**
+     * In-place nucleus filter for one logits row.
+     * @param {Float32Array} row
+     */
+    _filterRow(row) {
+        const n = row.length;
+        let maxLogit = -Infinity;
+        for (let i = 0; i < n; ++i) {
+            if (row[i] > maxLogit) maxLogit = row[i];
+        }
+
+        const probs = new Float64Array(n);
+        let sum = 0;
+        for (let i = 0; i < n; ++i) {
+            const p = Math.exp(row[i] - maxLogit);
+            probs[i] = p;
+            sum += p;
+        }
+        for (let i = 0; i < n; ++i) {
+            probs[i] /= sum;
+        }
+
+        const order = Array.from({ length: n }, (_, i) => i);
+        order.sort((a, b) => probs[b] - probs[a]);
+
+        let cumulative = 0;
+        for (let rank = 0; rank < n; ++rank) {
+            const index = order[rank];
+            // Drop tokens that sit entirely after the nucleus, keeping at least min_tokens_to_keep
+            // and the token that crosses `top_p`.
+            if (rank >= this.min_tokens_to_keep && cumulative >= this.top_p) {
+                row[index] = this.filter_value;
+            }
+            cumulative += probs[index];
+        }
+    }
 }
 
 /**

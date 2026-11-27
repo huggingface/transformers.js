@@ -210,6 +210,38 @@ describe("Generation parameters", () => {
     );
 
     it(
+      "applies top_p when sampling",
+      async () => {
+        const greedy = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: false,
+          max_new_tokens: 8,
+          top_k: 0,
+        });
+
+        // top_p close to 0 keeps only the most likely token, so sampling matches greedy.
+        random.seed(42);
+        const nucleus = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 8,
+          top_k: 0,
+          top_p: 1e-6,
+        });
+
+        random.seed(42);
+        const unfiltered = await generate(model, tokenizer, DUMMY_TEXT, {
+          do_sample: true,
+          max_new_tokens: 8,
+          top_k: 0,
+          top_p: 1.0,
+        });
+
+        expect(nucleus.tolist()).toEqual(greedy.tolist());
+        expect(unfiltered.tolist()).not.toEqual(greedy.tolist());
+      },
+      MAX_TEST_EXECUTION_TIME,
+    );
+
+    it(
       "supports custom stopping criteria",
       async () => {
         class StopAfterLengthCriteria extends StoppingCriteria {
