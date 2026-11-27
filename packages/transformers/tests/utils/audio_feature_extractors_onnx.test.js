@@ -178,4 +178,16 @@ describe("Audio feature extractors (ONNX post-processing)", () => {
     expect_close(input_values.data, normalize_columns(audio, audio.length, 1, { ddof: 0, eps_inside: 1e-7 }), 1e-4);
     expect(audio).toEqual(copy);
   });
+  it("Float64Array input gives the same features as Float32Array input", async () => {
+    const audio = make_signal(4000);
+    const audio64 = Float64Array.from(audio);
+    const extractors = [new ParakeetFeatureExtractor({ sampling_rate: 16000, feature_size: 128, n_fft: 512, win_length: 400, hop_length: 160, preemphasis: 0.97 }), new SeamlessM4TFeatureExtractor({ sampling_rate: 16000, num_mel_bins: 80, feature_size: 80, padding_value: 1, stride: 2 }), new Wav2Vec2FeatureExtractor({ do_normalize: true, sampling_rate: 16000 })];
+    for (const fe of extractors) {
+      const [expected] = Object.values(await fe(audio));
+      const [actual] = Object.values(await fe(audio64));
+      expect(actual.type).toBe("float32");
+      expect(actual.dims).toEqual(expected.dims);
+      expect(Array.from(actual.data)).toEqual(Array.from(expected.data));
+    }
+  });
 });
