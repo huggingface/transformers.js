@@ -1226,27 +1226,27 @@ export async function clamp(input, min = -Infinity, max = Infinity) {
 }
 
 /**
- * Adds a scalar to each element of a float32 tensor.
+ * Adds a number, or a float32 tensor broadcast against the input, to each element of a float32 tensor.
  * Inspired by https://pytorch.org/docs/stable/generated/torch.add.html
  * @param {Tensor} input The input tensor.
- * @param {number} other The number to add.
+ * @param {number|Tensor} other The number or tensor to add.
  * @returns {Promise<Tensor>} The output tensor.
  */
 export async function add(input, other) {
     const op = await TensorOpRegistry.add;
-    return await op({ x: input, b: scalar_float32(other) });
+    return await op({ x: input, b: other instanceof Tensor ? other : scalar_float32(other) });
 }
 
 /**
- * Multiplies each element of a float32 tensor by a scalar.
+ * Multiplies each element of a float32 tensor by a number, or by a float32 tensor broadcast against the input.
  * Inspired by https://pytorch.org/docs/stable/generated/torch.mul.html
  * @param {Tensor} input The input tensor.
- * @param {number} other The number to multiply by.
+ * @param {number|Tensor} other The number or tensor to multiply by.
  * @returns {Promise<Tensor>} The output tensor.
  */
 export async function mul(input, other) {
     const op = await TensorOpRegistry.mul;
-    return await op({ x: input, b: scalar_float32(other) });
+    return await op({ x: input, b: other instanceof Tensor ? other : scalar_float32(other) });
 }
 
 /**

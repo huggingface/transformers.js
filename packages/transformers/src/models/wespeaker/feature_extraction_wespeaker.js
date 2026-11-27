@@ -1,5 +1,5 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { Tensor } from '../../utils/tensor.js';
+import { Tensor, full, matmul, add } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 export class WeSpeakerFeatureExtractor extends FeatureExtractor {
@@ -19,9 +19,11 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
         );
         this.mel_filters = mel_filters;
 
+        // Kaldi compliance: the waveform is scaled to the range of 16-bit signed integers (32768 == 2 ** 15).
+        // Everything before the power spectrum is linear, so the scale is applied to the window instead.
         this.window = window_function(400, 'hamming', {
             periodic: false,
-        });
+        }).map((x) => x * 32768);
         this.min_num_frames = this.config.min_num_frames;
 
         this.spectrogram_kernel = spectrogram_kernel(this.window, 160, {
@@ -37,10 +39,6 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
      * @returns {Promise<Tensor>} An object containing the log-Mel spectrogram data as a Float32Array and its dimensions as an array of numbers.
      */
     async _extract_fbank_features(waveform) {
-        // Kaldi compliance: 16-bit signed integers
-        // 32768 == 2 ** 15
-        waveform = waveform.map((/** @type {number} */ x) => x * 32768);
-
         return spectrogram(
             waveform,
             this.window, // window
@@ -72,28 +70,16 @@ export class WeSpeakerFeatureExtractor extends FeatureExtractor {
     async _call(audio) {
         validate_audio_inputs(audio, 'WeSpeakerFeatureExtractor');
 
-        const features = (await this._extract_fbank_features(audio)).unsqueeze_(0);
+        let features = await this._extract_fbank_features(audio);
 
         if (this.config.fbank_centering_span === null) {
-            // center features with global average
-            const meanData = /** @type {Float32Array} */ (features.mean(1).data);
-            const featuresData = /** @type {Float32Array} */ (features.data);
-            const [batch_size, num_frames, feature_size] = features.dims;
-
-            for (let i = 0; i < batch_size; ++i) {
-                const offset1 = i * num_frames * feature_size;
-                const offset2 = i * feature_size;
-                for (let j = 0; j < num_frames; ++j) {
-                    const offset3 = offset1 + j * feature_size;
-                    for (let k = 0; k < feature_size; ++k) {
-                        featuresData[offset3 + k] -= meanData[offset2 + k];
-                    }
-                }
-            }
+            // center features with global average ([1, frames] @ [frames, mel] gives the negated mean)
+            const num_frames = features.dims[0];
+            features = await add(features, await matmul(full([1, num_frames], -1 / num_frames), features));
         }
 
         return {
-            input_features: features,
+            input_features: features.unsqueeze_(0),
         };
     }
 }

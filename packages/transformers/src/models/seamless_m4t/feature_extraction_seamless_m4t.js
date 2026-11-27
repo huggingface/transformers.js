@@ -1,5 +1,5 @@
 import { FeatureExtractor, validate_audio_inputs } from '../../feature_extraction_utils.js';
-import { Tensor } from '../../utils/tensor.js';
+import { Tensor, full, matmul, add, mul, pow } from '../../utils/tensor.js';
 import { mel_filter_bank, spectrogram, window_function, spectrogram_kernel } from '../../utils/audio.js';
 
 export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
@@ -19,9 +19,11 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
         );
         this.mel_filters = mel_filters;
 
+        // Kaldi compliance: the waveform is scaled to the range of 16-bit signed integers (32768 == 2 ** 15).
+        // Everything before the power spectrum is linear, so the scale is applied to the window instead.
         this.window = window_function(400, 'povey', {
             periodic: false,
-        });
+        }).map((x) => x * 32768);
 
         this.spectrogram_kernel = spectrogram_kernel(this.window, 160, {
             fft_length: 512,
@@ -38,10 +40,6 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
      */
     async _extract_fbank_features(waveform, max_length) {
         // NOTE: We don't pad/truncate since that is passed in as `max_num_frames`
-
-        // Kaldi compliance: 16-bit signed integers
-        // 32768 == 2 ** 15
-        waveform = waveform.map((/** @type {number} */ x) => x * 32768);
 
         return spectrogram(
             waveform,
@@ -85,28 +83,13 @@ export class SeamlessM4TFeatureExtractor extends FeatureExtractor {
         let features = await this._extract_fbank_features(audio, this.config.max_length);
 
         if (do_normalize_per_mel_bins) {
-            const [num_features, feature_size] = features.dims;
-            const data = features.data;
-            for (let i = 0; i < feature_size; ++i) {
-                let sum = 0;
-                for (let j = 0; j < num_features; ++j) {
-                    sum += data[j * feature_size + i];
-                }
-
-                const mean = sum / num_features;
-
-                let variance = 0;
-                for (let j = 0; j < num_features; ++j) {
-                    variance += (data[j * feature_size + i] - mean) ** 2;
-                }
-                variance /= num_features - 1; // NOTE: We use ddof=1
-
-                const std = Math.sqrt(variance + 1e-7);
-                for (let j = 0; j < num_features; ++j) {
-                    const index = j * feature_size + i;
-                    data[index] = (data[index] - mean) / std;
-                }
-            }
+            // Normalize each mel bin over the frames: (x - mean) / sqrt(var + 1e-7), with ddof=1.
+            // Means over frames are computed as [1, frames] @ [frames, mel] products.
+            const num_frames = features.dims[0];
+            const neg_mean = await matmul(full([1, num_frames], -1 / num_frames), features);
+            const centered = await add(features, neg_mean);
+            const variance = await matmul(full([1, num_frames], 1 / (num_frames - 1)), await pow(centered, 2));
+            features = await mul(centered, await pow(await add(variance, 1e-7), -0.5));
         }
 
         let padded_attention_mask;
