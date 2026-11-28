@@ -17,15 +17,11 @@ export async function get_tokenizer_files(modelId, options = {}) {
     const [config, chat_template] = await Promise.all([
         get_file_metadata(modelId, 'tokenizer_config.json', options),
         // Newer repos store the chat template in its own file instead of `tokenizer_config.json`.
-        get_file_metadata(modelId, CHAT_TEMPLATE_NAME, options).catch((error) => ({ exists: false, error })),
+        // It's optional: a failed check leaves the template in `tokenizer_config.json`, if any.
+        get_file_metadata(modelId, CHAT_TEMPLATE_NAME, options).catch(() => ({ exists: false })),
     ]);
     if (!config.exists) {
         return [];
-    }
-    if ('error' in chat_template && !config.fromCache) {
-        // The check failed, which is not the same as the file missing. Only a tokenizer
-        // that is served from the cache (e.g. offline) loads without this optional file.
-        throw chat_template.error;
     }
 
     return chat_template.exists

@@ -29,6 +29,23 @@ import { parse_response as template_parse_response, ResponseParser } from './uti
  */
 
 /**
+ * Reads a standalone `chat_template.jinja`, or `null` if it can't be read. The file is
+ * optional: a failed read (a missing file, a network error, or a local server's error
+ * response) leaves the template in `tokenizer_config.json`, if any.
+ * @param {string} pretrained_model_name_or_path The path to the tokenizer directory.
+ * @param {PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
+ * @returns {Promise<string|null>}
+ */
+async function loadChatTemplate(pretrained_model_name_or_path, options) {
+    try {
+        return await getModelText(pretrained_model_name_or_path, CHAT_TEMPLATE_NAME, false, options);
+    } catch (error) {
+        logger.warn(`Unable to load "${CHAT_TEMPLATE_NAME}" for "${pretrained_model_name_or_path}": ${error}`);
+        return null;
+    }
+}
+
+/**
  * Loads a tokenizer from the specified path.
  * @param {string} pretrained_model_name_or_path The path to the tokenizer directory.
  * @param {PretrainedTokenizerOptions} options Additional options for loading the tokenizer.
@@ -41,13 +58,12 @@ export async function loadTokenizer(pretrained_model_name_or_path, options) {
             `Tokenizer files are unavailable for "${pretrained_model_name_or_path}": tokenizer_config.json was not found in the available local/cache/Hub sources.`,
         );
     }
-    const [tokenizerJSON, tokenizerConfig, chat_template] = await Promise.all(
-        tokenizerFiles.map((file) =>
-            file === CHAT_TEMPLATE_NAME
-                ? getModelText(pretrained_model_name_or_path, file, true, options)
-                : getModelJSON(pretrained_model_name_or_path, file, true, options),
-        ),
-    );
+    const [tokenizerJSON, tokenizerConfig, chat_template] = await Promise.all([
+        ...tokenizerFiles
+            .filter((file) => file !== CHAT_TEMPLATE_NAME)
+            .map((file) => getModelJSON(pretrained_model_name_or_path, file, true, options)),
+        tokenizerFiles.includes(CHAT_TEMPLATE_NAME) ? loadChatTemplate(pretrained_model_name_or_path, options) : null,
+    ]);
     if (chat_template) {
         // As in Python transformers, a `chat_template.jinja` file takes precedence
         // over any template defined in `tokenizer_config.json`.

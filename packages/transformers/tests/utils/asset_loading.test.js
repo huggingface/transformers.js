@@ -20,6 +20,7 @@ const { is_cached_files, is_pipeline_cached_files } = await import("../../src/ut
 const { clear_cache, clear_pipeline_cache } = await import("../../src/utils/model_registry/clear_cache.js");
 const { FileCache } = await import("../../src/utils/cache/FileCache.js");
 const { AssetLoadingContext } = await import("../../src/utils/hub/AssetLoadingContext.js");
+const { loadTokenizer } = await import("../../src/tokenization_utils.js");
 
 const MODEL = "test/asset-loading";
 const REMOTE = `https://huggingface.co/${MODEL}/resolve/main/`;
@@ -381,6 +382,76 @@ describe("Internal asset loading", () => {
     cache.entries.set(`${revision}tokenizer_config.json?__transformersjs_cache_version=1`, jsonResponse({ cached: true }));
     expect(await get_tokenizer_files(MODEL, { revision: "v1", local_files_only: true })).toEqual(["tokenizer.json", "tokenizer_config.json"]);
     expect(env.fetch).not.toHaveBeenCalled();
+  });
+
+  describe("a standalone chat template", () => {
+    const INLINE = "{{ 'inline' }}";
+    const STANDALONE = "{{ 'standalone' }}";
+    const textResponse = (text, status = 200) => new Response(text, { status, headers: { "content-length": String(text.length) } });
+    const isProbe = (init) => new Headers(init?.headers).has("Range");
+    // A repository with both templates, and different ones: `tokenizer_config.json` has one inline,
+    // and `chat_template.jinja` another. `template(url, init)` answers for the standalone file.
+    const serve = (template) =>
+      jest.fn(async (url, init) => {
+        if (isChatTemplate(url)) return template(url, init);
+        if (String(url).endsWith("tokenizer_config.json")) return jsonResponse({ chat_template: INLINE });
+        if (String(url).endsWith("tokenizer.json")) return jsonResponse({ model: {} });
+        return notFound();
+      });
+    const chatTemplate = async (modelId = MODEL) => (await loadTokenizer(modelId, {}))[1].chat_template;
+
+    beforeEach(() => {
+      env.logLevel = 50;
+    });
+
+    it("wins over the inline template when it loads", async () => {
+      env.fetch = serve(() => textResponse(STANDALONE));
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(STANDALONE);
+    });
+
+    it("leaves the inline template when its check fails", async () => {
+      env.fetch = serve(() => {
+        throw new TypeError("Failed to fetch");
+      });
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+      expect(await chatTemplate()).toBe(INLINE);
+    });
+
+    it.each([
+      ["a 404", () => notFound()],
+      ["a server error", () => textResponse("Internal Server Error", 500)],
+      [
+        "a network error",
+        () => {
+          throw new TypeError("Failed to fetch");
+        },
+      ],
+    ])("leaves the inline template when the check passes but its read gets %s", async (_name, read) => {
+      env.fetch = serve((_url, init) => (isProbe(init) ? textResponse(" ", 206) : read()));
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(INLINE);
+    });
+
+    it("leaves the inline template when a local server answers with an error page", async () => {
+      env.allowLocalModels = true;
+      env.allowRemoteModels = false;
+      env.useFS = false;
+      env.fetch = serve(() => textResponse("<h1>500 Internal Server Error</h1>", 500));
+      // A local error response counts as present (as for every file), but its body isn't the template.
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(INLINE);
+      expect(env.fetch.mock.calls.every(([url]) => String(url).startsWith(`/models/${MODEL}/`))).toBe(true);
+    });
+
+    it("keeps both JSON files required", async () => {
+      const failing = serve(() => textResponse(STANDALONE));
+      env.fetch = jest.fn(async (url, init) => (String(url).endsWith("tokenizer.json") ? new Response(null, { status: 503 }) : failing(url, init)));
+      await expect(loadTokenizer(MODEL, {})).rejects.toThrow("tokenizer.json");
+      cache.entries.clear();
+      env.fetch = jest.fn(async (url, init) => (String(url).endsWith("tokenizer_config.json") ? notFound() : failing(url, init)));
+      await expect(loadTokenizer(MODEL, {})).rejects.toThrow("tokenizer_config.json was not found");
+    });
   });
 
   describe.each([
