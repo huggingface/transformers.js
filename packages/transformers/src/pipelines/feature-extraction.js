@@ -13,7 +13,7 @@ import { Tensor, mean_pooling, quantize_embeddings, stack } from '../utils/tenso
 
 /**
  * @typedef {Object} FeatureExtractionPipelineOptions Parameters specific to feature extraction pipelines.
- * @property {'none'|'mean'|'cls'|'first_token'|'eos'|'last_token'} [pooling="none"] The pooling method to use. `eos` and `last_token` select the last attended token in each sequence.
+ * @property {'none'|'mean'|'cls'|'first_token'|'eos'|'last_token'} [pooling="none"] The pooling method to use. `eos` and `last_token` select the last attended token in each sequence, or the last column for a fully masked sequence.
  * @property {boolean} [normalize=false] Whether to normalize the embeddings in the last dimension.
  * @property {boolean} [quantize=false] Whether to quantize the embeddings.
  * @property {'binary'|'ubinary'} [precision='binary'] The precision to use for quantization.
@@ -125,7 +125,8 @@ export class FeatureExtractionPipeline
                 const [batchSize, sequenceLength] = result.dims;
                 if (
                     result.dims.length !== 3 ||
-                    attention_mask?.dims[0] !== batchSize ||
+                    attention_mask?.dims.length !== 2 ||
+                    attention_mask.dims[0] !== batchSize ||
                     attention_mask.dims[1] !== sequenceLength
                 ) {
                     result = result.slice(null, -1);
