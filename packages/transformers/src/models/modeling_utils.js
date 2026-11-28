@@ -537,13 +537,8 @@ export class PreTrainedModel extends Callable {
             if (generation_config.temperature !== null && generation_config.temperature !== 1.0) {
                 processors.push(new TemperatureLogitsWarper(generation_config.temperature));
             }
-            // TODO: Add TopPLogitsWarper and TopKLogitsWarper
-            // if (generation_config.top_k !== null && generation_config.top_k !== 0) {
-            //     processors.push(new TopKLogitsWarper(generation_config.top_k));
-            // }
-            // if (generation_config.top_p !== null && generation_config.top_p < 1.0) {
-            //     processors.push(new TopPLogitsWarper(generation_config.top_p));
-            // }
+            // NOTE: `top_k` and `top_p` are applied by the sampler (see `MultinomialSampler`), so that
+            // they see the scores after the caller's logits processors have run.
         }
 
         if (logits_processor !== null) {
