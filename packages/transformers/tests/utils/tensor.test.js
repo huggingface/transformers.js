@@ -444,6 +444,12 @@ describe("Tensor operations", () => {
       const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
       expect(() => layer_norm(t1, [2])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
     });
+
+    it("should throw when normalized_shape is empty", () => {
+      const t1 = new Tensor("float32", [1, 2, 3, 4, 5, 6], [2, 3]);
+      // Empty shape from #1889: length is not 1 and [0] is undefined.
+      expect(() => layer_norm(t1, [])).toThrow("`normalized_shape` must be a 1D array with shape `[input.dims[1]]`.");
+    });
   });
 
   describe("sigmoid", () => {
