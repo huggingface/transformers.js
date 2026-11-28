@@ -272,6 +272,11 @@ async function loadResourceFile(path_or_repo_id, filename, fatal, options, retur
             }
         }
 
+        // An optional file a local server answered with an error status isn't there: its error body isn't the file.
+        if (!fatal && !servedStale && typeof response !== 'string' && response.status !== 200) {
+            return null;
+        }
+
         // Only cache the response if:
         toCacheResponse =
             cache && // 1. A caching system is available

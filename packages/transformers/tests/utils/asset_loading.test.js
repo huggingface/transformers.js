@@ -20,6 +20,7 @@ const { is_cached_files, is_pipeline_cached_files } = await import("../../src/ut
 const { clear_cache, clear_pipeline_cache } = await import("../../src/utils/model_registry/clear_cache.js");
 const { FileCache } = await import("../../src/utils/cache/FileCache.js");
 const { AssetLoadingContext } = await import("../../src/utils/hub/AssetLoadingContext.js");
+const { loadTokenizer } = await import("../../src/tokenization_utils.js");
 
 const MODEL = "test/asset-loading";
 const REMOTE = `https://huggingface.co/${MODEL}/resolve/main/`;
@@ -31,6 +32,10 @@ function jsonResponse(value) {
   const text = JSON.stringify(value);
   return new Response(text, { headers: { "content-type": "application/json", "content-length": String(text.length) } });
 }
+
+// The mocked repository has no standalone chat template, unless a test serves one.
+const isChatTemplate = (url) => String(url).endsWith("chat_template.jinja");
+const notFound = () => new Response(null, { status: 404 });
 
 function memoryCache() {
   const entries = new Map();
@@ -57,7 +62,7 @@ describe("Internal asset loading", () => {
       useFSCache: false,
       useBrowserCache: false,
       experimental_useCrossOriginStorage: false,
-      fetch: jest.fn(async () => jsonResponse({ updated: true })),
+      fetch: jest.fn(async (url) => (isChatTemplate(url) ? notFound() : jsonResponse({ updated: true }))),
     });
   });
   afterEach(() => {
@@ -408,6 +413,87 @@ describe("Internal asset loading", () => {
     await expect(get_tokenizer_files(MODEL)).rejects.toThrow("Failed to fetch");
   });
 
+  it("checks for a standalone chat template with the caller's options", async () => {
+    const revision = `https://huggingface.co/${MODEL}/resolve/v1/`;
+    env.fetch = jest.fn(async () => jsonResponse({ updated: true }));
+    expect(await get_tokenizer_files(MODEL, { revision: "v1" })).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`${revision}tokenizer_config.json`, `${revision}chat_template.jinja`]);
+    env.fetch.mockClear();
+    cache.entries.set(`${revision}tokenizer_config.json?__transformersjs_cache_version=1`, jsonResponse({ cached: true }));
+    expect(await get_tokenizer_files(MODEL, { revision: "v1", local_files_only: true })).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+    expect(env.fetch).not.toHaveBeenCalled();
+  });
+
+  describe("a standalone chat template", () => {
+    const INLINE = "{{ 'inline' }}";
+    const STANDALONE = "{{ 'standalone' }}";
+    const textResponse = (text, status = 200) => new Response(text, { status, headers: { "content-length": String(text.length) } });
+    const isProbe = (init) => new Headers(init?.headers).has("Range");
+    // A repository with both templates, and different ones: `tokenizer_config.json` has one inline,
+    // and `chat_template.jinja` another. `template(url, init)` answers for the standalone file.
+    const serve = (template) =>
+      jest.fn(async (url, init) => {
+        if (isChatTemplate(url)) return template(url, init);
+        if (String(url).endsWith("tokenizer_config.json")) return jsonResponse({ chat_template: INLINE });
+        if (String(url).endsWith("tokenizer.json")) return jsonResponse({ model: {} });
+        return notFound();
+      });
+    const chatTemplate = async (modelId = MODEL) => (await loadTokenizer(modelId, {}))[1].chat_template;
+
+    beforeEach(() => {
+      env.logLevel = 50;
+    });
+
+    it("wins over the inline template when it loads", async () => {
+      env.fetch = serve(() => textResponse(STANDALONE));
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(STANDALONE);
+    });
+
+    it("leaves the inline template when its check fails", async () => {
+      env.fetch = serve(() => {
+        throw new TypeError("Failed to fetch");
+      });
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
+      expect(await chatTemplate()).toBe(INLINE);
+    });
+
+    it.each([
+      ["a 404", () => notFound()],
+      ["a server error", () => textResponse("Internal Server Error", 500)],
+      [
+        "a network error",
+        () => {
+          throw new TypeError("Failed to fetch");
+        },
+      ],
+    ])("leaves the inline template when the check passes but its read gets %s", async (_name, read) => {
+      env.fetch = serve((_url, init) => (isProbe(init) ? textResponse(" ", 206) : read()));
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(INLINE);
+    });
+
+    it("leaves the inline template when a local server answers with an error page", async () => {
+      env.allowLocalModels = true;
+      env.allowRemoteModels = false;
+      env.useFS = false;
+      env.fetch = serve(() => textResponse("<h1>500 Internal Server Error</h1>", 500));
+      // A local error response counts as present (as for every file), but its body isn't the template.
+      expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]);
+      expect(await chatTemplate()).toBe(INLINE);
+      expect(env.fetch.mock.calls.every(([url]) => String(url).startsWith(`/models/${MODEL}/`))).toBe(true);
+    });
+
+    it("keeps both JSON files required", async () => {
+      const failing = serve(() => textResponse(STANDALONE));
+      env.fetch = jest.fn(async (url, init) => (String(url).endsWith("tokenizer.json") ? new Response(null, { status: 503 }) : failing(url, init)));
+      await expect(loadTokenizer(MODEL, {})).rejects.toThrow("tokenizer.json");
+      cache.entries.clear();
+      env.fetch = jest.fn(async (url, init) => (String(url).endsWith("tokenizer_config.json") ? notFound() : failing(url, init)));
+      await expect(loadTokenizer(MODEL, {})).rejects.toThrow("tokenizer_config.json was not found");
+    });
+  });
+
   describe.each([
     ["path offline", "/models/foo", null],
     ["path HTTP 404", "/models/foo", 404],
@@ -420,8 +506,9 @@ describe("Internal asset loading", () => {
       env.useFS = false;
       env.allowLocalModels = true;
       env.logLevel = 50;
-      env.fetch = jest.fn(async () => {
+      env.fetch = jest.fn(async (url) => {
         if (status === null) throw new TypeError("Failed to fetch");
+        if (isChatTemplate(url)) return notFound();
         return new Response(JSON.stringify({ error: status }), { status });
       });
       return new AssetLoadingContext().resolve(modelId, "tokenizer_config.json", cache);
@@ -514,11 +601,12 @@ describe("Internal asset loading", () => {
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
     env.fetch = jest.fn(async (url) => {
       if (url === `${REMOTE}tokenizer_config.json`) return jsonResponse({ updated: true });
+      if (isChatTemplate(url)) return notFound();
       if (localStatus === null) throw new TypeError("Failed to fetch locally");
       return new Response(null, { status: localStatus });
     });
     expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
-    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `/models/${MODEL}/chat_template.jinja`, `${REMOTE}tokenizer_config.json`, `${REMOTE}chat_template.jinja`]);
     env.fetch.mockClear();
     expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ updated: true });
     expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
@@ -537,12 +625,13 @@ describe("Internal asset loading", () => {
     cache.entries.set(`${REMOTE}tokenizer_config.json`, jsonResponse({ stale: true }));
     env.fetch = jest.fn(async (url) => {
       if (url === `${REMOTE}tokenizer_config.json`) return new Response(null, { status: 503 });
+      if (isChatTemplate(url)) return notFound();
       if (localStatus === null) throw new TypeError("Failed to fetch locally");
       return new Response(null, { status: localStatus });
     });
     expect(await getModelJSON(MODEL, "tokenizer_config.json")).toEqual({ stale: true });
     expect(await get_tokenizer_files(MODEL)).toEqual(["tokenizer.json", "tokenizer_config.json"]);
-    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`, `/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`]);
+    expect(env.fetch.mock.calls.map(([url]) => url)).toEqual([`/models/${MODEL}/tokenizer_config.json`, `${REMOTE}tokenizer_config.json`, `/models/${MODEL}/tokenizer_config.json`, `/models/${MODEL}/chat_template.jinja`, `${REMOTE}tokenizer_config.json`, `${REMOTE}chat_template.jinja`]);
     expect(cache.put).not.toHaveBeenCalled();
     expect(cache.delete).not.toHaveBeenCalled();
   });
