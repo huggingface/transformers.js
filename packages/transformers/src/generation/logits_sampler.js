@@ -8,6 +8,7 @@ import { Tensor, topk } from '../utils/tensor.js';
 import { max, softmax } from '../utils/maths.js';
 import { _weightedIndex } from '../utils/random.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
+import { TopKLogitsWarper, TopPLogitsWarper } from '../generation/logits_process.js';
 
 /**
  * Sampler is a base class for all sampling methods used for text generation.
@@ -126,13 +127,53 @@ class GreedySampler extends LogitsSampler {
  */
 class MultinomialSampler extends LogitsSampler {
     /**
+     * Creates a new MultinomialSampler.
+     * @param {GenerationConfig} generation_config The generation config.
+     */
+    constructor(generation_config) {
+        super(generation_config);
+
+        /**
+         * The warpers that select the candidates when `top_p` is set: top-k first (if set), then top-p
+         * over the tokens that top-k keeps, as in the Python library. Without `top_p`, this is `null`
+         * and `top_k` alone is applied in `sample`.
+         * @type {(TopKLogitsWarper|TopPLogitsWarper)[]|null}
+         */
+        this.warpers = null;
+
+        const { top_k, top_p, num_beams } = generation_config;
+        if ((top_p ?? 1.0) < 1.0) {
+            // Beam sampling needs at least two candidates per beam
+            const min_tokens_to_keep = num_beams > 1 ? 2 : 1;
+            this.warpers = [new TopPLogitsWarper(top_p, { min_tokens_to_keep })];
+            if ((top_k ?? 0) > 0) {
+                this.warpers.unshift(new TopKLogitsWarper(top_k, { min_tokens_to_keep }));
+            }
+        }
+    }
+
+    /**
      * Sample from the logits.
      * @param {Tensor} logits
      * @returns {Promise<[bigint, number][]>}
      */
     async sample(logits) {
         let k = logits.dims.at(-1); // defaults to vocab size
-        if (this.generation_config.top_k > 0) {
+        if (this.warpers) {
+            // Filter a copy of the scores, and sample from all tokens that are left. The number
+            // of candidates is not capped at `top_k` here, since top-k keeps tokens that are tied
+            // with the last one.
+            const data = /** @type {Float32Array} */ (logits.data).slice();
+            let warped = new Tensor('float32', data, [1, data.length]);
+            for (const warper of this.warpers) {
+                warped = warper([], warped);
+            }
+            logits = new Tensor('float32', data, [data.length]);
+            k = 0;
+            for (let j = 0; j < data.length; ++j) {
+                if (data[j] > -Infinity) ++k;
+            }
+        } else if (this.generation_config.top_k > 0) {
             k = Math.min(this.generation_config.top_k, k);
         }
 

@@ -3,10 +3,13 @@ import {
   pipeline,
   TextGenerationPipeline,
 
-  // Logits warpers
+  // Logits processors and warpers
+  LogitsProcessor,
+  LogitsProcessorList,
   TopKLogitsWarper,
   TopPLogitsWarper,
   Tensor,
+  random,
 } from "../../src/transformers.js";
 
 import { init } from "../init.js";
@@ -120,6 +123,123 @@ describe("Logits Processors", () => {
           // Only the most likely token is left to sample from. `top_k: 0` disables top-k.
           const output = await pipe(text_input, { max_new_tokens: 5, do_sample: true, top_k: 0, top_p: 1e-6 });
           expect(output).toEqual(greedy);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+    });
+
+    describe("sampling with top_k and top_p", () => {
+      // Replaces the scores of every step by the given probabilities (token id -> probability).
+      class FixedScores extends LogitsProcessor {
+        constructor(probs) {
+          super();
+          this.probs = probs;
+        }
+        _call(input_ids, logits) {
+          logits.data.fill(-Infinity);
+          for (const [token_id, prob] of Object.entries(this.probs)) {
+            logits.data[token_id] = Math.log(prob);
+          }
+          return logits;
+        }
+      }
+
+      // Raises the score of one token, like a caller that wants to promote it.
+      class Boost extends LogitsProcessor {
+        constructor(token_id) {
+          super();
+          this.token_id = token_id;
+        }
+        _call(input_ids, logits) {
+          logits.data[this.token_id] += 1000;
+          return logits;
+        }
+      }
+
+      /**
+       * Samples `max_new_tokens` tokens with the given processor and returns the distinct sampled token ids.
+       */
+      const sampled_tokens = async (processor, options, max_new_tokens = 60) => {
+        const logits_processor = new LogitsProcessorList();
+        logits_processor.push(processor);
+
+        random.seed(0);
+        const input_ids = new Tensor("int64", [1n, 22172n], [1, 2]);
+        const output = await pipe.model.generate({
+          input_ids,
+          max_new_tokens,
+          do_sample: true,
+          logits_processor,
+          ...options,
+        });
+        const new_tokens = Array.from(output.data.slice(input_ids.dims[1]), Number);
+        return [...new Set(new_tokens)].sort((a, b) => a - b);
+      };
+
+      it(
+        "samples from all tokens that are tied at the top-k cutoff",
+        async () => {
+          // top-k keeps all four tokens (three are tied for second place), and top-p needs all of them.
+          const processor = new FixedScores({ 10: 0.4, 11: 0.2, 12: 0.2, 13: 0.2 });
+          expect(await sampled_tokens(processor, { top_k: 2, top_p: 0.99 })).toEqual([10, 11, 12, 13]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "keeps only as many tokens tied at the top-p cutoff as needed",
+        async () => {
+          const processor = new FixedScores({ 10: 0.7, 11: 0.1, 12: 0.1, 13: 0.1 });
+          expect(await sampled_tokens(processor, { top_k: 0, top_p: 0.75 })).toEqual([10, 11]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "applies top-p to the tokens that top-k keeps",
+        async () => {
+          const processor = new FixedScores({ 10: 0.4, 11: 0.3, 12: 0.2, 13: 0.1 });
+
+          // Over the whole vocabulary, three tokens are needed to reach 0.75.
+          expect(await sampled_tokens(processor, { top_k: 0, top_p: 0.75 })).toEqual([10, 11, 12]);
+
+          // top-k keeps 0.4, 0.3 and 0.2, which are renormalized to 4/9, 3/9 and 2/9. Two tokens reach 0.75.
+          expect(await sampled_tokens(processor, { top_k: 3, top_p: 0.75 })).toEqual([10, 11]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "top-k alone samples from exactly top_k tokens",
+        async () => {
+          const processor = new FixedScores({ 10: 0.4, 11: 0.3, 12: 0.2, 13: 0.1 });
+          expect(await sampled_tokens(processor, { top_k: 2 })).toEqual([10, 11]);
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "custom logits processors run before the cutoff",
+        async () => {
+          // The boosted token is not among the most likely tokens of the model.
+          const token_id = 77;
+          for (const options of [{ top_k: 1 }, { top_k: 1, top_p: 0.9 }, { top_k: 0, top_p: 0.5 }]) {
+            expect(await sampled_tokens(new Boost(token_id), options, 5)).toEqual([token_id]);
+          }
+        },
+        MAX_TEST_EXECUTION_TIME,
+      );
+
+      it(
+        "a top_p that filters nothing does not change the sampled tokens",
+        async () => {
+          const generate = async (options) => {
+            random.seed(0);
+            const input_ids = new Tensor("int64", [1n, 22172n], [1, 2]);
+            const output = await pipe.model.generate({ input_ids, max_new_tokens: 10, do_sample: true, ...options });
+            return Array.from(output.data, Number);
+          };
+          expect(await generate({ top_k: 50, top_p: 1 - 1e-9 })).toEqual(await generate({ top_k: 50 }));
         },
         MAX_TEST_EXECUTION_TIME,
       );

@@ -39,8 +39,6 @@ import {
     MinLengthLogitsProcessor,
     MinNewTokensLengthLogitsProcessor,
     TemperatureLogitsWarper,
-    TopKLogitsWarper,
-    TopPLogitsWarper,
     ClassifierFreeGuidanceLogitsProcessor,
 } from '../generation/logits_process.js';
 import { GenerationConfig } from '../generation/configuration_utils.js';
@@ -539,14 +537,8 @@ export class PreTrainedModel extends Callable {
             if (generation_config.temperature !== null && generation_config.temperature !== 1.0) {
                 processors.push(new TemperatureLogitsWarper(generation_config.temperature));
             }
-            // Beam sampling needs at least two candidates per beam
-            const min_tokens_to_keep = generation_config.num_beams > 1 ? 2 : 1;
-            if ((generation_config.top_k ?? 0) > 0) {
-                processors.push(new TopKLogitsWarper(generation_config.top_k, { min_tokens_to_keep }));
-            }
-            if ((generation_config.top_p ?? 1.0) < 1.0) {
-                processors.push(new TopPLogitsWarper(generation_config.top_p, { min_tokens_to_keep }));
-            }
+            // NOTE: `top_k` and `top_p` are applied by the sampler (see `MultinomialSampler`), so that
+            // they see the scores after the caller's logits processors have run.
         }
 
         if (logits_processor !== null) {
